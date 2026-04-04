@@ -366,7 +366,7 @@ export default function AdminDashboardScreen({ navigation }) {
         v.fullName?.toLowerCase().includes(query) ||
         v.email?.toLowerCase().includes(query) ||
         v.purposeOfVisit?.toLowerCase().includes(query)
-      );
+      ); 
     }
     
     if (historyDateRange.startDate) {
