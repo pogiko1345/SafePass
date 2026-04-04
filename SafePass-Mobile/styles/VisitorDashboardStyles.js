@@ -1,0 +1,682 @@
+import { StyleSheet, Platform, Dimensions } from "react-native";
+
+const { width } = Dimensions.get("window");
+
+export default StyleSheet.create({
+  // ============ CONTAINERS ============
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+  },
+
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+
+  scrollContent: {
+    paddingBottom: 30,
+  },
+
+  // ============ HEADER ============
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.select({ ios: 60, android: 20, web: 20 }),
+    paddingBottom: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  greeting: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.8)",
+    fontWeight: "500",
+  },
+
+  userName: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+  },
+
+  profileButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+
+  profileGradient: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  profileInitials: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  // Status Card in Header
+  statusCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  statusIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  statusValue: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  timerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  timerText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+
+  // ============ NFC CARD ============
+  nfcCard: {
+    marginHorizontal: 20,
+    marginTop: -25,
+    borderRadius: 24,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 8px 24px rgba(0,0,0,0.15)" },
+    }),
+  },
+
+  nfcCardGradient: {
+    padding: 20,
+  },
+
+  nfcHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  nfcTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.8)",
+    letterSpacing: 1,
+  },
+
+  nfcSubtitle: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 2,
+  },
+
+  nfcChipIcon: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 8,
+    borderRadius: 20,
+  },
+
+  nfcBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  visitorAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+
+  visitorInitials: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  visitorInfo: {
+    flex: 1,
+  },
+
+  visitorName: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+
+  visitorId: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.8)",
+    marginBottom: 6,
+  },
+
+  nfcChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  nfcChipText: {
+    fontSize: 10,
+    color: "#FFD700",
+    fontWeight: "600",
+  },
+
+  nfcFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.2)",
+    paddingTop: 15,
+  },
+
+  nfcDetail: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  nfcDetailText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.8)",
+  },
+
+  // ============ NFC STATUS (ADD THESE) ============
+  nfcStatusContainer: {
+    marginVertical: 12,
+    paddingHorizontal: 8,
+  },
+
+  nfcStatusIndicator: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 30,
+    alignItems: "center",
+  },
+
+  nfcStatusSuccess: {
+    backgroundColor: "rgba(16,185,129,0.3)",
+  },
+
+  nfcStatusError: {
+    backgroundColor: "rgba(239,68,68,0.3)",
+  },
+
+  nfcStatusProcessing: {
+    backgroundColor: "rgba(245,158,11,0.3)",
+  },
+
+  nfcStatusText: {
+    fontSize: 13,
+    color: "#FFFFFF",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  // ============ QUICK ACTIONS ============
+  quickActions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginHorizontal: 20,
+    marginTop: 24,
+    marginBottom: 20,
+    gap: 12,
+  },
+
+  quickAction: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  quickActionGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.1)" },
+    }),
+  },
+
+  quickActionText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#64748B",
+  },
+
+  // ============ DETAILS CARD ============
+  detailsCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.05)" },
+    }),
+  },
+
+  detailsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+
+  detailsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#0F172A",
+  },
+
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 16,
+    gap: 12,
+  },
+
+  detailContent: {
+    flex: 1,
+  },
+
+  detailLabel: {
+    fontSize: 11,
+    color: "#94A3B8",
+    marginBottom: 2,
+    fontWeight: "500",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  detailValue: {
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
+  },
+
+  // ============ HISTORY ITEM ============
+  historyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    gap: 12,
+  },
+
+  historyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  historyInfo: {
+    flex: 1,
+  },
+
+  historyLocation: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E293B",
+    marginBottom: 2,
+  },
+
+  historyTime: {
+    fontSize: 11,
+    color: "#94A3B8",
+  },
+
+  historyStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+
+  historyStatusText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  // ============ NFC INSTRUCTIONS CARD (ADD THIS) ============
+  nfcInstructionsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EDE9FE",
+    borderRadius: 14,
+    padding: 14,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 8,
+    gap: 12,
+  },
+
+  nfcInstructionsText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#4F46E5",
+    lineHeight: 18,
+    fontWeight: "500",
+  },
+
+  // ============ MAP CARD ============
+  mapCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 20,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.1)" },
+    }),
+  },
+
+  mapGradient: {
+    padding: 20,
+    borderRadius: 20,
+  },
+
+  mapContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  mapTextContainer: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
+  mapTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#D97706",
+    marginBottom: 4,
+  },
+
+  mapSubtitle: {
+    fontSize: 13,
+    color: "#92400E",
+    marginBottom: 12,
+  },
+
+  mapButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  mapButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#D97706",
+  },
+
+  mapIconContainer: {
+    width: 60,
+    height: 60,
+    backgroundColor: "rgba(217, 119, 6, 0.1)",
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // ============ LOGOUT BUTTON ============
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 30,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FEE2E2",
+    gap: 8,
+  },
+
+  logoutText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#DC2626",
+  },
+
+  // ============ EMPTY STATE ============
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    marginHorizontal: 20,
+  },
+
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 8,
+  },
+
+  emptyText: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+
+  registerButton: {
+    borderRadius: 14,
+    overflow: "hidden",
+    width: "100%",
+  },
+
+  registerGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    gap: 10,
+  },
+
+  registerButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+
+  // ============ QR MODAL ============
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  qrModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    width: "90%",
+    maxWidth: 380,
+    overflow: "hidden",
+  },
+
+  qrModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  qrModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  qrContainer: {
+    padding: 24,
+    alignItems: "center",
+  },
+
+  qrPlaceholder: {
+    width: 220,
+    height: 220,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: "#E2E8F0",
+  },
+
+  qrVisitorName: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  qrVisitorId: {
+    fontSize: 14,
+    color: "#64748B",
+    marginBottom: 16,
+  },
+
+  qrDivider: {
+    width: 60,
+    height: 2,
+    backgroundColor: "#E2E8F0",
+    marginVertical: 16,
+  },
+
+  qrDetails: {
+    flexDirection: "row",
+    gap: 20,
+    marginBottom: 20,
+  },
+
+  qrDetailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  qrDetailText: {
+    fontSize: 12,
+    color: "#475569",
+  },
+
+  qrFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#F0FDF4",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+
+  qrNote: {
+    fontSize: 11,
+    color: "#10B981",
+    fontWeight: "500",
+  },
+});
