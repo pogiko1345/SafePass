@@ -1,4 +1,4 @@
-// VisitorRegisterScreen.jsx - Complete with Fixed Continue Button
+// hi
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -801,7 +801,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           )}
         </View>
       </View>
-
+            
       <View style={visitorRegisterStyles.formCard}>
         <View style={visitorRegisterStyles.cardHeader}>
           <View style={[visitorRegisterStyles.cardIcon, { backgroundColor: '#F3F4F6' }]}>

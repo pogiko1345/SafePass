@@ -26,6 +26,7 @@ const spacing = {
 
 export default StyleSheet.create({
   // ============ CONTAINERS ============
+  // hi
   safeArea: {
     flex: 1,
     backgroundColor: "#F8FAFC",
