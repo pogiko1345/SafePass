@@ -33,7 +33,10 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "build": {
+        "output": "static"
+      }
     },
     "plugins": [
       [
