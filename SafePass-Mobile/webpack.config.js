@@ -1,15 +1,17 @@
+// webpack.config.js
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
-const path = require('path');
 
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
   
-  // Ensure favicon is copied to build output
-  config.plugins.forEach(plugin => {
-    if (plugin.constructor.name === 'HtmlWebpackPlugin') {
-      plugin.userOptions.favicon = path.resolve(__dirname, 'assets/LogoSapphire.jpg');
-    }
-  });
+  // This is the key fix - ignore the AsyncStorage resolution error
+  config.resolve.fullySpecified = false;
+  
+  // Add fallback for AsyncStorage on web
+  config.resolve.alias = {
+    ...config.resolve.alias,
+    '@react-native-async-storage/async-storage': false,
+  };
   
   return config;
 };
