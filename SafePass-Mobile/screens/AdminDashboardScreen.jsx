@@ -1471,7 +1471,6 @@ export default function AdminDashboardScreen({ navigation }) {
       </Modal>
     </ScrollView>
   );
-
   const renderDashboardContent = () => (
     <Animated.ScrollView
       ref={mainScrollViewRef}
