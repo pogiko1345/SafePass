@@ -7,7 +7,6 @@ if (Platform.OS === 'web') {
   AsyncStorage = require('@react-native-async-storage/async-storage');
 }
 import * as ImageManipulator from 'expo-image-manipulator';
-import { Platform } from "react-native";
 
 const API_BASE_URL = Platform.select({
   ios: "http://localhost:5000/api",           // iOS simulator
