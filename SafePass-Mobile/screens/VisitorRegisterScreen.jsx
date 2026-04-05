@@ -969,4 +969,4 @@ export default function VisitorRegisterScreen({ navigation }) {
       <SuccessModal visible={showSuccess} credentials={registeredVisitor ? { email: registeredVisitor.userEmail, password: registeredVisitor.userPassword } : null} onConfirm={handleSuccessConfirm} />
     </SafeAreaView>
   );
-}
+} 

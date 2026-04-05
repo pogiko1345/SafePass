@@ -963,7 +963,7 @@ export default StyleSheet.create({
     borderRadius: 14,
     overflow: "hidden",
     width: "100%",
-  },
+  }, 
   successGradient: {
     flexDirection: "row",
     alignItems: "center",
