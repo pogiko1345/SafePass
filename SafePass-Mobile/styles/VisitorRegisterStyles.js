@@ -966,7 +966,7 @@ export default StyleSheet.create({
     paddingVertical: spacing.xs,
     width: "100%",
   },
-
+ 
   reviewLabel: {
     fontSize: fontSizes.sm,
     color: '#6B7280',
