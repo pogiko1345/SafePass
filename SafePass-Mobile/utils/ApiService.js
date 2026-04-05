@@ -1,4 +1,11 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from 'react-native';
+let AsyncStorage;
+
+if (Platform.OS === 'web') {
+  AsyncStorage = require('./webStorage').default;
+} else {
+  AsyncStorage = require('@react-native-async-storage/async-storage');
+}
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Platform } from "react-native";
 
