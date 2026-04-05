@@ -36,6 +36,7 @@
     "expo-status-bar": "~55.0.4",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.1.1",
     "mongoose": "^9.2.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
