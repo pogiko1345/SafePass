@@ -977,4 +977,34 @@ export default StyleSheet.create({
     fontSize: fontSizes.base,
     fontWeight: "600",
   },
+  fullScrollContainer: {
+  flexGrow: 1,
+  paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+},
+
+animatedContent: {
+  flex: 1,
+},
+fullScrollContainer: {
+  flexGrow: 1,
+  paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+},
+
+animatedContent: {
+  flex: 1,
+},
+fullScrollContainer: {
+  flexGrow: 1,
+  paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+},
+animatedContent: {
+  flex: 1,
+},
+fullScrollContainer: {
+  flexGrow: 1,
+  paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+},
+animatedContent: {
+  flex: 1,
+},
 });

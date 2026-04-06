@@ -1,5 +1,6 @@
-// hi
-import React, { useState, useEffect } from "react";
+// VisitorRegisterScreen.jsx (Safe Version – Full UI + Animations)
+
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,14 +16,23 @@ import {
   ActivityIndicator,
   Modal,
   Linking,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import visitorRegisterStyles from "../styles/VisitorRegisterStyles";
-import ApiService from "../utils/ApiService";
-import IDScannerService from "../utils/IDScannerService";
+
+// Safe service imports – prevent crash if files are missing
+let ApiService = null;
+let IDScannerService = null;
+try {
+  ApiService = require("../utils/ApiService").default;
+  IDScannerService = require("../utils/IDScannerService").default;
+} catch (e) {
+  console.warn("Service import failed – using fallback:", e.message);
+}
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== 'web') {
@@ -212,6 +222,18 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   
+  // Animation for step transitions (content fade/slide)
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  
+  // Animation for progress bar width
+  const progressWidthAnim = useRef(new Animated.Value(33)).current; // start at 33% for step 1
+  
+  // Animation for step circles (scale effect)
+  const stepScale1 = useRef(new Animated.Value(1)).current;
+  const stepScale2 = useRef(new Animated.Value(1)).current;
+  const stepScale3 = useRef(new Animated.Value(1)).current;
+
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -249,6 +271,62 @@ export default function VisitorRegisterScreen({ navigation }) {
     checkPermissions();
   }, []);
 
+  // Animate when step changes
+  useEffect(() => {
+    // Animate progress bar width
+    let targetPercent = 33;
+    if (currentStep === 1) targetPercent = 33;
+    else if (currentStep === 2) targetPercent = 66;
+    else if (currentStep === 3) targetPercent = 100;
+    
+    Animated.timing(progressWidthAnim, {
+      toValue: targetPercent,
+      duration: 400,
+      useNativeDriver: false, // width animation requires native driver false
+    }).start();
+    
+    // Animate the active step circle (pulse effect)
+    if (currentStep === 1) {
+      animateStepCircle(stepScale1);
+    } else if (currentStep === 2) {
+      animateStepCircle(stepScale2);
+    } else if (currentStep === 3) {
+      animateStepCircle(stepScale3);
+    }
+    
+    // Animate content fade and slide
+    fadeAnim.setValue(0);
+    slideAnim.setValue(20);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [currentStep]);
+
+  const animateStepCircle = (scaleAnim) => {
+    scaleAnim.setValue(1);
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.2,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
   const checkPermissions = async () => {
     if (Platform.OS !== 'web') {
       try {
@@ -263,6 +341,10 @@ export default function VisitorRegisterScreen({ navigation }) {
   const handleScanID = async () => {
     if (!idImage) {
       Alert.alert("No ID Photo", "Please upload an ID photo first to scan.");
+      return;
+    }
+    if (!IDScannerService) {
+      Alert.alert("Service Error", "ID Scanner service not available.");
       return;
     }
     setIsScanning(true);
@@ -442,7 +524,6 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-  // Helper to show validation errors
   const showValidationAlert = (errorsList) => {
     Alert.alert(
       "Missing Information",
@@ -515,7 +596,6 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const handleSubmit = async () => {
-    // Final validation before showing privacy modal
     const isStep1Valid = validateStep1();
     const isStep2Valid = validateStep2();
     
@@ -755,7 +835,6 @@ export default function VisitorRegisterScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* Compact Date and Time Row */}
       <View style={visitorRegisterStyles.formRow}>
         <View style={[visitorRegisterStyles.formCard, visitorRegisterStyles.halfCard]}>
           <View style={visitorRegisterStyles.cardHeader}>
@@ -875,98 +954,120 @@ export default function VisitorRegisterScreen({ navigation }) {
     <SafeAreaView style={visitorRegisterStyles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#059669" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={visitorRegisterStyles.keyboardView}>
-        <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={visitorRegisterStyles.header}>
-          <View style={visitorRegisterStyles.headerButtons}>
-            <TouchableOpacity style={visitorRegisterStyles.backButton} onPress={handleBack} activeOpacity={0.7}>
-              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-            {/* X button removed */}
-          </View>
-          <View style={visitorRegisterStyles.headerContent}>
-            <View style={visitorRegisterStyles.headerIconContainer}>
-              <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.05)']} style={visitorRegisterStyles.headerIconGradient}>
-                <Ionicons name="person-add" size={32} color="#FFFFFF" />
-              </LinearGradient>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={visitorRegisterStyles.fullScrollContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={visitorRegisterStyles.header}>
+            <View style={visitorRegisterStyles.headerButtons}>
+              <TouchableOpacity style={visitorRegisterStyles.backButton} onPress={handleBack} activeOpacity={0.7}>
+                <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
-            <Text style={visitorRegisterStyles.headerTitle}>Visitor Registration</Text>
-            <Text style={visitorRegisterStyles.headerSubtitle}>
-              {currentStep === 1 && "Personal Information"}
-              {currentStep === 2 && "Visit Details"}
-              {currentStep === 3 && "Review & Submit"}
-            </Text>
-          </View>
-        </LinearGradient>
-
-        <View style={visitorRegisterStyles.progressContainer}>
-          <View style={visitorRegisterStyles.progressHeader}>
-            <Text style={visitorRegisterStyles.progressTitle}>Registration Progress</Text>
-            <Text style={visitorRegisterStyles.progressPercentage}>{getProgressPercentage()}%</Text>
-          </View>
-          <View style={visitorRegisterStyles.progressBarContainer}>
-            <View style={[visitorRegisterStyles.progressBar, { width: `${getProgressPercentage()}%` }]} />
-          </View>
-        </View>
-
-        <View style={visitorRegisterStyles.stepIndicatorContainer}>
-          <View style={visitorRegisterStyles.stepWrapper}>
-            <View style={[visitorRegisterStyles.stepCircle, currentStep >= 1 && visitorRegisterStyles.stepCircleActive]}>
-              <Text style={[visitorRegisterStyles.stepCircleText, currentStep >= 1 && visitorRegisterStyles.stepCircleTextActive]}>1</Text>
-            </View>
-            <View style={[visitorRegisterStyles.stepConnector, currentStep > 1 && visitorRegisterStyles.stepConnectorActive]} />
-            <View style={[visitorRegisterStyles.stepCircle, currentStep >= 2 && visitorRegisterStyles.stepCircleActive]}>
-              <Text style={[visitorRegisterStyles.stepCircleText, currentStep >= 2 && visitorRegisterStyles.stepCircleTextActive]}>2</Text>
-            </View>
-            <View style={[visitorRegisterStyles.stepConnector, currentStep > 2 && visitorRegisterStyles.stepConnectorActive]} />
-            <View style={[visitorRegisterStyles.stepCircle, currentStep >= 3 && visitorRegisterStyles.stepCircleActive]}>
-              <Text style={[visitorRegisterStyles.stepCircleText, currentStep >= 3 && visitorRegisterStyles.stepCircleTextActive]}>3</Text>
-            </View>
-          </View>
-          <View style={visitorRegisterStyles.stepLabels}>
-            <Text style={[visitorRegisterStyles.stepLabel, currentStep >= 1 && visitorRegisterStyles.stepLabelActive]}>Personal</Text>
-            <Text style={[visitorRegisterStyles.stepLabel, currentStep >= 2 && visitorRegisterStyles.stepLabelActive]}>Visit</Text>
-            <Text style={[visitorRegisterStyles.stepLabel, currentStep >= 3 && visitorRegisterStyles.stepLabelActive]}>Review</Text>
-          </View>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={visitorRegisterStyles.scrollContainer}>
-          <View style={visitorRegisterStyles.content}>
-            <View style={visitorRegisterStyles.sectionHeader}>
-              <Text style={visitorRegisterStyles.sectionTitle}>
+            <View style={visitorRegisterStyles.headerContent}>
+              <View style={visitorRegisterStyles.headerIconContainer}>
+                <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.05)']} style={visitorRegisterStyles.headerIconGradient}>
+                  <Ionicons name="person-add" size={32} color="#FFFFFF" />
+                </LinearGradient>
+              </View>
+              <Text style={visitorRegisterStyles.headerTitle}>Visitor Registration</Text>
+              <Text style={visitorRegisterStyles.headerSubtitle}>
                 {currentStep === 1 && "Personal Information"}
                 {currentStep === 2 && "Visit Details"}
                 {currentStep === 3 && "Review & Submit"}
               </Text>
-              <View style={visitorRegisterStyles.sectionBadge}>
-                <Ionicons name="document-text" size={14} color="#059669" />
-                <Text style={visitorRegisterStyles.sectionBadgeText}>Step {currentStep}/3</Text>
-              </View>
             </View>
-            <View style={visitorRegisterStyles.formGrid}>
-              {currentStep === 1 && renderStep1()}
-              {currentStep === 2 && renderStep2()}
-              {currentStep === 3 && renderStep3()}
+          </LinearGradient>
+
+          <View style={visitorRegisterStyles.progressContainer}>
+            <View style={visitorRegisterStyles.progressHeader}>
+              <Text style={visitorRegisterStyles.progressTitle}>Registration Progress</Text>
+              <Text style={visitorRegisterStyles.progressPercentage}>{getProgressPercentage()}%</Text>
             </View>
-            <TouchableOpacity style={visitorRegisterStyles.continueButton} onPress={currentStep === 3 ? handleSubmit : handleNext} activeOpacity={0.8} disabled={isSubmitting}>
-              <LinearGradient colors={['#059669', '#047857']} style={visitorRegisterStyles.gradientButton}>
-                {isSubmitting ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Text style={visitorRegisterStyles.continueButtonText}>
-                      {currentStep === 1 && "Continue"}
-                      {currentStep === 2 && "Review"}
-                      {currentStep === 3 && "Submit Registration"}
-                    </Text>
-                    <Ionicons name={currentStep === 3 ? "checkmark-circle" : "arrow-forward"} size={20} color="#FFFFFF" />
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+            <View style={visitorRegisterStyles.progressBarContainer}>
+              <Animated.View 
+                style={[
+                  visitorRegisterStyles.progressBar, 
+                  { width: progressWidthAnim.interpolate({
+                      inputRange: [0, 100],
+                      outputRange: ['0%', '100%']
+                    }) 
+                  }
+                ]} 
+              />
+            </View>
           </View>
+
+          <View style={visitorRegisterStyles.stepIndicatorContainer}>
+            <View style={visitorRegisterStyles.stepWrapper}>
+              <Animated.View style={[visitorRegisterStyles.stepCircle, currentStep >= 1 && visitorRegisterStyles.stepCircleActive, { transform: [{ scale: stepScale1 }] }]}>
+                <Text style={[visitorRegisterStyles.stepCircleText, currentStep >= 1 && visitorRegisterStyles.stepCircleTextActive]}>1</Text>
+              </Animated.View>
+              <View style={[visitorRegisterStyles.stepConnector, currentStep > 1 && visitorRegisterStyles.stepConnectorActive]} />
+              <Animated.View style={[visitorRegisterStyles.stepCircle, currentStep >= 2 && visitorRegisterStyles.stepCircleActive, { transform: [{ scale: stepScale2 }] }]}>
+                <Text style={[visitorRegisterStyles.stepCircleText, currentStep >= 2 && visitorRegisterStyles.stepCircleTextActive]}>2</Text>
+              </Animated.View>
+              <View style={[visitorRegisterStyles.stepConnector, currentStep > 2 && visitorRegisterStyles.stepConnectorActive]} />
+              <Animated.View style={[visitorRegisterStyles.stepCircle, currentStep >= 3 && visitorRegisterStyles.stepCircleActive, { transform: [{ scale: stepScale3 }] }]}>
+                <Text style={[visitorRegisterStyles.stepCircleText, currentStep >= 3 && visitorRegisterStyles.stepCircleTextActive]}>3</Text>
+              </Animated.View>
+            </View>
+            <View style={visitorRegisterStyles.stepLabels}>
+              <Text style={[visitorRegisterStyles.stepLabel, currentStep >= 1 && visitorRegisterStyles.stepLabelActive]}>Personal</Text>
+              <Text style={[visitorRegisterStyles.stepLabel, currentStep >= 2 && visitorRegisterStyles.stepLabelActive]}>Visit</Text>
+              <Text style={[visitorRegisterStyles.stepLabel, currentStep >= 3 && visitorRegisterStyles.stepLabelActive]}>Review</Text>
+            </View>
+          </View>
+
+          <Animated.View 
+            style={[
+              visitorRegisterStyles.animatedContent,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              }
+            ]}
+          >
+            <View style={visitorRegisterStyles.content}>
+              <View style={visitorRegisterStyles.sectionHeader}>
+                <Text style={visitorRegisterStyles.sectionTitle}>
+                  {currentStep === 1 && "Personal Information"}
+                  {currentStep === 2 && "Visit Details"}
+                  {currentStep === 3 && "Review & Submit"}
+                </Text>
+                <View style={visitorRegisterStyles.sectionBadge}>
+                  <Ionicons name="document-text" size={14} color="#059669" />
+                  <Text style={visitorRegisterStyles.sectionBadgeText}>Step {currentStep}/3</Text>
+                </View>
+              </View>
+              <View style={visitorRegisterStyles.formGrid}>
+                {currentStep === 1 && renderStep1()}
+                {currentStep === 2 && renderStep2()}
+                {currentStep === 3 && renderStep3()}
+              </View>
+              <TouchableOpacity style={visitorRegisterStyles.continueButton} onPress={currentStep === 3 ? handleSubmit : handleNext} activeOpacity={0.8} disabled={isSubmitting}>
+                <LinearGradient colors={['#059669', '#047857']} style={visitorRegisterStyles.gradientButton}>
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text style={visitorRegisterStyles.continueButtonText}>
+                        {currentStep === 1 && "Continue"}
+                        {currentStep === 2 && "Review"}
+                        {currentStep === 3 && "Submit Registration"}
+                      </Text>
+                      <Ionicons name={currentStep === 3 ? "checkmark-circle" : "arrow-forward"} size={20} color="#FFFFFF" />
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
       <DataPrivacyModal visible={showDataPrivacy} onAccept={handlePrivacyAccept} onDecline={handlePrivacyDecline} />
       <SuccessModal visible={showSuccess} credentials={registeredVisitor ? { email: registeredVisitor.userEmail, password: registeredVisitor.userPassword } : null} onConfirm={handleSuccessConfirm} />
     </SafeAreaView>
   );
-} 
+}
