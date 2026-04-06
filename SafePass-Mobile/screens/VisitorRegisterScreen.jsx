@@ -1084,7 +1084,7 @@ export default function VisitorRegisterScreen({ navigation }) {
             <Text style={visitorRegisterStyles.cardLabel}>Vehicle Number</Text>
           </View>
           <Text style={visitorRegisterStyles.optionalBadge}>Optional</Text>
-        </View>
+        </View> 
         
         <View style={[
           visitorRegisterStyles.inputContainer,
