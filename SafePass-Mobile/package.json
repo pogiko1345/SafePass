@@ -2,13 +2,12 @@
   "name": "safepass-mobile",
   "version": "1.0.0",
   "main": "node_modules/expo/AppEntry.js",
-  
-    "scripts": {
+  "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:web": "expo export:web --config webpack.config.js",
+    "build:web": "expo export:web",
     "vercel-build": "npm run build:web"
   },
   "dependencies": {
