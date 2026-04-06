@@ -1,0 +1,25 @@
+{
+  "buildCommand": "npx expo export:web",
+  "outputDirectory": "static",
+  "devCommand": "expo start --web",
+  "installCommand": "npm install",
+  "framework": null,
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/(.*)\\.(js|css|png|jpg|jpeg|gif|svg|ico|json|ttf|woff|woff2)$",
+      "dest": "/$1.$2"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
