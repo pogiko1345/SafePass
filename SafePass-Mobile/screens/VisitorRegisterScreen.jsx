@@ -22,6 +22,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import visitorRegisterStyles from "../styles/VisitorRegisterStyles";
 import ApiService from "../utils/ApiService";
 import IDScannerService from "../utils/IDScannerService";
+import Logo from "../assets/LogoSapphire.jpg";
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== "web") {
@@ -385,6 +386,47 @@ export default function VisitorRegisterScreen({ navigation }) {
   useEffect(() => {
     checkPermissions();
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.title =
+        "Visitor Registration | SafePass Sapphire";
+    }
+  }, []);
+
+  const getStepConfig = () => {
+    switch (currentStep) {
+      case 1:
+        return {
+          title: "Personal Information",
+          subtitle:
+            "Provide your basic details and a valid government ID so the campus team can verify your visit request.",
+          icon: "person-circle-outline",
+        };
+      case 2:
+        return {
+          title: "Visit Details",
+          subtitle:
+            "Tell us why you are visiting, when you plan to arrive, and any optional vehicle details for gate coordination.",
+          icon: "calendar-clear-outline",
+        };
+      case 3:
+        return {
+          title: "Review & Submit",
+          subtitle:
+            "Confirm your registration details before sending them for approval. You can still go back and edit anything.",
+          icon: "checkmark-done-circle-outline",
+        };
+      default:
+        return {
+          title: "Visitor Registration",
+          subtitle: "Complete your registration to request campus access.",
+          icon: "document-text-outline",
+        };
+    }
+  };
+
+  const stepConfig = getStepConfig();
 
   const checkPermissions = async () => {
     if (Platform.OS !== "web") {
@@ -1325,7 +1367,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         style={visitorRegisterStyles.keyboardView}
       >
         <LinearGradient
-          colors={["#059669", "#047857"]}
+          colors={["#063B34", "#047857", "#059669"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={visitorRegisterStyles.header}
@@ -1338,9 +1380,23 @@ export default function VisitorRegisterScreen({ navigation }) {
             >
               <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
             </TouchableOpacity>
-            {/* X button removed */}
           </View>
           <View style={visitorRegisterStyles.headerContent}>
+            <View style={visitorRegisterStyles.headerBadge}>
+              <Image
+                source={Logo}
+                style={visitorRegisterStyles.headerBadgeLogo}
+                resizeMode="contain"
+              />
+              <View style={visitorRegisterStyles.headerBadgeTextWrap}>
+                <Text style={visitorRegisterStyles.headerBadgeEyebrow}>
+                  Sapphire Access Portal
+                </Text>
+                <Text style={visitorRegisterStyles.headerBadgeTitle}>
+                  SafePass Visitor Registration
+                </Text>
+              </View>
+            </View>
             <View style={visitorRegisterStyles.headerIconContainer}>
               <LinearGradient
                 colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.05)"]}
@@ -1350,12 +1406,13 @@ export default function VisitorRegisterScreen({ navigation }) {
               </LinearGradient>
             </View>
             <Text style={visitorRegisterStyles.headerTitle}>
-              Visitor Registration
+              Request Your Campus Visit
             </Text>
             <Text style={visitorRegisterStyles.headerSubtitle}>
-              {currentStep === 1 && "Personal Information"}
-              {currentStep === 2 && "Visit Details"}
-              {currentStep === 3 && "Review & Submit"}
+              {stepConfig.title}
+            </Text>
+            <Text style={visitorRegisterStyles.headerDescription}>
+              Complete this short guided form to submit your visit for approval and receive your SafePass access details.
             </Text>
           </View>
         </LinearGradient>
@@ -1476,13 +1533,16 @@ export default function VisitorRegisterScreen({ navigation }) {
         >
           <View style={visitorRegisterStyles.content}>
             <View style={visitorRegisterStyles.sectionHeader}>
-              <Text style={visitorRegisterStyles.sectionTitle}>
-                {currentStep === 1 && "Personal Information"}
-                {currentStep === 2 && "Visit Details"}
-                {currentStep === 3 && "Review & Submit"}
-              </Text>
+              <View style={visitorRegisterStyles.sectionTextBlock}>
+                <Text style={visitorRegisterStyles.sectionTitle}>
+                  {stepConfig.title}
+                </Text>
+                <Text style={visitorRegisterStyles.sectionDescription}>
+                  {stepConfig.subtitle}
+                </Text>
+              </View>
               <View style={visitorRegisterStyles.sectionBadge}>
-                <Ionicons name="document-text" size={14} color="#059669" />
+                <Ionicons name={stepConfig.icon} size={14} color="#047857" />
                 <Text style={visitorRegisterStyles.sectionBadgeText}>
                   Step {currentStep}/3
                 </Text>

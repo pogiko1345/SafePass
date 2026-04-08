@@ -1,382 +1,438 @@
 import { StyleSheet, Platform, Dimensions } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 const isSmallPhone = width <= 375;
 const isTablet = width >= 768 && width < 1024;
 
 export default StyleSheet.create({
-  // ============ SAFE AREA ============
   safeArea: {
     flex: 1,
-    backgroundColor: "#F0F4F8",
+    backgroundColor: "#F4F8FC",
   },
 
-  // ============ LAYOUT ============
   container: {
     flex: 1,
-    backgroundColor: "#F0F4F8",
-  },
-  
-  scrollContainer: {
-    flexGrow: 1,
-    paddingBottom: 20,
+    backgroundColor: "#F4F8FC",
   },
 
-  // ============ SPLASH / LOADING ============
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 28,
+  },
+
   splashContainer: {
     flex: 1,
-    backgroundColor: "#1A2A6C",
+    backgroundColor: "#041E42",
     justifyContent: "center",
     alignItems: "center",
   },
-  
+
   splashText: {
     marginTop: 16,
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "500",
-    letterSpacing: 0.5,
+    fontWeight: "600",
+    letterSpacing: 0.4,
   },
 
-  // ============ HEADER ============
   header: {
-    backgroundColor: "#1A2A6C",
+    backgroundColor: "#041E42",
     paddingHorizontal: 24,
     paddingTop: Platform.select({
       ios: 60,
       android: 50,
-      web: 50,
+      web: 54,
     }),
-    paddingBottom: 40,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    ...(isWeb && {
-      backgroundImage: "linear-gradient(135deg, #1A2A6C 0%, #112240 100%)",
-    }),
-  },
-  
-  headerContent: {
-    alignItems: "center",
-  },
-  
-  iconContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.3)",
-    ...(isWeb && {
-      transition: "transform 0.2s ease",
-      ":hover": {
-        transform: "scale(1.05)",
+    paddingBottom: 88,
+    borderBottomLeftRadius: 34,
+    borderBottomRightRadius: 34,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#041E42",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.16,
+        shadowRadius: 18,
+      },
+      android: { elevation: 6 },
+      web: {
+        backgroundImage: "linear-gradient(135deg, #041E42 0%, #0A3D91 62%, #1C6DD0 100%)",
+        boxShadow: "0px 18px 40px rgba(4, 30, 66, 0.22)",
       },
     }),
   },
-  
-  appName: {
-    color: "#FFFFFF",
-    fontSize: isSmallPhone ? 20 : isTablet ? 24 : 22,
-    fontWeight: "700",
-    textAlign: "center",
-    lineHeight: isSmallPhone ? 26 : isTablet ? 32 : 28,
-    marginBottom: 16,
-    letterSpacing: -0.3,
+
+  headerContent: {
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
-  // ============ API STATUS BADGE ============
+  brandBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 18,
+    ...Platform.select({
+      web: { backdropFilter: "blur(10px)" },
+    }),
+  },
+
+  brandBadgeLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    marginRight: 10,
+    backgroundColor: "#FFFFFF",
+  },
+
+  brandBadgeTextWrap: {
+    justifyContent: "center",
+  },
+
+  brandBadgeEyebrow: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+
+  brandBadgeTitle: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  logoImage: {
+    width: isSmallPhone ? 92 : 108,
+    height: isSmallPhone ? 92 : 108,
+    borderRadius: isSmallPhone ? 46 : 54,
+    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.28)",
+    backgroundColor: "#FFFFFF",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.16,
+        shadowRadius: 10,
+      },
+      android: { elevation: 6 },
+      web: { boxShadow: "0px 6px 18px rgba(0,0,0,0.18)" },
+    }),
+  },
+
+  appName: {
+    color: "#FFFFFF",
+    fontSize: isSmallPhone ? 21 : isTablet ? 26 : 24,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: isSmallPhone ? 28 : 32,
+    marginBottom: 10,
+    letterSpacing: -0.4,
+  },
+
+  headerTagline: {
+    color: "rgba(255,255,255,0.86)",
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 21,
+    maxWidth: 460,
+    marginBottom: 18,
+  },
+
   statusBadge: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 100,
+    borderRadius: 999,
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "center",
     gap: 8,
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "opacity 0.2s ease",
-      ":hover": {
-        opacity: 0.9,
-      },
-    }),
   },
-  
+
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: "#FFFFFF",
   },
-  
+
   statusText: {
     color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 0.5,
   },
 
-  // ============ CARDS ============
   card: {
     backgroundColor: "#FFFFFF",
-    marginTop: -20,
+    marginTop: -42,
     marginHorizontal: isSmallPhone ? 16 : 20,
     padding: isSmallPhone ? 20 : 24,
-    borderRadius: 24,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#E6EDF7",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
       },
-      android: {
-        elevation: 5,
-      },
-      web: {
-        boxShadow: "0px 8px 24px rgba(0, 0, 0, 0.08)",
-      },
+      android: { elevation: 5 },
+      web: { boxShadow: "0px 14px 32px rgba(15, 23, 42, 0.08)" },
     }),
     ...(isWeb && {
-      maxWidth: 480,
+      maxWidth: 520,
       alignSelf: "center",
       width: "100%",
     }),
   },
 
-  // ============ BACK TO ROLE BUTTON ============
   backToRoleButton: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
     marginBottom: 20,
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: 14,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 100,
+    backgroundColor: "#F3F7FB",
+    borderRadius: 999,
     gap: 6,
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "background-color 0.2s ease",
-      ":hover": {
-        backgroundColor: "#E5E7EB",
-      },
-    }),
+    borderWidth: 1,
+    borderColor: "#E4EBF5",
+    ...(isWeb && { cursor: "pointer" }),
   },
-  
+
   backToRoleText: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#1A2A6C",
+    fontWeight: "600",
+    color: "#0A3D91",
   },
 
-  // ============ WELCOME TITLES ============
-  welcomeTitle: {
-    fontSize: isSmallPhone ? 24 : 26,
+  roleHero: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F7FAFD",
+    borderRadius: 20,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E6EDF7",
+    marginBottom: 18,
+  },
+
+  roleIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+
+  roleHeroText: {
+    flex: 1,
+  },
+
+  roleEyebrow: {
+    fontSize: 12,
     fontWeight: "700",
-    color: "#111827",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+
+  rolePanel: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  welcomeTitle: {
+    fontSize: isSmallPhone ? 24 : 28,
+    fontWeight: "800",
+    color: "#0F172A",
     textAlign: "center",
-    marginBottom: 4,
+    marginBottom: 6,
     letterSpacing: -0.5,
   },
-  
+
   welcomeSubtitle: {
     fontSize: isSmallPhone ? 14 : 15,
-    color: "#6B7280",
+    color: "#5B667A",
     textAlign: "center",
     marginBottom: 24,
-    lineHeight: 20,
+    lineHeight: 21,
   },
 
-  // ============ INPUTS ============
   inputBox: {
     marginBottom: 20,
   },
-  
+
   label: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 6,
+    fontWeight: "700",
+    color: "#334155",
+    marginBottom: 7,
     marginLeft: 4,
   },
-  
+
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
-    borderRadius: 14,
+    borderColor: "#DCE5F0",
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: Platform.select({
       ios: 14,
       android: 10,
       web: 12,
     }),
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#F8FBFE",
     gap: 12,
     ...(isWeb && {
       transition: "border-color 0.2s ease, box-shadow 0.2s ease",
-      ":focus-within": {
-        borderColor: "#1A2A6C",
-        boxShadow: "0 0 0 3px rgba(26, 42, 108, 0.1)",
-      },
+      outline: "none",
     }),
   },
-  
+
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#111827",
+    color: "#0F172A",
     padding: 0,
     outline: "none",
   },
-  
+
   inputError: {
     borderColor: "#EF4444",
     backgroundColor: "#FEF2F2",
   },
-  
+
   errorText: {
-    color: "#EF4444",
+    color: "#DC2626",
     fontSize: 13,
     marginTop: 6,
     marginLeft: 4,
-    fontWeight: "500",
+    fontWeight: "600",
   },
-  
+
   helperText: {
     fontSize: 12,
-    color: "#6B7280",
-    marginTop: 4,
+    color: "#64748B",
+    marginTop: 5,
     marginLeft: 4,
   },
 
-  // ============ OPTIONS ROW ============
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 24,
   },
-  
+
   rememberBox: {
     flexDirection: "row",
     alignItems: "center",
-    ...(isWeb && {
-      cursor: "pointer",
-    }),
+    ...(isWeb && { cursor: "pointer" }),
   },
-  
+
   checkbox: {
     width: 20,
     height: 20,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#D1D5DB",
+    borderColor: "#CBD5E1",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
     backgroundColor: "#FFFFFF",
-    ...(isWeb && {
-      transition: "background-color 0.2s ease, border-color 0.2s ease",
-    }),
-  },
-  
-  checkboxChecked: {
-    backgroundColor: "#1A2A6C",
-    borderColor: "#1A2A6C",
-  },
-  
-  rememberText: {
-    fontSize: 14,
-    color: "#374151",
-    fontWeight: "500",
-  },
-  
-  forgotText: {
-    fontSize: 14,
-    color: "#1A2A6C",
-    fontWeight: "600",
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "color 0.2s ease",
-      ":hover": {
-        color: "#112240",
-        textDecoration: "underline",
-      },
-    }),
   },
 
-  // ============ LOGIN BUTTON ============
+  checkboxChecked: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+
+  rememberText: {
+    fontSize: 14,
+    color: "#334155",
+    fontWeight: "600",
+  },
+
+  forgotText: {
+    fontSize: 14,
+    color: "#0A3D91",
+    fontWeight: "700",
+  },
+
   loginButton: {
-    backgroundColor: "#1A2A6C",
+    backgroundColor: "#0A3D91",
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
     gap: 8,
     marginBottom: 16,
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "all 0.2s ease",
-      ":hover": {
-        backgroundColor: "#112240",
-        transform: "translateY(-1px)",
-      },
-      ":active": {
-        transform: "translateY(0)",
-      },
-    }),
-  },
-  
-  loginButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  
-  buttonDisabled: {
-    backgroundColor: "#9CA3AF",
-    opacity: 0.7,
-    ...(isWeb && {
-      ":hover": {
-        backgroundColor: "#9CA3AF",
-        transform: "none",
+    ...Platform.select({
+      web: {
+        cursor: "pointer",
+        transition: "transform 0.2s ease, background-color 0.2s ease",
       },
     }),
   },
 
-  // ============ 2FA INFO ============
+  loginButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+
+  buttonDisabled: {
+    backgroundColor: "#94A3B8",
+    opacity: 0.78,
+  },
+
   twoFactorInfo: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
-    backgroundColor: "#E8F0FE",
-    borderRadius: 12,
+    backgroundColor: "#EEF5FF",
+    borderRadius: 14,
     gap: 8,
     marginBottom: 16,
-  },
-  
-  twoFactorText: {
-    fontSize: 13,
-    color: "#1A2A6C",
-    fontWeight: "500",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
   },
 
-  // ============ VERIFICATION FORM (2FA) ============
+  twoFactorText: {
+    fontSize: 13,
+    color: "#0A3D91",
+    fontWeight: "600",
+  },
+
   verificationHeader: {
     alignItems: "center",
     marginBottom: 24,
   },
-  
+
   verificationTitle: {
     fontSize: isSmallPhone ? 20 : 22,
     fontWeight: "700",
@@ -385,7 +441,7 @@ export default StyleSheet.create({
     marginBottom: 6,
     letterSpacing: -0.3,
   },
-  
+
   verificationSubtitle: {
     fontSize: isSmallPhone ? 13 : 14,
     color: "#6B7280",
@@ -393,11 +449,11 @@ export default StyleSheet.create({
     lineHeight: 20,
     paddingHorizontal: 16,
   },
-  
+
   methodContainer: {
     marginBottom: 24,
   },
-  
+
   methodLabel: {
     fontSize: 14,
     fontWeight: "600",
@@ -405,12 +461,12 @@ export default StyleSheet.create({
     marginBottom: 12,
     marginLeft: 4,
   },
-  
+
   methodButtons: {
     flexDirection: "row",
     gap: 12,
   },
-  
+
   methodButton: {
     flex: 1,
     flexDirection: "row",
@@ -422,146 +478,115 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     gap: 8,
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "all 0.2s ease",
-      ":hover": {
-        backgroundColor: "#E5E7EB",
-      },
-    }),
   },
-  
+
   methodButtonActive: {
-    backgroundColor: "#1A2A6C",
-    borderColor: "#1A2A6C",
-    ...(isWeb && {
-      ":hover": {
-        backgroundColor: "#112240",
-      },
-    }),
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
   },
-  
+
   methodButtonText: {
     fontSize: 14,
     fontWeight: "600",
     color: "#6B7280",
   },
-  
+
   methodButtonTextActive: {
     color: "#FFFFFF",
   },
-  
+
   otpButton: {
-    backgroundColor: "#1A2A6C",
+    backgroundColor: "#0A3D91",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     gap: 8,
     marginBottom: 16,
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "background-color 0.2s ease",
-      ":hover": {
-        backgroundColor: "#112240",
-      },
-    }),
   },
-  
+
   otpButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
   },
-  
+
   backLink: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
     gap: 6,
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "opacity 0.2s ease",
-      ":hover": {
-        opacity: 0.8,
-      },
-    }),
-  },
-  
-  backLinkText: {
-    fontSize: 14,
-    color: "#6B7280",
-    fontWeight: "500",
   },
 
-  // ============ INFO BOX (OFFLINE) ============
+  backLinkText: {
+    fontSize: 14,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+
   infoBox: {
     marginTop: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
     backgroundColor: "#FEF2F2",
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     borderWidth: 1,
-    borderColor: "#FEE2E2",
+    borderColor: "#FECACA",
   },
-  
+
   infoText: {
     color: "#991B1B",
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "600",
     flex: 1,
   },
 
-  // ============ FOOTER ============
   footer: {
     alignItems: "center",
-    paddingVertical: 20,
+    paddingVertical: 22,
   },
-  
+
   footerText: {
-    color: "#9CA3AF",
+    color: "#94A3B8",
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
     marginTop: 4,
     letterSpacing: 0.3,
   },
 
-  // ============ OTP MODAL STYLES ============
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(4, 30, 66, 0.42)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
-  
+
   modalContent: {
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: isSmallPhone ? 20 : 24,
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 420,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E6EDF7",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.12,
         shadowRadius: 16,
       },
-      android: {
-        elevation: 8,
-      },
-      web: {
-        boxShadow: "0px 12px 32px rgba(0, 0, 0, 0.12)",
-      },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 16px 36px rgba(15, 23, 42, 0.14)" },
     }),
   },
-  
+
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -569,35 +594,35 @@ export default StyleSheet.create({
     width: "100%",
     marginBottom: 20,
   },
-  
+
   modalTitle: {
     fontSize: isSmallPhone ? 20 : 22,
-    fontWeight: "700",
-    color: "#111827",
+    fontWeight: "800",
+    color: "#0F172A",
     flex: 1,
     marginLeft: 12,
   },
-  
+
   modalSubtitle: {
     fontSize: isSmallPhone ? 13 : 14,
-    color: "#6B7280",
+    color: "#64748B",
     marginBottom: 4,
     textAlign: "center",
+    lineHeight: 20,
   },
-  
+
   modalPhone: {
     fontSize: isSmallPhone ? 16 : 18,
-    fontWeight: "700",
-    color: "#1A2A6C",
+    fontWeight: "800",
+    color: "#0A3D91",
     marginBottom: 24,
   },
 
-  // ============ OTP INPUT ============
   otpInputContainer: {
     width: "100%",
     marginBottom: 20,
   },
-  
+
   otpInput: {
     width: "100%",
     height: isSmallPhone ? 56 : 64,
@@ -611,115 +636,93 @@ export default StyleSheet.create({
     textAlign: "center",
     letterSpacing: isSmallPhone ? 8 : 10,
     backgroundColor: "#F9FAFB",
-    ...(isWeb && {
-      transition: "border-color 0.2s ease",
-      ":focus": {
-        borderColor: "#1A2A6C",
-        outline: "none",
-      },
-    }),
   },
-  
+
   timerContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 24,
     gap: 8,
   },
-  
+
   timerText: {
     fontSize: 14,
-    color: "#6B7280",
+    color: "#64748B",
   },
-  
+
   otpButtons: {
     width: "100%",
   },
-  
+
   otpVerifyButton: {
-    backgroundColor: "#1A2A6C",
+    backgroundColor: "#0A3D91",
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: "center",
     marginBottom: 12,
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "background-color 0.2s ease",
-      ":hover": {
-        backgroundColor: "#112240",
-      },
-    }),
   },
-  
+
   otpVerifyText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "700",
-  },
-  
-  otpResendButton: {
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-    backgroundColor: "#F3F4F6",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "background-color 0.2s ease",
-      ":hover": {
-        backgroundColor: "#E5E7EB",
-      },
-    }),
-  },
-  
-  otpResendText: {
-    color: "#6B7280",
-    fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "800",
   },
 
-  // ============ PASSWORD REQUIREMENTS ============
+  otpResendButton: {
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+    backgroundColor: "#F3F7FB",
+    borderWidth: 1,
+    borderColor: "#E5EAF3",
+  },
+
+  otpResendText: {
+    color: "#64748B",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
   passwordRequirements: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#F8FBFE",
     padding: isSmallPhone ? 16 : 18,
     borderRadius: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#E5EAF3",
     width: "100%",
   },
-  
+
   requirementsTitle: {
     fontSize: isSmallPhone ? 14 : 15,
-    fontWeight: "600",
-    color: "#374151",
+    fontWeight: "700",
+    color: "#334155",
     marginBottom: 14,
   },
-  
+
   requirementItem: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 10,
     gap: 10,
   },
-  
+
   requirementText: {
     fontSize: isSmallPhone ? 12 : 13,
-    color: "#6B7280",
+    color: "#64748B",
   },
-  
+
   requirementMet: {
     color: "#10B981",
     textDecorationLine: "line-through",
   },
-  
+
   passwordStrengthContainer: {
     marginTop: 10,
     marginBottom: 16,
     width: "100%",
   },
-  
+
   passwordStrengthBar: {
     flexDirection: "row",
     height: 6,
@@ -728,18 +731,18 @@ export default StyleSheet.create({
     marginBottom: 6,
     backgroundColor: "#E5E7EB",
   },
-  
+
   passwordStrengthSegment: {
     flex: 1,
     marginHorizontal: 1,
   },
-  
+
   passwordStrengthText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     textAlign: "right",
   },
-  
+
   passwordMatchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -747,73 +750,56 @@ export default StyleSheet.create({
     marginBottom: 20,
     gap: 8,
   },
-  
+
   passwordMatchText: {
     fontSize: isSmallPhone ? 12 : 13,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 
   loginErrorText: {
-    color: "#EF4444",
+    color: "#B91C1C",
     fontSize: 13,
     marginTop: 6,
     marginLeft: 4,
-    fontWeight: "500",
+    fontWeight: "600",
     backgroundColor: "#FEF2F2",
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "#FECACA",
   },
 
   demoHelper: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: "#F0F9FF",
     padding: 12,
     borderRadius: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#BAE6FD',
+    borderColor: "#BAE6FD",
   },
 
   demoHelperText: {
     fontSize: 13,
-    color: '#0369A1',
+    color: "#0369A1",
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   demoButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#1A2A6C',
-    alignItems: 'center',
+    borderColor: "#0A3D91",
+    alignItems: "center",
   },
 
   demoButtonText: {
     fontSize: 13,
-    color: '#1A2A6C',
-    fontWeight: '600',
-  },
-
-  logoImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.3)',
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-      android: { elevation: 6 },
-      web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.15)" },
-    }),
+    color: "#0A3D91",
+    fontWeight: "700",
   },
 });
