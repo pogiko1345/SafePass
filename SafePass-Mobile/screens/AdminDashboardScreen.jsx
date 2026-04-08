@@ -995,42 +995,43 @@ const confirmEditUser = async () => {
 };
 
   // FIXED: Delete user with proper state update
-const handleDeleteUser = () => {
-  Alert.alert("Delete User", `Delete ${selectedUser?.firstName} ${selectedUser?.lastName}? This action cannot be undone.`, [
-    { text: "Cancel", style: "cancel" },
-    {
-      text: "Delete",
-      style: "destructive",
-      onPress: async () => {
-        try {
-          const response = await ApiService.deleteUser(selectedUser._id);
-          if (response && (response.success || response.message)) {
-            const updatedUsers = allUsers.filter(user => user._id !== selectedUser._id && user.id !== selectedUser._id);
-            setAllUsers(updatedUsers);
-            setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
-            setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
-            
-            setStats(prev => ({
-              ...prev,
-              totalUsers: updatedUsers.length,
-              totalStaff: updatedUsers.filter(u => u.role === "staff").length,
-              totalGuards: updatedUsers.filter(u => u.role === "security" || u.role === "guard").length,
-              activeUsers: updatedUsers.filter(u => u.status === "active" || u.isActive).length,
-            }));
-            
-            Alert.alert("Success", "User deleted successfully");
-            setShowDeleteUserModal(false);
-          } else {
-            Alert.alert("Error", response?.message || "Failed to delete user");
+  const handleDeleteUser = () => {
+    Alert.alert("Delete User", `Delete ${selectedUser?.firstName} ${selectedUser?.lastName}? This action cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const response = await ApiService.deleteUser(selectedUser._id);
+            if (response?.success) {
+              // Update local state immediately
+              const updatedUsers = allUsers.filter(user => user._id !== selectedUser._id && user.id !== selectedUser._id);
+              setAllUsers(updatedUsers);
+              setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
+              setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
+              
+              setStats(prev => ({
+                ...prev,
+                totalUsers: updatedUsers.length,
+                totalStaff: updatedUsers.filter(u => u.role === "staff").length,
+                totalGuards: updatedUsers.filter(u => u.role === "security" || u.role === "guard").length,
+                activeUsers: updatedUsers.filter(u => u.status === "active" || u.isActive).length,
+              }));
+              
+              Alert.alert("Success", "User deleted successfully");
+              setShowDeleteUserModal(false);
+            } else {
+              Alert.alert("Error", response?.message || "Failed to delete user");
+            }
+          } catch (error) {
+            console.error("Delete user error:", error);
+            Alert.alert("Error", "Failed to delete user. Please try again.");
           }
-        } catch (error) {
-          console.error("Delete user error:", error);
-          Alert.alert("Error", "Failed to delete user. Please try again.");
-        }
+        },
       },
-    },
-  ]);
-};
+    ]);
+  };
 
   const updateSetting = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));

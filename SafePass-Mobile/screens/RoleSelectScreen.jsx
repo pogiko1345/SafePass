@@ -14,6 +14,7 @@ import {
   ScrollView,
   Keyboard,
   Alert,
+  Image, // Added Image import
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -163,16 +164,11 @@ export default function RoleSelectScreen({ navigation, route }) {
             <View style={roleSelectStyles.heroContent}>
               {/* Logo */}
               <View style={roleSelectStyles.logoContainer}>
-                <LinearGradient
-                  colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.05)"]}
-                  style={roleSelectStyles.logoGradient}
-                >
-                  <Ionicons 
-                    name="airplane" 
-                    size={48} 
-                    color="#FFFFFF" 
-                  />
-                </LinearGradient>
+                <Image 
+                  source={require('../assets/LogoSapphire.jpg')}
+                  style={roleSelectStyles.logoImage}
+                  resizeMode="contain"
+                />
               </View>
               
               {/* Title */}
