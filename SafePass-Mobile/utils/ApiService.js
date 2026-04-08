@@ -8,17 +8,29 @@ if (Platform.OS === 'web') {
 }
 import * as ImageManipulator from 'expo-image-manipulator';
 
+const WEB_FALLBACK_API_BASE_URL = (() => {
+  if (typeof window === "undefined") {
+    return "http://localhost:5000/api";
+  }
+
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:5000/api`;
+})();
+
 const DEFAULT_API_BASE_URL = Platform.select({
-  ios: "http://localhost:5000/api",           // iOS simulator
-  android: "http://10.0.2.2:5000/api",        // Android emulator
-  web: "http://localhost:5000/api",           // Web
-  default: "http://localhost:5000/api"        // Default
+  ios: "http://localhost:5000/api",            // iOS simulator
+  android: "http://10.0.2.2:5000/api",         // Android emulator
+  web: WEB_FALLBACK_API_BASE_URL,              // Browser on same host as backend
+  default: "http://localhost:5000/api",        // Default
 });
 
 const API_BASE_URL = (
   process.env.EXPO_PUBLIC_API_BASE_URL ||
   DEFAULT_API_BASE_URL
 ).replace(/\/$/, "");
+
+// Keep simulation/fallback OFF by default so app uses real backend/database.
+const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
 
 class ApiService {
   constructor() {
@@ -70,7 +82,7 @@ class ApiService {
   }
 
   isDevFallbackEnabled() {
-    return typeof __DEV__ !== "undefined" && __DEV__;
+    return DEV_FALLBACK_ENABLED;
   }
 
   // ================= NFC METHODS =================

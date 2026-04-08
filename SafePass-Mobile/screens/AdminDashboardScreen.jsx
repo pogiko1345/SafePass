@@ -961,12 +961,14 @@ const loadDashboardData = useCallback(async () => {
         Alert.alert("Success", `${roleDisplay} account created successfully!\n\nName: ${newUserData.firstName} ${newUserData.lastName}\nEmail: ${newUserData.email}\nPassword: ${generatedPassword}\nRole: ${roleDisplay}\nEmployee ID: ${userPayload.employeeId}\n\nLogin credentials have been sent to ${newUserData.email}`, [
           {
             text: "OK",
-            onPress: () => {
+            onPress: async () => {
               setShowAddUserModal(false);
               setNewUserData({
                 firstName: "", lastName: "", email: "", password: "", phone: "",
                 role: "staff", department: "", employeeId: "", position: "", shift: "Morning", status: "active",
               });
+              // Force a full data refresh so dashboard counters and lists stay in sync with DB.
+              await loadDashboardData();
             },
           },
         ]);
