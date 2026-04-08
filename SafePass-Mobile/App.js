@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { View, Text, ActivityIndicator, Platform } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============ ONLY VISITOR, SECURITY, ADMIN SCREENS ============
 import LoginScreen from "./screens/LoginScreen";
@@ -35,6 +34,10 @@ import SettingsScreen from "./screens/SettingsScreen";
 import RoleSelectScreen from "./screens/RoleSelectScreen";
 
 import ApiService from "./utils/ApiService";
+
+const Storage = Platform.OS === "web"
+  ? require("./utils/webStorage").default
+  : require("@react-native-async-storage/async-storage");
 
 
 const Stack = createNativeStackNavigator();
@@ -79,13 +82,13 @@ export default function App() {
 
   const checkAuthStatus = async () => {
     try {
-      const registrationFlag = await AsyncStorage.getItem('isNewRegistration');
+      const registrationFlag = await Storage.getItem('isNewRegistration');
       
       if (registrationFlag === 'true') {
         console.log("New registration flow detected - staying on auth screens");
         setIsNewRegistration(true);
         setCurrentUser(null);
-        await AsyncStorage.removeItem('isNewRegistration');
+        await Storage.removeItem('isNewRegistration');
         setIsLoading(false);
         return;
       }

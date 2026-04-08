@@ -917,13 +917,27 @@ const loadDashboardData = useCallback(async () => {
         userPayload.department = "Security Department";
       }
 
-      const response = await ApiService.register(userPayload);
+      const isSecurityRole = newUserData.role === "security" || newUserData.role === "guard";
+      const response = isSecurityRole
+        ? await ApiService.createSecurityGuard({
+            firstName: userPayload.firstName,
+            lastName: userPayload.lastName,
+            email: userPayload.email,
+            password: userPayload.password,
+            phone: userPayload.phone,
+            shift: userPayload.shift,
+            position: userPayload.position,
+            employeeId: userPayload.employeeId,
+          })
+        : await ApiService.register(userPayload);
 
       if (response && (response.success || response.user)) {
-        const roleDisplay = newUserData.role === "security" || newUserData.role === "guard" ? "SECURITY PERSONNEL" : "STAFF MEMBER";
+        const roleDisplay = isSecurityRole ? "SECURITY PERSONNEL" : "STAFF MEMBER";
+        const resolvedRole = isSecurityRole ? "guard" : (response.user?.role || newUserData.role);
         
         const newUser = {
           ...userPayload,
+          role: resolvedRole,
           _id: response.user?._id || response.user?.id || Date.now().toString(),
           createdAt: new Date().toISOString(),
         };
@@ -1291,16 +1305,23 @@ const loadDashboardData = useCallback(async () => {
             { label: "Approved Today", value: stats.approvedRequests, color: "#10B981" },
             { label: "Total Users", value: stats.totalUsers, color: "#3B82F6" },
             { label: "Active Users", value: stats.activeUsers, color: "#8B5CF6" },
+            { label: "Today Visits", value: stats.todayVisits, color: "#EF4444" },
+            { label: "Tomorrow Visits", value: stats.tomorrowVisits, color: "#14B8A6" },
           ].map((item) => (
             <View
               key={item.label}
               style={{
-                width: width > 1200 ? "24%" : width > 900 ? "48%" : "100%",
+                width: width > 1200 ? "32%" : width > 900 ? "48%" : "100%",
                 backgroundColor: theme.cardBackground,
                 borderColor: theme.borderColor,
                 borderWidth: 1,
                 borderRadius: 14,
                 padding: 14,
+                shadowColor: "#000",
+                shadowOpacity: 0.06,
+                shadowOffset: { width: 0, height: 3 },
+                shadowRadius: 6,
+                elevation: 2,
               }}
             >
               <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{item.label}</Text>
@@ -1317,12 +1338,26 @@ const loadDashboardData = useCallback(async () => {
             borderWidth: 1,
             borderRadius: 14,
             padding: 14,
+            shadowColor: "#000",
+            shadowOpacity: 0.06,
+            shadowOffset: { width: 0, height: 3 },
+            shadowRadius: 6,
+            elevation: 2,
           }}
         >
           <Text style={{ color: theme.textPrimary, fontSize: 16, fontWeight: "700" }}>Recent Pending Requests</Text>
           {pendingRequests.length ? pendingRequests.slice(0, 5).map((request) => renderRequestCard(request)) : (
             <Text style={{ marginTop: 10, color: theme.textSecondary }}>No pending requests right now.</Text>
           )}
+        </View>
+
+        <View style={{ marginTop: 14, flexDirection: "row", gap: 10 }}>
+          <TouchableOpacity style={[styles.submitButton, { flex: 1 }]} onPress={() => setActiveMenu("requests")}>
+            <Text style={styles.submitButtonText}>Open Requests</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={() => setActiveMenu("users")}>
+            <Text style={styles.cancelButtonText}>Manage Users</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </ScrollView>

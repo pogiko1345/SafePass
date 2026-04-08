@@ -16,7 +16,6 @@ import {
   Animated,
   Image,
 } from "react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import loginStyles from "../styles/LoginStyles";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
@@ -25,6 +24,9 @@ import Logo from "../assets/LogoSapphire.jpg";
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 const isSmallPhone = width <= 375;
+const Storage = Platform.OS === "web"
+  ? require("../utils/webStorage").default
+  : require("@react-native-async-storage/async-storage");
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
@@ -114,17 +116,17 @@ export default function LoginScreen({ navigation, route }) {
       const connected = await ApiService.testConnection();
       setApiConnected(connected);
       
-      const isNewRegistration = await AsyncStorage.getItem('isNewRegistration');
+      const isNewRegistration = await Storage.getItem('isNewRegistration');
       
       if (isNewRegistration === 'true') {
         console.log("📝 New registration detected - clearing token");
-        await AsyncStorage.multiRemove(['authToken', 'userToken', 'currentUser', 'isNewRegistration']);
+        await Storage.multiRemove(['authToken', 'userToken', 'currentUser', 'isNewRegistration']);
         setIsCheckingAuth(false);
         return;
       }
       
-      const token = await AsyncStorage.getItem('userToken');
-      const userJson = await AsyncStorage.getItem('currentUser');
+      const token = await ApiService.getToken();
+      const userJson = await Storage.getItem('currentUser');
       
       if (token && userJson) {
         const user = JSON.parse(userJson);
