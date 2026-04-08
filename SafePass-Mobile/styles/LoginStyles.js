@@ -9,13 +9,13 @@ export default StyleSheet.create({
   // ============ SAFE AREA ============
   safeArea: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#F0F4F8",
   },
 
   // ============ LAYOUT ============
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#F0F4F8",
   },
   
   scrollContainer: {
@@ -26,7 +26,7 @@ export default StyleSheet.create({
   // ============ SPLASH / LOADING ============
   splashContainer: {
     flex: 1,
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1A2A6C",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -41,7 +41,7 @@ export default StyleSheet.create({
 
   // ============ HEADER ============
   header: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1A2A6C",
     paddingHorizontal: 24,
     paddingTop: Platform.select({
       ios: 60,
@@ -52,7 +52,7 @@ export default StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     ...(isWeb && {
-      backgroundImage: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
+      backgroundImage: "linear-gradient(135deg, #1A2A6C 0%, #112240 100%)",
     }),
   },
   
@@ -171,7 +171,7 @@ export default StyleSheet.create({
   backToRoleText: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#4F46E5",
+    color: "#1A2A6C",
   },
 
   // ============ WELCOME TITLES ============
@@ -222,8 +222,8 @@ export default StyleSheet.create({
     ...(isWeb && {
       transition: "border-color 0.2s ease, box-shadow 0.2s ease",
       ":focus-within": {
-        borderColor: "#4F46E5",
-        boxShadow: "0 0 0 3px rgba(79, 70, 229, 0.1)",
+        borderColor: "#1A2A6C",
+        boxShadow: "0 0 0 3px rgba(26, 42, 108, 0.1)",
       },
     }),
   },
@@ -288,8 +288,8 @@ export default StyleSheet.create({
   },
   
   checkboxChecked: {
-    backgroundColor: "#4F46E5",
-    borderColor: "#4F46E5",
+    backgroundColor: "#1A2A6C",
+    borderColor: "#1A2A6C",
   },
   
   rememberText: {
@@ -300,13 +300,13 @@ export default StyleSheet.create({
   
   forgotText: {
     fontSize: 14,
-    color: "#4F46E5",
+    color: "#1A2A6C",
     fontWeight: "600",
     ...(isWeb && {
       cursor: "pointer",
       transition: "color 0.2s ease",
       ":hover": {
-        color: "#7C3AED",
+        color: "#112240",
         textDecoration: "underline",
       },
     }),
@@ -314,7 +314,7 @@ export default StyleSheet.create({
 
   // ============ LOGIN BUTTON ============
   loginButton: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1A2A6C",
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
@@ -326,7 +326,7 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "all 0.2s ease",
       ":hover": {
-        backgroundColor: "#7C3AED",
+        backgroundColor: "#112240",
         transform: "translateY(-1px)",
       },
       ":active": {
@@ -359,7 +359,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
-    backgroundColor: "#F0F9FF",
+    backgroundColor: "#E8F0FE",
     borderRadius: 12,
     gap: 8,
     marginBottom: 16,
@@ -367,7 +367,7 @@ export default StyleSheet.create({
   
   twoFactorText: {
     fontSize: 13,
-    color: "#0A3D91",
+    color: "#1A2A6C",
     fontWeight: "500",
   },
 
@@ -432,11 +432,11 @@ export default StyleSheet.create({
   },
   
   methodButtonActive: {
-    backgroundColor: "#4F46E5",
-    borderColor: "#4F46E5",
+    backgroundColor: "#1A2A6C",
+    borderColor: "#1A2A6C",
     ...(isWeb && {
       ":hover": {
-        backgroundColor: "#7C3AED",
+        backgroundColor: "#112240",
       },
     }),
   },
@@ -452,7 +452,7 @@ export default StyleSheet.create({
   },
   
   otpButton: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1A2A6C",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -464,7 +464,7 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "background-color 0.2s ease",
       ":hover": {
-        backgroundColor: "#7C3AED",
+        backgroundColor: "#112240",
       },
     }),
   },
@@ -588,7 +588,7 @@ export default StyleSheet.create({
   modalPhone: {
     fontSize: isSmallPhone ? 16 : 18,
     fontWeight: "700",
-    color: "#4F46E5",
+    color: "#1A2A6C",
     marginBottom: 24,
   },
 
@@ -614,7 +614,7 @@ export default StyleSheet.create({
     ...(isWeb && {
       transition: "border-color 0.2s ease",
       ":focus": {
-        borderColor: "#4F46E5",
+        borderColor: "#1A2A6C",
         outline: "none",
       },
     }),
@@ -637,7 +637,7 @@ export default StyleSheet.create({
   },
   
   otpVerifyButton: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1A2A6C",
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
@@ -646,7 +646,7 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "background-color 0.2s ease",
       ":hover": {
-        backgroundColor: "#7C3AED",
+        backgroundColor: "#112240",
       },
     }),
   },
@@ -753,67 +753,67 @@ export default StyleSheet.create({
     fontWeight: "500",
   },
 
-loginErrorText: {
-  color: "#EF4444",
-  fontSize: 13,
-  marginTop: 6,
-  marginLeft: 4,
-  fontWeight: "500",
-  backgroundColor: "#FEF2F2",
-  paddingVertical: 8,
-  paddingHorizontal: 12,
-  borderRadius: 8,
-  marginBottom: 4,
-},
+  loginErrorText: {
+    color: "#EF4444",
+    fontSize: 13,
+    marginTop: 6,
+    marginLeft: 4,
+    fontWeight: "500",
+    backgroundColor: "#FEF2F2",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
 
-demoHelper: {
-  backgroundColor: '#F0F9FF',
-  padding: 12,
-  borderRadius: 12,
-  marginBottom: 16,
-  borderWidth: 1,
-  borderColor: '#BAE6FD',
-},
+  demoHelper: {
+    backgroundColor: '#F0F9FF',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
 
-demoHelperText: {
-  fontSize: 13,
-  color: '#0369A1',
-  marginBottom: 8,
-  textAlign: 'center',
-},
+  demoHelperText: {
+    fontSize: 13,
+    color: '#0369A1',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
 
-demoButton: {
-  backgroundColor: '#FFFFFF',
-  paddingVertical: 8,
-  paddingHorizontal: 12,
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: '#4F46E5',
-  alignItems: 'center',
-},
+  demoButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#1A2A6C',
+    alignItems: 'center',
+  },
 
-demoButtonText: {
-  fontSize: 13,
-  color: '#4F46E5',
-  fontWeight: '600',
-},
+  demoButtonText: {
+    fontSize: 13,
+    color: '#1A2A6C',
+    fontWeight: '600',
+  },
 
-logoImage: {
-  width: 100,
-  height: 100,
-  borderRadius: 50,
-  marginBottom: 16,
-  borderWidth: 3,
-  borderColor: 'rgba(255,255,255,0.3)',
-  ...Platform.select({
-    ios: {
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 8,
-    },
-    android: { elevation: 6 },
-    web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.15)" },
-  }),
-},
+  logoImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.3)',
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: { elevation: 6 },
+      web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.15)" },
+    }),
+  },
 });

@@ -1,0 +1,9 @@
+{
+  "background_color": "#0A3D91",
+  "display": "standalone",
+  "lang": "en",
+  "name": "SafePass Mobile",
+  "short_name": "SafePass Mobile",
+  "start_url": "/?utm_source=web_app_manifest",
+  "orientation": "portrait"
+}

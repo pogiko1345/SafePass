@@ -85,6 +85,14 @@ export default StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
+  logoImage: {
+    width: isSmallPhone ? 80 : 100,
+    height: isSmallPhone ? 80 : 100,
+    borderRadius: isSmallPhone ? 40 : 50,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+
   logoGradient: {
     width: isSmallPhone ? 80 : 100,
     height: isSmallPhone ? 80 : 100,

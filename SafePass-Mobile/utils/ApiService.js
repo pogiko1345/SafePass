@@ -1,6 +1,12 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from 'react-native';
+let AsyncStorage;
+
+if (Platform.OS === 'web') {
+  AsyncStorage = require('./webStorage').default;
+} else {
+  AsyncStorage = require('@react-native-async-storage/async-storage');
+}
 import * as ImageManipulator from 'expo-image-manipulator';
-import { Platform } from "react-native";
 
 const API_BASE_URL = Platform.select({
   ios: "http://localhost:5000/api",           // iOS simulator
@@ -302,6 +308,15 @@ async verifyCredentials(email, password) {
     
     throw new Error(error.message || "Invalid email or password");
   }
+}
+
+generateRandomPassword(length = 10) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
 }
 
   async requestOtp(phoneNumber, method = 'sms') {

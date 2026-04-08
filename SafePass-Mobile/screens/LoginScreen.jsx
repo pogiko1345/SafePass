@@ -16,7 +16,7 @@ import {
   Animated,
   Image,
 } from "react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import loginStyles from "../styles/LoginStyles";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
@@ -515,7 +515,7 @@ export default function LoginScreen({ navigation, route }) {
   if (isCheckingAuth) {
     return (
       <View style={loginStyles.splashContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+        <StatusBar barStyle="light-content" backgroundColor="#1A2A6C" />
         <ActivityIndicator size="large" color="#FFFFFF" />
         <Text style={loginStyles.splashText}>Loading...</Text>
       </View>
@@ -524,7 +524,7 @@ export default function LoginScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={loginStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+      <StatusBar barStyle="light-content" backgroundColor="#1A2A6C" />
       
       <KeyboardAvoidingView
         style={loginStyles.container}
@@ -577,7 +577,7 @@ export default function LoginScreen({ navigation, route }) {
                     tabIndex: 0,
                   })}
                 >
-                  <Ionicons name="arrow-back" size={20} color="#4F46E5" />
+                  <Ionicons name="arrow-back" size={20} color="#1A2A6C" />
                   <Text style={loginStyles.backToRoleText}>Change Role</Text>
                 </TouchableOpacity>
 
@@ -706,7 +706,7 @@ export default function LoginScreen({ navigation, route }) {
 
                   {/* 2FA Info */}
                   <View style={loginStyles.twoFactorInfo}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color="#4F46E5" />
+                    <Ionicons name="shield-checkmark-outline" size={16} color="#1A2A6C" />
                     <Text style={loginStyles.twoFactorText}>
                       Secure login with 2-factor authentication
                     </Text>
@@ -745,7 +745,7 @@ export default function LoginScreen({ navigation, route }) {
           <View style={loginStyles.modalOverlay}>
             <View style={loginStyles.modalContent}>
               <View style={loginStyles.modalHeader}>
-                <Ionicons name="lock-open-outline" size={32} color="#4F46E5" />
+                <Ionicons name="lock-open-outline" size={32} color="#1A2A6C" />
                 <Text style={loginStyles.modalTitle}>
                   {resetStep === 1 ? 'Reset Password' : 
                    resetStep === 2 ? 'Verify Code' : 
