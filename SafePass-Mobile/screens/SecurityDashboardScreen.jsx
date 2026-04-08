@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import ApiService from "../utils/ApiService";
+import { canAccessSecurityDashboard, normalizeRole } from "../utils/authFlow";
 import styles from "../styles/SecurityDashboardStyles";
 
 // Import map components
@@ -247,11 +248,12 @@ export default function SecurityDashboardScreen({ navigation }) {
         return;
       }
 
-      if (!currentUser || !['security', 'guard', 'admin'].includes(currentUser.role)) {
+      const normalizedRole = normalizeRole(currentUser?.role);
+      if (!currentUser || !canAccessSecurityDashboard(normalizedRole)) {
         navigation.replace("Login");
         return;
       }
-      setUser(currentUser);
+      setUser({ ...currentUser, role: normalizedRole });
     } catch (error) {
       console.error("Load user error:", error);
       Alert.alert("Error", "Failed to load user data");

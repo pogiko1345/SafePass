@@ -148,7 +148,9 @@ app.post("/api/register", async (req, res) => {
       nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
     }
 
-    let employeeId = req.body.employeeId;
+    let employeeId = req.body.employeeId
+      ? String(req.body.employeeId).trim()
+      : undefined;
     if (!employeeId && (role === "staff" || role === "guard")) {
       const prefix = role === "staff" ? "STF" : "GRD";
       const timestamp = Date.now().toString().slice(-6);
@@ -164,7 +166,7 @@ const userData = {
   phone,
   role: role || 'visitor',
   nfcCardId,
-  employeeId: employeeId || null,
+  employeeId: employeeId || undefined,
   department: req.body.department || '',
   position: req.body.position || '',     
   shift: req.body.shift || 'Morning',     
@@ -317,14 +319,6 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // Check if user is pending
-    if (user.status === "pending") {
-      console.log("User account pending:", email);
-      return res.status(401).json({
-        error: "Account is pending approval. Please wait for admin approval.",
-      });
-    }
-
     // Check if user is inactive
     if (user.status === "inactive" || user.status === "suspended") {
       return res.status(401).json({ error: "Account is deactivated" });
@@ -351,9 +345,12 @@ app.post("/api/login", async (req, res) => {
       userName: `${user.firstName} ${user.lastName}`,
       location: "Mobile App",
       accessType: "system",
-      status: "granted",
+      status: user.status === "pending" ? "pending" : "granted",
       nfcCardId: user.nfcCardId,
-      notes: "User logged in via mobile app",
+      notes:
+        user.status === "pending"
+          ? "Pending visitor logged in and is waiting for admin approval"
+          : "User logged in via mobile app",
     });
     await accessLog.save();
 
@@ -365,7 +362,10 @@ app.post("/api/login", async (req, res) => {
 
     res.json({
       success: true,
-      message: "Login successful",
+      message:
+        user.status === "pending"
+          ? "Login successful. Account is waiting for admin approval."
+          : "Login successful",
       user: userResponse,
       token,
     });
@@ -481,31 +481,50 @@ app.post("/api/check-email", async (req, res) => {
 
 // Register a new visitor (Complete version with UNIQUE NFC ID for pending visitors)
 app.post("/api/visitors/register", async (req, res) => {
+  let createdVisitor = null;
+  let createdUser = null;
+
   try {
-    const visitorData = req.body;
+    const visitorData = req.body || {};
+    const normalizedEmail = String(visitorData.email || "")
+      .toLowerCase()
+      .trim();
+    const normalizedFullName = String(visitorData.fullName || "").trim();
+    const normalizedPhoneNumber = String(visitorData.phoneNumber || "").trim();
+    const normalizedIdNumber = String(visitorData.idNumber || "").trim();
+    const normalizedPurpose = String(visitorData.purposeOfVisit || "").trim();
+    const normalizedVehicleNumber = String(visitorData.vehicleNumber || "").trim();
 
     // 1. Check if user already exists
     const existingUser = await User.findOne({
-      email: visitorData.email.toLowerCase(),
+      email: normalizedEmail,
     });
     if (existingUser) {
+      const existingVisitorForUser = await Visitor.findOne({
+        email: normalizedEmail,
+      }).sort({ registeredAt: -1 });
+
       return res.status(400).json({
         success: false,
         message:
-          "An account with this email already exists. Please login instead.",
+          existingUser.role === "visitor" &&
+          (existingUser.status === "pending" ||
+            existingVisitorForUser?.approvalStatus === "pending")
+            ? "You already have a pending registration. Please log in to track your approval status."
+            : "An account with this email already exists. Please login instead.",
       });
     }
 
     // 2. Check if visitor already exists
     const existingVisitor = await Visitor.findOne({
-      email: visitorData.email.toLowerCase(),
-    });
+      email: normalizedEmail,
+    }).sort({ registeredAt: -1 });
     if (existingVisitor) {
       if (existingVisitor.approvalStatus === "pending") {
         return res.status(400).json({
           success: false,
           message:
-            "You already have a pending registration. Please wait for admin approval.",
+            "You already have a pending registration. Please log in to track your approval status.",
         });
       } else if (existingVisitor.approvalStatus === "approved") {
         return res.status(400).json({
@@ -522,13 +541,13 @@ app.post("/api/visitors/register", async (req, res) => {
 
     // 3. Create new visitor
     const visitor = new Visitor({
-      fullName: visitorData.fullName,
-      email: visitorData.email.toLowerCase(),
-      phoneNumber: visitorData.phoneNumber,
-      idNumber: visitorData.idNumber,
+      fullName: normalizedFullName,
+      email: normalizedEmail,
+      phoneNumber: normalizedPhoneNumber,
+      idNumber: normalizedIdNumber,
       idImage: visitorData.idImage,
-      purposeOfVisit: visitorData.purposeOfVisit,
-      vehicleNumber: visitorData.vehicleNumber || "",
+      purposeOfVisit: normalizedPurpose,
+      vehicleNumber: normalizedVehicleNumber,
       visitDate: new Date(visitorData.visitDate),
       visitTime: new Date(visitorData.visitTime),
       registeredAt: new Date(),
@@ -537,6 +556,7 @@ app.post("/api/visitors/register", async (req, res) => {
     });
 
     await visitor.save();
+    createdVisitor = visitor;
     console.log("✅ Visitor registered:", visitorData.email);
 
     // 4. Generate temporary password
@@ -549,11 +569,11 @@ app.post("/api/visitors/register", async (req, res) => {
 
     // 6. Create user account with UNIQUE NFC card ID (NOT NULL!)
     const user = new User({
-      firstName: visitorData.fullName.split(" ")[0] || "Visitor",
-      lastName: visitorData.fullName.split(" ").slice(1).join(" ") || "User",
-      email: visitorData.email.toLowerCase(),
+      firstName: normalizedFullName.split(" ")[0] || "Visitor",
+      lastName: normalizedFullName.split(" ").slice(1).join(" ") || "User",
+      email: normalizedEmail,
       password: tempPassword,
-      phone: visitorData.phoneNumber,
+      phone: normalizedPhoneNumber,
       role: "visitor",
       status: "pending",
       isActive: false,
@@ -562,6 +582,7 @@ app.post("/api/visitors/register", async (req, res) => {
     });
 
     await user.save();
+    createdUser = user;
     console.log("✅ User account created with NFC ID:", tempNfcCardId);
 
     // 7. Create notifications for ALL admins
@@ -621,10 +642,32 @@ app.post("/api/visitors/register", async (req, res) => {
 
     // Handle duplicate key error specifically
     if (error.code === 11000) {
+      const duplicateField =
+        Object.keys(error.keyPattern || {})[0] ||
+        Object.keys(error.keyValue || {})[0] ||
+        "";
+
+      if (createdVisitor && !createdUser) {
+        try {
+          await Visitor.deleteOne({ _id: createdVisitor._id });
+          console.log(
+            "↩️ Rolled back partial visitor record after duplicate registration error:",
+            createdVisitor.email,
+          );
+        } catch (rollbackError) {
+          console.error("Visitor rollback error:", rollbackError);
+        }
+      }
+
       return res.status(400).json({
         success: false,
         message:
-          "A duplicate entry was found. Please try again with different details.",
+          duplicateField === "email"
+            ? "An account with this email already exists. Please log in instead."
+            : duplicateField === "nfcCardId"
+              ? "Unable to assign a visitor access card right now. Please try submitting again."
+              : "A duplicate entry was found. Please try again with different details.",
+        duplicateField,
       });
     }
 

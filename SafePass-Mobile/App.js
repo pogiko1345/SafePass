@@ -13,7 +13,7 @@ import SecurityDashboardScreen from "./screens/SecurityDashboardScreen";
 import VisitorDashboardScreen from "./screens/VisitorDashboardScreen";
 
 // Common Screens
-import ProfileScreen from "./screens/ProfileScreen";
+import ProfileScreen from "./screens/ProfileScreenV2";
 import AccessLogScreen from "./screens/AccessLogScreen";
 import NFCScanScreen from "./screens/NFCScanScreen";
 import HelpScreen from "./screens/HelpScreen";
@@ -34,6 +34,7 @@ import SettingsScreen from "./screens/SettingsScreen";
 import RoleSelectScreen from "./screens/RoleSelectScreen";
 
 import ApiService from "./utils/ApiService";
+import { getDashboardRoute, isRecognizedRole, normalizeRole } from "./utils/authFlow";
 
 const Storage = Platform.OS === "web"
   ? require("./utils/webStorage").default
@@ -41,23 +42,6 @@ const Storage = Platform.OS === "web"
 
 
 const Stack = createNativeStackNavigator();
-
-const getInitialRoute = (user) => {
-  if (!user) return "RoleSelect";
-  const role = String(user.role || "").toLowerCase();
-  
-  switch (role) {
-    case "security":
-    case "guard":
-      return "SecurityDashboard";
-    case "admin":
-      return "AdminDashboard";
-    case "visitor":
-      return "VisitorDashboard";
-    default:
-      return "RoleSelect";
-  }
-};
 
 let logoutCallback = null;
 
@@ -107,10 +91,9 @@ export default function App() {
           return;
         }
 
-        const normalizedRole = String(user.role || "").toLowerCase();
+        const normalizedRole = normalizeRole(user.role);
         const normalizedUser = { ...user, role: normalizedRole };
-        const validRoles = ['visitor', 'security', 'guard', 'admin'];
-        if (validRoles.includes(normalizedRole)) {
+        if (isRecognizedRole(normalizedRole)) {
           setCurrentUser(normalizedUser);
         } else {
           console.log("Invalid user role detected:", user.role);
@@ -138,7 +121,7 @@ export default function App() {
 
   let initialRoute = "RoleSelect";
   if (!isNewRegistration && currentUser) {
-    initialRoute = getInitialRoute(currentUser);
+    initialRoute = getDashboardRoute(currentUser);
   }
   
   console.log("App.js initialRoute:", initialRoute);

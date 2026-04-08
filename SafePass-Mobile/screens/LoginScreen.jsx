@@ -19,6 +19,7 @@ import {
 import loginStyles from "../styles/LoginStyles";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
+import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
 import Logo from "../assets/LogoSapphire.jpg";
 
 const { width } = Dimensions.get("window");
@@ -30,7 +31,7 @@ const Storage = Platform.OS === "web"
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
-  const { role } = route?.params || { role: 'visitor' };
+  const { role, initialEmail = "", initialPassword = "" } = route?.params || { role: 'visitor' };
   
   // ============ STATE MANAGEMENT ============
   const [email, setEmail] = useState("");
@@ -99,6 +100,15 @@ export default function LoginScreen({ navigation, route }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (initialEmail) {
+      setEmail(initialEmail);
+    }
+    if (initialPassword) {
+      setPassword(initialPassword);
+    }
+  }, [initialEmail, initialPassword]);
+
   // ============ AUTH CHECK ============
   useEffect(() => {
     checkAuthAndConnection();
@@ -138,17 +148,8 @@ export default function LoginScreen({ navigation, route }) {
         const user = JSON.parse(userJson);
         console.log("🔑 Auto-login detected for:", user.email);
         
-        const normalizedRole = String(user.role || "").toLowerCase();
-
-        // Check if visitor is pending
-        if (normalizedRole === 'visitor' && user.status === 'pending') {
-          console.log("Visitor pending - clearing token");
-          await ApiService.clearAuth();
-          setIsCheckingAuth(false);
-          return;
-        }
-        
-        const route = getInitialRoute({ ...user, role: normalizedRole });
+        const normalizedRole = normalizeRole(user.role);
+        const route = getDashboardRoute({ ...user, role: normalizedRole });
         navigation.reset({
           index: 0,
           routes: [{ name: route }],
@@ -194,6 +195,28 @@ export default function LoginScreen({ navigation, route }) {
     if (errors.password) {
       setErrors({ ...errors, password: "" });
     }
+  };
+
+  const persistAuthenticatedSession = async ({ token, user, rememberEmail }) => {
+    const normalizedUser = {
+      ...user,
+      role: normalizeRole(user?.role) || "visitor",
+    };
+
+    if (token) {
+      await ApiService.setToken(token);
+    }
+
+    await Storage.setItem("currentUser", JSON.stringify(normalizedUser));
+
+    if (rememberEmail) {
+      await Storage.setItem("rememberedEmail", email.trim());
+    } else {
+      await Storage.removeItem("rememberedEmail");
+    }
+
+    await Storage.removeItem("isNewRegistration");
+    return normalizedUser;
   };
 
   // ============ FORGOT PASSWORD VALIDATION ============
@@ -462,25 +485,31 @@ export default function LoginScreen({ navigation, route }) {
       console.log('📥 Verify response:', verifyResponse);
       
       if (verifyResponse.success) {
-        // Check if user is pending
-        if (verifyResponse.user?.status === 'pending') {
-          console.log('⏳ User account is pending');
-          Alert.alert(
-            "Account Pending Approval",
-            "Your account is pending admin approval. You will receive an email once approved.",
-            [{ text: "OK" }]
-          );
-          setIsLoading(false);
+        const normalizedUser = {
+          ...verifyResponse.user,
+          role: normalizeRole(verifyResponse.user?.role) || "visitor",
+        };
+
+        if (verifyResponse.requires2FA === false) {
+          await persistAuthenticatedSession({
+            token: verifyResponse.tempToken,
+            user: normalizedUser,
+            rememberEmail: rememberMe,
+          });
+
+          navigation.reset({
+            index: 0,
+            routes: [{ name: getDashboardRoute(normalizedUser) }],
+          });
           return;
         }
-        
-        // 2FA for EVERYONE - always require verification
+
         navigation.navigate("Verification", {
           email: email,
           password: password,
           rememberMe: rememberMe,
           tempToken: verifyResponse.tempToken,
-          user: verifyResponse.user
+          user: normalizedUser
         });
       }
     } catch (error) {
@@ -497,20 +526,6 @@ export default function LoginScreen({ navigation, route }) {
       }
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const getInitialRoute = (user) => {
-    switch(user?.role) {
-      case 'security': 
-      case 'guard':
-        return "SecurityDashboard";
-      case 'admin': 
-        return "AdminDashboard";
-      case 'visitor': 
-        return "VisitorDashboard";
-      default: 
-        return "RoleSelect";
     }
   };
 

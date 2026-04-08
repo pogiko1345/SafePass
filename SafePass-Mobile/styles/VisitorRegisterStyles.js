@@ -32,15 +32,27 @@ export default StyleSheet.create({
     flex: 1,
     backgroundColor: "#F4F8FC",
   },
+  mainScrollView: {
+    flex: 1,
+  },
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  formShell: {
+    flex: 1,
+    width: "100%",
+    ...(isWeb && {
+      maxWidth: 860,
+      alignSelf: "center",
+      paddingHorizontal: spacing.base,
+    }),
   },
 
   header: {
     width: "100%",
     paddingTop: Platform.select({ ios: 54, android: 42, web: 46 }),
-    paddingBottom: 32,
+    paddingBottom: 42,
     borderBottomLeftRadius: 34,
     borderBottomRightRadius: 34,
     overflow: "hidden",
@@ -176,7 +188,7 @@ export default StyleSheet.create({
   progressContainer: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: spacing.base,
-    marginTop: -14,
+    marginTop: -22,
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.base,
     borderRadius: 20,
@@ -325,6 +337,104 @@ export default StyleSheet.create({
   formGrid: {
     gap: spacing.base,
     marginBottom: spacing.xl,
+  },
+
+  stepInsightCard: {
+    backgroundColor: "#F7FFFA",
+    borderWidth: 1,
+    borderColor: "#CDEEDF",
+    borderRadius: 22,
+    padding: spacing.base,
+    marginBottom: spacing.base,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#047857",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+      },
+      android: { elevation: 1 },
+      web: { boxShadow: "0px 10px 22px rgba(5, 150, 105, 0.06)" },
+    }),
+  },
+  stepInsightHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  stepInsightIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#DDF8EA",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepInsightTextWrap: {
+    flex: 1,
+  },
+  stepInsightTitle: {
+    fontSize: fontSizes.base,
+    fontWeight: "800",
+    color: "#065F46",
+    marginBottom: 4,
+  },
+  stepInsightSubtitle: {
+    fontSize: fontSizes.sm,
+    color: "#4B5563",
+    lineHeight: 20,
+  },
+  stepInsightStats: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    marginTop: spacing.base,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2EAF2",
+    overflow: "hidden",
+  },
+  stepInsightStat: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepInsightStatValue: {
+    fontSize: fontSizes.base,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  stepInsightStatLabel: {
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    marginTop: 3,
+    textAlign: "center",
+  },
+  stepInsightDivider: {
+    width: 1,
+    backgroundColor: "#E2E8F0",
+  },
+  reviewChecklist: {
+    marginTop: spacing.base,
+    gap: spacing.sm,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2EAF2",
+    padding: spacing.base,
+  },
+  reviewChecklistItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  reviewChecklistText: {
+    flex: 1,
+    fontSize: fontSizes.sm,
+    color: "#334155",
+    fontWeight: "600",
   },
 
   idUploadSection: {
@@ -794,6 +904,7 @@ export default StyleSheet.create({
   },
 
   continueButton: {
+    flex: 1.35,
     borderRadius: 18,
     overflow: "hidden",
     marginBottom: spacing.base,
@@ -817,6 +928,40 @@ export default StyleSheet.create({
     color: "#FFFFFF",
     fontSize: fontSizes.base,
     fontWeight: "700",
+  },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: spacing.sm,
+  },
+  secondaryActionButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 16,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.base,
+    ...Platform.select({
+      web: {
+        cursor: "pointer",
+        transition: "transform 0.2s ease, background-color 0.2s ease",
+        ":hover": {
+          backgroundColor: "#F8FAFC",
+          transform: "translateY(-1px)",
+        },
+      },
+    }),
+  },
+  secondaryActionText: {
+    fontSize: fontSizes.sm,
+    fontWeight: "700",
+    color: "#475569",
   },
 
   modalOverlay: {
@@ -1011,6 +1156,11 @@ export default StyleSheet.create({
     fontSize: fontSizes.base,
     fontWeight: "700",
     color: "#059669",
+  },
+  credentialsTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
     marginBottom: spacing.xs,
   },
   credentialsInfo: {

@@ -254,8 +254,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
   const [showUserManagementModal, setShowUserManagementModal] = useState(false);
+  const [showCreateSuccessModal, setShowCreateSuccessModal] = useState(false);
   const [userManagementStatusTab, setUserManagementStatusTab] = useState("active");
   const [createUserMessage, setCreateUserMessage] = useState("");
+  const [createdUserSummary, setCreatedUserSummary] = useState(null);
 
   // Chart Data
   const [visitorStats, setVisitorStats] = useState({
@@ -1007,6 +1009,7 @@ const loadDashboardData = useCallback(async () => {
       if (response && (response.success || response.user)) {
         const roleDisplay = isSecurityRole ? "SECURITY PERSONNEL" : "STAFF MEMBER";
         const resolvedRole = isSecurityRole ? "guard" : (response.user?.role || newUserData.role);
+        const createdName = `${newUserData.firstName} ${newUserData.lastName}`.trim();
         
         const newUser = {
           ...userPayload,
@@ -1030,28 +1033,17 @@ const loadDashboardData = useCallback(async () => {
           totalGuards: (newUserData.role === "security" || newUserData.role === "guard") ? prev.totalGuards + 1 : prev.totalGuards,
           activeUsers: prev.activeUsers + 1,
         }));
-        
-        Alert.alert("Success", `${roleDisplay} account created successfully!\n\nName: ${newUserData.firstName} ${newUserData.lastName}\nEmail: ${newUserData.email}\nPassword: ${generatedPassword}\nRole: ${roleDisplay}\nEmployee ID: ${userPayload.employeeId}\n\nLogin credentials have been sent to ${newUserData.email}`, [
-          {
-            text: "OK",
-            onPress: async () => {
-              setShowAddUserModal(false);
-              setNewUserData({
-                firstName: "", lastName: "", email: "", password: "", phone: "",
-                role: "staff", department: "", employeeId: "", position: "", shift: "Morning", status: "active",
-              });
-              // Force a full data refresh so dashboard counters and lists stay in sync with DB.
-              await loadDashboardData();
-              setActiveMenu("users");
-              setUserFilter("all");
-              setUserSearchQuery("");
-              setCurrentPage(1);
-              setUserManagementStatusTab("active");
-              setCreateUserMessage(`${newUserData.firstName} ${newUserData.lastName} was added successfully.`);
-              setShowUserManagementModal(true);
-            },
-          },
-        ]);
+
+        setShowAddUserModal(false);
+        setCreatedUserSummary({
+          name: createdName,
+          email: newUserData.email,
+          password: generatedPassword,
+          role: roleDisplay,
+          employeeId: userPayload.employeeId,
+          deliveryNote: `Login credentials have been sent to ${newUserData.email}.`,
+        });
+        setShowCreateSuccessModal(true);
       } else {
         Alert.alert("Error", response?.message || response?.error || "Failed to create account");
       }
@@ -1085,6 +1077,24 @@ const loadDashboardData = useCallback(async () => {
       isActive: userItem.isActive !== false,
     });
     setShowEditUserModal(true);
+  };
+
+  const handleCloseCreateSuccessModal = async () => {
+    const createdName = createdUserSummary?.name || "New user";
+    setShowCreateSuccessModal(false);
+    setCreatedUserSummary(null);
+    setNewUserData({
+      firstName: "", lastName: "", email: "", password: "", phone: "",
+      role: "staff", department: "", employeeId: "", position: "", shift: "Morning", status: "active",
+    });
+    await loadDashboardData();
+    setActiveMenu("users");
+    setUserFilter("all");
+    setUserSearchQuery("");
+    setCurrentPage(1);
+    setUserManagementStatusTab("active");
+    setCreateUserMessage(`${createdName} was added successfully.`);
+    setShowUserManagementModal(true);
   };
 
   // FIXED: Confirm Edit User
@@ -1301,19 +1311,30 @@ const loadDashboardData = useCallback(async () => {
 
   const renderBarChart = (labels, data) => {
     const max = Math.max(...(data || [0]), 1);
+    const chartColors = ["#3B82F6", "#8B5CF6", "#0EA5E9", "#14B8A6", "#F59E0B", "#EF4444"];
     return (
-      <View style={{ gap: 8, marginTop: 12 }}>
+      <View style={styles.analyticsBarChart}>
         {(labels || []).map((label, index) => {
           const value = data?.[index] || 0;
-          const percentage = Math.max(4, Math.round((value / max) * 100));
+          const percentage = value === 0 ? 0 : Math.max(8, Math.round((value / max) * 100));
+          const barColor = chartColors[index % chartColors.length];
           return (
-            <View key={`${label}-${index}`} style={{ gap: 4 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{label}</Text>
-                <Text style={{ color: theme.textPrimary, fontSize: 12, fontWeight: "600" }}>{value}</Text>
+            <View key={`${label}-${index}`} style={styles.analyticsBarRow}>
+              <View style={styles.analyticsBarMeta}>
+                <Text style={[styles.analyticsBarLabel, { color: theme.textSecondary }]}>{label}</Text>
+                <Text style={[styles.analyticsBarValue, { color: theme.textPrimary }]}>{value}</Text>
               </View>
-              <View style={{ height: 8, backgroundColor: isDarkMode ? "#334155" : "#E2E8F0", borderRadius: 6 }}>
-                <View style={{ width: `${percentage}%`, height: 8, borderRadius: 6, backgroundColor: "#3B82F6" }} />
+              <View style={[styles.analyticsBarTrack, { backgroundColor: isDarkMode ? "#334155" : "#E2E8F0" }]}>
+                <View
+                  style={[
+                    styles.analyticsBarFill,
+                    {
+                      width: `${percentage}%`,
+                      backgroundColor: barColor,
+                      opacity: value === 0 ? 0 : 1,
+                    },
+                  ]}
+                />
               </View>
             </View>
           );
@@ -1465,34 +1486,432 @@ const loadDashboardData = useCallback(async () => {
   const renderAnalyticsContent = () => {
     const chart = getCurrentChartData();
     const historyStats = getHistoryStats();
+    const filteredHistory = getFilteredHistory();
+    const selectedDateLabel = selectedDate.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+    const totalRequests = stats.totalRequests || 0;
+    const approvalRate = totalRequests > 0 ? Math.round((stats.approvedRequests / totalRequests) * 100) : 0;
+    const chartTotal = (chart?.data || []).reduce((sum, value) => sum + value, 0);
+    const chartPeakValue = Math.max(...(chart?.data || [0]), 0);
+    const chartPeakIndex = chart?.data?.findIndex((value) => value === chartPeakValue) ?? -1;
+    const chartPeakLabel = chartPeakIndex >= 0 ? chart?.labels?.[chartPeakIndex] : "N/A";
+    const chartAverage = chart?.data?.length ? (chartTotal / chart.data.length).toFixed(1) : "0.0";
+    const selectedDateVisitors = [...(dateAnalytics.visitors || [])].sort(
+      (a, b) => new Date(a.visitTime || a.visitDate) - new Date(b.visitTime || b.visitDate)
+    );
+    const distributionItems = [
+      { key: "approved", label: "Approved", value: stats.approvedRequests || 0, color: "#10B981" },
+      { key: "pending", label: "Pending", value: stats.pendingRequests || 0, color: "#F59E0B" },
+      { key: "rejected", label: "Rejected", value: stats.rejectedRequests || 0, color: "#EF4444" },
+    ];
+    const metricCards = [
+      {
+        key: "total",
+        icon: "layers-outline",
+        label: "Total Requests",
+        value: totalRequests,
+        accent: "#3B82F6",
+        helper: "All recorded visitor requests",
+      },
+      {
+        key: "approval",
+        icon: "checkmark-done-outline",
+        label: "Approval Rate",
+        value: `${approvalRate}%`,
+        accent: "#10B981",
+        helper: `${stats.approvedRequests || 0} approved requests`,
+      },
+      {
+        key: "today",
+        icon: "today-outline",
+        label: "Today Visits",
+        value: stats.todayVisits || 0,
+        accent: "#F97316",
+        helper: "Scheduled for today",
+      },
+      {
+        key: "upcoming",
+        icon: "time-outline",
+        label: "Upcoming",
+        value: stats.upcomingVisits || 0,
+        accent: "#8B5CF6",
+        helper: "Approved future visits",
+      },
+    ];
+    const historyFilters = [
+      { key: "all", label: "All" },
+      { key: "pending", label: "Pending" },
+      { key: "approved", label: "Approved" },
+      { key: "checked_in", label: "Checked In" },
+      { key: "checked_out", label: "Checked Out" },
+      { key: "rejected", label: "Rejected" },
+    ];
+
     return (
-      <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.pageContainer}>
-          <View style={styles.pageHeader}>
-            <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Analytics</Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(true)}>
-              <Ionicons name="calendar-outline" size={22} color="#3B82F6" />
+      <ScrollView
+        style={styles.contentScrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.analyticsContainer}
+      >
+        <View style={[styles.analyticsHeader, width < 900 && { flexDirection: "column", gap: 14 }]}>
+          <View>
+            <Text style={[styles.analyticsHeaderTitle, { color: theme.textPrimary }]}>Analytics</Text>
+            <Text style={[styles.analyticsHeaderSubtitle, { color: theme.textSecondary }]}>
+              Review request volume, approvals, and visitor activity from one place.
+            </Text>
+          </View>
+          <View style={styles.analyticsHeaderActions}>
+            <TouchableOpacity
+              style={[styles.analyticsActionButton, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}
+              onPress={onRefresh}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh-outline" size={16} color="#3B82F6" />
+              <Text style={styles.analyticsActionButtonText}>Refresh</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.analyticsActionButton, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}
+              onPress={() => setShowDatePicker(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar-outline" size={16} color="#8B5CF6" />
+              <Text style={styles.analyticsActionButtonText}>Pick Date</Text>
             </TouchableOpacity>
           </View>
+        </View>
 
-          <View style={{ backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14 }}>
-            <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>Selected Date</Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 4 }}>{formatDateTime(selectedDate)}</Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 8 }}>
-              Total: {dateAnalytics.total} | Approved: {dateAnalytics.approved} | Pending: {dateAnalytics.pending} | Rejected: {dateAnalytics.rejected}
+        <View
+          style={[
+            styles.analyticsHeroCard,
+            width < 960 && { flexDirection: "column" },
+            { backgroundColor: theme.cardBackground, borderColor: theme.borderColor },
+          ]}
+        >
+          <View style={styles.analyticsHeroContent}>
+            <View style={[styles.analyticsHeroBadge, { backgroundColor: isDarkMode ? "#312E81" : "#EEF2FF" }]}>
+              <Ionicons name="pulse-outline" size={14} color="#6366F1" />
+              <Text style={styles.analyticsHeroBadgeText}>Operational Snapshot</Text>
+            </View>
+            <Text style={[styles.analyticsHeroTitle, { color: theme.textPrimary }]}>
+              {dateAnalytics.total > 0
+                ? `${dateAnalytics.total} visit request${dateAnalytics.total > 1 ? "s are" : " is"} scheduled for ${selectedDateLabel}.`
+                : `No visit requests are scheduled for ${selectedDateLabel}.`}
+            </Text>
+            <Text style={[styles.analyticsHeroSubtitle, { color: theme.textSecondary }]}>
+              Approval rate is currently {approvalRate}% with {stats.upcomingVisits || 0} approved visit
+              {stats.upcomingVisits === 1 ? "" : "s"} still upcoming.
             </Text>
           </View>
+          <View style={[styles.analyticsHeroStats, width < 960 && { width: "100%", flexDirection: "row" }]}>
+            <View style={[styles.analyticsHeroStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+              <Text style={[styles.analyticsHeroStatValue, { color: theme.textPrimary }]}>{historyStats.uniqueEmails}</Text>
+              <Text style={[styles.analyticsHeroStatLabel, { color: theme.textSecondary }]}>Unique Visitors</Text>
+            </View>
+            <View style={[styles.analyticsHeroStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+              <Text style={[styles.analyticsHeroStatValue, { color: theme.textPrimary }]}>{stats.weeklyGrowth || 0}%</Text>
+              <Text style={[styles.analyticsHeroStatLabel, { color: theme.textSecondary }]}>7d Activity</Text>
+            </View>
+          </View>
+        </View>
 
-          <View style={{ marginTop: 14, backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14 }}>
-            <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>Visitor Trend ({activeChartDataset})</Text>
-            {renderBarChart(chart.labels, chart.data)}
+        <View style={styles.keyMetricsRow}>
+          {metricCards.map((card) => (
+            <View
+              key={card.key}
+              style={[styles.keyMetricCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}
+            >
+              <View style={[styles.keyMetricIcon, { backgroundColor: `${card.accent}15` }]}>
+                <Ionicons name={card.icon} size={22} color={card.accent} />
+              </View>
+              <View style={styles.analyticsMetricContent}>
+                <Text style={[styles.keyMetricValue, { color: theme.textPrimary }]}>{card.value}</Text>
+                <Text style={[styles.keyMetricLabel, { color: theme.textSecondary }]}>{card.label}</Text>
+                <Text style={[styles.analyticsMetricHelper, { color: theme.textSecondary }]}>{card.helper}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={[styles.analyticsSplitGrid, width < 1200 && styles.analyticsSplitGridStack]}>
+          <View style={styles.analyticsPrimaryColumn}>
+            <View style={[styles.mainStatCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <View style={styles.analyticsChartHeader}>
+                <View>
+                  <Text style={[styles.distributionTitle, { color: theme.textPrimary, marginBottom: 4 }]}>Visitor Trend</Text>
+                  <Text style={[styles.analyticsChartSubtitle, { color: theme.textSecondary }]}>
+                    Compare {activeChartDataset} request activity and spot the busiest period quickly.
+                  </Text>
+                </View>
+                <View style={[styles.analyticsDatasetSelector, { backgroundColor: isDarkMode ? "#0F172A" : "#F1F5F9" }]}>
+                  {["daily", "weekly", "monthly"].map((dataset) => (
+                    <TouchableOpacity
+                      key={dataset}
+                      style={[
+                        styles.analyticsDatasetButton,
+                        activeChartDataset === dataset && styles.analyticsDatasetButtonActive,
+                      ]}
+                      onPress={() => setActiveChartDataset(dataset)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.analyticsDatasetButtonText,
+                          { color: activeChartDataset === dataset ? "#FFFFFF" : theme.textSecondary },
+                        ]}
+                      >
+                        {dataset.charAt(0).toUpperCase() + dataset.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.analyticsQuickStatsRow}>
+                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsQuickStatValue, { color: theme.textPrimary }]}>{chartTotal}</Text>
+                  <Text style={[styles.analyticsQuickStatLabel, { color: theme.textSecondary }]}>Total Volume</Text>
+                </View>
+                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsQuickStatValue, { color: theme.textPrimary }]}>{chartPeakLabel || "N/A"}</Text>
+                  <Text style={[styles.analyticsQuickStatLabel, { color: theme.textSecondary }]}>Busiest Period</Text>
+                </View>
+                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsQuickStatValue, { color: theme.textPrimary }]}>{chartAverage}</Text>
+                  <Text style={[styles.analyticsQuickStatLabel, { color: theme.textSecondary }]}>Average</Text>
+                </View>
+              </View>
+
+              {renderBarChart(chart.labels, chart.data)}
+            </View>
+
+            <View style={[styles.historyCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <View style={styles.historyHeader}>
+                <View>
+                  <Text style={[styles.historyTitle, { color: theme.textPrimary }]}>Visitor History</Text>
+                  <Text style={[styles.analyticsChartSubtitle, { color: theme.textSecondary }]}>
+                    Search and filter recent visitor records by status.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.historyRefreshButton, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC" }]}
+                  onPress={onRefresh}
+                >
+                  <Ionicons name="refresh-outline" size={16} color="#3B82F6" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.historyFilters}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyFilterChips}>
+                  {historyFilters.map((filter) => (
+                    <TouchableOpacity
+                      key={filter.key}
+                      style={[
+                        styles.historyFilterChip,
+                        { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor },
+                        historyFilter === filter.key && styles.historyFilterChipActive,
+                      ]}
+                      onPress={() => setHistoryFilter(filter.key)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.historyFilterChipText,
+                          { color: historyFilter === filter.key ? "#FFFFFF" : theme.textSecondary },
+                          historyFilter === filter.key && styles.historyFilterChipTextActive,
+                        ]}
+                      >
+                        {filter.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <View style={[styles.historySearchBox, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Ionicons name="search-outline" size={16} color={theme.textSecondary} />
+                  <TextInput
+                    style={[styles.historySearchInput, { color: theme.textPrimary }]}
+                    placeholder="Search visitor, email, or purpose"
+                    placeholderTextColor={theme.textSecondary}
+                    value={historySearchQuery}
+                    onChangeText={setHistorySearchQuery}
+                  />
+                </View>
+              </View>
+
+              {filteredHistory.length === 0 ? (
+                <View style={styles.emptyHistoryState}>
+                  <Ionicons name="search-outline" size={42} color={theme.textSecondary} />
+                  <Text style={[styles.emptyHistoryTitle, { color: theme.textPrimary }]}>No matching history</Text>
+                  <Text style={[styles.emptyHistorySubtitle, { color: theme.textSecondary }]}>
+                    Try adjusting your status filter or search term.
+                  </Text>
+                </View>
+              ) : (
+                filteredHistory.slice(0, 8).map((visitor) => {
+                  const statusInfo = getStatusColor(visitor.status);
+                  const isToday =
+                    visitor.visitDate &&
+                    new Date(visitor.visitDate).toDateString() === new Date().toDateString();
+
+                  return (
+                    <View
+                      key={visitor._id || visitor.id || `${visitor.email}-${visitor.visitDate}`}
+                      style={[styles.historyItem, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}
+                    >
+                      <View style={styles.historyItemHeader}>
+                        <View style={[styles.historyItemAvatar, { backgroundColor: isDarkMode ? "#1E293B" : "#EFF6FF" }]}>
+                          <Text style={styles.historyItemAvatarText}>
+                            {(visitor.fullName || "V")
+                              .split(" ")
+                              .map((name) => name[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.historyItemInfo}>
+                          <Text style={[styles.historyItemName, { color: theme.textPrimary }]}>{visitor.fullName}</Text>
+                          <Text style={[styles.historyItemEmail, { color: theme.textSecondary }]}>{visitor.email}</Text>
+                          <Text style={[styles.historyItemPurpose, { color: theme.textSecondary }]}>
+                            {visitor.purposeOfVisit || "No purpose provided"}
+                          </Text>
+                        </View>
+                        <View style={[styles.analyticsStatusBadge, { backgroundColor: statusInfo.bg }]}>
+                          <Text style={[styles.analyticsStatusBadgeText, { color: statusInfo.text }]}>
+                            {statusInfo.label}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={[styles.historyItemDetails, { borderTopColor: theme.borderColor }]}>
+                        <View style={styles.historyDetailItem}>
+                          <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} />
+                          <Text style={[styles.historyDetailText, { color: theme.textSecondary }]}>
+                            {formatDate(visitor.visitDate)}
+                          </Text>
+                        </View>
+                        <View style={styles.historyDetailItem}>
+                          <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+                          <Text style={[styles.historyDetailText, { color: theme.textSecondary }]}>
+                            {formatTime(visitor.visitTime)}
+                          </Text>
+                        </View>
+                        <View style={styles.historyDetailItem}>
+                          <Ionicons name="swap-horizontal-outline" size={14} color={isToday ? "#10B981" : theme.textSecondary} />
+                          <Text
+                            style={[
+                              styles.historyDetailText,
+                              isToday ? styles.historyTodayBadge : styles.historyPastBadge,
+                            ]}
+                          >
+                            {isToday ? "Today" : "Past Schedule"}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
           </View>
 
-          <View style={{ marginTop: 14, backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14 }}>
-            <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>History Summary</Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 6 }}>
-              Total: {historyStats.total} | Approved: {historyStats.approved} | Checked In: {historyStats.checkedIn} | Checked Out: {historyStats.checkedOut}
-            </Text>
+          <View style={styles.analyticsSideColumn}>
+            <View style={[styles.distributionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <Text style={[styles.distributionTitle, { color: theme.textPrimary }]}>Selected Date Snapshot</Text>
+              <View style={styles.analyticsDateSummaryRow}>
+                <View style={[styles.analyticsDateSummaryCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsDateSummaryValue, { color: theme.textPrimary }]}>{dateAnalytics.total}</Text>
+                  <Text style={[styles.analyticsDateSummaryLabel, { color: theme.textSecondary }]}>Total Visits</Text>
+                </View>
+                <View style={[styles.analyticsDateSummaryCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsDateSummaryValue, { color: theme.textPrimary }]}>{dateAnalytics.approved}</Text>
+                  <Text style={[styles.analyticsDateSummaryLabel, { color: theme.textSecondary }]}>Approved</Text>
+                </View>
+              </View>
+
+              <View style={[styles.analyticsDateCallout, { backgroundColor: isDarkMode ? "#172554" : "#EFF6FF", borderColor: isDarkMode ? "#1D4ED8" : "#BFDBFE" }]}>
+                <Ionicons name="calendar-clear-outline" size={18} color="#3B82F6" />
+                <View style={styles.analyticsDateCalloutTextWrap}>
+                  <Text style={[styles.analyticsDateCalloutTitle, { color: theme.textPrimary }]}>{selectedDateLabel}</Text>
+                  <Text style={[styles.analyticsDateCalloutSubtitle, { color: theme.textSecondary }]}>
+                    Pending {dateAnalytics.pending} | Rejected {dateAnalytics.rejected}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.analyticsDateVisitorsList}>
+                {selectedDateVisitors.length === 0 ? (
+                  <View style={styles.emptyHistoryState}>
+                    <Ionicons name="calendar-outline" size={36} color={theme.textSecondary} />
+                    <Text style={[styles.emptyHistoryTitle, { color: theme.textPrimary }]}>No visitors scheduled</Text>
+                    <Text style={[styles.emptyHistorySubtitle, { color: theme.textSecondary }]}>
+                      Pick another date to inspect scheduled visits.
+                    </Text>
+                  </View>
+                ) : (
+                  selectedDateVisitors.slice(0, 5).map((visitor) => {
+                    const statusInfo = getStatusColor(visitor.status);
+                    return (
+                      <View
+                        key={visitor._id || visitor.id || `${visitor.email}-${visitor.visitDate}`}
+                        style={[styles.analyticsDateVisitorItem, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}
+                      >
+                        <View style={styles.analyticsDateVisitorInfo}>
+                          <Text style={[styles.analyticsDateVisitorName, { color: theme.textPrimary }]}>{visitor.fullName}</Text>
+                          <Text style={[styles.analyticsDateVisitorMeta, { color: theme.textSecondary }]}>
+                            {formatTime(visitor.visitTime)} | {visitor.purposeOfVisit || "Visit"}
+                          </Text>
+                        </View>
+                        <View style={[styles.analyticsStatusBadge, { backgroundColor: statusInfo.bg }]}>
+                          <Text style={[styles.analyticsStatusBadgeText, { color: statusInfo.text }]}>
+                            {statusInfo.label}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            </View>
+
+            <View style={[styles.distributionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <Text style={[styles.distributionTitle, { color: theme.textPrimary }]}>Status Distribution</Text>
+              <View style={styles.distributionStats}>
+                {distributionItems.map((item) => {
+                  const percent = totalRequests > 0 ? Math.round((item.value / totalRequests) * 100) : 0;
+                  return (
+                    <View key={item.key} style={styles.distributionItem}>
+                      <View style={[styles.distributionDot, { backgroundColor: item.color }]} />
+                      <Text style={[styles.distributionLabel, { color: theme.textPrimary }]}>{item.label}</Text>
+                      <Text style={[styles.distributionValue, { color: theme.textPrimary }]}>{item.value}</Text>
+                      <View style={[styles.distributionBar, { backgroundColor: isDarkMode ? "#334155" : "#E2E8F0" }]}>
+                        <View
+                          style={[
+                            styles.distributionBarFill,
+                            { width: `${percent}%`, backgroundColor: item.color },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.distributionPercent, { color: theme.textSecondary }]}>{percent}%</Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              <View style={styles.analyticsDistributionFooter}>
+                <View style={[styles.analyticsDistributionStat, { borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsDistributionValue, { color: theme.textPrimary }]}>{historyStats.checkedIn}</Text>
+                  <Text style={[styles.analyticsDistributionLabel, { color: theme.textSecondary }]}>Checked In</Text>
+                </View>
+                <View style={[styles.analyticsDistributionStat, { borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsDistributionValue, { color: theme.textPrimary }]}>{historyStats.checkedOut}</Text>
+                  <Text style={[styles.analyticsDistributionLabel, { color: theme.textSecondary }]}>Checked Out</Text>
+                </View>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -1942,6 +2361,62 @@ const loadDashboardData = useCallback(async () => {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.confirmButton, { backgroundColor: "#EF4444" }]} onPress={handleDeleteUser}>
                 <Text style={styles.confirmButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Create User Success Modal */}
+      <Modal
+        visible={showCreateSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseCreateSuccessModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModal, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+            <View style={[styles.createSuccessIcon, isDarkMode && { backgroundColor: "#064E3B" }]}>
+              <Ionicons name="checkmark-circle" size={52} color="#10B981" />
+            </View>
+            <Text style={[styles.confirmTitle, isDarkMode && styles.darkText]}>Account Created</Text>
+            <Text style={[styles.confirmMessage, isDarkMode && styles.darkTextSecondary]}>
+              The new {createdUserSummary?.role?.toLowerCase() || "user"} account has been created successfully.
+            </Text>
+
+            <View style={[styles.createSuccessSummary, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Name</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.name || "N/A"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Email</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.email || "N/A"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Password</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.password || "N/A"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Role</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.role || "N/A"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Employee ID</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.employeeId || "N/A"}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.createSuccessNote, isDarkMode && { backgroundColor: "#172554", borderColor: "#1D4ED8" }]}>
+              <Ionicons name="mail-outline" size={16} color="#3B82F6" />
+              <Text style={[styles.createSuccessNoteText, isDarkMode && { color: "#BFDBFE" }]}>
+                {createdUserSummary?.deliveryNote || "The account details are ready to review."}
+              </Text>
+            </View>
+
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity style={[styles.submitButton, { flex: 1 }]} onPress={handleCloseCreateSuccessModal}>
+                <Text style={styles.submitButtonText}>Continue</Text>
               </TouchableOpacity>
             </View>
           </View>

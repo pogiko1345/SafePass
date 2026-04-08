@@ -1387,6 +1387,72 @@ export default StyleSheet.create({
     color: "#FFF",
   },
 
+  createSuccessIcon: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: "#ECFDF5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+
+  createSuccessSummary: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    backgroundColor: "#F8FAFC",
+    padding: 16,
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  createSuccessRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  createSuccessLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  createSuccessValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+
+  createSuccessNote: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+
+  createSuccessNoteText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#1D4ED8",
+    fontWeight: "600",
+  },
+
   rejectModal: {
     backgroundColor: "#FFF",
     borderRadius: 24,
@@ -1676,6 +1742,12 @@ export default StyleSheet.create({
     marginBottom: 24,
   },
 
+  analyticsHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
   analyticsHeaderTitle: {
     fontSize: 24,
     fontWeight: "700",
@@ -1684,6 +1756,92 @@ export default StyleSheet.create({
 
   analyticsHeaderSubtitle: {
     fontSize: 13,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  analyticsActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+
+  analyticsActionButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E40AF",
+  },
+
+  analyticsHeroCard: {
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    marginBottom: 20,
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "stretch",
+  },
+
+  analyticsHeroContent: {
+    flex: 1,
+  },
+
+  analyticsHeroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginBottom: 12,
+  },
+
+  analyticsHeroBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#4F46E5",
+  },
+
+  analyticsHeroTitle: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsHeroSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+    marginTop: 10,
+  },
+
+  analyticsHeroStats: {
+    width: 180,
+    gap: 12,
+  },
+
+  analyticsHeroStat: {
+    flex: 1,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    justifyContent: "center",
+  },
+
+  analyticsHeroStatValue: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsHeroStatLabel: {
+    fontSize: 12,
     color: "#64748B",
     marginTop: 4,
   },
@@ -1752,6 +1910,138 @@ export default StyleSheet.create({
     fontSize: 11,
     color: "#64748B",
     marginTop: 2,
+  },
+
+  analyticsMetricContent: {
+    flex: 1,
+  },
+
+  analyticsMetricHelper: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+    lineHeight: 16,
+  },
+
+  analyticsSplitGrid: {
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "flex-start",
+  },
+
+  analyticsSplitGridStack: {
+    flexDirection: "column",
+  },
+
+  analyticsPrimaryColumn: {
+    flex: 1.4,
+    gap: 16,
+  },
+
+  analyticsSideColumn: {
+    flex: 1,
+    gap: 16,
+  },
+
+  analyticsChartHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+  },
+
+  analyticsChartSubtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+  },
+
+  analyticsDatasetSelector: {
+    flexDirection: "row",
+    gap: 6,
+    borderRadius: 999,
+    padding: 4,
+  },
+
+  analyticsDatasetButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+
+  analyticsDatasetButtonActive: {
+    backgroundColor: "#3B82F6",
+  },
+
+  analyticsDatasetButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  analyticsQuickStatsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 6,
+  },
+
+  analyticsQuickStat: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+  },
+
+  analyticsQuickStatValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsQuickStatLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  analyticsBarChart: {
+    gap: 12,
+    marginTop: 18,
+  },
+
+  analyticsBarRow: {
+    gap: 7,
+  },
+
+  analyticsBarMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  analyticsBarLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  analyticsBarValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+
+  analyticsBarTrack: {
+    height: 10,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+
+  analyticsBarFill: {
+    height: "100%",
+    borderRadius: 999,
   },
 
   mainStatsGrid: {
@@ -1943,12 +2233,133 @@ export default StyleSheet.create({
     textAlign: "right",
   },
 
+  analyticsDateSummaryRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  analyticsDateSummaryCard: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+  },
+
+  analyticsDateSummaryValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsDateSummaryLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  analyticsDateCallout: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+  },
+
+  analyticsDateCalloutTextWrap: {
+    flex: 1,
+  },
+
+  analyticsDateCalloutTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+
+  analyticsDateCalloutSubtitle: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 2,
+  },
+
+  analyticsDateVisitorsList: {
+    gap: 10,
+  },
+
+  analyticsDateVisitorItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+
+  analyticsDateVisitorInfo: {
+    flex: 1,
+  },
+
+  analyticsDateVisitorName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+
+  analyticsDateVisitorMeta: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  analyticsStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+  },
+
+  analyticsStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+
+  analyticsDistributionFooter: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+
+  analyticsDistributionStat: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
+
+  analyticsDistributionValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsDistributionLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
   // Visitor History Styles
   historyCard: {
     backgroundColor: "#FFF",
     borderRadius: 20,
     padding: 18,
-    marginTop: 20,
+    marginTop: 0,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     ...Platform.select({

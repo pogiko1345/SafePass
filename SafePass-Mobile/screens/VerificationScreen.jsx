@@ -16,6 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import ApiService from "../utils/ApiService";
+import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
 import verificationStyles from "../styles/VerificationStyles";
 
 const Storage = Platform.OS === "web"
@@ -103,6 +104,15 @@ export default function VerificationScreen({ navigation, route }) {
       }),
     ]).start();
   }, []);
+
+  useEffect(() => {
+    if (!userData?.phone) return;
+
+    let cleanPhone = String(userData.phone).replace(/[^\d]/g, "");
+    if (cleanPhone.startsWith("63")) cleanPhone = cleanPhone.slice(2);
+    if (cleanPhone.startsWith("0")) cleanPhone = cleanPhone.slice(1);
+    setPhoneNumber(cleanPhone.slice(0, 10));
+  }, [userData?.phone]);
 
   // Timer for OTP
   useEffect(() => {
@@ -253,8 +263,8 @@ export default function VerificationScreen({ navigation, route }) {
       
       console.log("💾 Storing user data:", finalUser.email, "Role:", finalUser.role);
       
-      // Ensure we persist a real authenticated token after OTP verification.
-      let sessionToken = verificationResponse?.token || null;
+      // Reuse the token returned during credential verification to avoid a second login request.
+      let sessionToken = verificationResponse?.token || tempToken || null;
       if (!sessionToken && email && password) {
         const loginResponse = await ApiService.login(email, password);
         sessionToken = loginResponse?.token || null;
@@ -270,33 +280,25 @@ export default function VerificationScreen({ navigation, route }) {
         console.log("⚠️ Using temporary token fallback");
       }
       
-      const userRole = String(finalUser.role || "visitor").toLowerCase();
+      const userRole = normalizeRole(finalUser.role) || "visitor";
 
       // Store user data
       await storeData("currentUser", JSON.stringify({ ...finalUser, role: userRole }));
       console.log("✅ User data stored");
       
-      // Store email if remember me is checked
+      // Treat remember-me as a trusted device so future logins can follow the faster path.
       if (rememberMe && email) {
         await storeData("rememberedEmail", email);
+        await ApiService.trustDevice();
         console.log("✅ Remembered email stored");
+      } else if (email) {
+        await Storage.removeItem("rememberedEmail");
       }
       
       // Clear new registration flag
-      await storeData("isNewRegistration", "false");
+      await Storage.removeItem("isNewRegistration");
       
-      // Determine dashboard route based on user role
-      let dashboardRoute = 'VisitorDashboard';
-      
-      if (userRole === 'admin') {
-        dashboardRoute = 'AdminDashboard';
-      } else if (userRole === 'security' || userRole === 'guard') {
-        dashboardRoute = 'SecurityDashboard';
-      } else if (userRole === 'staff') {
-        dashboardRoute = 'RoleSelect';
-      } else {
-        dashboardRoute = 'VisitorDashboard';
-      }
+      const dashboardRoute = getDashboardRoute(userRole);
       
       console.log('✅ Verification complete - Navigating to:', dashboardRoute, 'Role:', userRole);
       

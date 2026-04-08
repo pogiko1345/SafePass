@@ -505,6 +505,401 @@ export default StyleSheet.create({
     alignItems: "center",
   },
 
+  // ============ PENDING APPROVAL ============ 
+  pendingApprovalCard: {
+    marginHorizontal: 20,
+    marginTop: -25,
+    borderRadius: 24,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 8px 24px rgba(0,0,0,0.15)" },
+    }),
+  },
+
+  pendingApprovalGradient: {
+    padding: 22,
+  },
+
+  pendingApprovalIconWrap: {
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+    marginBottom: 14,
+  },
+
+  pendingApprovalTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+
+  pendingApprovalText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: "rgba(255,255,255,0.92)",
+    textAlign: "center",
+    marginBottom: 18,
+  },
+
+  pendingApprovalInfoBox: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 18,
+    padding: 16,
+    gap: 10,
+  },
+
+  pendingApprovalInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  pendingApprovalInfoLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  pendingApprovalInfoValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+
+  pendingStepsCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginTop: 18,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.05)" },
+    }),
+  },
+
+  pendingStepsTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 14,
+  },
+
+  pendingStepItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  pendingStepText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#475569",
+  },
+
+  // ============ APPROVED EXPERIENCE ============
+  approvedHeroCard: {
+    marginHorizontal: 20,
+    marginTop: -25,
+    borderRadius: 28,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.16,
+        shadowRadius: 16,
+      },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 10px 28px rgba(15,23,42,0.16)" },
+    }),
+  },
+
+  approvedHeroGradient: {
+    padding: 22,
+  },
+
+  approvedHeroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    marginBottom: 18,
+  },
+
+  approvedHeroBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0F766E",
+  },
+
+  approvedHeroHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 22,
+  },
+
+  approvedHeroAvatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+
+  approvedHeroInitials: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  approvedHeroTextWrap: {
+    flex: 1,
+  },
+
+  approvedHeroTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    lineHeight: 32,
+    color: "#FFFFFF",
+    marginBottom: 6,
+  },
+
+  approvedHeroSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.88)",
+  },
+
+  approvedHeroFacts: {
+    gap: 12,
+  },
+
+  approvedHeroFactCard: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 18,
+    padding: 14,
+  },
+
+  approvedHeroFactLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    color: "rgba(255,255,255,0.7)",
+    marginBottom: 4,
+  },
+
+  approvedHeroFactValue: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  approvedActionSection: {
+    marginHorizontal: 20,
+    marginTop: 20,
+  },
+
+  approvedSectionHeader: {
+    marginBottom: 14,
+  },
+
+  approvedSectionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  approvedSectionSubtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 19,
+  },
+
+  approvedActionGrid: {
+    gap: 14,
+  },
+
+  approvedActionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 3px 10px rgba(15,23,42,0.06)" },
+    }),
+  },
+
+  approvedActionIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  approvedActionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 6,
+  },
+
+  approvedActionText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+  },
+
+  approvedStatusBanner: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#EEF2FF",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+
+  approvedStatusBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#4338CA",
+  },
+
+  approvedInfoCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginTop: 18,
+    padding: 20,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.05)" },
+    }),
+  },
+
+  approvedInfoList: {
+    gap: 14,
+  },
+
+  approvedInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+
+  approvedInfoLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    color: "#94A3B8",
+  },
+
+  approvedInfoValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0F172A",
+  },
+
+  approvedTipsCard: {
+    backgroundColor: "#F8FAFC",
+    marginHorizontal: 20,
+    marginTop: 18,
+    padding: 20,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  approvedTipRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  approvedTipBullet: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#CCFBF1",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 1,
+  },
+
+  approvedTipText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#334155",
+    fontWeight: "500",
+  },
+
   // ============ LOGOUT BUTTON ============
   logoutButton: {
     flexDirection: "row",
