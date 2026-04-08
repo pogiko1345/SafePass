@@ -17,7 +17,6 @@ import {
   Switch,
   Image,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import * as Print from "expo-print";
 import { shareAsync } from "expo-sharing";
@@ -26,6 +25,53 @@ import ApiService from "../utils/ApiService";
 import styles from "../styles/AdminDashboardStyles";
 
 const { width, height } = Dimensions.get("window");
+const Storage = Platform.OS === "web"
+  ? require("../utils/webStorage").default
+  : require("@react-native-async-storage/async-storage");
+
+const storageGetItem = async (key) => {
+  if (Storage && typeof Storage.getItem === "function") {
+    return Storage.getItem(key);
+  }
+  if (typeof window !== "undefined" && window.localStorage) {
+    return window.localStorage.getItem(key);
+  }
+  return null;
+};
+
+const storageSetItem = async (key, value) => {
+  if (Storage && typeof Storage.setItem === "function") {
+    return Storage.setItem(key, value);
+  }
+  if (typeof window !== "undefined" && window.localStorage) {
+    window.localStorage.setItem(key, value);
+  }
+};
+
+const storageRemoveItem = async (key) => {
+  if (Storage && typeof Storage.removeItem === "function") {
+    return Storage.removeItem(key);
+  }
+  if (typeof window !== "undefined" && window.localStorage) {
+    window.localStorage.removeItem(key);
+  }
+};
+
+const storageMultiRemove = async (keys) => {
+  if (Storage && typeof Storage.multiRemove === "function") {
+    return Storage.multiRemove(keys);
+  }
+  await Promise.all((keys || []).map((key) => storageRemoveItem(key)));
+};
+
+const storageClear = async () => {
+  if (Storage && typeof Storage.clear === "function") {
+    return Storage.clear();
+  }
+  if (typeof window !== "undefined" && window.localStorage) {
+    window.localStorage.clear();
+  }
+};
 
 // Helper Functions
 const formatDateTime = (date) => {
@@ -560,26 +606,26 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
   };
 
-  // FIXED: Load Dashboard Data
-  const loadDashboardData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const currentUser = await ApiService.getCurrentUser();
-      if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "security")) {
-        Alert.alert("Access Denied", "You don't have admin privileges.");
-        navigation.replace("Login");
-        return;
-      }
-      setUser(currentUser);
-      await Promise.all([loadAllVisitRequests(), loadAllUsers()]);
-    } catch (error) {
-      console.error("Load dashboard error:", error);
-      Alert.alert("Error", "Failed to load dashboard data. Please try again.");
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+const loadDashboardData = useCallback(async () => {
+  setIsLoading(true);
+  try {
+    const currentUser = await ApiService.getCurrentUser();
+    const role = String(currentUser?.role || "").toLowerCase();
+    if (!currentUser || (role !== "admin" && role !== "security" && role !== "guard")) {
+      Alert.alert("Access Denied", "You don't have admin privileges.");
+      navigation.replace("Login");
+      return;
     }
-  }, [navigation]);
+    setUser(currentUser);
+    await Promise.all([loadAllVisitRequests(), loadAllUsers()]);
+  } catch (error) {
+    console.error("Load dashboard error:", error);
+    Alert.alert("Error", "Failed to load dashboard data. Please try again.");
+  } finally {
+    setIsLoading(false);
+    setRefreshing(false);
+  }
+}, [navigation]);
 
   useEffect(() => {
     loadDashboardData();
@@ -592,13 +638,13 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const savedSettings = await AsyncStorage.getItem("adminSettings");
+        const savedSettings = await storageGetItem("adminSettings");
         if (savedSettings) {
           const parsedSettings = JSON.parse(savedSettings);
           setSettings(parsedSettings);
           setIsDarkMode(parsedSettings.darkMode || false);
         }
-        const darkModePref = await AsyncStorage.getItem("isDarkMode");
+        const darkModePref = await storageGetItem("isDarkMode");
         if (darkModePref !== null) {
           const isDark = JSON.parse(darkModePref);
           setIsDarkMode(isDark);
@@ -708,8 +754,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         onPress: async () => {
           try {
             setIsLoading(true);
-            await AsyncStorage.multiRemove(["userToken", "userData", "currentUser", "trustedDevice", "isNewRegistration"]);
-            await AsyncStorage.removeItem("adminSettings");
+            await storageMultiRemove(["userToken", "authToken", "userData", "currentUser", "trustedDevice", "isNewRegistration"]);
+            await storageRemoveItem("adminSettings");
             try {
               await ApiService.logout();
             } catch (e) {
@@ -1002,16 +1048,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         style: "destructive",
         onPress: async () => {
           try {
-<<<<<<< HEAD
-            const response = await ApiService.deleteUser(selectedUser._id);
-            if (response && (response.success || response.message)) {
-              const updatedUsers = allUsers.filter(user => user._id !== selectedUser._id && user.id !== selectedUser._id);
-=======
             const response = await ApiService.deleteUser(selectedId);
             if (response?.success) {
               // Update local state immediately
               const updatedUsers = allUsers.filter(user => user._id !== selectedId && user.id !== selectedId);
->>>>>>> 80d14ef84165ee7182e58eb7a0ce6cb4f9bc8a81
+
               setAllUsers(updatedUsers);
               setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
               setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
@@ -1042,14 +1083,14 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     setSettings((prev) => ({ ...prev, [key]: value }));
     if (key === "darkMode") {
       setIsDarkMode(value);
-      AsyncStorage.setItem("isDarkMode", JSON.stringify(value));
+      storageSetItem("isDarkMode", JSON.stringify(value));
     }
   };
 
   const saveSettings = async () => {
     setIsSavingSettings(true);
     try {
-      await AsyncStorage.setItem("adminSettings", JSON.stringify(settings));
+      await storageSetItem("adminSettings", JSON.stringify(settings));
       const response = await ApiService.updateSystemSettings(settings);
       Alert.alert("Success", response?.success ? "Settings saved successfully!" : "Settings saved locally!");
     } catch (error) {
@@ -1113,7 +1154,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         style: "destructive",
         onPress: async () => {
           try {
-            await AsyncStorage.clear();
+            await storageClear();
             Alert.alert("Success", "All system data has been cleared");
             navigation.replace("Login");
           } catch (error) {
@@ -1157,8 +1198,227 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
   };
 
-  // Keep all existing render functions (renderBarChart, renderAnalyticsContent, renderSettingsContent, renderDashboardContent)
-  // ... (these remain the same as in your original code)
+  const renderBarChart = (labels, data) => {
+    const max = Math.max(...(data || [0]), 1);
+    return (
+      <View style={{ gap: 8, marginTop: 12 }}>
+        {(labels || []).map((label, index) => {
+          const value = data?.[index] || 0;
+          const percentage = Math.max(4, Math.round((value / max) * 100));
+          return (
+            <View key={`${label}-${index}`} style={{ gap: 4 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{label}</Text>
+                <Text style={{ color: theme.textPrimary, fontSize: 12, fontWeight: "600" }}>{value}</Text>
+              </View>
+              <View style={{ height: 8, backgroundColor: isDarkMode ? "#334155" : "#E2E8F0", borderRadius: 6 }}>
+                <View style={{ width: `${percentage}%`, height: 8, borderRadius: 6, backgroundColor: "#3B82F6" }} />
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderRequestCard = (request) => {
+    const id = getId(request) || `${request?.email || "request"}-${request?.visitDate || request?.createdAt || Date.now()}`;
+    const statusInfo = getStatusColor(request?.status);
+
+    return (
+      <TouchableOpacity
+        key={id}
+        activeOpacity={0.85}
+        onPress={() => {
+          setSelectedRequest(request);
+          setShowRequestDetailsModal(true);
+        }}
+        style={{
+          marginTop: 10,
+          backgroundColor: theme.cardBackground,
+          borderColor: theme.borderColor,
+          borderWidth: 1,
+          borderRadius: 12,
+          padding: 12,
+        }}
+      >
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: "700" }}>
+              {request?.fullName || "Unknown Visitor"}
+            </Text>
+            <Text style={{ color: theme.textSecondary, marginTop: 2 }}>
+              {request?.email || "No email"}
+            </Text>
+            <Text style={{ color: theme.textSecondary, marginTop: 2, fontSize: 12 }}>
+              {request?.purposeOfVisit || "No purpose provided"}
+            </Text>
+            <Text style={{ color: theme.textSecondary, marginTop: 4, fontSize: 12 }}>
+              {formatDateTime(request?.visitDate || request?.createdAt)}
+            </Text>
+          </View>
+
+          <View style={{ alignItems: "flex-end" }}>
+            <View style={{ backgroundColor: statusInfo.bg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+              <Text style={{ color: statusInfo.text, fontSize: 11, fontWeight: "700" }}>{statusInfo.label}</Text>
+            </View>
+            <Text style={{ color: theme.textSecondary, marginTop: 8, fontSize: 11 }}>
+              {formatDate(request?.createdAt)}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderDashboardContent = () => (
+    <ScrollView
+      style={styles.contentScrollView}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <View style={styles.pageContainer}>
+        <View style={styles.pageHeader}>
+          <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Dashboard Overview</Text>
+          <TouchableOpacity onPress={loadDashboardData}>
+            <Ionicons name="refresh-outline" size={22} color="#3B82F6" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+          {[
+            { label: "Pending Requests", value: stats.pendingRequests, color: "#F59E0B" },
+            { label: "Approved Today", value: stats.approvedRequests, color: "#10B981" },
+            { label: "Total Users", value: stats.totalUsers, color: "#3B82F6" },
+            { label: "Active Users", value: stats.activeUsers, color: "#8B5CF6" },
+          ].map((item) => (
+            <View
+              key={item.label}
+              style={{
+                width: width > 1200 ? "24%" : width > 900 ? "48%" : "100%",
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.borderColor,
+                borderWidth: 1,
+                borderRadius: 14,
+                padding: 14,
+              }}
+            >
+              <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{item.label}</Text>
+              <Text style={{ color: item.color, fontSize: 22, fontWeight: "700", marginTop: 6 }}>{item.value || 0}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View
+          style={{
+            marginTop: 14,
+            backgroundColor: theme.cardBackground,
+            borderColor: theme.borderColor,
+            borderWidth: 1,
+            borderRadius: 14,
+            padding: 14,
+          }}
+        >
+          <Text style={{ color: theme.textPrimary, fontSize: 16, fontWeight: "700" }}>Recent Pending Requests</Text>
+          {pendingRequests.length ? pendingRequests.slice(0, 5).map((request) => renderRequestCard(request)) : (
+            <Text style={{ marginTop: 10, color: theme.textSecondary }}>No pending requests right now.</Text>
+          )}
+        </View>
+      </View>
+    </ScrollView>
+  );
+
+  const renderAnalyticsContent = () => {
+    const chart = getCurrentChartData();
+    const historyStats = getHistoryStats();
+    return (
+      <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.pageContainer}>
+          <View style={styles.pageHeader}>
+            <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Analytics</Text>
+            <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+              <Ionicons name="calendar-outline" size={22} color="#3B82F6" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14 }}>
+            <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>Selected Date</Text>
+            <Text style={{ color: theme.textSecondary, marginTop: 4 }}>{formatDateTime(selectedDate)}</Text>
+            <Text style={{ color: theme.textSecondary, marginTop: 8 }}>
+              Total: {dateAnalytics.total} | Approved: {dateAnalytics.approved} | Pending: {dateAnalytics.pending} | Rejected: {dateAnalytics.rejected}
+            </Text>
+          </View>
+
+          <View style={{ marginTop: 14, backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14 }}>
+            <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>Visitor Trend ({activeChartDataset})</Text>
+            {renderBarChart(chart.labels, chart.data)}
+          </View>
+
+          <View style={{ marginTop: 14, backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14 }}>
+            <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>History Summary</Text>
+            <Text style={{ color: theme.textSecondary, marginTop: 6 }}>
+              Total: {historyStats.total} | Approved: {historyStats.approved} | Checked In: {historyStats.checkedIn} | Checked Out: {historyStats.checkedOut}
+            </Text>
+          </View>
+        </View>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display={Platform.OS === "ios" ? "spinner" : "default"}
+            onChange={(event, date) => {
+              setShowDatePicker(false);
+              if (date) {
+                setSelectedDate(date);
+                calculateDateAnalytics(date);
+              }
+            }}
+          />
+        )}
+      </ScrollView>
+    );
+  };
+
+  const renderSettingsContent = () => (
+    <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+      <View style={styles.pageContainer}>
+        <View style={styles.pageHeader}>
+          <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Settings</Text>
+        </View>
+
+        <View style={{ backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14, gap: 14 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ color: theme.textPrimary }}>Dark Mode</Text>
+            <Switch value={!!settings.darkMode} onValueChange={(value) => updateSetting("darkMode", value)} />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ color: theme.textPrimary }}>Email Notifications</Text>
+            <Switch value={!!settings.emailNotifications} onValueChange={(value) => updateSetting("emailNotifications", value)} />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ color: theme.textPrimary }}>SMS Alerts</Text>
+            <Switch value={!!settings.smsAlerts} onValueChange={(value) => updateSetting("smsAlerts", value)} />
+          </View>
+        </View>
+
+        <View style={{ marginTop: 14, flexDirection: "row", gap: 10 }}>
+          <TouchableOpacity style={[styles.submitButton, { flex: 1 }]} onPress={saveSettings} disabled={isSavingSettings}>
+            {isSavingSettings ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Save</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={resetSettings}>
+            <Text style={styles.cancelButtonText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ marginTop: 10 }}>
+          <TouchableOpacity style={[styles.cancelButton, { backgroundColor: "#FEE2E2" }]} onPress={clearSystemData}>
+            <Text style={[styles.cancelButtonText, { color: "#B91C1C" }]}>Clear System Data</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </ScrollView>
+  );
 
   if (isLoading) {
     return (

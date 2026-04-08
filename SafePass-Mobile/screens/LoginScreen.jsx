@@ -123,22 +123,28 @@ export default function LoginScreen({ navigation, route }) {
         return;
       }
       
-      const token = await AsyncStorage.getItem('authToken');
+<<<<<<< HEAD
+      const token = await ApiService.getToken();
+=======
+      const token = await AsyncStorage.getItem('userToken');
+>>>>>>> f735fcfb39f1a77210269c587a689128e37f12a1
       const userJson = await AsyncStorage.getItem('currentUser');
       
       if (token && userJson) {
         const user = JSON.parse(userJson);
         console.log("🔑 Auto-login detected for:", user.email);
         
+        const normalizedRole = String(user.role || "").toLowerCase();
+
         // Check if visitor is pending
-        if (user.role === 'visitor' && user.status === 'pending') {
+        if (normalizedRole === 'visitor' && user.status === 'pending') {
           console.log("Visitor pending - clearing token");
           await ApiService.clearAuth();
           setIsCheckingAuth(false);
           return;
         }
         
-        const route = getInitialRoute(user);
+        const route = getInitialRoute({ ...user, role: normalizedRole });
         navigation.reset({
           index: 0,
           routes: [{ name: route }],
@@ -493,6 +499,7 @@ export default function LoginScreen({ navigation, route }) {
   const getInitialRoute = (user) => {
     switch(user?.role) {
       case 'security': 
+      case 'guard':
         return "SecurityDashboard";
       case 'admin': 
         return "AdminDashboard";

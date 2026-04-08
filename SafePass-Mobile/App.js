@@ -41,8 +41,9 @@ const Stack = createNativeStackNavigator();
 
 const getInitialRoute = (user) => {
   if (!user) return "RoleSelect";
+  const role = String(user.role || "").toLowerCase();
   
-  switch (user.role) {
+  switch (role) {
     case "security":
     case "guard":
       return "SecurityDashboard";
@@ -89,13 +90,25 @@ export default function App() {
         return;
       }
       
-      const user = await ApiService.getCurrentUser();
+      const [user, token] = await Promise.all([
+        ApiService.getCurrentUser(),
+        ApiService.getToken(),
+      ]);
       console.log("App.js checkAuthStatus - User found:", user ? "Yes" : "No");
       
       if (user) {
+        if (!token) {
+          console.log("User cache exists but auth token is missing. Clearing stale auth state.");
+          await ApiService.clearAuth();
+          setCurrentUser(null);
+          return;
+        }
+
+        const normalizedRole = String(user.role || "").toLowerCase();
+        const normalizedUser = { ...user, role: normalizedRole };
         const validRoles = ['visitor', 'security', 'guard', 'admin'];
-        if (validRoles.includes(user.role)) {
-          setCurrentUser(user);
+        if (validRoles.includes(normalizedRole)) {
+          setCurrentUser(normalizedUser);
         } else {
           console.log("Invalid user role detected:", user.role);
           setCurrentUser(null);

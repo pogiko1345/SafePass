@@ -1,6 +1,6 @@
 {
   "files": {
-    "main.js": "/static/js/main.234cd042.js",
+    "main.js": "/static/js/main.fe2807d6.js",
     "static/js/253.c945bb4c.js": "/static/js/253.c945bb4c.js",
     "static/media/MaterialCommunityIcons.ttf": "/static/media/MaterialCommunityIcons.1fcc36272ea3e53d0031.ttf",
     "static/media/Ionicons.ttf": "/static/media/Ionicons.40518f95b2e2a69c5c07.ttf",
@@ -10,11 +10,11 @@
     "asyncStorageMock.js": "/asyncStorageMock.js",
     "manifest.json": "/manifest.json",
     "serve.json": "/serve.json",
-    "main.234cd042.js.map": "/static/js/main.234cd042.js.map",
+    "main.fe2807d6.js.map": "/static/js/main.fe2807d6.js.map",
     "253.c945bb4c.js.map": "/static/js/253.c945bb4c.js.map"
   },
   "entrypoints": [
     "static/js/253.c945bb4c.js",
-    "static/js/main.234cd042.js"
+    "static/js/main.fe2807d6.js"
   ]
 }

@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, required: true },
   role: { 
     type: String, 
-    enum: ['visitor', 'security', 'admin'],
+    enum: ['visitor', 'security', 'guard', 'admin'],
     default: 'visitor'
   },
   status: {
@@ -110,7 +110,7 @@ const seedDatabase = async () => {
         email: 'security@sapphire.edu',  // ← MATCHES YOUR SERVER.JS
         password: await bcrypt.hash('Security123!', 10),  // ← MATCHES YOUR SERVER.JS
         phone: '09123456780',
-        role: 'security',
+        role: 'guard',
         status: 'active',
         isActive: true,
         badgeNumber: 'SEC-001',
