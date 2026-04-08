@@ -28,14 +28,27 @@ class ApiService {
     this.token = token;
     if (token) {
       await AsyncStorage.setItem("userToken", token);
+      // Backward compatibility for older screens still reading authToken.
+      await AsyncStorage.setItem("authToken", token);
     } else {
       await AsyncStorage.removeItem("userToken");
+      await AsyncStorage.removeItem("authToken");
     }
   }
 
   async getToken() {
     if (!this.token) {
-      this.token = await AsyncStorage.getItem("userToken");
+      const userToken = await AsyncStorage.getItem("userToken");
+      if (userToken) {
+        this.token = userToken;
+      } else {
+        // Backward compatibility: migrate legacy authToken to userToken.
+        const legacyToken = await AsyncStorage.getItem("authToken");
+        if (legacyToken) {
+          this.token = legacyToken;
+          await AsyncStorage.setItem("userToken", legacyToken);
+        }
+      }
     }
     return this.token;
   }
@@ -44,6 +57,7 @@ class ApiService {
     this.token = null;
     await AsyncStorage.multiRemove([
       "userToken",
+      "authToken",
       "currentUser",
       "trustedDevice",
       "isNewRegistration"

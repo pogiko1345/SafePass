@@ -254,15 +254,17 @@ export default function VerificationScreen({ navigation, route }) {
       // FIXED: Use safe storage functions
       // Store the auth token
       if (verificationResponse?.token) {
-        await storeData("authToken", verificationResponse.token);
+        await ApiService.setToken(verificationResponse.token);
         console.log("✅ Auth token stored");
       } else if (tempToken) {
-        await storeData("authToken", tempToken);
+        await ApiService.setToken(tempToken);
         console.log("✅ Temp token stored");
       }
       
+      const userRole = String(finalUser.role || "visitor").toLowerCase();
+
       // Store user data
-      await storeData("currentUser", JSON.stringify(finalUser));
+      await storeData("currentUser", JSON.stringify({ ...finalUser, role: userRole }));
       console.log("✅ User data stored");
       
       // Store email if remember me is checked
@@ -275,7 +277,6 @@ export default function VerificationScreen({ navigation, route }) {
       await storeData("isNewRegistration", "false");
       
       // Determine dashboard route based on user role
-      const userRole = finalUser.role || 'visitor';
       let dashboardRoute = 'VisitorDashboard';
       
       if (userRole === 'admin') {

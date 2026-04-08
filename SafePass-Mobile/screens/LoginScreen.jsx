@@ -123,22 +123,24 @@ export default function LoginScreen({ navigation, route }) {
         return;
       }
       
-      const token = await AsyncStorage.getItem('authToken');
+      const token = await ApiService.getToken();
       const userJson = await AsyncStorage.getItem('currentUser');
       
       if (token && userJson) {
         const user = JSON.parse(userJson);
         console.log("🔑 Auto-login detected for:", user.email);
         
+        const normalizedRole = String(user.role || "").toLowerCase();
+
         // Check if visitor is pending
-        if (user.role === 'visitor' && user.status === 'pending') {
+        if (normalizedRole === 'visitor' && user.status === 'pending') {
           console.log("Visitor pending - clearing token");
           await ApiService.clearAuth();
           setIsCheckingAuth(false);
           return;
         }
         
-        const route = getInitialRoute(user);
+        const route = getInitialRoute({ ...user, role: normalizedRole });
         navigation.reset({
           index: 0,
           routes: [{ name: route }],
