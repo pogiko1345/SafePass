@@ -564,8 +564,19 @@ const loadAllUsers = async () => {
 const loadDashboardData = useCallback(async () => {
   setIsLoading(true);
   try {
-    const currentUser = await ApiService.getCurrentUser();
-    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "security")) {
+    const [currentUser, token] = await Promise.all([
+      ApiService.getCurrentUser(),
+      ApiService.getToken(),
+    ]);
+
+    if (!token) {
+      await ApiService.clearAuth();
+      Alert.alert("Session Expired", "Please login again.");
+      navigation.replace("Login");
+      return;
+    }
+
+    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "security" && currentUser.role !== "guard")) {
       Alert.alert("Access Denied", "You don't have admin privileges.");
       navigation.replace("Login");
       return;
