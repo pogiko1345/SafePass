@@ -422,6 +422,46 @@ app.put("/api/profile", authMiddleware, async (req, res) => {
   }
 });
 
+// 4b. CHANGE PASSWORD (Protected)
+app.put("/api/auth/change-password", authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Current and new passwords are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ success: false, message: "New password must be at least 6 characters" });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const isPasswordValid = await user.comparePassword(currentPassword);
+    if (!isPasswordValid) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Current password is incorrect" });
+    }
+
+    user.password = newPassword;
+    user.updatedAt = new Date();
+    await user.save();
+
+    res.json({ success: true, message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ success: false, message: "Failed to change password" });
+  }
+});
+
 // 5. CHECK EMAIL EXISTS
 app.post("/api/check-email", async (req, res) => {
   try {
@@ -1004,7 +1044,7 @@ app.get("/api/admin/security", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const guards = await User.find({ role: "guard" })
+    const guards = await User.find({ role: { $in: ["guard", "security"] } })
       .select("-password")
       .sort({ createdAt: -1 });
 
@@ -1017,6 +1057,38 @@ app.get("/api/admin/security", authMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get security guards",
+    });
+  }
+});
+
+// Get security guard by ID
+app.get("/api/admin/security/:id", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const guard = await User.findOne({
+      _id: req.params.id,
+      role: { $in: ["guard", "security"] },
+    }).select("-password");
+
+    if (!guard) {
+      return res.status(404).json({
+        success: false,
+        message: "Security guard not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      guard,
+    });
+  } catch (error) {
+    console.error("Get security guard by ID error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get security guard",
     });
   }
 });
@@ -1125,6 +1197,52 @@ app.put("/api/admin/security/:id/shift", authMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to assign shift",
+    });
+  }
+});
+
+// Get guard attendance logs (derived from access logs)
+app.get("/api/admin/security/:id/attendance", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const { startDate, endDate, limit = 100 } = req.query;
+
+    const guard = await User.findById(req.params.id).select("email firstName lastName");
+    if (!guard) {
+      return res.status(404).json({
+        success: false,
+        message: "Security guard not found",
+      });
+    }
+
+    const query = { userEmail: guard.email };
+    if (startDate || endDate) {
+      query.timestamp = {};
+      if (startDate) query.timestamp.$gte = new Date(startDate);
+      if (endDate) query.timestamp.$lte = new Date(endDate);
+    }
+
+    const attendance = await AccessLog.find(query)
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit));
+
+    res.json({
+      success: true,
+      attendance,
+      guard: {
+        id: guard._id,
+        name: `${guard.firstName || ""} ${guard.lastName || ""}`.trim(),
+        email: guard.email,
+      },
+    });
+  } catch (error) {
+    console.error("Get guard attendance error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get guard attendance",
     });
   }
 });
@@ -1693,6 +1811,60 @@ app.get("/api/visitors/:id", authMiddleware, async (req, res) => {
       success: false,
       message: "Failed to fetch visitor",
     });
+  }
+});
+
+// Update visitor (admin/security)
+app.put("/api/visitors/:id", authMiddleware, async (req, res) => {
+  try {
+    if (!["admin", "security", "guard"].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const updates = { ...req.body };
+    delete updates._id;
+    delete updates.__v;
+    delete updates.registeredAt;
+
+    const visitor = await Visitor.findByIdAndUpdate(
+      req.params.id,
+      { ...updates, updatedAt: new Date() },
+      { new: true, runValidators: true },
+    );
+
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Visitor not found" });
+    }
+
+    res.json({ success: true, message: "Visitor updated successfully", visitor });
+  } catch (error) {
+    console.error("Update visitor error:", error);
+    res.status(500).json({ success: false, message: "Failed to update visitor" });
+  }
+});
+
+// Delete visitor (admin only)
+app.delete("/api/visitors/:id", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Visitor not found" });
+    }
+
+    await Visitor.findByIdAndDelete(req.params.id);
+
+    if (visitor.email) {
+      await User.deleteOne({ email: visitor.email.toLowerCase().trim(), role: "visitor" });
+    }
+
+    res.json({ success: true, message: "Visitor deleted successfully" });
+  } catch (error) {
+    console.error("Delete visitor error:", error);
+    res.status(500).json({ success: false, message: "Failed to delete visitor" });
   }
 });
 

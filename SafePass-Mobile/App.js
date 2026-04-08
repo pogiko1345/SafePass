@@ -44,6 +44,7 @@ const getInitialRoute = (user) => {
   
   switch (user.role) {
     case "security":
+    case "guard":
       return "SecurityDashboard";
     case "admin":
       return "AdminDashboard";
@@ -92,7 +93,7 @@ export default function App() {
       console.log("App.js checkAuthStatus - User found:", user ? "Yes" : "No");
       
       if (user) {
-        const validRoles = ['visitor', 'security', 'admin'];
+        const validRoles = ['visitor', 'security', 'guard', 'admin'];
         if (validRoles.includes(user.role)) {
           setCurrentUser(user);
         } else {
