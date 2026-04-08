@@ -255,17 +255,14 @@ export default function VerificationScreen({ navigation, route }) {
       // Store the auth token
       if (verificationResponse?.token) {
         await ApiService.setToken(verificationResponse.token);
-<<<<<<< HEAD
         console.log("✅ Auth token stored");
       } else if (tempToken) {
         await ApiService.setToken(tempToken);
-=======
         await storeData("userToken", verificationResponse.token);
         console.log("✅ Auth token stored");
       } else if (tempToken) {
         await ApiService.setToken(tempToken);
         await storeData("userToken", tempToken);
->>>>>>> f735fcfb39f1a77210269c587a689128e37f12a1
         console.log("✅ Temp token stored");
       }
       

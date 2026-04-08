@@ -123,11 +123,7 @@ export default function LoginScreen({ navigation, route }) {
         return;
       }
       
-<<<<<<< HEAD
-      const token = await ApiService.getToken();
-=======
       const token = await AsyncStorage.getItem('userToken');
->>>>>>> f735fcfb39f1a77210269c587a689128e37f12a1
       const userJson = await AsyncStorage.getItem('currentUser');
       
       if (token && userJson) {
