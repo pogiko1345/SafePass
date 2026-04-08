@@ -310,6 +310,15 @@ async verifyCredentials(email, password) {
   }
 }
 
+generateRandomPassword(length = 10) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
   async requestOtp(phoneNumber, method = 'sms') {
     try {
       const response = await this.fetch("/auth/request-otp", {
