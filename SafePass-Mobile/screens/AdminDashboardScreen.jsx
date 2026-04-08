@@ -1221,6 +1221,56 @@ const loadDashboardData = useCallback(async () => {
     );
   };
 
+  const renderRequestCard = (request) => {
+    const id = getId(request) || `${request?.email || "request"}-${request?.visitDate || request?.createdAt || Date.now()}`;
+    const statusInfo = getStatusColor(request?.status);
+
+    return (
+      <TouchableOpacity
+        key={id}
+        activeOpacity={0.85}
+        onPress={() => {
+          setSelectedRequest(request);
+          setShowRequestDetailsModal(true);
+        }}
+        style={{
+          marginTop: 10,
+          backgroundColor: theme.cardBackground,
+          borderColor: theme.borderColor,
+          borderWidth: 1,
+          borderRadius: 12,
+          padding: 12,
+        }}
+      >
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: "700" }}>
+              {request?.fullName || "Unknown Visitor"}
+            </Text>
+            <Text style={{ color: theme.textSecondary, marginTop: 2 }}>
+              {request?.email || "No email"}
+            </Text>
+            <Text style={{ color: theme.textSecondary, marginTop: 2, fontSize: 12 }}>
+              {request?.purposeOfVisit || "No purpose provided"}
+            </Text>
+            <Text style={{ color: theme.textSecondary, marginTop: 4, fontSize: 12 }}>
+              {formatDateTime(request?.visitDate || request?.createdAt)}
+            </Text>
+          </View>
+
+          <View style={{ alignItems: "flex-end" }}>
+            <View style={{ backgroundColor: statusInfo.bg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+              <Text style={{ color: statusInfo.text, fontSize: 11, fontWeight: "700" }}>{statusInfo.label}</Text>
+            </View>
+            <Text style={{ color: theme.textSecondary, marginTop: 8, fontSize: 11 }}>
+              {formatDate(request?.createdAt)}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderDashboardContent = () => (
     <ScrollView
       style={styles.contentScrollView}

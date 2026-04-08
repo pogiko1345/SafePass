@@ -236,8 +236,18 @@ export default function SecurityDashboardScreen({ navigation }) {
   // ============ DATA LOADING FUNCTIONS ============
   const loadUserData = async () => {
     try {
-      const currentUser = await ApiService.getCurrentUser();
-      if (!currentUser || (currentUser.role !== 'security' && currentUser.role !== 'admin')) {
+      const [currentUser, token] = await Promise.all([
+        ApiService.getCurrentUser(),
+        ApiService.getToken(),
+      ]);
+
+      if (!token) {
+        await ApiService.clearAuth();
+        navigation.replace("Login");
+        return;
+      }
+
+      if (!currentUser || !['security', 'guard', 'admin'].includes(currentUser.role)) {
         navigation.replace("Login");
         return;
       }
@@ -260,28 +270,28 @@ export default function SecurityDashboardScreen({ navigation }) {
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      
-      const todayVisitors = await ApiService.getVisitors({
-        visitDate: { $gte: today, $lt: tomorrow }
+
+      const allVisitorsRes = await ApiService.getVisitors({});
+      const allVisitors = allVisitorsRes.visitors || [];
+      const todayVisitors = allVisitors.filter((visitor) => {
+        const visitDate = new Date(visitor.visitDate);
+        return visitDate >= today && visitDate < tomorrow;
       });
-      
-      const alertsRes = await ApiService.getSecurityLogs({ 
-        type: 'alert',
-        resolved: false 
-      });
+
+      const alertsRes = await ApiService.getNotifications({ read: false });
       
       const accessLogs = await ApiService.getAccessLogs(1, 10);
       
       setDashboardStats({
         activeUsers: activeUsersList.length,
-        totalVisitorsToday: todayVisitors.visitors?.length || 0,
-        activeAlerts: alertsRes.logs?.length || 0,
+        totalVisitorsToday: todayVisitors.length,
+        activeAlerts: alertsRes.notifications?.length || 0,
         recentAccess: accessLogs.accessLogs?.length || 0,
         occupancyRate: await calculateOccupancyRate(),
       });
       
       setRecentAccess(accessLogs.accessLogs || []);
-      setAlerts(alertsRes.logs || []);
+      setAlerts(alertsRes.notifications || []);
       
     } catch (error) {
       console.error("Load dashboard error:", error);
@@ -301,19 +311,12 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const loadVisitors = async () => {
     try {
-      const [activeRes, pendingRes, approvedRes, completedRes, allRes] = await Promise.all([
-        ApiService.getVisitors({ status: 'checked_in' }),
-        ApiService.getVisitors({ approvalStatus: 'pending' }),
-        ApiService.getVisitors({ approvalStatus: 'approved', status: { $ne: 'checked_in' } }),
-        ApiService.getVisitors({ status: 'checked_out' }),
-        ApiService.getVisitors({}),
-      ]);
-      
-      const active = activeRes.visitors || [];
-      const pending = pendingRes.visitors || [];
-      const approved = approvedRes.visitors || [];
-      const completed = completedRes.visitors || [];
+      const allRes = await ApiService.getVisitors({});
       const all = allRes.visitors || [];
+      const active = all.filter((visitor) => visitor.status === 'checked_in');
+      const pending = all.filter((visitor) => visitor.approvalStatus === 'pending');
+      const approved = all.filter((visitor) => visitor.approvalStatus === 'approved' && visitor.status !== 'checked_in');
+      const completed = all.filter((visitor) => visitor.status === 'checked_out');
       
       setVisitors({ active, pending, approved, completed, all });
       
