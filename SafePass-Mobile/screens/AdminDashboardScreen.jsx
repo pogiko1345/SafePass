@@ -117,7 +117,7 @@ const getRoleIcon = (role) => {
   }
 };
 
-export default function AdminDashboardScreen({ navigation }) {
+export default function AdminDashboardScreen({ navigation, onLogout }) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const mainScrollViewRef = useRef(null);
   const sidebarScrollViewRef = useRef(null);
@@ -667,6 +667,8 @@ const loadDashboardData = useCallback(async () => {
     setActiveMenu(action);
     setCurrentPage(1);
     switch (action) {
+      case "dashboard":
+        break;
       case "requests":
         setRequestFilter("pending");
         loadAllVisitRequests();
@@ -712,6 +714,9 @@ const loadDashboardData = useCallback(async () => {
               await ApiService.logout();
             } catch (e) {
               console.log("Logout API error (ignored):", e);
+            }
+            if (typeof onLogout === "function") {
+              onLogout();
             }
             navigation.reset({ index: 0, routes: [{ name: "Login" }] });
           } catch (error) {
@@ -996,6 +1001,12 @@ const confirmEditUser = async () => {
 
   // FIXED: Delete user with proper state update
   const handleDeleteUser = () => {
+    const selectedId = selectedUser?._id || selectedUser?.id;
+    if (!selectedId) {
+      Alert.alert("Error", "Cannot find user ID. Please refresh and try again.");
+      return;
+    }
+
     Alert.alert("Delete User", `Delete ${selectedUser?.firstName} ${selectedUser?.lastName}? This action cannot be undone.`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -1003,10 +1014,10 @@ const confirmEditUser = async () => {
         style: "destructive",
         onPress: async () => {
           try {
-            const response = await ApiService.deleteUser(selectedUser._id);
+            const response = await ApiService.deleteUser(selectedId);
             if (response?.success) {
               // Update local state immediately
-              const updatedUsers = allUsers.filter(user => user._id !== selectedUser._id && user.id !== selectedUser._id);
+              const updatedUsers = allUsers.filter(user => user._id !== selectedId && user.id !== selectedId);
               setAllUsers(updatedUsers);
               setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
               setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
