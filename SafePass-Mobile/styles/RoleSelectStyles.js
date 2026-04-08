@@ -1,17 +1,11 @@
-// RoleSelectStyles.js - Updated with Side-by-Side Box Styles
 import { StyleSheet, Platform, Dimensions } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 
-// Device breakpoints
 const isSmallPhone = width <= 375;
-const isMediumPhone = width > 375 && width <= 414;
-const isLargePhone = width > 414 && width < 768;
 const isTablet = width >= 768 && width < 1024;
-const isDesktop = width >= 1024;
 
-// Responsive font sizes
 const fontSizes = {
   xs: isSmallPhone ? 11 : 12,
   sm: isSmallPhone ? 13 : 14,
@@ -19,26 +13,22 @@ const fontSizes = {
   lg: isSmallPhone ? 18 : 20,
   xl: isSmallPhone ? 22 : 24,
   xxl: isSmallPhone ? 28 : 32,
-  xxxl: isSmallPhone ? 32 : 36,
 };
 
-// Responsive spacing
 const spacing = {
   xs: isSmallPhone ? 6 : 8,
   sm: isSmallPhone ? 12 : 16,
   base: isSmallPhone ? 16 : 20,
+  md: isSmallPhone ? 18 : 22,
   lg: isSmallPhone ? 20 : 24,
   xl: isSmallPhone ? 24 : 32,
   xxl: isSmallPhone ? 32 : 40,
-  xxxl: isSmallPhone ? 40 : 48,
-  md: isSmallPhone ? 18 : 22,
 };
 
 export default StyleSheet.create({
-  // ============ CONTAINERS ============
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4F8FC",
   },
 
   scrollContainer: {
@@ -46,126 +36,215 @@ export default StyleSheet.create({
     paddingBottom: spacing.lg,
   },
 
-  // ============ HERO SECTION ============
   heroWrapper: {
     width: "100%",
   },
 
   hero: {
     paddingTop: Platform.select({
-      ios: isSmallPhone ? 60 : 80,
-      android: isSmallPhone ? 50 : 70,
-      web: isSmallPhone ? 40 : 60,
+      ios: isSmallPhone ? 58 : 78,
+      android: isSmallPhone ? 48 : 68,
+      web: isSmallPhone ? 42 : 56,
     }),
-    paddingBottom: isSmallPhone ? 40 : 50,
-    borderBottomLeftRadius: isSmallPhone ? 28 : 32,
-    borderBottomRightRadius: isSmallPhone ? 28 : 32,
+    paddingBottom: isSmallPhone ? 38 : 48,
+    borderBottomLeftRadius: isSmallPhone ? 28 : 34,
+    borderBottomRightRadius: isSmallPhone ? 28 : 34,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
     ...Platform.select({
       ios: {
-        shadowColor: "#0A3D91",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
+        shadowColor: "#041E42",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.22,
+        shadowRadius: 20,
       },
       android: { elevation: 8 },
-      web: { boxShadow: "0px 8px 24px rgba(10, 61, 145, 0.2)" },
+      web: { boxShadow: "0px 14px 34px rgba(4, 30, 66, 0.24)" },
     }),
+  },
+
+  heroGlowOne: {
+    position: "absolute",
+    top: -30,
+    right: -10,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "rgba(255,255,255,0.09)",
+  },
+
+  heroGlowTwo: {
+    position: "absolute",
+    bottom: -60,
+    left: -30,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "rgba(56,189,248,0.12)",
   },
 
   heroContent: {
     alignItems: "center",
     width: "100%",
-    maxWidth: 500,
+    maxWidth: 760,
     paddingHorizontal: spacing.base,
+    zIndex: 1,
+  },
+
+  brandBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: spacing.lg,
+    ...Platform.select({
+      web: { backdropFilter: "blur(10px)" },
+    }),
+  },
+
+  brandBadgeLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+    backgroundColor: "#FFFFFF",
+  },
+
+  brandBadgeTextWrap: {
+    justifyContent: "center",
+  },
+
+  brandBadgeEyebrow: {
+    fontSize: fontSizes.xs,
+    color: "rgba(255,255,255,0.78)",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    fontWeight: "700",
+  },
+
+  brandBadgeTitle: {
+    fontSize: fontSizes.sm,
+    color: "#FFFFFF",
+    fontWeight: "700",
   },
 
   logoContainer: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.base,
   },
 
   logoImage: {
-    width: isSmallPhone ? 80 : 100,
-    height: isSmallPhone ? 80 : 100,
-    borderRadius: isSmallPhone ? 40 : 50,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-
-  logoGradient: {
-    width: isSmallPhone ? 80 : 100,
-    height: isSmallPhone ? 80 : 100,
-    borderRadius: isSmallPhone ? 40 : 50,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.2)",
+    width: isSmallPhone ? 88 : 112,
+    height: isSmallPhone ? 88 : 112,
+    borderRadius: isSmallPhone ? 44 : 56,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.28)",
+    backgroundColor: "#FFFFFF",
   },
 
   heroTitle: {
-    fontSize: fontSizes.xxl,
-    fontWeight: "700",
+    fontSize: isSmallPhone ? 28 : 34,
+    fontWeight: "800",
     color: "#FFFFFF",
     textAlign: "center",
-    lineHeight: isSmallPhone ? 34 : 38,
-    letterSpacing: -0.5,
+    lineHeight: isSmallPhone ? 34 : 42,
+    letterSpacing: -0.6,
+    maxWidth: 620,
   },
 
   heroSubtitle: {
-    fontSize: fontSizes.xl,
+    fontSize: fontSizes.lg,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: "rgba(255,255,255,0.94)",
     textAlign: "center",
-    marginTop: 4,
-    opacity: 0.95,
+    marginTop: 8,
   },
 
   heroDivider: {
-    width: isSmallPhone ? 50 : 60,
-    height: 3,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    borderRadius: 2,
+    width: 72,
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.36)",
+    borderRadius: 999,
     marginVertical: spacing.md,
   },
 
   heroDescription: {
     fontSize: fontSizes.sm,
-    color: "rgba(255,255,255,0.9)",
+    color: "rgba(255,255,255,0.88)",
     fontWeight: "500",
     textAlign: "center",
-    letterSpacing: 0.3,
+    lineHeight: 22,
+    maxWidth: 560,
   },
 
-  // ============ CONTENT SECTION ============
+  heroMetrics: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    width: "100%",
+  },
+
+  heroMetricCard: {
+    minWidth: 118,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+  },
+
+  heroMetricValue: {
+    fontSize: fontSizes.lg,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  heroMetricLabel: {
+    fontSize: fontSizes.xs,
+    color: "rgba(255,255,255,0.82)",
+    fontWeight: "600",
+    marginTop: 4,
+    textAlign: "center",
+  },
+
   content: {
     flex: 1,
     paddingHorizontal: spacing.base,
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
-    maxWidth: 1000,
+    maxWidth: 1040,
     alignSelf: "center",
     width: "100%",
   },
 
   sectionTitle: {
     fontSize: fontSizes.xl,
-    fontWeight: "700",
-    color: "#111827",
+    fontWeight: "800",
+    color: "#0F172A",
     textAlign: "center",
     marginBottom: spacing.xs,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
 
   sectionSubtitle: {
     fontSize: fontSizes.base,
-    color: "#6B7280",
+    color: "#5B667A",
     textAlign: "center",
     marginBottom: spacing.xl,
     lineHeight: 24,
+    maxWidth: 620,
+    alignSelf: "center",
   },
 
-  // ============ CARDS CONTAINER - NEW SIDE-BY-SIDE LAYOUT ============
   cardsContainer: {
     flexDirection: "column",
     gap: spacing.lg,
@@ -186,33 +265,25 @@ export default StyleSheet.create({
 
   cardWrapperRow: {
     flex: 1,
-    maxWidth: isTablet ? 340 : 380,
+    maxWidth: isTablet ? 350 : 400,
   },
 
   card: {
-    borderRadius: isSmallPhone ? 20 : 24,
+    borderRadius: isSmallPhone ? 22 : 28,
     overflow: "hidden",
     height: "100%",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.08,
-        shadowRadius: 12,
+        shadowRadius: 18,
       },
       android: { elevation: 4 },
       web: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
+        boxShadow: "0px 10px 28px rgba(15, 23, 42, 0.08)",
         cursor: "pointer",
-        transition: "all 0.3s ease",
-        ":hover": {
-          transform: "translateY(-4px)",
-          shadowOpacity: 0.12,
-          shadowRadius: 16,
-        },
+        transition: "transform 0.25s ease, box-shadow 0.25s ease",
       },
     }),
   },
@@ -220,8 +291,10 @@ export default StyleSheet.create({
   cardGradient: {
     padding: spacing.lg,
     backgroundColor: "#FFFFFF",
-    minHeight: isSmallPhone ? 280 : 320,
+    minHeight: isSmallPhone ? 290 : 330,
     justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#E6EDF7",
   },
 
   cardIconWrapper: {
@@ -230,9 +303,9 @@ export default StyleSheet.create({
   },
 
   cardIconGradient: {
-    width: isSmallPhone ? 56 : 64,
-    height: isSmallPhone ? 56 : 64,
-    borderRadius: isSmallPhone ? 16 : 18,
+    width: isSmallPhone ? 58 : 68,
+    height: isSmallPhone ? 58 : 68,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -244,7 +317,7 @@ export default StyleSheet.create({
 
   cardTitle: {
     fontSize: fontSizes.lg,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#111827",
     marginBottom: 8,
     textAlign: "center",
@@ -253,9 +326,9 @@ export default StyleSheet.create({
 
   cardDescription: {
     fontSize: fontSizes.sm,
-    color: "#6B7280",
+    color: "#5B667A",
     marginBottom: spacing.md,
-    lineHeight: 20,
+    lineHeight: 21,
     textAlign: "center",
   },
 
@@ -270,37 +343,38 @@ export default StyleSheet.create({
   featurePill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#F4F7FB",
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 20,
+    paddingVertical: 5,
+    borderRadius: 999,
     gap: 4,
+    borderWidth: 1,
+    borderColor: "#E5EDF6",
   },
 
   featurePillText: {
     fontSize: fontSizes.xs,
-    color: "#4B5563",
-    fontWeight: "500",
+    color: "#425066",
+    fontWeight: "600",
   },
 
   cardArrow: {
     alignSelf: "center",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#F3F4F6",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F4F7FB",
     justifyContent: "center",
     alignItems: "center",
     marginTop: spacing.xs,
   },
 
-  // ============ INFO GRID ============
   infoGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
     gap: spacing.sm,
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     marginBottom: spacing.lg,
   },
 
@@ -310,10 +384,10 @@ export default StyleSheet.create({
     backgroundColor: "#FFFFFF",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: 30,
+    borderRadius: 999,
     gap: spacing.xs,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#E5EAF3",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -322,17 +396,16 @@ export default StyleSheet.create({
         shadowRadius: 4,
       },
       android: { elevation: 1 },
-      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.04)" },
+      web: { boxShadow: "0px 2px 6px rgba(0,0,0,0.04)" },
     }),
   },
 
   infoCardText: {
     fontSize: fontSizes.xs,
-    color: "#4B5563",
-    fontWeight: "500",
+    color: "#425066",
+    fontWeight: "600",
   },
 
-  // ============ HELP LINK ============
   helpLink: {
     flexDirection: "row",
     alignItems: "center",
@@ -343,219 +416,28 @@ export default StyleSheet.create({
     ...(isWeb && {
       cursor: "pointer",
       transition: "opacity 0.2s ease",
-      ":hover": {
-        opacity: 0.7,
-      },
     }),
   },
 
   helpText: {
     fontSize: fontSizes.sm,
     color: "#6B7280",
-    fontWeight: "500",
+    fontWeight: "600",
   },
 
   versionText: {
     textAlign: "center",
     fontSize: fontSizes.xs,
-    color: "#9CA3AF",
+    color: "#94A3B8",
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
 
-  // ============ MODAL STYLES ============
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-
-  privacyModalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: isSmallPhone ? 24 : 28,
-    width: '90%',
-    maxWidth: isTablet ? 600 : 500,
-    maxHeight: '80%',
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2,
-        shadowRadius: 20,
-      },
-      android: { elevation: 10 },
-      web: { boxShadow: '0px 20px 40px rgba(0, 0, 0, 0.15)' },
-    }),
-  },
-
-  privacyModalHeader: {
-    backgroundColor: '#F9FAFB',
-    padding: spacing.lg,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-
-  privacyIconContainer: {
-    marginBottom: spacing.base,
-    borderRadius: isSmallPhone ? 25 : 30,
-    overflow: 'hidden',
-  },
-
-  privacyIconGradient: {
-    width: isSmallPhone ? 50 : 60,
-    height: isSmallPhone ? 50 : 60,
-    borderRadius: isSmallPhone ? 25 : 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  privacyModalTitle: {
-    fontSize: isSmallPhone ? 20 : 22,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 2,
-    textAlign: 'center',
-  },
-
-  privacyModalSubtitle: {
-    fontSize: fontSizes.sm,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: spacing.lg,
-  },
-
-  privacyModalContent: {
-    padding: spacing.lg,
-    maxHeight: isSmallPhone ? 350 : 400,
-  },
-
-  privacySection: {
-    marginBottom: spacing.lg,
-  },
-
-  privacySectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-    gap: spacing.xs,
-  },
-
-  privacySectionTitle: {
-    fontSize: isSmallPhone ? 15 : 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-
-  privacySectionText: {
-    fontSize: fontSizes.sm,
-    color: '#4B5563',
-    lineHeight: 22,
-    marginBottom: 2,
-    paddingLeft: 28,
-  },
-
-  privacyCheckboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.base,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
-  },
-
-  privacyCheckbox: {
-    width: isSmallPhone ? 22 : 24,
-    height: isSmallPhone ? 22 : 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#0A3D91',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-    backgroundColor: '#FFFFFF',
-  },
-
-  privacyCheckboxChecked: {
-    backgroundColor: '#0A3D91',
-    borderColor: '#0A3D91',
-  },
-
-  privacyCheckboxText: {
-    fontSize: isSmallPhone ? 13 : 14,
-    color: '#4B5563',
-    flex: 1,
-    lineHeight: 20,
-  },
-
-  privacyLinkText: {
-    color: '#0A3D91',
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-
-  privacyModalActions: {
-    flexDirection: 'row',
-    padding: spacing.base,
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-
-  privacyDeclineButton: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: isSmallPhone ? 12 : 14,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-  },
-
-  privacyDeclineText: {
-    fontSize: isSmallPhone ? 14 : 15,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-
-  privacyAcceptButton: {
-    flex: 2,
-    borderRadius: isSmallPhone ? 12 : 14,
-    overflow: 'hidden',
-  },
-
-  privacyAcceptButtonDisabled: {
-    opacity: 0.6,
-  },
-
-  privacyAcceptGradient: {
-    paddingVertical: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-
-  privacyAcceptText: {
-    fontSize: isSmallPhone ? 14 : 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-
-  // ============ WEB SPECIFIC ============
   ...(isWeb && {
     content: {
-      maxWidth: 1000,
+      maxWidth: 1040,
       marginHorizontal: "auto",
       width: "100%",
-    },
-    card: {
-      transition: "all 0.3s ease",
     },
   }),
 });
