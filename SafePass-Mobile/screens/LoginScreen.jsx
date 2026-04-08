@@ -93,6 +93,12 @@ export default function LoginScreen({ navigation, route }) {
     ]).start();
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.title = "SafePass Login | Sapphire International Aviation Academy";
+    }
+  }, []);
+
   // ============ AUTH CHECK ============
   useEffect(() => {
     checkAuthAndConnection();
@@ -508,6 +514,48 @@ export default function LoginScreen({ navigation, route }) {
     }
   };
 
+  const getRoleConfig = () => {
+    switch (role) {
+      case "visitor":
+        return {
+          label: "Visitor Access",
+          title: "Continue Your Visit Journey",
+          subtitle: "Track approvals, manage appointments, and keep your Sapphire visit details in one secure place.",
+          icon: "person-outline",
+          accent: "#0F766E",
+          panel: "Visitor Coordination",
+        };
+      case "security":
+      case "guard":
+        return {
+          label: "Security Access",
+          title: "Checkpoint Team Sign-In",
+          subtitle: "Enter the secure operations workspace for approvals, arrival monitoring, and access validation.",
+          icon: "shield-checkmark-outline",
+          accent: "#0A3D91",
+          panel: "Operations Console",
+        };
+      case "admin":
+        return {
+          label: "Administrative Access",
+          title: "Command and Oversight Login",
+          subtitle: "Open the administrative control center for user review, access supervision, and reporting.",
+          icon: "settings-outline",
+          accent: "#7C3AED",
+          panel: "Admin Control",
+        };
+      default:
+        return {
+          label: "System Access",
+          title: "Welcome Back",
+          subtitle: "Sign in to continue with your secure SafePass workflow.",
+          icon: "log-in-outline",
+          accent: "#0A3D91",
+          panel: "Secure Entry",
+        };
+    }
+  };
+
   // ============ WEB KEYBOARD NAVIGATION ============
   const handleKeyPress = (e, action) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -526,6 +574,8 @@ export default function LoginScreen({ navigation, route }) {
       </View>
     );
   }
+
+  const roleConfig = getRoleConfig();
 
   return (
     <SafeAreaView style={loginStyles.safeArea}>
@@ -547,7 +597,18 @@ export default function LoginScreen({ navigation, route }) {
             <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
               <View style={loginStyles.header}>
                 <View style={loginStyles.headerContent}>
-                  {/* Logo Image */}
+                  <View style={loginStyles.brandBadge}>
+                    <Image
+                      source={Logo}
+                      style={loginStyles.brandBadgeLogo}
+                      resizeMode="contain"
+                    />
+                    <View style={loginStyles.brandBadgeTextWrap}>
+                      <Text style={loginStyles.brandBadgeEyebrow}>Secure Login Portal</Text>
+                      <Text style={loginStyles.brandBadgeTitle}>SafePass Command Center</Text>
+                    </View>
+                  </View>
+
                   <Image 
                     source={Logo} 
                     style={loginStyles.logoImage}
@@ -555,6 +616,9 @@ export default function LoginScreen({ navigation, route }) {
                   />
                   <Text style={loginStyles.appName}>
                     Sapphire International{"\n"}Aviation Academy
+                  </Text>
+                  <Text style={loginStyles.headerTagline}>
+                    Campus arrival, access, and visitor authentication in one secure checkpoint flow
                   </Text>
                   
                   {/* API Status Badge */}
@@ -564,7 +628,7 @@ export default function LoginScreen({ navigation, route }) {
                   ]}>
                     <View style={loginStyles.statusDot} />
                     <Text style={loginStyles.statusText}>
-                      {apiConnected ? '● SYSTEM ONLINE' : '● SERVER OFFLINE'}
+                      {apiConnected ? 'SYSTEM ONLINE' : 'SERVER OFFLINE'}
                     </Text>
                   </View>
                 </View>
@@ -586,12 +650,18 @@ export default function LoginScreen({ navigation, route }) {
                   <Text style={loginStyles.backToRoleText}>Change Role</Text>
                 </TouchableOpacity>
 
-                <Text style={loginStyles.welcomeTitle}>Welcome Back</Text>
-                <Text style={loginStyles.welcomeSubtitle}>
-                  {role === 'visitor' ? 'Visitor Login' : 
-                   role === 'security' ? 'Security Login' : 
-                   role === 'admin' ? 'Admin Login' : 'System Access'}
-                </Text>
+                <View style={loginStyles.roleHero}>
+                  <View style={[loginStyles.roleIconWrap, { backgroundColor: roleConfig.accent }]}>
+                    <Ionicons name={roleConfig.icon} size={22} color="#FFFFFF" />
+                  </View>
+                  <View style={loginStyles.roleHeroText}>
+                    <Text style={loginStyles.roleEyebrow}>{roleConfig.label}</Text>
+                    <Text style={loginStyles.rolePanel}>{roleConfig.panel}</Text>
+                  </View>
+                </View>
+
+                <Text style={loginStyles.welcomeTitle}>{roleConfig.title}</Text>
+                <Text style={loginStyles.welcomeSubtitle}>{roleConfig.subtitle}</Text>
 
                 {/* STANDARD LOGIN FORM */}
                 <>
@@ -1095,3 +1165,4 @@ export default function LoginScreen({ navigation, route }) {
     </SafeAreaView>
   );
 }
+
