@@ -214,7 +214,10 @@ async fetch(url, options = {}) {
 
     if (!response.ok) {
       console.log(`❌ HTTP ${response.status}:`, data);
-      throw new Error(data.error || data.message || `HTTP ${response.status}`);
+      const apiError = new Error(data.error || data.message || `HTTP ${response.status}`);
+      apiError.status = response.status;
+      apiError.data = data;
+      throw apiError;
     }
 
     return data;
@@ -1080,7 +1083,12 @@ async createSecurityGuard(guardData) {
     return response;
   } catch (error) {
     console.error("❌ Create security guard error:", error);
-    const message = error?.message || "Failed to create security account";
+    const isDuplicateEmail =
+      error?.status === 409 ||
+      String(error?.message || "").toLowerCase().includes("email already");
+    const message = isDuplicateEmail
+      ? "Email already registered. Please use another email address."
+      : (error?.message || "Failed to create security account");
     throw new Error(message);
   }
 }

@@ -255,6 +255,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
   const [showUserManagementModal, setShowUserManagementModal] = useState(false);
   const [userManagementStatusTab, setUserManagementStatusTab] = useState("active");
+  const [createUserMessage, setCreateUserMessage] = useState("");
 
   // Chart Data
   const [visitorStats, setVisitorStats] = useState({
@@ -717,6 +718,12 @@ const loadDashboardData = useCallback(async () => {
     if (currentPage > newTotalPages && newTotalPages > 0) setCurrentPage(1);
   }, [getFilteredUsersCount, currentPage, itemsPerPage]);
 
+  useEffect(() => {
+    if (!createUserMessage) return;
+    const timer = setTimeout(() => setCreateUserMessage(""), 5000);
+    return () => clearTimeout(timer);
+  }, [createUserMessage]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadDashboardData();
@@ -944,6 +951,18 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
 
+    const normalizedEmail = newUserData.email.toLowerCase().trim();
+    const existingUser = allUsers.find(
+      (u) => String(u?.email || "").toLowerCase().trim() === normalizedEmail
+    );
+    if (existingUser) {
+      Alert.alert(
+        "Email Already Used",
+        `${normalizedEmail} is already registered as ${existingUser.role || "user"}. Please use a different email.`
+      );
+      return;
+    }
+
     setProcessingId("create-user");
 
     try {
@@ -952,7 +971,7 @@ const loadDashboardData = useCallback(async () => {
       const userPayload = {
         firstName: newUserData.firstName.trim(),
         lastName: newUserData.lastName.trim(),
-        email: newUserData.email.toLowerCase().trim(),
+        email: normalizedEmail,
         password: generatedPassword,
         phone: newUserData.phone.trim(),
         role: newUserData.role,
@@ -1028,6 +1047,7 @@ const loadDashboardData = useCallback(async () => {
               setUserSearchQuery("");
               setCurrentPage(1);
               setUserManagementStatusTab("active");
+              setCreateUserMessage(`${newUserData.firstName} ${newUserData.lastName} was added successfully.`);
               setShowUserManagementModal(true);
             },
           },
@@ -1037,7 +1057,12 @@ const loadDashboardData = useCallback(async () => {
       }
     } catch (error) {
       console.error("Create user error:", error);
-      Alert.alert("Error", error.message || "Failed to create account");
+      const message = String(error?.message || "");
+      if (message.toLowerCase().includes("email already")) {
+        Alert.alert("Email Already Used", "This email is already registered. Please use another email address.");
+      } else {
+        Alert.alert("Error", message || "Failed to create account");
+      }
     } finally {
       setProcessingId(null);
     }
@@ -1309,36 +1334,35 @@ const loadDashboardData = useCallback(async () => {
           setSelectedRequest(request);
           setShowRequestDetailsModal(true);
         }}
-        style={{
-          marginTop: 10,
-          backgroundColor: theme.cardBackground,
-          borderColor: theme.borderColor,
-          borderWidth: 1,
-          borderRadius: 12,
-          padding: 12,
-        }}
+        style={[
+          styles.dashboardRequestCard,
+          {
+            backgroundColor: theme.cardBackground,
+            borderColor: theme.borderColor,
+          },
+        ]}
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <View style={{ flex: 1, paddingRight: 10 }}>
-            <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: "700" }}>
+        <View style={styles.dashboardRequestCardTop}>
+          <View style={styles.dashboardRequestCardInfo}>
+            <Text style={[styles.dashboardRequestName, { color: theme.textPrimary }]}>
               {request?.fullName || "Unknown Visitor"}
             </Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 2 }}>
+            <Text style={[styles.dashboardRequestEmail, { color: theme.textSecondary }]}>
               {request?.email || "No email"}
             </Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 2, fontSize: 12 }}>
+            <Text style={[styles.dashboardRequestPurpose, { color: theme.textSecondary }]}>
               {request?.purposeOfVisit || "No purpose provided"}
             </Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 4, fontSize: 12 }}>
+            <Text style={[styles.dashboardRequestTime, { color: theme.textSecondary }]}>
               {formatDateTime(request?.visitDate || request?.createdAt)}
             </Text>
           </View>
 
-          <View style={{ alignItems: "flex-end" }}>
-            <View style={{ backgroundColor: statusInfo.bg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-              <Text style={{ color: statusInfo.text, fontSize: 11, fontWeight: "700" }}>{statusInfo.label}</Text>
+          <View style={styles.dashboardRequestRight}>
+            <View style={[styles.dashboardStatusBadge, { backgroundColor: statusInfo.bg }]}>
+              <Text style={[styles.dashboardStatusText, { color: statusInfo.text }]}>{statusInfo.label}</Text>
             </View>
-            <Text style={{ color: theme.textSecondary, marginTop: 8, fontSize: 11 }}>
+            <Text style={[styles.dashboardRequestDate, { color: theme.textSecondary }]}>
               {formatDate(request?.createdAt)}
             </Text>
           </View>
@@ -1356,64 +1380,77 @@ const loadDashboardData = useCallback(async () => {
       <View style={styles.pageContainer}>
         <View style={styles.pageHeader}>
           <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Dashboard Overview</Text>
-          <TouchableOpacity onPress={loadDashboardData}>
+          <TouchableOpacity style={styles.pageRefreshButton} onPress={loadDashboardData}>
             <Ionicons name="refresh-outline" size={22} color="#3B82F6" />
           </TouchableOpacity>
         </View>
 
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+        <View
+          style={[
+            styles.dashboardHeroCard,
+            isDarkMode && { backgroundColor: "#1E293B", borderColor: "#334155" },
+          ]}
+        >
+          <View style={styles.dashboardHeroLeft}>
+            <Text style={[styles.dashboardHeroTitle, isDarkMode && styles.darkText]}>
+              Welcome back, {user?.firstName || "Admin"}
+            </Text>
+            <Text style={[styles.dashboardHeroSubtitle, isDarkMode && styles.darkTextSecondary]}>
+              Live overview of visitor flow, user activity, and pending approvals.
+            </Text>
+          </View>
+          <View style={[styles.dashboardHeroBadge, isDarkMode && { backgroundColor: "#334155" }]}>
+            <Ionicons name="sparkles-outline" size={16} color="#2563EB" />
+            <Text style={[styles.dashboardHeroBadgeText, isDarkMode && styles.darkTextSecondary]}>
+              {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.dashboardStatsGrid}>
           {[
-            { label: "Pending Requests", value: stats.pendingRequests, color: "#F59E0B" },
-            { label: "Approved Today", value: stats.approvedRequests, color: "#10B981" },
-            { label: "Total Users", value: stats.totalUsers, color: "#3B82F6" },
-            { label: "Active Users", value: stats.activeUsers, color: "#8B5CF6" },
-            { label: "Today Visits", value: stats.todayVisits, color: "#EF4444" },
-            { label: "Tomorrow Visits", value: stats.tomorrowVisits, color: "#14B8A6" },
+            { label: "Pending Requests", value: stats.pendingRequests, color: "#F59E0B", icon: "time-outline" },
+            { label: "Approved Today", value: stats.approvedRequests, color: "#10B981", icon: "checkmark-circle-outline" },
+            { label: "Total Users", value: stats.totalUsers, color: "#3B82F6", icon: "people-outline" },
+            { label: "Active Users", value: stats.activeUsers, color: "#8B5CF6", icon: "pulse-outline" },
+            { label: "Today Visits", value: stats.todayVisits, color: "#EF4444", icon: "walk-outline" },
+            { label: "Tomorrow Visits", value: stats.tomorrowVisits, color: "#14B8A6", icon: "calendar-outline" },
           ].map((item) => (
             <View
               key={item.label}
-              style={{
-                width: width > 1200 ? "32%" : width > 900 ? "48%" : "100%",
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.borderColor,
-                borderWidth: 1,
-                borderRadius: 14,
-                padding: 14,
-                shadowColor: "#000",
-                shadowOpacity: 0.06,
-                shadowOffset: { width: 0, height: 3 },
-                shadowRadius: 6,
-                elevation: 2,
-              }}
+              style={[
+                styles.dashboardStatCard,
+                {
+                  width: width > 1200 ? "32%" : width > 900 ? "48%" : "100%",
+                  backgroundColor: theme.cardBackground,
+                  borderColor: theme.borderColor,
+                },
+              ]}
             >
-              <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{item.label}</Text>
-              <Text style={{ color: item.color, fontSize: 22, fontWeight: "700", marginTop: 6 }}>{item.value || 0}</Text>
+              <View style={styles.dashboardStatHeader}>
+                <Text style={[styles.dashboardStatLabel, { color: theme.textSecondary }]}>{item.label}</Text>
+                <View style={[styles.dashboardStatIcon, { backgroundColor: `${item.color}18` }]}>
+                  <Ionicons name={item.icon} size={16} color={item.color} />
+                </View>
+              </View>
+              <Text style={[styles.dashboardStatValue, { color: item.color }]}>{item.value || 0}</Text>
             </View>
           ))}
         </View>
 
-        <View
-          style={{
-            marginTop: 14,
-            backgroundColor: theme.cardBackground,
-            borderColor: theme.borderColor,
-            borderWidth: 1,
-            borderRadius: 14,
-            padding: 14,
-            shadowColor: "#000",
-            shadowOpacity: 0.06,
-            shadowOffset: { width: 0, height: 3 },
-            shadowRadius: 6,
-            elevation: 2,
-          }}
-        >
-          <Text style={{ color: theme.textPrimary, fontSize: 16, fontWeight: "700" }}>Recent Pending Requests</Text>
+        <View style={[styles.dashboardSectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+          <View style={styles.dashboardSectionHeader}>
+            <Text style={[styles.dashboardSectionTitle, { color: theme.textPrimary }]}>Recent Pending Requests</Text>
+            <TouchableOpacity onPress={() => setActiveMenu("requests")}>
+              <Text style={styles.dashboardSectionLink}>View all</Text>
+            </TouchableOpacity>
+          </View>
           {pendingRequests.length ? pendingRequests.slice(0, 5).map((request) => renderRequestCard(request)) : (
-            <Text style={{ marginTop: 10, color: theme.textSecondary }}>No pending requests right now.</Text>
+            <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>No pending requests right now.</Text>
           )}
         </View>
 
-        <View style={{ marginTop: 14, flexDirection: "row", gap: 10 }}>
+        <View style={styles.dashboardActionsRow}>
           <TouchableOpacity style={[styles.submitButton, { flex: 1 }]} onPress={() => setActiveMenu("requests")}>
             <Text style={styles.submitButtonText}>Open Requests</Text>
           </TouchableOpacity>
@@ -1575,7 +1612,7 @@ const loadDashboardData = useCallback(async () => {
         <View style={[styles.contentArea, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
           <Animated.View style={[styles.header, { opacity: headerOpacity }, isDarkMode && { backgroundColor: theme.headerBackground, borderBottomColor: "#334155" }]}>
             <View style={styles.headerTop}>
-              <View><Text style={[styles.headerTitle, isDarkMode && styles.darkText]}>{menuItems.find((item) => item.action === activeMenu)?.label || "Dashboard"}</Text><Text style={[styles.headerSubtitle, isDarkMode && styles.darkTextSecondary]}>Manage your academy efficiently</Text></View>
+              <View><Text style={[styles.headerTitle, isDarkMode && styles.darkText]}>{menuItems.find((item) => item.action === activeMenu)?.label || "Dashboard"}</Text><Text style={[styles.headerSubtitle, isDarkMode && styles.darkTextSecondary]}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</Text></View>
               <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.profileButton}><View style={[styles.profileIcon, isDarkMode && { backgroundColor: "#8B5CF6" }]}><Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View></TouchableOpacity>
             </View>
           </Animated.View>
@@ -1923,6 +1960,24 @@ const loadDashboardData = useCallback(async () => {
             </View>
 
             <View style={styles.modalBody}>
+              {createUserMessage ? (
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? "#064E3B" : "#D1FAE5",
+                    borderColor: isDarkMode ? "#10B981" : "#86EFAC",
+                    borderWidth: 1,
+                    borderRadius: 10,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    marginBottom: 10,
+                  }}
+                >
+                  <Text style={{ color: isDarkMode ? "#A7F3D0" : "#065F46", fontWeight: "600" }}>
+                    {createUserMessage}
+                  </Text>
+                </View>
+              ) : null}
+
               <View style={styles.roleSelector}>
                 {[
                   { key: "active", label: `Active (${activeUsersList.length})` },
