@@ -560,26 +560,25 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
   };
 
-  // FIXED: Load Dashboard Data
-  const loadDashboardData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const currentUser = await ApiService.getCurrentUser();
-      if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "security")) {
-        Alert.alert("Access Denied", "You don't have admin privileges.");
-        navigation.replace("Login");
-        return;
-      }
-      setUser(currentUser);
-      await Promise.all([loadAllVisitRequests(), loadAllUsers()]);
-    } catch (error) {
-      console.error("Load dashboard error:", error);
-      Alert.alert("Error", "Failed to load dashboard data. Please try again.");
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+const loadDashboardData = useCallback(async () => {
+  setIsLoading(true);
+  try {
+    const currentUser = await ApiService.getCurrentUser();
+    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "security")) {
+      Alert.alert("Access Denied", "You don't have admin privileges.");
+      navigation.replace("Login");
+      return;
     }
-  }, [navigation]);
+    setUser(currentUser);
+    await Promise.all([loadAllVisitRequests(), loadAllUsers()]);
+  } catch (error) {
+    console.error("Load dashboard error:", error);
+    Alert.alert("Error", "Failed to load dashboard data. Please try again.");
+  } finally {
+    setIsLoading(false);
+    setRefreshing(false);
+  }
+}, [navigation]);
 
   useEffect(() => {
     loadDashboardData();
