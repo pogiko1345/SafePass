@@ -42,11 +42,19 @@ class ApiService {
   // ================= TOKEN HANDLING =================
 
   async setToken(token) {
-    this.token = token;
-    if (token) {
-      await AsyncStorage.setItem("userToken", token);
+    const normalizedToken = typeof token === "string" ? token.trim() : "";
+    const validToken =
+      normalizedToken &&
+      normalizedToken !== "undefined" &&
+      normalizedToken !== "null"
+        ? normalizedToken
+        : null;
+
+    this.token = validToken;
+    if (validToken) {
+      await AsyncStorage.setItem("userToken", validToken);
       // Backward compatibility for older screens still reading authToken.
-      await AsyncStorage.setItem("authToken", token);
+      await AsyncStorage.setItem("authToken", validToken);
     } else {
       await AsyncStorage.removeItem("userToken");
       await AsyncStorage.removeItem("authToken");
@@ -55,15 +63,36 @@ class ApiService {
 
   async getToken() {
     if (!this.token) {
-      const userToken = await AsyncStorage.getItem("userToken");
+      const userTokenRaw = await AsyncStorage.getItem("userToken");
+      const userToken =
+        typeof userTokenRaw === "string"
+          ? userTokenRaw.trim()
+          : "";
+
       if (userToken) {
-        this.token = userToken;
+        if (userToken === "undefined" || userToken === "null") {
+          await AsyncStorage.removeItem("userToken");
+          await AsyncStorage.removeItem("authToken");
+          this.token = null;
+        } else {
+          this.token = userToken;
+        }
       } else {
         // Backward compatibility: migrate legacy authToken to userToken.
-        const legacyToken = await AsyncStorage.getItem("authToken");
+        const legacyTokenRaw = await AsyncStorage.getItem("authToken");
+        const legacyToken =
+          typeof legacyTokenRaw === "string"
+            ? legacyTokenRaw.trim()
+            : "";
+
         if (legacyToken) {
-          this.token = legacyToken;
-          await AsyncStorage.setItem("userToken", legacyToken);
+          if (legacyToken === "undefined" || legacyToken === "null") {
+            await AsyncStorage.removeItem("authToken");
+            this.token = null;
+          } else {
+            this.token = legacyToken;
+            await AsyncStorage.setItem("userToken", legacyToken);
+          }
         }
       }
     }

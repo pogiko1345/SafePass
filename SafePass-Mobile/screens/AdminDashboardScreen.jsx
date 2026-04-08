@@ -167,6 +167,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const mainScrollViewRef = useRef(null);
   const sidebarScrollViewRef = useRef(null);
+  const authErrorHandledRef = useRef(false);
 
   // User State
   const [user, setUser] = useState(null);
@@ -534,6 +535,26 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     return Math.round((recentRequests.length / Math.max(requests.length, 1)) * 100);
   };
 
+  const isAuthError = (error) => {
+    const message = String(error?.message || "").toLowerCase();
+    return (
+      message.includes("401") ||
+      message.includes("authenticate") ||
+      message.includes("unauthorized") ||
+      message.includes("token") ||
+      message.includes("jwt")
+    );
+  };
+
+  const handleAuthError = useCallback(async () => {
+    if (authErrorHandledRef.current) return;
+    authErrorHandledRef.current = true;
+    await ApiService.clearAuth();
+    Alert.alert("Session Expired", "Please log in again.", [
+      { text: "OK", onPress: () => navigation.replace("Login") },
+    ]);
+  }, [navigation]);
+
   // FIXED: Load All Visit Requests
   const loadAllVisitRequests = async () => {
     try {
@@ -590,6 +611,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       }
     } catch (error) {
       console.error("Load visit requests error:", error);
+      if (isAuthError(error)) {
+        await handleAuthError();
+        return;
+      }
       Alert.alert("Error", "Failed to load visit requests. Please check your connection.");
     }
   };
@@ -622,11 +647,16 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       }
     } catch (error) {
       console.error("Load users error:", error);
+      if (isAuthError(error)) {
+        await handleAuthError();
+        return;
+      }
       Alert.alert("Error", "Failed to load users. Please check your connection.");
     }
   };
 
 const loadDashboardData = useCallback(async () => {
+  authErrorHandledRef.current = false;
   setIsLoading(true);
   try {
     const currentUser = await ApiService.getCurrentUser();
@@ -640,12 +670,16 @@ const loadDashboardData = useCallback(async () => {
     await Promise.all([loadAllVisitRequests(), loadAllUsers()]);
   } catch (error) {
     console.error("Load dashboard error:", error);
+    if (isAuthError(error)) {
+      await handleAuthError();
+      return;
+    }
     Alert.alert("Error", "Failed to load dashboard data. Please try again.");
   } finally {
     setIsLoading(false);
     setRefreshing(false);
   }
-}, [navigation]);
+}, [navigation, handleAuthError]);
 
   useEffect(() => {
     loadDashboardData();
