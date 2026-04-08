@@ -944,6 +944,27 @@ export default StyleSheet.create({
     gap: 16,
   },
 
+  userManagementList: {
+    marginTop: 10,
+    maxHeight: 400,
+  },
+
+  userStatusBadgeActive: {
+    backgroundColor: "rgba(16,185,129,0.15)",
+  },
+
+  userStatusBadgeInactive: {
+    backgroundColor: "rgba(239,68,68,0.15)",
+  },
+
+  userStatusTextActive: {
+    color: "#10B981",
+  },
+
+  userStatusTextInactive: {
+    color: "#EF4444",
+  },
+
   // ============================================
   // 15. SEARCH & FILTERS - Search and filter UI
   // ============================================

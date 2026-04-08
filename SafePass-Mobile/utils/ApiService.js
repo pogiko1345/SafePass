@@ -217,6 +217,21 @@ async register(userData) {
   }
 }
 
+  async createStaffUser(staffData) {
+    try {
+      const payload = {
+        ...staffData,
+        role: "staff",
+        status: staffData?.status || "active",
+        isActive: staffData?.isActive ?? true,
+      };
+      return await this.register(payload);
+    } catch (error) {
+      const message = error?.message || "Failed to create staff account";
+      throw new Error(message);
+    }
+  }
+
   async login(email, password) {
     try {
       const response = await this.fetch("/login", {
@@ -1036,7 +1051,8 @@ async createSecurityGuard(guardData) {
     return response;
   } catch (error) {
     console.error("❌ Create security guard error:", error);
-    throw error;
+    const message = error?.message || "Failed to create security account";
+    throw new Error(message);
   }
 }
 

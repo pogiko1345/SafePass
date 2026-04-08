@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -252,6 +252,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
+  const [showUserManagementModal, setShowUserManagementModal] = useState(false);
+  const [userManagementStatusTab, setUserManagementStatusTab] = useState("active");
 
   // Chart Data
   const [visitorStats, setVisitorStats] = useState({
@@ -398,6 +400,24 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     const filtered = getFilteredUsersList();
     return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [getFilteredUsersList, currentPage, itemsPerPage]);
+
+  const getUsersByStatus = useCallback((statusTab) => {
+    if (statusTab === "active") {
+      return allUsers.filter((u) => u.status === "active" || u.isActive === true);
+    }
+    if (statusTab === "inactive") {
+      return allUsers.filter((u) => u.status === "inactive" || u.isActive === false);
+    }
+    return allUsers;
+  }, [allUsers]);
+
+  const activeUsersList = useMemo(() => getUsersByStatus("active"), [getUsersByStatus]);
+  const inactiveUsersList = useMemo(() => getUsersByStatus("inactive"), [getUsersByStatus]);
+  const userManagementUsers = useMemo(() => {
+    if (userManagementStatusTab === "active") return activeUsersList;
+    if (userManagementStatusTab === "inactive") return inactiveUsersList;
+    return allUsers;
+  }, [activeUsersList, inactiveUsersList, allUsers, userManagementStatusTab]);
 
   const getFilteredHistory = useCallback(() => {
     let filtered = [...visitorHistory];
@@ -929,7 +949,7 @@ const loadDashboardData = useCallback(async () => {
             position: userPayload.position,
             employeeId: userPayload.employeeId,
           })
-        : await ApiService.register(userPayload);
+        : await ApiService.createStaffUser(userPayload);
 
       if (response && (response.success || response.user)) {
         const roleDisplay = isSecurityRole ? "SECURITY PERSONNEL" : "STAFF MEMBER";
@@ -969,6 +989,12 @@ const loadDashboardData = useCallback(async () => {
               });
               // Force a full data refresh so dashboard counters and lists stay in sync with DB.
               await loadDashboardData();
+              setActiveMenu("users");
+              setUserFilter("all");
+              setUserSearchQuery("");
+              setCurrentPage(1);
+              setUserManagementStatusTab("active");
+              setShowUserManagementModal(true);
             },
           },
         ]);
@@ -1845,6 +1871,85 @@ const loadDashboardData = useCallback(async () => {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.confirmButton, { backgroundColor: "#EF4444" }]} onPress={handleDeleteUser}>
                 <Text style={styles.confirmButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* User Management Modal */}
+      <Modal visible={showUserManagementModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "90%" }, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+            <View style={[styles.modalHeader, isDarkMode && { borderBottomColor: theme.borderColor }]}>
+              <Text style={[styles.modalTitle, isDarkMode && styles.darkText]}>User Management</Text>
+              <TouchableOpacity onPress={() => setShowUserManagementModal(false)}>
+                <Ionicons name="close" size={24} color={isDarkMode ? "#94A3B8" : "#6B7280"} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.roleSelector}>
+                {[
+                  { key: "active", label: `Active (${activeUsersList.length})` },
+                  { key: "inactive", label: `Inactive (${inactiveUsersList.length})` },
+                  { key: "all", label: `All (${allUsers.length})` },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[styles.roleOption, userManagementStatusTab === item.key && styles.roleOptionActive, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569" }]}
+                    onPress={() => setUserManagementStatusTab(item.key)}
+                  >
+                    <Text style={[styles.roleText, userManagementStatusTab === item.key && styles.roleTextActive, isDarkMode && userManagementStatusTab !== item.key && { color: "#94A3B8" }]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <ScrollView style={styles.userManagementList} showsVerticalScrollIndicator={false}>
+                {userManagementUsers.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="people-outline" size={48} color="#CBD5E1" />
+                    <Text style={[styles.emptyStateTitle, isDarkMode && styles.darkText]}>No users found</Text>
+                    <Text style={[styles.emptyStateSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                      No {userManagementStatusTab} users available.
+                    </Text>
+                  </View>
+                ) : (
+                  userManagementUsers.map((userItem) => (
+                    <View key={userItem._id || userItem.id || userItem.email} style={[styles.userRow, isDarkMode && { borderBottomColor: theme.borderColor }]}>
+                      <View style={styles.userInfo}>
+                        <View style={[styles.userAvatar, { backgroundColor: `${getRoleColor(userItem.role)}20` }]}>
+                          <Ionicons name={getRoleIcon(userItem.role)} size={22} color={getRoleColor(userItem.role)} />
+                        </View>
+                        <View>
+                          <Text style={[styles.userName, isDarkMode && styles.darkText]}>{userItem.firstName} {userItem.lastName}</Text>
+                          <Text style={[styles.userEmail, isDarkMode && styles.darkTextSecondary]}>{userItem.email}</Text>
+                          <View style={styles.userMeta}>
+                            <View style={styles.roleBadge}>
+                              <Text style={styles.roleBadgeText}>{userItem.role?.toUpperCase() || "USER"}</Text>
+                            </View>
+                            <View style={[styles.roleBadge, (userItem.status === "active" || userItem.isActive) ? styles.userStatusBadgeActive : styles.userStatusBadgeInactive]}>
+                              <Text style={[styles.roleBadgeText, (userItem.status === "active" || userItem.isActive) ? styles.userStatusTextActive : styles.userStatusTextInactive]}>
+                                {(userItem.status === "active" || userItem.isActive) ? "ACTIVE" : "INACTIVE"}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+
+            <View style={[styles.modalFooter, isDarkMode && { borderTopColor: theme.borderColor }]}>
+              <TouchableOpacity style={[styles.cancelButton, { flex: 1 }, isDarkMode && { backgroundColor: "#334155" }]} onPress={() => setShowUserManagementModal(false)}>
+                <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.submitButton, { flex: 1 }]} onPress={() => { setShowUserManagementModal(false); setActiveMenu("users"); }}>
+                <Text style={styles.submitButtonText}>Open User Page</Text>
               </TouchableOpacity>
             </View>
           </View>
