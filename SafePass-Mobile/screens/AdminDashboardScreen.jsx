@@ -468,119 +468,118 @@ export default function AdminDashboardScreen({ navigation }) {
     return Math.round((recentRequests.length / Math.max(requests.length, 1)) * 100);
   };
 
-  // FIXED: Load all visit requests with better error handling
-  const loadAllVisitRequests = async () => {
-    try {
-      const response = await ApiService.getAllVisitors({ limit: 500 });
-      if (response?.success) {
-        const requests = response.visitors || [];
-        const pending = requests.filter((r) => r.status === "pending");
-        const approved = requests.filter((r) => r.status === "approved");
-        const rejected = requests.filter((r) => r.status === "rejected");
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const nextDay = new Date(tomorrow);
-        nextDay.setDate(nextDay.getDate() + 1);
+const loadAllVisitRequests = async () => {
+  try {
+    const response = await ApiService.getAllVisitors({ limit: 500 });
+    // ApiService.getAllVisitors returns data directly, not wrapped in {success}
+    if (response && response.visitors) {
+      const requests = response.visitors || [];
+      const pending = requests.filter((r) => r.status === "pending");
+      const approved = requests.filter((r) => r.status === "approved");
+      const rejected = requests.filter((r) => r.status === "rejected");
 
-        const todayVisits = requests.filter((r) => {
-          const visitDate = new Date(r.visitDate);
-          return visitDate >= today && visitDate < tomorrow;
-        }).length;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const nextDay = new Date(tomorrow);
+      nextDay.setDate(nextDay.getDate() + 1);
 
-        const tomorrowVisits = requests.filter((r) => {
-          const visitDate = new Date(r.visitDate);
-          return visitDate >= tomorrow && visitDate < nextDay;
-        }).length;
+      const todayVisits = requests.filter((r) => {
+        const visitDate = new Date(r.visitDate);
+        return visitDate >= today && visitDate < tomorrow;
+      }).length;
 
-        const upcomingVisits = requests.filter((r) => {
-          const visitDate = new Date(r.visitDate);
-          return visitDate >= today && r.status === "approved";
-        }).length;
+      const tomorrowVisits = requests.filter((r) => {
+        const visitDate = new Date(r.visitDate);
+        return visitDate >= tomorrow && visitDate < nextDay;
+      }).length;
 
-        setVisitRequests(requests);
-        setPendingRequests(pending);
-        setApprovedRequests(approved);
-        setRejectedRequests(rejected);
-        calculateChartData(requests);
-        calculateDateAnalytics(selectedDate);
+      const upcomingVisits = requests.filter((r) => {
+        const visitDate = new Date(r.visitDate);
+        return visitDate >= today && r.status === "approved";
+      }).length;
 
-        setStats((prev) => ({
-          ...prev,
-          pendingRequests: pending.length,
-          approvedRequests: approved.length,
-          rejectedRequests: rejected.length,
-          totalRequests: requests.length,
-          todayVisits,
-          tomorrowVisits,
-          upcomingVisits,
-          weeklyGrowth: calculateWeeklyGrowth(requests),
-          activeVisitors: approved.filter((r) => new Date(r.visitDate) >= new Date()).length,
-        }));
-      } else {
-        console.error("Failed to load visit requests:", response?.message);
-      }
-    } catch (error) {
-      console.error("Load visit requests error:", error);
-      Alert.alert("Error", "Failed to load visit requests. Please check your connection.");
+      setVisitRequests(requests);
+      setPendingRequests(pending);
+      setApprovedRequests(approved);
+      setRejectedRequests(rejected);
+      calculateChartData(requests);
+      calculateDateAnalytics(selectedDate);
+
+      setStats((prev) => ({
+        ...prev,
+        pendingRequests: pending.length,
+        approvedRequests: approved.length,
+        rejectedRequests: rejected.length,
+        totalRequests: requests.length,
+        todayVisits,
+        tomorrowVisits,
+        upcomingVisits,
+        weeklyGrowth: calculateWeeklyGrowth(requests),
+        activeVisitors: approved.filter((r) => new Date(r.visitDate) >= new Date()).length,
+      }));
+    } else {
+      console.error("Failed to load visit requests:", response);
     }
-  };
+  } catch (error) {
+    console.error("Load visit requests error:", error);
+    Alert.alert("Error", "Failed to load visit requests. Please check your connection.");
+  }
+};
 
   // FIXED: Load all users with proper role filtering
-  const loadAllUsers = async () => {
-    try {
-      const response = await ApiService.getAllUsers({ limit: 500 });
-      if (response?.success) {
-        const users = response.users || [];
-        // Properly filter staff (role exactly 'staff')
-        const staff = users.filter((u) => u.role === "staff");
-        // Properly filter security (role exactly 'security' or 'guard')
-        const security = users.filter((u) => u.role === "security" || u.role === "guard");
-        const departments = new Set(staff.filter((s) => s.department).map((s) => s.department));
+const loadAllUsers = async () => {
+  try {
+    const response = await ApiService.getAllUsers({ limit: 500 });
+    if (response && response.users) {
+      const users = response.users || [];
+      const staff = users.filter((u) => u.role === "staff");
+      const security = users.filter((u) => u.role === "security" || u.role === "guard");
+      const departments = new Set(staff.filter((s) => s.department).map((s) => s.department));
 
-        setAllUsers(users);
-        setStaffUsers(staff);
-        setGuardUsers(security);
-        setVisitorUsers(users.filter((u) => u.role === "visitor"));
-        setAdminUsers(users.filter((u) => u.role === "admin"));
-        setStats((prev) => ({
-          ...prev,
-          totalUsers: users.length,
-          totalStaff: staff.length,
-          totalGuards: security.length,
-          activeUsers: users.filter((u) => u.status === "active" || u.isActive).length,
-          totalDepartments: departments.size,
-        }));
-      } else {
-        console.error("Failed to load users:", response?.message);
-      }
-    } catch (error) {
-      console.error("Load users error:", error);
-      Alert.alert("Error", "Failed to load users. Please check your connection.");
+      setAllUsers(users);
+      setStaffUsers(staff);
+      setGuardUsers(security);
+      setVisitorUsers(users.filter((u) => u.role === "visitor"));
+      setAdminUsers(users.filter((u) => u.role === "admin"));
+      setStats((prev) => ({
+        ...prev,
+        totalUsers: users.length,
+        totalStaff: staff.length,
+        totalGuards: security.length,
+        activeUsers: users.filter((u) => u.status === "active" || u.isActive).length,
+        totalDepartments: departments.size,
+      }));
+    } else {
+      console.error("Failed to load users:", response);
     }
-  };
+  } catch (error) {
+    console.error("Load users error:", error);
+    Alert.alert("Error", "Failed to load users. Please check your connection.");
+  }
+};
 
-  const loadDashboardData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const currentUser = await ApiService.getCurrentUser();
-      if (!currentUser || currentUser.role !== "admin") {
-        Alert.alert("Access Denied", "You don't have admin privileges.");
-        navigation.replace("Login");
-        return;
-      }
-      setUser(currentUser);
-      await Promise.all([loadAllVisitRequests(), loadAllUsers()]);
-    } catch (error) {
-      console.error("Load dashboard error:", error);
-      Alert.alert("Error", "Failed to load dashboard data. Please try again.");
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+const loadDashboardData = useCallback(async () => {
+  setIsLoading(true);
+  try {
+    const currentUser = await ApiService.getCurrentUser();
+    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "security")) {
+      Alert.alert("Access Denied", "You don't have admin privileges.");
+      navigation.replace("Login");
+      return;
     }
-  }, [navigation]);
+    setUser(currentUser);
+    await Promise.all([loadAllVisitRequests(), loadAllUsers()]);
+  } catch (error) {
+    console.error("Load dashboard error:", error);
+    Alert.alert("Error", "Failed to load dashboard data. Please try again.");
+  } finally {
+    setIsLoading(false);
+    setRefreshing(false);
+  }
+}, [navigation]);
 
   useEffect(() => {
     loadDashboardData();
@@ -726,118 +725,113 @@ export default function AdminDashboardScreen({ navigation }) {
   };
 
   // FIXED: Approve request with proper state update
-  const handleApproveRequest = async (request) => {
-    const id = request._id || request.id;
-    if (!id) {
-      Alert.alert("Error", "Cannot find visitor ID. Please refresh and try again.");
-      return;
-    }
-    if (processingId === id) return;
+const handleApproveRequest = async (request) => {
+  const id = request._id || request.id;
+  if (!id) {
+    Alert.alert("Error", "Cannot find visitor ID. Please refresh and try again.");
+    return;
+  }
+  if (processingId === id) return;
 
-    Alert.alert("Approve Visit Request", `Are you sure you want to approve ${request.fullName || "this visitor"}'s visit?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Approve",
-        onPress: async () => {
-          setProcessingId(id);
-          try {
-            const response = await ApiService.approveVisitor(id);
-            if (response?.success) {
-              // Update local state immediately
-              const updatedRequests = visitRequests.map(req => {
-                if ((req._id === id || req.id === id)) {
-                  return { ...req, status: "approved" };
-                }
-                return req;
-              });
-              
-              setVisitRequests(updatedRequests);
-              setPendingRequests(updatedRequests.filter(r => r.status === "pending"));
-              setApprovedRequests(updatedRequests.filter(r => r.status === "approved"));
-              
-              // Update stats
-              setStats(prev => ({
-                ...prev,
-                pendingRequests: updatedRequests.filter(r => r.status === "pending").length,
-                approvedRequests: updatedRequests.filter(r => r.status === "approved").length,
-              }));
-              
-              Alert.alert("Success", `${request.fullName || "Visitor"} has been approved successfully!`);
-              setShowRequestDetailsModal(false);
-              // Refresh data in background
-              loadAllVisitRequests();
-            } else {
-              Alert.alert("Error", response?.message || "Failed to approve request");
-            }
-          } catch (error) {
-            console.error("Approve error:", error);
-            Alert.alert("Error", error.message || "Failed to approve request. Please try again.");
-          } finally {
-            setProcessingId(null);
+  Alert.alert("Approve Visit Request", `Are you sure you want to approve ${request.fullName || "this visitor"}'s visit?`, [
+    { text: "Cancel", style: "cancel" },
+    {
+      text: "Approve",
+      onPress: async () => {
+        setProcessingId(id);
+        try {
+          const response = await ApiService.approveVisitor(id, "Approved by admin");
+          // ApiService.approveVisitor returns data directly
+          if (response && (response.success || response.visitor)) {
+            const updatedRequests = visitRequests.map(req => {
+              if ((req._id === id || req.id === id)) {
+                return { ...req, status: "approved" };
+              }
+              return req;
+            });
+            
+            setVisitRequests(updatedRequests);
+            setPendingRequests(updatedRequests.filter(r => r.status === "pending"));
+            setApprovedRequests(updatedRequests.filter(r => r.status === "approved"));
+            
+            setStats(prev => ({
+              ...prev,
+              pendingRequests: updatedRequests.filter(r => r.status === "pending").length,
+              approvedRequests: updatedRequests.filter(r => r.status === "approved").length,
+            }));
+            
+            Alert.alert("Success", `${request.fullName || "Visitor"} has been approved successfully!`);
+            setShowRequestDetailsModal(false);
+            loadAllVisitRequests();
+          } else {
+            Alert.alert("Error", response?.message || "Failed to approve request");
           }
-        },
+        } catch (error) {
+          console.error("Approve error:", error);
+          Alert.alert("Error", error.message || "Failed to approve request. Please try again.");
+        } finally {
+          setProcessingId(null);
+        }
       },
-    ]);
-  };
+    },
+  ]);
+};
 
   // FIXED: Reject request with proper state update
-  const handleRejectRequest = async () => {
-    if (!rejectionReason.trim()) {
-      Alert.alert("Error", "Please provide a reason for rejection");
-      return;
-    }
-    const id = selectedRequest?._id || selectedRequest?.id;
-    if (!id) {
-      Alert.alert("Error", "Cannot find visitor ID");
-      return;
-    }
+const handleRejectRequest = async () => {
+  if (!rejectionReason.trim()) {
+    Alert.alert("Error", "Please provide a reason for rejection");
+    return;
+  }
+  const id = selectedRequest?._id || selectedRequest?.id;
+  if (!id) {
+    Alert.alert("Error", "Cannot find visitor ID");
+    return;
+  }
 
-    Alert.alert("Reject Visit Request", `Are you sure you want to reject ${selectedRequest?.fullName}'s visit?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Reject",
-        onPress: async () => {
-          setProcessingId(id);
-          try {
-            const response = await ApiService.rejectVisitor(id, rejectionReason);
-            if (response?.success) {
-              // Update local state immediately
-              const updatedRequests = visitRequests.map(req => {
-                if ((req._id === id || req.id === id)) {
-                  return { ...req, status: "rejected", rejectionReason };
-                }
-                return req;
-              });
-              
-              setVisitRequests(updatedRequests);
-              setPendingRequests(updatedRequests.filter(r => r.status === "pending"));
-              setRejectedRequests(updatedRequests.filter(r => r.status === "rejected"));
-              
-              // Update stats
-              setStats(prev => ({
-                ...prev,
-                pendingRequests: updatedRequests.filter(r => r.status === "pending").length,
-                rejectedRequests: updatedRequests.filter(r => r.status === "rejected").length,
-              }));
-              
-              Alert.alert("Success", `${selectedRequest?.fullName} has been rejected.`);
-              setShowRejectModal(false);
-              setRejectionReason("");
-              // Refresh data in background
-              loadAllVisitRequests();
-            } else {
-              Alert.alert("Error", response?.message || "Failed to reject request");
-            }
-          } catch (error) {
-            console.error("Reject error:", error);
-            Alert.alert("Error", error.message || "Failed to reject request. Please try again.");
-          } finally {
-            setProcessingId(null);
+  Alert.alert("Reject Visit Request", `Are you sure you want to reject ${selectedRequest?.fullName}'s visit?`, [
+    { text: "Cancel", style: "cancel" },
+    {
+      text: "Reject",
+      onPress: async () => {
+        setProcessingId(id);
+        try {
+          const response = await ApiService.rejectVisitor(id, rejectionReason);
+          if (response && (response.success || response.visitor)) {
+            const updatedRequests = visitRequests.map(req => {
+              if ((req._id === id || req.id === id)) {
+                return { ...req, status: "rejected", rejectionReason };
+              }
+              return req;
+            });
+            
+            setVisitRequests(updatedRequests);
+            setPendingRequests(updatedRequests.filter(r => r.status === "pending"));
+            setRejectedRequests(updatedRequests.filter(r => r.status === "rejected"));
+            
+            setStats(prev => ({
+              ...prev,
+              pendingRequests: updatedRequests.filter(r => r.status === "pending").length,
+              rejectedRequests: updatedRequests.filter(r => r.status === "rejected").length,
+            }));
+            
+            Alert.alert("Success", `${selectedRequest?.fullName} has been rejected.`);
+            setShowRejectModal(false);
+            setRejectionReason("");
+            loadAllVisitRequests();
+          } else {
+            Alert.alert("Error", response?.message || "Failed to reject request");
           }
-        },
+        } catch (error) {
+          console.error("Reject error:", error);
+          Alert.alert("Error", error.message || "Failed to reject request. Please try again.");
+        } finally {
+          setProcessingId(null);
+        }
       },
-    ]);
-  };
+    },
+  ]);
+};
 
   const generateRandomPassword = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
@@ -849,92 +843,89 @@ export default function AdminDashboardScreen({ navigation }) {
   };
 
   // FIXED: Create user with proper role assignment
-  const handleCreateUser = async () => {
-    if (!newUserData.firstName || !newUserData.lastName || !newUserData.email || !newUserData.phone) {
-      Alert.alert("Error", "Please fill all required fields (*)");
-      return;
+const handleCreateUser = async () => {
+  if (!newUserData.firstName || !newUserData.lastName || !newUserData.email || !newUserData.phone) {
+    Alert.alert("Error", "Please fill all required fields (*)");
+    return;
+  }
+
+  setProcessingId("create-user");
+
+  try {
+    const generatedPassword = newUserData.password || ApiService.generateRandomPassword();
+    
+    const userPayload = {
+      firstName: newUserData.firstName.trim(),
+      lastName: newUserData.lastName.trim(),
+      email: newUserData.email.toLowerCase().trim(),
+      password: generatedPassword,
+      phone: newUserData.phone.trim(),
+      role: newUserData.role,
+      status: "active",
+      isActive: true,
+    };
+
+    // Add role-specific fields
+    if (newUserData.role === "staff") {
+      userPayload.department = newUserData.department || "General";
+      userPayload.position = newUserData.position || "Staff Member";
+      userPayload.employeeId = newUserData.employeeId || `STF-${Date.now().toString().slice(-6)}`;
+    } else if (newUserData.role === "security" || newUserData.role === "guard") {
+      userPayload.shift = newUserData.shift || "Morning";
+      userPayload.position = newUserData.position || "Security Personnel";
+      userPayload.employeeId = newUserData.employeeId || `SEC-${Date.now().toString().slice(-6)}`;
+      userPayload.department = "Security Department";
     }
 
-    setProcessingId("create-user");
+    const response = await ApiService.register(userPayload);
 
-    try {
-      const generatedPassword = newUserData.password || generateRandomPassword();
-      // Ensure correct role assignment
-      let userRole = newUserData.role === "security" ? "security" : "staff";
-
-      const userPayload = {
-        firstName: newUserData.firstName.trim(),
-        lastName: newUserData.lastName.trim(),
-        email: newUserData.email.toLowerCase().trim(),
-        password: generatedPassword,
-        phone: newUserData.phone.trim(),
-        role: userRole,
-        status: "active",
-        isActive: true,
+    if (response && (response.success || response.user)) {
+      const roleDisplay = newUserData.role === "security" || newUserData.role === "guard" ? "SECURITY PERSONNEL" : "STAFF MEMBER";
+      
+      const newUser = {
+        ...userPayload,
+        _id: response.user?._id || response.user?.id || Date.now().toString(),
+        createdAt: new Date().toISOString(),
       };
-
-      // Add role-specific fields
-      if (userRole === "staff") {
-        userPayload.department = newUserData.department || "General";
-        userPayload.position = newUserData.position || "Staff Member";
-        userPayload.employeeId = newUserData.employeeId || `STF-${Date.now().toString().slice(-6)}`;
-      } else if (userRole === "security") {
-        userPayload.shift = newUserData.shift || "Morning";
-        userPayload.position = newUserData.position || "Security Personnel";
-        userPayload.employeeId = newUserData.employeeId || `SEC-${Date.now().toString().slice(-6)}`;
-        userPayload.department = "Security Department";
+      
+      setAllUsers(prev => [...prev, newUser]);
+      
+      if (newUserData.role === "staff") {
+        setStaffUsers(prev => [...prev, newUser]);
+      } else if (newUserData.role === "security" || newUserData.role === "guard") {
+        setGuardUsers(prev => [...prev, newUser]);
       }
-
-      const response = await ApiService.register(userPayload);
-
-      if (response?.success) {
-        const roleDisplay = userRole === "security" ? "SECURITY PERSONNEL" : "STAFF MEMBER";
-        
-        // Update local state immediately
-        const newUser = {
-          ...userPayload,
-          _id: response.user?._id || response.user?.id || Date.now().toString(),
-          createdAt: new Date().toISOString(),
-        };
-        
-        setAllUsers(prev => [...prev, newUser]);
-        
-        if (userRole === "staff") {
-          setStaffUsers(prev => [...prev, newUser]);
-        } else if (userRole === "security") {
-          setGuardUsers(prev => [...prev, newUser]);
-        }
-        
-        setStats(prev => ({
-          ...prev,
-          totalUsers: prev.totalUsers + 1,
-          totalStaff: userRole === "staff" ? prev.totalStaff + 1 : prev.totalStaff,
-          totalGuards: userRole === "security" ? prev.totalGuards + 1 : prev.totalGuards,
-          activeUsers: prev.activeUsers + 1,
-        }));
-        
-        Alert.alert("Success", `${roleDisplay} account created successfully!\n\nName: ${newUserData.firstName} ${newUserData.lastName}\nEmail: ${newUserData.email}\nPassword: ${generatedPassword}\nRole: ${roleDisplay}\nEmployee ID: ${userPayload.employeeId}\n\nLogin credentials have been sent to ${newUserData.email}`, [
-          {
-            text: "OK",
-            onPress: () => {
-              setShowAddUserModal(false);
-              setNewUserData({
-                firstName: "", lastName: "", email: "", password: "", phone: "",
-                role: "staff", department: "", employeeId: "", position: "", shift: "Morning", status: "active",
-              });
-            },
+      
+      setStats(prev => ({
+        ...prev,
+        totalUsers: prev.totalUsers + 1,
+        totalStaff: newUserData.role === "staff" ? prev.totalStaff + 1 : prev.totalStaff,
+        totalGuards: (newUserData.role === "security" || newUserData.role === "guard") ? prev.totalGuards + 1 : prev.totalGuards,
+        activeUsers: prev.activeUsers + 1,
+      }));
+      
+      Alert.alert("Success", `${roleDisplay} account created successfully!\n\nName: ${newUserData.firstName} ${newUserData.lastName}\nEmail: ${newUserData.email}\nPassword: ${generatedPassword}\nRole: ${roleDisplay}\nEmployee ID: ${userPayload.employeeId}\n\nLogin credentials have been sent to ${newUserData.email}`, [
+        {
+          text: "OK",
+          onPress: () => {
+            setShowAddUserModal(false);
+            setNewUserData({
+              firstName: "", lastName: "", email: "", password: "", phone: "",
+              role: "staff", department: "", employeeId: "", position: "", shift: "Morning", status: "active",
+            });
           },
-        ]);
-      } else {
-        Alert.alert("Error", response?.message || response?.error || "Failed to create account");
-      }
-    } catch (error) {
-      console.error("Create user error:", error);
-      Alert.alert("Error", error.message || "Failed to create account");
-    } finally {
-      setProcessingId(null);
+        },
+      ]);
+    } else {
+      Alert.alert("Error", response?.message || response?.error || "Failed to create account");
     }
-  };
+  } catch (error) {
+    console.error("Create user error:", error);
+    Alert.alert("Error", error.message || "Failed to create account");
+  } finally {
+    setProcessingId(null);
+  }
+};
 
   // FIXED: Edit user with proper role handling
   const handleEditUser = (userItem) => {
@@ -957,91 +948,89 @@ export default function AdminDashboardScreen({ navigation }) {
   };
 
   // FIXED: Confirm edit user with proper update
-  const confirmEditUser = async () => {
-    if (!editUserData.firstName || !editUserData.lastName) {
-      Alert.alert("Error", "Please fill all required fields");
-      return;
-    }
+const confirmEditUser = async () => {
+  if (!editUserData.firstName || !editUserData.lastName) {
+    Alert.alert("Error", "Please fill all required fields");
+    return;
+  }
 
-    setProcessingId("edit-user");
-    try {
-      const updatePayload = {
-        firstName: editUserData.firstName,
-        lastName: editUserData.lastName,
-        phone: editUserData.phone,
-        role: editUserData.role,
-        department: editUserData.department,
-        shift: editUserData.shift,
-        position: editUserData.position,
-        status: editUserData.status,
-        isActive: editUserData.status === "active",
-      };
+  setProcessingId("edit-user");
+  try {
+    const updatePayload = {
+      firstName: editUserData.firstName,
+      lastName: editUserData.lastName,
+      phone: editUserData.phone,
+      role: editUserData.role,
+      department: editUserData.department,
+      shift: editUserData.shift,
+      position: editUserData.position,
+      status: editUserData.status,
+      isActive: editUserData.status === "active",
+    };
+    
+    const response = await ApiService.updateUser(editUserData.id, updatePayload);
+    if (response && (response.success || response.user)) {
+      const updatedUsers = allUsers.map(user => {
+        if ((user._id === editUserData.id || user.id === editUserData.id)) {
+          return { ...user, ...updatePayload };
+        }
+        return user;
+      });
       
-      const response = await ApiService.updateUser(editUserData.id, updatePayload);
-      if (response?.success) {
-        // Update local state immediately
-        const updatedUsers = allUsers.map(user => {
-          if ((user._id === editUserData.id || user.id === editUserData.id)) {
-            return { ...user, ...updatePayload };
-          }
-          return user;
-        });
-        
-        setAllUsers(updatedUsers);
-        setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
-        setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
-        
-        Alert.alert("Success", "User has been updated successfully!");
-        setShowEditUserModal(false);
-      } else {
-        Alert.alert("Error", response?.message || "Failed to update user");
-      }
-    } catch (error) {
-      console.error("Update user error:", error);
-      Alert.alert("Error", error.message || "Failed to update user");
-    } finally {
-      setProcessingId(null);
+      setAllUsers(updatedUsers);
+      setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
+      setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
+      
+      Alert.alert("Success", "User has been updated successfully!");
+      setShowEditUserModal(false);
+    } else {
+      Alert.alert("Error", response?.message || "Failed to update user");
     }
-  };
+  } catch (error) {
+    console.error("Update user error:", error);
+    Alert.alert("Error", error.message || "Failed to update user");
+  } finally {
+    setProcessingId(null);
+  }
+};
 
   // FIXED: Delete user with proper state update
-  const handleDeleteUser = () => {
-    Alert.alert("Delete User", `Delete ${selectedUser?.firstName} ${selectedUser?.lastName}? This action cannot be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const response = await ApiService.deleteUser(selectedUser._id);
-            if (response?.success) {
-              // Update local state immediately
-              const updatedUsers = allUsers.filter(user => user._id !== selectedUser._id && user.id !== selectedUser._id);
-              setAllUsers(updatedUsers);
-              setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
-              setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
-              
-              setStats(prev => ({
-                ...prev,
-                totalUsers: updatedUsers.length,
-                totalStaff: updatedUsers.filter(u => u.role === "staff").length,
-                totalGuards: updatedUsers.filter(u => u.role === "security" || u.role === "guard").length,
-                activeUsers: updatedUsers.filter(u => u.status === "active" || u.isActive).length,
-              }));
-              
-              Alert.alert("Success", "User deleted successfully");
-              setShowDeleteUserModal(false);
-            } else {
-              Alert.alert("Error", response?.message || "Failed to delete user");
-            }
-          } catch (error) {
-            console.error("Delete user error:", error);
-            Alert.alert("Error", "Failed to delete user. Please try again.");
+const handleDeleteUser = () => {
+  Alert.alert("Delete User", `Delete ${selectedUser?.firstName} ${selectedUser?.lastName}? This action cannot be undone.`, [
+    { text: "Cancel", style: "cancel" },
+    {
+      text: "Delete",
+      style: "destructive",
+      onPress: async () => {
+        try {
+          const response = await ApiService.deleteUser(selectedUser._id);
+          if (response && (response.success || response.message)) {
+            const updatedUsers = allUsers.filter(user => user._id !== selectedUser._id && user.id !== selectedUser._id);
+            setAllUsers(updatedUsers);
+            setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
+            setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
+            
+            setStats(prev => ({
+              ...prev,
+              totalUsers: updatedUsers.length,
+              totalStaff: updatedUsers.filter(u => u.role === "staff").length,
+              totalGuards: updatedUsers.filter(u => u.role === "security" || u.role === "guard").length,
+              activeUsers: updatedUsers.filter(u => u.status === "active" || u.isActive).length,
+            }));
+            
+            Alert.alert("Success", "User deleted successfully");
+            setShowDeleteUserModal(false);
+          } else {
+            Alert.alert("Error", response?.message || "Failed to delete user");
           }
-        },
+        } catch (error) {
+          console.error("Delete user error:", error);
+          Alert.alert("Error", "Failed to delete user. Please try again.");
+        }
       },
-    ]);
-  };
+    },
+  ]);
+};
 
   const updateSetting = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
