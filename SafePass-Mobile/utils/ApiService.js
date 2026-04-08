@@ -50,45 +50,65 @@ class ApiService {
     ]);
   }
 
-  // Add to ApiService.js
+  // ================= NFC METHODS =================
+  async processNfcTap(tapData) {
+    try {
+      const visitorId = tapData?.visitorId;
+      if (!visitorId) {
+        return { success: false, message: "Missing visitor ID" };
+      }
 
-// Process NFC tap from mobile app
-static async processNfcTap(tapData) {
-  try {
-    const response = await this.api.post('/nfc/tap', tapData);
-    return response.data;
-  } catch (error) {
-    console.error('Process NFC tap error:', error);
-    throw error;
+      const visitorRes = await this.getVisitorById(visitorId);
+      const visitor = visitorRes?.visitor;
+      if (!visitor) {
+        return { success: false, message: "Visitor record not found" };
+      }
+
+      if (visitor.status === "checked_in") {
+        const response = await this.fetch(`/visitors/${visitorId}/self-checkout`, {
+          method: "PUT",
+        });
+        return { ...response, action: "check_out" };
+      }
+
+      if (visitor.status === "checked_out") {
+        return { success: false, message: "Visit already completed" };
+      }
+
+      if (visitor.status !== "approved" && visitor.approvalStatus !== "approved") {
+        return { success: false, message: "Visit request is not approved yet" };
+      }
+
+      const response = await this.fetch(`/visitors/${visitorId}/self-checkin`, {
+        method: "PUT",
+      });
+      return { ...response, action: "check_in" };
+    } catch (error) {
+      console.error("Process NFC tap error:", error);
+      throw error;
+    }
   }
-}
 
-// Send command to Arduino gate controller
-static async sendGateCommand(gateId, command, visitorId) {
-  try {
-    const response = await this.api.post('/gate/control', {
+  async sendGateCommand(gateId, command, visitorId) {
+    // Gate controller endpoint is not available yet; keep API shape stable.
+    return {
+      success: true,
+      simulated: true,
       gateId,
-      command, // 'open', 'close', 'status'
+      command,
       visitorId,
-      timestamp: new Date().toISOString()
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Send gate command error:', error);
-    throw error;
+      timestamp: new Date().toISOString(),
+    };
   }
-}
 
-// Get gate status
-static async getGateStatus(gateId) {
-  try {
-    const response = await this.api.get(`/gate/status/${gateId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Get gate status error:', error);
-    throw error;
+  async getGateStatus(gateId) {
+    return {
+      success: true,
+      simulated: true,
+      gateId,
+      status: "online",
+    };
   }
-}
 
   // ================= GENERIC FETCH =================
 async fetch(url, options = {}) {
@@ -308,15 +328,6 @@ async verifyCredentials(email, password) {
     
     throw new Error(error.message || "Invalid email or password");
   }
-}
-
-generateRandomPassword(length = 10) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return password;
 }
 
   async requestOtp(phoneNumber, method = 'sms') {
@@ -686,19 +697,6 @@ async rejectVisitor(visitorId, reason) {
   }
 }
 
-  async rejectVisitor(visitorId, reason) {
-    try {
-      const response = await this.fetch(`/admin/visitors/${visitorId}/reject`, {
-        method: "PUT",
-        body: { reason }
-      });
-      return response;
-    } catch (error) {
-      console.error("Reject visitor error:", error);
-      throw error;
-    }
-  }
-
   async sendAdminNotification(notificationData) {
     try {
       const response = await this.fetch("/admin/notifications", {
@@ -774,7 +772,7 @@ async rejectVisitor(visitorId, reason) {
 
   async getVisitorStats() {
     try {
-      const response = await this.fetch("/admin/visitors/stats");
+      const response = await this.fetch("/visitors/stats");
       return response;
     } catch (error) {
       console.error("Get visitor stats error:", error);
@@ -1149,6 +1147,93 @@ generateRandomPassword(length = 10) {
     } catch (error) {
       console.error("Mark all notifications error:", error);
       throw error;
+    }
+  }
+
+  // ================= COMPATIBILITY METHODS =================
+  async changePassword(payload) {
+    try {
+      return await this.fetch("/auth/change-password", {
+        method: "PUT",
+        body: payload,
+      });
+    } catch (error) {
+      console.error("Change password error:", error);
+      throw error;
+    }
+  }
+
+  async getActiveUserCount() {
+    try {
+      const response = await this.getAllUsers({ status: "active", limit: 1 });
+      return response?.total ?? response?.users?.length ?? 0;
+    } catch (error) {
+      console.error("Get active user count error:", error);
+      return 0;
+    }
+  }
+
+  async getSecurityReports() {
+    try {
+      const response = await this.getSecurityLogs({ limit: 100 });
+      const reports = (response?.logs || [])
+        .filter((log) => log?.notes || log?.status === "denied")
+        .map((log) => ({
+          ...log,
+          resolved: false,
+          reason: log.notes || "Security incident",
+        }));
+      return { success: true, reports };
+    } catch (error) {
+      console.error("Get security reports error:", error);
+      return { success: false, reports: [] };
+    }
+  }
+
+  async resolveAlert(alertId) {
+    try {
+      const result = await this.markNotificationAsRead(alertId);
+      return { success: !!result?.success };
+    } catch (error) {
+      console.error("Resolve alert error:", error);
+      return { success: false };
+    }
+  }
+
+  async reportVisitor(visitorId, reportData) {
+    try {
+      return await this.fetch(`/visitors/${visitorId}/report`, {
+        method: "POST",
+        body: reportData,
+      });
+    } catch (error) {
+      console.error("Report visitor error:", error);
+      throw error;
+    }
+  }
+
+  async updateVisitor(visitorId, data) {
+    try {
+      return await this.fetch(`/visitors/${visitorId}`, {
+        method: "PUT",
+        body: data,
+      });
+    } catch (error) {
+      // Let VisitorManagementScreen fall back to local demo-mode update path.
+      console.error("Update visitor error:", error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  async deleteVisitor(visitorId) {
+    try {
+      return await this.fetch(`/visitors/${visitorId}`, {
+        method: "DELETE",
+      });
+    } catch (error) {
+      // Let VisitorManagementScreen fall back to local demo-mode delete path.
+      console.error("Delete visitor error:", error);
+      return { success: false, message: error.message };
     }
   }
 

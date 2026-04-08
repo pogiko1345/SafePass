@@ -117,7 +117,7 @@ const getRoleIcon = (role) => {
   }
 };
 
-export default function AdminDashboardScreen({ navigation }) {
+export default function AdminDashboardScreen({ navigation, onLogout }) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const mainScrollViewRef = useRef(null);
   const sidebarScrollViewRef = useRef(null);
@@ -667,6 +667,8 @@ export default function AdminDashboardScreen({ navigation }) {
     setActiveMenu(action);
     setCurrentPage(1);
     switch (action) {
+      case "dashboard":
+        break;
       case "requests":
         setRequestFilter("pending");
         loadAllVisitRequests();
@@ -712,6 +714,9 @@ export default function AdminDashboardScreen({ navigation }) {
               await ApiService.logout();
             } catch (e) {
               console.log("Logout API error (ignored):", e);
+            }
+            if (typeof onLogout === "function") {
+              onLogout();
             }
             navigation.reset({ index: 0, routes: [{ name: "Login" }] });
           } catch (error) {
@@ -984,6 +989,12 @@ export default function AdminDashboardScreen({ navigation }) {
 
   // FIXED: Handle Delete User
   const handleDeleteUser = () => {
+    const selectedId = selectedUser?._id || selectedUser?.id;
+    if (!selectedId) {
+      Alert.alert("Error", "Cannot find user ID. Please refresh and try again.");
+      return;
+    }
+
     Alert.alert("Delete User", `Delete ${selectedUser?.firstName} ${selectedUser?.lastName}? This action cannot be undone.`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -991,9 +1002,16 @@ export default function AdminDashboardScreen({ navigation }) {
         style: "destructive",
         onPress: async () => {
           try {
+<<<<<<< HEAD
             const response = await ApiService.deleteUser(selectedUser._id);
             if (response && (response.success || response.message)) {
               const updatedUsers = allUsers.filter(user => user._id !== selectedUser._id && user.id !== selectedUser._id);
+=======
+            const response = await ApiService.deleteUser(selectedId);
+            if (response?.success) {
+              // Update local state immediately
+              const updatedUsers = allUsers.filter(user => user._id !== selectedId && user.id !== selectedId);
+>>>>>>> 80d14ef84165ee7182e58eb7a0ce6cb4f9bc8a81
               setAllUsers(updatedUsers);
               setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
               setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
