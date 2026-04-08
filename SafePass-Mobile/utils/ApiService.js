@@ -8,12 +8,17 @@ if (Platform.OS === 'web') {
 }
 import * as ImageManipulator from 'expo-image-manipulator';
 
-const API_BASE_URL = Platform.select({
+const DEFAULT_API_BASE_URL = Platform.select({
   ios: "http://localhost:5000/api",           // iOS simulator
   android: "http://10.0.2.2:5000/api",        // Android emulator
   web: "http://localhost:5000/api",           // Web
   default: "http://localhost:5000/api"        // Default
 });
+
+const API_BASE_URL = (
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
+  DEFAULT_API_BASE_URL
+).replace(/\/$/, "");
 
 class ApiService {
   constructor() {
@@ -48,6 +53,10 @@ class ApiService {
       "trustedDevice",
       "isNewRegistration"
     ]);
+  }
+
+  isDevFallbackEnabled() {
+    return typeof __DEV__ !== "undefined" && __DEV__;
   }
 
   // ================= NFC METHODS =================
@@ -301,8 +310,12 @@ async verifyCredentials(email, password) {
     
   } catch (error) {
     console.error("Verify credentials error:", error);
-    
-    // Demo accounts (fallback if backend not running)
+
+    if (!this.isDevFallbackEnabled()) {
+      throw new Error(error.message || "Invalid email or password");
+    }
+
+    // Demo accounts (development fallback if backend not running)
     const demoAccounts = {
       'admin@test.com': { password: 'admin123', role: 'admin', status: 'active' },
       'security@test.com': { password: 'security123', role: 'security', status: 'active' },
@@ -340,6 +353,10 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.log("⚠️ OTP request API not ready - using simulation");
       
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
       
       this._lastOtp = {
@@ -377,6 +394,10 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.log("⚠️ OTP verify API not ready - using simulation");
       
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       const isValid = this._lastOtp && 
                      this._lastOtp.phoneNumber === phoneNumber &&
                      this._lastOtp.expiresAt > Date.now() &&
@@ -412,6 +433,10 @@ async verifyCredentials(email, password) {
       return response;
     } catch (error) {
       console.log("⚠️ Enable 2FA API not ready - using simulation");
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       return {
         success: true,
         message: "2FA enabled successfully",
@@ -427,6 +452,10 @@ async verifyCredentials(email, password) {
       return response;
     } catch (error) {
       console.log("⚠️ Disable 2FA API not ready - using simulation");
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       return {
         success: true,
         message: "2FA disabled successfully",
@@ -481,6 +510,10 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.log("⚠️ Password reset API not ready - using simulation");
       
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       const resetToken = "reset_" + Math.random().toString(36).substring(2);
       
       this._lastReset = {
@@ -516,6 +549,10 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.log("⚠️ Password reset verify API not ready - using simulation");
       
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       const isValid = this._lastReset?.email === email && 
                       this._lastReset?.token === resetToken &&
                       this._lastReset?.expiresAt > Date.now() &&
@@ -548,6 +585,10 @@ async verifyCredentials(email, password) {
       return response;
     } catch (error) {
       console.log("⚠️ Password reset API not ready - using simulation");
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       return {
         success: true,
         message: "Password reset successfully"

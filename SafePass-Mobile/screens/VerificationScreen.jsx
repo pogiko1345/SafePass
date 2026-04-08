@@ -254,10 +254,12 @@ export default function VerificationScreen({ navigation, route }) {
       // FIXED: Use safe storage functions
       // Store the auth token
       if (verificationResponse?.token) {
-        await storeData("authToken", verificationResponse.token);
+        await ApiService.setToken(verificationResponse.token);
+        await storeData("userToken", verificationResponse.token);
         console.log("✅ Auth token stored");
       } else if (tempToken) {
-        await storeData("authToken", tempToken);
+        await ApiService.setToken(tempToken);
+        await storeData("userToken", tempToken);
         console.log("✅ Temp token stored");
       }
       
@@ -283,7 +285,7 @@ export default function VerificationScreen({ navigation, route }) {
       } else if (userRole === 'security' || userRole === 'guard') {
         dashboardRoute = 'SecurityDashboard';
       } else if (userRole === 'staff') {
-        dashboardRoute = 'StaffDashboard';
+        dashboardRoute = 'RoleSelect';
       } else {
         dashboardRoute = 'VisitorDashboard';
       }

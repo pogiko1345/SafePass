@@ -123,7 +123,7 @@ export default function LoginScreen({ navigation, route }) {
         return;
       }
       
-      const token = await AsyncStorage.getItem('authToken');
+      const token = await AsyncStorage.getItem('userToken');
       const userJson = await AsyncStorage.getItem('currentUser');
       
       if (token && userJson) {
@@ -493,6 +493,7 @@ export default function LoginScreen({ navigation, route }) {
   const getInitialRoute = (user) => {
     switch(user?.role) {
       case 'security': 
+      case 'guard':
         return "SecurityDashboard";
       case 'admin': 
         return "AdminDashboard";
