@@ -1134,7 +1134,7 @@ const confirmEditUser = async () => {
       }
     };
 
-    const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${getTitle()} - Sapphire Aviation</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:20px;background:white;}.print-header{text-align:center;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid #3B82F6;}.print-header h2{color:#1E3A5F;font-size:18px;margin-bottom:4px;}.print-header p{color:#64748B;font-size:11px;}table{width:100%;border-collapse:collapse;font-size:12px;}th{background:#F1F5F9;color:#1E293B;padding:10px 8px;text-align:left;font-weight:600;border-bottom:2px solid #E2E8F0;}td{padding:8px;border-bottom:1px solid #E2E8F0;}.role-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}.role-admin{background:#EFF6FF;color:#3B82F6;}.role-staff{background:#D1FAE5;color:#10B981;}.role-guard{background:#FEF3C7;color:#F59E0B;}.role-security{background:#EDE9FE;color:#8B5CF6;}.role-visitor{background:#EDE9FE;color:#8B5CF6;}.status-active{color:#10B981;font-weight:600;}.status-inactive{color:#EF4444;font-weight:600;}.print-footer{margin-top:20px;text-align:center;font-size:10px;color:#94A3B8;padding-top:10px;border-top:1px solid #E2E8F0;}@media print{body{padding:10px;}}</style></head><body><div class="print-header"><h2>Sapphire Aviation Academy</h2><p>${getTitle()} | Generated: ${new Date().toLocaleDateString()}</p></div><tr><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Date Created</th></tr></thead><tbody>${users.map((userItem) => `<tr><td><strong>${userItem.firstName} ${userItem.lastName}</strong></td><td>${userItem.email}</td><td><span class="role-badge role-${userItem.role}">${userItem.role?.toUpperCase() || "USER"}</span></td><td class="${userItem.status === "active" || userItem.isActive ? "status-active" : "status-inactive"}">${userItem.status === "active" || userItem.isActive ? "ACTIVE" : "INACTIVE"}</td><td>${new Date(userItem.createdAt).toLocaleDateString()}</td></tr>`).join("")}</tbody></table><div class="print-footer"><p>Total: ${users.length} users | Printed on ${new Date().toLocaleString()}</p></div></body></html>`;
+    const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${getTitle()} - Sapphire Aviation</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:20px;background:white;}.print-header{text-align:center;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid #3B82F6;}.print-header h2{color:#1E3A5F;font-size:18px;margin-bottom:4px;}.print-header p{color:#64748B;font-size:11px;}table{width:100%;border-collapse:collapse;font-size:12px;}th{background:#F1F5F9;color:#1E293B;padding:10px 8px;text-align:left;font-weight:600;border-bottom:2px solid #E2E8F0;}td{padding:8px;border-bottom:1px solid #E2E8F0;}.role-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}.role-admin{background:#EFF6FF;color:#3B82F6;}.role-staff{background:#D1FAE5;color:#10B981;}.role-guard{background:#FEF3C7;color:#F59E0B;}.role-security{background:#EDE9FE;color:#8B5CF6;}.role-visitor{background:#EDE9FE;color:#8B5CF6;}.status-active{color:#10B981;font-weight:600;}.status-inactive{color:#EF4444;font-weight:600;}.print-footer{margin-top:20px;text-align:center;font-size:10px;color:#94A3B8;padding-top:10px;border-top:1px solid #E2E8F0;}@media print{body{padding:10px;}}</style></head><body><div class="print-header"><h2>Sapphire Aviation Academy</h2><p>${getTitle()} | Generated: ${new Date().toLocaleDateString()}</p></div><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Date Created</th></tr></thead><tbody>${users.map((userItem) => `<tr><td><strong>${userItem.firstName} ${userItem.lastName}</strong></td><td>${userItem.email}</td><td><span class="role-badge role-${userItem.role}">${userItem.role?.toUpperCase() || "USER"}</span></td><td class="${userItem.status === "active" || userItem.isActive ? "status-active" : "status-inactive"}">${userItem.status === "active" || userItem.isActive ? "ACTIVE" : "INACTIVE"}</td><td>${new Date(userItem.createdAt).toLocaleDateString()}</td></tr>`).join("")}</tbody></table><div class="print-footer"><p>Total: ${users.length} users | Printed on ${new Date().toLocaleString()}</p></div></body></html>`;
 
     try {
       if (Platform.OS === "web") {
@@ -1152,8 +1152,334 @@ const confirmEditUser = async () => {
     }
   };
 
-  // Keep all existing render functions (renderBarChart, renderAnalyticsContent, renderSettingsContent, renderDashboardContent)
-  // ... (these remain the same as in your original code)
+  const renderBarChart = (labels = [], data = [], barColor = "#3B82F6") => {
+    const maxValue = Math.max(...data, 1);
+    return (
+      <View style={styles.chartContainer}>
+        <View style={styles.chartBarsContainer}>
+          {labels.map((label, index) => {
+            const value = data[index] || 0;
+            const heightPercent = Math.max((value / maxValue) * 100, value > 0 ? 8 : 2);
+            return (
+              <View key={`${label}-${index}`} style={styles.chartBarWrapper}>
+                <View style={[styles.chartBar, { height: `${heightPercent}%`, backgroundColor: barColor }]} />
+                <Text style={[styles.chartBarLabel, isDarkMode && styles.darkTextSecondary]}>{label}</Text>
+                <Text style={[styles.chartBarValue, isDarkMode && styles.darkTextSecondary]}>{value}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
+
+  const renderRequestCard = (request) => {
+    const id = getId(request);
+    const statusStyle = getStatusColor(request.status);
+
+    return (
+      <View key={id || Math.random().toString()} style={[styles.requestCard, isDarkMode && styles.darkRequestCard]}>
+        <View style={styles.requestCardHeader}>
+          <View style={styles.requestAvatar}>
+            <Text style={styles.requestAvatarText}>{request?.fullName?.charAt(0)?.toUpperCase() || "V"}</Text>
+          </View>
+          <View style={styles.requestInfo}>
+            <Text style={[styles.requestName, isDarkMode && styles.darkText]}>{request?.fullName || "Unknown Visitor"}</Text>
+            <Text style={[styles.requestPurpose, isDarkMode && styles.darkTextSecondary]}>{request?.purposeOfVisit || "No purpose provided"}</Text>
+            <Text style={[styles.requestDate, isDarkMode && styles.darkTextSecondary]}>{formatDateTime(request?.visitDate || request?.createdAt)}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+            <Text style={[styles.statusText, { color: statusStyle.text }]}>{statusStyle.label}</Text>
+          </View>
+        </View>
+
+        <View style={[styles.requestDetails, isDarkMode && { backgroundColor: "#334155" }]}>
+          <View style={styles.requestDetailItem}>
+            <Ionicons name="mail-outline" size={14} color={isDarkMode ? "#94A3B8" : "#475569"} />
+            <Text style={[styles.requestDetailText, isDarkMode && styles.darkTextSecondary]}>{request?.email || "N/A"}</Text>
+          </View>
+          <View style={styles.requestDetailItem}>
+            <Ionicons name="call-outline" size={14} color={isDarkMode ? "#94A3B8" : "#475569"} />
+            <Text style={[styles.requestDetailText, isDarkMode && styles.darkTextSecondary]}>{request?.phoneNumber || "N/A"}</Text>
+          </View>
+        </View>
+
+        <View style={styles.requestActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.viewButton]}
+            onPress={() => {
+              setSelectedRequest(request);
+              setShowRequestDetailsModal(true);
+            }}
+          >
+            <Ionicons name="eye-outline" size={16} color="#FFF" />
+          </TouchableOpacity>
+
+          {request?.status === "pending" && (
+            <>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.approveButton]}
+                onPress={() => handleApproveRequest(request)}
+                disabled={processingId === id}
+              >
+                {processingId === id ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-outline" size={16} color="#FFF" />
+                    <Text style={styles.actionButtonText}>Approve</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.rejectButton]}
+                onPress={() => {
+                  setSelectedRequest(request);
+                  setShowRejectModal(true);
+                }}
+                disabled={processingId === id}
+              >
+                <Ionicons name="close-outline" size={16} color="#FFF" />
+                <Text style={styles.actionButtonText}>Reject</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const renderDashboardContent = () => {
+    const chartData = getCurrentChartData();
+    return (
+      <ScrollView
+        ref={mainScrollViewRef}
+        style={styles.contentScrollView}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <View style={[styles.welcomeBanner, isDarkMode && styles.darkWelcomeBanner]}>
+          <View style={styles.welcomeBannerLeft}>
+            <Image source={require("../assets/LogoSapphire.jpg")} style={styles.welcomeLogo} />
+            <View>
+              <Text style={styles.welcomeTitle}>Welcome back, {user?.firstName || "Admin"}</Text>
+              <Text style={styles.welcomeSubtitle}>System overview at a glance</Text>
+            </View>
+          </View>
+          <View style={styles.welcomeDate}>
+            <Text style={styles.welcomeDateText}>{new Date().toLocaleDateString()}</Text>
+          </View>
+        </View>
+
+        <View style={styles.statsGrid}>
+          {[
+            { label: "Pending", value: stats.pendingRequests, icon: "time-outline", bg: "#FEF3C7", color: "#D97706" },
+            { label: "Approved", value: stats.approvedRequests, icon: "checkmark-circle-outline", bg: "#D1FAE5", color: "#059669" },
+            { label: "Users", value: stats.totalUsers, icon: "people-outline", bg: "#DBEAFE", color: "#2563EB" },
+            { label: "Active", value: stats.activeUsers, icon: "pulse-outline", bg: "#EDE9FE", color: "#7C3AED" },
+          ].map((item) => (
+            <View key={item.label} style={[styles.statCard, isDarkMode && styles.darkStatCard]}>
+              <View style={[styles.statIcon, { backgroundColor: item.bg }]}>
+                <Ionicons name={item.icon} size={22} color={item.color} />
+              </View>
+              <View>
+                <Text style={[styles.statNumber, isDarkMode && styles.darkText]}>{item.value}</Text>
+                <Text style={[styles.statLabel, isDarkMode && styles.darkTextSecondary]}>{item.label}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.chartSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>Visitor Trends</Text>
+            <View style={styles.chartTypeSelector}>
+              {["daily", "weekly", "monthly"].map((type) => (
+                <TouchableOpacity key={type} style={[styles.chartTypeButton, activeChartDataset === type && styles.chartTypeButtonActive]} onPress={() => setActiveChartDataset(type)}>
+                  <Text style={[styles.chartTypeText, activeChartDataset === type && styles.chartTypeTextActive]}>{type}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <View style={[styles.chartCard, isDarkMode && styles.darkChartCard]}>
+            {renderBarChart(chartData.labels, chartData.data)}
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderAnalyticsContent = () => {
+    const historyStats = getHistoryStats();
+    const filteredHistory = getFilteredHistory();
+
+    return (
+      <ScrollView style={styles.contentScrollView}>
+        <View style={styles.analyticsContainer}>
+          <View style={styles.analyticsHeader}>
+            <View>
+              <Text style={[styles.analyticsHeaderTitle, isDarkMode && styles.darkText]}>Analytics</Text>
+              <Text style={[styles.analyticsHeaderSubtitle, isDarkMode && styles.darkTextSecondary]}>Visitor and access insights</Text>
+            </View>
+            <TouchableOpacity style={styles.refreshButton} onPress={loadDashboardData}>
+              <Ionicons name="refresh-outline" size={16} color="#3B82F6" />
+              <Text style={styles.refreshButtonText}>Refresh</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.keyMetricsRow}>
+            <View style={[styles.keyMetricCard, isDarkMode && styles.darkCard]}>
+              <View style={[styles.keyMetricIcon, { backgroundColor: "#DBEAFE" }]}><Ionicons name="bar-chart-outline" size={20} color="#2563EB" /></View>
+              <View><Text style={[styles.keyMetricValue, isDarkMode && styles.darkText]}>{historyStats.total}</Text><Text style={[styles.keyMetricLabel, isDarkMode && styles.darkTextSecondary]}>Total</Text></View>
+            </View>
+            <View style={[styles.keyMetricCard, isDarkMode && styles.darkCard]}>
+              <View style={[styles.keyMetricIcon, { backgroundColor: "#D1FAE5" }]}><Ionicons name="checkmark-done-outline" size={20} color="#059669" /></View>
+              <View><Text style={[styles.keyMetricValue, isDarkMode && styles.darkText]}>{historyStats.approved}</Text><Text style={[styles.keyMetricLabel, isDarkMode && styles.darkTextSecondary]}>Approved</Text></View>
+            </View>
+            <View style={[styles.keyMetricCard, isDarkMode && styles.darkCard]}>
+              <View style={[styles.keyMetricIcon, { backgroundColor: "#FEF3C7" }]}><Ionicons name="time-outline" size={20} color="#D97706" /></View>
+              <View><Text style={[styles.keyMetricValue, isDarkMode && styles.darkText]}>{historyStats.pending}</Text><Text style={[styles.keyMetricLabel, isDarkMode && styles.darkTextSecondary]}>Pending</Text></View>
+            </View>
+          </View>
+
+          <View style={[styles.settingsCard, isDarkMode && styles.darkCard]}>
+            <View style={styles.pageHeader}>
+              <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>History</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(true)}><Ionicons name="calendar-outline" size={20} color="#3B82F6" /></TouchableOpacity>
+            </View>
+            {showDatePicker && Platform.OS !== "web" && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display="default"
+                onChange={(event, selected) => {
+                  setShowDatePicker(false);
+                  if (selected) {
+                    setSelectedDate(selected);
+                    calculateDateAnalytics(selected);
+                  }
+                }}
+              />
+            )}
+            <View style={styles.historySearchBox}>
+              <Ionicons name="search-outline" size={16} color="#64748B" />
+              <TextInput style={[styles.historySearchInput, isDarkMode && styles.darkText]} value={historySearchQuery} onChangeText={setHistorySearchQuery} placeholder="Search history..." placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"} />
+            </View>
+            {filteredHistory.slice(0, 8).map((item) => (
+              <View key={getId(item)} style={[styles.historyItem, isDarkMode && { backgroundColor: "#334155", borderColor: theme.borderColor }]}>
+                <Text style={[styles.historyItemName, isDarkMode && styles.darkText]}>{item.fullName}</Text>
+                <Text style={[styles.historyItemEmail, isDarkMode && styles.darkTextSecondary]}>{item.email}</Text>
+                <Text style={[styles.historyDetailText, isDarkMode && styles.darkTextSecondary]}>{formatDate(item.visitDate)} | {item.status}</Text>
+              </View>
+            ))}
+            {filteredHistory.length === 0 && (
+              <View style={styles.emptyHistoryState}>
+                <Text style={[styles.emptyHistorySubtitle, isDarkMode && styles.darkTextSecondary]}>No history records found.</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderSettingsContent = () => (
+    <>
+      <ScrollView style={styles.contentScrollView}>
+        <View style={styles.settingsContainer}>
+          <View style={styles.settingsHeader}>
+            <View>
+              <Text style={[styles.settingsHeaderTitle, isDarkMode && styles.darkText]}>Settings</Text>
+              <Text style={[styles.settingsHeaderSubtitle, isDarkMode && styles.darkTextSecondary]}>Manage account and system preferences</Text>
+            </View>
+            <View style={styles.settingsHeaderActions}>
+              <TouchableOpacity style={styles.settingsResetButton} onPress={resetSettings}><Text style={styles.settingsResetButtonText}>Reset</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.settingsSaveButton, isSavingSettings && styles.settingsSaveButtonDisabled]} onPress={saveSettings} disabled={isSavingSettings}>
+                {isSavingSettings ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.settingsSaveButtonText}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={[styles.settingsCard, isDarkMode && styles.darkCard]}>
+            <View style={styles.settingItem}>
+              <View style={styles.settingInfo}><Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>Dark Mode</Text></View>
+              <Switch value={settings.darkMode} onValueChange={(value) => updateSetting("darkMode", value)} />
+            </View>
+            <View style={styles.settingItem}>
+              <View style={styles.settingInfo}><Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>Email Notifications</Text></View>
+              <Switch value={settings.emailNotifications} onValueChange={(value) => updateSetting("emailNotifications", value)} />
+            </View>
+            <View style={styles.settingItem}>
+              <View style={styles.settingInfo}><Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>SMS Alerts</Text></View>
+              <Switch value={settings.smsAlerts} onValueChange={(value) => updateSetting("smsAlerts", value)} />
+            </View>
+            <TouchableOpacity style={styles.passwordChangeButton} onPress={() => setShowChangePasswordModal(true)}>
+              <Text style={[styles.passwordChangeLabel, isDarkMode && styles.darkText]}>Change Password</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+
+      <Modal visible={showChangePasswordModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDarkMode && styles.darkModal]}>
+            <View style={[styles.modalHeader, isDarkMode && styles.darkModalHeader]}>
+              <Text style={[styles.modalTitle, isDarkMode && styles.darkText]}>Change Password</Text>
+              <TouchableOpacity onPress={() => setShowChangePasswordModal(false)}>
+                <Ionicons name="close" size={24} color={isDarkMode ? "#94A3B8" : "#6B7280"} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Current Password</Text>
+                <TextInput
+                  style={[styles.input, isDarkMode && styles.darkInput]}
+                  placeholder="Enter current password"
+                  placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                  secureTextEntry
+                  value={changePasswordData.currentPassword}
+                  onChangeText={(text) => setChangePasswordData((prev) => ({ ...prev, currentPassword: text }))}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>New Password</Text>
+                <TextInput
+                  style={[styles.input, isDarkMode && styles.darkInput]}
+                  placeholder="Enter new password"
+                  placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                  secureTextEntry
+                  value={changePasswordData.newPassword}
+                  onChangeText={(text) => setChangePasswordData((prev) => ({ ...prev, newPassword: text }))}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Confirm Password</Text>
+                <TextInput
+                  style={[styles.input, isDarkMode && styles.darkInput]}
+                  placeholder="Confirm new password"
+                  placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                  secureTextEntry
+                  value={changePasswordData.confirmPassword}
+                  onChangeText={(text) => setChangePasswordData((prev) => ({ ...prev, confirmPassword: text }))}
+                />
+              </View>
+            </View>
+
+            <View style={[styles.modalFooter, isDarkMode && styles.darkModalFooter]}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowChangePasswordModal(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitButton} onPress={handleChangePassword}>
+                <Text style={styles.submitButtonText}>Update</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
 
   if (isLoading) {
     return (
