@@ -26,7 +26,7 @@ import { canAccessSecurityDashboard, normalizeRole } from "../utils/authFlow";
 import styles from "../styles/SecurityDashboardStyles";
 
 // Import map components
-import CampusMap from "../components/CampusMap";
+import SharedMonitoringMap from "../components/SharedMonitoringMap";
 
 const { width, height } = Dimensions.get("window");
 const isDesktop = width >= 1024;
@@ -935,6 +935,66 @@ export default function SecurityDashboardScreen({ navigation }) {
         <RefreshControl refreshing={refreshing} onRefresh={refreshData} />
       }
     >
+      <View style={styles.dashboardShell}>
+      <View style={styles.securityHeroSection}>
+        <LinearGradient
+          colors={['#7F1D1D', '#DC2626', '#B91C1C']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.securityHeroCard}
+        >
+          <View style={styles.securityHeroTop}>
+            <View style={styles.securityHeroBadge}>
+              <Ionicons name="shield-checkmark-outline" size={14} color="#FECACA" />
+              <Text style={styles.securityHeroBadgeText}>Security Operations Center</Text>
+            </View>
+            <View style={styles.securityHeroShiftBadge}>
+              <Text style={styles.securityHeroShiftText}>On Duty</Text>
+            </View>
+          </View>
+
+          <Text style={styles.securityHeroTitle}>Keep campus access moving safely and visibly.</Text>
+          <Text style={styles.securityHeroSubtitle}>
+            Track approved visitors, monitor live movement, and respond to alerts from one command workspace.
+          </Text>
+
+          <View style={styles.securityHeroStats}>
+            <View style={styles.securityHeroStatCard}>
+              <Text style={styles.securityHeroStatValue}>{visitorStats.activeNow}</Text>
+              <Text style={styles.securityHeroStatLabel}>Active Visitors</Text>
+            </View>
+            <View style={styles.securityHeroStatCard}>
+              <Text style={styles.securityHeroStatValue}>{visitorStats.totalToday}</Text>
+              <Text style={styles.securityHeroStatLabel}>Today's Visits</Text>
+            </View>
+            <View style={styles.securityHeroStatCard}>
+              <Text style={styles.securityHeroStatValue}>{unreadCount}</Text>
+              <Text style={styles.securityHeroStatLabel}>Unread Alerts</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.securityHeroSideCards}>
+          <View style={styles.securityHeroSideCard}>
+            <View style={[styles.securityHeroSideIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="people-circle-outline" size={18} color="#D97706" />
+            </View>
+            <Text style={styles.securityHeroSideValue}>{dashboardStats.activeUsers}</Text>
+            <Text style={styles.securityHeroSideLabel}>On-Site Now</Text>
+            <Text style={styles.securityHeroSideMeta}>{visitorStats.pendingApproval} awaiting admin review</Text>
+          </View>
+
+          <View style={styles.securityHeroSideCard}>
+            <View style={[styles.securityHeroSideIcon, { backgroundColor: '#EDE9FE' }]}>
+              <Ionicons name="document-text-outline" size={18} color="#7C3AED" />
+            </View>
+            <Text style={styles.securityHeroSideValue}>{reports.length}</Text>
+            <Text style={styles.securityHeroSideLabel}>Reports Logged</Text>
+            <Text style={styles.securityHeroSideMeta}>{alerts.length} security alert{alerts.length === 1 ? '' : 's'} tracked</Text>
+          </View>
+        </View>
+      </View>
+
       {/* Quick Stats */}
       <View style={styles.statsContainer}>
         <LinearGradient
@@ -948,10 +1008,10 @@ export default function SecurityDashboardScreen({ navigation }) {
               <Ionicons name="people" size={28} color="#DC2626" />
             </View>
             <Text style={styles.statCardLargeValue}>{visitorStats.activeNow}</Text>
-            <Text style={styles.statCardLargeLabel}>Active Visitors</Text>
+            <Text style={styles.statCardLargeLabel}>Visitors currently being monitored across active access points</Text>
             <View style={styles.statBadge}>
               <Ionicons name="shield-checkmark-outline" size={12} color="#10B981" />
-              <Text style={styles.statBadgeText}>{unreadCount} unread notifications</Text>
+              <Text style={styles.statBadgeText}>{unreadCount} unread notifications for this shift</Text>
             </View>
           </View>
         </LinearGradient>
@@ -963,7 +1023,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             </View>
             <Text style={styles.statValueLarge}>{dashboardStats.activeUsers}</Text>
             <Text style={styles.statLabel}>On-Site Visitors</Text>
-            <Text style={styles.statTrend}>{visitorStats.pendingApproval} awaiting admin approval</Text>
+            <Text style={styles.statTrend}>{visitorStats.pendingApproval} waiting on admin approval</Text>
           </View>
 
           <View style={styles.statCardMedium}>
@@ -972,27 +1032,23 @@ export default function SecurityDashboardScreen({ navigation }) {
             </View>
             <Text style={styles.statValueLarge}>{visitorStats.totalToday}</Text>
             <Text style={styles.statLabel}>Today's Visitors</Text>
-            <Text style={styles.statTrend}>{reports.length} incident report{reports.length === 1 ? '' : 's'}</Text>
+            <Text style={styles.statTrend}>{reports.length} incident report{reports.length === 1 ? '' : 's'} filed</Text>
           </View>
         </View>
       </View>
 
+      <View style={styles.securityWorkspaceGrid}>
       {/* Live Visitor Tracking */}
-      <View style={styles.mapSection}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="map-outline" size={20} color="#10B981" />
-            <Text style={styles.sectionTitle}>Live Visitor Tracking</Text>
-          </View>
-          <TouchableOpacity onPress={() => setShowMapModal(true)}>
-            <Text style={styles.viewAll}>Full Screen</Text>
-          </TouchableOpacity>
-        </View>
-
-        {renderMapFilters()}
-
-        <View style={styles.mapContainer}>
-          <CampusMap
+      <View style={styles.securityWorkspacePrimary}>
+        <View style={styles.mapSection}>
+          <SharedMonitoringMap
+            title="Live Visitor Tracking"
+            subtitle="Monitor approved visitors, active movement, and current check-ins in one live panel."
+            iconName="map-outline"
+            iconColor="#10B981"
+            actionLabel="Full Screen"
+            onActionPress={() => setShowMapModal(true)}
+            controls={renderMapFilters()}
             visitors={getFilteredVisitorLocations()}
             floors={floors}
             offices={offices}
@@ -1003,12 +1059,20 @@ export default function SecurityDashboardScreen({ navigation }) {
             onVisitorSelect={handleVisitorSelect}
             hoveredVisitor={hoveredVisitor}
             renderHoverCard={renderHoverCard}
+            backgroundColor="#FFFFFF"
+            borderColor="#E5E7EB"
+            summaryItems={[
+              { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
+              { label: "Approved", value: visitors.approved.length || 0, color: "#2563EB" },
+              { label: "Checked In", value: visitors.active.length || 0, color: "#F59E0B" },
+            ]}
+            statusLabel="Security monitoring"
           />
         </View>
       </View>
 
       {/* Operations Overview */}
-      <View style={styles.activitySection}>
+      <View style={[styles.activitySection, styles.securityWorkspaceSecondary]}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="clipboard-outline" size={20} color="#10B981" />
@@ -1057,6 +1121,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           )}
         </View>
       </View>
+      </View>
 
       {/* Pending Approval Banner */}
       {visitorStats.pendingApproval > 0 && (
@@ -1087,7 +1152,10 @@ export default function SecurityDashboardScreen({ navigation }) {
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="flash-outline" size={20} color="#F59E0B" />
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View>
+              <Text style={styles.sectionTitle}>Command Actions</Text>
+              <Text style={styles.securitySectionSubtitle}>Jump into the most common guard tasks without leaving the dashboard.</Text>
+            </View>
           </View>
         </View>
         
@@ -1101,7 +1169,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             >
               <Ionicons name="person-add-outline" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionTitle}>Register Visitor</Text>
-              <Text style={styles.quickActionSubtitle}>Add new visitor to system</Text>
+              <Text style={styles.quickActionSubtitle}>Add a new visitor record for manual intake</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -1113,8 +1181,8 @@ export default function SecurityDashboardScreen({ navigation }) {
               end={{ x: 1, y: 1 }}
             >
               <Ionicons name="map-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>View Map</Text>
-              <Text style={styles.quickActionSubtitle}>Track active visitors</Text>
+              <Text style={styles.quickActionTitle}>Open Map</Text>
+              <Text style={styles.quickActionSubtitle}>Track approved and active visitors live</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -1126,8 +1194,8 @@ export default function SecurityDashboardScreen({ navigation }) {
               end={{ x: 1, y: 1 }}
             >
               <Ionicons name="list-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>View All</Text>
-              <Text style={styles.quickActionSubtitle}>See all visitors</Text>
+              <Text style={styles.quickActionTitle}>Visitor Queue</Text>
+              <Text style={styles.quickActionSubtitle}>Review all visitor records and statuses</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -1140,7 +1208,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             >
               <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionTitle}>Quick Scan</Text>
-              <Text style={styles.quickActionSubtitle}>Scan visitor QR/ID</Text>
+              <Text style={styles.quickActionSubtitle}>Launch QR and ID scanning tools</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -1231,6 +1299,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           ))}
         </View>
       )}
+      </View>
     </ScrollView>
   );
 
@@ -1238,32 +1307,32 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderMapTab = () => (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.mapSectionFull}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="map-outline" size={20} color="#10B981" />
-            <Text style={styles.sectionTitle}>Live Visitor Tracking Map</Text>
-          </View>
-          <TouchableOpacity onPress={() => setShowMapModal(true)}>
-            <Text style={styles.viewAll}>Full Screen</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {renderMapFilters()}
-        
-        <View style={styles.mapContainerFull}>
-          <CampusMap
-            visitors={getFilteredVisitorLocations()}
-            floors={floors}
-            offices={offices}
-            selectedFloor={selectedFloor}
-            selectedOffice={selectedOffice}
-            onVisitorHover={handleVisitorHover}
-            onVisitorLeave={handleVisitorLeave}
-            onVisitorSelect={handleVisitorSelect}
-            hoveredVisitor={hoveredVisitor}
-            renderHoverCard={renderHoverCard}
-          />
-        </View>
+        <SharedMonitoringMap
+          title="Live Visitor Tracking Map"
+          iconName="map-outline"
+          iconColor="#10B981"
+          actionLabel="Full Screen"
+          onActionPress={() => setShowMapModal(true)}
+          controls={renderMapFilters()}
+          visitors={getFilteredVisitorLocations()}
+          floors={floors}
+          offices={offices}
+          selectedFloor={selectedFloor}
+          selectedOffice={selectedOffice}
+          onVisitorHover={handleVisitorHover}
+          onVisitorLeave={handleVisitorLeave}
+          onVisitorSelect={handleVisitorSelect}
+          hoveredVisitor={hoveredVisitor}
+          renderHoverCard={renderHoverCard}
+          backgroundColor="#FFFFFF"
+          borderColor="#E5E7EB"
+          summaryItems={[
+            { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
+            { label: "Approved", value: visitors.approved.length || 0, color: "#2563EB" },
+            { label: "Checked In", value: visitors.active.length || 0, color: "#F59E0B" },
+          ]}
+          statusLabel="Security monitoring"
+        />
       </View>
     </ScrollView>
   );
@@ -2056,8 +2125,12 @@ export default function SecurityDashboardScreen({ navigation }) {
             </TouchableOpacity>
           </View>
           <View style={styles.fullscreenMapContainer}>
-            {renderMapFilters()}
-            <CampusMap
+            <SharedMonitoringMap
+              title="Live Visitor Tracking"
+              subtitle="Monitor approved visitors, check-ins, and on-site movement from one shared monitoring map."
+              iconName="map-outline"
+              iconColor="#10B981"
+              controls={renderMapFilters()}
               visitors={getFilteredVisitorLocations()}
               floors={floors}
               offices={offices}
@@ -2068,7 +2141,18 @@ export default function SecurityDashboardScreen({ navigation }) {
               onVisitorSelect={handleVisitorSelect}
               hoveredVisitor={hoveredVisitor}
               renderHoverCard={renderHoverCard}
-              fullscreen={true}
+              fullscreen
+              backgroundColor="#111827"
+              borderColor="#374151"
+              mapBackgroundColor="#111827"
+              textPrimary="#FFFFFF"
+              textSecondary="#CBD5E1"
+              summaryItems={[
+                { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
+                { label: "Approved", value: visitors.approved.length || 0, color: "#60A5FA" },
+                { label: "Checked In", value: visitors.active.length || 0, color: "#FBBF24" },
+              ]}
+              statusLabel="Security monitoring"
             />
           </View>
         </View>

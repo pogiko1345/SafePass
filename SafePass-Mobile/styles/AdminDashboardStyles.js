@@ -270,6 +270,55 @@ export default StyleSheet.create({
     backgroundColor: "#F5F8FC",
   },
 
+  adminContentShell: {
+    flex: 1,
+    flexDirection: "row",
+    minWidth: 0,
+  },
+
+  adminMonitoringDock: {
+    width: 420,
+    borderLeftWidth: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
+  adminMonitoringDockHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+
+  adminMonitoringDockTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  adminMonitoringDockSubtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+  },
+
+  adminMonitoringDockClose: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F8FAFC",
+  },
+
+  adminMonitoringDockBody: {
+    flex: 1,
+    padding: 16,
+  },
+
   contentScrollView: {
     flex: 1,
   },
@@ -332,10 +381,41 @@ export default StyleSheet.create({
     color: "#1E293B",
   },
 
+  headerCopy: {
+    flex: 1,
+    paddingRight: 16,
+  },
+
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#64748B",
     marginTop: 4,
+    lineHeight: 19,
+  },
+
+  headerMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
+
+  headerMetaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+  },
+
+  headerMetaText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#334155",
   },
 
   profileButton: {
@@ -486,6 +566,174 @@ export default StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#2563EB",
+  },
+
+  sectionTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  viewAll: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
+  },
+
+  adminMapSection: {
+    marginTop: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+  },
+
+  adminMapFilters: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+  },
+
+  adminMapFilterRow: {
+    paddingRight: 8,
+  },
+
+  adminMapFilterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginRight: 10,
+  },
+
+  adminMapFilterChipActive: {
+    backgroundColor: "#10B981",
+    borderColor: "#10B981",
+  },
+
+  adminMapFilterChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#475569",
+  },
+
+  adminMapFilterChipTextActive: {
+    color: "#FFFFFF",
+  },
+
+  adminMapLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+
+  adminMapLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  adminMapLegendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+
+  adminMapLegendText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  adminMapContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  adminMapSideCard: {
+    marginTop: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+  },
+
+  adminMapSummaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 14,
+  },
+
+  adminMapSummaryCard: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+
+  adminMapFocusCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 14,
+  },
+
+  adminMapActivityList: {
+    gap: 0,
+  },
+
+  adminMapActivityItem: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+
+  adminMapModalContent: {
+    width: "100%",
+    maxWidth: 1220,
+    maxHeight: "92%",
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+
+  adminMapModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  adminMapModalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  adminMapModalBody: {
+    padding: 18,
+  },
+
+  adminMapModalMapWrap: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
   },
 
   dashboardSectionEmpty: {
@@ -878,12 +1126,16 @@ export default StyleSheet.create({
 
   quickActionsGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 16,
     marginTop: 12,
+    marginBottom: 16,
   },
 
   quickActionCard: {
-    flex: 1,
+    minWidth: 180,
+    flexGrow: 1,
+    flexBasis: 180,
     backgroundColor: "#FFF",
     borderRadius: 16,
     padding: 16,
@@ -913,6 +1165,70 @@ export default StyleSheet.create({
     fontSize: 11,
     color: "#64748B",
     textAlign: "center",
+    lineHeight: 17,
+  },
+
+  quickActionBadge: {
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+
+  quickActionBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+
+  dashboardFlowCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 16,
+  },
+
+  dashboardFlowSteps: {
+    gap: 12,
+    marginTop: 14,
+  },
+
+  dashboardFlowStep: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+
+  dashboardFlowStepIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  dashboardFlowStepCopy: {
+    flex: 1,
+  },
+
+  dashboardFlowStepTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 3,
+  },
+
+  dashboardFlowStepSubtitle: {
+    fontSize: 12,
+    color: "#64748B",
+    lineHeight: 18,
   },
 
   // ============================================
@@ -1666,6 +1982,341 @@ export default StyleSheet.create({
     gap: 12,
   },
 
+  userProfileModal: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    width: "100%",
+    maxWidth: 620,
+    maxHeight: "86%",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  userProfileHero: {
+    paddingHorizontal: 24,
+    paddingTop: 22,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  userProfileHeroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+
+  userProfileAvatar: {
+    width: 70,
+    height: 70,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  userProfileAvatarText: {
+    fontSize: 24,
+    fontWeight: "800",
+  },
+
+  userProfileCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(148,163,184,0.12)",
+  },
+
+  userProfileName: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  userProfileEmail: {
+    fontSize: 14,
+    color: "#64748B",
+    marginBottom: 14,
+  },
+
+  userProfileBadgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  userProfileBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+
+  userProfileBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  userProfileBody: {
+    flex: 1,
+  },
+
+  userProfileBodyContent: {
+    padding: 20,
+    gap: 18,
+  },
+
+  userProfileSection: {
+    gap: 12,
+  },
+
+  userProfileSectionTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  userProfileInfoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  userProfileInfoCard: {
+    minWidth: 220,
+    flexGrow: 1,
+    flexBasis: 220,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#FFFFFF",
+    gap: 6,
+  },
+
+  userProfileInfoLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    color: "#94A3B8",
+  },
+
+  userProfileInfoValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+    lineHeight: 20,
+  },
+
+  userProfileCallout: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+
+  userProfileCalloutText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#1D4ED8",
+  },
+
+  userEditorModal: {
+    backgroundColor: "#FFF",
+    borderRadius: 28,
+    width: "100%",
+    maxWidth: 760,
+    maxHeight: "88%",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  userEditorSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: "#64748B",
+  },
+
+  userEditorBody: {
+    paddingBottom: 6,
+  },
+
+  userEditorHero: {
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 18,
+  },
+
+  userEditorHeroCopy: {
+    flex: 1,
+    gap: 6,
+  },
+
+  userEditorHeroName: {
+    fontSize: 21,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  userEditorHeroEmail: {
+    fontSize: 13,
+    color: "#64748B",
+  },
+
+  userEditorSection: {
+    marginBottom: 18,
+  },
+
+  userEditorSectionTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 12,
+  },
+
+  userEditorGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+  },
+
+  userEditorHalfField: {
+    minWidth: 220,
+    flexGrow: 1,
+    flexBasis: 220,
+  },
+
+  userEditorReadonlyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 30,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    backgroundColor: "#F8FAFC",
+    marginBottom: 12,
+  },
+
+  userEditorReadonlyText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "600",
+  },
+
+  userEditorRoleWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 8,
+  },
+
+  userEditorRoleOption: {
+    minWidth: 120,
+    flexGrow: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 30,
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  createUserModal: {
+    backgroundColor: "#FFF",
+    borderRadius: 28,
+    width: "100%",
+    maxWidth: 760,
+    maxHeight: "88%",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  createUserSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: "#64748B",
+  },
+
+  createUserBody: {
+    paddingBottom: 6,
+  },
+
+  createUserHero: {
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 18,
+  },
+
+  createUserHeroCopy: {
+    flex: 1,
+    gap: 6,
+  },
+
+  createUserHeroTitle: {
+    fontSize: 21,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  createUserHeroText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+  },
+
+  createUserPreviewCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 22,
+    backgroundColor: "#F8FAFC",
+    padding: 16,
+    gap: 14,
+  },
+
+  createUserPreviewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  createUserPreviewTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  createUserPreviewInfoCard: {
+    minWidth: 180,
+    flexBasis: 180,
+  },
+
   input: {
     borderWidth: 1,
     borderColor: "#E2E8F0",
@@ -2125,6 +2776,15 @@ export default StyleSheet.create({
     gap: 10,
   },
 
+  analyticsEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: "#6366F1",
+    marginBottom: 6,
+  },
+
   analyticsHeaderTitle: {
     fontSize: 24,
     fontWeight: "700",
@@ -2201,6 +2861,39 @@ export default StyleSheet.create({
   analyticsHeroStats: {
     width: 180,
     gap: 12,
+  },
+
+  analyticsHeroInsightRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 16,
+  },
+
+  analyticsHeroInsightCard: {
+    minWidth: 150,
+    flexGrow: 1,
+    flexBasis: 150,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 5,
+  },
+
+  analyticsHeroInsightLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    color: "#94A3B8",
+  },
+
+  analyticsHeroInsightValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
   },
 
   analyticsHeroStat: {
@@ -2361,6 +3054,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     marginBottom: 6,
+    flexWrap: "wrap",
   },
 
   analyticsQuickStat: {
@@ -2385,7 +3079,6 @@ export default StyleSheet.create({
 
   analyticsBarChart: {
     gap: 12,
-    marginTop: 18,
   },
 
   analyticsBarRow: {
@@ -2444,6 +3137,70 @@ export default StyleSheet.create({
       android: { elevation: 2 },
       web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.05)" },
     }),
+  },
+
+  analyticsChartCallout: {
+    marginBottom: 14,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+
+  analyticsChartCalloutCopy: {
+    flex: 1,
+    minWidth: 220,
+  },
+
+  analyticsChartCalloutTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+
+  analyticsChartCalloutText: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+  },
+
+  analyticsMiniLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
+
+  analyticsMiniLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  analyticsMiniLegendDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 99,
+  },
+
+  analyticsMiniLegendText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  analyticsChartSurface: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 20,
+    padding: 16,
   },
 
   mainStatCardHeader: {
@@ -2550,6 +3307,34 @@ export default StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+  },
+
+  analyticsPanelHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+    flexWrap: "wrap",
+  },
+
+  analyticsPanelSubtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  analyticsPanelPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+  },
+
+  analyticsPanelPillText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
 
   distributionTitle: {
@@ -2711,6 +3496,25 @@ export default StyleSheet.create({
     marginTop: 16,
   },
 
+  analyticsDistributionCallout: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  analyticsDistributionCalloutText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+  },
+
   analyticsDistributionStat: {
     flex: 1,
     borderRadius: 16,
@@ -2756,6 +3560,38 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+  },
+
+  historyOverviewRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+
+  historyOverviewCard: {
+    minWidth: 150,
+    flexGrow: 1,
+    flexBasis: 150,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+
+  historyOverviewValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  historyOverviewLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 
   historyTitle: {
