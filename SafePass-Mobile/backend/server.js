@@ -2097,9 +2097,64 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
   }
 });
 
+// Check-in visitor (by security)
+app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
+  try {
+    if (!["admin", "security", "guard", "staff"].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+
+    if (!visitor) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor not found",
+      });
+    }
+
+    visitor.status = "checked_in";
+    visitor.checkedInAt = new Date();
+    visitor.checkedInBy = req.user._id;
+    await visitor.save();
+
+    const notification = new Notification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} has checked in`,
+      type: "info",
+      severity: "low",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+    });
+    await notification.save();
+
+    res.json({
+      success: true,
+      message: "Visitor checked in successfully",
+      visitor,
+    });
+  } catch (error) {
+    console.error("Check-in error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to check in visitor",
+    });
+  }
+});
+
 // Check-out visitor (by security)
 app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
   try {
+    if (!["admin", "security", "guard", "staff"].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
     const visitor = await Visitor.findById(req.params.id);
 
     if (!visitor) {

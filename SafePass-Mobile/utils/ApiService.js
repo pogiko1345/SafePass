@@ -737,6 +737,30 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async securityCheckIn(visitorId) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/checkin`, {
+        method: "PUT",
+      });
+      return response;
+    } catch (error) {
+      console.error("Security check-in error:", error);
+      throw error;
+    }
+  }
+
+  async securityCheckOut(visitorId) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/checkout`, {
+        method: "PUT",
+      });
+      return response;
+    } catch (error) {
+      console.error("Security check-out error:", error);
+      throw error;
+    }
+  }
+
   async getVisitors(filters = {}) {
     try {
       const queryString = new URLSearchParams(filters).toString();
