@@ -370,6 +370,7 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const [idImage, setIdImage] = useState(null);
   const [idImageBase64, setIdImageBase64] = useState(null);
+  const [idImageFileName, setIdImageFileName] = useState("");
   const [focusedField, setFocusedField] = useState(null);
   const [completedFields, setCompletedFields] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -453,10 +454,14 @@ export default function VisitorRegisterScreen({ navigation }) {
       const progressInterval = setInterval(() => {
         setScanProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
-      const scannedData = await IDScannerService.scanIDImage(idImage);
+      const scannedData = await IDScannerService.scanIDImage({
+        uri: idImage,
+        base64: idImageBase64,
+        fileName: idImageFileName,
+      });
       clearInterval(progressInterval);
       setScanProgress(100);
-      if (scannedData) {
+      if (scannedData?.success) {
         let filledFields = [];
         if (scannedData.fullName) {
           setFormData((prev) => ({ ...prev, fullName: scannedData.fullName }));
@@ -476,6 +481,8 @@ export default function VisitorRegisterScreen({ navigation }) {
             "Please ensure the ID is clear and well-lit.",
           );
         }
+      } else if (scannedData?.message) {
+        Alert.alert("ID Scan", scannedData.message);
       } else {
         Alert.alert(
           "Scan Failed",
@@ -588,11 +595,14 @@ export default function VisitorRegisterScreen({ navigation }) {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         let uri = result.assets[0].uri;
         let base64 = result.assets[0].base64;
+        let fileName = result.assets[0].fileName || "";
         if (Platform.OS === "android" && !uri.startsWith("file://")) {
           uri = "file://" + uri;
         }
+        IDScannerService.clearCache();
         setIdImage(uri);
         setIdImageBase64(base64);
+        setIdImageFileName(fileName);
         setErrors((prev) => ({ ...prev, idImage: "" }));
         setCompletedFields((prev) => ({ ...prev, idImage: true }));
         Alert.alert("Success", "ID photo uploaded successfully!");

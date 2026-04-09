@@ -2442,6 +2442,20 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       return res.status(404).json({ success: false, message: "Appointment not found" });
     }
 
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be approved here.",
+      });
+    }
+
+    if ((visitor.appointmentStatus || "pending") !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending appointments can be approved.",
+      });
+    }
+
     visitor.status = "approved";
     visitor.approvalStatus = "approved";
     visitor.requestCategory = "appointment";
@@ -2456,6 +2470,9 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
 
     await createRoleNotification({
       title: "Appointment Approved",
@@ -2506,7 +2523,7 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
     res.json({
       success: true,
       message: "Appointment approved successfully",
-      visitor,
+      visitor: updatedVisitor,
     });
   } catch (error) {
     console.error("Staff approve appointment error:", error);
@@ -2539,6 +2556,20 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       return res.status(404).json({ success: false, message: "Appointment not found" });
     }
 
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be adjusted here.",
+      });
+    }
+
+    if ((visitor.appointmentStatus || "pending") !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending appointments can be adjusted.",
+      });
+    }
+
     if (finalVisitDate) {
       visitor.visitDate = new Date(finalVisitDate);
     }
@@ -2557,6 +2588,9 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
 
     await createRoleNotification({
       title: "Appointment Time Adjusted",
@@ -2610,7 +2644,7 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     res.json({
       success: true,
       message: "Appointment adjusted successfully",
-      visitor,
+      visitor: updatedVisitor,
     });
   } catch (error) {
     console.error("Staff adjust appointment error:", error);
@@ -2632,6 +2666,20 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
       return res.status(404).json({ success: false, message: "Appointment not found" });
     }
 
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be rejected here.",
+      });
+    }
+
+    if ((visitor.appointmentStatus || "pending") !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending appointments can be rejected.",
+      });
+    }
+
     const rejectionReason = String(
       req.body?.reason || "Appointment request declined by staff.",
     ).trim();
@@ -2648,6 +2696,9 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
 
     if (visitorUser) {
       await createRoleNotification({
@@ -2684,7 +2735,7 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
     res.json({
       success: true,
       message: "Appointment rejected successfully",
-      visitor,
+      visitor: updatedVisitor,
     });
   } catch (error) {
     console.error("Staff reject appointment error:", error);

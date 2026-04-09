@@ -404,6 +404,9 @@ export default StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 22,
     padding: 20,
+    width: "100%",
+    maxWidth: 540,
+    alignSelf: "center",
   },
 
   modalTitle: {
@@ -422,10 +425,34 @@ export default StyleSheet.create({
   modalField: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: "#DBE3F0",
+    backgroundColor: "#F8FAFC",
     paddingHorizontal: 14,
     paddingVertical: 14,
     marginTop: 14,
+  },
+
+  modalFieldTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  modalFieldIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#DBEAFE",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modalFieldIconWarm: {
+    backgroundColor: "#FEF3C7",
+  },
+
+  modalFieldBody: {
+    flex: 1,
   },
 
   modalFieldLabel: {
@@ -438,9 +465,16 @@ export default StyleSheet.create({
 
   modalFieldValue: {
     marginTop: 4,
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "800",
     color: "#0F172A",
+  },
+
+  modalFieldHint: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#64748B",
   },
 
   modalInput: {
