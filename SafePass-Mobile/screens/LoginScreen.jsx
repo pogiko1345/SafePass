@@ -15,6 +15,7 @@ import {
   Dimensions,
   Animated,
   Image,
+  Linking,
 } from "react-native";
 import loginStyles from "../styles/LoginStyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -588,6 +589,19 @@ export default function LoginScreen({ navigation, route }) {
     }
   };
 
+  const openExternalLink = async (url) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert("Link Unavailable", "This link could not be opened on your device.");
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert("Link Error", "Unable to open the school link right now.");
+    }
+  };
+
   // ============ SPLASH SCREEN ============
   if (isCheckingAuth) {
     return (
@@ -829,6 +843,42 @@ export default function LoginScreen({ navigation, route }) {
                   {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date().toLocaleDateString()}
                 </Text>
                 <Text style={loginStyles.footerText}>Secure Campus Access System v2.0</Text>
+                <View style={loginStyles.footerContactCard}>
+                  <Text style={loginStyles.footerContactTitle}>
+                    Sapphire International Aviation Academy
+                  </Text>
+                  <Text style={loginStyles.footerContactLine}>Tel No: (02) 7091 - 3362</Text>
+                  <Text style={loginStyles.footerContactLine}>Mobile No: 0917 580 4858</Text>
+                  <View style={loginStyles.footerLinkRow}>
+                    <TouchableOpacity
+                      style={loginStyles.footerLinkChip}
+                      onPress={() => openExternalLink("https://sapphireaviationacademy.edu.ph/")}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="globe-outline" size={14} color="#0A3D91" />
+                      <Text style={loginStyles.footerLinkText}>Website</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={loginStyles.footerLinkChip}
+                      onPress={() => openExternalLink("https://www.facebook.com/sapphireaviationacademy/")}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="logo-facebook" size={14} color="#0A3D91" />
+                      <Text style={loginStyles.footerLinkText}>Facebook</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={loginStyles.footerLinkChip}
+                      onPress={() => openExternalLink("https://www.youtube.com/@sapphireaviation5105")}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="logo-youtube" size={14} color="#0A3D91" />
+                      <Text style={loginStyles.footerLinkText}>YouTube</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={loginStyles.footerCopyright}>
+                    ©2024. Sapphire International Aviation Academy
+                  </Text>
+                </View>
               </View>
             </Animated.View>
           </ScrollView>

@@ -425,6 +425,105 @@ export default StyleSheet.create({
     fontWeight: "600",
   },
 
+  contactCard: {
+    marginTop: spacing.md,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: "#E5EAF3",
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 18,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 10px 26px rgba(15, 23, 42, 0.06)" },
+    }),
+  },
+
+  contactHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+
+  contactHeaderIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#EAF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+
+  contactHeaderText: {
+    flex: 1,
+  },
+
+  contactTitle: {
+    fontSize: fontSizes.base,
+    color: "#0F172A",
+    fontWeight: "800",
+  },
+
+  contactSubtitle: {
+    fontSize: fontSizes.sm,
+    color: "#64748B",
+    marginTop: 3,
+    fontWeight: "500",
+  },
+
+  contactList: {
+    gap: 6,
+    marginBottom: spacing.sm,
+  },
+
+  contactLine: {
+    fontSize: fontSizes.sm,
+    color: "#334155",
+    fontWeight: "600",
+  },
+
+  contactLinkRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+
+  contactLinkChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: "#F4F7FB",
+    borderWidth: 1,
+    borderColor: "#E5EDF6",
+    ...(isWeb && { cursor: "pointer" }),
+  },
+
+  contactLinkText: {
+    fontSize: fontSizes.xs,
+    color: "#0A3D91",
+    fontWeight: "700",
+  },
+
+  contactCopyright: {
+    marginTop: spacing.sm,
+    fontSize: fontSizes.xs,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+
   versionText: {
     textAlign: "center",
     fontSize: fontSizes.xs,

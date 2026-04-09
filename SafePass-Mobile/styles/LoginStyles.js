@@ -558,6 +558,79 @@ export default StyleSheet.create({
     letterSpacing: 0.3,
   },
 
+  footerContactCard: {
+    marginTop: 14,
+    width: "100%",
+    maxWidth: 520,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E6EDF7",
+    alignItems: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.05,
+        shadowRadius: 14,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 10px 22px rgba(15, 23, 42, 0.05)" },
+    }),
+  },
+
+  footerContactTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+
+  footerContactLine: {
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 2,
+  },
+
+  footerLinkRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 12,
+  },
+
+  footerLinkChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#F4F7FB",
+    borderWidth: 1,
+    borderColor: "#E5EDF6",
+    ...(isWeb && { cursor: "pointer" }),
+  },
+
+  footerLinkText: {
+    fontSize: 12,
+    color: "#0A3D91",
+    fontWeight: "700",
+  },
+
+  footerCopyright: {
+    marginTop: 12,
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(4, 30, 66, 0.42)",

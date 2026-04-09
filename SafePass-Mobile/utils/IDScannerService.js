@@ -1,13 +1,54 @@
 // utils/IDScannerService.js
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
-import { Platform } from 'react-native';
+import * as ImageManipulator from "expo-image-manipulator";
+import { Platform } from "react-native";
 
 class IDScannerService {
   constructor() {
-    this.isAvailable = true;
-    // Cache for scanned data to avoid re-scanning same image
     this.scanCache = new Map();
+  }
+
+  normalizeImageSource(imageSource) {
+    if (!imageSource) {
+      return { uri: "", base64: "", fileName: "" };
+    }
+
+    if (typeof imageSource === "string") {
+      return { uri: imageSource, base64: "", fileName: "" };
+    }
+
+    return {
+      uri: imageSource.uri || "",
+      base64: imageSource.base64 || "",
+      fileName: imageSource.fileName || "",
+    };
+  }
+
+  getCacheKey(source) {
+    return source.uri || source.fileName || source.base64?.slice(0, 120) || "scan";
+  }
+
+  isTextDetectionAvailable() {
+    return (
+      Platform.OS === "web" &&
+      typeof globalThis !== "undefined" &&
+      typeof globalThis.TextDetector === "function"
+    );
+  }
+
+  buildEmptyResult(message, extra = {}) {
+    return {
+      success: false,
+      available: this.isTextDetectionAvailable(),
+      fullName: "",
+      idNumber: "",
+      dateOfBirth: "",
+      address: "",
+      nationality: "",
+      rawText: "",
+      detectedFields: [],
+      message,
+      ...extra,
+    };
   }
 
   // Process the uploaded ID image and extract information
@@ -219,6 +260,213 @@ EXPIRES: ${new Date().getFullYear() + 5}
       }
     }
     
+    return validated;
+  }
+
+  async scanIDImage(imageSource) {
+    const normalizedSource = this.normalizeImageSource(imageSource);
+    const cacheKey = this.getCacheKey(normalizedSource);
+
+    if (!normalizedSource.uri && !normalizedSource.base64) {
+      return this.buildEmptyResult("Please upload an ID photo first.");
+    }
+
+    if (this.scanCache.has(cacheKey)) {
+      return this.scanCache.get(cacheKey);
+    }
+
+    try {
+      const processedImage = await this.preprocessImage(normalizedSource);
+      const extractedText = await this.extractTextFromImage(processedImage);
+
+      if (!extractedText) {
+        const result = this.buildEmptyResult(
+          this.isTextDetectionAvailable()
+            ? "No readable text was detected. Please use a clearer, well-lit ID photo."
+            : "Automatic ID text scanning is not available on this device or browser yet. Please fill in the details manually.",
+        );
+        this.scanCache.set(cacheKey, result);
+        return result;
+      }
+
+      const parsedData = this.parseExtractedText(extractedText);
+      const validatedData = this.validateExtractedData(parsedData);
+      const detectedFields = ["fullName", "idNumber", "dateOfBirth", "address", "nationality"].filter(
+        (field) => Boolean(validatedData[field]),
+      );
+
+      const result = {
+        success: detectedFields.length > 0,
+        available: true,
+        ...validatedData,
+        detectedFields,
+        message:
+          detectedFields.length > 0
+            ? `Detected ${detectedFields.join(", ")}.`
+            : "The scan finished, but no usable name or ID number was found.",
+      };
+
+      this.scanCache.set(cacheKey, result);
+      return result;
+    } catch (error) {
+      console.error("ID scan error:", error);
+      return this.buildEmptyResult(
+        "The ID scanner could not process this photo. Please try another image or enter the details manually.",
+      );
+    }
+  }
+
+  async preprocessImage(imageSource) {
+    const targetUri = imageSource.uri || `data:image/jpeg;base64,${imageSource.base64}`;
+
+    if (!targetUri) {
+      return imageSource;
+    }
+
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        targetUri,
+        [{ resize: { width: 1400 } }],
+        {
+          compress: 0.92,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
+      );
+
+      return {
+        ...imageSource,
+        uri: manipulated.uri || imageSource.uri,
+        base64: manipulated.base64 || imageSource.base64,
+      };
+    } catch (error) {
+      console.error("Image preprocessing error:", error);
+      return imageSource;
+    }
+  }
+
+  async extractTextFromImage(imageSource) {
+    if (this.isTextDetectionAvailable()) {
+      return this.extractTextOnWeb(imageSource);
+    }
+
+    return "";
+  }
+
+  async extractTextOnWeb(imageSource) {
+    const detector = new globalThis.TextDetector();
+    const imageElement = await this.loadHtmlImage(
+      imageSource.base64 ? `data:image/jpeg;base64,${imageSource.base64}` : imageSource.uri
+    );
+    const detections = await detector.detect(imageElement);
+
+    return detections
+      .map((entry) => entry.rawValue || "")
+      .join("\n")
+      .replace(/\s+\n/g, "\n")
+      .trim();
+  }
+
+  loadHtmlImage(source) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = source;
+    });
+  }
+
+  parseExtractedText(text) {
+    const normalizedText = String(text || "").replace(/\r/g, "\n");
+    const data = {
+      fullName: "",
+      idNumber: "",
+      dateOfBirth: "",
+      address: "",
+      nationality: "",
+      rawText: normalizedText,
+    };
+
+    const patterns = {
+      fullName: [
+        /(?:full name|name)[:\s]+([A-Z][A-Z\s,'.-]{4,})/i,
+        /\b([A-Z][A-Z]+(?:[\s,.'-]+[A-Z][A-Z]+){1,3})\b/,
+      ],
+      idNumber: [
+        /(?:id(?: number| no\.?)?|license|passport|umid|national id)[:\s#-]+([A-Z0-9-]{5,})/i,
+        /\b([A-Z]{1,6}-\d{4,}|\d{4}-\d{4}-\d{4}|\d{5,})\b/,
+      ],
+      dateOfBirth: [
+        /(?:date of birth|birth date|birthdate|dob)[:\s]+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+        /\b(\d{1,2}[/-]\d{1,2}[/-]\d{4})\b/,
+      ],
+      address: [
+        /(?:address|residence|addr)[:\s]+([A-Z0-9][A-Z0-9\s,.-]{8,})/i,
+      ],
+      nationality: [
+        /(?:nationality|citizenship)[:\s]+([A-Z][A-Z\s]{2,})/i,
+      ],
+    };
+
+    for (const [key, patternList] of Object.entries(patterns)) {
+      for (const pattern of patternList) {
+        const match = normalizedText.match(pattern);
+        if (match?.[1]) {
+          data[key] = match[1].trim();
+          break;
+        }
+      }
+    }
+
+    return data;
+  }
+
+  validateExtractedData(data) {
+    const validated = { ...data };
+
+    if (validated.fullName) {
+      validated.fullName = validated.fullName
+        .replace(/[^A-Za-z\s,'.-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .split(" ")
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ");
+
+      if (validated.fullName.split(" ").length < 2) {
+        validated.fullName = "";
+      }
+    }
+
+    if (validated.idNumber) {
+      validated.idNumber = validated.idNumber.replace(/\s+/g, "").toUpperCase();
+    }
+
+    if (validated.dateOfBirth) {
+      const dateParts = validated.dateOfBirth.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
+      if (dateParts) {
+        let year = dateParts[3];
+        if (year.length === 2) {
+          year = Number(year) > 30 ? `19${year}` : `20${year}`;
+        }
+        validated.dateOfBirth = `${dateParts[1].padStart(2, "0")}/${dateParts[2].padStart(2, "0")}/${year}`;
+      }
+    }
+
+    if (validated.address) {
+      validated.address = validated.address.replace(/\s+/g, " ").trim();
+    }
+
+    if (validated.nationality) {
+      validated.nationality = validated.nationality
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase()
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+
     return validated;
   }
 

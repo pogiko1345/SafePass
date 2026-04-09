@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -53,7 +53,7 @@ const getStatusMeta = (status) => {
 const getAppointmentStatus = (appointment) => {
   if (!appointment) return "pending";
   if (appointment.status === "checked_out") return "completed";
-  return appointment.appointmentStatus || "pending";
+  return String(appointment.appointmentStatus || "pending").toLowerCase();
 };
 
 export default function StaffDashboardScreen({ navigation, onLogout }) {
@@ -74,6 +74,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [rejectionReason, setRejectionReason] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const webDateInputRef = useRef(null);
+  const webTimeInputRef = useRef(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -149,6 +151,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   );
 
   const mergeAppointment = (updatedVisitor) => {
+    if (!updatedVisitor?._id) return;
     setAppointments((current) =>
       current.map((item) =>
         String(item._id) === String(updatedVisitor._id) ? { ...item, ...updatedVisitor } : item,
@@ -156,7 +159,22 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     );
   };
 
+  const closeAdjustModal = () => {
+    setShowDatePicker(false);
+    setShowTimePicker(false);
+    setShowAdjustModal(false);
+    setSelectedAppointment(null);
+    setAdjustmentNote("");
+  };
+
+  const closeRejectModal = () => {
+    setShowRejectModal(false);
+    setSelectedAppointment(null);
+    setRejectionReason("");
+  };
+
   const handleApprove = async (appointment) => {
+    if (!appointment?._id) return;
     setProcessingId(appointment._id);
     try {
       const response = await ApiService.approveStaffAppointment(appointment._id);
@@ -176,7 +194,102 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     setAdjustedDate(new Date(appointment.visitDate || new Date()));
     setAdjustedTime(new Date(appointment.visitTime || new Date()));
     setAdjustmentNote(appointment.staffAdjustmentNote || "");
+    setShowDatePicker(false);
+    setShowTimePicker(false);
     setShowAdjustModal(true);
+  };
+
+  const getWebDateInputValue = () => {
+    const value = new Date(adjustedDate || new Date());
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const getWebTimeInputValue = () => {
+    const value = new Date(adjustedTime || new Date());
+    const hours = String(value.getHours()).padStart(2, "0");
+    const minutes = String(value.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
+  const handleAdjustDatePress = () => {
+    setShowTimePicker(false);
+
+    if (Platform.OS === "web") {
+      const input = webDateInputRef.current;
+      if (input?.showPicker) {
+        input.showPicker();
+        return;
+      }
+      input?.click?.();
+      return;
+    }
+
+    setShowDatePicker(true);
+  };
+
+  const handleAdjustTimePress = () => {
+    setShowDatePicker(false);
+
+    if (Platform.OS === "web") {
+      const input = webTimeInputRef.current;
+      if (input?.showPicker) {
+        input.showPicker();
+        return;
+      }
+      input?.click?.();
+      return;
+    }
+
+    setShowTimePicker(true);
+  };
+
+  const handleAdjustDateChange = (event, value) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+    }
+
+    if (event?.type === "dismissed" || !value) {
+      return;
+    }
+
+    setAdjustedDate(value);
+  };
+
+  const handleAdjustTimeChange = (event, value) => {
+    if (Platform.OS === "android") {
+      setShowTimePicker(false);
+    }
+
+    if (event?.type === "dismissed" || !value) {
+      return;
+    }
+
+    setAdjustedTime(value);
+  };
+
+  const handleWebDateChange = (event) => {
+    const nextValue = event?.target?.value;
+    if (!nextValue) return;
+
+    const [year, month, day] = nextValue.split("-").map(Number);
+    if (!year || !month || !day) return;
+
+    setAdjustedDate(new Date(year, month - 1, day));
+  };
+
+  const handleWebTimeChange = (event) => {
+    const nextValue = event?.target?.value;
+    if (!nextValue) return;
+
+    const [hours, minutes] = nextValue.split(":").map(Number);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return;
+
+    const nextTime = new Date(adjustedTime || new Date());
+    nextTime.setHours(hours, minutes, 0, 0);
+    setAdjustedTime(nextTime);
   };
 
   const submitAdjustment = async () => {
@@ -189,14 +302,15 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
       const response = await ApiService.adjustStaffAppointment(selectedAppointment._id, {
         visitDate: adjustedDate.toISOString(),
+        preferredDate: adjustedDate.toISOString(),
         visitTime: mergedDateTime.toISOString(),
+        preferredTime: mergedDateTime.toISOString(),
         note: adjustmentNote,
       });
       if (response?.visitor) {
         mergeAppointment(response.visitor);
       }
-      setShowAdjustModal(false);
-      setSelectedAppointment(null);
+      closeAdjustModal();
       await loadData();
     } catch (error) {
       Alert.alert("Update Failed", error?.message || "Could not adjust appointment.");
@@ -226,8 +340,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       if (response?.visitor) {
         mergeAppointment(response.visitor);
       }
-      setShowRejectModal(false);
-      setSelectedAppointment(null);
+      closeRejectModal();
       await loadData();
     } catch (error) {
       Alert.alert("Rejection Failed", error?.message || "Could not reject appointment.");
@@ -450,7 +563,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </TouchableOpacity>
       </ScrollView>
 
-      <Modal visible={showAdjustModal} transparent animationType="fade" onRequestClose={() => setShowAdjustModal(false)}>
+      <Modal visible={showAdjustModal} transparent animationType="fade" onRequestClose={closeAdjustModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Adjust Appointment Time</Text>
@@ -458,14 +571,32 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               Update the visitor's preferred schedule before approving the appointment.
             </Text>
 
-            <TouchableOpacity style={styles.modalField} onPress={() => setShowDatePicker(true)}>
-              <Text style={styles.modalFieldLabel}>Preferred Date</Text>
-              <Text style={styles.modalFieldValue}>{formatDate(adjustedDate)}</Text>
+            <TouchableOpacity style={styles.modalField} onPress={handleAdjustDatePress}>
+              <View style={styles.modalFieldTop}>
+                <View style={styles.modalFieldIcon}>
+                  <Ionicons name="calendar-outline" size={18} color="#1D4ED8" />
+                </View>
+                <View style={styles.modalFieldBody}>
+                  <Text style={styles.modalFieldLabel}>Preferred Date</Text>
+                  <Text style={styles.modalFieldValue}>{formatDate(adjustedDate)}</Text>
+                  <Text style={styles.modalFieldHint}>Tap to choose a calendar date</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.modalField} onPress={() => setShowTimePicker(true)}>
-              <Text style={styles.modalFieldLabel}>Preferred Time</Text>
-              <Text style={styles.modalFieldValue}>{formatTime(adjustedTime)}</Text>
+            <TouchableOpacity style={styles.modalField} onPress={handleAdjustTimePress}>
+              <View style={styles.modalFieldTop}>
+                <View style={[styles.modalFieldIcon, styles.modalFieldIconWarm]}>
+                  <Ionicons name="time-outline" size={18} color="#D97706" />
+                </View>
+                <View style={styles.modalFieldBody}>
+                  <Text style={styles.modalFieldLabel}>Preferred Time</Text>
+                  <Text style={styles.modalFieldValue}>{formatTime(adjustedTime)}</Text>
+                  <Text style={styles.modalFieldHint}>Tap to choose an updated time slot</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </View>
             </TouchableOpacity>
 
             <TextInput
@@ -477,32 +608,60 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               multiline
             />
 
-            {showDatePicker ? (
+            {Platform.OS === "web" ? (
+              <input
+                ref={webDateInputRef}
+                type="date"
+                value={getWebDateInputValue()}
+                onChange={handleWebDateChange}
+                style={{
+                  position: "absolute",
+                  width: 1,
+                  height: 1,
+                  opacity: 0,
+                  pointerEvents: "none",
+                }}
+                aria-label="Adjust appointment date"
+              />
+            ) : null}
+
+            {Platform.OS === "web" ? (
+              <input
+                ref={webTimeInputRef}
+                type="time"
+                value={getWebTimeInputValue()}
+                onChange={handleWebTimeChange}
+                style={{
+                  position: "absolute",
+                  width: 1,
+                  height: 1,
+                  opacity: 0,
+                  pointerEvents: "none",
+                }}
+                aria-label="Adjust appointment time"
+              />
+            ) : null}
+
+            {Platform.OS !== "web" && showDatePicker ? (
               <DateTimePicker
                 value={adjustedDate}
                 mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={(_, value) => {
-                  setShowDatePicker(false);
-                  if (value) setAdjustedDate(value);
-                }}
+                onChange={handleAdjustDateChange}
               />
             ) : null}
 
-            {showTimePicker ? (
+            {Platform.OS !== "web" && showTimePicker ? (
               <DateTimePicker
                 value={adjustedTime}
                 mode="time"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={(_, value) => {
-                  setShowTimePicker(false);
-                  if (value) setAdjustedTime(value);
-                }}
+                onChange={handleAdjustTimeChange}
               />
             ) : null}
 
             <View style={styles.modalActionRow}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowAdjustModal(false)}>
+              <TouchableOpacity style={styles.modalCancel} onPress={closeAdjustModal}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSubmit} onPress={submitAdjustment}>
@@ -513,7 +672,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </View>
       </Modal>
 
-      <Modal visible={showRejectModal} transparent animationType="fade" onRequestClose={() => setShowRejectModal(false)}>
+      <Modal visible={showRejectModal} transparent animationType="fade" onRequestClose={closeRejectModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Reject Appointment</Text>
@@ -529,7 +688,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               multiline
             />
             <View style={styles.modalActionRow}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowRejectModal(false)}>
+              <TouchableOpacity style={styles.modalCancel} onPress={closeRejectModal}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalReject} onPress={submitRejection}>
