@@ -11,6 +11,7 @@ import VisitorRegisterScreen from "./screens/VisitorRegisterScreen";
 import AdminDashboardScreen from "./screens/AdminDashboardScreen";
 import SecurityDashboardScreen from "./screens/SecurityDashboardScreen";
 import VisitorDashboardScreen from "./screens/VisitorDashboardScreen";
+import StaffDashboardScreen from "./screens/StaffDashboardScreen";
 
 // Common Screens
 import ProfileScreen from "./screens/ProfileScreenV2";
@@ -51,6 +52,7 @@ const WEB_ROUTE_TITLES = {
   Verification: `Account Verification | ${APP_ORGANIZATION}`,
   Help: `Help Center | ${APP_ORGANIZATION}`,
   AdminDashboard: `Admin Dashboard | ${APP_ORGANIZATION}`,
+  StaffDashboard: `Staff Dashboard | ${APP_ORGANIZATION}`,
   SecurityDashboard: `Security Operations | ${APP_ORGANIZATION}`,
   VisitorDashboard: `Visitor Dashboard | ${APP_ORGANIZATION}`,
   VisitorPass: `Visitor Pass | ${APP_ORGANIZATION}`,
@@ -259,6 +261,9 @@ export default function App() {
         {/* Dashboard Screens */}
         <Stack.Screen name="AdminDashboard">
           {(props) => <AdminDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}
+        </Stack.Screen>
+        <Stack.Screen name="StaffDashboard">
+          {(props) => <StaffDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}
         </Stack.Screen>
         <Stack.Screen name="SecurityDashboard">
           {(props) => <SecurityDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}

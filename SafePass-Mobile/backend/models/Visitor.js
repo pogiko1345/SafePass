@@ -38,6 +38,16 @@ const visitorSchema = new mongoose.Schema({
     required: [true, 'Purpose of visit is required'],
     trim: true
   },
+  host: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  assignedOffice: {
+    type: String,
+    default: "",
+    trim: true,
+  },
   vehicleNumber: { 
     type: String, 
     default: "",
@@ -76,6 +86,57 @@ const visitorSchema = new mongoose.Schema({
   adminNotes: { 
     type: String,
     default: null
+  },
+  requestCategory: {
+    type: String,
+    enum: ["registration", "appointment"],
+    default: "registration",
+    index: true,
+  },
+  approvalFlow: {
+    type: String,
+    enum: ["admin", "staff"],
+    default: "admin",
+    index: true,
+  },
+  appointmentStatus: {
+    type: String,
+    enum: ["not_requested", "pending", "approved", "adjusted", "rejected"],
+    default: "not_requested",
+    index: true,
+  },
+  appointmentRequestedAt: {
+    type: Date,
+    default: null,
+  },
+  assignedStaff: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  assignedStaffName: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  staffActionBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  staffActionAt: {
+    type: Date,
+    default: null,
+  },
+  staffAdjustmentNote: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  staffRejectionReason: {
+    type: String,
+    default: "",
+    trim: true,
   },
   
   // ============ Check-in/out Status ============
@@ -166,6 +227,7 @@ visitorSchema.index({ email: 1, status: 1 });
 visitorSchema.index({ approvalStatus: 1, status: 1 });
 visitorSchema.index({ visitDate: 1, status: 1 });
 visitorSchema.index({ registeredAt: -1 });
+visitorSchema.index({ requestCategory: 1, appointmentStatus: 1, visitDate: 1 });
 
 // ============ Virtual Fields ============
 visitorSchema.virtual('isApproved').get(function() {

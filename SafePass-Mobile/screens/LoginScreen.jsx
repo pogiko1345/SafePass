@@ -550,6 +550,15 @@ export default function LoginScreen({ navigation, route }) {
           accent: "#0A3D91",
           panel: "Operations Console",
         };
+      case "staff":
+        return {
+          label: "Staff Access",
+          title: "Appointment Desk Sign-In",
+          subtitle: "Review visitor appointments, adjust schedules, and respond to requests from the staff dashboard.",
+          icon: "briefcase-outline",
+          accent: "#0F766E",
+          panel: "Staff Coordination",
+        };
       case "admin":
         return {
           label: "Administrative Access",

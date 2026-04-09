@@ -782,6 +782,68 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async requestVisitorAppointment(userId, appointmentData) {
+    try {
+      const response = await this.fetch(`/visitors/${userId}/visit`, {
+        method: "PUT",
+        body: appointmentData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Request visitor appointment error:", error);
+      throw error;
+    }
+  }
+
+  async getStaffAppointments(filters = {}) {
+    try {
+      const queryString = new URLSearchParams(filters).toString();
+      const response = await this.fetch(
+        `/staff/appointments${queryString ? `?${queryString}` : ""}`,
+      );
+      return response;
+    } catch (error) {
+      console.error("Get staff appointments error:", error);
+      throw error;
+    }
+  }
+
+  async approveStaffAppointment(visitorId, note = "") {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/approve`, {
+        method: "PUT",
+        body: { note },
+      });
+    } catch (error) {
+      console.error("Approve staff appointment error:", error);
+      throw error;
+    }
+  }
+
+  async adjustStaffAppointment(visitorId, adjustmentData) {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/adjust`, {
+        method: "PUT",
+        body: adjustmentData,
+      });
+    } catch (error) {
+      console.error("Adjust staff appointment error:", error);
+      throw error;
+    }
+  }
+
+  async rejectStaffAppointment(visitorId, reason) {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/reject`, {
+        method: "PUT",
+        body: { reason },
+      });
+    } catch (error) {
+      console.error("Reject staff appointment error:", error);
+      throw error;
+    }
+  }
+
   // ================= ADMIN VISITOR APPROVAL METHODS =================
 
   async getPendingVisitors() {

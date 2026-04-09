@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema({
   // For targeting specific users/roles
   targetRole: { 
     type: String, 
-    enum: ['security', 'admin', 'all'],
+    enum: ['security', 'guard', 'staff', 'admin', 'visitor', 'all'],
     default: 'all'
   },
   targetUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Specific user
@@ -31,6 +31,10 @@ const notificationSchema = new mongoose.Schema({
   // Reference to related data
   relatedVisitor: { type: mongoose.Schema.Types.ObjectId, ref: 'Visitor' },
   relatedUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
+  },
   
   // Timestamps
   createdAt: { type: Date, default: Date.now },

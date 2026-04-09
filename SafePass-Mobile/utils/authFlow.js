@@ -12,9 +12,10 @@ export const getDashboardRoute = (userOrRole) => {
   switch (role) {
     case "admin":
       return "AdminDashboard";
+    case "staff":
+      return "StaffDashboard";
     case "security":
     case "guard":
-    case "staff":
       return "SecurityDashboard";
     case "visitor":
       return "VisitorDashboard";
