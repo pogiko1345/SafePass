@@ -281,16 +281,72 @@ export default function SecurityDashboardScreen({ navigation }) {
     );
   };
 
+  const COMPLETED_VISITOR_HISTORY_DAYS = 30;
+
+  const isWithinCompletedHistoryWindow = (visitor) => {
+    const completedAt =
+      visitor?.checkedOutAt ||
+      visitor?.updatedAt ||
+      visitor?.visitDate;
+
+    if (!completedAt) {
+      return false;
+    }
+
+    const completedDate = new Date(completedAt);
+    if (Number.isNaN(completedDate.getTime())) {
+      return false;
+    }
+
+    const cutoffDate = new Date();
+    cutoffDate.setHours(0, 0, 0, 0);
+    cutoffDate.setDate(cutoffDate.getDate() - COMPLETED_VISITOR_HISTORY_DAYS);
+
+    return completedDate >= cutoffDate;
+  };
+
+  const getCompletedHistoryDaysLeft = (visitor) => {
+    const completedAt =
+      visitor?.checkedOutAt ||
+      visitor?.updatedAt ||
+      visitor?.visitDate;
+
+    if (!completedAt) {
+      return null;
+    }
+
+    const completedDate = new Date(completedAt);
+    if (Number.isNaN(completedDate.getTime())) {
+      return null;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    completedDate.setHours(0, 0, 0, 0);
+
+    const elapsedDays = Math.floor((today - completedDate) / 86400000);
+    return Math.max(0, COMPLETED_VISITOR_HISTORY_DAYS - elapsedDays);
+  };
+
   const deriveVisitorCollections = (all = []) => {
     const active = all.filter((visitor) => visitor.status === 'checked_in');
     const pending = all.filter((visitor) => visitor.approvalStatus === 'pending');
     const approved = all.filter(
       (visitor) =>
-        visitor.approvalStatus === 'approved' && visitor.status !== 'checked_in',
+        visitor.approvalStatus === 'approved' &&
+        visitor.status !== 'checked_in' &&
+        visitor.status !== 'checked_out',
     );
-    const completed = all.filter((visitor) => visitor.status === 'checked_out');
+    const completed = all.filter(
+      (visitor) =>
+        visitor.status === 'checked_out' &&
+        isWithinCompletedHistoryWindow(visitor),
+    );
+    const allVisible = [...active, ...pending, ...approved, ...completed].sort(
+      (a, b) => new Date(b.updatedAt || b.createdAt || b.visitDate) - new Date(a.updatedAt || a.createdAt || a.visitDate)
+    );
 
-    return { active, pending, approved, completed, all };
+    return { active, pending, approved, completed, all: allVisible };
   };
 
   const deriveVisitorStats = (all = [], active = [], pending = []) => {
@@ -1430,7 +1486,12 @@ export default function SecurityDashboardScreen({ navigation }) {
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="people-outline" size={20} color="#0A3D91" />
-            <Text style={styles.sectionTitle}>Visitor Management</Text>
+            <View>
+              <Text style={styles.sectionTitle}>Visitor Management</Text>
+              <Text style={styles.securitySectionSubtitle}>
+                Completed visits stay here for 30 days, then roll off the history view automatically.
+              </Text>
+            </View>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={handleRegisterVisitor}>
             <Ionicons name="add" size={20} color="#FFFFFF" />
@@ -1450,7 +1511,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               }}
             >
               <Text style={[styles.filterTabText, visitorFilter === filter && styles.filterTabTextActive]}>
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                {filter === 'completed' ? 'Completed' : filter.charAt(0).toUpperCase() + filter.slice(1)}
                 {filter === 'active' && ` (${visitors.active.length})`}
                 {filter === 'pending' && ` (${visitors.pending.length})`}
                 {filter === 'approved' && ` (${visitors.approved.length})`}
@@ -1486,7 +1547,11 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name="people-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyStateTitle}>No visitors found</Text>
             <Text style={styles.emptyStateSubtitle}>
-              {searchQuery ? 'Try a different search term' : 'No visitors in this category'}
+              {searchQuery
+                ? 'Try a different search term'
+                : visitorFilter === 'completed'
+                  ? 'No completed visits are available in the last 30 days'
+                  : 'No visitors in this category'}
             </Text>
           </View>
         )}
@@ -1804,6 +1869,9 @@ export default function SecurityDashboardScreen({ navigation }) {
     const statusBadge = getStatusBadge(visitor);
     const isCheckedIn = visitor.status === 'checked_in';
     const isProcessing = isVisitorProcessing(visitor._id);
+    const historyDaysLeft = visitor.status === 'checked_out'
+      ? getCompletedHistoryDaysLeft(visitor)
+      : null;
     
     return (
       <TouchableOpacity
@@ -1862,6 +1930,14 @@ export default function SecurityDashboardScreen({ navigation }) {
               {formatDate(visitor.visitDate)}
             </Text>
           </View>
+          {historyDaysLeft !== null && (
+            <View style={[styles.visitorCardFooterItem, styles.visitorHistoryCountdown]}>
+              <Ionicons name="time-outline" size={14} color="#D97706" />
+              <Text style={styles.visitorHistoryCountdownText}>
+                {historyDaysLeft} day{historyDaysLeft === 1 ? '' : 's'} left
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.visitorCardActions}>
@@ -2471,6 +2547,15 @@ export default function SecurityDashboardScreen({ navigation }) {
 
             {selectedVisitor && (
               <ScrollView style={styles.modalBody} contentContainerStyle={styles.visitorDetailBody} showsVerticalScrollIndicator={false}>
+                {selectedVisitor.status === 'checked_out' && getCompletedHistoryDaysLeft(selectedVisitor) !== null ? (
+                  <View style={styles.visitorHistoryNotice}>
+                    <Ionicons name="archive-outline" size={18} color="#D97706" />
+                    <Text style={styles.visitorHistoryNoticeText}>
+                      This visit history will remain visible for {getCompletedHistoryDaysLeft(selectedVisitor)} more day{getCompletedHistoryDaysLeft(selectedVisitor) === 1 ? '' : 's'} before it rolls off Visitor Management. The visitor account will stay active in the system.
+                    </Text>
+                  </View>
+                ) : null}
+
                 <View style={styles.visitorDetailHero}>
                   <View style={styles.detailPhotoSection}>
                     {selectedVisitor.idImage ? (

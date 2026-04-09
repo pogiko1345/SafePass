@@ -965,9 +965,22 @@ export default StyleSheet.create({
     gap: 4,
   },
 
+  visitorHistoryCountdown: {
+    backgroundColor: colors.warningLight,
+    borderRadius: 999,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4,
+  },
+
   visitorCardFooterText: {
     fontSize: fontSize.xs,
     color: colors.gray[500],
+  },
+
+  visitorHistoryCountdownText: {
+    fontSize: fontSize.xs,
+    color: "#B45309",
+    fontWeight: "700",
   },
 
   visitorCardActions: {
@@ -2197,6 +2210,25 @@ export default StyleSheet.create({
 
   visitorDetailBody: {
     gap: spacing.lg,
+  },
+
+  visitorHistoryNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.warningSoft,
+    borderWidth: 1,
+    borderColor: colors.warningLight,
+    borderRadius: 18,
+    padding: spacing.md,
+  },
+
+  visitorHistoryNoticeText: {
+    flex: 1,
+    fontSize: fontSize.xs,
+    lineHeight: 18,
+    color: "#92400E",
+    fontWeight: "600",
   },
 
   visitorDetailHero: {
