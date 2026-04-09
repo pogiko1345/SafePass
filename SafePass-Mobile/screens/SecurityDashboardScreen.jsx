@@ -91,7 +91,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   
   // UI State
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [visitorFilter, setVisitorFilter] = useState('active');
+  const [visitorFilter, setVisitorFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showVisitorModal, setShowVisitorModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -905,7 +905,18 @@ export default function SecurityDashboardScreen({ navigation }) {
       if (!result?.success) {
         throw new Error("Failed to resolve alert");
       }
-      await loadNotifications();
+
+      setNotifications((current) =>
+        current.map((item) =>
+          item._id === alert._id ? { ...item, read: true } : item
+        )
+      );
+      setAlerts((current) => current.filter((item) => item._id !== alert._id));
+      setUnreadCount((current) => Math.max(0, current - 1));
+      setDashboardStats((current) => ({
+        ...current,
+        activeAlerts: Math.max(0, current.activeAlerts - 1),
+      }));
     } catch (error) {
       console.error("Resolve alert error:", error);
       Alert.alert("Error", "Failed to resolve alert. Please try again.");
@@ -1147,9 +1158,12 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name="clipboard-outline" size={20} color="#10B981" />
             <Text style={styles.sectionTitle}>Operations Snapshot</Text>
           </View>
-          <TouchableOpacity onPress={() => setActiveTab('visitors')}>
-            <Text style={styles.viewAll}>Manage Visitors</Text>
-          </TouchableOpacity>
+                  <TouchableOpacity onPress={() => {
+                    setVisitorFilter('all');
+                    setActiveTab('visitors');
+                  }}>
+                    <Text style={styles.viewAll}>Manage Visitors</Text>
+                  </TouchableOpacity>
         </View>
 
         <View style={styles.reportStatsGrid}>
@@ -1255,7 +1269,10 @@ export default function SecurityDashboardScreen({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('visitors')}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => {
+            setVisitorFilter('all');
+            setActiveTab('visitors');
+          }}>
             <LinearGradient
               colors={['#F59E0B', '#D97706']}
               style={styles.quickActionGradient}
@@ -1423,7 +1440,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
         {/* Filter Tabs */}
         <View style={styles.filterTabs}>
-          {['active', 'pending', 'approved', 'completed', 'all'].map((filter) => (
+          {['all', 'active', 'pending', 'approved', 'completed'].map((filter) => (
             <TouchableOpacity
               key={filter}
               style={[styles.filterTab, visitorFilter === filter && styles.filterTabActive]}
@@ -2441,116 +2458,138 @@ export default function SecurityDashboardScreen({ navigation }) {
         onRequestClose={() => setShowDetailModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Visitor Details</Text>
+          <View style={[styles.modalContent, styles.visitorDetailModalContent]}>
+            <View style={[styles.modalHeader, styles.visitorDetailHeader]}>
+              <View>
+                <Text style={styles.modalTitle}>Visitor Profile</Text>
+                <Text style={styles.visitorDetailHeaderSubtitle}>Review identity, schedule, and access status before taking action.</Text>
+              </View>
               <TouchableOpacity onPress={() => setShowDetailModal(false)}>
                 <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
             {selectedVisitor && (
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                <View style={styles.detailPhotoSection}>
-                  {selectedVisitor.idImage ? (
-                    <Image 
-                      source={{ uri: selectedVisitor.idImage }} 
-                      style={styles.detailIdPhoto} 
-                    />
-                  ) : (
-                    <View style={styles.detailIdPlaceholder}>
-                      <Ionicons name="id-card-outline" size={60} color="#9CA3AF" />
-                      <Text style={styles.detailIdPlaceholderText}>No ID photo available</Text>
+              <ScrollView style={styles.modalBody} contentContainerStyle={styles.visitorDetailBody} showsVerticalScrollIndicator={false}>
+                <View style={styles.visitorDetailHero}>
+                  <View style={styles.detailPhotoSection}>
+                    {selectedVisitor.idImage ? (
+                      <Image 
+                        source={{ uri: selectedVisitor.idImage }} 
+                        style={styles.detailIdPhoto} 
+                      />
+                    ) : (
+                      <View style={styles.detailIdPlaceholder}>
+                        <Ionicons name="id-card-outline" size={60} color="#9CA3AF" />
+                        <Text style={styles.detailIdPlaceholderText}>No ID photo available</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.visitorDetailHeroCopy}>
+                    <View style={styles.visitorDetailBadgeRow}>
+                      <View style={[styles.visitorDetailStatusPill, { backgroundColor: getStatusBadge(selectedVisitor).bg }]}>
+                        <Text style={[styles.visitorDetailStatusPillText, { color: getStatusBadge(selectedVisitor).text }]}>
+                          {getStatusBadge(selectedVisitor).label}
+                        </Text>
+                      </View>
+                      <View style={styles.visitorDetailAccessPill}>
+                        <Ionicons name="shield-checkmark-outline" size={12} color="#0A3D91" />
+                        <Text style={styles.visitorDetailAccessPillText}>
+                          {selectedVisitor.approvalStatus === 'approved' ? 'Cleared for access' : 'Awaiting clearance'}
+                        </Text>
+                      </View>
                     </View>
-                  )}
-                  <View style={[styles.statusBadge, { 
-                    backgroundColor: getStatusBadge(selectedVisitor).bg,
-                    alignSelf: 'center',
-                    marginTop: 10,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                  }]}>
-                    <Text style={[styles.statusBadgeText, { 
-                      color: getStatusBadge(selectedVisitor).text 
-                    }]}>
-                      {getStatusBadge(selectedVisitor).label}
-                    </Text>
+
+                    <Text style={styles.detailName}>{selectedVisitor.fullName}</Text>
+                    <Text style={styles.visitorDetailPurpose}>{selectedVisitor.purposeOfVisit || 'No purpose recorded'}</Text>
+
+                    <View style={styles.visitorDetailQuickInfo}>
+                      <View style={styles.visitorDetailQuickInfoCard}>
+                        <Text style={styles.visitorDetailQuickInfoLabel}>Visit Date</Text>
+                        <Text style={styles.visitorDetailQuickInfoValue}>{formatDate(selectedVisitor.visitDate)}</Text>
+                      </View>
+                      <View style={styles.visitorDetailQuickInfoCard}>
+                        <Text style={styles.visitorDetailQuickInfoLabel}>Visit Time</Text>
+                        <Text style={styles.visitorDetailQuickInfoValue}>{formatTime(selectedVisitor.visitTime)}</Text>
+                      </View>
+                      <View style={styles.visitorDetailQuickInfoCard}>
+                        <Text style={styles.visitorDetailQuickInfoLabel}>Host</Text>
+                        <Text style={styles.visitorDetailQuickInfoValue}>{selectedVisitor.host || 'Not assigned'}</Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
 
-                <View style={styles.detailInfoSection}>
-                  <Text style={styles.detailName}>{selectedVisitor.fullName}</Text>
-                  
-                  <View style={styles.detailItem}>
-                    <Ionicons name="call-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>{selectedVisitor.phoneNumber}</Text>
-                  </View>
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="mail-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>{selectedVisitor.email}</Text>
-                  </View>
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="card-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>ID: {selectedVisitor.idNumber}</Text>
-                  </View>
-
-                  <View style={styles.detailDivider} />
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="document-text-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>{selectedVisitor.purposeOfVisit}</Text>
-                  </View>
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="person-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>Host: {selectedVisitor.host}</Text>
-                  </View>
-
-                  {selectedVisitor.assignedOffice && (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="business-outline" size={18} color="#6B7280" />
-                      <Text style={styles.detailText}>Office: {selectedVisitor.assignedOffice}</Text>
+                <View style={styles.visitorDetailSection}>
+                  <Text style={styles.visitorDetailSectionTitle}>Identity & Contact</Text>
+                  <View style={styles.visitorDetailInfoGrid}>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Phone</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.phoneNumber || 'No phone number'}</Text>
                     </View>
-                  )}
-
-                  {selectedVisitor.vehicleNumber && (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="car-outline" size={18} color="#6B7280" />
-                      <Text style={styles.detailText}>Vehicle: {selectedVisitor.vehicleNumber}</Text>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Email</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.email || 'No email address'}</Text>
                     </View>
-                  )}
-
-                  <View style={styles.detailDivider} />
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="calendar-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>Visit Date: {formatDate(selectedVisitor.visitDate)}</Text>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>ID Number</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.idNumber || 'No ID recorded'}</Text>
+                    </View>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Vehicle</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.vehicleNumber || 'No vehicle listed'}</Text>
+                    </View>
                   </View>
+                </View>
 
-                  <View style={styles.detailItem}>
-                    <Ionicons name="time-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>Visit Time: {formatTime(selectedVisitor.visitTime)}</Text>
+                <View style={styles.visitorDetailSection}>
+                  <Text style={styles.visitorDetailSectionTitle}>Visit Assignment</Text>
+                  <View style={styles.visitorDetailInfoGrid}>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Host / Department</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.host || 'Not set'}</Text>
+                    </View>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Assigned Office</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.assignedOffice || 'Not assigned'}</Text>
+                    </View>
                   </View>
+                </View>
 
-                  {selectedVisitor.checkedInAt && (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="log-in-outline" size={18} color="#10B981" />
-                      <Text style={styles.detailText}>
-                        Checked In: {formatDateTime(selectedVisitor.checkedInAt)}
-                      </Text>
+                <View style={styles.visitorDetailSection}>
+                  <Text style={styles.visitorDetailSectionTitle}>Access Timeline</Text>
+                  <View style={styles.visitorDetailTimeline}>
+                    <View style={styles.visitorDetailTimelineItem}>
+                      <View style={[styles.visitorDetailTimelineDot, { backgroundColor: '#3B82F6' }]} />
+                      <View style={styles.visitorDetailTimelineCopy}>
+                        <Text style={styles.visitorDetailTimelineTitle}>Scheduled Arrival</Text>
+                        <Text style={styles.visitorDetailTimelineText}>
+                          {formatDate(selectedVisitor.visitDate)} at {formatTime(selectedVisitor.visitTime)}
+                        </Text>
+                      </View>
                     </View>
-                  )}
 
-                  {selectedVisitor.checkedOutAt && (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-                      <Text style={styles.detailText}>
-                        Checked Out: {formatDateTime(selectedVisitor.checkedOutAt)}
-                      </Text>
-                    </View>
-                  )}
+                    {selectedVisitor.checkedInAt ? (
+                      <View style={styles.visitorDetailTimelineItem}>
+                        <View style={[styles.visitorDetailTimelineDot, { backgroundColor: '#10B981' }]} />
+                        <View style={styles.visitorDetailTimelineCopy}>
+                          <Text style={styles.visitorDetailTimelineTitle}>Checked In</Text>
+                          <Text style={styles.visitorDetailTimelineText}>{formatDateTime(selectedVisitor.checkedInAt)}</Text>
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {selectedVisitor.checkedOutAt ? (
+                      <View style={styles.visitorDetailTimelineItem}>
+                        <View style={[styles.visitorDetailTimelineDot, { backgroundColor: '#DC2626' }]} />
+                        <View style={styles.visitorDetailTimelineCopy}>
+                          <Text style={styles.visitorDetailTimelineTitle}>Checked Out</Text>
+                          <Text style={styles.visitorDetailTimelineText}>{formatDateTime(selectedVisitor.checkedOutAt)}</Text>
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
 
                 <View style={styles.detailActions}>

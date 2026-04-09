@@ -2180,6 +2180,197 @@ export default StyleSheet.create({
     marginTop: spacing.xs,
   },
 
+  visitorDetailModalContent: {
+    maxWidth: 760,
+  },
+
+  visitorDetailHeader: {
+    alignItems: "flex-start",
+  },
+
+  visitorDetailHeaderSubtitle: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    marginTop: 4,
+    lineHeight: 16,
+  },
+
+  visitorDetailBody: {
+    gap: spacing.lg,
+  },
+
+  visitorDetailHero: {
+    backgroundColor: colors.gray[50],
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.lg,
+    gap: spacing.lg,
+    ...(isWeb && isDesktop ? { flexDirection: "row", alignItems: "center" } : {}),
+  },
+
+  visitorDetailHeroCopy: {
+    flex: 1,
+  },
+
+  visitorDetailBadgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  visitorDetailStatusPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+  },
+
+  visitorDetailStatusPillText: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+
+  visitorDetailAccessPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.infoSoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+  },
+
+  visitorDetailAccessPillText: {
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+    color: colors.secondary,
+  },
+
+  visitorDetailPurpose: {
+    fontSize: fontSize.base,
+    color: colors.gray[600],
+    marginTop: spacing.xs,
+    lineHeight: 20,
+  },
+
+  visitorDetailQuickInfo: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+
+  visitorDetailQuickInfoCard: {
+    minWidth: 120,
+    flexGrow: 1,
+    flexBasis: 120,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+
+  visitorDetailQuickInfoLabel: {
+    fontSize: fontSize.xxs,
+    color: colors.gray[400],
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    fontWeight: "700",
+  },
+
+  visitorDetailQuickInfoValue: {
+    fontSize: fontSize.sm,
+    color: colors.gray[800],
+    fontWeight: "700",
+    marginTop: 4,
+  },
+
+  visitorDetailSection: {
+    gap: spacing.sm,
+  },
+
+  visitorDetailSectionTitle: {
+    fontSize: fontSize.md,
+    fontWeight: "800",
+    color: colors.gray[900],
+  },
+
+  visitorDetailInfoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+
+  visitorDetailInfoCard: {
+    minWidth: 180,
+    flexGrow: 1,
+    flexBasis: 180,
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.md,
+  },
+
+  visitorDetailInfoLabel: {
+    fontSize: fontSize.xxs,
+    color: colors.gray[400],
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+
+  visitorDetailInfoValue: {
+    fontSize: fontSize.sm,
+    color: colors.gray[800],
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+
+  visitorDetailTimeline: {
+    backgroundColor: colors.gray[50],
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+
+  visitorDetailTimelineItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+
+  visitorDetailTimelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+
+  visitorDetailTimelineCopy: {
+    flex: 1,
+  },
+
+  visitorDetailTimelineTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[800],
+  },
+
+  visitorDetailTimelineText: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    marginTop: 2,
+    lineHeight: 16,
+  },
+
   detailInfoSection: {
     gap: spacing.md,
   },
