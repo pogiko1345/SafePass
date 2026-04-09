@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -23,8 +23,27 @@ import * as Haptics from 'expo-haptics';
 import ApiService from "../utils/ApiService";
 import visitorDashboardStyles from "../styles/VisitorDashboardStyles";
 
+let DateTimePickerComponent = null;
+if (Platform.OS !== "web") {
+  try {
+    const DateTimePickerModule = require("@react-native-community/datetimepicker");
+    DateTimePickerComponent = DateTimePickerModule.default;
+  } catch (error) {
+    console.warn("DateTimePicker not available:", error);
+  }
+}
+
 const { width } = Dimensions.get("window");
 const isSmallPhone = width <= 375;
+const APPOINTMENT_PURPOSE_OPTIONS = [
+  "Campus Tour",
+  "Meeting",
+  "Document Submission",
+  "Training",
+  "Interview",
+  "Official Business",
+  "Other",
+];
 
 // NFC Configuration
 // For web: Use Web NFC API
@@ -46,11 +65,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [refreshing, setRefreshing] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [showAppointmentDatePicker, setShowAppointmentDatePicker] = useState(false);
+  const [showAppointmentTimePicker, setShowAppointmentTimePicker] = useState(false);
+  const [showPurposeDropdown, setShowPurposeDropdown] = useState(false);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState({
-    preferredDate: "",
-    preferredTime: "",
-    purposeOfVisit: "",
+    preferredDate: null,
+    preferredTime: null,
+    purposeSelection: "Campus Tour",
+    customPurpose: "",
   });
   const [accessLogs, setAccessLogs] = useState([]);
   const [greeting, setGreeting] = useState("");
@@ -61,6 +84,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [tapCount, setTapCount] = useState(0);
   const [lastTapTime, setLastTapTime] = useState(0);
   const nfcListenerRef = useRef(null);
+  const appointmentWebDateInputRef = useRef(null);
+  const appointmentTimeOptions = useMemo(() => {
+    const options = [];
+    for (let hour = 7; hour <= 18; hour += 1) {
+      for (const minute of [0, 30]) {
+        const option = new Date();
+        option.setHours(hour, minute, 0, 0);
+        options.push(option);
+      }
+    }
+    return options;
+  }, []);
 
   useEffect(() => {
     loadVisitorData();
@@ -427,41 +462,144 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     loadVisitorData();
   };
 
-  const formatDateInput = (dateString) => {
-    if (!dateString) return "";
+  const getValidDate = (dateString) => {
+    if (!dateString) return null;
     const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toISOString().slice(0, 10);
+    if (Number.isNaN(date.getTime())) return null;
+    return date;
   };
 
-  const formatTimeInput = (dateString) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return "";
-    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  const getDefaultAppointmentDate = () => {
+    const visitorDate = getValidDate(visitor?.visitDate);
+    if (visitorDate) return visitorDate;
+    const nextVisitDate = new Date();
+    nextVisitDate.setDate(nextVisitDate.getDate() + 1);
+    nextVisitDate.setHours(9, 0, 0, 0);
+    return nextVisitDate;
+  };
+
+  const getDefaultAppointmentTime = () => {
+    const visitorTime = getValidDate(visitor?.visitTime);
+    if (visitorTime) return visitorTime;
+    const nextVisitTime = new Date();
+    nextVisitTime.setHours(9, 0, 0, 0);
+    return nextVisitTime;
+  };
+
+  const formatAppointmentPickerDate = (dateValue) => {
+    const date = getValidDate(dateValue);
+    if (!date) return "Select preferred date";
+    return date.toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const getAppointmentMinDateValue = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const getAppointmentWebDateValue = () => {
+    const date = getValidDate(appointmentForm.preferredDate) || getDefaultAppointmentDate();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const applyAppointmentDateSelection = (selectedValue) => {
+    const selectedDate = getValidDate(selectedValue);
+    if (!selectedDate) return;
+
+    selectedDate.setHours(12, 0, 0, 0);
+    setAppointmentForm((prev) => ({
+      ...prev,
+      preferredDate: selectedDate,
+    }));
+  };
+
+  const handleAppointmentDatePress = () => {
+    setShowAppointmentTimePicker(false);
+    setShowPurposeDropdown(false);
+
+    if (Platform.OS === "web") {
+      const input = appointmentWebDateInputRef.current;
+      if (input?.showPicker) {
+        input.showPicker();
+        return;
+      }
+      input?.click?.();
+      return;
+    }
+
+    setShowAppointmentDatePicker(true);
+  };
+
+  const handleAppointmentDateChange = (event, selectedDate) => {
+    if (Platform.OS === "android") {
+      setShowAppointmentDatePicker(false);
+    }
+
+    if (event?.type === "dismissed" || !selectedDate) {
+      return;
+    }
+
+    applyAppointmentDateSelection(selectedDate);
+  };
+
+  const handleAppointmentWebDateChange = (event) => {
+    const nextValue = event?.target?.value;
+    if (!nextValue) return;
+
+    const [year, month, day] = nextValue.split("-").map(Number);
+    if (!year || !month || !day) return;
+
+    applyAppointmentDateSelection(new Date(year, month - 1, day));
   };
 
   const populateAppointmentForm = () => {
+    const existingPurpose = String(visitor?.purposeOfVisit || "").trim();
+    const matchedPurpose = APPOINTMENT_PURPOSE_OPTIONS.includes(existingPurpose)
+      ? existingPurpose
+      : existingPurpose
+        ? "Other"
+        : "Campus Tour";
+
     setAppointmentForm({
-      preferredDate: formatDateInput(visitor?.visitDate),
-      preferredTime: formatTimeInput(visitor?.visitTime),
-      purposeOfVisit: visitor?.purposeOfVisit || "",
+      preferredDate: getDefaultAppointmentDate(),
+      preferredTime: getDefaultAppointmentTime(),
+      purposeSelection: matchedPurpose,
+      customPurpose: matchedPurpose === "Other" ? existingPurpose : "",
     });
   };
 
   const openAppointmentModal = () => {
     populateAppointmentForm();
+    setShowAppointmentDatePicker(false);
+    setShowAppointmentTimePicker(false);
+    setShowPurposeDropdown(false);
     setShowAppointmentModal(true);
   };
 
   const closeAppointmentModal = () => {
+    setShowAppointmentDatePicker(false);
+    setShowAppointmentTimePicker(false);
+    setShowPurposeDropdown(false);
     setShowAppointmentModal(false);
   };
 
   const handleRequestAppointment = async () => {
-    const preferredDate = appointmentForm.preferredDate.trim();
-    const preferredTime = appointmentForm.preferredTime.trim();
-    const purposeOfVisit = appointmentForm.purposeOfVisit.trim();
+    const preferredDate = appointmentForm.preferredDate;
+    const preferredTime = appointmentForm.preferredTime;
+    const purposeOfVisit =
+      appointmentForm.purposeSelection === "Other"
+        ? appointmentForm.customPurpose.trim()
+        : appointmentForm.purposeSelection.trim();
 
     if (!currentUser?._id) {
       Alert.alert("Login Required", "Please sign in again before requesting a new appointment.");
@@ -473,16 +611,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
-    const combinedDateTime = new Date(`${preferredDate}T${preferredTime}:00`);
+    const combinedDateTime = new Date(preferredDate);
+    combinedDateTime.setHours(preferredTime.getHours(), preferredTime.getMinutes(), 0, 0);
     if (Number.isNaN(combinedDateTime.getTime())) {
-      Alert.alert("Invalid Schedule", "Please enter a valid preferred date and time.");
+      Alert.alert("Invalid Schedule", "Please choose a valid preferred date and time.");
       return;
     }
 
     setIsSubmittingAppointment(true);
     try {
       const response = await ApiService.requestVisitorAppointment(currentUser._id, {
-        preferredDate: new Date(`${preferredDate}T00:00:00`).toISOString(),
+        preferredDate: new Date(preferredDate).toISOString(),
         preferredTime: combinedDateTime.toISOString(),
         purposeOfVisit,
       });
@@ -493,8 +632,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           title: "Appointment Submitted Successfully",
           message:
             "Your new visit request has been sent to staff for review. You can track approval, time adjustments, or rejection updates from this dashboard.",
-          date: preferredDate,
-          time: preferredTime,
+          date: formatDate(preferredDate),
+          time: formatTime(preferredTime),
           purpose: purposeOfVisit,
         });
         Alert.alert("Appointment Submitted", "Your request was sent to staff for review.");
@@ -583,6 +722,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
+      hour12: true,
     });
   };
 
@@ -731,6 +871,67 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     String(currentUser?.status || "").toLowerCase() === "active";
   const approvedActionLabel = isNfcReading ? "Stop NFC" : "Start NFC";
   const approvedActionIcon = isNfcReading ? "pause-circle" : "radio";
+  const displayName =
+    visitor?.fullName ||
+    [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") ||
+    "Visitor";
+  const journeyTitle = isPendingApproval
+    ? "Registration Review In Progress"
+    : isPendingStaffReview
+      ? "Staff Review In Progress"
+      : isApprovedVisitor
+        ? "Access Ready"
+        : canRequestNewAppointment
+          ? "Schedule Your Next Visit"
+          : canCreateFreshAppointment
+            ? "Visitor Account Active"
+            : "Start Your SafePass";
+  const journeySubtitle = isPendingApproval
+    ? "An admin is reviewing your first visitor request."
+    : isPendingStaffReview
+      ? "Staff is evaluating your preferred schedule."
+      : isApprovedVisitor
+        ? "Your pass, QR access, and NFC tools are active."
+        : canRequestNewAppointment
+          ? "Use this site to request another appointment without registering again."
+          : canCreateFreshAppointment
+            ? "Submit a new preferred date, time, and purpose from this dashboard."
+            : "Create your first visitor registration to unlock access tools.";
+  const commandMetrics = visitor
+    ? [
+        {
+          label: "Visit Date",
+          value: formatDate(visitor.visitDate),
+          icon: "calendar-outline",
+        },
+        {
+          label: "Visit Time",
+          value: formatTime(visitor.visitTime),
+          icon: "time-outline",
+        },
+        {
+          label: "Purpose",
+          value: visitor.purposeOfVisit || "Pending details",
+          icon: "document-text-outline",
+        },
+      ]
+    : [
+        {
+          label: "Account",
+          value: String(currentUser?.status || "Active").toUpperCase(),
+          icon: "person-circle-outline",
+        },
+        {
+          label: "Role",
+          value: "Visitor",
+          icon: "id-card-outline",
+        },
+        {
+          label: "Next Step",
+          value: canCreateFreshAppointment ? "Request Visit" : "Register",
+          icon: "arrow-forward-circle-outline",
+        },
+      ];
 
   return (
     <SafeAreaView style={visitorDashboardStyles.safeArea}>
@@ -745,9 +946,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       >
         <View style={visitorDashboardStyles.headerTop}>
           <View>
+            <View style={visitorDashboardStyles.headerPill}>
+              <Ionicons name="airplane-outline" size={14} color="#FFFFFF" />
+              <Text style={visitorDashboardStyles.headerPillText}>SafePass Visitor Portal</Text>
+            </View>
             <Text style={visitorDashboardStyles.greeting}>{greeting},</Text>
             <Text style={visitorDashboardStyles.userName}>
-              {visitor?.fullName?.split(' ')[0] || 'Visitor'}!
+              {displayName.split(' ')[0] || 'Visitor'}!
+            </Text>
+            <Text style={visitorDashboardStyles.headerSupportText}>
+              Sapphire International Aviation Academy
             </Text>
           </View>
           <TouchableOpacity 
@@ -793,6 +1001,63 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#4F46E5"]} />
         }
       >
+        <View style={visitorDashboardStyles.dashboardShell}>
+          <View style={visitorDashboardStyles.commandDeckCard}>
+            <View style={visitorDashboardStyles.commandDeckHeader}>
+              <View style={visitorDashboardStyles.commandDeckTitleWrap}>
+                <Text style={visitorDashboardStyles.commandDeckEyebrow}>Visit Command</Text>
+                <Text style={visitorDashboardStyles.commandDeckTitle}>{journeyTitle}</Text>
+                <Text style={visitorDashboardStyles.commandDeckSubtitle}>{journeySubtitle}</Text>
+              </View>
+              <View style={[visitorDashboardStyles.commandDeckBadge, { backgroundColor: `${statusColor}18` }]}>
+                <View style={[visitorDashboardStyles.commandDeckBadgeDot, { backgroundColor: statusColor }]} />
+                <Text style={[visitorDashboardStyles.commandDeckBadgeText, { color: statusColor }]}>
+                  {statusText}
+                </Text>
+              </View>
+            </View>
+
+            <View style={visitorDashboardStyles.commandMetricsGrid}>
+              {commandMetrics.map((item) => (
+                <View key={item.label} style={visitorDashboardStyles.commandMetricCard}>
+                  <View style={visitorDashboardStyles.commandMetricIcon}>
+                    <Ionicons name={item.icon} size={16} color="#4F46E5" />
+                  </View>
+                  <Text style={visitorDashboardStyles.commandMetricLabel}>{item.label}</Text>
+                  <Text style={visitorDashboardStyles.commandMetricValue} numberOfLines={2}>
+                    {item.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {(isApprovedVisitor || canRequestNewAppointment || canCreateFreshAppointment) ? (
+              <View style={visitorDashboardStyles.commandActionRow}>
+                <TouchableOpacity
+                  style={visitorDashboardStyles.commandPrimaryButton}
+                  onPress={isApprovedVisitor ? openAppointmentModal : openAppointmentModal}
+                  activeOpacity={0.9}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
+                  <Text style={visitorDashboardStyles.commandPrimaryButtonText}>
+                    {isApprovedVisitor ? "Plan Another Visit" : "Open Re-appointment"}
+                  </Text>
+                </TouchableOpacity>
+
+                {isApprovedVisitor ? (
+                  <TouchableOpacity
+                    style={visitorDashboardStyles.commandSecondaryButton}
+                    onPress={() => setShowQRModal(true)}
+                    activeOpacity={0.9}
+                  >
+                    <Ionicons name="qr-code-outline" size={18} color="#4F46E5" />
+                    <Text style={visitorDashboardStyles.commandSecondaryButtonText}>Show QR</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+
         {visitor ? (
           isPendingApproval ? (
             <>
@@ -1158,6 +1423,42 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       {visitor.vehicleNumber || "No vehicle registered"}
                     </Text>
                   </View>
+                </View>
+              </View>
+
+              <View style={visitorDashboardStyles.reappointmentCard}>
+                <View style={visitorDashboardStyles.reappointmentCardHeader}>
+                  <View>
+                    <Text style={visitorDashboardStyles.reappointmentCardTitle}>
+                      Need Another Visit?
+                    </Text>
+                    <Text style={visitorDashboardStyles.reappointmentCardSubtitle}>
+                      You can request a new appointment from this account without registering again.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={visitorDashboardStyles.reappointmentPrimaryButton}
+                    onPress={openAppointmentModal}
+                    activeOpacity={0.9}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
+                    <Text style={visitorDashboardStyles.reappointmentPrimaryButtonText}>
+                      Re-appoint
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={visitorDashboardStyles.reappointmentChecklist}>
+                  {[
+                    "Choose your next preferred date and time from the site.",
+                    "Staff will review the request and may approve, adjust, or reject it.",
+                    "Submitting a new request will replace the current visit schedule on your account.",
+                  ].map((item) => (
+                    <View key={item} style={visitorDashboardStyles.reappointmentChecklistRow}>
+                      <Ionicons name="arrow-forward-circle-outline" size={18} color="#0F766E" />
+                      <Text style={visitorDashboardStyles.reappointmentChecklistText}>{item}</Text>
+                    </View>
+                  ))}
                 </View>
               </View>
 
@@ -1751,6 +2052,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </TouchableOpacity>
           </View>
         )}
+        </View>
       </ScrollView>
 
       <Modal
@@ -1779,45 +2081,205 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <View style={visitorDashboardStyles.appointmentModalBody}>
               <View style={visitorDashboardStyles.appointmentField}>
                 <Text style={visitorDashboardStyles.appointmentFieldLabel}>Preferred Date</Text>
-                <TextInput
-                  style={visitorDashboardStyles.appointmentFieldInput}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#94A3B8"
-                  value={appointmentForm.preferredDate}
-                  onChangeText={(text) =>
-                    setAppointmentForm((prev) => ({ ...prev, preferredDate: text }))
-                  }
-                  autoCapitalize="none"
-                />
+                <TouchableOpacity
+                  style={visitorDashboardStyles.appointmentPickerField}
+                  onPress={handleAppointmentDatePress}
+                  activeOpacity={0.85}
+                >
+                  <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
+                    <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
+                      <Ionicons name="calendar-outline" size={18} color="#4F46E5" />
+                    </View>
+                    <View>
+                      <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a date</Text>
+                      <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                        {formatAppointmentPickerDate(appointmentForm.preferredDate)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons
+                    name={Platform.OS === "web" ? "calendar-clear-outline" : showAppointmentDatePicker ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+
+                {Platform.OS === "web" ? (
+                  <input
+                    ref={appointmentWebDateInputRef}
+                    type="date"
+                    value={getAppointmentWebDateValue()}
+                    min={getAppointmentMinDateValue()}
+                    onChange={handleAppointmentWebDateChange}
+                    style={{
+                      position: "absolute",
+                      width: 1,
+                      height: 1,
+                      opacity: 0,
+                      pointerEvents: "none",
+                    }}
+                    aria-label="Preferred appointment date"
+                  />
+                ) : null}
+
+                {Platform.OS !== "web" && showAppointmentDatePicker && DateTimePickerComponent ? (
+                  <DateTimePickerComponent
+                    value={getValidDate(appointmentForm.preferredDate) || getDefaultAppointmentDate()}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    onChange={handleAppointmentDateChange}
+                    minimumDate={new Date()}
+                  />
+                ) : null}
               </View>
 
               <View style={visitorDashboardStyles.appointmentField}>
                 <Text style={visitorDashboardStyles.appointmentFieldLabel}>Preferred Time</Text>
-                <TextInput
-                  style={visitorDashboardStyles.appointmentFieldInput}
-                  placeholder="HH:MM"
-                  placeholderTextColor="#94A3B8"
-                  value={appointmentForm.preferredTime}
-                  onChangeText={(text) =>
-                    setAppointmentForm((prev) => ({ ...prev, preferredTime: text }))
-                  }
-                  autoCapitalize="none"
-                />
+                <TouchableOpacity
+                  style={visitorDashboardStyles.appointmentPickerField}
+                  onPress={() => {
+                    setShowAppointmentTimePicker((current) => !current);
+                    setShowAppointmentDatePicker(false);
+                    setShowPurposeDropdown(false);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
+                    <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
+                      <Ionicons name="time-outline" size={18} color="#4F46E5" />
+                    </View>
+                    <View>
+                      <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a time</Text>
+                      <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                        {appointmentForm.preferredTime ? formatTime(appointmentForm.preferredTime) : "Select preferred time"}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons
+                    name={showAppointmentTimePicker ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+
+                {showAppointmentTimePicker ? (
+                  <View style={visitorDashboardStyles.pickerDropdownMenu}>
+                    <ScrollView
+                      style={visitorDashboardStyles.pickerDropdownScroll}
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {appointmentTimeOptions.map((option) => {
+                        const isSelected =
+                          appointmentForm.preferredTime &&
+                          new Date(appointmentForm.preferredTime).getHours() === option.getHours() &&
+                          new Date(appointmentForm.preferredTime).getMinutes() === option.getMinutes();
+                        return (
+                          <TouchableOpacity
+                            key={`${option.getHours()}-${option.getMinutes()}`}
+                            style={[
+                              visitorDashboardStyles.pickerOptionItem,
+                              isSelected && visitorDashboardStyles.pickerOptionItemActive,
+                            ]}
+                            onPress={() => {
+                              setAppointmentForm((prev) => ({ ...prev, preferredTime: option }));
+                              setShowAppointmentTimePicker(false);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                visitorDashboardStyles.pickerOptionText,
+                                isSelected && visitorDashboardStyles.pickerOptionTextActive,
+                              ]}
+                            >
+                              {formatTime(option)}
+                            </Text>
+                            {isSelected ? (
+                              <Ionicons name="checkmark-circle" size={18} color="#4F46E5" />
+                            ) : null}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ) : null}
               </View>
 
               <View style={visitorDashboardStyles.appointmentField}>
                 <Text style={visitorDashboardStyles.appointmentFieldLabel}>Purpose Of Visit</Text>
-                <TextInput
-                  style={[visitorDashboardStyles.appointmentFieldInput, visitorDashboardStyles.appointmentFieldTextarea]}
-                  placeholder="Describe why you need to visit the campus"
-                  placeholderTextColor="#94A3B8"
-                  value={appointmentForm.purposeOfVisit}
-                  onChangeText={(text) =>
-                    setAppointmentForm((prev) => ({ ...prev, purposeOfVisit: text }))
-                  }
-                  multiline
-                  textAlignVertical="top"
-                />
+                <TouchableOpacity
+                  style={visitorDashboardStyles.appointmentPickerField}
+                  onPress={() => setShowPurposeDropdown((current) => !current)}
+                  activeOpacity={0.85}
+                >
+                  <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
+                    <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
+                      <Ionicons name="list-outline" size={18} color="#4F46E5" />
+                    </View>
+                    <View>
+                      <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a purpose</Text>
+                      <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                        {appointmentForm.purposeSelection}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons
+                    name={showPurposeDropdown ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+
+                {showPurposeDropdown ? (
+                  <View style={visitorDashboardStyles.purposeDropdownMenu}>
+                    {APPOINTMENT_PURPOSE_OPTIONS.map((option) => {
+                      const isSelected = appointmentForm.purposeSelection === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[
+                            visitorDashboardStyles.purposeOptionItem,
+                            isSelected && visitorDashboardStyles.purposeOptionItemActive,
+                          ]}
+                          onPress={() => {
+                            setAppointmentForm((prev) => ({
+                              ...prev,
+                              purposeSelection: option,
+                              customPurpose: option === "Other" ? prev.customPurpose : "",
+                            }));
+                            setShowPurposeDropdown(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              visitorDashboardStyles.purposeOptionText,
+                              isSelected && visitorDashboardStyles.purposeOptionTextActive,
+                            ]}
+                          >
+                            {option}
+                          </Text>
+                          {isSelected ? (
+                            <Ionicons name="checkmark-circle" size={18} color="#4F46E5" />
+                          ) : null}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : null}
+
+                {appointmentForm.purposeSelection === "Other" ? (
+                  <TextInput
+                    style={[visitorDashboardStyles.appointmentFieldInput, visitorDashboardStyles.appointmentFieldTextarea]}
+                    placeholder="Type your purpose of visit"
+                    placeholderTextColor="#94A3B8"
+                    value={appointmentForm.customPurpose}
+                    onChangeText={(text) =>
+                      setAppointmentForm((prev) => ({ ...prev, customPurpose: text }))
+                    }
+                    multiline
+                    textAlignVertical="top"
+                  />
+                ) : null}
               </View>
 
               <View style={visitorDashboardStyles.appointmentModalFooter}>
