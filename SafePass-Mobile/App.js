@@ -42,6 +42,28 @@ const Storage = Platform.OS === "web"
 
 
 const Stack = createNativeStackNavigator();
+const APP_NAME = "SafePass";
+const APP_ORGANIZATION = "Sapphire International Aviation Academy";
+const WEB_ROUTE_TITLES = {
+  RoleSelect: `Access Portal | ${APP_ORGANIZATION}`,
+  Login: `Login | ${APP_ORGANIZATION}`,
+  VisitorRegister: `Visitor Registration | ${APP_ORGANIZATION}`,
+  Verification: `Account Verification | ${APP_ORGANIZATION}`,
+  Help: `Help Center | ${APP_ORGANIZATION}`,
+  AdminDashboard: `Admin Dashboard | ${APP_ORGANIZATION}`,
+  SecurityDashboard: `Security Operations | ${APP_ORGANIZATION}`,
+  VisitorDashboard: `Visitor Dashboard | ${APP_ORGANIZATION}`,
+  VisitorPass: `Visitor Pass | ${APP_ORGANIZATION}`,
+  WebMapScreen: `Campus Map | ${APP_ORGANIZATION}`,
+  Profile: `Profile | ${APP_ORGANIZATION}`,
+  AccessLog: `Access Logs | ${APP_ORGANIZATION}`,
+  NFCScan: `NFC Scanner | ${APP_ORGANIZATION}`,
+  VisitorManagement: `Visitor Management | ${APP_ORGANIZATION}`,
+  NFCManagement: `NFC Management | ${APP_ORGANIZATION}`,
+  Reports: `Reports | ${APP_ORGANIZATION}`,
+  SecurityLogs: `Security Logs | ${APP_ORGANIZATION}`,
+  Settings: `Settings | ${APP_ORGANIZATION}`,
+};
 
 let logoutCallback = null;
 
@@ -63,6 +85,12 @@ export default function App() {
       logoutCallback = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined" && isLoading) {
+      document.title = `${APP_NAME} Portal | ${APP_ORGANIZATION}`;
+    }
+  }, [isLoading]);
 
   const checkAuthStatus = async () => {
     try {
@@ -112,9 +140,86 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F5F7FA" }}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={{ marginTop: 10, color: "#6B7280" }}>Loading SafePass...</Text>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#F5F7FA",
+          paddingHorizontal: 24,
+        }}
+      >
+        <View
+          style={{
+            width: "100%",
+            maxWidth: 360,
+            backgroundColor: "#FFFFFF",
+            borderRadius: 24,
+            paddingVertical: 28,
+            paddingHorizontal: 24,
+            alignItems: "center",
+            shadowColor: "#0F172A",
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.08,
+            shadowRadius: 24,
+            elevation: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 24,
+              fontWeight: "800",
+              color: "#0F172A",
+              textAlign: "center",
+            }}
+          >
+            {APP_NAME}
+          </Text>
+          <Text
+            style={{
+              marginTop: 6,
+              fontSize: 13,
+              lineHeight: 19,
+              color: "#475569",
+              textAlign: "center",
+            }}
+          >
+            {APP_ORGANIZATION}
+          </Text>
+          <View
+            style={{
+              width: 56,
+              height: 4,
+              borderRadius: 999,
+              backgroundColor: "#0A3D91",
+              marginTop: 16,
+              marginBottom: 20,
+            }}
+          />
+          <ActivityIndicator size="large" color="#0A3D91" />
+          <Text
+            style={{
+              marginTop: 16,
+              fontSize: 14,
+              fontWeight: "600",
+              color: "#1E293B",
+              textAlign: "center",
+            }}
+          >
+            Preparing your secure access portal
+          </Text>
+          <Text
+            style={{
+              marginTop: 6,
+              fontSize: 12,
+              lineHeight: 18,
+              color: "#64748B",
+              textAlign: "center",
+            }}
+          >
+            Verifying your session and loading the appropriate dashboard.
+          </Text>
+        </View>
       </View>
     );
   }
@@ -128,7 +233,13 @@ export default function App() {
   console.log("Current user:", currentUser ? `${currentUser.role}` : "None");
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      documentTitle={{
+        enabled: Platform.OS === "web",
+        formatter: (_options, route) =>
+          WEB_ROUTE_TITLES[route?.name] || `${APP_NAME} | ${APP_ORGANIZATION}`,
+      }}
+    >
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{ 
