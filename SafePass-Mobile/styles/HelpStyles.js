@@ -2,215 +2,405 @@ import { StyleSheet, Platform, Dimensions } from "react-native";
 
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
-const isSmallPhone = width <= 375;
-const isTablet = width >= 768 && width < 1024;
+const isSmallPhone = width <= 390;
+const isWide = width >= 1024;
+
+const webHover = (styles) => (isWeb ? styles : {});
 
 export default StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#EEF4F7",
   },
 
   scrollContainer: {
     flexGrow: 1,
+    paddingBottom: 36,
   },
 
-  header: {
-    paddingTop: Platform.select({
-      ios: 60,
-      android: 50,
-      web: 50,
-    }),
-    paddingBottom: 30,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    paddingHorizontal: 20,
+  hero: {
+    paddingTop: Platform.select({ ios: 58, android: 44, web: 44 }),
+    paddingHorizontal: isWide ? 44 : 20,
+    paddingBottom: 34,
+    borderBottomLeftRadius: 34,
+    borderBottomRightRadius: 34,
+    overflow: "hidden",
   },
 
   backButton: {
-    position: "absolute",
-    top: Platform.select({ ios: 60, android: 50, web: 50 }),
-    left: 20,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.16)",
     justifyContent: "center",
     alignItems: "center",
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "background-color 0.2s ease",
-      ":hover": {
-        backgroundColor: "rgba(255,255,255,0.3)",
-      },
-    }),
+    ...webHover({ cursor: "pointer" }),
   },
 
-  headerContent: {
+  heroBadge: {
+    marginTop: 22,
+    alignSelf: "flex-start",
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
   },
 
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.3)",
-  },
-
-  title: {
-    fontSize: isSmallPhone ? 24 : isTablet ? 32 : 28,
+  heroBadgeText: {
+    fontSize: 12,
     fontWeight: "700",
-    color: "#FFFFFF",
-    marginBottom: 8,
+    color: "#ECFDF5",
   },
 
-  subtitle: {
-    fontSize: isSmallPhone ? 14 : isTablet ? 18 : 16,
-    color: "rgba(255,255,255,0.9)",
-    marginBottom: 10,
+  heroBody: {
+    marginTop: 22,
+    maxWidth: 760,
   },
 
-  contactSection: {
-    padding: isSmallPhone ? 16 : 20,
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: isSmallPhone ? 16 : 20,
-    marginTop: -20,
+  heroIconShell: {
+    width: 76,
+    height: 76,
     borderRadius: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 5,
-      },
-      web: {
-        boxShadow: "0px 8px 24px rgba(0, 0, 0, 0.08)",
-      },
-    }),
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 18,
   },
 
-  sectionTitle: {
-    fontSize: isSmallPhone ? 16 : 18,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 16,
+  heroTitle: {
+    fontSize: isWide ? 42 : isSmallPhone ? 28 : 34,
+    lineHeight: isWide ? 48 : isSmallPhone ? 34 : 40,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    maxWidth: 620,
   },
 
-  contactCards: {
+  heroSubtitle: {
+    marginTop: 12,
+    fontSize: isWide ? 17 : 15,
+    lineHeight: 24,
+    color: "rgba(255,255,255,0.82)",
+    maxWidth: 640,
+  },
+
+  heroStats: {
+    marginTop: 24,
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
 
-  contactCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: isSmallPhone ? 12 : 16,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 16,
+  heroStatCard: {
+    minWidth: isWide ? 156 : 110,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "background-color 0.2s ease, transform 0.2s ease",
-      ":hover": {
-        backgroundColor: "#F3F4F6",
-        transform: "translateY(-1px)",
-      },
-    }),
+    borderColor: "rgba(255,255,255,0.14)",
   },
 
-  contactIcon: {
-    width: isSmallPhone ? 40 : 48,
-    height: isSmallPhone ? 40 : 48,
-    borderRadius: isSmallPhone ? 20 : 24,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
+  heroStatValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: 4,
   },
 
-  contactInfo: {
-    flex: 1,
+  heroStatLabel: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.74)",
   },
 
-  contactLabel: {
-    fontSize: isSmallPhone ? 11 : 12,
-    color: "#6B7280",
-    marginBottom: 2,
+  pageShell: {
+    width: "100%",
+    maxWidth: 1180,
+    alignSelf: "center",
+    paddingHorizontal: isWide ? 28 : 16,
+    marginTop: -18,
   },
 
-  contactValue: {
-    fontSize: isSmallPhone ? 13 : 14,
-    fontWeight: "600",
-    color: "#111827",
-  },
-
-  faqSection: {
-    padding: isSmallPhone ? 16 : 20,
-    marginHorizontal: isSmallPhone ? 16 : 20,
-    marginTop: 20,
+  sectionCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    borderRadius: 28,
+    padding: isWide ? 28 : 20,
+    marginTop: 18,
+    borderWidth: 1,
+    borderColor: "#DCE6EE",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.08,
+        shadowRadius: 24,
       },
       android: {
-        elevation: 3,
+        elevation: 4,
       },
       web: {
-        boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.05)",
+        boxShadow: "0 18px 40px rgba(15, 23, 42, 0.08)",
       },
     }),
   },
 
-  faqItem: {
-    marginBottom: 20,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+  sectionHeader: {
+    marginBottom: 18,
   },
 
-  faqQuestion: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+  sectionEyebrow: {
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    color: "#0F766E",
     marginBottom: 8,
   },
 
-  questionText: {
-    flex: 1,
-    fontSize: isSmallPhone ? 14 : 15,
-    fontWeight: "600",
-    color: "#111827",
+  sectionTitle: {
+    fontSize: isSmallPhone ? 22 : 26,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 8,
   },
 
-  answerText: {
-    fontSize: isSmallPhone ? 13 : 14,
-    color: "#6B7280",
+  sectionSubtitle: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: "#64748B",
+    maxWidth: 720,
+  },
+
+  contactGrid: {
+    flexDirection: isWide ? "row" : "column",
+    flexWrap: "wrap",
+    gap: 14,
+  },
+
+  contactCard: {
+    flex: 1,
+    minWidth: isWide ? 0 : "100%",
+    backgroundColor: "#F8FBFC",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#DDEAF0",
+    padding: 18,
+    ...webHover({ cursor: "pointer" }),
+  },
+
+  contactIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  contactLabel: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 6,
+  },
+
+  contactValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#334155",
+    marginBottom: 8,
+  },
+
+  contactHelper: {
+    fontSize: 13,
     lineHeight: 20,
-    marginLeft: isSmallPhone ? 30 : 30,
+    color: "#64748B",
+    minHeight: 40,
+  },
+
+  contactLinkRow: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  contactLinkText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  guideGrid: {
+    flexDirection: isWide ? "row" : "column",
+    gap: 14,
+  },
+
+  guideCard: {
+    flex: 1,
+    padding: 18,
+    borderRadius: 22,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  guideIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  guideTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 8,
+  },
+
+  guideDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+  },
+
+  faqList: {
+    gap: 12,
+  },
+
+  faqItem: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    ...webHover({ cursor: "pointer" }),
+  },
+
+  faqQuestionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  faqQuestionTextWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  faqQuestion: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+    lineHeight: 20,
+  },
+
+  faqAnswer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    fontSize: 13,
+    lineHeight: 21,
+    color: "#64748B",
+  },
+
+  ctaCard: {
+    marginTop: 18,
+    borderRadius: 28,
+    padding: isWide ? 28 : 20,
+    borderWidth: 1,
+    borderColor: "#E7E5E4",
+  },
+
+  ctaTextWrap: {
+    marginBottom: 18,
+    maxWidth: 760,
+  },
+
+  ctaTitle: {
+    fontSize: isSmallPhone ? 22 : 26,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 8,
+  },
+
+  ctaSubtitle: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: "#475569",
+  },
+
+  ctaActions: {
+    flexDirection: isSmallPhone ? "column" : "row",
+    gap: 12,
+  },
+
+  secondaryCta: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.76)",
+    borderWidth: 1,
+    borderColor: "#D6E1E8",
+    alignItems: "center",
+    justifyContent: "center",
+    ...webHover({ cursor: "pointer" }),
+  },
+
+  secondaryCtaText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#334155",
+  },
+
+  primaryCta: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#0F766E",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    ...webHover({ cursor: "pointer" }),
+  },
+
+  primaryCtaText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
 
   footer: {
-    padding: isSmallPhone ? 20 : 30,
+    paddingVertical: 28,
     alignItems: "center",
   },
 
   footerText: {
-    fontSize: isSmallPhone ? 11 : 12,
-    color: "#9CA3AF",
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#334155",
+    textAlign: "center",
     marginBottom: 4,
+  },
+
+  footerSubtext: {
+    fontSize: 12,
+    color: "#64748B",
+    textAlign: "center",
   },
 });

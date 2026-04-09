@@ -96,7 +96,7 @@ export default function LoginScreen({ navigation, route }) {
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
-      document.title = "SafePass Login | Sapphire International Aviation Academy";
+      document.title = "Login | Sapphire International Aviation Academy";
     }
   }, []);
 

@@ -49,8 +49,8 @@ const purposeOptions = [
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({ visible, credentials, onConfirm }) => {
   const handleCopy = (text, type) => {
-    if (Platform.OS === "web") {
-      navigator.clipboard.writeText(text);
+    if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text).catch(() => {});
     }
     Alert.alert("Copied", `${type} copied to clipboard`);
   };
@@ -393,7 +393,7 @@ export default function VisitorRegisterScreen({ navigation }) {
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
       document.title =
-        "Visitor Registration | SafePass Sapphire";
+        "Visitor Registration | Sapphire International Aviation Academy";
     }
   }, []);
 
@@ -775,13 +775,20 @@ export default function VisitorRegisterScreen({ navigation }) {
       const response = await ApiService.registerVisitor(visitorData);
 
       if (response && response.success) {
-        setRegisteredVisitor({
+        const submittedVisitor = {
           fullName: formData.fullName,
           email: formData.email,
           userEmail: response.credentials?.email || formData.email,
           userPassword: response.credentials?.password || "Check your email",
-        });
-        setShowSuccess(true);
+        };
+
+        setRegisteredVisitor(submittedVisitor);
+
+        // Give the privacy modal a beat to close before showing the success popup.
+        setTimeout(() => {
+          setShowSuccess(true);
+        }, Platform.OS === "web" ? 180 : 80);
+
       } else {
         Alert.alert(
           "Registration Error",
@@ -873,12 +880,21 @@ export default function VisitorRegisterScreen({ navigation }) {
     await AsyncStorage.setItem("isNewRegistration", "true");
 
     setTimeout(() => {
-      navigation.replace("Login", {
-        role: "visitor",
-        initialEmail: loginEmail,
-        initialPassword: loginPassword,
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: "Login",
+            params: {
+              role: "visitor",
+              initialEmail: loginEmail,
+              initialPassword: loginPassword,
+            },
+          },
+        ],
       });
-    }, 150);
+      setRegisteredVisitor(null);
+    }, Platform.OS === "web" ? 60 : 150);
   };
 
   const getProgressPercentage = () => {

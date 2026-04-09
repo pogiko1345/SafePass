@@ -1309,7 +1309,7 @@ const loadDashboardData = useCallback(async () => {
       }
     };
 
-    const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${getTitle()} - Sapphire Aviation</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:20px;background:white;}.print-header{text-align:center;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid #3B82F6;}.print-header h2{color:#1E3A5F;font-size:18px;margin-bottom:4px;}.print-header p{color:#64748B;font-size:11px;}table{width:100%;border-collapse:collapse;font-size:12px;}th{background:#F1F5F9;color:#1E293B;padding:10px 8px;text-align:left;font-weight:600;border-bottom:2px solid #E2E8F0;}td{padding:8px;border-bottom:1px solid #E2E8F0;}.role-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}.role-admin{background:#EFF6FF;color:#3B82F6;}.role-staff{background:#D1FAE5;color:#10B981;}.role-guard{background:#FEF3C7;color:#F59E0B;}.role-security{background:#EDE9FE;color:#8B5CF6;}.role-visitor{background:#EDE9FE;color:#8B5CF6;}.status-active{color:#10B981;font-weight:600;}.status-inactive{color:#EF4444;font-weight:600;}.print-footer{margin-top:20px;text-align:center;font-size:10px;color:#94A3B8;padding-top:10px;border-top:1px solid #E2E8F0;}@media print{body{padding:10px;}}</style></head><body><div class="print-header"><h2>Sapphire Aviation Academy</h2><p>${getTitle()} | Generated: ${new Date().toLocaleDateString()}</p></div><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Date Created</th></tr></thead><tbody>${users.map((userItem) => `<tr><td><strong>${userItem.firstName} ${userItem.lastName}</strong></td><td>${userItem.email}</td><td><span class="role-badge role-${userItem.role}">${userItem.role?.toUpperCase() || "USER"}</span></td><td class="${userItem.status === "active" || userItem.isActive ? "status-active" : "status-inactive"}">${userItem.status === "active" || userItem.isActive ? "ACTIVE" : "INACTIVE"}</td><td>${new Date(userItem.createdAt).toLocaleDateString()}</td></tr>`).join("")}</tbody></table><div class="print-footer"><p>Total: ${users.length} users | Printed on ${new Date().toLocaleString()}</p></div></body></html>`;
+    const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${getTitle()} - Sapphire International Aviation Academy</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:20px;background:white;}.print-header{text-align:center;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid #3B82F6;}.print-header h2{color:#1E3A5F;font-size:18px;margin-bottom:4px;}.print-header p{color:#64748B;font-size:11px;}table{width:100%;border-collapse:collapse;font-size:12px;}th{background:#F1F5F9;color:#1E293B;padding:10px 8px;text-align:left;font-weight:600;border-bottom:2px solid #E2E8F0;}td{padding:8px;border-bottom:1px solid #E2E8F0;}.role-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}.role-admin{background:#EFF6FF;color:#3B82F6;}.role-staff{background:#D1FAE5;color:#10B981;}.role-guard{background:#FEF3C7;color:#F59E0B;}.role-security{background:#EDE9FE;color:#8B5CF6;}.role-visitor{background:#EDE9FE;color:#8B5CF6;}.status-active{color:#10B981;font-weight:600;}.status-inactive{color:#EF4444;font-weight:600;}.print-footer{margin-top:20px;text-align:center;font-size:10px;color:#94A3B8;padding-top:10px;border-top:1px solid #E2E8F0;}@media print{body{padding:10px;}}</style></head><body><div class="print-header"><h2>Sapphire International Aviation Academy</h2><p>${getTitle()} | Generated: ${new Date().toLocaleDateString()}</p></div><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Date Created</th></tr></thead><tbody>${users.map((userItem) => `<tr><td><strong>${userItem.firstName} ${userItem.lastName}</strong></td><td>${userItem.email}</td><td><span class="role-badge role-${userItem.role}">${userItem.role?.toUpperCase() || "USER"}</span></td><td class="${userItem.status === "active" || userItem.isActive ? "status-active" : "status-inactive"}">${userItem.status === "active" || userItem.isActive ? "ACTIVE" : "INACTIVE"}</td><td>${new Date(userItem.createdAt).toLocaleDateString()}</td></tr>`).join("")}</tbody></table><div class="print-footer"><p>Total: ${users.length} users | Printed on ${new Date().toLocaleString()}</p></div></body></html>`;
 
     try {
       if (Platform.OS === "web") {
@@ -2009,7 +2009,7 @@ const loadDashboardData = useCallback(async () => {
           <ScrollView ref={sidebarScrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.sidebarContent}>
             <View style={[styles.sidebarHeader, isDarkMode && { borderBottomColor: "#334155" }]}>
               <Image source={require("../assets/LogoSapphire.jpg")} style={styles.sidebarLogoImage} />
-              <Text style={[styles.sidebarBrand, isDarkMode && styles.darkText]}>Sapphire Aviation</Text>
+              <Text style={[styles.sidebarBrand, isDarkMode && styles.darkText]}>Sapphire International Aviation Academy</Text>
               <View style={[styles.sidebarRoleBadge, isDarkMode && { backgroundColor: "#8B5CF6" }]}><Text style={styles.sidebarRoleText}>ADMIN</Text></View>
               <View style={[styles.sidebarStats, isDarkMode && { backgroundColor: "rgba(255,255,255,0.05)" }]}>
                 <View style={styles.sidebarStat}><Text style={[styles.sidebarStatNumber, isDarkMode && styles.darkText]}>{stats.pendingRequests}</Text><Text style={[styles.sidebarStatLabel, isDarkMode && { color: "rgba(255,255,255,0.6)" }]}>Pending</Text></View>
@@ -2067,13 +2067,53 @@ const loadDashboardData = useCallback(async () => {
                   <TextInput style={[styles.searchInput, isDarkMode && styles.darkText]} placeholder="Search by name, email, or phone..." placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"} value={searchQuery} onChangeText={setSearchQuery} />
                   {searchQuery !== "" && <TouchableOpacity onPress={() => setSearchQuery("")}><Ionicons name="close-circle" size={18} color="#9CA3AF" /></TouchableOpacity>}
                 </View>
-                <View style={styles.tabBar}>
-                  {["pending", "approved", "rejected"].map((tab) => (
-                    <TouchableOpacity key={tab} style={[styles.tab, requestFilter === tab && styles.tabActive]} onPress={() => { setRequestFilter(tab); setSearchQuery(""); }}>
-                      <Text style={[styles.tabText, requestFilter === tab && styles.tabTextActive]}>{tab.charAt(0).toUpperCase() + tab.slice(1)} ({tab === "pending" ? pendingRequests.length : tab === "approved" ? approvedRequests.length : rejectedRequests.length})</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.tabBar}
+                >
+                  {[
+                    { key: "pending", label: "Pending", count: pendingRequests.length },
+                    { key: "approved", label: "Approved", count: approvedRequests.length },
+                    { key: "rejected", label: "Rejected", count: rejectedRequests.length },
+                  ].map((tab) => {
+                    const isActive = requestFilter === tab.key;
+
+                    return (
+                      <TouchableOpacity
+                        key={tab.key}
+                        style={[
+                          styles.tab,
+                          isActive && styles.tabActive,
+                          isDarkMode && !isActive && { backgroundColor: "#1E293B", borderColor: theme.borderColor },
+                        ]}
+                        onPress={() => { setRequestFilter(tab.key); setSearchQuery(""); }}
+                      >
+                        <View style={styles.tabContent}>
+                          <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                            {tab.label}
+                          </Text>
+                          <View
+                            style={[
+                              styles.tabCountBadge,
+                              isActive && styles.tabCountBadgeActive,
+                              isDarkMode && !isActive && { backgroundColor: "#334155" },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.tabCountText,
+                                isActive && styles.tabCountTextActive,
+                              ]}
+                            >
+                              {tab.count}
+                            </Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
                 {getFilteredRequests().length > 0 ? getFilteredRequests().map((request) => renderRequestCard(request)) : (
                   <View style={[styles.emptyState, isDarkMode && { backgroundColor: theme.cardBackground }]}>
                     <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />

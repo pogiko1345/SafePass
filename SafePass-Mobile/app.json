@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SafePass Sapphire",
+    "name": "Sapphire International Aviation Academy",
     "slug": "safepass-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -33,7 +33,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/LogoSapphire.jpg",
+      "favicon": "./assets/favicon-school.png",
       "build": {
         "output": "static"
       }

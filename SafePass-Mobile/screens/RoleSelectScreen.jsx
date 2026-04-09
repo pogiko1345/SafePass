@@ -83,7 +83,7 @@ export default function RoleSelectScreen({ navigation, route }) {
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
-      document.title = "SafePass | Sapphire International Aviation Academy";
+      document.title = "Sapphire International Aviation Academy";
     }
   }, []);
 
