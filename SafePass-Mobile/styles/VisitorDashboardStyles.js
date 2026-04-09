@@ -34,6 +34,10 @@ export default StyleSheet.create({
     paddingBottom: 16,
   },
 
+  dashboardShellWide: {
+    maxWidth: 1200,
+  },
+
   // ============ HEADER ============
   header: {
     paddingHorizontal: 20,
@@ -156,19 +160,19 @@ export default StyleSheet.create({
     marginHorizontal: 20,
     marginTop: -22,
     marginBottom: 18,
-    padding: 20,
-    borderRadius: 24,
+    padding: 22,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E6ECF5",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.09,
+        shadowRadius: 20,
       },
-      android: { elevation: 4 },
-      web: { boxShadow: "0px 14px 28px rgba(15,23,42,0.08)" },
+      android: { elevation: 5 },
+      web: { boxShadow: "0px 18px 38px rgba(15,23,42,0.09)" },
     }),
   },
 
@@ -177,8 +181,16 @@ export default StyleSheet.create({
     marginBottom: 16,
   },
 
+  commandDeckHeaderWide: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+
   commandDeckTitleWrap: {
     gap: 4,
+    flex: 1,
+    maxWidth: 620,
   },
 
   commandDeckEyebrow: {
@@ -226,23 +238,22 @@ export default StyleSheet.create({
   commandMetricsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 14,
   },
 
   commandMetricCard: {
-    width: width > 900 ? "31%" : width > 620 ? "48%" : "100%",
     backgroundColor: "#F8FAFC",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
   },
 
   commandMetricIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#EEF2FF",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#E0E7FF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 10,
@@ -268,7 +279,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
-    marginTop: 16,
+    marginTop: 18,
   },
 
   commandPrimaryButton: {
@@ -278,7 +289,7 @@ export default StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: "#4F46E5",
   },
 
@@ -295,7 +306,7 @@ export default StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: "#EEF2FF",
     borderWidth: 1,
     borderColor: "#C7D2FE",
@@ -896,6 +907,9 @@ export default StyleSheet.create({
   },
 
   approvedHeroFacts: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "stretch",
     gap: 12,
   },
 
@@ -903,6 +917,7 @@ export default StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.14)",
     borderRadius: 18,
     padding: 14,
+    minWidth: 0,
   },
 
   approvedHeroFactLabel: {
@@ -943,6 +958,9 @@ export default StyleSheet.create({
   },
 
   approvedActionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "stretch",
     gap: 14,
   },
 
@@ -962,6 +980,7 @@ export default StyleSheet.create({
       android: { elevation: 2 },
       web: { boxShadow: "0px 3px 10px rgba(15,23,42,0.06)" },
     }),
+    minWidth: 0,
   },
 
   approvedActionIconWrap: {
@@ -984,6 +1003,120 @@ export default StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: "#64748B",
+  },
+
+  approvedVirtualNfcCard: {
+    borderRadius: 24,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.16,
+        shadowRadius: 16,
+      },
+      android: { elevation: 6 },
+      web: { boxShadow: "0px 10px 28px rgba(15,23,42,0.14)" },
+    }),
+  },
+
+  approvedVirtualNfcCardGradient: {
+    padding: 20,
+    gap: 18,
+  },
+
+  approvedVirtualNfcHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 18,
+  },
+
+  approvedVirtualNfcBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+
+  approvedVirtualNfcBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#DBEAFE",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+
+  approvedVirtualNfcTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: 6,
+  },
+
+  approvedVirtualNfcSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.84)",
+    maxWidth: 260,
+  },
+
+  approvedVirtualNfcIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  approvedVirtualNfcCardNumberRow: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 6,
+  },
+
+  approvedVirtualNfcCardLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.72)",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+
+  approvedVirtualNfcCardNumber: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  approvedVirtualNfcFooter: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  approvedVirtualNfcFooterItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+
+  approvedVirtualNfcFooterText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#DBEAFE",
   },
 
   approvedStatusBanner: {
@@ -1022,6 +1155,10 @@ export default StyleSheet.create({
       android: { elevation: 2 },
       web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.05)" },
     }),
+  },
+
+  approvedGridSectionReset: {
+    marginHorizontal: 20,
   },
 
   approvedInfoList: {
@@ -1262,6 +1399,886 @@ export default StyleSheet.create({
     fontSize: 11,
     color: "#10B981",
     fontWeight: "500",
+  },
+
+  virtualNfcModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    width: "92%",
+    maxWidth: 760,
+    overflow: "hidden",
+  },
+
+  virtualNfcModalContentCompact: {
+    width: "96%",
+    maxWidth: 420,
+    borderRadius: 24,
+  },
+
+  virtualNfcModalHeader: {
+    padding: 22,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+  },
+
+  virtualNfcModalHeaderCompact: {
+    padding: 18,
+    gap: 12,
+  },
+
+  virtualNfcModalTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: 6,
+  },
+
+  virtualNfcModalSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.82)",
+    maxWidth: 280,
+  },
+
+  virtualNfcModalBody: {
+    padding: 20,
+    gap: 18,
+  },
+
+  virtualNfcModalBodyCompact: {
+    padding: 16,
+    gap: 14,
+  },
+
+  virtualNfcDisplayRow: {
+    alignItems: "center",
+  },
+
+  virtualNfcDisplayRowCompact: {
+    alignItems: "stretch",
+  },
+
+  virtualNfcPreviewCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 28,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+      },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 18px 42px rgba(15,23,42,0.18)" },
+    }),
+  },
+
+  virtualNfcPreviewCardCompact: {
+    maxWidth: "100%",
+    borderRadius: 24,
+  },
+
+  virtualNfcCardGradient: {
+    padding: 22,
+    gap: 18,
+  },
+
+  virtualNfcCardTopBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  virtualNfcCardIdentity: {
+    gap: 6,
+  },
+
+  virtualNfcPreviewTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 14,
+  },
+
+  virtualNfcPreviewBrand: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+
+  virtualNfcPreviewSchool: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.72)",
+    maxWidth: 220,
+  },
+
+  virtualNfcPreviewLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.72)",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    marginBottom: 4,
+  },
+
+  virtualNfcPreviewName: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  virtualNfcPreviewChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(59,130,246,0.22)",
+  },
+
+  virtualNfcIdBand: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  virtualNfcPreviewId: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  virtualNfcDetailsGrid: {
+    flexDirection: "row",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+
+  virtualNfcDetailCard: {
+    flex: 1,
+    minWidth: 130,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  virtualNfcDetailCardWide: {
+    width: "100%",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  virtualNfcPreviewMetaLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.72)",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 5,
+  },
+
+  virtualNfcPreviewMetaValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  virtualNfcTapHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  virtualNfcTapHintIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#FDE68A",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  virtualNfcTapHintCopy: {
+    flex: 1,
+  },
+
+  virtualNfcTapHintTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  virtualNfcTapHintText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#475569",
+  },
+
+  checkoutSummaryCard: {
+    backgroundColor: "#FFF7ED",
+    borderRadius: 18,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+  },
+
+  checkoutSummaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  checkoutSummaryLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#9A3412",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  checkoutSummaryValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#7C2D12",
+  },
+
+  virtualNfcInfoCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 18,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  virtualNfcInfoCardCompact: {
+    padding: 14,
+    borderRadius: 16,
+  },
+
+  virtualNfcInfoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  virtualNfcInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#334155",
+    fontWeight: "500",
+  },
+
+  virtualNfcModalFooter: {
+    flexDirection: "row",
+    gap: 12,
+  },
+
+  virtualNfcModalFooterCompact: {
+    flexDirection: "column",
+  },
+
+  virtualNfcSecondaryButton: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+
+  virtualNfcSecondaryButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#475569",
+  },
+
+  virtualNfcPrimaryButton: {
+    flex: 1,
+    borderRadius: 16,
+    backgroundColor: "#1D4ED8",
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  checkoutPrimaryButton: {
+    flex: 1,
+    borderRadius: 16,
+    backgroundColor: "#DC2626",
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  virtualNfcPrimaryButtonText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  accessFlowModalContent: {
+    width: "92%",
+    maxWidth: 430,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    overflow: "hidden",
+  },
+
+  accessFlowHero: {
+    padding: 22,
+    gap: 12,
+  },
+
+  accessFlowHeroTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+  },
+
+  accessFlowHeroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.9)",
+  },
+
+  accessFlowHeroBadgeDanger: {
+    backgroundColor: "rgba(255,255,255,0.92)",
+  },
+
+  accessFlowHeroBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0F766E",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  accessFlowHeroBadgeTextDanger: {
+    color: "#991B1B",
+  },
+
+  accessFlowTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  accessFlowSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.86)",
+  },
+
+  accessFlowBody: {
+    padding: 20,
+    gap: 16,
+  },
+
+  checkInArrivalCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 22,
+    padding: 18,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  checkInArrivalTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  checkInArrivalIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+
+  checkInArrivalAvatar: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#CCFBF1",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  checkInArrivalInitials: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F766E",
+  },
+
+  checkInArrivalCopy: {
+    flex: 1,
+    gap: 3,
+  },
+
+  checkInArrivalName: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  checkInArrivalPurpose: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+  },
+
+  checkInArrivalStatusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+  },
+
+  checkInArrivalStatusText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0F766E",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  checkInArrivalMetaGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  checkInArrivalMetaCard: {
+    flex: 1,
+    minWidth: 130,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  checkInArrivalMetaCardWide: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  checkInArrivalMetaLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 5,
+  },
+
+  checkInArrivalMetaValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+    lineHeight: 20,
+  },
+
+  checkInArrivalGuideCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  checkInArrivalGuideTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  checkInArrivalGuideRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  checkInArrivalGuideIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#CCFBF1",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 1,
+  },
+
+  checkInArrivalGuideText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#334155",
+    fontWeight: "500",
+  },
+
+  accessFlowSummaryCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  accessFlowSummaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  accessFlowSummaryLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  accessFlowSummaryValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  accessFlowTimelineCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  accessFlowTimelineRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  accessFlowTimelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#14B8A6",
+    marginTop: 5,
+  },
+
+  accessFlowTimelineDotDanger: {
+    backgroundColor: "#DC2626",
+  },
+
+  accessFlowTimelineText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#334155",
+    fontWeight: "500",
+  },
+
+  accessFlowFooter: {
+    flexDirection: "row",
+    gap: 12,
+  },
+
+  accessFlowSecondaryButton: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingVertical: 14,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  accessFlowSecondaryButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#475569",
+  },
+
+  accessFlowPrimaryButton: {
+    flex: 1,
+    borderRadius: 16,
+    backgroundColor: "#1D4ED8",
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  accessFlowDangerButton: {
+    flex: 1,
+    borderRadius: 16,
+    backgroundColor: "#DC2626",
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  accessFlowPrimaryButtonText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  accessFlowSuccessContent: {
+    width: "90%",
+    maxWidth: 390,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    padding: 24,
+    alignItems: "center",
+  },
+
+  accessFlowSuccessIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: "#ECFDF5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+
+  accessFlowSuccessIconWrapDanger: {
+    backgroundColor: "#FEF2F2",
+  },
+
+  accessFlowSuccessTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+
+  accessFlowSuccessText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: "#64748B",
+    textAlign: "center",
+    marginBottom: 18,
+  },
+
+  checkInSuccessStamp: {
+    width: "100%",
+    backgroundColor: "#ECFDF5",
+    borderRadius: 20,
+    padding: 16,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    marginBottom: 18,
+  },
+
+  checkInSuccessStampHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  checkInSuccessStampLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0F766E",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+
+  checkInSuccessStampStatus: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0F766E",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "#D1FAE5",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  checkInSuccessStampName: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  checkInSuccessStampSubtext: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#475569",
+  },
+
+  accessFlowSuccessMetaCard: {
+    width: "100%",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 18,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 18,
+  },
+
+  accessFlowSuccessMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  accessFlowSuccessMetaLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  accessFlowSuccessMetaValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  virtualNfcSuccessContent: {
+    width: "90%",
+    maxWidth: 380,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    padding: 24,
+    alignItems: "center",
+  },
+
+  virtualNfcSuccessIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: "#ECFDF5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+
+  checkoutSuccessIconWrap: {
+    backgroundColor: "#FEF2F2",
+  },
+
+  virtualNfcSuccessTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+
+  virtualNfcSuccessText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: "#64748B",
+    textAlign: "center",
+    marginBottom: 18,
+  },
+
+  virtualNfcSuccessMetaCard: {
+    width: "100%",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 18,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 18,
+  },
+
+  virtualNfcSuccessMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  virtualNfcSuccessMetaLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  virtualNfcSuccessMetaValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
   },
 
   adjustedStatusBanner: {

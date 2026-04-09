@@ -2080,6 +2080,11 @@ app.delete("/api/visitors/:id", authMiddleware, async (req, res) => {
 app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
+    const checkInSource = String(req.body?.source || "mobile_app")
+      .trim()
+      .toLowerCase();
+    const sourceLabel =
+      checkInSource === "virtual_nfc_card" ? "virtual NFC card" : "mobile app";
 
     if (!visitor) {
       return res.status(404).json({
@@ -2101,15 +2106,30 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       });
     }
 
+    if (visitor.status === "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "You are already checked in for this visit.",
+      });
+    }
+
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been completed.",
+      });
+    }
+
     visitor.status = "checked_in";
     visitor.checkedInAt = new Date();
+    visitor.checkedInBy = req.user._id;
     await visitor.save();
 
     // Create access log
     const accessLog = new AccessLog({
       userEmail: visitor.email,
       userName: visitor.fullName,
-      location: "Mobile App",
+      location: checkInSource === "virtual_nfc_card" ? "Virtual NFC Card" : "Mobile App",
       accessType: "entry",
       activityType: "visitor_self_checkin",
       status: "granted",
@@ -2119,10 +2139,43 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       metadata: {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
+        source: checkInSource,
       },
-      notes: "Visitor self check-in via mobile app",
+      notes: `Visitor self check-in via ${sourceLabel}`,
     });
     await accessLog.save();
+
+    await createRoleNotification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} checked in using the ${sourceLabel}.`,
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkin",
+        source: checkInSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} checked in using the ${sourceLabel}.`,
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkin",
+        source: checkInSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     res.json({
       success: true,
@@ -2142,6 +2195,11 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
 app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
+    const checkOutSource = String(req.body?.source || "mobile_app")
+      .trim()
+      .toLowerCase();
+    const sourceLabel =
+      checkOutSource === "visitor_dashboard" ? "visitor dashboard" : "mobile app";
 
     if (!visitor) {
       return res.status(404).json({
@@ -2150,15 +2208,30 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       });
     }
 
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been checked out.",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "You must be checked in before you can check out.",
+      });
+    }
+
     visitor.status = "checked_out";
     visitor.checkedOutAt = new Date();
+    visitor.checkedOutBy = req.user._id;
     await visitor.save();
 
     // Create access log
     const accessLog = new AccessLog({
       userEmail: visitor.email,
       userName: visitor.fullName,
-      location: "Mobile App",
+      location: checkOutSource === "visitor_dashboard" ? "Visitor Dashboard" : "Mobile App",
       accessType: "exit",
       activityType: "visitor_self_checkout",
       status: "granted",
@@ -2168,10 +2241,43 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       metadata: {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
+        source: checkOutSource,
       },
-      notes: "Visitor self check-out via mobile app",
+      notes: `Visitor self check-out via ${sourceLabel}`,
     });
     await accessLog.save();
+
+    await createRoleNotification({
+      title: "Visitor Checked Out",
+      message: `${visitor.fullName} checked out using the ${sourceLabel}.`,
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkout",
+        source: checkOutSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Visitor Checked Out",
+      message: `${visitor.fullName} checked out using the ${sourceLabel}.`,
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkout",
+        source: checkOutSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     res.json({
       success: true,
