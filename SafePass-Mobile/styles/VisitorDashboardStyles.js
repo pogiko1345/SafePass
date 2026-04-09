@@ -1074,4 +1074,322 @@ export default StyleSheet.create({
     color: "#10B981",
     fontWeight: "500",
   },
+
+  adjustedStatusBanner: {
+    backgroundColor: "#DBEAFE",
+  },
+
+  adjustedStatusText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1D4ED8",
+  },
+
+  reappointmentHeroCard: {
+    marginHorizontal: 20,
+    marginTop: -25,
+    borderRadius: 26,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.16,
+        shadowRadius: 16,
+      },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 10px 28px rgba(15,23,42,0.16)" },
+    }),
+  },
+
+  reappointmentHeroGradient: {
+    padding: 22,
+  },
+
+  reappointmentHeroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    marginBottom: 18,
+  },
+
+  reappointmentHeroBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0F766E",
+  },
+
+  reappointmentHeroTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    lineHeight: 32,
+    color: "#FFFFFF",
+    marginBottom: 8,
+  },
+
+  reappointmentHeroText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: "rgba(255,255,255,0.92)",
+    marginBottom: 18,
+  },
+
+  reappointmentMetaGrid: {
+    gap: 12,
+  },
+
+  reappointmentMetaCard: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 16,
+    padding: 14,
+  },
+
+  reappointmentMetaLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    color: "rgba(255,255,255,0.7)",
+    marginBottom: 4,
+  },
+
+  reappointmentMetaValue: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  reappointmentCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginTop: 18,
+    padding: 20,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 3px 10px rgba(15,23,42,0.06)" },
+    }),
+  },
+
+  reappointmentCardHeader: {
+    gap: 14,
+    marginBottom: 18,
+  },
+
+  reappointmentCardTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  reappointmentCardSubtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 19,
+  },
+
+  reappointmentPrimaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#0F766E",
+    borderRadius: 14,
+  },
+
+  reappointmentPrimaryButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  reappointmentChecklist: {
+    gap: 12,
+  },
+
+  reappointmentChecklistRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  reappointmentChecklistText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#475569",
+  },
+
+  appointmentModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    width: "92%",
+    maxWidth: 460,
+    overflow: "hidden",
+  },
+
+  appointmentModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    padding: 20,
+    gap: 16,
+  },
+
+  appointmentModalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+
+  appointmentModalSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "rgba(255,255,255,0.88)",
+  },
+
+  appointmentModalBody: {
+    padding: 20,
+    gap: 16,
+  },
+
+  appointmentField: {
+    gap: 8,
+  },
+
+  appointmentFieldLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    color: "#475569",
+    textTransform: "uppercase",
+  },
+
+  appointmentFieldInput: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 14,
+    color: "#0F172A",
+  },
+
+  appointmentFieldTextarea: {
+    minHeight: 110,
+    paddingTop: 14,
+  },
+
+  appointmentModalFooter: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 4,
+  },
+
+  appointmentSecondaryButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  appointmentSecondaryButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
+  },
+
+  appointmentPrimaryButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: "#2563EB",
+  },
+
+  appointmentPrimaryButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  appointmentSuccessCard: {
+    backgroundColor: "#ECFDF5",
+    marginHorizontal: 20,
+    marginTop: 18,
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+  },
+
+  appointmentSuccessHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  appointmentSuccessIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#D1FAE5",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  appointmentSuccessTextWrap: {
+    flex: 1,
+  },
+
+  appointmentSuccessTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#065F46",
+    marginBottom: 4,
+  },
+
+  appointmentSuccessText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#047857",
+  },
+
+  appointmentSuccessMetaRow: {
+    marginTop: 12,
+    gap: 4,
+  },
+
+  appointmentSuccessMeta: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#065F46",
+  },
 });

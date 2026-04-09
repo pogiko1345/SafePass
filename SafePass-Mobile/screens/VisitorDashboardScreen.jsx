@@ -14,6 +14,7 @@ import {
   Modal,
   Dimensions,
   Vibration,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,9 +40,18 @@ if (Platform.OS !== 'web') {
 
 export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [visitor, setVisitor] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [appointmentFeedback, setAppointmentFeedback] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
+  const [appointmentForm, setAppointmentForm] = useState({
+    preferredDate: "",
+    preferredTime: "",
+    purposeOfVisit: "",
+  });
   const [accessLogs, setAccessLogs] = useState([]);
   const [greeting, setGreeting] = useState("");
   const [isNfcSupported, setIsNfcSupported] = useState(false);
@@ -77,6 +87,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         navigation.replace("Login");
         return;
       }
+      setCurrentUser(currentUser);
 
       const profileResponse = await ApiService.getVisitorProfile();
       if (profileResponse.success && profileResponse.visitor) {
@@ -99,7 +110,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       }
     } catch (error) {
       console.error("Load visitor data error:", error);
-      Alert.alert("Error", "Failed to load visitor data");
+      const isProfileMissing =
+        error?.status === 404 ||
+        String(error?.message || "").includes("404") ||
+        String(error?.message || "").toLowerCase().includes("profile not found");
+
+      if (isProfileMissing) {
+        setVisitor(null);
+        setAccessLogs([]);
+      } else {
+        Alert.alert("Error", "Failed to load visitor data");
+      }
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -406,6 +427,90 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     loadVisitorData();
   };
 
+  const formatDateInput = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 10);
+  };
+
+  const formatTimeInput = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "";
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  };
+
+  const populateAppointmentForm = () => {
+    setAppointmentForm({
+      preferredDate: formatDateInput(visitor?.visitDate),
+      preferredTime: formatTimeInput(visitor?.visitTime),
+      purposeOfVisit: visitor?.purposeOfVisit || "",
+    });
+  };
+
+  const openAppointmentModal = () => {
+    populateAppointmentForm();
+    setShowAppointmentModal(true);
+  };
+
+  const closeAppointmentModal = () => {
+    setShowAppointmentModal(false);
+  };
+
+  const handleRequestAppointment = async () => {
+    const preferredDate = appointmentForm.preferredDate.trim();
+    const preferredTime = appointmentForm.preferredTime.trim();
+    const purposeOfVisit = appointmentForm.purposeOfVisit.trim();
+
+    if (!currentUser?._id) {
+      Alert.alert("Login Required", "Please sign in again before requesting a new appointment.");
+      return;
+    }
+
+    if (!preferredDate || !preferredTime || !purposeOfVisit) {
+      Alert.alert("Missing Details", "Please complete the preferred date, time, and purpose of visit.");
+      return;
+    }
+
+    const combinedDateTime = new Date(`${preferredDate}T${preferredTime}:00`);
+    if (Number.isNaN(combinedDateTime.getTime())) {
+      Alert.alert("Invalid Schedule", "Please enter a valid preferred date and time.");
+      return;
+    }
+
+    setIsSubmittingAppointment(true);
+    try {
+      const response = await ApiService.requestVisitorAppointment(currentUser._id, {
+        preferredDate: new Date(`${preferredDate}T00:00:00`).toISOString(),
+        preferredTime: combinedDateTime.toISOString(),
+        purposeOfVisit,
+      });
+
+      if (response?.success) {
+        setShowAppointmentModal(false);
+        setAppointmentFeedback({
+          title: "Appointment Submitted Successfully",
+          message:
+            "Your new visit request has been sent to staff for review. You can track approval, time adjustments, or rejection updates from this dashboard.",
+          date: preferredDate,
+          time: preferredTime,
+          purpose: purposeOfVisit,
+        });
+        Alert.alert("Appointment Submitted", "Your request was sent to staff for review.");
+        await loadVisitorData();
+        return;
+      }
+
+      Alert.alert("Request Failed", response?.message || "Failed to send your appointment request.");
+    } catch (error) {
+      console.error("Request appointment error:", error);
+      Alert.alert("Request Failed", error?.message || "Failed to send your appointment request.");
+    } finally {
+      setIsSubmittingAppointment(false);
+    }
+  };
+
   const handleCheckIn = async () => {
     if (!visitor) return;
     
@@ -519,6 +624,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const getStatusColor = () => {
+    if (visitor?.approvalStatus === "pending") return "#F59E0B";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "#F59E0B";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "#2563EB";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "#DC2626";
     switch(visitor?.status) {
       case 'checked_in': return '#10B981';
       case 'approved': return '#4F46E5';
@@ -531,6 +640,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const getStatusText = () => {
+    if (visitor?.approvalStatus === "pending") return "Pending Admin Approval";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "Pending Staff Review";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "Time Adjusted";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "Appointment Declined";
     switch(visitor?.status) {
       case 'checked_in': return 'Checked In';
       case 'approved': return 'Approved';
@@ -543,6 +656,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const getStatusIcon = () => {
+    if (visitor?.approvalStatus === "pending") return "time-outline";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "briefcase-outline";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "swap-horizontal-outline";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "close-circle";
     switch(visitor?.status) {
       case 'checked_in': return 'checkmark-circle';
       case 'approved': return 'checkmark-circle';
@@ -593,8 +710,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const statusIcon = getStatusIcon();
   const isPendingApproval =
     visitor?.status === "pending" || visitor?.approvalStatus === "pending";
+  const isPendingStaffReview =
+    !isPendingApproval &&
+    visitor?.approvalFlow === "staff" &&
+    visitor?.appointmentStatus === "pending";
+  const isAdjustedAppointment =
+    visitor?.approvalFlow === "staff" &&
+    visitor?.appointmentStatus === "adjusted" &&
+    visitor?.status === "approved";
   const isApprovedVisitor =
-    !isPendingApproval && visitor?.status === "approved";
+    !isPendingApproval && !isPendingStaffReview && visitor?.status === "approved";
+  const canRequestNewAppointment =
+    visitor?.approvalStatus === "approved" &&
+    !isApprovedVisitor &&
+    !isPendingStaffReview &&
+    visitor?.status !== "checked_in";
+  const canCreateFreshAppointment =
+    !visitor &&
+    String(currentUser?.role || "").toLowerCase() === "visitor" &&
+    String(currentUser?.status || "").toLowerCase() === "active";
   const approvedActionLabel = isNfcReading ? "Stop NFC" : "Start NFC";
   const approvedActionIcon = isNfcReading ? "pause-circle" : "radio";
 
@@ -714,6 +848,96 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.pendingStepItem}>
                     <Ionicons name="checkmark-circle-outline" size={18} color="#F59E0B" />
+                    <Text style={visitorDashboardStyles.pendingStepText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={visitorDashboardStyles.logoutButton}
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+                <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
+              </TouchableOpacity>
+            </>
+          ) : isPendingStaffReview ? (
+            <>
+              {appointmentFeedback ? (
+                <View style={visitorDashboardStyles.appointmentSuccessCard}>
+                  <View style={visitorDashboardStyles.appointmentSuccessHeader}>
+                    <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
+                      <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
+                    </View>
+                    <View style={visitorDashboardStyles.appointmentSuccessTextWrap}>
+                      <Text style={visitorDashboardStyles.appointmentSuccessTitle}>
+                        {appointmentFeedback.title}
+                      </Text>
+                      <Text style={visitorDashboardStyles.appointmentSuccessText}>
+                        {appointmentFeedback.message}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={visitorDashboardStyles.appointmentSuccessMetaRow}>
+                    <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
+                      {appointmentFeedback.date} at {appointmentFeedback.time}
+                    </Text>
+                    <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
+                      {appointmentFeedback.purpose}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              <View style={visitorDashboardStyles.pendingApprovalCard}>
+                <LinearGradient
+                  colors={["#2563EB", "#1D4ED8"]}
+                  style={visitorDashboardStyles.pendingApprovalGradient}
+                >
+                  <View style={visitorDashboardStyles.pendingApprovalIconWrap}>
+                    <Ionicons name="briefcase-outline" size={38} color="#FFFFFF" />
+                  </View>
+                  <Text style={visitorDashboardStyles.pendingApprovalTitle}>
+                    Waiting for Staff Response
+                  </Text>
+                  <Text style={visitorDashboardStyles.pendingApprovalText}>
+                    Your reappointment request is now with the staff team. They can approve it, adjust
+                    your preferred time, or decline it from their dashboard.
+                  </Text>
+
+                  <View style={visitorDashboardStyles.pendingApprovalInfoBox}>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoRow}>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Visitor</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>{visitor.fullName}</Text>
+                    </View>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoRow}>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Preferred Date</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>{formatDate(visitor.visitDate)}</Text>
+                    </View>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoRow}>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Preferred Time</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>{formatTime(visitor.visitTime)}</Text>
+                    </View>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoRow}>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Purpose</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>
+                        {visitor.purposeOfVisit || "Appointment request submitted"}
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              <View style={visitorDashboardStyles.pendingStepsCard}>
+                <Text style={visitorDashboardStyles.pendingStepsTitle}>What happens next?</Text>
+                {[
+                  "Staff will review your preferred date, time, and visit purpose.",
+                  "If needed, they can adjust the time and you will see the update here after refresh.",
+                  "Once approved, your SafePass tools will appear again for check-in and gate access.",
+                ].map((item) => (
+                  <View key={item} style={visitorDashboardStyles.pendingStepItem}>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#3B82F6" />
                     <Text style={visitorDashboardStyles.pendingStepText}>{item}</Text>
                   </View>
                 ))}
@@ -884,6 +1108,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     </Text>
                   </View>
                 )}
+
+                {isAdjustedAppointment && (
+                  <View style={[visitorDashboardStyles.approvedStatusBanner, visitorDashboardStyles.adjustedStatusBanner]}>
+                    <Ionicons name="swap-horizontal-outline" size={18} color="#1D4ED8" />
+                    <Text style={visitorDashboardStyles.adjustedStatusText}>
+                      {visitor.staffAdjustmentNote
+                        ? `Staff updated your schedule: ${visitor.staffAdjustmentNote}`
+                        : "Staff approved your visit with an updated schedule."}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View style={visitorDashboardStyles.approvedInfoCard}>
@@ -910,6 +1145,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <View style={visitorDashboardStyles.approvedInfoRow}>
                     <Text style={visitorDashboardStyles.approvedInfoLabel}>Phone</Text>
                     <Text style={visitorDashboardStyles.approvedInfoValue}>{visitor.phoneNumber}</Text>
+                  </View>
+                  <View style={visitorDashboardStyles.approvedInfoRow}>
+                    <Text style={visitorDashboardStyles.approvedInfoLabel}>Assigned Staff</Text>
+                    <Text style={visitorDashboardStyles.approvedInfoValue}>
+                      {visitor.assignedStaffName || visitor.host || "Front Office"}
+                    </Text>
                   </View>
                   <View style={visitorDashboardStyles.approvedInfoRow}>
                     <Text style={visitorDashboardStyles.approvedInfoLabel}>Vehicle</Text>
@@ -1022,6 +1263,150 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                           ]}
                         >
                           {log.status === "granted" ? "Granted" : "Denied"}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={visitorDashboardStyles.logoutButton}
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+                <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
+              </TouchableOpacity>
+            </>
+          ) : canRequestNewAppointment ? (
+            <>
+              {appointmentFeedback ? (
+                <View style={visitorDashboardStyles.appointmentSuccessCard}>
+                  <View style={visitorDashboardStyles.appointmentSuccessHeader}>
+                    <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
+                      <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
+                    </View>
+                    <View style={visitorDashboardStyles.appointmentSuccessTextWrap}>
+                      <Text style={visitorDashboardStyles.appointmentSuccessTitle}>
+                        {appointmentFeedback.title}
+                      </Text>
+                      <Text style={visitorDashboardStyles.appointmentSuccessText}>
+                        {appointmentFeedback.message}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={visitorDashboardStyles.appointmentSuccessMetaRow}>
+                    <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
+                      {appointmentFeedback.date} at {appointmentFeedback.time}
+                    </Text>
+                    <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
+                      {appointmentFeedback.purpose}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              <View style={visitorDashboardStyles.reappointmentHeroCard}>
+                <LinearGradient
+                  colors={visitor?.appointmentStatus === "rejected" ? ["#DC2626", "#B91C1C"] : ["#0F766E", "#2563EB"]}
+                  style={visitorDashboardStyles.reappointmentHeroGradient}
+                >
+                  <View style={visitorDashboardStyles.reappointmentHeroBadge}>
+                    <Ionicons
+                      name={visitor?.appointmentStatus === "rejected" ? "alert-circle-outline" : "calendar-outline"}
+                      size={16}
+                      color={visitor?.appointmentStatus === "rejected" ? "#991B1B" : "#0F766E"}
+                    />
+                    <Text style={visitorDashboardStyles.reappointmentHeroBadgeText}>
+                      {visitor?.appointmentStatus === "rejected" ? "Appointment Declined" : "Ready for Another Visit"}
+                    </Text>
+                  </View>
+                  <Text style={visitorDashboardStyles.reappointmentHeroTitle}>
+                    {visitor?.appointmentStatus === "rejected"
+                      ? "Request A New Schedule"
+                      : "Book Your Next Appointment"}
+                  </Text>
+                  <Text style={visitorDashboardStyles.reappointmentHeroText}>
+                    {visitor?.appointmentStatus === "rejected"
+                      ? visitor?.staffRejectionReason || "Your previous appointment was declined. You can submit a new request here without registering again."
+                      : "Your visitor account is active. Enter your preferred date, time, and purpose to send a new request directly to staff."}
+                  </Text>
+
+                  <View style={visitorDashboardStyles.reappointmentMetaGrid}>
+                    <View style={visitorDashboardStyles.reappointmentMetaCard}>
+                      <Text style={visitorDashboardStyles.reappointmentMetaLabel}>Last Schedule</Text>
+                      <Text style={visitorDashboardStyles.reappointmentMetaValue}>{formatDate(visitor.visitDate)}</Text>
+                    </View>
+                    <View style={visitorDashboardStyles.reappointmentMetaCard}>
+                      <Text style={visitorDashboardStyles.reappointmentMetaLabel}>Last Time</Text>
+                      <Text style={visitorDashboardStyles.reappointmentMetaValue}>{formatTime(visitor.visitTime)}</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              <View style={visitorDashboardStyles.reappointmentCard}>
+                <View style={visitorDashboardStyles.reappointmentCardHeader}>
+                  <View>
+                    <Text style={visitorDashboardStyles.reappointmentCardTitle}>New Appointment Request</Text>
+                    <Text style={visitorDashboardStyles.reappointmentCardSubtitle}>
+                      Staff will receive your preferred schedule and visit purpose.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={visitorDashboardStyles.reappointmentPrimaryButton}
+                    onPress={openAppointmentModal}
+                    activeOpacity={0.9}
+                  >
+                    <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+                    <Text style={visitorDashboardStyles.reappointmentPrimaryButtonText}>Request Visit</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={visitorDashboardStyles.reappointmentChecklist}>
+                  {[
+                    "Use your existing visitor account. No need to register again.",
+                    "Choose your preferred date and time for the next visit.",
+                    "Staff will approve, adjust, or reject the request from their dashboard.",
+                  ].map((item) => (
+                    <View key={item} style={visitorDashboardStyles.reappointmentChecklistRow}>
+                      <Ionicons name="checkmark-circle" size={18} color="#0F766E" />
+                      <Text style={visitorDashboardStyles.reappointmentChecklistText}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {accessLogs.length > 0 && (
+                <View style={visitorDashboardStyles.detailsCard}>
+                  <View style={visitorDashboardStyles.detailsHeader}>
+                    <Ionicons name="time-outline" size={20} color="#4F46E5" />
+                    <Text style={visitorDashboardStyles.detailsTitle}>Recent Access Activity</Text>
+                  </View>
+
+                  {accessLogs.slice(0, 3).map((log, index) => (
+                    <View key={index} style={visitorDashboardStyles.historyItem}>
+                      <View
+                        style={[
+                          visitorDashboardStyles.historyIcon,
+                          {
+                            backgroundColor: log.status === "granted" ? "#E3F2E9" : "#FEE2E2",
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={log.status === "granted" ? "checkmark" : "close"}
+                          size={14}
+                          color={log.status === "granted" ? "#10B981" : "#EF4444"}
+                        />
+                      </View>
+                      <View style={visitorDashboardStyles.historyInfo}>
+                        <Text style={visitorDashboardStyles.historyLocation}>
+                          {log.location || "Main Gate"}
+                        </Text>
+                        <Text style={visitorDashboardStyles.historyTime}>
+                          {formatDateTime(log.timestamp)}
                         </Text>
                       </View>
                     </View>
@@ -1325,25 +1710,144 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <View style={visitorDashboardStyles.emptyIconContainer}>
               <Ionicons name="id-card-outline" size={80} color="#9CA3AF" />
             </View>
-            <Text style={visitorDashboardStyles.emptyTitle}>No Visitor Pass Found</Text>
-            <Text style={visitorDashboardStyles.emptyText}>
-              You don't have an active visitor pass. Please register as a visitor first.
+            {appointmentFeedback ? (
+              <View style={visitorDashboardStyles.appointmentSuccessCard}>
+                <View style={visitorDashboardStyles.appointmentSuccessHeader}>
+                  <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
+                    <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
+                  </View>
+                  <View style={visitorDashboardStyles.appointmentSuccessTextWrap}>
+                    <Text style={visitorDashboardStyles.appointmentSuccessTitle}>
+                      {appointmentFeedback.title}
+                    </Text>
+                    <Text style={visitorDashboardStyles.appointmentSuccessText}>
+                      {appointmentFeedback.message}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+            <Text style={visitorDashboardStyles.emptyTitle}>
+              {canCreateFreshAppointment ? "Request Your Next Visit" : "No Visitor Pass Found"}
             </Text>
-            <TouchableOpacity 
+            <Text style={visitorDashboardStyles.emptyText}>
+              {canCreateFreshAppointment
+                ? "Your visitor account is already active. Submit a new preferred date, time, and purpose here instead of registering again."
+                : "You don't have an active visitor pass yet. Please register as a visitor first."}
+            </Text>
+            <TouchableOpacity
               style={visitorDashboardStyles.registerButton}
-              onPress={() => navigation.navigate("VisitorRegister")}
+              onPress={canCreateFreshAppointment ? openAppointmentModal : () => navigation.navigate("VisitorRegister")}
             >
               <LinearGradient
                 colors={['#4F46E5', '#7C3AED']}
                 style={visitorDashboardStyles.registerGradient}
               >
-                <Ionicons name="person-add" size={20} color="#FFFFFF" />
-                <Text style={visitorDashboardStyles.registerButtonText}>Register as Visitor</Text>
+                <Ionicons name={canCreateFreshAppointment ? "calendar-outline" : "person-add"} size={20} color="#FFFFFF" />
+                <Text style={visitorDashboardStyles.registerButtonText}>
+                  {canCreateFreshAppointment ? "Request Appointment" : "Register as Visitor"}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={showAppointmentModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeAppointmentModal}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.appointmentModalContent}>
+            <LinearGradient
+              colors={["#0F766E", "#2563EB"]}
+              style={visitorDashboardStyles.appointmentModalHeader}
+            >
+              <View>
+                <Text style={visitorDashboardStyles.appointmentModalTitle}>New Appointment Request</Text>
+                <Text style={visitorDashboardStyles.appointmentModalSubtitle}>
+                  Send your preferred schedule directly to staff.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={closeAppointmentModal}>
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <View style={visitorDashboardStyles.appointmentModalBody}>
+              <View style={visitorDashboardStyles.appointmentField}>
+                <Text style={visitorDashboardStyles.appointmentFieldLabel}>Preferred Date</Text>
+                <TextInput
+                  style={visitorDashboardStyles.appointmentFieldInput}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#94A3B8"
+                  value={appointmentForm.preferredDate}
+                  onChangeText={(text) =>
+                    setAppointmentForm((prev) => ({ ...prev, preferredDate: text }))
+                  }
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={visitorDashboardStyles.appointmentField}>
+                <Text style={visitorDashboardStyles.appointmentFieldLabel}>Preferred Time</Text>
+                <TextInput
+                  style={visitorDashboardStyles.appointmentFieldInput}
+                  placeholder="HH:MM"
+                  placeholderTextColor="#94A3B8"
+                  value={appointmentForm.preferredTime}
+                  onChangeText={(text) =>
+                    setAppointmentForm((prev) => ({ ...prev, preferredTime: text }))
+                  }
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={visitorDashboardStyles.appointmentField}>
+                <Text style={visitorDashboardStyles.appointmentFieldLabel}>Purpose Of Visit</Text>
+                <TextInput
+                  style={[visitorDashboardStyles.appointmentFieldInput, visitorDashboardStyles.appointmentFieldTextarea]}
+                  placeholder="Describe why you need to visit the campus"
+                  placeholderTextColor="#94A3B8"
+                  value={appointmentForm.purposeOfVisit}
+                  onChangeText={(text) =>
+                    setAppointmentForm((prev) => ({ ...prev, purposeOfVisit: text }))
+                  }
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={visitorDashboardStyles.appointmentModalFooter}>
+                <TouchableOpacity
+                  style={visitorDashboardStyles.appointmentSecondaryButton}
+                  onPress={closeAppointmentModal}
+                  disabled={isSubmittingAppointment}
+                >
+                  <Text style={visitorDashboardStyles.appointmentSecondaryButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={visitorDashboardStyles.appointmentPrimaryButton}
+                  onPress={handleRequestAppointment}
+                  disabled={isSubmittingAppointment}
+                >
+                  {isSubmittingAppointment ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="send-outline" size={18} color="#FFFFFF" />
+                      <Text style={visitorDashboardStyles.appointmentPrimaryButtonText}>Send Request</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* QR Code Modal */}
       <Modal

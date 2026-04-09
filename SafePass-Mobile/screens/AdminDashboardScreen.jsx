@@ -22,6 +22,7 @@ import * as Print from "expo-print";
 import { shareAsync } from "expo-sharing";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import ApiService from "../utils/ApiService";
+import CampusMap from "../components/CampusMap";
 import styles from "../styles/AdminDashboardStyles";
 
 const { width, height } = Dimensions.get("window");
@@ -168,6 +169,80 @@ const getRequestStatus = (request) => {
   return request.approvalStatus || request.status || "unknown";
 };
 
+const ADMIN_MAP_FLOORS = [{ id: "all", name: "Campus", icon: "map-outline" }];
+
+const clampValue = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const getActivityLabel = (activityType) => {
+  switch (activityType) {
+    case "visitor_appointment_request":
+      return "Appointment Request";
+    case "admin_approved_registration":
+      return "Admin Approval";
+    case "admin_rejected_registration":
+      return "Admin Rejection";
+    case "staff_approved_appointment":
+      return "Staff Approval";
+    case "staff_adjusted_appointment":
+      return "Time Adjusted";
+    case "staff_rejected_appointment":
+      return "Staff Rejection";
+    case "security_checkin":
+    case "visitor_self_checkin":
+      return "Check In";
+    case "security_checkout":
+    case "visitor_self_checkout":
+      return "Check Out";
+    case "visitor_registration_request":
+      return "Registration Request";
+    default:
+      return "System Activity";
+  }
+};
+
+const getActivityMarkerStatus = (activity) => {
+  const type = String(activity?.activityType || "").toLowerCase();
+  if (type.includes("reject")) return "alert";
+  if (type.includes("checkin")) return "checked_in";
+  if (type.includes("appointment_request") || type.includes("adjusted")) return "moving";
+  if (type.includes("approve")) return "active";
+  return "active";
+};
+
+const getActivityCoordinates = (activity, index = 0) => {
+  const haystack = [
+    activity?.location,
+    activity?.notes,
+    activity?.activityType,
+    activity?.relatedVisitor?.assignedOffice,
+    activity?.relatedVisitor?.host,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const zones = [
+    { keywords: ["gate", "checkpoint", "entry"], x: 18, y: 78 },
+    { keywords: ["admin"], x: 78, y: 22 },
+    { keywords: ["staff", "faculty", "office"], x: 64, y: 42 },
+    { keywords: ["security"], x: 24, y: 30 },
+    { keywords: ["hangar", "aviation", "academy"], x: 46, y: 62 },
+    { keywords: ["appointment"], x: 54, y: 28 },
+  ];
+
+  const baseZone =
+    zones.find((zone) => zone.keywords.some((keyword) => haystack.includes(keyword))) ||
+    { x: 48, y: 48 };
+
+  const offsetX = ((index % 4) - 1.5) * 5;
+  const offsetY = ((Math.floor(index / 4) % 3) - 1) * 5;
+
+  return {
+    x: clampValue(baseZone.x + offsetX, 8, 92),
+    y: clampValue(baseZone.y + offsetY, 10, 90),
+  };
+};
+
 export default function AdminDashboardScreen({ navigation, onLogout }) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const mainScrollViewRef = useRef(null);
@@ -263,6 +338,14 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [userManagementStatusTab, setUserManagementStatusTab] = useState("active");
   const [createUserMessage, setCreateUserMessage] = useState("");
   const [createdUserSummary, setCreatedUserSummary] = useState(null);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [activitySummary, setActivitySummary] = useState({
+    appointmentRequests: 0,
+    staffActions: 0,
+    completedVisits: 0,
+    approvals: 0,
+  });
+  const [selectedMapActivity, setSelectedMapActivity] = useState(null);
 
   // Chart Data
   const [visitorStats, setVisitorStats] = useState({
@@ -663,6 +746,29 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
   };
 
+  const loadRecentActivities = useCallback(async () => {
+    try {
+      const response = await ApiService.getRecentActivities(30);
+      const activities = response?.activities || [];
+      setRecentActivities(activities);
+      setActivitySummary(
+        response?.summary || {
+          appointmentRequests: 0,
+          staffActions: 0,
+          completedVisits: 0,
+          approvals: 0,
+        },
+      );
+    } catch (error) {
+      console.error("Load recent activities error:", error);
+      if (isAuthError(error)) {
+        await handleAuthError();
+        return;
+      }
+      setRecentActivities([]);
+    }
+  }, [handleAuthError]);
+
 const loadDashboardData = useCallback(async () => {
   authErrorHandledRef.current = false;
   setIsLoading(true);
@@ -676,7 +782,7 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
     setUser(currentUser);
-    await Promise.all([loadAllVisitRequests(), loadAllUsers()]);
+    await Promise.all([loadAllVisitRequests(), loadAllUsers(), loadRecentActivities()]);
   } catch (error) {
     console.error("Load dashboard error:", error);
     if (isAuthError(error)) {
@@ -688,7 +794,7 @@ const loadDashboardData = useCallback(async () => {
     setIsLoading(false);
     setRefreshing(false);
   }
-}, [navigation, handleAuthError]);
+}, [navigation, handleAuthError, loadRecentActivities]);
 
   useEffect(() => {
     loadDashboardData();
@@ -777,6 +883,49 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const theme = getDynamicStyles();
+
+  const monitoredMapVisitors = useMemo(
+    () =>
+      (recentActivities || []).slice(0, 18).map((activity, index) => {
+        const relatedVisitor = activity?.relatedVisitor;
+        const relatedUser = activity?.relatedUser;
+        const displayName =
+          relatedVisitor?.fullName ||
+          [relatedUser?.firstName, relatedUser?.lastName].filter(Boolean).join(" ") ||
+          activity?.userName ||
+          "System Activity";
+
+        return {
+          id: activity?._id || `${activity?.activityType || "activity"}-${index}`,
+          name: displayName,
+          purpose:
+            relatedVisitor?.purposeOfVisit ||
+            getActivityLabel(activity?.activityType),
+          status: getActivityMarkerStatus(activity),
+          location: {
+            coordinates: getActivityCoordinates(activity, index),
+          },
+          activityType: activity?.activityType,
+          eventLabel: getActivityLabel(activity?.activityType),
+          lastUpdate: activity?.timestamp,
+          detail:
+            activity?.notes ||
+            activity?.message ||
+            "Recent system activity",
+          sourceActivity: activity,
+        };
+      }),
+    [recentActivities],
+  );
+
+  const activeMapActivity = useMemo(() => {
+    if (!selectedMapActivity) return monitoredMapVisitors[0] || null;
+    return (
+      monitoredMapVisitors.find((item) => item.id === selectedMapActivity.id) ||
+      monitoredMapVisitors[0] ||
+      null
+    );
+  }, [monitoredMapVisitors, selectedMapActivity]);
 
   const handleMenuAction = (action) => {
     setActiveMenu(action);
@@ -1475,6 +1624,154 @@ const loadDashboardData = useCallback(async () => {
               <Text style={[styles.dashboardStatValue, { color: item.color }]}>{item.value || 0}</Text>
             </View>
           ))}
+        </View>
+
+        <View style={[styles.analyticsSplitGrid, width < 1200 && styles.analyticsSplitGridStack, { marginBottom: 14 }]}>
+          <View style={styles.analyticsPrimaryColumn}>
+            <View style={[styles.dashboardSectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <View style={styles.dashboardSectionHeader}>
+                <View>
+                  <Text style={[styles.dashboardSectionTitle, { color: theme.textPrimary }]}>Live Monitoring Map</Text>
+                  <Text style={[styles.analyticsChartSubtitle, { color: theme.textSecondary }]}>
+                    Track approvals, appointment requests, and gate activity as they happen.
+                  </Text>
+                </View>
+                <View style={[styles.dashboardHeroBadge, isDarkMode && { backgroundColor: "#334155" }]}>
+                  <Ionicons name="pulse-outline" size={16} color="#10B981" />
+                  <Text style={[styles.dashboardHeroBadgeText, isDarkMode && styles.darkTextSecondary]}>
+                    {monitoredMapVisitors.length} live marker{monitoredMapVisitors.length === 1 ? "" : "s"}
+                  </Text>
+                </View>
+              </View>
+
+              <CampusMap
+                visitors={monitoredMapVisitors}
+                floors={ADMIN_MAP_FLOORS}
+                offices={[]}
+                selectedFloor="all"
+                selectedOffice="all"
+                onVisitorSelect={(item) => setSelectedMapActivity(item)}
+                hoveredVisitor={activeMapActivity}
+              />
+
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
+                {[
+                  { label: "Approvals", color: "#10B981" },
+                  { label: "Requests / Adjustments", color: "#F59E0B" },
+                  { label: "Rejections", color: "#DC2626" },
+                ].map((item) => (
+                  <View
+                    key={item.label}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                      borderWidth: 1,
+                      borderColor: theme.borderColor,
+                    }}
+                  >
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.color }} />
+                    <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: "700" }}>{item.label}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.analyticsSideColumn}>
+            <View style={[styles.dashboardSectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <View style={styles.dashboardSectionHeader}>
+                <Text style={[styles.dashboardSectionTitle, { color: theme.textPrimary }]}>Activity Monitor</Text>
+                <TouchableOpacity onPress={loadRecentActivities}>
+                  <Text style={styles.dashboardSectionLink}>Refresh</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+                {[
+                  { label: "Requests", value: activitySummary.appointmentRequests, color: "#F59E0B" },
+                  { label: "Staff Actions", value: activitySummary.staffActions, color: "#3B82F6" },
+                  { label: "Completed", value: activitySummary.completedVisits, color: "#64748B" },
+                  { label: "Approvals", value: activitySummary.approvals, color: "#10B981" },
+                ].map((item) => (
+                  <View
+                    key={item.label}
+                    style={{
+                      minWidth: width > 900 ? "47%" : "100%",
+                      backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                      borderWidth: 1,
+                      borderColor: theme.borderColor,
+                      borderRadius: 16,
+                      paddingVertical: 12,
+                      paddingHorizontal: 14,
+                    }}
+                  >
+                    <Text style={{ color: item.color, fontSize: 20, fontWeight: "800" }}>{item.value || 0}</Text>
+                    <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: "700", marginTop: 2 }}>{item.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {activeMapActivity ? (
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    borderColor: theme.borderColor,
+                    padding: 14,
+                    marginBottom: 14,
+                  }}
+                >
+                  <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: "800", marginBottom: 4 }}>
+                    {activeMapActivity.name}
+                  </Text>
+                  <Text style={{ color: "#3B82F6", fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
+                    {activeMapActivity.eventLabel}
+                  </Text>
+                  <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
+                    {activeMapActivity.detail}
+                  </Text>
+                  <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 8 }}>
+                    {formatDateTime(activeMapActivity.lastUpdate)}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>
+                  No live admin activity is available yet.
+                </Text>
+              )}
+
+              {(recentActivities || []).slice(0, 5).map((activity, index) => {
+                const marker = monitoredMapVisitors[index];
+                return (
+                  <TouchableOpacity
+                    key={activity._id || `${activity.activityType}-${index}`}
+                    onPress={() => marker && setSelectedMapActivity(marker)}
+                    style={{
+                      paddingVertical: 12,
+                      borderTopWidth: index === 0 ? 0 : 1,
+                      borderTopColor: theme.borderColor,
+                    }}
+                  >
+                    <Text style={{ color: theme.textPrimary, fontSize: 14, fontWeight: "700", marginBottom: 4 }}>
+                      {getActivityLabel(activity.activityType)}
+                    </Text>
+                    <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
+                      {activity.notes || activity.relatedVisitor?.fullName || "Recent system action"}
+                    </Text>
+                    <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 6 }}>
+                      {formatDate(activity.timestamp)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         </View>
 
         <View style={[styles.dashboardSectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
