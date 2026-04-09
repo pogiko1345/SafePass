@@ -101,6 +101,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [processingVisitorId, setProcessingVisitorId] = useState(null);
+  const [resolvingAlertId, setResolvingAlertId] = useState(null);
   
   // Form State
   const [newVisitor, setNewVisitor] = useState({
@@ -263,6 +264,22 @@ export default function SecurityDashboardScreen({ navigation }) {
       ...notification,
       read: normalizeNotificationReadState(notification, currentUserId),
     }));
+
+  const isActiveAlertNotification = (notification) => {
+    if (!notification || notification.read) {
+      return false;
+    }
+
+    const type = String(notification.type || "").toLowerCase();
+    const severity = String(notification.severity || "").toLowerCase();
+
+    return (
+      type === "alert" ||
+      type.includes("security") ||
+      severity === "high" ||
+      severity === "medium"
+    );
+  };
 
   const deriveVisitorCollections = (all = []) => {
     const active = all.filter((visitor) => visitor.status === 'checked_in');
@@ -528,16 +545,11 @@ export default function SecurityDashboardScreen({ navigation }) {
         response.notifications || [],
         currentUser?._id,
       );
-      const alertNotifications = normalizedNotifications.filter(
-        (notification) =>
-          notification.type === 'alert' ||
-          ['high', 'medium'].includes(notification.severity),
-      );
+      const unreadNotifications = normalizedNotifications.filter((notification) => !notification.read);
+      const alertNotifications = unreadNotifications.filter(isActiveAlertNotification);
 
       setNotifications(normalizedNotifications);
-      setUnreadCount(
-        normalizedNotifications.filter((notification) => !notification.read).length,
-      );
+      setUnreadCount(unreadNotifications.length);
       setAlerts(alertNotifications);
       setDashboardStats((current) => ({
         ...current,
@@ -882,6 +894,26 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
   };
 
+  const handleResolveAlert = async (alert) => {
+    if (!alert?._id || resolvingAlertId === alert._id) {
+      return;
+    }
+
+    try {
+      setResolvingAlertId(alert._id);
+      const result = await ApiService.resolveAlert(alert._id);
+      if (!result?.success) {
+        throw new Error("Failed to resolve alert");
+      }
+      await loadNotifications();
+    } catch (error) {
+      console.error("Resolve alert error:", error);
+      Alert.alert("Error", "Failed to resolve alert. Please try again.");
+    } finally {
+      setResolvingAlertId(null);
+    }
+  };
+
   const markAllAsRead = async () => {
     try {
       await ApiService.markAllNotificationsAsRead();
@@ -1038,36 +1070,73 @@ export default function SecurityDashboardScreen({ navigation }) {
       </View>
 
       <View style={styles.securityWorkspaceGrid}>
-      {/* Live Visitor Tracking */}
+      {/* Live Operations Queue */}
       <View style={styles.securityWorkspacePrimary}>
-        <View style={styles.mapSection}>
-          <SharedMonitoringMap
-            title="Live Visitor Tracking"
-            subtitle="Monitor approved visitors, active movement, and current check-ins in one live panel."
-            iconName="map-outline"
-            iconColor="#10B981"
-            actionLabel="Full Screen"
-            onActionPress={() => setShowMapModal(true)}
-            controls={renderMapFilters()}
-            visitors={getFilteredVisitorLocations()}
-            floors={floors}
-            offices={offices}
-            selectedFloor={selectedFloor}
-            selectedOffice={selectedOffice}
-            onVisitorHover={handleVisitorHover}
-            onVisitorLeave={handleVisitorLeave}
-            onVisitorSelect={handleVisitorSelect}
-            hoveredVisitor={hoveredVisitor}
-            renderHoverCard={renderHoverCard}
-            backgroundColor="#FFFFFF"
-            borderColor="#E5E7EB"
-            summaryItems={[
-              { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
-              { label: "Approved", value: visitors.approved.length || 0, color: "#2563EB" },
-              { label: "Checked In", value: visitors.active.length || 0, color: "#F59E0B" },
-            ]}
-            statusLabel="Security monitoring"
-          />
+        <View style={styles.securityPanelCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="pulse-outline" size={20} color="#10B981" />
+              <View>
+                <Text style={styles.sectionTitle}>Live Operations Queue</Text>
+                <Text style={styles.securitySectionSubtitle}>Monitor active visitors and recent status changes without the campus map.</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => setActiveTab('visitors')}>
+              <Text style={styles.viewAll}>Open Visitors</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.securityMiniStats}>
+            <View style={styles.securityMiniStatCard}>
+              <Text style={styles.securityMiniStatValue}>{visitors.active.length}</Text>
+              <Text style={styles.securityMiniStatLabel}>Checked In</Text>
+            </View>
+            <View style={styles.securityMiniStatCard}>
+              <Text style={styles.securityMiniStatValue}>{visitors.approved.length}</Text>
+              <Text style={styles.securityMiniStatLabel}>Approved</Text>
+            </View>
+            <View style={styles.securityMiniStatCard}>
+              <Text style={styles.securityMiniStatValue}>{visitors.pending.length}</Text>
+              <Text style={styles.securityMiniStatLabel}>Pending</Text>
+            </View>
+          </View>
+
+          <View style={styles.activityList}>
+            {[...visitors.active, ...visitors.approved].slice(0, 6).map((visitor, index) => (
+              <TouchableOpacity
+                key={visitor._id || `${visitor.email}-${index}`}
+                style={styles.activityItem}
+                onPress={() => handleViewDetails(visitor)}
+              >
+                <View style={[styles.activityIcon, {
+                  backgroundColor: visitor.status === 'checked_in' ? '#D1FAE5' : '#DBEAFE',
+                }]}>
+                  <Ionicons
+                    name={visitor.status === 'checked_in' ? 'log-in-outline' : 'checkmark-circle-outline'}
+                    size={16}
+                    color={visitor.status === 'checked_in' ? '#059669' : '#2563EB'}
+                  />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>{visitor.fullName}</Text>
+                  <Text style={styles.activityLocation}>
+                    {visitor.status === 'checked_in' ? 'Currently on site' : 'Ready for arrival'} • {visitor.assignedOffice || visitor.host || 'Campus access'}
+                  </Text>
+                </View>
+                <Text style={styles.activityTime}>
+                  {formatTime(visitor.checkedInAt || visitor.visitTime)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            {[...visitors.active, ...visitors.approved].length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="pulse-outline" size={44} color="#D1D5DB" />
+                <Text style={styles.emptyStateTitle}>No live visitor activity</Text>
+                <Text style={styles.emptyStateSubtitle}>Approved arrivals and active check-ins will appear here automatically.</Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
 
@@ -1173,16 +1242,16 @@ export default function SecurityDashboardScreen({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('map')}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('alerts')}>
             <LinearGradient
               colors={['#10B981', '#059669']}
               style={styles.quickActionGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Ionicons name="map-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>Open Map</Text>
-              <Text style={styles.quickActionSubtitle}>Track approved and active visitors live</Text>
+              <Ionicons name="warning-outline" size={24} color="#FFFFFF" />
+              <Text style={styles.quickActionTitle}>Alerts Center</Text>
+              <Text style={styles.quickActionSubtitle}>Review alerts and resolve incidents quickly</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -1448,12 +1517,14 @@ export default function SecurityDashboardScreen({ navigation }) {
               {!alert.resolved && (
                 <TouchableOpacity 
                   style={styles.resolveButton}
-                  onPress={async () => {
-                    await ApiService.resolveAlert(alert._id);
-                    refreshData();
-                  }}
+                  onPress={() => handleResolveAlert(alert)}
+                  disabled={resolvingAlertId === alert._id}
                 >
-                  <Text style={styles.resolveButtonText}>Mark as Resolved</Text>
+                  {resolvingAlertId === alert._id ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.resolveButtonText}>Mark as Resolved</Text>
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -1955,7 +2026,6 @@ export default function SecurityDashboardScreen({ navigation }) {
   // Menu Items
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline', color: '#DC2626' },
-    { id: 'map', label: 'Live Map', icon: 'map-outline', color: '#10B981' },
     { id: 'visitors', label: 'Visitors', icon: 'people-outline', color: '#0A3D91' },
     { id: 'alerts', label: 'Alerts', icon: 'warning-outline', color: '#F59E0B' },
     { id: 'logs', label: 'Access Logs', icon: 'time-outline', color: '#059669' },
