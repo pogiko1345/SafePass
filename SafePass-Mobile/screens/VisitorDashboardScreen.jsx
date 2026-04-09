@@ -957,7 +957,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     <View style={visitorDashboardStyles.mapTextContainer}>
                       <Text style={visitorDashboardStyles.mapTitle}>Campus Map</Text>
                       <Text style={visitorDashboardStyles.mapSubtitle}>
-                        Plan your route before you arrive at Sapphire Aviation School.
+                        Plan your route before you arrive at Sapphire International Aviation Academy.
                       </Text>
                       <View style={visitorDashboardStyles.mapButton}>
                         <Text style={visitorDashboardStyles.mapButtonText}>View Map</Text>
@@ -1203,7 +1203,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <View style={visitorDashboardStyles.mapTextContainer}>
                     <Text style={visitorDashboardStyles.mapTitle}>Campus Map</Text>
                     <Text style={visitorDashboardStyles.mapSubtitle}>
-                      Find your way around Sapphire Aviation School
+                      Find your way around Sapphire International Aviation Academy
                     </Text>
                     <View style={visitorDashboardStyles.mapButton}>
                       <Text style={visitorDashboardStyles.mapButtonText}>View Map</Text>

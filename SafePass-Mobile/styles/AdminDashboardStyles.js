@@ -75,7 +75,8 @@ export default StyleSheet.create({
   },
 
   sidebarBrand: {
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: "700",
     color: "#FFF",
     marginBottom: 8,
@@ -966,30 +967,81 @@ export default StyleSheet.create({
 
   tabBar: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
     marginBottom: 20,
+    paddingRight: 8,
   },
 
   tab: {
-    flex: 1,
+    minWidth: 132,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     alignItems: "center",
-    borderRadius: 30,
+    justifyContent: "center",
+    borderRadius: 18,
     backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
 
   tabActive: {
     backgroundColor: "#3B82F6",
+    borderColor: "#3B82F6",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#3B82F6",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: "0px 10px 24px rgba(59, 130, 246, 0.18)",
+      },
+    }),
+  },
+
+  tabContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
   },
 
   tabText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#64748B",
   },
 
   tabTextActive: {
     color: "#FFF",
+  },
+
+  tabCountBadge: {
+    minWidth: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#E2E8F0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  tabCountBadgeActive: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+
+  tabCountText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#334155",
+  },
+
+  tabCountTextActive: {
+    color: "#FFFFFF",
   },
 
   // ============================================

@@ -16,7 +16,7 @@ export const getPrintHTML = (users, title, activeMenu) => {
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>${getTitle()} - Sapphire Aviation</title>
+      <title>${getTitle()} - Sapphire International Aviation Academy</title>
       <style>
         * {
           margin: 0;
@@ -89,7 +89,7 @@ export const getPrintHTML = (users, title, activeMenu) => {
     </head>
     <body>
       <div class="print-header">
-        <h2>Sapphire Aviation Academy</h2>
+        <h2>Sapphire International Aviation Academy</h2>
         <p>${getTitle()} | Generated: ${new Date().toLocaleDateString()}</p>
       </div>
 

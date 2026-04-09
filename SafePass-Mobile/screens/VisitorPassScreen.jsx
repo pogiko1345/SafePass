@@ -286,7 +286,7 @@ export default function VisitorPassScreen({ navigation, route }) {
             <View style={visitorPassStyles.cardHeader}>
               <View>
                 <Text style={visitorPassStyles.cardTitle}>VISITOR ACCESS</Text>
-                <Text style={visitorPassStyles.cardSubtitle}>Sapphire Aviation Academy</Text>
+                <Text style={visitorPassStyles.cardSubtitle}>Sapphire International Aviation Academy</Text>
               </View>
               <View style={visitorPassStyles.cardLogo}>
                 <Ionicons name="airplane" size={24} color="#FFFFFF" />
