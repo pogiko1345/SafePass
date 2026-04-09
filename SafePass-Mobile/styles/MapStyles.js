@@ -47,6 +47,65 @@ export default StyleSheet.create({
     paddingBottom: 30,
   },
 
+  mapSectionCard: {
+    backgroundColor: "#FFFFFF",
+    margin: 20,
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.05)" },
+    }),
+  },
+
+  mapSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  mapSectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  mapSectionSubtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 19,
+    maxWidth: 420,
+  },
+
+  mapLaunchChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#DDE5FF",
+  },
+
+  mapLaunchChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#4F46E5",
+  },
+
   // ============ MAP PLACEHOLDER ============
   mapPlaceholder: {
     backgroundColor: "#FFFFFF",

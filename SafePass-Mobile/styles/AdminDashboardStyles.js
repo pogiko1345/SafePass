@@ -1227,6 +1227,331 @@ export default StyleSheet.create({
     color: "#EF4444",
   },
 
+  managementHeroCard: {
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 18,
+    gap: 18,
+  },
+
+  managementHeroMain: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 16,
+  },
+
+  managementIconBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  managementHeroCopy: {
+    flex: 1,
+    gap: 6,
+  },
+
+  managementEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+
+  managementDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+  },
+
+  managementHeaderActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  managementPrimaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
+
+  managementPrimaryButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  managementSecondaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    backgroundColor: "#EFF6FF",
+  },
+
+  managementSecondaryButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#3B82F6",
+  },
+
+  managementStatsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+    marginBottom: 18,
+  },
+
+  managementStatCard: {
+    minWidth: 150,
+    flexGrow: 1,
+    flexBasis: 150,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 20,
+    padding: 16,
+    gap: 10,
+  },
+
+  managementStatIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  managementStatValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  managementStatLabel: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  userWorkspaceCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 24,
+    padding: 20,
+  },
+
+  userWorkspaceHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+
+  userWorkspaceTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 4,
+  },
+
+  userWorkspaceSubtitle: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  userRefreshButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    backgroundColor: "#EFF6FF",
+  },
+
+  userRefreshButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  userSearchBox: {
+    marginBottom: 14,
+  },
+
+  userCardList: {
+    gap: 14,
+  },
+
+  userManagementCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 22,
+    padding: 16,
+    gap: 14,
+  },
+
+  userManagementCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  userAvatarInitials: {
+    fontSize: 17,
+    fontWeight: "800",
+  },
+
+  userIdentityBlock: {
+    flex: 1,
+    gap: 4,
+  },
+
+  userIdentityTitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+
+  userLiveStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+
+  userLiveStatusText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+
+  userManagementMetaGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  userManagementMetaPill: {
+    minWidth: 180,
+    flexGrow: 1,
+    flexBasis: 180,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#FFFFFF",
+  },
+
+  userManagementMetaText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#475569",
+  },
+
+  userManagementActions: {
+    flexDirection: "row",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+
+  userManagementActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+
+  userManagementDangerButton: {
+    backgroundColor: "rgba(239,68,68,0.08)",
+    borderColor: "rgba(239,68,68,0.16)",
+  },
+
+  userManagementActionText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  userPaginationRow: {
+    marginTop: 18,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+
+  userPaginationSummary: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  userPaginationControls: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  userPaginationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+  },
+
+  userPaginationButtonDisabled: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+  },
+
+  userPaginationButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#334155",
+  },
+
+  userPaginationButtonTextDisabled: {
+    color: "#94A3B8",
+  },
+
+  userEmptyState: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 22,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 20,
+  },
+
   // ============================================
   // 15. SEARCH & FILTERS - Search and filter UI
   // ============================================

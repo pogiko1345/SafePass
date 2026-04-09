@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import MapStyles from "../styles/MapStyles";
+import CampusMap from "../components/CampusMap";
 
 export default function WebMapScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
@@ -23,51 +24,69 @@ export default function WebMapScreen({ navigation }) {
       name: "Main Gate", 
       description: "Visitor Entrance & Security Checkpoint", 
       icon: "business",
-      coordinates: { lat: 14.5995, lng: 120.9842 }
+      coordinates: { lat: 14.5995, lng: 120.9842 },
+      mapPosition: { x: 18, y: 78 },
     },
     { 
       name: "Administration Building", 
       description: "Visitor Registration & Admin Office", 
       icon: "business",
-      coordinates: { lat: 14.6001, lng: 120.9850 }
+      coordinates: { lat: 14.6001, lng: 120.9850 },
+      mapPosition: { x: 78, y: 22 },
     },
     { 
       name: "Library", 
       description: "Student Resource Center & Study Hall", 
       icon: "library",
-      coordinates: { lat: 14.5988, lng: 120.9848 }
+      coordinates: { lat: 14.5988, lng: 120.9848 },
+      mapPosition: { x: 58, y: 48 },
     },
     { 
       name: "Cafeteria", 
       description: "Food Court & Dining Area", 
       icon: "restaurant",
-      coordinates: { lat: 14.5992, lng: 120.9835 }
+      coordinates: { lat: 14.5992, lng: 120.9835 },
+      mapPosition: { x: 34, y: 58 },
     },
     { 
       name: "Aviation Hangar", 
       description: "Flight Training Center & Aircraft Storage", 
       icon: "airplane",
-      coordinates: { lat: 14.6005, lng: 120.9825 }
+      coordinates: { lat: 14.6005, lng: 120.9825 },
+      mapPosition: { x: 46, y: 70 },
     },
     { 
       name: "Flight Simulator Lab", 
       description: "Simulator Training & Practice Area", 
       icon: "desktop",
-      coordinates: { lat: 14.5978, lng: 120.9855 }
+      coordinates: { lat: 14.5978, lng: 120.9855 },
+      mapPosition: { x: 68, y: 58 },
     },
     { 
       name: "Security Office", 
       description: "Main Security Office & Check-in Point", 
       icon: "shield",
-      coordinates: { lat: 14.5990, lng: 120.9838 }
+      coordinates: { lat: 14.5990, lng: 120.9838 },
+      mapPosition: { x: 24, y: 30 },
     },
     { 
       name: "Parking Area", 
       description: "Visitor & Staff Parking", 
       icon: "car",
-      coordinates: { lat: 14.5985, lng: 120.9828 }
+      coordinates: { lat: 14.5985, lng: 120.9828 },
+      mapPosition: { x: 24, y: 64 },
     },
   ];
+
+  const campusMapVisitors = locations.map((location) => ({
+    id: location.name,
+    name: location.name,
+    purpose: location.description,
+    status: "active",
+    location: {
+      coordinates: location.mapPosition,
+    },
+  }));
 
   const openGoogleMaps = () => {
     setLoading(true);
@@ -121,28 +140,31 @@ export default function WebMapScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={MapStyles.scrollContent}
       >
-        {/* Map Placeholder */}
-        <View style={MapStyles.mapPlaceholder}>
-          <View style={MapStyles.mapPlaceholderIcon}>
-            <Ionicons name="map-outline" size={48} color="#9CA3AF" />
-          </View>
-          <Text style={MapStyles.mapPlaceholderText}>Interactive Map</Text>
-          <Text style={MapStyles.mapPlaceholderSubtext}>
-            Tap the button below to view the full campus map on Google Maps
-          </Text>
-          <TouchableOpacity 
-            style={MapStyles.openMapsButton}
-            onPress={openGoogleMaps}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
-              style={MapStyles.openMapsGradient}
+        <View style={MapStyles.mapSectionCard}>
+          <View style={MapStyles.mapSectionHeader}>
+            <View>
+              <Text style={MapStyles.mapSectionTitle}>Campus Map Overview</Text>
+              <Text style={MapStyles.mapSectionSubtitle}>
+                View key school locations in the in-app campus map.
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={MapStyles.mapLaunchChip}
+              onPress={openGoogleMaps}
+              activeOpacity={0.8}
             >
-              <Ionicons name="map" size={20} color="#FFFFFF" />
-              <Text style={MapStyles.openMapsText}>Open in Google Maps</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <Ionicons name="globe-outline" size={16} color="#4F46E5" />
+              <Text style={MapStyles.mapLaunchChipText}>Open External Map</Text>
+            </TouchableOpacity>
+          </View>
+
+          <CampusMap
+            visitors={campusMapVisitors}
+            floors={[{ id: "all", name: "Campus", icon: "map-outline" }]}
+            offices={[]}
+            selectedFloor="all"
+            selectedOffice="all"
+          />
         </View>
 
         {/* Campus Locations List */}
@@ -176,7 +198,7 @@ export default function WebMapScreen({ navigation }) {
         {/* Footer Note */}
         <View style={{ padding: 20, alignItems: 'center' }}>
           <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center' }}>
-            Tap on any location to get directions
+            The campus map shows the main school areas, and each location card can still open directions.
           </Text>
         </View>
       </ScrollView>

@@ -164,12 +164,41 @@ const getRoleIcon = (role) => {
   }
 };
 
+const isSecurityRole = (role) => role === "security" || role === "guard";
+
+const isUserActive = (user) => user?.status === "active" || user?.isActive === true;
+
+const formatRoleLabel = (role) => {
+  if (isSecurityRole(role)) return "Security";
+  if (!role) return "User";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+};
+
+const getUserInitials = (user) => {
+  const first = String(user?.firstName || "").trim().charAt(0);
+  const last = String(user?.lastName || "").trim().charAt(0);
+  return `${first}${last}`.trim().toUpperCase() || "U";
+};
+
 const getRequestStatus = (request) => {
   if (!request) return "unknown";
   return request.approvalStatus || request.status || "unknown";
 };
 
 const ADMIN_MAP_FLOORS = [{ id: "all", name: "Campus", icon: "map-outline" }];
+const ADMIN_MAP_ACTIVITY_TYPES = new Set([
+  "visitor_registration_request",
+  "visitor_appointment_request",
+  "admin_approved_registration",
+  "admin_rejected_registration",
+  "staff_approved_appointment",
+  "staff_adjusted_appointment",
+  "staff_rejected_appointment",
+  "security_checkin",
+  "visitor_self_checkin",
+  "security_checkout",
+  "visitor_self_checkout",
+]);
 
 const clampValue = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -419,6 +448,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const menuItems = [
     { icon: "grid-outline", label: "Dashboard", action: "dashboard", color: "#2563EB" },
     { icon: "time-outline", label: "Visit Requests", action: "requests", color: "#F59E0B", badge: stats?.pendingRequests },
+    { icon: "map-outline", label: "Campus Map", action: "webmap", color: "#10B981" },
     { icon: "person-add-outline", label: "Manage Staff", action: "staff", color: "#10B981" },
     { icon: "shield-outline", label: "Security", action: "security", color: "#8B5CF6" },
     { icon: "people-circle-outline", label: "All Users", action: "users", color: "#3B82F6" },
@@ -456,19 +486,25 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const getFilteredUsersList = useCallback(() => {
     let filtered = [...allUsers];
 
+    if (activeMenu === "staff") {
+      filtered = filtered.filter((u) => u.role === "staff");
+    } else if (activeMenu === "security") {
+      filtered = filtered.filter((u) => isSecurityRole(u.role));
+    }
+
     if (userFilter !== "all" && userFilter !== "active" && userFilter !== "inactive") {
       if (userFilter === "security") {
-        filtered = filtered.filter((u) => u.role === "security" || u.role === "guard");
+        filtered = filtered.filter((u) => isSecurityRole(u.role));
       } else {
         filtered = filtered.filter((u) => u.role === userFilter);
       }
     }
 
     if (userFilter === "active") {
-      filtered = filtered.filter((u) => u.status === "active" || u.isActive === true);
+      filtered = filtered.filter((u) => isUserActive(u));
     }
     if (userFilter === "inactive") {
-      filtered = filtered.filter((u) => u.status === "inactive" || u.isActive === false);
+      filtered = filtered.filter((u) => !isUserActive(u));
     }
 
     if (userSearchQuery.trim()) {
@@ -483,8 +519,12 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       );
     }
 
-    return filtered;
-  }, [allUsers, userFilter, userSearchQuery]);
+    return filtered.sort((a, b) => {
+      const nameA = `${a?.firstName || ""} ${a?.lastName || ""}`.trim().toLowerCase();
+      const nameB = `${b?.firstName || ""} ${b?.lastName || ""}`.trim().toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }, [activeMenu, allUsers, userFilter, userSearchQuery]);
 
   const getFilteredUsersCount = useCallback(() => getFilteredUsersList().length, [getFilteredUsersList]);
 
@@ -510,6 +550,109 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     if (userManagementStatusTab === "inactive") return inactiveUsersList;
     return allUsers;
   }, [activeUsersList, inactiveUsersList, allUsers, userManagementStatusTab]);
+
+  const filteredUsers = useMemo(() => getFilteredUsersList(), [getFilteredUsersList]);
+  const paginatedUsers = useMemo(() => getPaginatedUsers(), [getPaginatedUsers]);
+  const scopedUsers = useMemo(() => {
+    if (activeMenu === "staff") return staffUsers;
+    if (activeMenu === "security") return guardUsers;
+    return allUsers;
+  }, [activeMenu, allUsers, guardUsers, staffUsers]);
+  const scopedActiveUsers = useMemo(() => scopedUsers.filter((userItem) => isUserActive(userItem)), [scopedUsers]);
+  const scopedInactiveUsers = useMemo(() => scopedUsers.filter((userItem) => !isUserActive(userItem)), [scopedUsers]);
+  const totalFilteredUsers = filteredUsers.length;
+  const visibleStartIndex = totalFilteredUsers === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const visibleEndIndex = Math.min(currentPage * itemsPerPage, totalFilteredUsers);
+  const staffDepartmentCount = useMemo(
+    () => new Set(staffUsers.map((userItem) => userItem.department).filter(Boolean)).size,
+    [staffUsers],
+  );
+  const userManagementConfig = useMemo(() => {
+    if (activeMenu === "staff") {
+      return {
+        title: "Staff Directory",
+        eyebrow: "Team Administration",
+        description: "Review staff accounts, keep assignments organized, and manage who can respond to visitor appointments.",
+        icon: "briefcase-outline",
+        accent: "#10B981",
+        primaryActionLabel: "Create Staff",
+        searchPlaceholder: "Search staff by name, email, phone, or department...",
+        stats: [
+          { key: "total", label: "Staff Accounts", value: scopedUsers.length, icon: "people-outline" },
+          { key: "active", label: "Active Staff", value: scopedActiveUsers.length, icon: "checkmark-circle-outline" },
+          { key: "inactive", label: "Inactive Staff", value: scopedInactiveUsers.length, icon: "pause-circle-outline" },
+          { key: "departments", label: "Departments", value: staffDepartmentCount, icon: "business-outline" },
+        ],
+        filters: [
+          { key: "all", label: "All Staff", count: scopedUsers.length },
+          { key: "active", label: "Active", count: scopedActiveUsers.length },
+          { key: "inactive", label: "Inactive", count: scopedInactiveUsers.length },
+        ],
+      };
+    }
+
+    if (activeMenu === "security") {
+      return {
+        title: "Security Team",
+        eyebrow: "Operations Access",
+        description: "Manage guards and security personnel who verify arrivals, monitor visits, and handle gate operations.",
+        icon: "shield-checkmark-outline",
+        accent: "#8B5CF6",
+        primaryActionLabel: "Create Security",
+        searchPlaceholder: "Search security personnel by name, email, or phone...",
+        stats: [
+          { key: "total", label: "Security Accounts", value: scopedUsers.length, icon: "shield-outline" },
+          { key: "active", label: "Active Team", value: scopedActiveUsers.length, icon: "checkmark-circle-outline" },
+          { key: "inactive", label: "Inactive Team", value: scopedInactiveUsers.length, icon: "pause-circle-outline" },
+          { key: "visible", label: "Filtered View", value: totalFilteredUsers, icon: "funnel-outline" },
+        ],
+        filters: [
+          { key: "all", label: "All Security", count: scopedUsers.length },
+          { key: "active", label: "Active", count: scopedActiveUsers.length },
+          { key: "inactive", label: "Inactive", count: scopedInactiveUsers.length },
+        ],
+      };
+    }
+
+    return {
+      title: "All Users",
+      eyebrow: "Account Control Center",
+      description: "Monitor every account in one place, move between roles quickly, and keep only the right users active in the system.",
+      icon: "people-circle-outline",
+      accent: "#3B82F6",
+      primaryActionLabel: null,
+      searchPlaceholder: "Search all users by name, email, phone, or department...",
+      stats: [
+        { key: "total", label: "Total Users", value: allUsers.length, icon: "people-outline" },
+        { key: "staff", label: "Staff", value: staffUsers.length, icon: "briefcase-outline" },
+        { key: "security", label: "Security", value: guardUsers.length, icon: "shield-outline" },
+        { key: "active", label: "Active Users", value: activeUsersList.length, icon: "pulse-outline" },
+      ],
+      filters: [
+        { key: "all", label: "All", count: allUsers.length },
+        { key: "staff", label: "Staff", count: staffUsers.length },
+        { key: "security", label: "Security", count: guardUsers.length },
+        { key: "visitor", label: "Visitors", count: visitorUsers.length },
+        { key: "admin", label: "Admins", count: adminUsers.length },
+        { key: "active", label: "Active", count: activeUsersList.length },
+        { key: "inactive", label: "Inactive", count: inactiveUsersList.length },
+      ],
+    };
+  }, [
+    activeMenu,
+    activeUsersList.length,
+    adminUsers.length,
+    allUsers.length,
+    guardUsers.length,
+    inactiveUsersList.length,
+    scopedActiveUsers.length,
+    scopedInactiveUsers.length,
+    scopedUsers.length,
+    staffDepartmentCount,
+    staffUsers.length,
+    totalFilteredUsers,
+    visitorUsers.length,
+  ]);
 
   const getFilteredHistory = useCallback(() => {
     let filtered = [...visitorHistory];
@@ -884,9 +1027,22 @@ const loadDashboardData = useCallback(async () => {
 
   const theme = getDynamicStyles();
 
+  const mapActivities = useMemo(
+    () =>
+      (recentActivities || []).filter((activity) => {
+        const activityType = String(activity?.activityType || "").toLowerCase();
+        if (!ADMIN_MAP_ACTIVITY_TYPES.has(activityType)) {
+          return false;
+        }
+
+        return Boolean(activity?.relatedVisitor || activity?.location || activity?.notes);
+      }),
+    [recentActivities],
+  );
+
   const monitoredMapVisitors = useMemo(
     () =>
-      (recentActivities || []).slice(0, 18).map((activity, index) => {
+      mapActivities.slice(0, 18).map((activity, index) => {
         const relatedVisitor = activity?.relatedVisitor;
         const relatedUser = activity?.relatedUser;
         const displayName =
@@ -915,7 +1071,7 @@ const loadDashboardData = useCallback(async () => {
           sourceActivity: activity,
         };
       }),
-    [recentActivities],
+    [mapActivities],
   );
 
   const activeMapActivity = useMemo(() => {
@@ -928,6 +1084,11 @@ const loadDashboardData = useCallback(async () => {
   }, [monitoredMapVisitors, selectedMapActivity]);
 
   const handleMenuAction = (action) => {
+    if (action === "webmap") {
+      navigation.navigate("WebMapScreen");
+      return;
+    }
+
     setActiveMenu(action);
     setCurrentPage(1);
     switch (action) {
@@ -938,12 +1099,12 @@ const loadDashboardData = useCallback(async () => {
         loadAllVisitRequests();
         break;
       case "staff":
-        setUserFilter("staff");
+        setUserFilter("all");
         setUserSearchQuery("");
         loadAllUsers();
         break;
       case "security":
-        setUserFilter("security");
+        setUserFilter("all");
         setUserSearchQuery("");
         loadAllUsers();
         break;
@@ -954,9 +1115,6 @@ const loadDashboardData = useCallback(async () => {
         break;
       case "analytics":
         calculateDateAnalytics(selectedDate);
-        break;
-      case "profile":
-        navigation.navigate("Profile");
         break;
       default:
         Alert.alert("Coming Soon", `${action} is under development`);
@@ -1746,7 +1904,7 @@ const loadDashboardData = useCallback(async () => {
                 </Text>
               )}
 
-              {(recentActivities || []).slice(0, 5).map((activity, index) => {
+              {mapActivities.slice(0, 5).map((activity, index) => {
                 const marker = monitoredMapVisitors[index];
                 return (
                   <TouchableOpacity
@@ -2288,6 +2446,341 @@ const loadDashboardData = useCallback(async () => {
     </ScrollView>
   );
 
+  const renderUserManagementContent = () => (
+    <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+      <View style={styles.pageContainer}>
+        <View
+          style={[
+            styles.managementHeroCard,
+            {
+              backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
+              borderColor: theme.borderColor,
+            },
+          ]}
+        >
+          <View style={styles.managementHeroMain}>
+            <View style={[styles.managementIconBadge, { backgroundColor: `${userManagementConfig.accent}18` }]}>
+              <Ionicons name={userManagementConfig.icon} size={26} color={userManagementConfig.accent} />
+            </View>
+            <View style={styles.managementHeroCopy}>
+              <Text style={[styles.managementEyebrow, { color: userManagementConfig.accent }]}>
+                {userManagementConfig.eyebrow}
+              </Text>
+              <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>
+                {userManagementConfig.title}
+              </Text>
+              <Text style={[styles.managementDescription, isDarkMode && styles.darkTextSecondary]}>
+                {userManagementConfig.description}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.managementHeaderActions}>
+            {userManagementConfig.primaryActionLabel ? (
+              <TouchableOpacity
+                style={[styles.managementPrimaryButton, { backgroundColor: userManagementConfig.accent }]}
+                onPress={() => setShowAddUserModal(true)}
+              >
+                <Ionicons name="person-add-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.managementPrimaryButtonText}>
+                  {userManagementConfig.primaryActionLabel}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity
+              style={[
+                styles.managementSecondaryButton,
+                isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+              ]}
+              onPress={handlePrintUsers}
+            >
+              <Ionicons name="print-outline" size={18} color={userManagementConfig.accent} />
+              <Text style={[styles.managementSecondaryButtonText, { color: userManagementConfig.accent }]}>
+                Print List
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.managementStatsGrid}>
+          {userManagementConfig.stats.map((item) => (
+            <View
+              key={item.key}
+              style={[
+                styles.managementStatCard,
+                {
+                  backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={[styles.managementStatIcon, { backgroundColor: `${userManagementConfig.accent}16` }]}>
+                <Ionicons name={item.icon} size={18} color={userManagementConfig.accent} />
+              </View>
+              <Text style={[styles.managementStatValue, isDarkMode && styles.darkText]}>
+                {item.value}
+              </Text>
+              <Text style={[styles.managementStatLabel, isDarkMode && styles.darkTextSecondary]}>
+                {item.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <View
+          style={[
+            styles.userWorkspaceCard,
+            {
+              backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
+              borderColor: theme.borderColor,
+            },
+          ]}
+        >
+          <View style={styles.userWorkspaceHeader}>
+            <View>
+              <Text style={[styles.userWorkspaceTitle, isDarkMode && styles.darkText]}>Directory View</Text>
+              <Text style={[styles.userWorkspaceSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                Showing {visibleStartIndex}-{visibleEndIndex} of {totalFilteredUsers} matching accounts
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.userRefreshButton,
+                isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+              ]}
+              onPress={loadAllUsers}
+            >
+              <Ionicons name="refresh-outline" size={18} color={userManagementConfig.accent} />
+              <Text style={[styles.userRefreshButtonText, { color: userManagementConfig.accent }]}>
+                Refresh
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View
+            style={[
+              styles.searchBox,
+              styles.userSearchBox,
+              isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+            ]}
+          >
+            <Ionicons name="search-outline" size={20} color="#7F8C8D" />
+            <TextInput
+              style={[styles.searchInput, isDarkMode && styles.darkText]}
+              placeholder={userManagementConfig.searchPlaceholder}
+              placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+              value={userSearchQuery}
+              onChangeText={(text) => {
+                setUserSearchQuery(text);
+                setCurrentPage(1);
+              }}
+            />
+            {userSearchQuery ? (
+              <TouchableOpacity onPress={() => { setUserSearchQuery(""); setCurrentPage(1); }}>
+                <Ionicons name="close-circle" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
+            {userManagementConfig.filters.map((filterItem) => (
+              <TouchableOpacity
+                key={filterItem.key}
+                style={[styles.filterChip, userFilter === filterItem.key && styles.filterChipActive]}
+                onPress={() => {
+                  setUserFilter(filterItem.key);
+                  setCurrentPage(1);
+                }}
+              >
+                <Text style={[styles.filterChipText, userFilter === filterItem.key && styles.filterChipTextActive]}>
+                  {filterItem.label} ({filterItem.count})
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {paginatedUsers.length > 0 ? (
+            <>
+              <View style={styles.userCardList}>
+                {paginatedUsers.map((userItem) => {
+                  const userIsActive = isUserActive(userItem);
+                  const roleColor = getRoleColor(userItem.role);
+
+                  return (
+                    <View
+                      key={userItem._id || userItem.id || userItem.email}
+                      style={[
+                        styles.userManagementCard,
+                        {
+                          backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                          borderColor: theme.borderColor,
+                        },
+                      ]}
+                    >
+                      <View style={styles.userManagementCardHeader}>
+                        <View style={styles.userInfo}>
+                          <View style={[styles.userAvatar, { backgroundColor: `${roleColor}18` }]}>
+                            <Text style={[styles.userAvatarInitials, { color: roleColor }]}>
+                              {getUserInitials(userItem)}
+                            </Text>
+                          </View>
+
+                          <View style={styles.userIdentityBlock}>
+                            <View style={styles.userIdentityTitleRow}>
+                              <Text style={[styles.userName, isDarkMode && styles.darkText]}>
+                                {userItem.firstName} {userItem.lastName}
+                              </Text>
+                              <View
+                                style={[
+                                  styles.userLiveStatusBadge,
+                                  {
+                                    backgroundColor: userIsActive ? "rgba(16,185,129,0.14)" : "rgba(239,68,68,0.14)",
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.userLiveStatusText,
+                                    { color: userIsActive ? "#10B981" : "#EF4444" },
+                                  ]}
+                                >
+                                  {userIsActive ? "Active" : "Inactive"}
+                                </Text>
+                              </View>
+                            </View>
+                            <Text style={[styles.userEmail, isDarkMode && styles.darkTextSecondary]}>
+                              {userItem.email}
+                            </Text>
+                            <View style={styles.userMeta}>
+                              <View style={[styles.roleBadge, { backgroundColor: `${roleColor}14` }]}>
+                                <Text style={[styles.roleBadgeText, { color: roleColor }]}>
+                                  {formatRoleLabel(userItem.role)}
+                                </Text>
+                              </View>
+                              {userItem.department ? (
+                                <View style={styles.deptBadge}>
+                                  <Text style={styles.deptBadgeText}>{userItem.department}</Text>
+                                </View>
+                              ) : null}
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={styles.userManagementMetaGrid}>
+                        <View
+                          style={[
+                            styles.userManagementMetaPill,
+                            isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+                          ]}
+                        >
+                          <Ionicons name="call-outline" size={14} color="#64748B" />
+                          <Text style={[styles.userManagementMetaText, isDarkMode && styles.darkTextSecondary]}>
+                            {userItem.phone || "No phone number"}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.userManagementMetaPill,
+                            isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+                          ]}
+                        >
+                          <Ionicons name="card-outline" size={14} color="#64748B" />
+                          <Text style={[styles.userManagementMetaText, isDarkMode && styles.darkTextSecondary]}>
+                            {userItem.employeeId || "No employee ID"}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.userManagementMetaPill,
+                            isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+                          ]}
+                        >
+                          <Ionicons name="ellipse-outline" size={14} color="#64748B" />
+                          <Text style={[styles.userManagementMetaText, isDarkMode && styles.darkTextSecondary]}>
+                            {userIsActive ? "Account enabled" : "Requires review"}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.userManagementActions}>
+                        <TouchableOpacity
+                          style={[
+                            styles.userManagementActionButton,
+                            { backgroundColor: `${userManagementConfig.accent}12`, borderColor: `${userManagementConfig.accent}24` },
+                          ]}
+                          onPress={() => handleEditUser(userItem)}
+                        >
+                          <Ionicons name="create-outline" size={16} color={userManagementConfig.accent} />
+                          <Text style={[styles.userManagementActionText, { color: userManagementConfig.accent }]}>
+                            Edit
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.userManagementActionButton, styles.userManagementDangerButton]}
+                          onPress={() => {
+                            setSelectedUser(userItem);
+                            setShowDeleteUserModal(true);
+                          }}
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                          <Text style={[styles.userManagementActionText, { color: "#EF4444" }]}>
+                            Delete
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+
+              <View style={styles.userPaginationRow}>
+                <Text style={[styles.userPaginationSummary, isDarkMode && styles.darkTextSecondary]}>
+                  Page {currentPage} of {totalPages}
+                </Text>
+                <View style={styles.userPaginationControls}>
+                  <TouchableOpacity
+                    style={[styles.userPaginationButton, currentPage === 1 && styles.userPaginationButtonDisabled]}
+                    onPress={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <Ionicons name="chevron-back-outline" size={16} color={currentPage === 1 ? "#94A3B8" : "#334155"} />
+                    <Text style={[styles.userPaginationButtonText, currentPage === 1 && styles.userPaginationButtonTextDisabled]}>
+                      Previous
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.userPaginationButton, currentPage >= totalPages && styles.userPaginationButtonDisabled]}
+                    onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    <Text style={[styles.userPaginationButtonText, currentPage >= totalPages && styles.userPaginationButtonTextDisabled]}>
+                      Next
+                    </Text>
+                    <Ionicons name="chevron-forward-outline" size={16} color={currentPage >= totalPages ? "#94A3B8" : "#334155"} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={[styles.emptyState, styles.userEmptyState, isDarkMode && { backgroundColor: "#0F172A" }]}>
+              <Ionicons name="people-outline" size={64} color="#CBD5E1" />
+              <Text style={[styles.emptyStateTitle, isDarkMode && styles.darkText]}>
+                No accounts found
+              </Text>
+              <Text style={[styles.emptyStateSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                {userSearchQuery
+                  ? "Try a different keyword or clear the search field to see more accounts."
+                  : "There are no accounts in this view yet. Create a new account or switch filters to continue."}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </ScrollView>
+  );
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -2422,41 +2915,7 @@ const loadDashboardData = useCallback(async () => {
             </ScrollView>
           )}
 
-          {(activeMenu === "staff" || activeMenu === "security" || activeMenu === "users") && (
-            <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
-              <View style={styles.pageContainer}>
-                <View style={styles.pageHeader}>
-                  <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>{activeMenu === "staff" ? "Staff Management" : activeMenu === "security" ? "Security Personnel" : "User Management"}</Text>
-                  <View style={{ flexDirection: "row", gap: 12 }}>
-                    {(activeMenu === "staff" || activeMenu === "security") && <TouchableOpacity onPress={() => setShowAddUserModal(true)}><Ionicons name="person-add-outline" size={24} color="#3B82F6" /></TouchableOpacity>}
-                    <TouchableOpacity onPress={handlePrintUsers} style={styles.printButton}><Ionicons name="print-outline" size={22} color="#3B82F6" /></TouchableOpacity>
-                  </View>
-                </View>
-                <View style={[styles.searchBox, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
-                  <Ionicons name="search-outline" size={20} color="#7F8C8D" />
-                  <TextInput style={[styles.searchInput, isDarkMode && styles.darkText]} placeholder="Search users..." placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"} value={userSearchQuery} onChangeText={(text) => { setUserSearchQuery(text); setCurrentPage(1); }} />
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
-                  <TouchableOpacity style={[styles.filterChip, userFilter === "all" && styles.filterChipActive]} onPress={() => { setUserFilter("all"); setCurrentPage(1); }}><Text style={[styles.filterChipText, userFilter === "all" && styles.filterChipTextActive]}>All ({allUsers.length})</Text></TouchableOpacity>
-                  <TouchableOpacity style={[styles.filterChip, userFilter === "staff" && styles.filterChipActive]} onPress={() => { setUserFilter("staff"); setCurrentPage(1); }}><Text style={[styles.filterChipText, userFilter === "staff" && styles.filterChipTextActive]}>Staff ({staffUsers.length})</Text></TouchableOpacity>
-                  <TouchableOpacity style={[styles.filterChip, userFilter === "security" && styles.filterChipActive]} onPress={() => { setUserFilter("security"); setCurrentPage(1); }}><Text style={[styles.filterChipText, userFilter === "security" && styles.filterChipTextActive]}>Security ({guardUsers.length})</Text></TouchableOpacity>
-                  <TouchableOpacity style={[styles.filterChip, userFilter === "active" && styles.filterChipActive]} onPress={() => { setUserFilter("active"); setCurrentPage(1); }}><Text style={[styles.filterChipText, userFilter === "active" && styles.filterChipTextActive]}>Active ({stats.activeUsers})</Text></TouchableOpacity>
-                </ScrollView>
-                {getPaginatedUsers().map((userItem) => (
-                  <View key={userItem._id} style={[styles.userRow, isDarkMode && { borderBottomColor: theme.borderColor }]}>
-                    <View style={styles.userInfo}>
-                      <View style={[styles.userAvatar, { backgroundColor: `${getRoleColor(userItem.role)}20` }]}><Ionicons name={getRoleIcon(userItem.role)} size={24} color={getRoleColor(userItem.role)} /></View>
-                      <View><Text style={[styles.userName, isDarkMode && styles.darkText]}>{userItem.firstName} {userItem.lastName}</Text><Text style={[styles.userEmail, isDarkMode && styles.darkTextSecondary]}>{userItem.email}</Text><View style={styles.userMeta}><View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{userItem.role?.toUpperCase()}</Text></View>{userItem.department && <View style={styles.deptBadge}><Text style={styles.deptBadgeText}>{userItem.department}</Text></View>}</View></View>
-                    </View>
-                    <View style={styles.userActions}>
-                      <TouchableOpacity onPress={() => handleEditUser(userItem)}><Ionicons name="create-outline" size={18} color="#3B82F6" /></TouchableOpacity>
-                      <TouchableOpacity onPress={() => { setSelectedUser(userItem); setShowDeleteUserModal(true); }}><Ionicons name="trash-outline" size={18} color="#EF4444" /></TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
-          )}
+          {(activeMenu === "staff" || activeMenu === "security" || activeMenu === "users") && renderUserManagementContent()}
         </View>
       </View>
 
