@@ -27,6 +27,13 @@ export default StyleSheet.create({
     paddingBottom: 30,
   },
 
+  dashboardShell: {
+    width: "100%",
+    maxWidth: 1120,
+    alignSelf: "center",
+    paddingBottom: 16,
+  },
+
   // ============ HEADER ============
   header: {
     paddingHorizontal: 20,
@@ -49,11 +56,37 @@ export default StyleSheet.create({
     fontWeight: "500",
   },
 
+  headerPill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    marginBottom: 10,
+  },
+
+  headerPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    color: "#FFFFFF",
+    textTransform: "uppercase",
+  },
+
   userName: {
     fontSize: 28,
     fontWeight: "700",
     color: "#FFFFFF",
     letterSpacing: -0.5,
+  },
+
+  headerSupportText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.82)",
+    marginTop: 6,
   },
 
   profileButton: {
@@ -116,6 +149,162 @@ export default StyleSheet.create({
   timerText: {
     fontSize: 14,
     fontWeight: "500",
+  },
+
+  commandDeckCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginTop: -22,
+    marginBottom: 18,
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+      },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 14px 28px rgba(15,23,42,0.08)" },
+    }),
+  },
+
+  commandDeckHeader: {
+    gap: 14,
+    marginBottom: 16,
+  },
+
+  commandDeckTitleWrap: {
+    gap: 4,
+  },
+
+  commandDeckEyebrow: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    color: "#6366F1",
+  },
+
+  commandDeckTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0F172A",
+    lineHeight: 30,
+  },
+
+  commandDeckSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+  },
+
+  commandDeckBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+
+  commandDeckBadgeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+
+  commandDeckBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  commandMetricsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  commandMetricCard: {
+    width: width > 900 ? "31%" : width > 620 ? "48%" : "100%",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    padding: 14,
+  },
+
+  commandMetricIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  commandMetricLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    color: "#94A3B8",
+    marginBottom: 4,
+  },
+
+  commandMetricValue: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  commandActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 16,
+  },
+
+  commandPrimaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#4F46E5",
+  },
+
+  commandPrimaryButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  commandSecondaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+  },
+
+  commandSecondaryButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#4F46E5",
   },
 
   // ============ NFC CARD ============
@@ -1282,6 +1471,117 @@ export default StyleSheet.create({
     letterSpacing: 0.5,
     color: "#475569",
     textTransform: "uppercase",
+  },
+
+  appointmentPickerField: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+
+  appointmentPickerFieldLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+
+  appointmentPickerIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  appointmentPickerLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+
+  appointmentPickerValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  purposeDropdownMenu: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+
+  pickerDropdownMenu: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+
+  pickerDropdownScroll: {
+    maxHeight: 220,
+  },
+
+  pickerOptionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+
+  pickerOptionItemActive: {
+    backgroundColor: "#EEF2FF",
+  },
+
+  pickerOptionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0F172A",
+  },
+
+  pickerOptionTextActive: {
+    color: "#4338CA",
+  },
+
+  purposeOptionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+
+  purposeOptionItemActive: {
+    backgroundColor: "#EEF2FF",
+  },
+
+  purposeOptionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0F172A",
+  },
+
+  purposeOptionTextActive: {
+    color: "#4338CA",
   },
 
   appointmentFieldInput: {
