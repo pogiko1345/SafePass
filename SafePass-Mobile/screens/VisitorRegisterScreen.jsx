@@ -22,6 +22,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import visitorRegisterStyles from "../styles/VisitorRegisterStyles";
 import ApiService from "../utils/ApiService";
 import IDScannerService from "../utils/IDScannerService";
+import Logo from "../assets/LogoSapphire.jpg";
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== "web") {
@@ -75,16 +76,19 @@ const SuccessModal = ({ visible, credentials, onConfirm }) => {
             Registration Submitted!
           </Text>
           <Text style={visitorRegisterStyles.successMessage}>
-            Your visitor registration has been submitted and is pending admin
-            approval. You will receive an email once approved.
+            Your request has been sent to the admin for approval. You can log in
+            now using these credentials, and your dashboard will show that your
+            visit is waiting for approval.
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
-            <Text style={visitorRegisterStyles.credentialsTitle}>
-              <Ionicons name="mail-outline" size={16} color="#059669" /> Your
-              Credentials
-            </Text>
+            <View style={visitorRegisterStyles.credentialsTitleRow}>
+              <Ionicons name="mail-outline" size={16} color="#059669" />
+              <Text style={visitorRegisterStyles.credentialsTitle}>
+                Your Credentials
+              </Text>
+            </View>
             <Text style={visitorRegisterStyles.credentialsInfo}>
-              These credentials will be activated after admin approval.
+              Save these login details. Your account is already available for sign in.
             </Text>
             {credentials && (
               <>
@@ -129,7 +133,7 @@ const SuccessModal = ({ visible, credentials, onConfirm }) => {
               style={visitorRegisterStyles.successGradient}
             >
               <Text style={visitorRegisterStyles.successButtonText}>
-                Return to Login
+                Go to Login
               </Text>
               <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
             </LinearGradient>
@@ -385,6 +389,47 @@ export default function VisitorRegisterScreen({ navigation }) {
   useEffect(() => {
     checkPermissions();
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.title =
+        "Visitor Registration | SafePass Sapphire";
+    }
+  }, []);
+
+  const getStepConfig = () => {
+    switch (currentStep) {
+      case 1:
+        return {
+          title: "Personal Information",
+          subtitle:
+            "Provide your basic details and a valid government ID so the campus team can verify your visit request.",
+          icon: "person-circle-outline",
+        };
+      case 2:
+        return {
+          title: "Visit Details",
+          subtitle:
+            "Tell us why you are visiting, when you plan to arrive, and any optional vehicle details for gate coordination.",
+          icon: "calendar-clear-outline",
+        };
+      case 3:
+        return {
+          title: "Review & Submit",
+          subtitle:
+            "Confirm your registration details before sending them for approval. You can still go back and edit anything.",
+          icon: "checkmark-done-circle-outline",
+        };
+      default:
+        return {
+          title: "Visitor Registration",
+          subtitle: "Complete your registration to request campus access.",
+          icon: "document-text-outline",
+        };
+    }
+  };
+
+  const stepConfig = getStepConfig();
 
   const checkPermissions = async () => {
     if (Platform.OS !== "web") {
@@ -745,20 +790,53 @@ export default function VisitorRegisterScreen({ navigation }) {
       }
     } catch (error) {
       console.error("Registration error:", error);
-      let errorMessage = error.message || "Failed to connect to server.";
-      if (errorMessage.includes("already exists")) {
+      let errorMessage =
+        error?.data?.message || error.message || "Failed to connect to server.";
+      const normalizedMessage = errorMessage.toLowerCase();
+
+      if (
+        normalizedMessage.includes("pending registration") ||
+        normalizedMessage.includes("track your approval status")
+      ) {
         Alert.alert(
-          "Email Already Registered",
-          "A visitor account with this email already exists. Please login or use a different email.",
+          "Registration Already Submitted",
+          "This visitor already has a pending registration. You can log in now to view the waiting-for-approval screen.",
           [
             {
               text: "Go to Login",
-              onPress: () => navigation.navigate("Login", { role: "visitor" }),
+              onPress: () =>
+                navigation.navigate("Login", {
+                  role: "visitor",
+                  initialEmail: formData.email.trim(),
+                }),
             },
             { text: "OK", style: "cancel" },
           ],
         );
-      } else if (errorMessage.includes("Network request failed")) {
+      } else if (
+        normalizedMessage.includes("already exists") ||
+        normalizedMessage.includes("duplicate entry") ||
+        normalizedMessage.includes("duplicate")
+      ) {
+        Alert.alert(
+          "Email Already Registered",
+          "A visitor account with this email already exists. Please log in instead, or use Forgot Password if you no longer have the password.",
+          [
+            {
+              text: "Go to Login",
+              onPress: () =>
+                navigation.navigate("Login", {
+                  role: "visitor",
+                  initialEmail: formData.email.trim(),
+                }),
+            },
+            { text: "OK", style: "cancel" },
+          ],
+        );
+      } else if (
+        normalizedMessage.includes("network request failed") ||
+        normalizedMessage.includes("cannot connect to backend")
+      ) {
         Alert.alert(
           "Network Error",
           "Cannot connect to the server. Please check your internet connection.",
@@ -780,26 +858,149 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const handleSuccessConfirm = async () => {
+    const loginEmail = registeredVisitor?.userEmail || formData.email;
+    const loginPassword =
+      registeredVisitor?.userPassword || "Check your email";
+
     setShowSuccess(false);
-    await AsyncStorage.removeItem("pendingVisitor");
-    navigation.reset({
-      index: 0,
-      routes: [
-        {
-          name: "RoleSelect",
-          params: {
-            registrationSuccess: true,
-            message: "Registration submitted for approval.",
-          },
-        },
-      ],
-    });
+
+    await AsyncStorage.multiRemove([
+      "pendingVisitor",
+      "authToken",
+      "userToken",
+      "currentUser",
+    ]);
+    await AsyncStorage.setItem("isNewRegistration", "true");
+
+    setTimeout(() => {
+      navigation.replace("Login", {
+        role: "visitor",
+        initialEmail: loginEmail,
+        initialPassword: loginPassword,
+      });
+    }, 150);
   };
 
   const getProgressPercentage = () => {
     if (currentStep === 1) return 33;
     if (currentStep === 2) return 66;
     return 100;
+  };
+
+  const personalCompletionCount = [
+    completedFields.fullName,
+    completedFields.email,
+    completedFields.phoneNumber,
+    completedFields.idNumber,
+    completedFields.idImage,
+  ].filter(Boolean).length;
+
+  const visitCompletionCount = [
+    completedFields.purposeOfVisit,
+    !!visitData.visitDate,
+    !!visitData.visitTime,
+  ].filter(Boolean).length;
+
+  const renderStepInsights = () => {
+    if (currentStep === 1) {
+      return (
+        <View style={visitorRegisterStyles.stepInsightCard}>
+          <View style={visitorRegisterStyles.stepInsightHeader}>
+            <View style={visitorRegisterStyles.stepInsightIcon}>
+              <Ionicons name="shield-checkmark-outline" size={18} color="#047857" />
+            </View>
+            <View style={visitorRegisterStyles.stepInsightTextWrap}>
+              <Text style={visitorRegisterStyles.stepInsightTitle}>Identity Checkpoint</Text>
+              <Text style={visitorRegisterStyles.stepInsightSubtitle}>
+                Upload your ID and complete the required contact fields so the campus team can verify you quickly.
+              </Text>
+            </View>
+          </View>
+          <View style={visitorRegisterStyles.stepInsightStats}>
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{personalCompletionCount}/5</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Complete</Text>
+            </View>
+            <View style={visitorRegisterStyles.stepInsightDivider} />
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>AI</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>ID auto-fill</Text>
+            </View>
+            <View style={visitorRegisterStyles.stepInsightDivider} />
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>Secure</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Encrypted upload</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (currentStep === 2) {
+      return (
+        <View style={visitorRegisterStyles.stepInsightCard}>
+          <View style={visitorRegisterStyles.stepInsightHeader}>
+            <View style={visitorRegisterStyles.stepInsightIcon}>
+              <Ionicons name="calendar-outline" size={18} color="#047857" />
+            </View>
+            <View style={visitorRegisterStyles.stepInsightTextWrap}>
+              <Text style={visitorRegisterStyles.stepInsightTitle}>Visit Scheduling</Text>
+              <Text style={visitorRegisterStyles.stepInsightSubtitle}>
+                Add the reason for your visit and confirm your preferred arrival date and time for smoother gate coordination.
+              </Text>
+            </View>
+          </View>
+          <View style={visitorRegisterStyles.stepInsightStats}>
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitCompletionCount}/3</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Ready</Text>
+            </View>
+            <View style={visitorRegisterStyles.stepInsightDivider} />
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitData.purposeOfVisit ? "Set" : "Pick"}</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Visit purpose</Text>
+            </View>
+            <View style={visitorRegisterStyles.stepInsightDivider} />
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{formatTime(visitData.visitTime)}</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Arrival time</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={visitorRegisterStyles.stepInsightCard}>
+        <View style={visitorRegisterStyles.stepInsightHeader}>
+          <View style={visitorRegisterStyles.stepInsightIcon}>
+            <Ionicons name="checkmark-done-outline" size={18} color="#047857" />
+          </View>
+          <View style={visitorRegisterStyles.stepInsightTextWrap}>
+            <Text style={visitorRegisterStyles.stepInsightTitle}>Final Review</Text>
+            <Text style={visitorRegisterStyles.stepInsightSubtitle}>
+              Double-check your details before submitting. Once approved, your temporary visitor credentials will be activated.
+            </Text>
+          </View>
+        </View>
+        <View style={visitorRegisterStyles.reviewChecklist}>
+          {[
+            { label: "Personal details completed", done: personalCompletionCount === 5 },
+            { label: "Visit purpose selected", done: !!visitData.purposeOfVisit },
+            { label: "Preferred visit schedule confirmed", done: !!visitData.visitDate && !!visitData.visitTime },
+          ].map((item) => (
+            <View key={item.label} style={visitorRegisterStyles.reviewChecklistItem}>
+              <Ionicons
+                name={item.done ? "checkmark-circle" : "ellipse-outline"}
+                size={16}
+                color={item.done ? "#059669" : "#94A3B8"}
+              />
+              <Text style={visitorRegisterStyles.reviewChecklistText}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
   };
 
   const renderStep1 = () => (
@@ -1322,207 +1523,249 @@ export default function VisitorRegisterScreen({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor="#059669" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 12}
         style={visitorRegisterStyles.keyboardView}
       >
-        <LinearGradient
-          colors={["#059669", "#047857"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={visitorRegisterStyles.header}
-        >
-          <View style={visitorRegisterStyles.headerButtons}>
-            <TouchableOpacity
-              style={visitorRegisterStyles.backButton}
-              onPress={handleBack}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-            {/* X button removed */}
-          </View>
-          <View style={visitorRegisterStyles.headerContent}>
-            <View style={visitorRegisterStyles.headerIconContainer}>
-              <LinearGradient
-                colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.05)"]}
-                style={visitorRegisterStyles.headerIconGradient}
-              >
-                <Ionicons name="person-add" size={32} color="#FFFFFF" />
-              </LinearGradient>
-            </View>
-            <Text style={visitorRegisterStyles.headerTitle}>
-              Visitor Registration
-            </Text>
-            <Text style={visitorRegisterStyles.headerSubtitle}>
-              {currentStep === 1 && "Personal Information"}
-              {currentStep === 2 && "Visit Details"}
-              {currentStep === 3 && "Review & Submit"}
-            </Text>
-          </View>
-        </LinearGradient>
-
-        <View style={visitorRegisterStyles.progressContainer}>
-          <View style={visitorRegisterStyles.progressHeader}>
-            <Text style={visitorRegisterStyles.progressTitle}>
-              Registration Progress
-            </Text>
-            <Text style={visitorRegisterStyles.progressPercentage}>
-              {getProgressPercentage()}%
-            </Text>
-          </View>
-          <View style={visitorRegisterStyles.progressBarContainer}>
-            <View
-              style={[
-                visitorRegisterStyles.progressBar,
-                { width: `${getProgressPercentage()}%` },
-              ]}
-            />
-          </View>
-        </View>
-
-        <View style={visitorRegisterStyles.stepIndicatorContainer}>
-          <View style={visitorRegisterStyles.stepWrapper}>
-            <View
-              style={[
-                visitorRegisterStyles.stepCircle,
-                currentStep >= 1 && visitorRegisterStyles.stepCircleActive,
-              ]}
-            >
-              <Text
-                style={[
-                  visitorRegisterStyles.stepCircleText,
-                  currentStep >= 1 &&
-                    visitorRegisterStyles.stepCircleTextActive,
-                ]}
-              >
-                1
-              </Text>
-            </View>
-            <View
-              style={[
-                visitorRegisterStyles.stepConnector,
-                currentStep > 1 && visitorRegisterStyles.stepConnectorActive,
-              ]}
-            />
-            <View
-              style={[
-                visitorRegisterStyles.stepCircle,
-                currentStep >= 2 && visitorRegisterStyles.stepCircleActive,
-              ]}
-            >
-              <Text
-                style={[
-                  visitorRegisterStyles.stepCircleText,
-                  currentStep >= 2 &&
-                    visitorRegisterStyles.stepCircleTextActive,
-                ]}
-              >
-                2
-              </Text>
-            </View>
-            <View
-              style={[
-                visitorRegisterStyles.stepConnector,
-                currentStep > 2 && visitorRegisterStyles.stepConnectorActive,
-              ]}
-            />
-            <View
-              style={[
-                visitorRegisterStyles.stepCircle,
-                currentStep >= 3 && visitorRegisterStyles.stepCircleActive,
-              ]}
-            >
-              <Text
-                style={[
-                  visitorRegisterStyles.stepCircleText,
-                  currentStep >= 3 &&
-                    visitorRegisterStyles.stepCircleTextActive,
-                ]}
-              >
-                3
-              </Text>
-            </View>
-          </View>
-          <View style={visitorRegisterStyles.stepLabels}>
-            <Text
-              style={[
-                visitorRegisterStyles.stepLabel,
-                currentStep >= 1 && visitorRegisterStyles.stepLabelActive,
-              ]}
-            >
-              Personal
-            </Text>
-            <Text
-              style={[
-                visitorRegisterStyles.stepLabel,
-                currentStep >= 2 && visitorRegisterStyles.stepLabelActive,
-              ]}
-            >
-              Visit
-            </Text>
-            <Text
-              style={[
-                visitorRegisterStyles.stepLabel,
-                currentStep >= 3 && visitorRegisterStyles.stepLabelActive,
-              ]}
-            >
-              Review
-            </Text>
-          </View>
-        </View>
-
         <ScrollView
+          style={visitorRegisterStyles.mainScrollView}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
           contentContainerStyle={visitorRegisterStyles.scrollContainer}
         >
-          <View style={visitorRegisterStyles.content}>
-            <View style={visitorRegisterStyles.sectionHeader}>
-              <Text style={visitorRegisterStyles.sectionTitle}>
-                {currentStep === 1 && "Personal Information"}
-                {currentStep === 2 && "Visit Details"}
-                {currentStep === 3 && "Review & Submit"}
+          <LinearGradient
+            colors={["#063B34", "#047857", "#059669"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={visitorRegisterStyles.header}
+          >
+            <View style={visitorRegisterStyles.headerButtons}>
+              <TouchableOpacity
+                style={visitorRegisterStyles.backButton}
+                onPress={handleBack}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <View style={visitorRegisterStyles.headerContent}>
+              <View style={visitorRegisterStyles.headerBadge}>
+                <Image
+                  source={Logo}
+                  style={visitorRegisterStyles.headerBadgeLogo}
+                  resizeMode="contain"
+                />
+                <View style={visitorRegisterStyles.headerBadgeTextWrap}>
+                  <Text style={visitorRegisterStyles.headerBadgeEyebrow}>
+                    Sapphire Access Portal
+                  </Text>
+                  <Text style={visitorRegisterStyles.headerBadgeTitle}>
+                    SafePass Visitor Registration
+                  </Text>
+                </View>
+              </View>
+              <View style={visitorRegisterStyles.headerIconContainer}>
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.05)"]}
+                  style={visitorRegisterStyles.headerIconGradient}
+                >
+                  <Ionicons name="person-add" size={32} color="#FFFFFF" />
+                </LinearGradient>
+              </View>
+              <Text style={visitorRegisterStyles.headerTitle}>
+                Request Your Campus Visit
               </Text>
-              <View style={visitorRegisterStyles.sectionBadge}>
-                <Ionicons name="document-text" size={14} color="#059669" />
-                <Text style={visitorRegisterStyles.sectionBadgeText}>
-                  Step {currentStep}/3
+              <Text style={visitorRegisterStyles.headerSubtitle}>
+                {stepConfig.title}
+              </Text>
+              <Text style={visitorRegisterStyles.headerDescription}>
+                Complete this short guided form to submit your visit for approval and receive your SafePass access details.
+              </Text>
+            </View>
+          </LinearGradient>
+
+          <View style={visitorRegisterStyles.formShell}>
+            <View style={visitorRegisterStyles.progressContainer}>
+              <View style={visitorRegisterStyles.progressHeader}>
+                <Text style={visitorRegisterStyles.progressTitle}>
+                  Registration Progress
+                </Text>
+                <Text style={visitorRegisterStyles.progressPercentage}>
+                  {getProgressPercentage()}%
+                </Text>
+              </View>
+              <View style={visitorRegisterStyles.progressBarContainer}>
+                <View
+                  style={[
+                    visitorRegisterStyles.progressBar,
+                    { width: `${getProgressPercentage()}%` },
+                  ]}
+                />
+              </View>
+            </View>
+
+            <View style={visitorRegisterStyles.stepIndicatorContainer}>
+              <View style={visitorRegisterStyles.stepWrapper}>
+                <View
+                  style={[
+                    visitorRegisterStyles.stepCircle,
+                    currentStep >= 1 && visitorRegisterStyles.stepCircleActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      visitorRegisterStyles.stepCircleText,
+                      currentStep >= 1 &&
+                        visitorRegisterStyles.stepCircleTextActive,
+                    ]}
+                  >
+                    1
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    visitorRegisterStyles.stepConnector,
+                    currentStep > 1 && visitorRegisterStyles.stepConnectorActive,
+                  ]}
+                />
+                <View
+                  style={[
+                    visitorRegisterStyles.stepCircle,
+                    currentStep >= 2 && visitorRegisterStyles.stepCircleActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      visitorRegisterStyles.stepCircleText,
+                      currentStep >= 2 &&
+                        visitorRegisterStyles.stepCircleTextActive,
+                    ]}
+                  >
+                    2
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    visitorRegisterStyles.stepConnector,
+                    currentStep > 2 && visitorRegisterStyles.stepConnectorActive,
+                  ]}
+                />
+                <View
+                  style={[
+                    visitorRegisterStyles.stepCircle,
+                    currentStep >= 3 && visitorRegisterStyles.stepCircleActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      visitorRegisterStyles.stepCircleText,
+                      currentStep >= 3 &&
+                        visitorRegisterStyles.stepCircleTextActive,
+                    ]}
+                  >
+                    3
+                  </Text>
+                </View>
+              </View>
+              <View style={visitorRegisterStyles.stepLabels}>
+                <Text
+                  style={[
+                    visitorRegisterStyles.stepLabel,
+                    currentStep >= 1 && visitorRegisterStyles.stepLabelActive,
+                  ]}
+                >
+                  Personal
+                </Text>
+                <Text
+                  style={[
+                    visitorRegisterStyles.stepLabel,
+                    currentStep >= 2 && visitorRegisterStyles.stepLabelActive,
+                  ]}
+                >
+                  Visit
+                </Text>
+                <Text
+                  style={[
+                    visitorRegisterStyles.stepLabel,
+                    currentStep >= 3 && visitorRegisterStyles.stepLabelActive,
+                  ]}
+                >
+                  Review
                 </Text>
               </View>
             </View>
-            <View style={visitorRegisterStyles.formGrid}>
-              {currentStep === 1 && renderStep1()}
-              {currentStep === 2 && renderStep2()}
-              {currentStep === 3 && renderStep3()}
+
+            <View style={visitorRegisterStyles.content}>
+              <View style={visitorRegisterStyles.sectionHeader}>
+                <View style={visitorRegisterStyles.sectionTextBlock}>
+                  <Text style={visitorRegisterStyles.sectionTitle}>
+                    {stepConfig.title}
+                  </Text>
+                  <Text style={visitorRegisterStyles.sectionDescription}>
+                    {stepConfig.subtitle}
+                  </Text>
+                </View>
+                <View style={visitorRegisterStyles.sectionBadge}>
+                  <Ionicons name={stepConfig.icon} size={14} color="#047857" />
+                  <Text style={visitorRegisterStyles.sectionBadgeText}>
+                    Step {currentStep}/3
+                  </Text>
+                </View>
+              </View>
+              {renderStepInsights()}
+              <View style={visitorRegisterStyles.formGrid}>
+                {currentStep === 1 && renderStep1()}
+                {currentStep === 2 && renderStep2()}
+                {currentStep === 3 && renderStep3()}
+              </View>
+              <View style={visitorRegisterStyles.actionRow}>
+                <TouchableOpacity
+                  style={visitorRegisterStyles.secondaryActionButton}
+                  onPress={handleBack}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={currentStep === 1 ? "arrow-back" : "chevron-back"}
+                    size={18}
+                    color="#475569"
+                  />
+                  <Text style={visitorRegisterStyles.secondaryActionText}>
+                    {currentStep === 1 ? "Back to Portal" : "Previous Step"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={visitorRegisterStyles.continueButton}
+                  onPress={currentStep === 3 ? handleSubmit : handleNext}
+                  activeOpacity={0.8}
+                  disabled={isSubmitting}
+                >
+                  <LinearGradient
+                    colors={["#059669", "#047857"]}
+                    style={visitorRegisterStyles.gradientButton}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Text style={visitorRegisterStyles.continueButtonText}>
+                          {currentStep === 1 && "Continue"}
+                          {currentStep === 2 && "Review"}
+                          {currentStep === 3 && "Submit Registration"}
+                        </Text>
+                        <Ionicons
+                          name={
+                            currentStep === 3 ? "checkmark-circle" : "arrow-forward"
+                          }
+                          size={20}
+                          color="#FFFFFF"
+                        />
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
-            <TouchableOpacity
-              style={visitorRegisterStyles.continueButton}
-              onPress={currentStep === 3 ? handleSubmit : handleNext}
-              activeOpacity={0.8}
-              disabled={isSubmitting}
-            >
-              <LinearGradient
-                colors={["#059669", "#047857"]}
-                style={visitorRegisterStyles.gradientButton}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Text style={visitorRegisterStyles.continueButtonText}>
-                      {currentStep === 1 && "Continue"}
-                      {currentStep === 2 && "Review"}
-                      {currentStep === 3 && "Submit Registration"}
-                    </Text>
-                    <Ionicons
-                      name={
-                        currentStep === 3 ? "checkmark-circle" : "arrow-forward"
-                      }
-                      size={20}
-                      color="#FFFFFF"
-                    />
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

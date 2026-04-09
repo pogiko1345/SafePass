@@ -1,57 +1,77 @@
 import { StyleSheet, Platform, Dimensions } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 const isSmallPhone = width <= 375;
-const isMediumPhone = width > 375 && width <= 414;
 const isTablet = width >= 768 && width < 1024;
 
 const fontSizes = {
   xs: isSmallPhone ? 11 : 12,
-  sm: isSmallPhone ? 12 : 13,
-  base: isSmallPhone ? 14 : 15,
-  lg: isSmallPhone ? 16 : 18,
-  xl: isSmallPhone ? 20 : 22,
-  xxl: isSmallPhone ? 24 : 28,
+  sm: isSmallPhone ? 12 : 14,
+  base: isSmallPhone ? 14 : 16,
+  lg: isSmallPhone ? 17 : 19,
+  xl: isSmallPhone ? 22 : 26,
+  xxl: isSmallPhone ? 28 : 34,
 };
 
 const spacing = {
   xs: isSmallPhone ? 4 : 6,
   sm: isSmallPhone ? 8 : 10,
-  base: isSmallPhone ? 12 : 16,
-  lg: isSmallPhone ? 16 : 20,
-  xl: isSmallPhone ? 20 : 24,
-  xxl: isSmallPhone ? 24 : 30,
+  base: isSmallPhone ? 14 : 16,
+  lg: isSmallPhone ? 18 : 22,
+  xl: isSmallPhone ? 24 : 30,
+  xxl: isSmallPhone ? 30 : 38,
 };
 
 export default StyleSheet.create({
-  // ============ CONTAINERS ============
-  // hi
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4F8FC",
   },
   keyboardView: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4F8FC",
+  },
+  mainScrollView: {
+    flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  formShell: {
+    flex: 1,
+    width: "100%",
+    ...(isWeb && {
+      maxWidth: 860,
+      alignSelf: "center",
+      paddingHorizontal: spacing.base,
+    }),
   },
 
-  // ============ HEADER ============
   header: {
     width: "100%",
-    paddingTop: Platform.select({ ios: 50, android: 40, web: 40 }),
-    paddingBottom: 28,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    paddingTop: Platform.select({ ios: 54, android: 42, web: 46 }),
+    paddingBottom: 42,
+    borderBottomLeftRadius: 34,
+    borderBottomRightRadius: 34,
     overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#063B34",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.16,
+        shadowRadius: 18,
+      },
+      android: { elevation: 7 },
+      web: {
+        boxShadow: "0px 18px 40px rgba(6, 59, 52, 0.18)",
+      },
+    }),
   },
   headerButtons: {
     position: "absolute",
-    top: Platform.select({ ios: 50, android: 40, web: 40 }),
+    top: Platform.select({ ios: 52, android: 42, web: 42 }),
     left: spacing.base,
     right: spacing.base,
     zIndex: 10,
@@ -59,42 +79,84 @@ export default StyleSheet.create({
     justifyContent: "space-between",
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.16)",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
     ...(isWeb && {
       cursor: "pointer",
-      transition: "all 0.2s ease",
+      transition: "transform 0.2s ease, background-color 0.2s ease",
       ":hover": {
-        backgroundColor: "rgba(255,255,255,0.3)",
-        transform: "scale(1.05)",
+        backgroundColor: "rgba(255,255,255,0.24)",
+        transform: "translateY(-1px)",
       },
     }),
   },
   exitButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.16)",
     justifyContent: "center",
     alignItems: "center",
   },
   headerContent: {
     alignItems: "center",
     paddingHorizontal: spacing.lg,
+    width: "100%",
+    maxWidth: 720,
+    alignSelf: "center",
+  },
+  headerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: spacing.lg,
+    ...Platform.select({
+      web: { backdropFilter: "blur(10px)" },
+    }),
+  },
+  headerBadgeLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#FFFFFF",
+    marginRight: 10,
+  },
+  headerBadgeTextWrap: {
+    justifyContent: "center",
+  },
+  headerBadgeEyebrow: {
+    fontSize: fontSizes.xs,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.76)",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  headerBadgeTitle: {
+    fontSize: fontSizes.sm,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   headerIconContainer: {
     marginBottom: spacing.sm,
-    borderRadius: 32,
+    borderRadius: 36,
     overflow: "hidden",
   },
   headerIconGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -102,24 +164,46 @@ export default StyleSheet.create({
   },
   headerTitle: {
     fontSize: fontSizes.xxl,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#FFFFFF",
-    marginBottom: 4,
-    letterSpacing: -0.3,
+    marginBottom: 6,
+    textAlign: "center",
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
+    fontSize: fontSizes.lg,
+    color: "rgba(255,255,255,0.94)",
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  headerDescription: {
     fontSize: fontSizes.sm,
-    color: "rgba(255,255,255,0.85)",
-    fontWeight: "400",
+    color: "rgba(255,255,255,0.84)",
+    textAlign: "center",
+    lineHeight: 22,
+    maxWidth: 540,
   },
 
-  // ============ PROGRESS ============
   progressContainer: {
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.base,
+    marginTop: -22,
+    paddingHorizontal: spacing.base,
     paddingVertical: spacing.base,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E4EDF7",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.04,
+        shadowRadius: 10,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 10px 20px rgba(15, 23, 42, 0.05)" },
+    }),
   },
   progressHeader: {
     flexDirection: "row",
@@ -129,44 +213,46 @@ export default StyleSheet.create({
   },
   progressTitle: {
     fontSize: fontSizes.sm,
-    fontWeight: "500",
+    fontWeight: "600",
     color: "#64748B",
   },
   progressPercentage: {
     fontSize: fontSizes.sm,
-    fontWeight: "600",
-    color: "#059669",
+    fontWeight: "700",
+    color: "#047857",
   },
   progressBarContainer: {
-    height: 4,
+    height: 6,
     backgroundColor: "#E2E8F0",
-    borderRadius: 2,
+    borderRadius: 999,
     overflow: "hidden",
   },
   progressBar: {
     height: "100%",
     backgroundColor: "#059669",
-    borderRadius: 2,
+    borderRadius: 999,
   },
 
-  // ============ STEP INDICATORS ============
   stepIndicatorContainer: {
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.base,
+    marginTop: spacing.base,
+    paddingHorizontal: spacing.base,
     paddingVertical: spacing.base,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E4EDF7",
   },
   stepWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#F1F5F9",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#EFF4F8",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -175,7 +261,7 @@ export default StyleSheet.create({
   },
   stepCircleText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#94A3B8",
   },
   stepCircleTextActive: {
@@ -183,9 +269,10 @@ export default StyleSheet.create({
   },
   stepConnector: {
     flex: 1,
-    height: 2,
+    height: 3,
     backgroundColor: "#E2E8F0",
     marginHorizontal: spacing.xs,
+    borderRadius: 999,
   },
   stepConnectorActive: {
     backgroundColor: "#059669",
@@ -197,29 +284,39 @@ export default StyleSheet.create({
   },
   stepLabel: {
     fontSize: 11,
-    fontWeight: "500",
+    fontWeight: "600",
     color: "#94A3B8",
   },
   stepLabelActive: {
-    color: "#059669",
+    color: "#047857",
   },
 
-  // ============ CONTENT ============
   content: {
     padding: spacing.lg,
-    ...(isWeb && { maxWidth: 600, alignSelf: "center", width: "100%" }),
+    ...(isWeb && { maxWidth: 760, alignSelf: "center", width: "100%" }),
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: spacing.lg,
+    gap: spacing.base,
+  },
+  sectionTextBlock: {
+    flex: 1,
   },
   sectionTitle: {
     fontSize: fontSizes.xl,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#0F172A",
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
+    marginBottom: 4,
+  },
+  sectionDescription: {
+    fontSize: fontSizes.sm,
+    color: "#64748B",
+    lineHeight: 21,
+    maxWidth: 520,
   },
   sectionBadge: {
     flexDirection: "row",
@@ -227,20 +324,119 @@ export default StyleSheet.create({
     backgroundColor: "#ECFDF5",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: 20,
+    borderRadius: 999,
     gap: 4,
+    borderWidth: 1,
+    borderColor: "#CFF4E5",
   },
   sectionBadgeText: {
     fontSize: fontSizes.xs,
-    fontWeight: "600",
-    color: "#059669",
+    fontWeight: "700",
+    color: "#047857",
   },
   formGrid: {
     gap: spacing.base,
     marginBottom: spacing.xl,
   },
 
-  // ============ ID UPLOAD ============
+  stepInsightCard: {
+    backgroundColor: "#F7FFFA",
+    borderWidth: 1,
+    borderColor: "#CDEEDF",
+    borderRadius: 22,
+    padding: spacing.base,
+    marginBottom: spacing.base,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#047857",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+      },
+      android: { elevation: 1 },
+      web: { boxShadow: "0px 10px 22px rgba(5, 150, 105, 0.06)" },
+    }),
+  },
+  stepInsightHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  stepInsightIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#DDF8EA",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepInsightTextWrap: {
+    flex: 1,
+  },
+  stepInsightTitle: {
+    fontSize: fontSizes.base,
+    fontWeight: "800",
+    color: "#065F46",
+    marginBottom: 4,
+  },
+  stepInsightSubtitle: {
+    fontSize: fontSizes.sm,
+    color: "#4B5563",
+    lineHeight: 20,
+  },
+  stepInsightStats: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    marginTop: spacing.base,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2EAF2",
+    overflow: "hidden",
+  },
+  stepInsightStat: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepInsightStatValue: {
+    fontSize: fontSizes.base,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  stepInsightStatLabel: {
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    marginTop: 3,
+    textAlign: "center",
+  },
+  stepInsightDivider: {
+    width: 1,
+    backgroundColor: "#E2E8F0",
+  },
+  reviewChecklist: {
+    marginTop: spacing.base,
+    gap: spacing.sm,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2EAF2",
+    padding: spacing.base,
+  },
+  reviewChecklistItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  reviewChecklistText: {
+    flex: 1,
+    fontSize: fontSizes.sm,
+    color: "#334155",
+    fontWeight: "600",
+  },
+
   idUploadSection: {
     marginBottom: spacing.base,
   },
@@ -249,30 +445,40 @@ export default StyleSheet.create({
   },
   idCardTitle: {
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#0F172A",
-    marginBottom: 2,
+    marginBottom: 4,
   },
   idCardSubtitle: {
     fontSize: fontSizes.sm,
     color: "#64748B",
+    lineHeight: 20,
   },
 
-  // ============ FORM CARD ============
   formCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: 22,
     padding: spacing.base,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E4EDF7",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+      },
+      android: { elevation: 1 },
+      web: { boxShadow: "0px 10px 22px rgba(15, 23, 42, 0.04)" },
+    }),
   },
   formCardFocused: {
     borderColor: "#059669",
     borderWidth: 2,
   },
   formCardError: {
-    borderColor: "#FEE2E2",
-    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    backgroundColor: "#FFF8F8",
   },
   cardHeader: {
     flexDirection: "row",
@@ -280,54 +486,53 @@ export default StyleSheet.create({
     marginBottom: spacing.sm,
   },
   cardIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     marginRight: spacing.xs,
   },
   cardLabel: {
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#0F172A",
     flex: 1,
   },
   cardLabelSmall: {
     fontSize: fontSizes.sm,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#0F172A",
     flex: 1,
   },
   requiredBadge: {
     fontSize: 10,
-    fontWeight: "600",
-    color: "#EF4444",
+    fontWeight: "700",
+    color: "#DC2626",
     backgroundColor: "#FEF2F2",
     paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: 12,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
   optionalBadge: {
     fontSize: 10,
-    fontWeight: "500",
+    fontWeight: "600",
     color: "#64748B",
     backgroundColor: "#F1F5F9",
     paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: 12,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
 
-  // ============ INPUTS ============
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 14,
+    borderColor: "#E2EAF2",
+    borderRadius: 16,
     paddingHorizontal: spacing.base,
-    minHeight: 48,
+    minHeight: 52,
     gap: spacing.xs,
   },
   inputContainerFocused: {
@@ -347,28 +552,28 @@ export default StyleSheet.create({
   },
   errorText: {
     fontSize: fontSizes.xs,
-    color: "#EF4444",
-    marginTop: 4,
+    color: "#DC2626",
+    marginTop: 6,
     marginLeft: spacing.xs,
+    fontWeight: "600",
   },
   inputHint: {
     fontSize: fontSizes.xs,
     color: "#64748B",
-    marginTop: 2,
+    marginTop: 4,
   },
 
-  // ============ UPLOAD AREA ============
   uploadArea: {
-    borderRadius: 14,
+    borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 2,
-    borderColor: "#E2E8F0",
+    borderColor: "#DCE8E2",
     borderStyle: "dashed",
-    minHeight: 160,
+    minHeight: 176,
     ...(isWeb && {
       cursor: "pointer",
-      transition: "all 0.2s ease",
+      transition: "border-color 0.2s ease, background-color 0.2s ease",
       ":hover": {
         borderColor: "#059669",
         backgroundColor: "#ECFDF5",
@@ -385,9 +590,9 @@ export default StyleSheet.create({
     justifyContent: "center",
   },
   uploadIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: "#ECFDF5",
     justifyContent: "center",
     alignItems: "center",
@@ -395,17 +600,19 @@ export default StyleSheet.create({
   },
   uploadTitle: {
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#0F172A",
-    marginBottom: 2,
+    marginBottom: 4,
   },
   uploadSubtitle: {
     fontSize: fontSizes.xs,
     color: "#64748B",
+    textAlign: "center",
+    lineHeight: 18,
   },
   uploadPreview: {
     width: "100%",
-    height: 160,
+    height: 176,
     position: "relative",
   },
   previewImage: {
@@ -430,19 +637,18 @@ export default StyleSheet.create({
   changePhotoText: {
     color: "#FFFFFF",
     fontSize: fontSizes.sm,
-    fontWeight: "600",
-    marginTop: 4,
+    fontWeight: "700",
+    marginTop: 6,
   },
 
-  // ============ SCAN BUTTON ============
   scanButton: {
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
     marginTop: spacing.sm,
     ...(isWeb && {
       transition: "transform 0.2s ease",
       ":hover": {
-        transform: "scale(1.02)",
+        transform: "translateY(-1px)",
       },
     }),
   },
@@ -450,55 +656,56 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    paddingVertical: 13,
     gap: spacing.xs,
   },
   scanButtonText: {
     color: "#FFFFFF",
     fontSize: fontSizes.sm,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   scanningContainer: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 14,
+    backgroundColor: "#F8FBFE",
+    borderRadius: 16,
     padding: spacing.base,
     marginTop: spacing.sm,
     alignItems: "center",
     gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: "#DCE8E2",
   },
   scanningText: {
     fontSize: fontSizes.sm,
-    color: "#059669",
-    fontWeight: "500",
+    color: "#047857",
+    fontWeight: "600",
   },
   scanProgressContainer: {
     width: "100%",
-    height: 4,
+    height: 5,
     backgroundColor: "#E2E8F0",
-    borderRadius: 2,
+    borderRadius: 999,
     overflow: "hidden",
   },
   scanProgressBar: {
     height: "100%",
     backgroundColor: "#059669",
-    borderRadius: 2,
+    borderRadius: 999,
   },
 
-  // ============ DROPDOWN ============
   dropdownButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 14,
+    borderColor: "#E2EAF2",
+    borderRadius: 16,
     paddingHorizontal: spacing.base,
-    paddingVertical: 14,
-    minHeight: 48,
+    paddingVertical: 15,
+    minHeight: 52,
     ...(isWeb && {
       cursor: "pointer",
-      transition: "all 0.2s ease",
+      transition: "border-color 0.2s ease, background-color 0.2s ease",
       ":hover": {
         borderColor: "#059669",
         backgroundColor: "#ECFDF5",
@@ -514,19 +721,24 @@ export default StyleSheet.create({
     color: "#94A3B8",
   },
 
-  // ============ PICKER MODAL ============
   pickerModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(2, 24, 20, 0.5)",
     justifyContent: "flex-end",
     ...(isWeb && { justifyContent: "center" }),
   },
   pickerModalContainer: {
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     maxHeight: "80%",
-    ...(isWeb && { borderRadius: 24, maxWidth: 400, alignSelf: "center", width: "90%" }),
+    ...(isWeb && {
+      borderRadius: 26,
+      maxWidth: 420,
+      alignSelf: "center",
+      width: "90%",
+      boxShadow: "0px 16px 34px rgba(15, 23, 42, 0.12)",
+    }),
   },
   pickerModalHeader: {
     flexDirection: "row",
@@ -538,7 +750,7 @@ export default StyleSheet.create({
   },
   pickerModalTitle: {
     fontSize: fontSizes.lg,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#0F172A",
   },
   pickerModalOption: {
@@ -557,10 +769,9 @@ export default StyleSheet.create({
   },
   pickerModalOptionTextActive: {
     color: "#059669",
-    fontWeight: "500",
+    fontWeight: "700",
   },
 
-  // ============ COMPACT DATE/TIME ROW ============
   formRow: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -574,17 +785,17 @@ export default StyleSheet.create({
   datePickerButtonCompact: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
+    borderColor: "#E2EAF2",
+    borderRadius: 14,
     paddingHorizontal: spacing.sm,
-    height: 40,
+    height: 42,
     marginTop: 2,
     gap: 6,
     ...(isWeb && {
       cursor: "pointer",
-      transition: "all 0.2s ease",
+      transition: "border-color 0.2s ease, background-color 0.2s ease",
       ":hover": {
         borderColor: "#059669",
         backgroundColor: "#ECFDF5",
@@ -595,54 +806,38 @@ export default StyleSheet.create({
     fontSize: fontSizes.sm,
     color: "#0F172A",
     flex: 1,
+    fontWeight: "600",
   },
   webDateInputCompact: {
     width: "100%",
-    padding: 8,
-    borderRadius: 12,
-    border: "1px solid #E2E8F0",
+    padding: 10,
+    borderRadius: 14,
+    border: "1px solid #E2EAF2",
     fontSize: fontSizes.sm,
     color: "#0F172A",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     marginTop: 2,
     fontFamily: "inherit",
-    ...(isWeb && {
-      transition: "all 0.2s ease",
-      ":focus": {
-        borderColor: "#059669",
-        outline: "none",
-        boxShadow: "0 0 0 2px rgba(5, 150, 105, 0.1)",
-      },
-    }),
   },
   webTimeInputCompact: {
     width: "100%",
-    padding: 8,
-    borderRadius: 12,
-    border: "1px solid #E2E8F0",
+    padding: 10,
+    borderRadius: 14,
+    border: "1px solid #E2EAF2",
     fontSize: fontSizes.sm,
     color: "#0F172A",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     marginTop: 2,
     fontFamily: "inherit",
-    ...(isWeb && {
-      transition: "all 0.2s ease",
-      ":focus": {
-        borderColor: "#059669",
-        outline: "none",
-        boxShadow: "0 0 0 2px rgba(5, 150, 105, 0.1)",
-      },
-    }),
   },
 
-  // ============ REVIEW CARD ============
   reviewCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: 22,
     padding: spacing.base,
     marginBottom: spacing.base,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E4EDF7",
   },
   reviewHeader: {
     flexDirection: "row",
@@ -655,58 +850,62 @@ export default StyleSheet.create({
   },
   reviewHeaderText: {
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#0F172A",
     flex: 1,
   },
   reviewItem: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
     paddingVertical: spacing.xs,
+    gap: spacing.sm,
   },
   reviewLabel: {
     fontSize: fontSizes.sm,
     color: "#64748B",
+    flex: 1,
   },
   reviewValue: {
     fontSize: fontSizes.sm,
     color: "#0F172A",
-    fontWeight: "500",
+    fontWeight: "600",
+    flex: 1,
+    textAlign: "right",
   },
   reviewImage: {
     width: "100%",
-    height: 120,
-    borderRadius: 12,
+    height: 132,
+    borderRadius: 14,
     marginTop: spacing.xs,
   },
 
-  // ============ EDIT BUTTON ============
   editButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#ECFDF5",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: 20,
+    borderRadius: 999,
     gap: 4,
     ...(isWeb && {
       cursor: "pointer",
-      transition: "all 0.2s ease",
+      transition: "background-color 0.2s ease, transform 0.2s ease",
       ":hover": {
         backgroundColor: "#D1FAE5",
-        transform: "scale(1.02)",
+        transform: "translateY(-1px)",
       },
     }),
   },
   editButtonText: {
     fontSize: fontSizes.xs,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#059669",
   },
 
-  // ============ CONTINUE BUTTON ============
   continueButton: {
-    borderRadius: 14,
+    flex: 1.35,
+    borderRadius: 18,
     overflow: "hidden",
     marginBottom: spacing.base,
     ...(isWeb && {
@@ -714,10 +913,7 @@ export default StyleSheet.create({
       transition: "transform 0.2s ease, box-shadow 0.2s ease",
       ":hover": {
         transform: "translateY(-2px)",
-        boxShadow: "0px 8px 20px rgba(5, 150, 105, 0.3)",
-      },
-      ":active": {
-        transform: "translateY(0)",
+        boxShadow: "0px 10px 24px rgba(5, 150, 105, 0.28)",
       },
     }),
   },
@@ -725,19 +921,52 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
+    paddingVertical: 17,
     gap: spacing.xs,
   },
   continueButtonText: {
     color: "#FFFFFF",
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
+  },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: spacing.sm,
+  },
+  secondaryActionButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 16,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.base,
+    ...Platform.select({
+      web: {
+        cursor: "pointer",
+        transition: "transform 0.2s ease, background-color 0.2s ease",
+        ":hover": {
+          backgroundColor: "#F8FAFC",
+          transform: "translateY(-1px)",
+        },
+      },
+    }),
+  },
+  secondaryActionText: {
+    fontSize: fontSizes.sm,
+    fontWeight: "700",
+    color: "#475569",
   },
 
-  // ============ MODALS ============
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(2, 24, 20, 0.45)",
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.lg,
@@ -746,15 +975,18 @@ export default StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     width: "90%",
-    maxWidth: 500,
-    maxHeight: "80%",
+    maxWidth: 520,
+    maxHeight: "82%",
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E4EDF7",
   },
   privacyModalHeader: {
     padding: spacing.lg,
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
+    backgroundColor: "#F8FBFE",
   },
   privacyIconContainer: {
     marginBottom: spacing.sm,
@@ -770,9 +1002,9 @@ export default StyleSheet.create({
   },
   privacyModalTitle: {
     fontSize: fontSizes.xl,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#0F172A",
-    marginBottom: 2,
+    marginBottom: 4,
   },
   privacyModalSubtitle: {
     fontSize: fontSizes.sm,
@@ -794,7 +1026,7 @@ export default StyleSheet.create({
   },
   privacySectionTitle: {
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#0F172A",
   },
   privacySectionText: {
@@ -810,7 +1042,7 @@ export default StyleSheet.create({
     padding: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
   privacyCheckbox: {
     width: 22,
@@ -833,7 +1065,7 @@ export default StyleSheet.create({
   },
   privacyLinkText: {
     color: "#059669",
-    fontWeight: "600",
+    fontWeight: "700",
   },
   privacyModalActions: {
     flexDirection: "row",
@@ -851,7 +1083,7 @@ export default StyleSheet.create({
   },
   privacyDeclineText: {
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#64748B",
   },
   privacyAcceptButton: {
@@ -871,18 +1103,19 @@ export default StyleSheet.create({
   },
   privacyAcceptText: {
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#FFFFFF",
   },
 
-  // ============ SUCCESS MODAL ============
   successModalContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: spacing.xl,
     alignItems: "center",
     width: "90%",
-    maxWidth: 400,
+    maxWidth: 420,
+    borderWidth: 1,
+    borderColor: "#E4EDF7",
   },
   successIconContainer: {
     marginBottom: spacing.base,
@@ -890,15 +1123,15 @@ export default StyleSheet.create({
     overflow: "hidden",
   },
   successIconGradient: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     justifyContent: "center",
     alignItems: "center",
   },
   successTitle: {
     fontSize: fontSizes.xl,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#0F172A",
     marginBottom: spacing.sm,
     textAlign: "center",
@@ -911,22 +1144,24 @@ export default StyleSheet.create({
     lineHeight: 22,
   },
   credentialsBox: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 16,
+    backgroundColor: "#F8FBFE",
+    borderRadius: 18,
     padding: spacing.base,
     marginBottom: spacing.base,
     width: "100%",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E2EAF2",
   },
   credentialsTitle: {
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#059669",
-    marginBottom: spacing.xs,
+  },
+  credentialsTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
   credentialsInfo: {
     fontSize: fontSizes.sm,
@@ -944,37 +1179,37 @@ export default StyleSheet.create({
   },
   credentialLabel: {
     fontSize: fontSizes.sm,
-    fontWeight: "500",
+    fontWeight: "600",
     color: "#475569",
-    width: 70,
+    width: 72,
   },
   credentialValue: {
     fontSize: fontSizes.sm,
     color: "#0F172A",
-    fontWeight: "500",
+    fontWeight: "600",
     flex: 1,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   copyButton: {
     padding: spacing.xs,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: "#ECFDF5",
   },
   successButton: {
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
     width: "100%",
-  }, 
+  },
   successGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
+    paddingVertical: 15,
     gap: spacing.xs,
   },
   successButtonText: {
     color: "#FFFFFF",
     fontSize: fontSizes.base,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 });

@@ -15,16 +15,19 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
-// FIXED: Import AsyncStorage correctly for Webpack
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from "../utils/ApiService";
+import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
 import verificationStyles from "../styles/VerificationStyles";
+
+const Storage = Platform.OS === "web"
+  ? require("../utils/webStorage").default
+  : require("@react-native-async-storage/async-storage");
 
 // Helper function to safely store data
 const storeData = async (key, value) => {
   try {
-    if (!AsyncStorage || typeof AsyncStorage.setItem !== 'function') {
-      console.error('AsyncStorage is not available');
+    if (!Storage || typeof Storage.setItem !== 'function') {
+      console.error("Storage is not available");
       // Fallback for web - use localStorage
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(key, value);
@@ -32,7 +35,7 @@ const storeData = async (key, value) => {
       }
       return false;
     }
-    await AsyncStorage.setItem(key, value);
+    await Storage.setItem(key, value);
     return true;
   } catch (error) {
     console.error(`Error storing ${key}:`, error);
@@ -42,15 +45,15 @@ const storeData = async (key, value) => {
 
 const getData = async (key) => {
   try {
-    if (!AsyncStorage || typeof AsyncStorage.getItem !== 'function') {
-      console.error('AsyncStorage is not available');
+    if (!Storage || typeof Storage.getItem !== 'function') {
+      console.error("Storage is not available");
       // Fallback for web - use localStorage
       if (typeof window !== 'undefined' && window.localStorage) {
         return window.localStorage.getItem(key);
       }
       return null;
     }
-    return await AsyncStorage.getItem(key);
+    return await Storage.getItem(key);
   } catch (error) {
     console.error(`Error getting ${key}:`, error);
     return null;
@@ -101,6 +104,15 @@ export default function VerificationScreen({ navigation, route }) {
       }),
     ]).start();
   }, []);
+
+  useEffect(() => {
+    if (!userData?.phone) return;
+
+    let cleanPhone = String(userData.phone).replace(/[^\d]/g, "");
+    if (cleanPhone.startsWith("63")) cleanPhone = cleanPhone.slice(2);
+    if (cleanPhone.startsWith("0")) cleanPhone = cleanPhone.slice(1);
+    setPhoneNumber(cleanPhone.slice(0, 10));
+  }, [userData?.phone]);
 
   // Timer for OTP
   useEffect(() => {
@@ -241,7 +253,7 @@ export default function VerificationScreen({ navigation, route }) {
       setIsLoading(true);
       
       // Use the user data from the verification response or from route params
-      const finalUser = verificationResponse?.user || userData;
+      let finalUser = verificationResponse?.user || userData;
       
       if (!finalUser) {
         console.error("No user data available");
@@ -251,51 +263,42 @@ export default function VerificationScreen({ navigation, route }) {
       
       console.log("💾 Storing user data:", finalUser.email, "Role:", finalUser.role);
       
-      // FIXED: Use safe storage functions
-      // Store the auth token
-      if (verificationResponse?.token) {
-        await ApiService.setToken(verificationResponse.token);
-<<<<<<< HEAD
+      // Reuse the token returned during credential verification to avoid a second login request.
+      let sessionToken = verificationResponse?.token || tempToken || null;
+      if (!sessionToken && email && password) {
+        const loginResponse = await ApiService.login(email, password);
+        sessionToken = loginResponse?.token || null;
+        if (loginResponse?.user) {
+          finalUser = loginResponse.user;
+        }
+      }
+      if (sessionToken) {
+        await ApiService.setToken(sessionToken);
         console.log("✅ Auth token stored");
       } else if (tempToken) {
         await ApiService.setToken(tempToken);
-=======
-        await storeData("userToken", verificationResponse.token);
-        console.log("✅ Auth token stored");
-      } else if (tempToken) {
-        await ApiService.setToken(tempToken);
-        await storeData("userToken", tempToken);
->>>>>>> f735fcfb39f1a77210269c587a689128e37f12a1
-        console.log("✅ Temp token stored");
+        console.log("⚠️ Using temporary token fallback");
       }
       
-      const userRole = String(finalUser.role || "visitor").toLowerCase();
+      const userRole = normalizeRole(finalUser.role) || "visitor";
 
       // Store user data
       await storeData("currentUser", JSON.stringify({ ...finalUser, role: userRole }));
       console.log("✅ User data stored");
       
-      // Store email if remember me is checked
+      // Treat remember-me as a trusted device so future logins can follow the faster path.
       if (rememberMe && email) {
         await storeData("rememberedEmail", email);
+        await ApiService.trustDevice();
         console.log("✅ Remembered email stored");
+      } else if (email) {
+        await Storage.removeItem("rememberedEmail");
       }
       
       // Clear new registration flag
-      await storeData("isNewRegistration", "false");
+      await Storage.removeItem("isNewRegistration");
       
-      // Determine dashboard route based on user role
-      let dashboardRoute = 'VisitorDashboard';
-      
-      if (userRole === 'admin') {
-        dashboardRoute = 'AdminDashboard';
-      } else if (userRole === 'security' || userRole === 'guard') {
-        dashboardRoute = 'SecurityDashboard';
-      } else if (userRole === 'staff') {
-        dashboardRoute = 'RoleSelect';
-      } else {
-        dashboardRoute = 'VisitorDashboard';
-      }
+      const dashboardRoute = getDashboardRoute(userRole);
       
       console.log('✅ Verification complete - Navigating to:', dashboardRoute, 'Role:', userRole);
       

@@ -81,10 +81,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       const profileResponse = await ApiService.getVisitorProfile();
       if (profileResponse.success && profileResponse.visitor) {
         setVisitor(profileResponse.visitor);
-        
-        const logsResponse = await ApiService.getVisitorAccessLogs(profileResponse.visitor._id);
-        if (logsResponse.success) {
-          setAccessLogs(logsResponse.logs);
+
+        const pendingVisitor =
+          profileResponse.visitor.status === "pending" ||
+          profileResponse.visitor.approvalStatus === "pending";
+
+        if (!pendingVisitor) {
+          const logsResponse = await ApiService.getVisitorAccessLogs(profileResponse.visitor._id);
+          if (logsResponse.success) {
+            setAccessLogs(logsResponse.logs);
+          }
+        } else {
+          setAccessLogs([]);
         }
       } else {
         setVisitor(null);
@@ -583,6 +591,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const statusColor = getStatusColor();
   const statusText = getStatusText();
   const statusIcon = getStatusIcon();
+  const isPendingApproval =
+    visitor?.status === "pending" || visitor?.approvalStatus === "pending";
+  const isApprovedVisitor =
+    !isPendingApproval && visitor?.status === "approved";
+  const approvedActionLabel = isNfcReading ? "Stop NFC" : "Start NFC";
+  const approvedActionIcon = isNfcReading ? "pause-circle" : "radio";
 
   return (
     <SafeAreaView style={visitorDashboardStyles.safeArea}>
@@ -646,6 +660,384 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         }
       >
         {visitor ? (
+          isPendingApproval ? (
+            <>
+              <View style={visitorDashboardStyles.pendingApprovalCard}>
+                <LinearGradient
+                  colors={['#F59E0B', '#D97706']}
+                  style={visitorDashboardStyles.pendingApprovalGradient}
+                >
+                  <View style={visitorDashboardStyles.pendingApprovalIconWrap}>
+                    <Ionicons name="hourglass-outline" size={38} color="#FFFFFF" />
+                  </View>
+                  <Text style={visitorDashboardStyles.pendingApprovalTitle}>
+                    Waiting for Admin Approval
+                  </Text>
+                  <Text style={visitorDashboardStyles.pendingApprovalText}>
+                    Your visitor account has been created successfully. An admin still needs to approve
+                    your visit request before your SafePass and check-in features become active.
+                  </Text>
+
+                  <View style={visitorDashboardStyles.pendingApprovalInfoBox}>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoRow}>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Visitor</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>{visitor.fullName}</Text>
+                    </View>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoRow}>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Email</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>{visitor.email}</Text>
+                    </View>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoRow}>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Visit Date</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>{formatDate(visitor.visitDate)}</Text>
+                    </View>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoRow}>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Visit Time</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>{formatTime(visitor.visitTime)}</Text>
+                    </View>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoRow}>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Purpose</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>
+                        {visitor.purposeOfVisit || "Visit request submitted"}
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              <View style={visitorDashboardStyles.pendingStepsCard}>
+                <Text style={visitorDashboardStyles.pendingStepsTitle}>What happens next?</Text>
+                {[
+                  "Your registration has already been sent to the admin for review.",
+                  "Once approved, your visitor pass and access tools will appear here automatically.",
+                  "Until then, you can sign in and track your approval status from this dashboard.",
+                ].map((item) => (
+                  <View key={item} style={visitorDashboardStyles.pendingStepItem}>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#F59E0B" />
+                    <Text style={visitorDashboardStyles.pendingStepText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={visitorDashboardStyles.logoutButton}
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+                <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
+              </TouchableOpacity>
+            </>
+          ) : isApprovedVisitor ? (
+            <>
+              <View style={visitorDashboardStyles.approvedHeroCard}>
+                <LinearGradient
+                  colors={["#0F766E", "#0EA5A4", "#2563EB"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={visitorDashboardStyles.approvedHeroGradient}
+                >
+                  <View style={visitorDashboardStyles.approvedHeroBadge}>
+                    <Ionicons name="shield-checkmark" size={16} color="#0F766E" />
+                    <Text style={visitorDashboardStyles.approvedHeroBadgeText}>
+                      Approved Access
+                    </Text>
+                  </View>
+
+                  <View style={visitorDashboardStyles.approvedHeroHeader}>
+                    <View style={visitorDashboardStyles.approvedHeroAvatar}>
+                      <Text style={visitorDashboardStyles.approvedHeroInitials}>
+                        {visitor.fullName
+                          ?.split(" ")
+                          .map((name) => name[0])
+                          .join("")
+                          .substring(0, 2)
+                          .toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={visitorDashboardStyles.approvedHeroTextWrap}>
+                      <Text style={visitorDashboardStyles.approvedHeroTitle}>
+                        Your SafePass is Ready
+                      </Text>
+                      <Text style={visitorDashboardStyles.approvedHeroSubtitle}>
+                        Present your QR code or use NFC at the gate when you arrive on campus.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={visitorDashboardStyles.approvedHeroFacts}>
+                    <View style={visitorDashboardStyles.approvedHeroFactCard}>
+                      <Text style={visitorDashboardStyles.approvedHeroFactLabel}>
+                        Visit Date
+                      </Text>
+                      <Text style={visitorDashboardStyles.approvedHeroFactValue}>
+                        {formatDate(visitor.visitDate)}
+                      </Text>
+                    </View>
+                    <View style={visitorDashboardStyles.approvedHeroFactCard}>
+                      <Text style={visitorDashboardStyles.approvedHeroFactLabel}>
+                        Arrival Time
+                      </Text>
+                      <Text style={visitorDashboardStyles.approvedHeroFactValue}>
+                        {formatTime(visitor.visitTime)}
+                      </Text>
+                    </View>
+                    <View style={visitorDashboardStyles.approvedHeroFactCard}>
+                      <Text style={visitorDashboardStyles.approvedHeroFactLabel}>
+                        Access ID
+                      </Text>
+                      <Text style={visitorDashboardStyles.approvedHeroFactValue}>
+                        {visitor.idNumber}
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              <View style={visitorDashboardStyles.approvedActionSection}>
+                <View style={visitorDashboardStyles.approvedSectionHeader}>
+                  <Text style={visitorDashboardStyles.approvedSectionTitle}>
+                    Access Tools
+                  </Text>
+                  <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
+                    Choose the fastest way to enter campus.
+                  </Text>
+                </View>
+
+                <View style={visitorDashboardStyles.approvedActionGrid}>
+                  <TouchableOpacity
+                    style={visitorDashboardStyles.approvedActionCard}
+                    onPress={() => setShowQRModal(true)}
+                    activeOpacity={0.9}
+                  >
+                    <LinearGradient
+                      colors={["#10B981", "#059669"]}
+                      style={visitorDashboardStyles.approvedActionIconWrap}
+                    >
+                      <Ionicons name="qr-code" size={22} color="#FFFFFF" />
+                    </LinearGradient>
+                    <Text style={visitorDashboardStyles.approvedActionTitle}>
+                      Show QR Pass
+                    </Text>
+                    <Text style={visitorDashboardStyles.approvedActionText}>
+                      Open your visitor pass for gate scanning.
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={visitorDashboardStyles.approvedActionCard}
+                    onPress={isNfcReading ? stopNfcReading : startNfcReading}
+                    activeOpacity={0.9}
+                  >
+                    <LinearGradient
+                      colors={isNfcReading ? ["#2563EB", "#1D4ED8"] : ["#4F46E5", "#7C3AED"]}
+                      style={visitorDashboardStyles.approvedActionIconWrap}
+                    >
+                      <Ionicons name={approvedActionIcon} size={22} color="#FFFFFF" />
+                    </LinearGradient>
+                    <Text style={visitorDashboardStyles.approvedActionTitle}>
+                      {approvedActionLabel}
+                    </Text>
+                    <Text style={visitorDashboardStyles.approvedActionText}>
+                      {isNfcReading
+                        ? "Your phone is ready to tap on the reader."
+                        : isNfcSupported
+                          ? "Activate tap-to-check-in before reaching the gate."
+                          : "NFC is not available on this device."}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={visitorDashboardStyles.approvedActionCard}
+                    onPress={handleCheckIn}
+                    activeOpacity={0.9}
+                  >
+                    <LinearGradient
+                      colors={["#F59E0B", "#D97706"]}
+                      style={visitorDashboardStyles.approvedActionIconWrap}
+                    >
+                      <Ionicons name="log-in" size={22} color="#FFFFFF" />
+                    </LinearGradient>
+                    <Text style={visitorDashboardStyles.approvedActionTitle}>
+                      Check In
+                    </Text>
+                    <Text style={visitorDashboardStyles.approvedActionText}>
+                      Manually confirm your arrival if needed.
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {nfcStatus && (
+                  <View style={visitorDashboardStyles.approvedStatusBanner}>
+                    <Ionicons
+                      name={
+                        nfcStatus.type === "success"
+                          ? "checkmark-circle"
+                          : nfcStatus.type === "error"
+                            ? "alert-circle"
+                            : "sync-circle"
+                      }
+                      size={18}
+                      color="#4F46E5"
+                    />
+                    <Text style={visitorDashboardStyles.approvedStatusBannerText}>
+                      {nfcStatus.message}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={visitorDashboardStyles.approvedInfoCard}>
+                <View style={visitorDashboardStyles.approvedSectionHeader}>
+                  <Text style={visitorDashboardStyles.approvedSectionTitle}>
+                    Visit Snapshot
+                  </Text>
+                  <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
+                    Everything you need before arrival.
+                  </Text>
+                </View>
+
+                <View style={visitorDashboardStyles.approvedInfoList}>
+                  <View style={visitorDashboardStyles.approvedInfoRow}>
+                    <Text style={visitorDashboardStyles.approvedInfoLabel}>Visitor</Text>
+                    <Text style={visitorDashboardStyles.approvedInfoValue}>{visitor.fullName}</Text>
+                  </View>
+                  <View style={visitorDashboardStyles.approvedInfoRow}>
+                    <Text style={visitorDashboardStyles.approvedInfoLabel}>Purpose</Text>
+                    <Text style={visitorDashboardStyles.approvedInfoValue}>
+                      {visitor.purposeOfVisit}
+                    </Text>
+                  </View>
+                  <View style={visitorDashboardStyles.approvedInfoRow}>
+                    <Text style={visitorDashboardStyles.approvedInfoLabel}>Phone</Text>
+                    <Text style={visitorDashboardStyles.approvedInfoValue}>{visitor.phoneNumber}</Text>
+                  </View>
+                  <View style={visitorDashboardStyles.approvedInfoRow}>
+                    <Text style={visitorDashboardStyles.approvedInfoLabel}>Vehicle</Text>
+                    <Text style={visitorDashboardStyles.approvedInfoValue}>
+                      {visitor.vehicleNumber || "No vehicle registered"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={visitorDashboardStyles.approvedTipsCard}>
+                <View style={visitorDashboardStyles.approvedSectionHeader}>
+                  <Text style={visitorDashboardStyles.approvedSectionTitle}>
+                    Arrival Checklist
+                  </Text>
+                  <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
+                    A quick guide for a smooth gate entry.
+                  </Text>
+                </View>
+
+                {[
+                  "Bring the same ID you used during registration.",
+                  "Arrive a few minutes before your scheduled visit time.",
+                  "Use your QR pass or NFC tap first before asking for manual assistance.",
+                ].map((tip) => (
+                  <View key={tip} style={visitorDashboardStyles.approvedTipRow}>
+                    <View style={visitorDashboardStyles.approvedTipBullet}>
+                      <Ionicons name="checkmark" size={14} color="#0F766E" />
+                    </View>
+                    <Text style={visitorDashboardStyles.approvedTipText}>{tip}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={visitorDashboardStyles.mapCard}
+                onPress={() => navigation.navigate("WebMapScreen")}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={["#FEF3C7", "#FFFBEB"]}
+                  style={visitorDashboardStyles.mapGradient}
+                >
+                  <View style={visitorDashboardStyles.mapContent}>
+                    <View style={visitorDashboardStyles.mapTextContainer}>
+                      <Text style={visitorDashboardStyles.mapTitle}>Campus Map</Text>
+                      <Text style={visitorDashboardStyles.mapSubtitle}>
+                        Plan your route before you arrive at Sapphire Aviation School.
+                      </Text>
+                      <View style={visitorDashboardStyles.mapButton}>
+                        <Text style={visitorDashboardStyles.mapButtonText}>View Map</Text>
+                        <Ionicons name="arrow-forward" size={16} color="#D97706" />
+                      </View>
+                    </View>
+                    <View style={visitorDashboardStyles.mapIconContainer}>
+                      <Ionicons name="map-outline" size={48} color="#D97706" />
+                    </View>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {accessLogs.length > 0 && (
+                <View style={visitorDashboardStyles.detailsCard}>
+                  <View style={visitorDashboardStyles.detailsHeader}>
+                    <Ionicons name="time-outline" size={20} color="#4F46E5" />
+                    <Text style={visitorDashboardStyles.detailsTitle}>Recent Access Activity</Text>
+                  </View>
+
+                  {accessLogs.slice(0, 3).map((log, index) => (
+                    <View key={index} style={visitorDashboardStyles.historyItem}>
+                      <View
+                        style={[
+                          visitorDashboardStyles.historyIcon,
+                          {
+                            backgroundColor:
+                              log.status === "granted" ? "#E3F2E9" : "#FEE2E2",
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={log.status === "granted" ? "checkmark" : "close"}
+                          size={14}
+                          color={log.status === "granted" ? "#10B981" : "#EF4444"}
+                        />
+                      </View>
+                      <View style={visitorDashboardStyles.historyInfo}>
+                        <Text style={visitorDashboardStyles.historyLocation}>
+                          {log.location || "Main Gate"}
+                        </Text>
+                        <Text style={visitorDashboardStyles.historyTime}>
+                          {formatDateTime(log.timestamp)}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          visitorDashboardStyles.historyStatus,
+                          {
+                            backgroundColor:
+                              log.status === "granted" ? "#E3F2E9" : "#FEE2E2",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            visitorDashboardStyles.historyStatusText,
+                            {
+                              color:
+                                log.status === "granted" ? "#10B981" : "#EF4444",
+                            },
+                          ]}
+                        >
+                          {log.status === "granted" ? "Granted" : "Denied"}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={visitorDashboardStyles.logoutButton}
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+                <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
           <>
             {/* NFC Tap Card - Interactive Tap to Check In/Out */}
             <TouchableOpacity 
@@ -927,6 +1319,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
             </TouchableOpacity>
           </>
+          )
         ) : (
           <View style={visitorDashboardStyles.emptyState}>
             <View style={visitorDashboardStyles.emptyIconContainer}>

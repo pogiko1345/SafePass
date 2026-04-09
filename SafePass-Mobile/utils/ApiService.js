@@ -8,17 +8,29 @@ if (Platform.OS === 'web') {
 }
 import * as ImageManipulator from 'expo-image-manipulator';
 
+const WEB_FALLBACK_API_BASE_URL = (() => {
+  if (typeof window === "undefined") {
+    return "http://localhost:5000/api";
+  }
+
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:5000/api`;
+})();
+
 const DEFAULT_API_BASE_URL = Platform.select({
-  ios: "http://localhost:5000/api",           // iOS simulator
-  android: "http://10.0.2.2:5000/api",        // Android emulator
-  web: "http://localhost:5000/api",           // Web
-  default: "http://localhost:5000/api"        // Default
+  ios: "http://localhost:5000/api",            // iOS simulator
+  android: "http://10.0.2.2:5000/api",         // Android emulator
+  web: WEB_FALLBACK_API_BASE_URL,              // Browser on same host as backend
+  default: "http://localhost:5000/api",        // Default
 });
 
 const API_BASE_URL = (
   process.env.EXPO_PUBLIC_API_BASE_URL ||
   DEFAULT_API_BASE_URL
 ).replace(/\/$/, "");
+
+// Keep simulation/fallback OFF by default so app uses real backend/database.
+const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
 
 class ApiService {
   constructor() {
@@ -30,11 +42,19 @@ class ApiService {
   // ================= TOKEN HANDLING =================
 
   async setToken(token) {
-    this.token = token;
-    if (token) {
-      await AsyncStorage.setItem("userToken", token);
+    const normalizedToken = typeof token === "string" ? token.trim() : "";
+    const validToken =
+      normalizedToken &&
+      normalizedToken !== "undefined" &&
+      normalizedToken !== "null"
+        ? normalizedToken
+        : null;
+
+    this.token = validToken;
+    if (validToken) {
+      await AsyncStorage.setItem("userToken", validToken);
       // Backward compatibility for older screens still reading authToken.
-      await AsyncStorage.setItem("authToken", token);
+      await AsyncStorage.setItem("authToken", validToken);
     } else {
       await AsyncStorage.removeItem("userToken");
       await AsyncStorage.removeItem("authToken");
@@ -43,15 +63,36 @@ class ApiService {
 
   async getToken() {
     if (!this.token) {
-      const userToken = await AsyncStorage.getItem("userToken");
+      const userTokenRaw = await AsyncStorage.getItem("userToken");
+      const userToken =
+        typeof userTokenRaw === "string"
+          ? userTokenRaw.trim()
+          : "";
+
       if (userToken) {
-        this.token = userToken;
+        if (userToken === "undefined" || userToken === "null") {
+          await AsyncStorage.removeItem("userToken");
+          await AsyncStorage.removeItem("authToken");
+          this.token = null;
+        } else {
+          this.token = userToken;
+        }
       } else {
         // Backward compatibility: migrate legacy authToken to userToken.
-        const legacyToken = await AsyncStorage.getItem("authToken");
+        const legacyTokenRaw = await AsyncStorage.getItem("authToken");
+        const legacyToken =
+          typeof legacyTokenRaw === "string"
+            ? legacyTokenRaw.trim()
+            : "";
+
         if (legacyToken) {
-          this.token = legacyToken;
-          await AsyncStorage.setItem("userToken", legacyToken);
+          if (legacyToken === "undefined" || legacyToken === "null") {
+            await AsyncStorage.removeItem("authToken");
+            this.token = null;
+          } else {
+            this.token = legacyToken;
+            await AsyncStorage.setItem("userToken", legacyToken);
+          }
         }
       }
     }
@@ -70,7 +111,7 @@ class ApiService {
   }
 
   isDevFallbackEnabled() {
-    return typeof __DEV__ !== "undefined" && __DEV__;
+    return DEV_FALLBACK_ENABLED;
   }
 
   // ================= NFC METHODS =================
@@ -173,7 +214,10 @@ async fetch(url, options = {}) {
 
     if (!response.ok) {
       console.log(`❌ HTTP ${response.status}:`, data);
-      throw new Error(data.error || data.message || `HTTP ${response.status}`);
+      const apiError = new Error(data.error || data.message || `HTTP ${response.status}`);
+      apiError.status = response.status;
+      apiError.data = data;
+      throw apiError;
     }
 
     return data;
@@ -204,6 +248,21 @@ async register(userData) {
     throw error;
   }
 }
+
+  async createStaffUser(staffData) {
+    try {
+      const payload = {
+        ...staffData,
+        role: "staff",
+        status: staffData?.status || "active",
+        isActive: staffData?.isActive ?? true,
+      };
+      return await this.register(payload);
+    } catch (error) {
+      const message = error?.message || "Failed to create staff account";
+      throw new Error(message);
+    }
+  }
 
   async login(email, password) {
     try {
@@ -678,6 +737,30 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async securityCheckIn(visitorId) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/checkin`, {
+        method: "PUT",
+      });
+      return response;
+    } catch (error) {
+      console.error("Security check-in error:", error);
+      throw error;
+    }
+  }
+
+  async securityCheckOut(visitorId) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/checkout`, {
+        method: "PUT",
+      });
+      return response;
+    } catch (error) {
+      console.error("Security check-out error:", error);
+      throw error;
+    }
+  }
+
   async getVisitors(filters = {}) {
     try {
       const queryString = new URLSearchParams(filters).toString();
@@ -1024,7 +1107,13 @@ async createSecurityGuard(guardData) {
     return response;
   } catch (error) {
     console.error("❌ Create security guard error:", error);
-    throw error;
+    const isDuplicateEmail =
+      error?.status === 409 ||
+      String(error?.message || "").toLowerCase().includes("email already");
+    const message = isDuplicateEmail
+      ? "Email already registered. Please use another email address."
+      : (error?.message || "Failed to create security account");
+    throw new Error(message);
   }
 }
 

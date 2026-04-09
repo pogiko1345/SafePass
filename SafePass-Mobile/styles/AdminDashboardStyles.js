@@ -38,8 +38,11 @@ export default StyleSheet.create({
 
   sidebar: {
     width: sidebarWidth,
-    backgroundColor: "#1E3A5F",
+    backgroundColor: "#0F2A43",
     height: "100%",
+    borderTopRightRadius: 26,
+    borderBottomRightRadius: 26,
+    overflow: "hidden",
   },
 
   sidebarContent: {
@@ -48,10 +51,10 @@ export default StyleSheet.create({
 
   sidebarHeader: {
     paddingHorizontal: 20,
-    paddingVertical: 28,
+    paddingVertical: 24,
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
+    borderBottomColor: "rgba(255,255,255,0.08)",
   },
 
   sidebarLogoImage: {
@@ -95,7 +98,7 @@ export default StyleSheet.create({
 
   sidebarStats: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 12,
     padding: 12,
     width: "100%",
@@ -127,7 +130,7 @@ export default StyleSheet.create({
   sidebarMenuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     marginHorizontal: 12,
     borderRadius: 12,
@@ -135,7 +138,9 @@ export default StyleSheet.create({
   },
 
   sidebarMenuItemActive: {
-    backgroundColor: "rgba(59,130,246,0.2)",
+    backgroundColor: "rgba(56,189,248,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(125,211,252,0.35)",
   },
 
   sidebarMenuIcon: {
@@ -261,7 +266,7 @@ export default StyleSheet.create({
 
   contentArea: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F5F8FC",
   },
 
   contentScrollView: {
@@ -273,19 +278,19 @@ export default StyleSheet.create({
   },
 
   pageContainer: {
-    padding: 24,
+    padding: 22,
   },
 
   pageHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 18,
   },
 
   pageTitle: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 25,
+    fontWeight: "800",
     color: "#1E293B",
   },
 
@@ -298,17 +303,19 @@ export default StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: Platform.select({ ios: 50, android: 20, web: 20 }),
     paddingBottom: 16,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: "#0F172A",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
       },
       android: { elevation: 3 },
-      web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.05)" },
+      web: { boxShadow: "0px 2px 12px rgba(15,23,42,0.08)" },
     }),
   },
 
@@ -325,29 +332,232 @@ export default StyleSheet.create({
   },
 
   headerSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#64748B",
-    marginTop: 2,
+    marginTop: 4,
   },
 
   profileButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(59,130,246,0.1)",
+    backgroundColor: "rgba(14,165,233,0.12)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#3B82F6",
+    borderColor: "#0EA5E9",
   },
 
   profileIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#0EA5E9",
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  pageRefreshButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+
+  dashboardHeroCard: {
+    marginBottom: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    backgroundColor: "#F0F9FF",
+    padding: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  dashboardHeroLeft: {
+    flex: 1,
+  },
+
+  dashboardHeroTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 5,
+  },
+
+  dashboardHeroSubtitle: {
+    fontSize: 12,
+    color: "#475569",
+    lineHeight: 18,
+  },
+
+  dashboardHeroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#E0F2FE",
+    borderRadius: 999,
+  },
+
+  dashboardHeroBadgeText: {
+    fontSize: 11,
+    color: "#0369A1",
+    fontWeight: "600",
+  },
+
+  dashboardStatsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  dashboardStatCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  dashboardStatHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  dashboardStatLabel: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  dashboardStatIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  dashboardStatValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    marginTop: 10,
+  },
+
+  dashboardSectionCard: {
+    marginTop: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 7,
+    elevation: 2,
+  },
+
+  dashboardSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+
+  dashboardSectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  dashboardSectionLink: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
+  },
+
+  dashboardSectionEmpty: {
+    marginTop: 10,
+    color: "#64748B",
+  },
+
+  dashboardActionsRow: {
+    marginTop: 14,
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  dashboardRequestCard: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+
+  dashboardRequestCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+
+  dashboardRequestCardInfo: {
+    flex: 1,
+    paddingRight: 10,
+  },
+
+  dashboardRequestName: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  dashboardRequestEmail: {
+    marginTop: 2,
+    color: "#64748B",
+  },
+
+  dashboardRequestPurpose: {
+    marginTop: 2,
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  dashboardRequestTime: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  dashboardRequestRight: {
+    alignItems: "flex-end",
+  },
+
+  dashboardStatusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  dashboardStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  dashboardRequestDate: {
+    marginTop: 8,
+    fontSize: 11,
+    color: "#64748B",
   },
 
   profileInitials: {
@@ -944,6 +1154,27 @@ export default StyleSheet.create({
     gap: 16,
   },
 
+  userManagementList: {
+    marginTop: 10,
+    maxHeight: 400,
+  },
+
+  userStatusBadgeActive: {
+    backgroundColor: "rgba(16,185,129,0.15)",
+  },
+
+  userStatusBadgeInactive: {
+    backgroundColor: "rgba(239,68,68,0.15)",
+  },
+
+  userStatusTextActive: {
+    color: "#10B981",
+  },
+
+  userStatusTextInactive: {
+    color: "#EF4444",
+  },
+
   // ============================================
   // 15. SEARCH & FILTERS - Search and filter UI
   // ============================================
@@ -1154,6 +1385,72 @@ export default StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: "#FFF",
+  },
+
+  createSuccessIcon: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: "#ECFDF5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+
+  createSuccessSummary: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    backgroundColor: "#F8FAFC",
+    padding: 16,
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  createSuccessRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  createSuccessLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  createSuccessValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+
+  createSuccessNote: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+
+  createSuccessNoteText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#1D4ED8",
+    fontWeight: "600",
   },
 
   rejectModal: {
@@ -1445,6 +1742,12 @@ export default StyleSheet.create({
     marginBottom: 24,
   },
 
+  analyticsHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
   analyticsHeaderTitle: {
     fontSize: 24,
     fontWeight: "700",
@@ -1453,6 +1756,92 @@ export default StyleSheet.create({
 
   analyticsHeaderSubtitle: {
     fontSize: 13,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  analyticsActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+
+  analyticsActionButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E40AF",
+  },
+
+  analyticsHeroCard: {
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    marginBottom: 20,
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "stretch",
+  },
+
+  analyticsHeroContent: {
+    flex: 1,
+  },
+
+  analyticsHeroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginBottom: 12,
+  },
+
+  analyticsHeroBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#4F46E5",
+  },
+
+  analyticsHeroTitle: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsHeroSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+    marginTop: 10,
+  },
+
+  analyticsHeroStats: {
+    width: 180,
+    gap: 12,
+  },
+
+  analyticsHeroStat: {
+    flex: 1,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    justifyContent: "center",
+  },
+
+  analyticsHeroStatValue: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsHeroStatLabel: {
+    fontSize: 12,
     color: "#64748B",
     marginTop: 4,
   },
@@ -1521,6 +1910,138 @@ export default StyleSheet.create({
     fontSize: 11,
     color: "#64748B",
     marginTop: 2,
+  },
+
+  analyticsMetricContent: {
+    flex: 1,
+  },
+
+  analyticsMetricHelper: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+    lineHeight: 16,
+  },
+
+  analyticsSplitGrid: {
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "flex-start",
+  },
+
+  analyticsSplitGridStack: {
+    flexDirection: "column",
+  },
+
+  analyticsPrimaryColumn: {
+    flex: 1.4,
+    gap: 16,
+  },
+
+  analyticsSideColumn: {
+    flex: 1,
+    gap: 16,
+  },
+
+  analyticsChartHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+  },
+
+  analyticsChartSubtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+  },
+
+  analyticsDatasetSelector: {
+    flexDirection: "row",
+    gap: 6,
+    borderRadius: 999,
+    padding: 4,
+  },
+
+  analyticsDatasetButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+
+  analyticsDatasetButtonActive: {
+    backgroundColor: "#3B82F6",
+  },
+
+  analyticsDatasetButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  analyticsQuickStatsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 6,
+  },
+
+  analyticsQuickStat: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+  },
+
+  analyticsQuickStatValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsQuickStatLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  analyticsBarChart: {
+    gap: 12,
+    marginTop: 18,
+  },
+
+  analyticsBarRow: {
+    gap: 7,
+  },
+
+  analyticsBarMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  analyticsBarLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  analyticsBarValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+
+  analyticsBarTrack: {
+    height: 10,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+
+  analyticsBarFill: {
+    height: "100%",
+    borderRadius: 999,
   },
 
   mainStatsGrid: {
@@ -1712,12 +2233,133 @@ export default StyleSheet.create({
     textAlign: "right",
   },
 
+  analyticsDateSummaryRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  analyticsDateSummaryCard: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+  },
+
+  analyticsDateSummaryValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsDateSummaryLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  analyticsDateCallout: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+  },
+
+  analyticsDateCalloutTextWrap: {
+    flex: 1,
+  },
+
+  analyticsDateCalloutTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+
+  analyticsDateCalloutSubtitle: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 2,
+  },
+
+  analyticsDateVisitorsList: {
+    gap: 10,
+  },
+
+  analyticsDateVisitorItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+
+  analyticsDateVisitorInfo: {
+    flex: 1,
+  },
+
+  analyticsDateVisitorName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+
+  analyticsDateVisitorMeta: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  analyticsStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+  },
+
+  analyticsStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+
+  analyticsDistributionFooter: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+
+  analyticsDistributionStat: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
+
+  analyticsDistributionValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  analyticsDistributionLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
   // Visitor History Styles
   historyCard: {
     backgroundColor: "#FFF",
     borderRadius: 20,
     padding: 18,
-    marginTop: 20,
+    marginTop: 0,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     ...Platform.select({

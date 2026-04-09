@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "SafePass Mobile",
+    "name": "SafePass Sapphire",
     "slug": "safepass-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/LogoSapphire.jpg",
     "userInterfaceStyle": "light",
-"splash": {
-  "image": "./assets/icon.png",
-  "resizeMode": "contain",
-  "backgroundColor": "#0A3D91"
-},
+    "splash": {
+      "image": "./assets/LogoSapphire.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#041E42"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -23,8 +23,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0A3D91"
+        "foregroundImage": "./assets/LogoSapphire.jpg",
+        "backgroundColor": "#041E42"
       },
       "permissions": [
         "android.permission.CAMERA",
@@ -33,7 +33,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/LogoSapphire.jpg",
       "build": {
         "output": "static"
       }

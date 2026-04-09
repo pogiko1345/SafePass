@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import ApiService from "../utils/ApiService";
+import { canAccessSecurityDashboard, normalizeRole } from "../utils/authFlow";
 import styles from "../styles/SecurityDashboardStyles";
 
 // Import map components
@@ -99,6 +100,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [processingVisitorId, setProcessingVisitorId] = useState(null);
   
   // Form State
   const [newVisitor, setNewVisitor] = useState({
@@ -190,27 +192,32 @@ export default function SecurityDashboardScreen({ navigation }) {
   }, []);
 
   const initializeScreen = async () => {
-    await loadUserData();
-    await loadDashboardData();
-    await loadVisitors();
-    await loadNotifications();
-    await loadAnalytics();
-    await loadVisitorLocations();
-    await loadAccessLogs();
-    await loadReports();
-    
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-    ]).start();
+    try {
+      const currentUser = await loadUserData();
+      if (!currentUser) {
+        return;
+      }
+
+      await Promise.all([
+        loadOperationalData(),
+        loadNotifications(currentUser),
+      ]);
+
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]).start();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const requestPermissions = async () => {
@@ -233,6 +240,212 @@ export default function SecurityDashboardScreen({ navigation }) {
     setSidebarOpen(!sidebarOpen);
   };
 
+  const getStartOfToday = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  };
+
+  const normalizeNotificationReadState = (notification, currentUserId) => {
+    if (!notification || !currentUserId) {
+      return false;
+    }
+
+    return Array.isArray(notification.readBy) && notification.readBy.some((entry) => {
+      const readByUserId =
+        typeof entry?.user === 'object' ? entry?.user?._id : entry?.user;
+      return String(readByUserId) === String(currentUserId);
+    });
+  };
+
+  const normalizeNotifications = (items = [], currentUserId = user?._id) =>
+    items.map((notification) => ({
+      ...notification,
+      read: normalizeNotificationReadState(notification, currentUserId),
+    }));
+
+  const deriveVisitorCollections = (all = []) => {
+    const active = all.filter((visitor) => visitor.status === 'checked_in');
+    const pending = all.filter((visitor) => visitor.approvalStatus === 'pending');
+    const approved = all.filter(
+      (visitor) =>
+        visitor.approvalStatus === 'approved' && visitor.status !== 'checked_in',
+    );
+    const completed = all.filter((visitor) => visitor.status === 'checked_out');
+
+    return { active, pending, approved, completed, all };
+  };
+
+  const deriveVisitorStats = (all = [], active = [], pending = []) => {
+    const today = getStartOfToday();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const now = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo = new Date(now);
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+    return {
+      totalToday: all.filter((visitor) => {
+        const visitDate = new Date(visitor.visitDate);
+        return visitDate >= today && visitDate < tomorrow;
+      }).length,
+      totalThisWeek: all.filter((visitor) => new Date(visitor.visitDate) >= weekAgo).length,
+      totalThisMonth: all.filter((visitor) => new Date(visitor.visitDate) >= monthAgo).length,
+      activeNow: active.length,
+      pendingApproval: pending.length,
+    };
+  };
+
+  const deriveAnalytics = (all = []) => {
+    const officeCount = {};
+    const purposeCount = {};
+    const visitsByHour = new Array(24).fill(0);
+    const visitDurations = [];
+
+    all.forEach((visitor) => {
+      const office = visitor.assignedOffice || visitor.host;
+      if (office) {
+        officeCount[office] = (officeCount[office] || 0) + 1;
+      }
+
+      const purpose = visitor.purposeOfVisit;
+      if (purpose) {
+        purposeCount[purpose] = (purposeCount[purpose] || 0) + 1;
+      }
+
+      if (visitor.visitTime) {
+        const visitHour = new Date(visitor.visitTime).getHours();
+        if (!Number.isNaN(visitHour)) {
+          visitsByHour[visitHour] += 1;
+        }
+      }
+
+      if (visitor.checkedInAt && visitor.checkedOutAt) {
+        const durationMinutes =
+          (new Date(visitor.checkedOutAt) - new Date(visitor.checkedInAt)) / 60000;
+        if (durationMinutes > 0) {
+          visitDurations.push(durationMinutes);
+        }
+      }
+    });
+
+    const totalVisitors = all.length || 1;
+    const mostVisitedOffices = Object.entries(officeCount)
+      .map(([office, count]) => ({
+        office,
+        count,
+        percentage: Math.round((count / totalVisitors) * 100),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const popularVisitPurposes = Object.entries(purposeCount)
+      .map(([purpose, count]) => ({ purpose, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const averageVisitDuration =
+      visitDurations.length > 0
+        ? Math.round(
+            visitDurations.reduce((sum, minutes) => sum + minutes, 0) /
+              visitDurations.length,
+          )
+        : 0;
+
+    return {
+      mostVisitedOffices,
+      visitorsByHour: visitsByHour.map((count, hour) => ({ hour, count })),
+      popularVisitPurposes,
+      averageVisitDuration,
+    };
+  };
+
+  const deriveVisitorLocations = (activeVisitors = []) =>
+    activeVisitors.map((visitor, index) => ({
+      id: visitor._id,
+      name: visitor.fullName,
+      phone: visitor.phoneNumber,
+      purpose: visitor.purposeOfVisit,
+      host: visitor.host,
+      checkInTime: visitor.checkedInAt,
+      status: visitor.status,
+      idPhoto: visitor.idImage,
+      location: {
+        floor: getRandomFloor(),
+        office: visitor.assignedOffice || getRandomOffice(),
+        coordinates: {
+          x: 15 + ((index * 17) % 70),
+          y: 15 + ((index * 23) % 70),
+        },
+        timestamp: new Date(),
+      },
+      movement: [],
+    }));
+
+  const deriveAccessLogs = (all = []) =>
+    all
+      .flatMap((visitor) => {
+        const officeLocation =
+          visitor.assignedOffice || visitor.host || 'Main Gate';
+        const entries = [];
+
+        if (visitor.approvedAt) {
+          entries.push({
+            _id: `${visitor._id}-approved`,
+            userName: visitor.fullName,
+            location: officeLocation,
+            status: 'granted',
+            accessType: 'approval',
+            notes: 'Visitor approved for entry',
+            timestamp: visitor.approvedAt,
+          });
+        }
+
+        if (visitor.checkedInAt) {
+          entries.push({
+            _id: `${visitor._id}-checked-in`,
+            userName: visitor.fullName,
+            location: officeLocation,
+            status: 'granted',
+            accessType: 'entry',
+            notes: 'Checked in by security',
+            timestamp: visitor.checkedInAt,
+          });
+        }
+
+        if (visitor.checkedOutAt) {
+          entries.push({
+            _id: `${visitor._id}-checked-out`,
+            userName: visitor.fullName,
+            location: officeLocation,
+            status: 'granted',
+            accessType: 'exit',
+            notes: 'Checked out by security',
+            timestamp: visitor.checkedOutAt,
+          });
+        }
+
+        return entries;
+      })
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  const deriveReports = (all = []) =>
+    all
+      .flatMap((visitor) =>
+        (visitor.reports || []).map((report, index) => ({
+          _id: `${visitor._id}-report-${index}`,
+          reason: report.reason || 'Security incident',
+          createdAt: report.reportedAt,
+          visitorName: visitor.fullName,
+          status: report.resolved ? 'Resolved' : 'Open',
+          resolved: !!report.resolved,
+        })),
+      )
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
   // ============ DATA LOADING FUNCTIONS ============
   const loadUserData = async () => {
     try {
@@ -247,185 +460,100 @@ export default function SecurityDashboardScreen({ navigation }) {
         return;
       }
 
-      if (!currentUser || !['security', 'guard', 'admin'].includes(currentUser.role)) {
+      const normalizedRole = normalizeRole(currentUser?.role);
+      if (!currentUser || !canAccessSecurityDashboard(normalizedRole)) {
         navigation.replace("Login");
-        return;
+        return null;
       }
-      setUser(currentUser);
+      const normalizedUser = { ...currentUser, role: normalizedRole };
+      setUser(normalizedUser);
+      return normalizedUser;
     } catch (error) {
       console.error("Load user error:", error);
       Alert.alert("Error", "Failed to load user data");
-    } finally {
-      setIsLoading(false);
+      return null;
     }
   };
 
-  const loadDashboardData = async () => {
+  const loadOperationalData = async () => {
     try {
-      const activeUsersRes = await ApiService.getAllUsers({ status: 'active', isActive: true });
-      const activeUsersList = activeUsersRes.users || [];
-      setActiveUsers(activeUsersList);
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
       const allVisitorsRes = await ApiService.getVisitors({});
       const allVisitors = allVisitorsRes.visitors || [];
-      const todayVisitors = allVisitors.filter((visitor) => {
-        const visitDate = new Date(visitor.visitDate);
-        return visitDate >= today && visitDate < tomorrow;
-      });
+      const collections = deriveVisitorCollections(allVisitors);
+      const stats = deriveVisitorStats(
+        collections.all,
+        collections.active,
+        collections.pending,
+      );
+      const operationalAnalytics = deriveAnalytics(collections.all);
+      const derivedLogs = deriveAccessLogs(collections.all);
+      const derivedReports = deriveReports(collections.all);
 
-      const alertsRes = await ApiService.getNotifications({ read: false });
-      
-      const accessLogs = await ApiService.getAccessLogs(1, 10);
-      
-      setDashboardStats({
-        activeUsers: activeUsersList.length,
-        totalVisitorsToday: todayVisitors.length,
-        activeAlerts: alertsRes.notifications?.length || 0,
-        recentAccess: accessLogs.accessLogs?.length || 0,
-        occupancyRate: await calculateOccupancyRate(),
-      });
-      
-      setRecentAccess(accessLogs.accessLogs || []);
-      setAlerts(alertsRes.notifications || []);
-      
+      setVisitors(collections);
+      setVisitorStats(stats);
+      setAnalytics(operationalAnalytics);
+      setVisitorLocations(deriveVisitorLocations(collections.active));
+      setAccessLogs(derivedLogs);
+      setLogsTotal(derivedLogs.length);
+      setReports(derivedReports);
+      setActiveUsers(collections.active);
+      setRecentAccess(derivedLogs.slice(0, 10));
+      setDashboardStats((current) => ({
+        ...current,
+        activeUsers: collections.active.length,
+        totalVisitorsToday: stats.totalToday,
+        recentAccess: derivedLogs.length,
+        occupancyRate: 0,
+      }));
     } catch (error) {
-      console.error("Load dashboard error:", error);
+      console.error("Load operational data error:", error);
     }
   };
 
-  const calculateOccupancyRate = async () => {
-    try {
-      const settings = await ApiService.getSystemSettings();
-      const totalCapacity = settings.campusCapacity || 500;
-      const currentOccupancy = await ApiService.getActiveUserCount();
-      return Math.round((currentOccupancy / totalCapacity) * 100);
-    } catch {
-      return 0;
-    }
-  };
-
-  const loadVisitors = async () => {
-    try {
-      const allRes = await ApiService.getVisitors({});
-      const all = allRes.visitors || [];
-      const active = all.filter((visitor) => visitor.status === 'checked_in');
-      const pending = all.filter((visitor) => visitor.approvalStatus === 'pending');
-      const approved = all.filter((visitor) => visitor.approvalStatus === 'approved' && visitor.status !== 'checked_in');
-      const completed = all.filter((visitor) => visitor.status === 'checked_out');
-      
-      setVisitors({ active, pending, approved, completed, all });
-      
-      const now = new Date();
-      const today = new Date(now.setHours(0, 0, 0, 0));
-      const weekAgo = new Date(now);
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      const monthAgo = new Date(now);
-      monthAgo.setMonth(monthAgo.getMonth() - 1);
-      
-      setVisitorStats({
-        totalToday: all.filter(v => new Date(v.visitDate).setHours(0,0,0,0) === today.getTime()).length,
-        totalThisWeek: all.filter(v => new Date(v.visitDate) >= weekAgo).length,
-        totalThisMonth: all.filter(v => new Date(v.visitDate) >= monthAgo).length,
-        activeNow: active.length,
-        pendingApproval: pending.length,
-      });
-      
-    } catch (error) {
-      console.error("Load visitors error:", error);
-    }
-  };
+  const loadDashboardData = loadOperationalData;
+  const loadVisitors = loadOperationalData;
 
   const loadAccessLogs = async () => {
-    try {
-      const response = await ApiService.getAccessLogs(logsPage, 20);
-      setAccessLogs(response.accessLogs || []);
-      setLogsTotal(response.total || 0);
-    } catch (error) {
-      console.error("Load access logs error:", error);
-    }
+    await loadOperationalData();
   };
 
   const loadReports = async () => {
-    try {
-      const response = await ApiService.getSecurityReports();
-      setReports(response.reports || []);
-    } catch (error) {
-      console.error("Load reports error:", error);
-    }
+    await loadOperationalData();
   };
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (currentUser = user) => {
     try {
-      const response = await ApiService.getNotifications({ read: false });
-      setNotifications(response.notifications || []);
-      setUnreadCount(response.unreadCount || 0);
+      const response = await ApiService.getNotifications({ limit: 100 });
+      const normalizedNotifications = normalizeNotifications(
+        response.notifications || [],
+        currentUser?._id,
+      );
+      const alertNotifications = normalizedNotifications.filter(
+        (notification) =>
+          notification.type === 'alert' ||
+          ['high', 'medium'].includes(notification.severity),
+      );
+
+      setNotifications(normalizedNotifications);
+      setUnreadCount(
+        normalizedNotifications.filter((notification) => !notification.read).length,
+      );
+      setAlerts(alertNotifications);
+      setDashboardStats((current) => ({
+        ...current,
+        activeAlerts: alertNotifications.length,
+      }));
     } catch (error) {
       console.error("Load notifications error:", error);
     }
   };
 
   const loadAnalytics = async () => {
-    try {
-      const allVisitors = visitors.all.length ? visitors.all : await ApiService.getVisitors({});
-      const officeCount = {};
-      
-      (allVisitors.visitors || []).forEach(visitor => {
-        const office = visitor.assignedOffice;
-        if (office) {
-          officeCount[office] = (officeCount[office] || 0) + 1;
-        }
-      });
-      
-      const mostVisited = Object.entries(officeCount)
-        .map(([office, count]) => ({ office, count, percentage: Math.round((count / (allVisitors.visitors?.length || 1)) * 100) }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-      
-      setAnalytics({
-        mostVisitedOffices: mostVisited,
-        visitorsByHour: [],
-        popularVisitPurposes: [],
-        averageVisitDuration: 0,
-      });
-      
-    } catch (error) {
-      console.error("Load analytics error:", error);
-    }
+    await loadOperationalData();
   };
 
   const loadVisitorLocations = async () => {
-    try {
-      const activeVisitors = visitors.active;
-      const locations = activeVisitors.map((visitor, index) => ({
-        id: visitor._id,
-        name: visitor.fullName,
-        phone: visitor.phoneNumber,
-        purpose: visitor.purposeOfVisit,
-        host: visitor.host,
-        checkInTime: visitor.checkedInAt,
-        status: visitor.status,
-        idPhoto: visitor.idImage,
-        location: {
-          floor: getRandomFloor(),
-          office: visitor.assignedOffice || getRandomOffice(),
-          coordinates: {
-            x: 15 + ((index * 17) % 70),
-            y: 15 + ((index * 23) % 70),
-          },
-          timestamp: new Date(),
-        },
-        movement: [],
-      }));
-      
-      setVisitorLocations(locations);
-    } catch (error) {
-      console.error("Load visitor locations error:", error);
-    }
+    await loadOperationalData();
   };
 
   const getRandomFloor = () => {
@@ -466,16 +594,14 @@ export default function SecurityDashboardScreen({ navigation }) {
   // ============ HELPER FUNCTIONS ============
   const refreshData = async () => {
     setRefreshing(true);
-    await Promise.all([
-      loadDashboardData(),
-      loadVisitors(),
-      loadNotifications(),
-      loadAnalytics(),
-      loadVisitorLocations(),
-      loadAccessLogs(),
-      loadReports(),
-    ]);
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        loadOperationalData(),
+        loadNotifications(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const formatDate = (date) => {
@@ -522,6 +648,8 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
     return { bg: '#F3F4F6', text: '#6B7280', label: 'UNKNOWN' };
   };
+
+  const isVisitorProcessing = (visitorId) => processingVisitorId === visitorId;
 
   // ============ VISITOR MANAGEMENT ============
   const handleRegisterVisitor = () => {
@@ -586,7 +714,14 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const submitVisitor = async () => {
-    if (!newVisitor.fullName || !newVisitor.purposeOfVisit || !newVisitor.host || !newVisitor.phoneNumber) {
+    if (
+      !newVisitor.fullName ||
+      !newVisitor.purposeOfVisit ||
+      !newVisitor.host ||
+      !newVisitor.phoneNumber ||
+      !newVisitor.email ||
+      !newVisitor.idNumber
+    ) {
       Alert.alert("Error", "Please fill in all required fields");
       return;
     }
@@ -619,8 +754,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       
       if (response.success) {
         setShowVisitorModal(false);
-        await loadVisitors();
-        await loadAnalytics();
+        await refreshData();
         Alert.alert("Success", "Visitor registered successfully");
       } else {
         throw new Error(response.message);
@@ -633,19 +767,69 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const handleCheckIn = async (visitor) => {
+    if (isVisitorProcessing(visitor._id)) {
+      return;
+    }
+
+    if (visitor.approvalStatus !== 'approved') {
+      Alert.alert("Approval Required", `${visitor.fullName} is still waiting for admin approval.`);
+      return;
+    }
+
+    if (visitor.status === 'checked_in') {
+      Alert.alert("Already Checked In", `${visitor.fullName} is already checked in.`);
+      return;
+    }
+
+    if (visitor.status === 'checked_out') {
+      Alert.alert("Visit Completed", `${visitor.fullName} has already checked out.`);
+      return;
+    }
+
     try {
-      const response = await ApiService.visitorCheckIn(visitor._id);
+      setProcessingVisitorId(visitor._id);
+      const response = await ApiService.securityCheckIn(visitor._id);
       if (response.success) {
-        await loadVisitors();
-        await loadVisitorLocations();
+        await refreshData();
         Alert.alert("Success", `${visitor.fullName} checked in successfully`);
       }
     } catch (error) {
-      Alert.alert("Error", error.message);
+      Alert.alert("Error", error.message || "Failed to check in visitor");
+    } finally {
+      setProcessingVisitorId(null);
     }
   };
 
   const handleCheckOut = async (visitor) => {
+    if (isVisitorProcessing(visitor._id)) {
+      return;
+    }
+
+    if (visitor.status !== 'checked_in') {
+      Alert.alert("Check-in Required", `${visitor.fullName} must be checked in before checkout.`);
+      return;
+    }
+
+    const performCheckOut = async () => {
+      try {
+        setProcessingVisitorId(visitor._id);
+        const response = await ApiService.securityCheckOut(visitor._id);
+        if (response.success) {
+          await refreshData();
+          Alert.alert("Success", `${visitor.fullName} checked out successfully`);
+        }
+      } catch (error) {
+        Alert.alert("Error", error.message || "Failed to check out visitor");
+      } finally {
+        setProcessingVisitorId(null);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      await performCheckOut();
+      return;
+    }
+
     Alert.alert(
       "Confirm Check-out",
       `Check out ${visitor.fullName}?`,
@@ -653,18 +837,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         { text: "Cancel", style: "cancel" },
         {
           text: "Check Out",
-          onPress: async () => {
-            try {
-              const response = await ApiService.visitorCheckOut(visitor._id);
-              if (response.success) {
-                await loadVisitors();
-                await loadVisitorLocations();
-                Alert.alert("Success", `${visitor.fullName} checked out successfully`);
-              }
-            } catch (error) {
-              Alert.alert("Error", error.message);
-            }
-          }
+          onPress: performCheckOut
         }
       ]
     );
@@ -687,6 +860,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const submitReport = async (visitor, reason) => {
     try {
       await ApiService.reportVisitor(visitor._id, { reason, reportedBy: user._id });
+      await refreshData();
       Alert.alert("Report Submitted", "Security team has been notified");
     } catch (error) {
       Alert.alert("Error", "Failed to submit report");
@@ -776,8 +950,8 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Text style={styles.statCardLargeValue}>{visitorStats.activeNow}</Text>
             <Text style={styles.statCardLargeLabel}>Active Visitors</Text>
             <View style={styles.statBadge}>
-              <Ionicons name="trending-up" size={12} color="#10B981" />
-              <Text style={styles.statBadgeText}>+{Math.floor(Math.random() * 20)}% today</Text>
+              <Ionicons name="shield-checkmark-outline" size={12} color="#10B981" />
+              <Text style={styles.statBadgeText}>{unreadCount} unread notifications</Text>
             </View>
           </View>
         </LinearGradient>
@@ -788,8 +962,8 @@ export default function SecurityDashboardScreen({ navigation }) {
               <Ionicons name="people-circle" size={20} color="#F59E0B" />
             </View>
             <Text style={styles.statValueLarge}>{dashboardStats.activeUsers}</Text>
-            <Text style={styles.statLabel}>Active Users</Text>
-            <Text style={styles.statTrend}>+12 today</Text>
+            <Text style={styles.statLabel}>On-Site Visitors</Text>
+            <Text style={styles.statTrend}>{visitorStats.pendingApproval} awaiting admin approval</Text>
           </View>
 
           <View style={styles.statCardMedium}>
@@ -798,38 +972,59 @@ export default function SecurityDashboardScreen({ navigation }) {
             </View>
             <Text style={styles.statValueLarge}>{visitorStats.totalToday}</Text>
             <Text style={styles.statLabel}>Today's Visitors</Text>
-            <Text style={styles.statTrend}>Expected +8</Text>
+            <Text style={styles.statTrend}>{reports.length} incident report{reports.length === 1 ? '' : 's'}</Text>
           </View>
         </View>
       </View>
 
-      {/* Campus Map Section */}
+      {/* Operations Overview */}
       <View style={styles.mapSection}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
-            <Ionicons name="map-outline" size={20} color="#10B981" />
-            <Text style={styles.sectionTitle}>Live Visitor Tracking</Text>
+            <Ionicons name="clipboard-outline" size={20} color="#10B981" />
+            <Text style={styles.sectionTitle}>Operations Snapshot</Text>
           </View>
-          <TouchableOpacity onPress={() => setShowMapModal(true)}>
-            <Text style={styles.viewAll}>Full Screen</Text>
+          <TouchableOpacity onPress={() => setActiveTab('visitors')}>
+            <Text style={styles.viewAll}>Manage Visitors</Text>
           </TouchableOpacity>
         </View>
-        
-        {renderMapFilters()}
-        
-        <View style={styles.mapContainer}>
-          <CampusMap
-            visitors={getFilteredVisitorLocations()}
-            floors={floors}
-            offices={offices}
-            selectedFloor={selectedFloor}
-            selectedOffice={selectedOffice}
-            onVisitorHover={handleVisitorHover}
-            onVisitorLeave={handleVisitorLeave}
-            onVisitorSelect={handleVisitorSelect}
-            hoveredVisitor={hoveredVisitor}
-            renderHoverCard={renderHoverCard}
-          />
+
+        <View style={styles.reportStatsGrid}>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{visitors.approved.length}</Text>
+            <Text style={styles.reportStatLabel}>Approved Visits</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{visitors.pending.length}</Text>
+            <Text style={styles.reportStatLabel}>Pending Review</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{visitors.completed.length}</Text>
+            <Text style={styles.reportStatLabel}>Completed Today</Text>
+          </View>
+        </View>
+
+        <View style={styles.activityList}>
+          {analytics.mostVisitedOffices.slice(0, 3).map((office, index) => (
+            <View key={office.office || index} style={styles.activityItem}>
+              <View style={[styles.activityIcon, { backgroundColor: '#DBEAFE' }]}>
+                <Ionicons name="business-outline" size={16} color="#0A3D91" />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>{office.office}</Text>
+                <Text style={styles.activityLocation}>{office.count} scheduled visit{office.count === 1 ? '' : 's'}</Text>
+              </View>
+              <Text style={styles.activityTime}>{office.percentage}%</Text>
+            </View>
+          ))}
+
+          {analytics.mostVisitedOffices.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="business-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyStateTitle}>No Office Traffic Yet</Text>
+              <Text style={styles.emptyStateSubtitle}>Visitor assignments will appear here once registrations come in</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -880,16 +1075,16 @@ export default function SecurityDashboardScreen({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('map')}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('alerts')}>
             <LinearGradient
               colors={['#10B981', '#059669']}
               style={styles.quickActionGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Ionicons name="map-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>View Map</Text>
-              <Text style={styles.quickActionSubtitle}>Track visitor locations</Text>
+              <Ionicons name="warning-outline" size={24} color="#FFFFFF" />
+              <Text style={styles.quickActionTitle}>Open Alerts</Text>
+              <Text style={styles.quickActionSubtitle}>Review security notifications</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -1239,10 +1434,10 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
           <TouchableOpacity 
             style={styles.generateButton}
-            onPress={() => Alert.alert('Generate Report', 'Report generation feature coming soon')}
+            onPress={refreshData}
           >
-            <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.generateButtonText}>Export</Text>
+            <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.generateButtonText}>Refresh</Text>
           </TouchableOpacity>
         </View>
 
@@ -1295,6 +1490,14 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Text style={styles.reportCardStatus}>Status: {report.status}</Text>
               </View>
             ))}
+          </View>
+        )}
+
+        {reports.length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="shield-checkmark-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateTitle}>No Security Reports</Text>
+            <Text style={styles.emptyStateSubtitle}>Reported visitor incidents will appear here</Text>
           </View>
         )}
       </View>
@@ -1413,6 +1616,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderVisitorCard = (visitor) => {
     const statusBadge = getStatusBadge(visitor);
     const isCheckedIn = visitor.status === 'checked_in';
+    const isProcessing = isVisitorProcessing(visitor._id);
     
     return (
       <TouchableOpacity
@@ -1476,17 +1680,28 @@ export default function SecurityDashboardScreen({ navigation }) {
         <View style={styles.visitorCardActions}>
           {visitor.approvalStatus === 'approved' && (
             <TouchableOpacity 
-              style={[styles.visitorCardAction, styles.visitorCardActionPrimary]}
+              style={[
+                styles.visitorCardAction,
+                styles.visitorCardActionPrimary,
+                isProcessing && styles.buttonDisabled,
+              ]}
               onPress={() => isCheckedIn ? handleCheckOut(visitor) : handleCheckIn(visitor)}
+              disabled={isProcessing}
             >
-              <Ionicons 
-                name={isCheckedIn ? "log-out-outline" : "log-in-outline"} 
-                size={18} 
-                color="#FFFFFF" 
-              />
-              <Text style={styles.visitorCardActionText}>
-                {isCheckedIn ? 'Check Out' : 'Check In'}
-              </Text>
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons 
+                    name={isCheckedIn ? "log-out-outline" : "log-in-outline"} 
+                    size={18} 
+                    color="#FFFFFF" 
+                  />
+                  <Text style={styles.visitorCardActionText}>
+                    {isCheckedIn ? 'Check Out' : 'Check In'}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
 
@@ -1641,7 +1856,6 @@ export default function SecurityDashboardScreen({ navigation }) {
   // Menu Items
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline', color: '#DC2626' },
-    { id: 'map', label: 'Live Map', icon: 'map-outline', color: '#10B981' },
     { id: 'visitors', label: 'Visitors', icon: 'people-outline', color: '#0A3D91' },
     { id: 'alerts', label: 'Alerts', icon: 'warning-outline', color: '#F59E0B' },
     { id: 'logs', label: 'Access Logs', icon: 'time-outline', color: '#059669' },
@@ -1746,7 +1960,6 @@ export default function SecurityDashboardScreen({ navigation }) {
 
           {/* Tab Content */}
           {activeTab === 'dashboard' && renderDashboardTab()}
-          {activeTab === 'map' && renderMapTab()}
           {activeTab === 'visitors' && renderVisitorsTab()}
           {activeTab === 'alerts' && renderAlertsTab()}
           {activeTab === 'logs' && renderLogsTab()}
@@ -2053,9 +2266,9 @@ export default function SecurityDashboardScreen({ navigation }) {
             {selectedVisitor && (
               <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
                 <View style={styles.detailPhotoSection}>
-                  {selectedVisitor.idPhoto ? (
+                  {selectedVisitor.idImage ? (
                     <Image 
-                      source={{ uri: selectedVisitor.idPhoto }} 
+                      source={{ uri: selectedVisitor.idImage }} 
                       style={styles.detailIdPhoto} 
                     />
                   ) : (
@@ -2157,7 +2370,11 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <View style={styles.detailActions}>
                   {selectedVisitor.approvalStatus === 'approved' && selectedVisitor.status !== 'checked_out' && (
                     <TouchableOpacity 
-                      style={[styles.detailActionButton, styles.detailActionPrimary]}
+                      style={[
+                        styles.detailActionButton,
+                        styles.detailActionPrimary,
+                        isVisitorProcessing(selectedVisitor._id) && styles.buttonDisabled,
+                      ]}
                       onPress={() => {
                         setShowDetailModal(false);
                         if (selectedVisitor.status === 'checked_in') {
@@ -2166,15 +2383,22 @@ export default function SecurityDashboardScreen({ navigation }) {
                           handleCheckIn(selectedVisitor);
                         }
                       }}
+                      disabled={isVisitorProcessing(selectedVisitor._id)}
                     >
-                      <Ionicons 
-                        name={selectedVisitor.status === 'checked_in' ? "log-out-outline" : "log-in-outline"} 
-                        size={20} 
-                        color="#FFFFFF" 
-                      />
-                      <Text style={styles.detailActionText}>
-                        {selectedVisitor.status === 'checked_in' ? 'Check Out' : 'Check In'}
-                      </Text>
+                      {isVisitorProcessing(selectedVisitor._id) ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons 
+                            name={selectedVisitor.status === 'checked_in' ? "log-out-outline" : "log-in-outline"} 
+                            size={20} 
+                            color="#FFFFFF" 
+                          />
+                          <Text style={styles.detailActionText}>
+                            {selectedVisitor.status === 'checked_in' ? 'Check Out' : 'Check In'}
+                          </Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   )}
 

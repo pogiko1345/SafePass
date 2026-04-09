@@ -16,19 +16,22 @@ import {
   Animated,
   Image,
 } from "react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import loginStyles from "../styles/LoginStyles";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
+import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
 import Logo from "../assets/LogoSapphire.jpg";
 
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 const isSmallPhone = width <= 375;
+const Storage = Platform.OS === "web"
+  ? require("../utils/webStorage").default
+  : require("@react-native-async-storage/async-storage");
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
-  const { role } = route?.params || { role: 'visitor' };
+  const { role, initialEmail = "", initialPassword = "" } = route?.params || { role: 'visitor' };
   
   // ============ STATE MANAGEMENT ============
   const [email, setEmail] = useState("");
@@ -91,6 +94,21 @@ export default function LoginScreen({ navigation, route }) {
     ]).start();
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.title = "SafePass Login | Sapphire International Aviation Academy";
+    }
+  }, []);
+
+  useEffect(() => {
+    if (initialEmail) {
+      setEmail(initialEmail);
+    }
+    if (initialPassword) {
+      setPassword(initialPassword);
+    }
+  }, [initialEmail, initialPassword]);
+
   // ============ AUTH CHECK ============
   useEffect(() => {
     checkAuthAndConnection();
@@ -114,37 +132,24 @@ export default function LoginScreen({ navigation, route }) {
       const connected = await ApiService.testConnection();
       setApiConnected(connected);
       
-      const isNewRegistration = await AsyncStorage.getItem('isNewRegistration');
+      const isNewRegistration = await Storage.getItem('isNewRegistration');
       
       if (isNewRegistration === 'true') {
         console.log("📝 New registration detected - clearing token");
-        await AsyncStorage.multiRemove(['authToken', 'userToken', 'currentUser', 'isNewRegistration']);
+        await Storage.multiRemove(['authToken', 'userToken', 'currentUser', 'isNewRegistration']);
         setIsCheckingAuth(false);
         return;
       }
       
-<<<<<<< HEAD
       const token = await ApiService.getToken();
-=======
-      const token = await AsyncStorage.getItem('userToken');
->>>>>>> f735fcfb39f1a77210269c587a689128e37f12a1
-      const userJson = await AsyncStorage.getItem('currentUser');
+      const userJson = await Storage.getItem('currentUser');
       
       if (token && userJson) {
         const user = JSON.parse(userJson);
         console.log("🔑 Auto-login detected for:", user.email);
         
-        const normalizedRole = String(user.role || "").toLowerCase();
-
-        // Check if visitor is pending
-        if (normalizedRole === 'visitor' && user.status === 'pending') {
-          console.log("Visitor pending - clearing token");
-          await ApiService.clearAuth();
-          setIsCheckingAuth(false);
-          return;
-        }
-        
-        const route = getInitialRoute({ ...user, role: normalizedRole });
+        const normalizedRole = normalizeRole(user.role);
+        const route = getDashboardRoute({ ...user, role: normalizedRole });
         navigation.reset({
           index: 0,
           routes: [{ name: route }],
@@ -190,6 +195,28 @@ export default function LoginScreen({ navigation, route }) {
     if (errors.password) {
       setErrors({ ...errors, password: "" });
     }
+  };
+
+  const persistAuthenticatedSession = async ({ token, user, rememberEmail }) => {
+    const normalizedUser = {
+      ...user,
+      role: normalizeRole(user?.role) || "visitor",
+    };
+
+    if (token) {
+      await ApiService.setToken(token);
+    }
+
+    await Storage.setItem("currentUser", JSON.stringify(normalizedUser));
+
+    if (rememberEmail) {
+      await Storage.setItem("rememberedEmail", email.trim());
+    } else {
+      await Storage.removeItem("rememberedEmail");
+    }
+
+    await Storage.removeItem("isNewRegistration");
+    return normalizedUser;
   };
 
   // ============ FORGOT PASSWORD VALIDATION ============
@@ -458,25 +485,31 @@ export default function LoginScreen({ navigation, route }) {
       console.log('📥 Verify response:', verifyResponse);
       
       if (verifyResponse.success) {
-        // Check if user is pending
-        if (verifyResponse.user?.status === 'pending') {
-          console.log('⏳ User account is pending');
-          Alert.alert(
-            "Account Pending Approval",
-            "Your account is pending admin approval. You will receive an email once approved.",
-            [{ text: "OK" }]
-          );
-          setIsLoading(false);
+        const normalizedUser = {
+          ...verifyResponse.user,
+          role: normalizeRole(verifyResponse.user?.role) || "visitor",
+        };
+
+        if (verifyResponse.requires2FA === false) {
+          await persistAuthenticatedSession({
+            token: verifyResponse.tempToken,
+            user: normalizedUser,
+            rememberEmail: rememberMe,
+          });
+
+          navigation.reset({
+            index: 0,
+            routes: [{ name: getDashboardRoute(normalizedUser) }],
+          });
           return;
         }
-        
-        // 2FA for EVERYONE - always require verification
+
         navigation.navigate("Verification", {
           email: email,
           password: password,
           rememberMe: rememberMe,
           tempToken: verifyResponse.tempToken,
-          user: verifyResponse.user
+          user: normalizedUser
         });
       }
     } catch (error) {
@@ -496,17 +529,45 @@ export default function LoginScreen({ navigation, route }) {
     }
   };
 
-  const getInitialRoute = (user) => {
-    switch(user?.role) {
-      case 'security': 
-      case 'guard':
-        return "SecurityDashboard";
-      case 'admin': 
-        return "AdminDashboard";
-      case 'visitor': 
-        return "VisitorDashboard";
-      default: 
-        return "RoleSelect";
+  const getRoleConfig = () => {
+    switch (role) {
+      case "visitor":
+        return {
+          label: "Visitor Access",
+          title: "Continue Your Visit Journey",
+          subtitle: "Track approvals, manage appointments, and keep your Sapphire visit details in one secure place.",
+          icon: "person-outline",
+          accent: "#0F766E",
+          panel: "Visitor Coordination",
+        };
+      case "security":
+      case "guard":
+        return {
+          label: "Security Access",
+          title: "Checkpoint Team Sign-In",
+          subtitle: "Enter the secure operations workspace for approvals, arrival monitoring, and access validation.",
+          icon: "shield-checkmark-outline",
+          accent: "#0A3D91",
+          panel: "Operations Console",
+        };
+      case "admin":
+        return {
+          label: "Administrative Access",
+          title: "Command and Oversight Login",
+          subtitle: "Open the administrative control center for user review, access supervision, and reporting.",
+          icon: "settings-outline",
+          accent: "#7C3AED",
+          panel: "Admin Control",
+        };
+      default:
+        return {
+          label: "System Access",
+          title: "Welcome Back",
+          subtitle: "Sign in to continue with your secure SafePass workflow.",
+          icon: "log-in-outline",
+          accent: "#0A3D91",
+          panel: "Secure Entry",
+        };
     }
   };
 
@@ -529,6 +590,8 @@ export default function LoginScreen({ navigation, route }) {
     );
   }
 
+  const roleConfig = getRoleConfig();
+
   return (
     <SafeAreaView style={loginStyles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#1A2A6C" />
@@ -549,7 +612,18 @@ export default function LoginScreen({ navigation, route }) {
             <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
               <View style={loginStyles.header}>
                 <View style={loginStyles.headerContent}>
-                  {/* Logo Image */}
+                  <View style={loginStyles.brandBadge}>
+                    <Image
+                      source={Logo}
+                      style={loginStyles.brandBadgeLogo}
+                      resizeMode="contain"
+                    />
+                    <View style={loginStyles.brandBadgeTextWrap}>
+                      <Text style={loginStyles.brandBadgeEyebrow}>Secure Login Portal</Text>
+                      <Text style={loginStyles.brandBadgeTitle}>SafePass Command Center</Text>
+                    </View>
+                  </View>
+
                   <Image 
                     source={Logo} 
                     style={loginStyles.logoImage}
@@ -557,6 +631,9 @@ export default function LoginScreen({ navigation, route }) {
                   />
                   <Text style={loginStyles.appName}>
                     Sapphire International{"\n"}Aviation Academy
+                  </Text>
+                  <Text style={loginStyles.headerTagline}>
+                    Campus arrival, access, and visitor authentication in one secure checkpoint flow
                   </Text>
                   
                   {/* API Status Badge */}
@@ -566,7 +643,7 @@ export default function LoginScreen({ navigation, route }) {
                   ]}>
                     <View style={loginStyles.statusDot} />
                     <Text style={loginStyles.statusText}>
-                      {apiConnected ? '● SYSTEM ONLINE' : '● SERVER OFFLINE'}
+                      {apiConnected ? 'SYSTEM ONLINE' : 'SERVER OFFLINE'}
                     </Text>
                   </View>
                 </View>
@@ -588,12 +665,18 @@ export default function LoginScreen({ navigation, route }) {
                   <Text style={loginStyles.backToRoleText}>Change Role</Text>
                 </TouchableOpacity>
 
-                <Text style={loginStyles.welcomeTitle}>Welcome Back</Text>
-                <Text style={loginStyles.welcomeSubtitle}>
-                  {role === 'visitor' ? 'Visitor Login' : 
-                   role === 'security' ? 'Security Login' : 
-                   role === 'admin' ? 'Admin Login' : 'System Access'}
-                </Text>
+                <View style={loginStyles.roleHero}>
+                  <View style={[loginStyles.roleIconWrap, { backgroundColor: roleConfig.accent }]}>
+                    <Ionicons name={roleConfig.icon} size={22} color="#FFFFFF" />
+                  </View>
+                  <View style={loginStyles.roleHeroText}>
+                    <Text style={loginStyles.roleEyebrow}>{roleConfig.label}</Text>
+                    <Text style={loginStyles.rolePanel}>{roleConfig.panel}</Text>
+                  </View>
+                </View>
+
+                <Text style={loginStyles.welcomeTitle}>{roleConfig.title}</Text>
+                <Text style={loginStyles.welcomeSubtitle}>{roleConfig.subtitle}</Text>
 
                 {/* STANDARD LOGIN FORM */}
                 <>
@@ -1097,3 +1180,4 @@ export default function LoginScreen({ navigation, route }) {
     </SafeAreaView>
   );
 }
+

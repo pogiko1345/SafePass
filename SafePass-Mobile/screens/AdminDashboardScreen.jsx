@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -163,10 +163,16 @@ const getRoleIcon = (role) => {
   }
 };
 
+const getRequestStatus = (request) => {
+  if (!request) return "unknown";
+  return request.approvalStatus || request.status || "unknown";
+};
+
 export default function AdminDashboardScreen({ navigation, onLogout }) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const mainScrollViewRef = useRef(null);
   const sidebarScrollViewRef = useRef(null);
+  const authErrorHandledRef = useRef(false);
 
   // User State
   const [user, setUser] = useState(null);
@@ -252,6 +258,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
+  const [showUserManagementModal, setShowUserManagementModal] = useState(false);
+  const [showCreateSuccessModal, setShowCreateSuccessModal] = useState(false);
+  const [userManagementStatusTab, setUserManagementStatusTab] = useState("active");
+  const [createUserMessage, setCreateUserMessage] = useState("");
+  const [createdUserSummary, setCreatedUserSummary] = useState(null);
 
   // Chart Data
   const [visitorStats, setVisitorStats] = useState({
@@ -336,7 +347,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const getFilteredRequests = useCallback(() => {
     let filtered = [...visitRequests];
     if (requestFilter !== "all") {
-      filtered = filtered.filter((r) => r.status === requestFilter);
+      filtered = filtered.filter((r) => getRequestStatus(r) === requestFilter);
     }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -398,6 +409,24 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     const filtered = getFilteredUsersList();
     return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [getFilteredUsersList, currentPage, itemsPerPage]);
+
+  const getUsersByStatus = useCallback((statusTab) => {
+    if (statusTab === "active") {
+      return allUsers.filter((u) => u.status === "active" || u.isActive === true);
+    }
+    if (statusTab === "inactive") {
+      return allUsers.filter((u) => u.status === "inactive" || u.isActive === false);
+    }
+    return allUsers;
+  }, [allUsers]);
+
+  const activeUsersList = useMemo(() => getUsersByStatus("active"), [getUsersByStatus]);
+  const inactiveUsersList = useMemo(() => getUsersByStatus("inactive"), [getUsersByStatus]);
+  const userManagementUsers = useMemo(() => {
+    if (userManagementStatusTab === "active") return activeUsersList;
+    if (userManagementStatusTab === "inactive") return inactiveUsersList;
+    return allUsers;
+  }, [activeUsersList, inactiveUsersList, allUsers, userManagementStatusTab]);
 
   const getFilteredHistory = useCallback(() => {
     let filtered = [...visitorHistory];
@@ -494,9 +523,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       return visitDate >= targetDate && visitDate < nextDay;
     });
 
-    const approved = visitorsOnDate.filter((r) => r.status === "approved");
-    const pending = visitorsOnDate.filter((r) => r.status === "pending");
-    const rejected = visitorsOnDate.filter((r) => r.status === "rejected");
+    const approved = visitorsOnDate.filter((r) => getRequestStatus(r) === "approved");
+    const pending = visitorsOnDate.filter((r) => getRequestStatus(r) === "pending");
+    const rejected = visitorsOnDate.filter((r) => getRequestStatus(r) === "rejected");
 
     setDateAnalytics({
       total: visitorsOnDate.length,
@@ -514,15 +543,35 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     return Math.round((recentRequests.length / Math.max(requests.length, 1)) * 100);
   };
 
+  const isAuthError = (error) => {
+    const message = String(error?.message || "").toLowerCase();
+    return (
+      message.includes("401") ||
+      message.includes("authenticate") ||
+      message.includes("unauthorized") ||
+      message.includes("token") ||
+      message.includes("jwt")
+    );
+  };
+
+  const handleAuthError = useCallback(async () => {
+    if (authErrorHandledRef.current) return;
+    authErrorHandledRef.current = true;
+    await ApiService.clearAuth();
+    Alert.alert("Session Expired", "Please log in again.", [
+      { text: "OK", onPress: () => navigation.replace("Login") },
+    ]);
+  }, [navigation]);
+
   // FIXED: Load All Visit Requests
   const loadAllVisitRequests = async () => {
     try {
       const response = await ApiService.getAllVisitors({ limit: 500 });
       if (response && response.visitors) {
         const requests = response.visitors || [];
-        const pending = requests.filter((r) => r.status === "pending");
-        const approved = requests.filter((r) => r.status === "approved");
-        const rejected = requests.filter((r) => r.status === "rejected");
+        const pending = requests.filter((r) => getRequestStatus(r) === "pending");
+        const approved = requests.filter((r) => getRequestStatus(r) === "approved");
+        const rejected = requests.filter((r) => getRequestStatus(r) === "rejected");
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -543,7 +592,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
 
         const upcomingVisits = requests.filter((r) => {
           const visitDate = new Date(r.visitDate);
-          return visitDate >= today && r.status === "approved";
+          return visitDate >= today && getRequestStatus(r) === "approved";
         }).length;
 
         setVisitRequests(requests);
@@ -570,6 +619,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       }
     } catch (error) {
       console.error("Load visit requests error:", error);
+      if (isAuthError(error)) {
+        await handleAuthError();
+        return;
+      }
       Alert.alert("Error", "Failed to load visit requests. Please check your connection.");
     }
   };
@@ -602,16 +655,22 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       }
     } catch (error) {
       console.error("Load users error:", error);
+      if (isAuthError(error)) {
+        await handleAuthError();
+        return;
+      }
       Alert.alert("Error", "Failed to load users. Please check your connection.");
     }
   };
 
 const loadDashboardData = useCallback(async () => {
+  authErrorHandledRef.current = false;
   setIsLoading(true);
   try {
-    const currentUser = await ApiService.getCurrentUser();
+    const profileResponse = await ApiService.getProfile();
+    const currentUser = profileResponse?.user || (await ApiService.getCurrentUser());
     const role = String(currentUser?.role || "").toLowerCase();
-    if (!currentUser || (role !== "admin" && role !== "security" && role !== "guard")) {
+    if (!currentUser || role !== "admin") {
       Alert.alert("Access Denied", "You don't have admin privileges.");
       navigation.replace("Login");
       return;
@@ -620,12 +679,16 @@ const loadDashboardData = useCallback(async () => {
     await Promise.all([loadAllVisitRequests(), loadAllUsers()]);
   } catch (error) {
     console.error("Load dashboard error:", error);
+    if (isAuthError(error)) {
+      await handleAuthError();
+      return;
+    }
     Alert.alert("Error", "Failed to load dashboard data. Please try again.");
   } finally {
     setIsLoading(false);
     setRefreshing(false);
   }
-}, [navigation]);
+}, [navigation, handleAuthError]);
 
   useEffect(() => {
     loadDashboardData();
@@ -662,6 +725,12 @@ const loadDashboardData = useCallback(async () => {
     setTotalPages(newTotalPages > 0 ? newTotalPages : 1);
     if (currentPage > newTotalPages && newTotalPages > 0) setCurrentPage(1);
   }, [getFilteredUsersCount, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    if (!createUserMessage) return;
+    const timer = setTimeout(() => setCreateUserMessage(""), 5000);
+    return () => clearTimeout(timer);
+  }, [createUserMessage]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -782,49 +851,61 @@ const loadDashboardData = useCallback(async () => {
       Alert.alert("Error", "Cannot find visitor ID. Please refresh and try again.");
       return;
     }
+    if (String(user?.role || "").toLowerCase() !== "admin") {
+      Alert.alert("Admin Required", "Only admin accounts can approve visit requests.");
+      return;
+    }
     if (processingId === id) return;
 
-    Alert.alert("Approve Visit Request", `Are you sure you want to approve ${request.fullName || "this visitor"}'s visit?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Approve",
-        onPress: async () => {
-          setProcessingId(id);
-          try {
-            const response = await ApiService.approveVisitor(id, "Approved by admin");
-            if (response && (response.success || response.visitor)) {
-              const updatedRequests = visitRequests.map(req => {
-                if ((req._id === id || req.id === id)) {
-                  return { ...req, status: "approved" };
-                }
-                return req;
-              });
-              
-              setVisitRequests(updatedRequests);
-              setPendingRequests(updatedRequests.filter(r => r.status === "pending"));
-              setApprovedRequests(updatedRequests.filter(r => r.status === "approved"));
-              
-              setStats(prev => ({
-                ...prev,
-                pendingRequests: updatedRequests.filter(r => r.status === "pending").length,
-                approvedRequests: updatedRequests.filter(r => r.status === "approved").length,
-              }));
-              
-              Alert.alert("Success", `${request.fullName || "Visitor"} has been approved successfully!`);
-              setShowRequestDetailsModal(false);
-              loadAllVisitRequests();
-            } else {
-              Alert.alert("Error", response?.message || "Failed to approve request");
-            }
-          } catch (error) {
-            console.error("Approve error:", error);
-            Alert.alert("Error", error.message || "Failed to approve request. Please try again.");
-          } finally {
-            setProcessingId(null);
+    setProcessingId(id);
+    try {
+      const response = await ApiService.approveVisitor(id, "Approved by admin");
+      if (response && (response.success || response.visitor)) {
+        const approvedVisitor = response.visitor || {};
+        const updatedRequests = visitRequests.map(req => {
+          if ((req._id === id || req.id === id)) {
+            return {
+              ...req,
+              ...approvedVisitor,
+              status: approvedVisitor.status || "approved",
+              approvalStatus: approvedVisitor.approvalStatus || "approved",
+            };
           }
-        },
-      },
-    ]);
+          return req;
+        });
+
+        setVisitRequests(updatedRequests);
+        setPendingRequests(updatedRequests.filter(r => (r.approvalStatus || r.status) === "pending"));
+        setApprovedRequests(updatedRequests.filter(r => (r.approvalStatus || r.status) === "approved"));
+
+        setStats(prev => ({
+          ...prev,
+          pendingRequests: updatedRequests.filter(r => (r.approvalStatus || r.status) === "pending").length,
+          approvedRequests: updatedRequests.filter(r => (r.approvalStatus || r.status) === "approved").length,
+        }));
+
+        setShowRequestDetailsModal(false);
+        setSelectedRequest(null);
+        await loadAllVisitRequests();
+
+        Alert.alert(
+          "Visitor Approved",
+          `${approvedVisitor.fullName || request.fullName || "Visitor"} has been approved successfully.\n\nThe visitor account is now active.\nEmail: ${approvedVisitor.email || request.email || "N/A"}\nPassword: ${approvedVisitor.temporaryPassword || "Use the registration password"}`,
+        );
+      } else {
+        Alert.alert("Error", response?.message || "Failed to approve request");
+      }
+    } catch (error) {
+      console.error("Approve error:", error);
+      Alert.alert(
+        "Approval Failed",
+        error?.status === 403
+          ? "This action requires an admin account. Please sign in again as admin."
+          : (error.message || "Failed to approve request. Please try again."),
+      );
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   // FIXED: Handle Reject Request
@@ -890,6 +971,18 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
 
+    const normalizedEmail = newUserData.email.toLowerCase().trim();
+    const existingUser = allUsers.find(
+      (u) => String(u?.email || "").toLowerCase().trim() === normalizedEmail
+    );
+    if (existingUser) {
+      Alert.alert(
+        "Email Already Used",
+        `${normalizedEmail} is already registered as ${existingUser.role || "user"}. Please use a different email.`
+      );
+      return;
+    }
+
     setProcessingId("create-user");
 
     try {
@@ -898,7 +991,7 @@ const loadDashboardData = useCallback(async () => {
       const userPayload = {
         firstName: newUserData.firstName.trim(),
         lastName: newUserData.lastName.trim(),
-        email: newUserData.email.toLowerCase().trim(),
+        email: normalizedEmail,
         password: generatedPassword,
         phone: newUserData.phone.trim(),
         role: newUserData.role,
@@ -917,13 +1010,28 @@ const loadDashboardData = useCallback(async () => {
         userPayload.department = "Security Department";
       }
 
-      const response = await ApiService.register(userPayload);
+      const isSecurityRole = newUserData.role === "security" || newUserData.role === "guard";
+      const response = isSecurityRole
+        ? await ApiService.createSecurityGuard({
+            firstName: userPayload.firstName,
+            lastName: userPayload.lastName,
+            email: userPayload.email,
+            password: userPayload.password,
+            phone: userPayload.phone,
+            shift: userPayload.shift,
+            position: userPayload.position,
+            employeeId: userPayload.employeeId,
+          })
+        : await ApiService.createStaffUser(userPayload);
 
       if (response && (response.success || response.user)) {
-        const roleDisplay = newUserData.role === "security" || newUserData.role === "guard" ? "SECURITY PERSONNEL" : "STAFF MEMBER";
+        const roleDisplay = isSecurityRole ? "SECURITY PERSONNEL" : "STAFF MEMBER";
+        const resolvedRole = isSecurityRole ? "guard" : (response.user?.role || newUserData.role);
+        const createdName = `${newUserData.firstName} ${newUserData.lastName}`.trim();
         
         const newUser = {
           ...userPayload,
+          role: resolvedRole,
           _id: response.user?._id || response.user?.id || Date.now().toString(),
           createdAt: new Date().toISOString(),
         };
@@ -943,25 +1051,28 @@ const loadDashboardData = useCallback(async () => {
           totalGuards: (newUserData.role === "security" || newUserData.role === "guard") ? prev.totalGuards + 1 : prev.totalGuards,
           activeUsers: prev.activeUsers + 1,
         }));
-        
-        Alert.alert("Success", `${roleDisplay} account created successfully!\n\nName: ${newUserData.firstName} ${newUserData.lastName}\nEmail: ${newUserData.email}\nPassword: ${generatedPassword}\nRole: ${roleDisplay}\nEmployee ID: ${userPayload.employeeId}\n\nLogin credentials have been sent to ${newUserData.email}`, [
-          {
-            text: "OK",
-            onPress: () => {
-              setShowAddUserModal(false);
-              setNewUserData({
-                firstName: "", lastName: "", email: "", password: "", phone: "",
-                role: "staff", department: "", employeeId: "", position: "", shift: "Morning", status: "active",
-              });
-            },
-          },
-        ]);
+
+        setShowAddUserModal(false);
+        setCreatedUserSummary({
+          name: createdName,
+          email: newUserData.email,
+          password: generatedPassword,
+          role: roleDisplay,
+          employeeId: userPayload.employeeId,
+          deliveryNote: `Login credentials have been sent to ${newUserData.email}.`,
+        });
+        setShowCreateSuccessModal(true);
       } else {
         Alert.alert("Error", response?.message || response?.error || "Failed to create account");
       }
     } catch (error) {
       console.error("Create user error:", error);
-      Alert.alert("Error", error.message || "Failed to create account");
+      const message = String(error?.message || "");
+      if (message.toLowerCase().includes("email already")) {
+        Alert.alert("Email Already Used", "This email is already registered. Please use another email address.");
+      } else {
+        Alert.alert("Error", message || "Failed to create account");
+      }
     } finally {
       setProcessingId(null);
     }
@@ -984,6 +1095,24 @@ const loadDashboardData = useCallback(async () => {
       isActive: userItem.isActive !== false,
     });
     setShowEditUserModal(true);
+  };
+
+  const handleCloseCreateSuccessModal = async () => {
+    const createdName = createdUserSummary?.name || "New user";
+    setShowCreateSuccessModal(false);
+    setCreatedUserSummary(null);
+    setNewUserData({
+      firstName: "", lastName: "", email: "", password: "", phone: "",
+      role: "staff", department: "", employeeId: "", position: "", shift: "Morning", status: "active",
+    });
+    await loadDashboardData();
+    setActiveMenu("users");
+    setUserFilter("all");
+    setUserSearchQuery("");
+    setCurrentPage(1);
+    setUserManagementStatusTab("active");
+    setCreateUserMessage(`${createdName} was added successfully.`);
+    setShowUserManagementModal(true);
   };
 
   // FIXED: Confirm Edit User
@@ -1200,19 +1329,30 @@ const loadDashboardData = useCallback(async () => {
 
   const renderBarChart = (labels, data) => {
     const max = Math.max(...(data || [0]), 1);
+    const chartColors = ["#3B82F6", "#8B5CF6", "#0EA5E9", "#14B8A6", "#F59E0B", "#EF4444"];
     return (
-      <View style={{ gap: 8, marginTop: 12 }}>
+      <View style={styles.analyticsBarChart}>
         {(labels || []).map((label, index) => {
           const value = data?.[index] || 0;
-          const percentage = Math.max(4, Math.round((value / max) * 100));
+          const percentage = value === 0 ? 0 : Math.max(8, Math.round((value / max) * 100));
+          const barColor = chartColors[index % chartColors.length];
           return (
-            <View key={`${label}-${index}`} style={{ gap: 4 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{label}</Text>
-                <Text style={{ color: theme.textPrimary, fontSize: 12, fontWeight: "600" }}>{value}</Text>
+            <View key={`${label}-${index}`} style={styles.analyticsBarRow}>
+              <View style={styles.analyticsBarMeta}>
+                <Text style={[styles.analyticsBarLabel, { color: theme.textSecondary }]}>{label}</Text>
+                <Text style={[styles.analyticsBarValue, { color: theme.textPrimary }]}>{value}</Text>
               </View>
-              <View style={{ height: 8, backgroundColor: isDarkMode ? "#334155" : "#E2E8F0", borderRadius: 6 }}>
-                <View style={{ width: `${percentage}%`, height: 8, borderRadius: 6, backgroundColor: "#3B82F6" }} />
+              <View style={[styles.analyticsBarTrack, { backgroundColor: isDarkMode ? "#334155" : "#E2E8F0" }]}>
+                <View
+                  style={[
+                    styles.analyticsBarFill,
+                    {
+                      width: `${percentage}%`,
+                      backgroundColor: barColor,
+                      opacity: value === 0 ? 0 : 1,
+                    },
+                  ]}
+                />
               </View>
             </View>
           );
@@ -1223,7 +1363,7 @@ const loadDashboardData = useCallback(async () => {
 
   const renderRequestCard = (request) => {
     const id = getId(request) || `${request?.email || "request"}-${request?.visitDate || request?.createdAt || Date.now()}`;
-    const statusInfo = getStatusColor(request?.status);
+    const statusInfo = getStatusColor(getRequestStatus(request));
 
     return (
       <TouchableOpacity
@@ -1233,36 +1373,35 @@ const loadDashboardData = useCallback(async () => {
           setSelectedRequest(request);
           setShowRequestDetailsModal(true);
         }}
-        style={{
-          marginTop: 10,
-          backgroundColor: theme.cardBackground,
-          borderColor: theme.borderColor,
-          borderWidth: 1,
-          borderRadius: 12,
-          padding: 12,
-        }}
+        style={[
+          styles.dashboardRequestCard,
+          {
+            backgroundColor: theme.cardBackground,
+            borderColor: theme.borderColor,
+          },
+        ]}
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <View style={{ flex: 1, paddingRight: 10 }}>
-            <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: "700" }}>
+        <View style={styles.dashboardRequestCardTop}>
+          <View style={styles.dashboardRequestCardInfo}>
+            <Text style={[styles.dashboardRequestName, { color: theme.textPrimary }]}>
               {request?.fullName || "Unknown Visitor"}
             </Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 2 }}>
+            <Text style={[styles.dashboardRequestEmail, { color: theme.textSecondary }]}>
               {request?.email || "No email"}
             </Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 2, fontSize: 12 }}>
+            <Text style={[styles.dashboardRequestPurpose, { color: theme.textSecondary }]}>
               {request?.purposeOfVisit || "No purpose provided"}
             </Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 4, fontSize: 12 }}>
+            <Text style={[styles.dashboardRequestTime, { color: theme.textSecondary }]}>
               {formatDateTime(request?.visitDate || request?.createdAt)}
             </Text>
           </View>
 
-          <View style={{ alignItems: "flex-end" }}>
-            <View style={{ backgroundColor: statusInfo.bg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-              <Text style={{ color: statusInfo.text, fontSize: 11, fontWeight: "700" }}>{statusInfo.label}</Text>
+          <View style={styles.dashboardRequestRight}>
+            <View style={[styles.dashboardStatusBadge, { backgroundColor: statusInfo.bg }]}>
+              <Text style={[styles.dashboardStatusText, { color: statusInfo.text }]}>{statusInfo.label}</Text>
             </View>
-            <Text style={{ color: theme.textSecondary, marginTop: 8, fontSize: 11 }}>
+            <Text style={[styles.dashboardRequestDate, { color: theme.textSecondary }]}>
               {formatDate(request?.createdAt)}
             </Text>
           </View>
@@ -1280,49 +1419,83 @@ const loadDashboardData = useCallback(async () => {
       <View style={styles.pageContainer}>
         <View style={styles.pageHeader}>
           <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Dashboard Overview</Text>
-          <TouchableOpacity onPress={loadDashboardData}>
+          <TouchableOpacity style={styles.pageRefreshButton} onPress={loadDashboardData}>
             <Ionicons name="refresh-outline" size={22} color="#3B82F6" />
           </TouchableOpacity>
         </View>
 
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+        <View
+          style={[
+            styles.dashboardHeroCard,
+            isDarkMode && { backgroundColor: "#1E293B", borderColor: "#334155" },
+          ]}
+        >
+          <View style={styles.dashboardHeroLeft}>
+            <Text style={[styles.dashboardHeroTitle, isDarkMode && styles.darkText]}>
+              Welcome back, {user?.firstName || "Admin"}
+            </Text>
+            <Text style={[styles.dashboardHeroSubtitle, isDarkMode && styles.darkTextSecondary]}>
+              Live overview of visitor flow, user activity, and pending approvals.
+            </Text>
+          </View>
+          <View style={[styles.dashboardHeroBadge, isDarkMode && { backgroundColor: "#334155" }]}>
+            <Ionicons name="sparkles-outline" size={16} color="#2563EB" />
+            <Text style={[styles.dashboardHeroBadgeText, isDarkMode && styles.darkTextSecondary]}>
+              {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.dashboardStatsGrid}>
           {[
-            { label: "Pending Requests", value: stats.pendingRequests, color: "#F59E0B" },
-            { label: "Approved Today", value: stats.approvedRequests, color: "#10B981" },
-            { label: "Total Users", value: stats.totalUsers, color: "#3B82F6" },
-            { label: "Active Users", value: stats.activeUsers, color: "#8B5CF6" },
+            { label: "Pending Requests", value: stats.pendingRequests, color: "#F59E0B", icon: "time-outline" },
+            { label: "Approved Today", value: stats.approvedRequests, color: "#10B981", icon: "checkmark-circle-outline" },
+            { label: "Total Users", value: stats.totalUsers, color: "#3B82F6", icon: "people-outline" },
+            { label: "Active Users", value: stats.activeUsers, color: "#8B5CF6", icon: "pulse-outline" },
+            { label: "Today Visits", value: stats.todayVisits, color: "#EF4444", icon: "walk-outline" },
+            { label: "Tomorrow Visits", value: stats.tomorrowVisits, color: "#14B8A6", icon: "calendar-outline" },
           ].map((item) => (
             <View
               key={item.label}
-              style={{
-                width: width > 1200 ? "24%" : width > 900 ? "48%" : "100%",
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.borderColor,
-                borderWidth: 1,
-                borderRadius: 14,
-                padding: 14,
-              }}
+              style={[
+                styles.dashboardStatCard,
+                {
+                  width: width > 1200 ? "32%" : width > 900 ? "48%" : "100%",
+                  backgroundColor: theme.cardBackground,
+                  borderColor: theme.borderColor,
+                },
+              ]}
             >
-              <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{item.label}</Text>
-              <Text style={{ color: item.color, fontSize: 22, fontWeight: "700", marginTop: 6 }}>{item.value || 0}</Text>
+              <View style={styles.dashboardStatHeader}>
+                <Text style={[styles.dashboardStatLabel, { color: theme.textSecondary }]}>{item.label}</Text>
+                <View style={[styles.dashboardStatIcon, { backgroundColor: `${item.color}18` }]}>
+                  <Ionicons name={item.icon} size={16} color={item.color} />
+                </View>
+              </View>
+              <Text style={[styles.dashboardStatValue, { color: item.color }]}>{item.value || 0}</Text>
             </View>
           ))}
         </View>
 
-        <View
-          style={{
-            marginTop: 14,
-            backgroundColor: theme.cardBackground,
-            borderColor: theme.borderColor,
-            borderWidth: 1,
-            borderRadius: 14,
-            padding: 14,
-          }}
-        >
-          <Text style={{ color: theme.textPrimary, fontSize: 16, fontWeight: "700" }}>Recent Pending Requests</Text>
+        <View style={[styles.dashboardSectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+          <View style={styles.dashboardSectionHeader}>
+            <Text style={[styles.dashboardSectionTitle, { color: theme.textPrimary }]}>Recent Pending Requests</Text>
+            <TouchableOpacity onPress={() => setActiveMenu("requests")}>
+              <Text style={styles.dashboardSectionLink}>View all</Text>
+            </TouchableOpacity>
+          </View>
           {pendingRequests.length ? pendingRequests.slice(0, 5).map((request) => renderRequestCard(request)) : (
-            <Text style={{ marginTop: 10, color: theme.textSecondary }}>No pending requests right now.</Text>
+            <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>No pending requests right now.</Text>
           )}
+        </View>
+
+        <View style={styles.dashboardActionsRow}>
+          <TouchableOpacity style={[styles.submitButton, { flex: 1 }]} onPress={() => setActiveMenu("requests")}>
+            <Text style={styles.submitButtonText}>Open Requests</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={() => setActiveMenu("users")}>
+            <Text style={styles.cancelButtonText}>Manage Users</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </ScrollView>
@@ -1331,34 +1504,432 @@ const loadDashboardData = useCallback(async () => {
   const renderAnalyticsContent = () => {
     const chart = getCurrentChartData();
     const historyStats = getHistoryStats();
+    const filteredHistory = getFilteredHistory();
+    const selectedDateLabel = selectedDate.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+    const totalRequests = stats.totalRequests || 0;
+    const approvalRate = totalRequests > 0 ? Math.round((stats.approvedRequests / totalRequests) * 100) : 0;
+    const chartTotal = (chart?.data || []).reduce((sum, value) => sum + value, 0);
+    const chartPeakValue = Math.max(...(chart?.data || [0]), 0);
+    const chartPeakIndex = chart?.data?.findIndex((value) => value === chartPeakValue) ?? -1;
+    const chartPeakLabel = chartPeakIndex >= 0 ? chart?.labels?.[chartPeakIndex] : "N/A";
+    const chartAverage = chart?.data?.length ? (chartTotal / chart.data.length).toFixed(1) : "0.0";
+    const selectedDateVisitors = [...(dateAnalytics.visitors || [])].sort(
+      (a, b) => new Date(a.visitTime || a.visitDate) - new Date(b.visitTime || b.visitDate)
+    );
+    const distributionItems = [
+      { key: "approved", label: "Approved", value: stats.approvedRequests || 0, color: "#10B981" },
+      { key: "pending", label: "Pending", value: stats.pendingRequests || 0, color: "#F59E0B" },
+      { key: "rejected", label: "Rejected", value: stats.rejectedRequests || 0, color: "#EF4444" },
+    ];
+    const metricCards = [
+      {
+        key: "total",
+        icon: "layers-outline",
+        label: "Total Requests",
+        value: totalRequests,
+        accent: "#3B82F6",
+        helper: "All recorded visitor requests",
+      },
+      {
+        key: "approval",
+        icon: "checkmark-done-outline",
+        label: "Approval Rate",
+        value: `${approvalRate}%`,
+        accent: "#10B981",
+        helper: `${stats.approvedRequests || 0} approved requests`,
+      },
+      {
+        key: "today",
+        icon: "today-outline",
+        label: "Today Visits",
+        value: stats.todayVisits || 0,
+        accent: "#F97316",
+        helper: "Scheduled for today",
+      },
+      {
+        key: "upcoming",
+        icon: "time-outline",
+        label: "Upcoming",
+        value: stats.upcomingVisits || 0,
+        accent: "#8B5CF6",
+        helper: "Approved future visits",
+      },
+    ];
+    const historyFilters = [
+      { key: "all", label: "All" },
+      { key: "pending", label: "Pending" },
+      { key: "approved", label: "Approved" },
+      { key: "checked_in", label: "Checked In" },
+      { key: "checked_out", label: "Checked Out" },
+      { key: "rejected", label: "Rejected" },
+    ];
+
     return (
-      <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.pageContainer}>
-          <View style={styles.pageHeader}>
-            <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Analytics</Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(true)}>
-              <Ionicons name="calendar-outline" size={22} color="#3B82F6" />
+      <ScrollView
+        style={styles.contentScrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.analyticsContainer}
+      >
+        <View style={[styles.analyticsHeader, width < 900 && { flexDirection: "column", gap: 14 }]}>
+          <View>
+            <Text style={[styles.analyticsHeaderTitle, { color: theme.textPrimary }]}>Analytics</Text>
+            <Text style={[styles.analyticsHeaderSubtitle, { color: theme.textSecondary }]}>
+              Review request volume, approvals, and visitor activity from one place.
+            </Text>
+          </View>
+          <View style={styles.analyticsHeaderActions}>
+            <TouchableOpacity
+              style={[styles.analyticsActionButton, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}
+              onPress={onRefresh}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh-outline" size={16} color="#3B82F6" />
+              <Text style={styles.analyticsActionButtonText}>Refresh</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.analyticsActionButton, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}
+              onPress={() => setShowDatePicker(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar-outline" size={16} color="#8B5CF6" />
+              <Text style={styles.analyticsActionButtonText}>Pick Date</Text>
             </TouchableOpacity>
           </View>
+        </View>
 
-          <View style={{ backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14 }}>
-            <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>Selected Date</Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 4 }}>{formatDateTime(selectedDate)}</Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 8 }}>
-              Total: {dateAnalytics.total} | Approved: {dateAnalytics.approved} | Pending: {dateAnalytics.pending} | Rejected: {dateAnalytics.rejected}
+        <View
+          style={[
+            styles.analyticsHeroCard,
+            width < 960 && { flexDirection: "column" },
+            { backgroundColor: theme.cardBackground, borderColor: theme.borderColor },
+          ]}
+        >
+          <View style={styles.analyticsHeroContent}>
+            <View style={[styles.analyticsHeroBadge, { backgroundColor: isDarkMode ? "#312E81" : "#EEF2FF" }]}>
+              <Ionicons name="pulse-outline" size={14} color="#6366F1" />
+              <Text style={styles.analyticsHeroBadgeText}>Operational Snapshot</Text>
+            </View>
+            <Text style={[styles.analyticsHeroTitle, { color: theme.textPrimary }]}>
+              {dateAnalytics.total > 0
+                ? `${dateAnalytics.total} visit request${dateAnalytics.total > 1 ? "s are" : " is"} scheduled for ${selectedDateLabel}.`
+                : `No visit requests are scheduled for ${selectedDateLabel}.`}
+            </Text>
+            <Text style={[styles.analyticsHeroSubtitle, { color: theme.textSecondary }]}>
+              Approval rate is currently {approvalRate}% with {stats.upcomingVisits || 0} approved visit
+              {stats.upcomingVisits === 1 ? "" : "s"} still upcoming.
             </Text>
           </View>
+          <View style={[styles.analyticsHeroStats, width < 960 && { width: "100%", flexDirection: "row" }]}>
+            <View style={[styles.analyticsHeroStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+              <Text style={[styles.analyticsHeroStatValue, { color: theme.textPrimary }]}>{historyStats.uniqueEmails}</Text>
+              <Text style={[styles.analyticsHeroStatLabel, { color: theme.textSecondary }]}>Unique Visitors</Text>
+            </View>
+            <View style={[styles.analyticsHeroStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+              <Text style={[styles.analyticsHeroStatValue, { color: theme.textPrimary }]}>{stats.weeklyGrowth || 0}%</Text>
+              <Text style={[styles.analyticsHeroStatLabel, { color: theme.textSecondary }]}>7d Activity</Text>
+            </View>
+          </View>
+        </View>
 
-          <View style={{ marginTop: 14, backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14 }}>
-            <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>Visitor Trend ({activeChartDataset})</Text>
-            {renderBarChart(chart.labels, chart.data)}
+        <View style={styles.keyMetricsRow}>
+          {metricCards.map((card) => (
+            <View
+              key={card.key}
+              style={[styles.keyMetricCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}
+            >
+              <View style={[styles.keyMetricIcon, { backgroundColor: `${card.accent}15` }]}>
+                <Ionicons name={card.icon} size={22} color={card.accent} />
+              </View>
+              <View style={styles.analyticsMetricContent}>
+                <Text style={[styles.keyMetricValue, { color: theme.textPrimary }]}>{card.value}</Text>
+                <Text style={[styles.keyMetricLabel, { color: theme.textSecondary }]}>{card.label}</Text>
+                <Text style={[styles.analyticsMetricHelper, { color: theme.textSecondary }]}>{card.helper}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={[styles.analyticsSplitGrid, width < 1200 && styles.analyticsSplitGridStack]}>
+          <View style={styles.analyticsPrimaryColumn}>
+            <View style={[styles.mainStatCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <View style={styles.analyticsChartHeader}>
+                <View>
+                  <Text style={[styles.distributionTitle, { color: theme.textPrimary, marginBottom: 4 }]}>Visitor Trend</Text>
+                  <Text style={[styles.analyticsChartSubtitle, { color: theme.textSecondary }]}>
+                    Compare {activeChartDataset} request activity and spot the busiest period quickly.
+                  </Text>
+                </View>
+                <View style={[styles.analyticsDatasetSelector, { backgroundColor: isDarkMode ? "#0F172A" : "#F1F5F9" }]}>
+                  {["daily", "weekly", "monthly"].map((dataset) => (
+                    <TouchableOpacity
+                      key={dataset}
+                      style={[
+                        styles.analyticsDatasetButton,
+                        activeChartDataset === dataset && styles.analyticsDatasetButtonActive,
+                      ]}
+                      onPress={() => setActiveChartDataset(dataset)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.analyticsDatasetButtonText,
+                          { color: activeChartDataset === dataset ? "#FFFFFF" : theme.textSecondary },
+                        ]}
+                      >
+                        {dataset.charAt(0).toUpperCase() + dataset.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.analyticsQuickStatsRow}>
+                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsQuickStatValue, { color: theme.textPrimary }]}>{chartTotal}</Text>
+                  <Text style={[styles.analyticsQuickStatLabel, { color: theme.textSecondary }]}>Total Volume</Text>
+                </View>
+                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsQuickStatValue, { color: theme.textPrimary }]}>{chartPeakLabel || "N/A"}</Text>
+                  <Text style={[styles.analyticsQuickStatLabel, { color: theme.textSecondary }]}>Busiest Period</Text>
+                </View>
+                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsQuickStatValue, { color: theme.textPrimary }]}>{chartAverage}</Text>
+                  <Text style={[styles.analyticsQuickStatLabel, { color: theme.textSecondary }]}>Average</Text>
+                </View>
+              </View>
+
+              {renderBarChart(chart.labels, chart.data)}
+            </View>
+
+            <View style={[styles.historyCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <View style={styles.historyHeader}>
+                <View>
+                  <Text style={[styles.historyTitle, { color: theme.textPrimary }]}>Visitor History</Text>
+                  <Text style={[styles.analyticsChartSubtitle, { color: theme.textSecondary }]}>
+                    Search and filter recent visitor records by status.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.historyRefreshButton, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC" }]}
+                  onPress={onRefresh}
+                >
+                  <Ionicons name="refresh-outline" size={16} color="#3B82F6" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.historyFilters}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyFilterChips}>
+                  {historyFilters.map((filter) => (
+                    <TouchableOpacity
+                      key={filter.key}
+                      style={[
+                        styles.historyFilterChip,
+                        { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor },
+                        historyFilter === filter.key && styles.historyFilterChipActive,
+                      ]}
+                      onPress={() => setHistoryFilter(filter.key)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.historyFilterChipText,
+                          { color: historyFilter === filter.key ? "#FFFFFF" : theme.textSecondary },
+                          historyFilter === filter.key && styles.historyFilterChipTextActive,
+                        ]}
+                      >
+                        {filter.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <View style={[styles.historySearchBox, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Ionicons name="search-outline" size={16} color={theme.textSecondary} />
+                  <TextInput
+                    style={[styles.historySearchInput, { color: theme.textPrimary }]}
+                    placeholder="Search visitor, email, or purpose"
+                    placeholderTextColor={theme.textSecondary}
+                    value={historySearchQuery}
+                    onChangeText={setHistorySearchQuery}
+                  />
+                </View>
+              </View>
+
+              {filteredHistory.length === 0 ? (
+                <View style={styles.emptyHistoryState}>
+                  <Ionicons name="search-outline" size={42} color={theme.textSecondary} />
+                  <Text style={[styles.emptyHistoryTitle, { color: theme.textPrimary }]}>No matching history</Text>
+                  <Text style={[styles.emptyHistorySubtitle, { color: theme.textSecondary }]}>
+                    Try adjusting your status filter or search term.
+                  </Text>
+                </View>
+              ) : (
+                filteredHistory.slice(0, 8).map((visitor) => {
+                  const statusInfo = getStatusColor(visitor.status);
+                  const isToday =
+                    visitor.visitDate &&
+                    new Date(visitor.visitDate).toDateString() === new Date().toDateString();
+
+                  return (
+                    <View
+                      key={visitor._id || visitor.id || `${visitor.email}-${visitor.visitDate}`}
+                      style={[styles.historyItem, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}
+                    >
+                      <View style={styles.historyItemHeader}>
+                        <View style={[styles.historyItemAvatar, { backgroundColor: isDarkMode ? "#1E293B" : "#EFF6FF" }]}>
+                          <Text style={styles.historyItemAvatarText}>
+                            {(visitor.fullName || "V")
+                              .split(" ")
+                              .map((name) => name[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.historyItemInfo}>
+                          <Text style={[styles.historyItemName, { color: theme.textPrimary }]}>{visitor.fullName}</Text>
+                          <Text style={[styles.historyItemEmail, { color: theme.textSecondary }]}>{visitor.email}</Text>
+                          <Text style={[styles.historyItemPurpose, { color: theme.textSecondary }]}>
+                            {visitor.purposeOfVisit || "No purpose provided"}
+                          </Text>
+                        </View>
+                        <View style={[styles.analyticsStatusBadge, { backgroundColor: statusInfo.bg }]}>
+                          <Text style={[styles.analyticsStatusBadgeText, { color: statusInfo.text }]}>
+                            {statusInfo.label}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={[styles.historyItemDetails, { borderTopColor: theme.borderColor }]}>
+                        <View style={styles.historyDetailItem}>
+                          <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} />
+                          <Text style={[styles.historyDetailText, { color: theme.textSecondary }]}>
+                            {formatDate(visitor.visitDate)}
+                          </Text>
+                        </View>
+                        <View style={styles.historyDetailItem}>
+                          <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+                          <Text style={[styles.historyDetailText, { color: theme.textSecondary }]}>
+                            {formatTime(visitor.visitTime)}
+                          </Text>
+                        </View>
+                        <View style={styles.historyDetailItem}>
+                          <Ionicons name="swap-horizontal-outline" size={14} color={isToday ? "#10B981" : theme.textSecondary} />
+                          <Text
+                            style={[
+                              styles.historyDetailText,
+                              isToday ? styles.historyTodayBadge : styles.historyPastBadge,
+                            ]}
+                          >
+                            {isToday ? "Today" : "Past Schedule"}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
           </View>
 
-          <View style={{ marginTop: 14, backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14 }}>
-            <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>History Summary</Text>
-            <Text style={{ color: theme.textSecondary, marginTop: 6 }}>
-              Total: {historyStats.total} | Approved: {historyStats.approved} | Checked In: {historyStats.checkedIn} | Checked Out: {historyStats.checkedOut}
-            </Text>
+          <View style={styles.analyticsSideColumn}>
+            <View style={[styles.distributionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <Text style={[styles.distributionTitle, { color: theme.textPrimary }]}>Selected Date Snapshot</Text>
+              <View style={styles.analyticsDateSummaryRow}>
+                <View style={[styles.analyticsDateSummaryCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsDateSummaryValue, { color: theme.textPrimary }]}>{dateAnalytics.total}</Text>
+                  <Text style={[styles.analyticsDateSummaryLabel, { color: theme.textSecondary }]}>Total Visits</Text>
+                </View>
+                <View style={[styles.analyticsDateSummaryCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsDateSummaryValue, { color: theme.textPrimary }]}>{dateAnalytics.approved}</Text>
+                  <Text style={[styles.analyticsDateSummaryLabel, { color: theme.textSecondary }]}>Approved</Text>
+                </View>
+              </View>
+
+              <View style={[styles.analyticsDateCallout, { backgroundColor: isDarkMode ? "#172554" : "#EFF6FF", borderColor: isDarkMode ? "#1D4ED8" : "#BFDBFE" }]}>
+                <Ionicons name="calendar-clear-outline" size={18} color="#3B82F6" />
+                <View style={styles.analyticsDateCalloutTextWrap}>
+                  <Text style={[styles.analyticsDateCalloutTitle, { color: theme.textPrimary }]}>{selectedDateLabel}</Text>
+                  <Text style={[styles.analyticsDateCalloutSubtitle, { color: theme.textSecondary }]}>
+                    Pending {dateAnalytics.pending} | Rejected {dateAnalytics.rejected}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.analyticsDateVisitorsList}>
+                {selectedDateVisitors.length === 0 ? (
+                  <View style={styles.emptyHistoryState}>
+                    <Ionicons name="calendar-outline" size={36} color={theme.textSecondary} />
+                    <Text style={[styles.emptyHistoryTitle, { color: theme.textPrimary }]}>No visitors scheduled</Text>
+                    <Text style={[styles.emptyHistorySubtitle, { color: theme.textSecondary }]}>
+                      Pick another date to inspect scheduled visits.
+                    </Text>
+                  </View>
+                ) : (
+                  selectedDateVisitors.slice(0, 5).map((visitor) => {
+                    const statusInfo = getStatusColor(visitor.status);
+                    return (
+                      <View
+                        key={visitor._id || visitor.id || `${visitor.email}-${visitor.visitDate}`}
+                        style={[styles.analyticsDateVisitorItem, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}
+                      >
+                        <View style={styles.analyticsDateVisitorInfo}>
+                          <Text style={[styles.analyticsDateVisitorName, { color: theme.textPrimary }]}>{visitor.fullName}</Text>
+                          <Text style={[styles.analyticsDateVisitorMeta, { color: theme.textSecondary }]}>
+                            {formatTime(visitor.visitTime)} | {visitor.purposeOfVisit || "Visit"}
+                          </Text>
+                        </View>
+                        <View style={[styles.analyticsStatusBadge, { backgroundColor: statusInfo.bg }]}>
+                          <Text style={[styles.analyticsStatusBadgeText, { color: statusInfo.text }]}>
+                            {statusInfo.label}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            </View>
+
+            <View style={[styles.distributionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <Text style={[styles.distributionTitle, { color: theme.textPrimary }]}>Status Distribution</Text>
+              <View style={styles.distributionStats}>
+                {distributionItems.map((item) => {
+                  const percent = totalRequests > 0 ? Math.round((item.value / totalRequests) * 100) : 0;
+                  return (
+                    <View key={item.key} style={styles.distributionItem}>
+                      <View style={[styles.distributionDot, { backgroundColor: item.color }]} />
+                      <Text style={[styles.distributionLabel, { color: theme.textPrimary }]}>{item.label}</Text>
+                      <Text style={[styles.distributionValue, { color: theme.textPrimary }]}>{item.value}</Text>
+                      <View style={[styles.distributionBar, { backgroundColor: isDarkMode ? "#334155" : "#E2E8F0" }]}>
+                        <View
+                          style={[
+                            styles.distributionBarFill,
+                            { width: `${percent}%`, backgroundColor: item.color },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.distributionPercent, { color: theme.textSecondary }]}>{percent}%</Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              <View style={styles.analyticsDistributionFooter}>
+                <View style={[styles.analyticsDistributionStat, { borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsDistributionValue, { color: theme.textPrimary }]}>{historyStats.checkedIn}</Text>
+                  <Text style={[styles.analyticsDistributionLabel, { color: theme.textSecondary }]}>Checked In</Text>
+                </View>
+                <View style={[styles.analyticsDistributionStat, { borderColor: theme.borderColor }]}>
+                  <Text style={[styles.analyticsDistributionValue, { color: theme.textPrimary }]}>{historyStats.checkedOut}</Text>
+                  <Text style={[styles.analyticsDistributionLabel, { color: theme.textSecondary }]}>Checked Out</Text>
+                </View>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -1478,7 +2049,7 @@ const loadDashboardData = useCallback(async () => {
         <View style={[styles.contentArea, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
           <Animated.View style={[styles.header, { opacity: headerOpacity }, isDarkMode && { backgroundColor: theme.headerBackground, borderBottomColor: "#334155" }]}>
             <View style={styles.headerTop}>
-              <View><Text style={[styles.headerTitle, isDarkMode && styles.darkText]}>{menuItems.find((item) => item.action === activeMenu)?.label || "Dashboard"}</Text><Text style={[styles.headerSubtitle, isDarkMode && styles.darkTextSecondary]}>Manage your academy efficiently</Text></View>
+              <View><Text style={[styles.headerTitle, isDarkMode && styles.darkText]}>{menuItems.find((item) => item.action === activeMenu)?.label || "Dashboard"}</Text><Text style={[styles.headerSubtitle, isDarkMode && styles.darkTextSecondary]}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</Text></View>
               <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.profileButton}><View style={[styles.profileIcon, isDarkMode && { backgroundColor: "#8B5CF6" }]}><Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View></TouchableOpacity>
             </View>
           </Animated.View>
@@ -1595,8 +2166,8 @@ const loadDashboardData = useCallback(async () => {
                 )}
                 <View style={[styles.detailSection, isDarkMode && { borderBottomColor: theme.borderColor }]}>
                   <Text style={[styles.detailLabel, isDarkMode && styles.darkTextSecondary]}>Status</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedRequest.status).bg, alignSelf: "flex-start" }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(selectedRequest.status).text }]}>{getStatusColor(selectedRequest.status).label}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(getRequestStatus(selectedRequest)).bg, alignSelf: "flex-start" }]}>
+                    <Text style={[styles.statusText, { color: getStatusColor(getRequestStatus(selectedRequest)).text }]}>{getStatusColor(getRequestStatus(selectedRequest)).label}</Text>
                   </View>
                 </View>
                 {selectedRequest.rejectionReason && (
@@ -1611,7 +2182,7 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity style={[styles.cancelButton, isDarkMode && { backgroundColor: "#334155" }]} onPress={() => setShowRequestDetailsModal(false)}>
                 <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Close</Text>
               </TouchableOpacity>
-              {selectedRequest?.status === "pending" && (
+              {getRequestStatus(selectedRequest) === "pending" && (
                 <>
                   <TouchableOpacity style={[styles.submitButton, { backgroundColor: "#10B981" }]} onPress={() => handleApproveRequest(selectedRequest)} disabled={processingId === selectedRequest?._id}>
                     {processingId === selectedRequest?._id ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Approve</Text>}
@@ -1808,6 +2379,159 @@ const loadDashboardData = useCallback(async () => {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.confirmButton, { backgroundColor: "#EF4444" }]} onPress={handleDeleteUser}>
                 <Text style={styles.confirmButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Create User Success Modal */}
+      <Modal
+        visible={showCreateSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseCreateSuccessModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModal, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+            <View style={[styles.createSuccessIcon, isDarkMode && { backgroundColor: "#064E3B" }]}>
+              <Ionicons name="checkmark-circle" size={52} color="#10B981" />
+            </View>
+            <Text style={[styles.confirmTitle, isDarkMode && styles.darkText]}>Account Created</Text>
+            <Text style={[styles.confirmMessage, isDarkMode && styles.darkTextSecondary]}>
+              The new {createdUserSummary?.role?.toLowerCase() || "user"} account has been created successfully.
+            </Text>
+
+            <View style={[styles.createSuccessSummary, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Name</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.name || "N/A"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Email</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.email || "N/A"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Password</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.password || "N/A"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Role</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.role || "N/A"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Employee ID</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.employeeId || "N/A"}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.createSuccessNote, isDarkMode && { backgroundColor: "#172554", borderColor: "#1D4ED8" }]}>
+              <Ionicons name="mail-outline" size={16} color="#3B82F6" />
+              <Text style={[styles.createSuccessNoteText, isDarkMode && { color: "#BFDBFE" }]}>
+                {createdUserSummary?.deliveryNote || "The account details are ready to review."}
+              </Text>
+            </View>
+
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity style={[styles.submitButton, { flex: 1 }]} onPress={handleCloseCreateSuccessModal}>
+                <Text style={styles.submitButtonText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* User Management Modal */}
+      <Modal visible={showUserManagementModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "90%" }, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+            <View style={[styles.modalHeader, isDarkMode && { borderBottomColor: theme.borderColor }]}>
+              <Text style={[styles.modalTitle, isDarkMode && styles.darkText]}>User Management</Text>
+              <TouchableOpacity onPress={() => setShowUserManagementModal(false)}>
+                <Ionicons name="close" size={24} color={isDarkMode ? "#94A3B8" : "#6B7280"} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              {createUserMessage ? (
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? "#064E3B" : "#D1FAE5",
+                    borderColor: isDarkMode ? "#10B981" : "#86EFAC",
+                    borderWidth: 1,
+                    borderRadius: 10,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    marginBottom: 10,
+                  }}
+                >
+                  <Text style={{ color: isDarkMode ? "#A7F3D0" : "#065F46", fontWeight: "600" }}>
+                    {createUserMessage}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={styles.roleSelector}>
+                {[
+                  { key: "active", label: `Active (${activeUsersList.length})` },
+                  { key: "inactive", label: `Inactive (${inactiveUsersList.length})` },
+                  { key: "all", label: `All (${allUsers.length})` },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[styles.roleOption, userManagementStatusTab === item.key && styles.roleOptionActive, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569" }]}
+                    onPress={() => setUserManagementStatusTab(item.key)}
+                  >
+                    <Text style={[styles.roleText, userManagementStatusTab === item.key && styles.roleTextActive, isDarkMode && userManagementStatusTab !== item.key && { color: "#94A3B8" }]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <ScrollView style={styles.userManagementList} showsVerticalScrollIndicator={false}>
+                {userManagementUsers.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="people-outline" size={48} color="#CBD5E1" />
+                    <Text style={[styles.emptyStateTitle, isDarkMode && styles.darkText]}>No users found</Text>
+                    <Text style={[styles.emptyStateSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                      No {userManagementStatusTab} users available.
+                    </Text>
+                  </View>
+                ) : (
+                  userManagementUsers.map((userItem) => (
+                    <View key={userItem._id || userItem.id || userItem.email} style={[styles.userRow, isDarkMode && { borderBottomColor: theme.borderColor }]}>
+                      <View style={styles.userInfo}>
+                        <View style={[styles.userAvatar, { backgroundColor: `${getRoleColor(userItem.role)}20` }]}>
+                          <Ionicons name={getRoleIcon(userItem.role)} size={22} color={getRoleColor(userItem.role)} />
+                        </View>
+                        <View>
+                          <Text style={[styles.userName, isDarkMode && styles.darkText]}>{userItem.firstName} {userItem.lastName}</Text>
+                          <Text style={[styles.userEmail, isDarkMode && styles.darkTextSecondary]}>{userItem.email}</Text>
+                          <View style={styles.userMeta}>
+                            <View style={styles.roleBadge}>
+                              <Text style={styles.roleBadgeText}>{userItem.role?.toUpperCase() || "USER"}</Text>
+                            </View>
+                            <View style={[styles.roleBadge, (userItem.status === "active" || userItem.isActive) ? styles.userStatusBadgeActive : styles.userStatusBadgeInactive]}>
+                              <Text style={[styles.roleBadgeText, (userItem.status === "active" || userItem.isActive) ? styles.userStatusTextActive : styles.userStatusTextInactive]}>
+                                {(userItem.status === "active" || userItem.isActive) ? "ACTIVE" : "INACTIVE"}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+
+            <View style={[styles.modalFooter, isDarkMode && { borderTopColor: theme.borderColor }]}>
+              <TouchableOpacity style={[styles.cancelButton, { flex: 1 }, isDarkMode && { backgroundColor: "#334155" }]} onPress={() => setShowUserManagementModal(false)}>
+                <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.submitButton, { flex: 1 }]} onPress={() => { setShowUserManagementModal(false); setActiveMenu("users"); }}>
+                <Text style={styles.submitButtonText}>Open User Page</Text>
               </TouchableOpacity>
             </View>
           </View>
