@@ -163,6 +163,11 @@ const getRoleIcon = (role) => {
   }
 };
 
+const getRequestStatus = (request) => {
+  if (!request) return "unknown";
+  return request.approvalStatus || request.status || "unknown";
+};
+
 export default function AdminDashboardScreen({ navigation, onLogout }) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const mainScrollViewRef = useRef(null);
@@ -342,7 +347,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const getFilteredRequests = useCallback(() => {
     let filtered = [...visitRequests];
     if (requestFilter !== "all") {
-      filtered = filtered.filter((r) => r.status === requestFilter);
+      filtered = filtered.filter((r) => getRequestStatus(r) === requestFilter);
     }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -518,9 +523,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       return visitDate >= targetDate && visitDate < nextDay;
     });
 
-    const approved = visitorsOnDate.filter((r) => r.status === "approved");
-    const pending = visitorsOnDate.filter((r) => r.status === "pending");
-    const rejected = visitorsOnDate.filter((r) => r.status === "rejected");
+    const approved = visitorsOnDate.filter((r) => getRequestStatus(r) === "approved");
+    const pending = visitorsOnDate.filter((r) => getRequestStatus(r) === "pending");
+    const rejected = visitorsOnDate.filter((r) => getRequestStatus(r) === "rejected");
 
     setDateAnalytics({
       total: visitorsOnDate.length,
@@ -564,9 +569,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       const response = await ApiService.getAllVisitors({ limit: 500 });
       if (response && response.visitors) {
         const requests = response.visitors || [];
-        const pending = requests.filter((r) => r.status === "pending");
-        const approved = requests.filter((r) => r.status === "approved");
-        const rejected = requests.filter((r) => r.status === "rejected");
+        const pending = requests.filter((r) => getRequestStatus(r) === "pending");
+        const approved = requests.filter((r) => getRequestStatus(r) === "approved");
+        const rejected = requests.filter((r) => getRequestStatus(r) === "rejected");
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -587,7 +592,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
 
         const upcomingVisits = requests.filter((r) => {
           const visitDate = new Date(r.visitDate);
-          return visitDate >= today && r.status === "approved";
+          return visitDate >= today && getRequestStatus(r) === "approved";
         }).length;
 
         setVisitRequests(requests);
@@ -662,9 +667,10 @@ const loadDashboardData = useCallback(async () => {
   authErrorHandledRef.current = false;
   setIsLoading(true);
   try {
-    const currentUser = await ApiService.getCurrentUser();
+    const profileResponse = await ApiService.getProfile();
+    const currentUser = profileResponse?.user || (await ApiService.getCurrentUser());
     const role = String(currentUser?.role || "").toLowerCase();
-    if (!currentUser || (role !== "admin" && role !== "security" && role !== "guard")) {
+    if (!currentUser || role !== "admin") {
       Alert.alert("Access Denied", "You don't have admin privileges.");
       navigation.replace("Login");
       return;
@@ -845,49 +851,61 @@ const loadDashboardData = useCallback(async () => {
       Alert.alert("Error", "Cannot find visitor ID. Please refresh and try again.");
       return;
     }
+    if (String(user?.role || "").toLowerCase() !== "admin") {
+      Alert.alert("Admin Required", "Only admin accounts can approve visit requests.");
+      return;
+    }
     if (processingId === id) return;
 
-    Alert.alert("Approve Visit Request", `Are you sure you want to approve ${request.fullName || "this visitor"}'s visit?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Approve",
-        onPress: async () => {
-          setProcessingId(id);
-          try {
-            const response = await ApiService.approveVisitor(id, "Approved by admin");
-            if (response && (response.success || response.visitor)) {
-              const updatedRequests = visitRequests.map(req => {
-                if ((req._id === id || req.id === id)) {
-                  return { ...req, status: "approved" };
-                }
-                return req;
-              });
-              
-              setVisitRequests(updatedRequests);
-              setPendingRequests(updatedRequests.filter(r => r.status === "pending"));
-              setApprovedRequests(updatedRequests.filter(r => r.status === "approved"));
-              
-              setStats(prev => ({
-                ...prev,
-                pendingRequests: updatedRequests.filter(r => r.status === "pending").length,
-                approvedRequests: updatedRequests.filter(r => r.status === "approved").length,
-              }));
-              
-              Alert.alert("Success", `${request.fullName || "Visitor"} has been approved successfully!`);
-              setShowRequestDetailsModal(false);
-              loadAllVisitRequests();
-            } else {
-              Alert.alert("Error", response?.message || "Failed to approve request");
-            }
-          } catch (error) {
-            console.error("Approve error:", error);
-            Alert.alert("Error", error.message || "Failed to approve request. Please try again.");
-          } finally {
-            setProcessingId(null);
+    setProcessingId(id);
+    try {
+      const response = await ApiService.approveVisitor(id, "Approved by admin");
+      if (response && (response.success || response.visitor)) {
+        const approvedVisitor = response.visitor || {};
+        const updatedRequests = visitRequests.map(req => {
+          if ((req._id === id || req.id === id)) {
+            return {
+              ...req,
+              ...approvedVisitor,
+              status: approvedVisitor.status || "approved",
+              approvalStatus: approvedVisitor.approvalStatus || "approved",
+            };
           }
-        },
-      },
-    ]);
+          return req;
+        });
+
+        setVisitRequests(updatedRequests);
+        setPendingRequests(updatedRequests.filter(r => (r.approvalStatus || r.status) === "pending"));
+        setApprovedRequests(updatedRequests.filter(r => (r.approvalStatus || r.status) === "approved"));
+
+        setStats(prev => ({
+          ...prev,
+          pendingRequests: updatedRequests.filter(r => (r.approvalStatus || r.status) === "pending").length,
+          approvedRequests: updatedRequests.filter(r => (r.approvalStatus || r.status) === "approved").length,
+        }));
+
+        setShowRequestDetailsModal(false);
+        setSelectedRequest(null);
+        await loadAllVisitRequests();
+
+        Alert.alert(
+          "Visitor Approved",
+          `${approvedVisitor.fullName || request.fullName || "Visitor"} has been approved successfully.\n\nThe visitor account is now active.\nEmail: ${approvedVisitor.email || request.email || "N/A"}\nPassword: ${approvedVisitor.temporaryPassword || "Use the registration password"}`,
+        );
+      } else {
+        Alert.alert("Error", response?.message || "Failed to approve request");
+      }
+    } catch (error) {
+      console.error("Approve error:", error);
+      Alert.alert(
+        "Approval Failed",
+        error?.status === 403
+          ? "This action requires an admin account. Please sign in again as admin."
+          : (error.message || "Failed to approve request. Please try again."),
+      );
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   // FIXED: Handle Reject Request
@@ -1345,7 +1363,7 @@ const loadDashboardData = useCallback(async () => {
 
   const renderRequestCard = (request) => {
     const id = getId(request) || `${request?.email || "request"}-${request?.visitDate || request?.createdAt || Date.now()}`;
-    const statusInfo = getStatusColor(request?.status);
+    const statusInfo = getStatusColor(getRequestStatus(request));
 
     return (
       <TouchableOpacity
@@ -2148,8 +2166,8 @@ const loadDashboardData = useCallback(async () => {
                 )}
                 <View style={[styles.detailSection, isDarkMode && { borderBottomColor: theme.borderColor }]}>
                   <Text style={[styles.detailLabel, isDarkMode && styles.darkTextSecondary]}>Status</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedRequest.status).bg, alignSelf: "flex-start" }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(selectedRequest.status).text }]}>{getStatusColor(selectedRequest.status).label}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(getRequestStatus(selectedRequest)).bg, alignSelf: "flex-start" }]}>
+                    <Text style={[styles.statusText, { color: getStatusColor(getRequestStatus(selectedRequest)).text }]}>{getStatusColor(getRequestStatus(selectedRequest)).label}</Text>
                   </View>
                 </View>
                 {selectedRequest.rejectionReason && (
@@ -2164,7 +2182,7 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity style={[styles.cancelButton, isDarkMode && { backgroundColor: "#334155" }]} onPress={() => setShowRequestDetailsModal(false)}>
                 <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Close</Text>
               </TouchableOpacity>
-              {selectedRequest?.status === "pending" && (
+              {getRequestStatus(selectedRequest) === "pending" && (
                 <>
                   <TouchableOpacity style={[styles.submitButton, { backgroundColor: "#10B981" }]} onPress={() => handleApproveRequest(selectedRequest)} disabled={processingId === selectedRequest?._id}>
                     {processingId === selectedRequest?._id ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Approve</Text>}

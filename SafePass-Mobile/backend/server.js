@@ -86,6 +86,14 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
+const getNotificationTargetRoles = (role) => {
+  const normalizedRole = String(role || "").toLowerCase();
+  if (normalizedRole === "guard" || normalizedRole === "security") {
+    return ["all", "security", "guard"];
+  }
+  return ["all", normalizedRole];
+};
+
 // ========== EMAIL SIMULATION (for demo) ==========
 const sendEmail = (to, subject, body) => {
   console.log(`\n📧 ========== EMAIL SIMULATION ==========`);
@@ -539,7 +547,10 @@ app.post("/api/visitors/register", async (req, res) => {
       });
     }
 
-    // 3. Create new visitor
+    // 3. Generate the temporary visitor password before creating linked records
+    const tempPassword = `VIS${Math.random().toString(36).slice(-8).toUpperCase()}`;
+
+    // 4. Create new visitor
     const visitor = new Visitor({
       fullName: normalizedFullName,
       email: normalizedEmail,
@@ -553,14 +564,12 @@ app.post("/api/visitors/register", async (req, res) => {
       registeredAt: new Date(),
       status: "pending",
       approvalStatus: "pending",
+      temporaryPassword: tempPassword,
     });
 
     await visitor.save();
     createdVisitor = visitor;
     console.log("✅ Visitor registered:", visitorData.email);
-
-    // 4. Generate temporary password
-    const tempPassword = `VIS${Math.random().toString(36).slice(-8).toUpperCase()}`;
 
     // 5. Generate UNIQUE temporary NFC card ID (KEY FIX!)
     const timestamp = Date.now();
@@ -855,7 +864,14 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       console.log(`   NFC Card: ${user.nfcCardId}`);
     } else {
       console.log("📝 Updating existing user account...");
-      // Update existing user - REPLACE temporary NFC with REAL one
+      // Keep the approved account credentials and visitor link in sync.
+      user.firstName = visitor.fullName.split(" ")[0] || user.firstName;
+      user.lastName =
+        visitor.fullName.split(" ").slice(1).join(" ") || user.lastName;
+      user.phone = visitor.phoneNumber || user.phone;
+      user.role = "visitor";
+      user.visitorId = visitor._id;
+      user.password = tempPassword;
       user.status = "active";
       user.isActive = true;
       user.nfcCardId = realNfcCardId;
@@ -879,7 +895,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     // Create notification for security
     const notification = new Notification({
       title: "New Visitor Approved",
-      message: `${visitor.fullName} has been approved to visit on ${new Date(visitor.visitDate).toLocaleDateString()}`,
+      message: `${visitor.fullName} has been approved to visit on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}`,
       type: "visitor",
       severity: "medium",
       targetRole: "security",
@@ -2116,10 +2132,42 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
       });
     }
 
+    if (visitor.approvalStatus !== "approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor is still waiting for admin approval",
+      });
+    }
+
+    if (visitor.status === "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor is already checked in",
+      });
+    }
+
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor has already checked out",
+      });
+    }
+
     visitor.status = "checked_in";
     visitor.checkedInAt = new Date();
     visitor.checkedInBy = req.user._id;
     await visitor.save();
+
+    const accessLog = new AccessLog({
+      userId: req.user._id,
+      userEmail: visitor.email,
+      userName: visitor.fullName,
+      location: visitor.assignedOffice || visitor.host || "Campus Entry",
+      accessType: "entry",
+      status: "granted",
+      notes: `Checked in by ${req.user.firstName} ${req.user.lastName}`,
+    });
+    await accessLog.save();
 
     const notification = new Notification({
       title: "Visitor Checked In",
@@ -2164,10 +2212,35 @@ app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
       });
     }
 
+    if (visitor.approvalStatus !== "approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor is not approved for checkout flow",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor must be checked in before checkout",
+      });
+    }
+
     visitor.status = "checked_out";
     visitor.checkedOutAt = new Date();
     visitor.checkedOutBy = req.user._id;
     await visitor.save();
+
+    const accessLog = new AccessLog({
+      userId: req.user._id,
+      userEmail: visitor.email,
+      userName: visitor.fullName,
+      location: visitor.assignedOffice || visitor.host || "Campus Exit",
+      accessType: "exit",
+      status: "granted",
+      notes: `Checked out by ${req.user.firstName} ${req.user.lastName}`,
+    });
+    await accessLog.save();
 
     const notification = new Notification({
       title: "Visitor Checked Out",
@@ -2242,9 +2315,10 @@ app.post("/api/visitors/:id/report", authMiddleware, async (req, res) => {
 app.get("/api/notifications", authMiddleware, async (req, res) => {
   try {
     const { read, limit = 50 } = req.query;
+    const targetRoles = getNotificationTargetRoles(req.user.role);
 
     let query = {
-      $or: [{ targetRole: "all" }, { targetRole: req.user.role }],
+      targetRole: { $in: targetRoles },
     };
 
     if (read === "false") {
@@ -2313,9 +2387,10 @@ app.put("/api/notifications/:id/read", authMiddleware, async (req, res) => {
 // Mark all notifications as read
 app.put("/api/notifications/read-all", authMiddleware, async (req, res) => {
   try {
+    const targetRoles = getNotificationTargetRoles(req.user.role);
     await Notification.updateMany(
       {
-        $or: [{ targetRole: "all" }, { targetRole: req.user.role }],
+        targetRole: { $in: targetRoles },
         "readBy.user": { $ne: req.user._id },
       },
       {

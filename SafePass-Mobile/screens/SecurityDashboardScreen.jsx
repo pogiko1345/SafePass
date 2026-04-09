@@ -100,6 +100,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [processingVisitorId, setProcessingVisitorId] = useState(null);
   
   // Form State
   const [newVisitor, setNewVisitor] = useState({
@@ -648,6 +649,8 @@ export default function SecurityDashboardScreen({ navigation }) {
     return { bg: '#F3F4F6', text: '#6B7280', label: 'UNKNOWN' };
   };
 
+  const isVisitorProcessing = (visitorId) => processingVisitorId === visitorId;
+
   // ============ VISITOR MANAGEMENT ============
   const handleRegisterVisitor = () => {
     setNewVisitor({
@@ -764,18 +767,69 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const handleCheckIn = async (visitor) => {
+    if (isVisitorProcessing(visitor._id)) {
+      return;
+    }
+
+    if (visitor.approvalStatus !== 'approved') {
+      Alert.alert("Approval Required", `${visitor.fullName} is still waiting for admin approval.`);
+      return;
+    }
+
+    if (visitor.status === 'checked_in') {
+      Alert.alert("Already Checked In", `${visitor.fullName} is already checked in.`);
+      return;
+    }
+
+    if (visitor.status === 'checked_out') {
+      Alert.alert("Visit Completed", `${visitor.fullName} has already checked out.`);
+      return;
+    }
+
     try {
+      setProcessingVisitorId(visitor._id);
       const response = await ApiService.securityCheckIn(visitor._id);
       if (response.success) {
         await refreshData();
         Alert.alert("Success", `${visitor.fullName} checked in successfully`);
       }
     } catch (error) {
-      Alert.alert("Error", error.message);
+      Alert.alert("Error", error.message || "Failed to check in visitor");
+    } finally {
+      setProcessingVisitorId(null);
     }
   };
 
   const handleCheckOut = async (visitor) => {
+    if (isVisitorProcessing(visitor._id)) {
+      return;
+    }
+
+    if (visitor.status !== 'checked_in') {
+      Alert.alert("Check-in Required", `${visitor.fullName} must be checked in before checkout.`);
+      return;
+    }
+
+    const performCheckOut = async () => {
+      try {
+        setProcessingVisitorId(visitor._id);
+        const response = await ApiService.securityCheckOut(visitor._id);
+        if (response.success) {
+          await refreshData();
+          Alert.alert("Success", `${visitor.fullName} checked out successfully`);
+        }
+      } catch (error) {
+        Alert.alert("Error", error.message || "Failed to check out visitor");
+      } finally {
+        setProcessingVisitorId(null);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      await performCheckOut();
+      return;
+    }
+
     Alert.alert(
       "Confirm Check-out",
       `Check out ${visitor.fullName}?`,
@@ -783,17 +837,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         { text: "Cancel", style: "cancel" },
         {
           text: "Check Out",
-          onPress: async () => {
-            try {
-              const response = await ApiService.securityCheckOut(visitor._id);
-              if (response.success) {
-                await refreshData();
-                Alert.alert("Success", `${visitor.fullName} checked out successfully`);
-              }
-            } catch (error) {
-              Alert.alert("Error", error.message);
-            }
-          }
+          onPress: performCheckOut
         }
       ]
     );
@@ -1572,6 +1616,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderVisitorCard = (visitor) => {
     const statusBadge = getStatusBadge(visitor);
     const isCheckedIn = visitor.status === 'checked_in';
+    const isProcessing = isVisitorProcessing(visitor._id);
     
     return (
       <TouchableOpacity
@@ -1635,17 +1680,28 @@ export default function SecurityDashboardScreen({ navigation }) {
         <View style={styles.visitorCardActions}>
           {visitor.approvalStatus === 'approved' && (
             <TouchableOpacity 
-              style={[styles.visitorCardAction, styles.visitorCardActionPrimary]}
+              style={[
+                styles.visitorCardAction,
+                styles.visitorCardActionPrimary,
+                isProcessing && styles.buttonDisabled,
+              ]}
               onPress={() => isCheckedIn ? handleCheckOut(visitor) : handleCheckIn(visitor)}
+              disabled={isProcessing}
             >
-              <Ionicons 
-                name={isCheckedIn ? "log-out-outline" : "log-in-outline"} 
-                size={18} 
-                color="#FFFFFF" 
-              />
-              <Text style={styles.visitorCardActionText}>
-                {isCheckedIn ? 'Check Out' : 'Check In'}
-              </Text>
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons 
+                    name={isCheckedIn ? "log-out-outline" : "log-in-outline"} 
+                    size={18} 
+                    color="#FFFFFF" 
+                  />
+                  <Text style={styles.visitorCardActionText}>
+                    {isCheckedIn ? 'Check Out' : 'Check In'}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
 
@@ -2314,7 +2370,11 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <View style={styles.detailActions}>
                   {selectedVisitor.approvalStatus === 'approved' && selectedVisitor.status !== 'checked_out' && (
                     <TouchableOpacity 
-                      style={[styles.detailActionButton, styles.detailActionPrimary]}
+                      style={[
+                        styles.detailActionButton,
+                        styles.detailActionPrimary,
+                        isVisitorProcessing(selectedVisitor._id) && styles.buttonDisabled,
+                      ]}
                       onPress={() => {
                         setShowDetailModal(false);
                         if (selectedVisitor.status === 'checked_in') {
@@ -2323,15 +2383,22 @@ export default function SecurityDashboardScreen({ navigation }) {
                           handleCheckIn(selectedVisitor);
                         }
                       }}
+                      disabled={isVisitorProcessing(selectedVisitor._id)}
                     >
-                      <Ionicons 
-                        name={selectedVisitor.status === 'checked_in' ? "log-out-outline" : "log-in-outline"} 
-                        size={20} 
-                        color="#FFFFFF" 
-                      />
-                      <Text style={styles.detailActionText}>
-                        {selectedVisitor.status === 'checked_in' ? 'Check Out' : 'Check In'}
-                      </Text>
+                      {isVisitorProcessing(selectedVisitor._id) ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons 
+                            name={selectedVisitor.status === 'checked_in' ? "log-out-outline" : "log-in-outline"} 
+                            size={20} 
+                            color="#FFFFFF" 
+                          />
+                          <Text style={styles.detailActionText}>
+                            {selectedVisitor.status === 'checked_in' ? 'Check Out' : 'Check In'}
+                          </Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   )}
 
