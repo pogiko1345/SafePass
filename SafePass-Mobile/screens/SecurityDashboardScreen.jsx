@@ -977,8 +977,38 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Operations Overview */}
+      {/* Live Visitor Tracking */}
       <View style={styles.mapSection}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="map-outline" size={20} color="#10B981" />
+            <Text style={styles.sectionTitle}>Live Visitor Tracking</Text>
+          </View>
+          <TouchableOpacity onPress={() => setShowMapModal(true)}>
+            <Text style={styles.viewAll}>Full Screen</Text>
+          </TouchableOpacity>
+        </View>
+
+        {renderMapFilters()}
+
+        <View style={styles.mapContainer}>
+          <CampusMap
+            visitors={getFilteredVisitorLocations()}
+            floors={floors}
+            offices={offices}
+            selectedFloor={selectedFloor}
+            selectedOffice={selectedOffice}
+            onVisitorHover={handleVisitorHover}
+            onVisitorLeave={handleVisitorLeave}
+            onVisitorSelect={handleVisitorSelect}
+            hoveredVisitor={hoveredVisitor}
+            renderHoverCard={renderHoverCard}
+          />
+        </View>
+      </View>
+
+      {/* Operations Overview */}
+      <View style={styles.activitySection}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="clipboard-outline" size={20} color="#10B981" />
@@ -1075,16 +1105,16 @@ export default function SecurityDashboardScreen({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('alerts')}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('map')}>
             <LinearGradient
               colors={['#10B981', '#059669']}
               style={styles.quickActionGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Ionicons name="warning-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>Open Alerts</Text>
-              <Text style={styles.quickActionSubtitle}>Review security notifications</Text>
+              <Ionicons name="map-outline" size={24} color="#FFFFFF" />
+              <Text style={styles.quickActionTitle}>View Map</Text>
+              <Text style={styles.quickActionSubtitle}>Track active visitors</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -1856,6 +1886,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   // Menu Items
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline', color: '#DC2626' },
+    { id: 'map', label: 'Live Map', icon: 'map-outline', color: '#10B981' },
     { id: 'visitors', label: 'Visitors', icon: 'people-outline', color: '#0A3D91' },
     { id: 'alerts', label: 'Alerts', icon: 'warning-outline', color: '#F59E0B' },
     { id: 'logs', label: 'Access Logs', icon: 'time-outline', color: '#059669' },
@@ -1960,6 +1991,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
           {/* Tab Content */}
           {activeTab === 'dashboard' && renderDashboardTab()}
+          {activeTab === 'map' && renderMapTab()}
           {activeTab === 'visitors' && renderVisitorsTab()}
           {activeTab === 'alerts' && renderAlertsTab()}
           {activeTab === 'logs' && renderLogsTab()}
