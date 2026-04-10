@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.js": "/static/js/main.aa67adca.js",
-    "static/js/333.93ab9321.js": "/static/js/333.93ab9321.js",
+    "main.js": "/static/js/main.ce38408d.js",
+    "static/js/333.ed7b314d.js": "/static/js/333.ed7b314d.js",
     "static/media/MaterialCommunityIcons.ttf": "/static/media/MaterialCommunityIcons.1fcc36272ea3e53d0031.ttf",
     "static/media/Ionicons.ttf": "/static/media/Ionicons.40518f95b2e2a69c5c07.ttf",
     "static/media/LogoSapphire.jpg": "/static/media/LogoSapphire.bf1c2f7a8da6d3f5b03b.jpg",
@@ -12,11 +12,11 @@
     "favicon-16.png": "/favicon-16.png",
     "manifest.json": "/manifest.json",
     "serve.json": "/serve.json",
-    "main.aa67adca.js.map": "/static/js/main.aa67adca.js.map",
-    "333.93ab9321.js.map": "/static/js/333.93ab9321.js.map"
+    "main.ce38408d.js.map": "/static/js/main.ce38408d.js.map",
+    "333.ed7b314d.js.map": "/static/js/333.ed7b314d.js.map"
   },
   "entrypoints": [
-    "static/js/333.93ab9321.js",
-    "static/js/main.aa67adca.js"
+    "static/js/333.ed7b314d.js",
+    "static/js/main.ce38408d.js"
   ]
 }
