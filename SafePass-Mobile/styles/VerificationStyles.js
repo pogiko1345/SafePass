@@ -5,6 +5,7 @@ const { width, height } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 const isSmallPhone = width <= 375;
 const isTablet = width >= 768;
+const isDesktop = width >= 1100;
 
 export default StyleSheet.create({
   // ============ CONTAINERS ============
@@ -18,17 +19,78 @@ export default StyleSheet.create({
     backgroundColor: "#F8FAFC",
   },
 
+  scrollView: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    flexGrow: 1,
+  },
+
   animatedContainer: {
     flex: 1,
   },
 
+  backgroundOrbTop: {
+    position: "absolute",
+    top: -120,
+    right: -80,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(79,70,229,0.12)",
+  },
+
+  backgroundOrbBottom: {
+    position: "absolute",
+    bottom: -110,
+    left: -70,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "rgba(59,130,246,0.10)",
+  },
+
+  pageShell: {
+    flex: 1,
+    width: "100%",
+    alignSelf: "center",
+    paddingHorizontal: isSmallPhone ? 14 : 20,
+    paddingVertical: isSmallPhone ? 16 : 24,
+    gap: 18,
+    ...(isDesktop
+      ? {
+          flexDirection: "row",
+          alignItems: "stretch",
+          justifyContent: "center",
+          maxWidth: 1180,
+          width: "100%",
+          alignSelf: "center",
+          paddingTop: 28,
+        }
+      : {}),
+  },
+
   // ============ HEADER ============
-  header: {
-    paddingTop: Platform.select({ ios: 60, android: 45, web: 45 }),
-    paddingBottom: 40,
-    paddingHorizontal: 24,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+  heroPanel: {
+    width: "100%",
+    paddingTop: Platform.select({ ios: 52, android: 32, web: 28 }),
+    paddingBottom: isSmallPhone ? 22 : 28,
+    paddingHorizontal: isSmallPhone ? 18 : 24,
+    borderRadius: 34,
+    overflow: "hidden",
+    minHeight: isDesktop ? 640 : undefined,
+    ...(isDesktop ? { width: 420 } : {}),
+    ...Platform.select({
+      ios: {
+        shadowColor: "#312E81",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 20,
+      },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 16px 40px rgba(79,70,229,0.20)" },
+    }),
   },
 
   backButton: {
@@ -43,8 +105,28 @@ export default StyleSheet.create({
     borderColor: "rgba(255,255,255,0.3)",
   },
 
-  headerContent: {
+  heroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    marginBottom: 18,
+  },
+
+  heroBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#E0E7FF",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  headerContent: {
+    alignItems: isDesktop ? "flex-start" : "center",
   },
 
   iconContainer: {
@@ -71,41 +153,133 @@ export default StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: "rgba(255,255,255,0.9)",
-    textAlign: "center",
+    textAlign: isDesktop ? "left" : "center",
     lineHeight: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: isDesktop ? 0 : 20,
+  },
+
+  heroMetaRow: {
+    flexDirection: isSmallPhone ? "column" : "row",
+    flexWrap: isSmallPhone ? "nowrap" : "wrap",
+    gap: 12,
+    marginTop: 24,
+  },
+
+  heroMetaCard: {
+    width: isSmallPhone ? "100%" : undefined,
+    minWidth: 120,
+    flexGrow: 1,
+    flexBasis: 120,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+
+  heroMetaLabel: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.72)",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+
+  heroMetaValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 
   // ============ CONTENT ============
-  content: {
+  panelCard: {
     flex: 1,
-    padding: 20,
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 34,
+    padding: isSmallPhone ? 18 : 24,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    ...(isDesktop ? { maxWidth: 680 } : {}),
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 24,
+      },
+      android: { elevation: 6 },
+      web: { boxShadow: "0px 18px 40px rgba(15,23,42,0.08)" },
+    }),
+  },
+
+  panelHeader: {
+    marginBottom: 20,
+  },
+
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 22,
+  },
+
+  progressStep: {
+    alignItems: "center",
+    gap: 8,
+  },
+
+  progressDot: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  progressDotActive: {
+    backgroundColor: "#4F46E5",
+  },
+
+  progressLabel: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "700",
+  },
+
+  progressLabelActive: {
+    color: "#312E81",
+  },
+
+  progressLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 10,
+  },
+
+  progressLineActive: {
+    backgroundColor: "#4F46E5",
   },
 
   // ============ USER INFO CARD ============
   userInfoCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 22,
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: { elevation: 2 },
-      web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.05)" },
-    }),
+    borderColor: "#E5E7EB",
   },
 
   avatarContainer: {
     marginRight: 16,
+  },
+
+  userInfoCopy: {
+    flex: 1,
   },
 
   avatarGradient: {
@@ -131,10 +305,10 @@ export default StyleSheet.create({
   // ============ CARDS ============
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 26,
+    padding: isSmallPhone ? 18 : 22,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: "#E5E7EB",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -158,7 +332,6 @@ export default StyleSheet.create({
   sectionSubtitle: {
     fontSize: 14,
     color: "#6B7280",
-    marginBottom: 24,
     lineHeight: 20,
   },
 
@@ -185,6 +358,7 @@ export default StyleSheet.create({
     ...Platform.select({
       web: {
         transition: "all 0.2s ease",
+        outlineStyle: "none",
       },
     }),
   },
@@ -242,8 +416,9 @@ export default StyleSheet.create({
   },
 
   methodButtons: {
-    flexDirection: "row",
+    flexDirection: isSmallPhone ? "column" : "row",
     gap: 12,
+    flexWrap: "nowrap",
   },
 
   methodButton: {
@@ -273,7 +448,7 @@ export default StyleSheet.create({
 
   // ============ BUTTONS ============
   sendButton: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1D4ED8",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -296,10 +471,10 @@ export default StyleSheet.create({
   // ============ OTP CARD ============
   otpCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 26,
+    padding: isSmallPhone ? 18 : 22,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: "#E5E7EB",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -466,13 +641,14 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 24,
+    paddingTop: 20,
+    paddingBottom: 4,
     gap: 8,
   },
 
   securityNoteText: {
     fontSize: 12,
-    color: "#9CA3AF",
-    fontWeight: "500",
+    color: "#64748B",
+    fontWeight: "600",
   },
 });

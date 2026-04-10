@@ -5,6 +5,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  ScrollView,
   SafeAreaView,
   StatusBar,
   Alert,
@@ -12,16 +13,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import ApiService from "../utils/ApiService";
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
+import {
+  IS_VISITOR_ONLY_APP,
+  getVariantBlockedRoleMessage,
+  isRoleAllowedInCurrentVariant,
+} from "../utils/appVariant";
 import verificationStyles from "../styles/VerificationStyles";
 
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
-  : require("@react-native-async-storage/async-storage");
+  : require("@react-native-async-storage/async-storage").default;
 
 // Helper function to safely store data
 const storeData = async (key, value) => {
@@ -63,6 +70,11 @@ const getData = async (key) => {
 export default function VerificationScreen({ navigation, route }) {
   // Properly extract params with defaults
   const { email, password, rememberMe, tempToken, user: userData } = route.params || {};
+  const { width: viewportWidth } = useWindowDimensions();
+  const isDesktopLayout = viewportWidth >= 1100;
+  const isTabletLayout = viewportWidth >= 768;
+  const isCompactWidth = viewportWidth <= 520;
+  const isPhoneWidth = viewportWidth <= 420;
   
   console.log("📱 VerificationScreen mounted with:", { email, hasTempToken: !!tempToken, userRole: userData?.role });
   
@@ -282,6 +294,22 @@ export default function VerificationScreen({ navigation, route }) {
       
       const userRole = normalizeRole(finalUser.role) || "visitor";
 
+      if (!isRoleAllowedInCurrentVariant(userRole)) {
+        await ApiService.clearAuth();
+        await Storage.removeItem("currentUser");
+        Alert.alert("Visitor App Only", getVariantBlockedRoleMessage(userRole), [
+          {
+            text: "Back to Login",
+            onPress: () =>
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              }),
+          },
+        ]);
+        return;
+      }
+
       // Store user data
       await storeData("currentUser", JSON.stringify({ ...finalUser, role: userRole }));
       console.log("✅ User data stored");
@@ -298,7 +326,7 @@ export default function VerificationScreen({ navigation, route }) {
       // Clear new registration flag
       await Storage.removeItem("isNewRegistration");
       
-      const dashboardRoute = getDashboardRoute(userRole);
+      const dashboardRoute = IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(userRole);
       
       console.log('✅ Verification complete - Navigating to:', dashboardRoute, 'Role:', userRole);
       
@@ -353,280 +381,412 @@ export default function VerificationScreen({ navigation, route }) {
         style={verificationStyles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <Animated.View style={[verificationStyles.animatedContainer, { opacity: fadeAnim }]}>
-          {/* Header */}
-          <LinearGradient
-            colors={['#4F46E5', '#7C3AED']}
-            style={verificationStyles.header}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <TouchableOpacity
-              style={verificationStyles.backButton}
-              onPress={handleBack}
-              activeOpacity={0.7}
+        <View style={verificationStyles.backgroundOrbTop} />
+        <View style={verificationStyles.backgroundOrbBottom} />
+        <ScrollView
+          style={verificationStyles.scrollView}
+          contentContainerStyle={verificationStyles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Animated.View style={[verificationStyles.animatedContainer, { opacity: fadeAnim }]}>
+            <View
+              style={[
+                verificationStyles.pageShell,
+                !isDesktopLayout && {
+                  flexDirection: "column",
+                  maxWidth: 760,
+                  width: "100%",
+                },
+                isPhoneWidth && {
+                  paddingHorizontal: 12,
+                  paddingVertical: 14,
+                },
+              ]}
             >
-              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            
-            <View style={verificationStyles.headerContent}>
-              <View style={verificationStyles.iconContainer}>
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
-                  style={verificationStyles.iconGradient}
+              <LinearGradient
+                colors={['#1D4ED8', '#4F46E5', '#7C3AED']}
+                style={[
+                  verificationStyles.heroPanel,
+                  !isDesktopLayout && {
+                    width: "100%",
+                    minHeight: undefined,
+                  },
+                  isCompactWidth && {
+                    paddingHorizontal: 16,
+                    paddingBottom: 22,
+                  },
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <TouchableOpacity
+                  style={verificationStyles.backButton}
+                  onPress={handleBack}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="shield-checkmark" size={48} color="#FFFFFF" />
-                </LinearGradient>
-              </View>
-              <Text style={verificationStyles.headerTitle}>Verify Your Identity</Text>
-              <Text style={verificationStyles.headerSubtitle}>
-                Two-factor authentication adds an extra layer of security
-              </Text>
-            </View>
-          </LinearGradient>
+                  <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
 
-          {/* Content */}
-          <Animated.View style={[
-            verificationStyles.content,
-            { transform: [{ translateY: slideAnim }] }
-          ]}>
-            {!otpVerified && (
-              <>
-                {/* User Info Card */}
-                <View style={verificationStyles.userInfoCard}>
-                  <View style={verificationStyles.avatarContainer}>
+                <View style={verificationStyles.heroBadge}>
+                  <Ionicons name="shield-checkmark-outline" size={14} color="#DBEAFE" />
+                  <Text style={verificationStyles.heroBadgeText}>Two-Step Verification</Text>
+                </View>
+
+                <View
+                  style={[
+                    verificationStyles.headerContent,
+                    !isDesktopLayout && { alignItems: "center" },
+                    isDesktopLayout && { alignItems: "flex-start" },
+                  ]}
+                >
+                  <View style={verificationStyles.iconContainer}>
                     <LinearGradient
-                      colors={['#EEF2FF', '#E0E7FF']}
-                      style={verificationStyles.avatarGradient}
+                      colors={['rgba(255,255,255,0.32)', 'rgba(255,255,255,0.08)']}
+                      style={verificationStyles.iconGradient}
                     >
-                      <Ionicons name="person" size={32} color="#4F46E5" />
+                      <Ionicons name="shield-checkmark" size={44} color="#FFFFFF" />
                     </LinearGradient>
                   </View>
-                  <View>
-                    <Text style={verificationStyles.userEmail}>{email || "User"}</Text>
-                    <Text style={verificationStyles.userMessage}>
-                      We need to verify it's really you
+                  <Text
+                    style={[
+                      verificationStyles.headerTitle,
+                      isPhoneWidth && { fontSize: 24, lineHeight: 30 },
+                    ]}
+                  >
+                    Verify Your Identity
+                  </Text>
+                  <Text
+                    style={[
+                      verificationStyles.headerSubtitle,
+                      !isDesktopLayout && { textAlign: "center", paddingHorizontal: 6 },
+                      isDesktopLayout && { textAlign: "left", paddingHorizontal: 0 },
+                    ]}
+                  >
+                    Secure access to your SafePass account with a one-time verification code.
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    verificationStyles.heroMetaRow,
+                    isCompactWidth && { flexDirection: "column", flexWrap: "nowrap" },
+                  ]}
+                >
+                  <View
+                    style={[
+                      verificationStyles.heroMetaCard,
+                      isCompactWidth && { width: "100%" },
+                    ]}
+                  >
+                    <Text style={verificationStyles.heroMetaLabel}>Account</Text>
+                    <Text style={verificationStyles.heroMetaValue}>{email || "User"}</Text>
+                  </View>
+                  <View
+                    style={[
+                      verificationStyles.heroMetaCard,
+                      isCompactWidth && { width: "100%" },
+                    ]}
+                  >
+                    <Text style={verificationStyles.heroMetaLabel}>Method</Text>
+                    <Text style={verificationStyles.heroMetaValue}>
+                      {otpSent ? (otpMethod === "sms" ? "SMS Code" : "Voice Call") : "Phone Setup"}
+                    </Text>
+                  </View>
+                </View>
+              </LinearGradient>
+
+              <Animated.View
+                style={[
+                  verificationStyles.panelCard,
+                  !isDesktopLayout && {
+                    maxWidth: "100%",
+                    width: "100%",
+                  },
+                  isPhoneWidth && {
+                    padding: 16,
+                    borderRadius: 28,
+                  },
+                  {
+                    transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+                  },
+                ]}
+              >
+                <View style={verificationStyles.progressRow}>
+                  <View style={verificationStyles.progressStep}>
+                    <View style={[verificationStyles.progressDot, verificationStyles.progressDotActive]}>
+                      <Ionicons name="phone-portrait-outline" size={14} color="#FFFFFF" />
+                    </View>
+                    <Text style={[verificationStyles.progressLabel, verificationStyles.progressLabelActive]}>
+                      Setup
+                    </Text>
+                  </View>
+                  <View style={[verificationStyles.progressLine, otpSent && verificationStyles.progressLineActive]} />
+                  <View style={verificationStyles.progressStep}>
+                    <View style={[verificationStyles.progressDot, otpSent && verificationStyles.progressDotActive]}>
+                      <Ionicons name="key-outline" size={14} color={otpSent ? "#FFFFFF" : "#94A3B8"} />
+                    </View>
+                    <Text style={[verificationStyles.progressLabel, otpSent && verificationStyles.progressLabelActive]}>
+                      Confirm
+                    </Text>
+                  </View>
+                  <View style={[verificationStyles.progressLine, otpVerified && verificationStyles.progressLineActive]} />
+                  <View style={verificationStyles.progressStep}>
+                    <View style={[verificationStyles.progressDot, otpVerified && verificationStyles.progressDotActive]}>
+                      <Ionicons name="checkmark-outline" size={14} color={otpVerified ? "#FFFFFF" : "#94A3B8"} />
+                    </View>
+                    <Text style={[verificationStyles.progressLabel, otpVerified && verificationStyles.progressLabelActive]}>
+                      Access
                     </Text>
                   </View>
                 </View>
 
-                {showPhoneInput ? (
-                  // Phone Number Input Section
-                  <Animated.View style={[verificationStyles.card, { transform: [{ scale: scaleAnim }] }]}>
-                    <Text style={verificationStyles.sectionTitle}>Verify with Phone</Text>
-                    <Text style={verificationStyles.sectionSubtitle}>
-                      We'll send a verification code to your mobile number
-                    </Text>
-
-                    <View style={verificationStyles.inputGroup}>
-                      <Text style={verificationStyles.label}>Mobile Number</Text>
-                      <View style={[
-                        verificationStyles.inputContainer,
-                        phoneError && verificationStyles.inputError
-                      ]}>
-                        <View style={verificationStyles.countryCode}>
-                          <Text style={verificationStyles.countryCodeText}>+63</Text>
-                        </View>
-                        <TextInput
-                          style={verificationStyles.input}
-                          placeholder="912 345 6789"
-                          placeholderTextColor="#9CA3AF"
-                          value={phoneNumber}
-                          onChangeText={(text) => {
-                            const cleaned = text.replace(/[^0-9]/g, '');
-                            setPhoneNumber(cleaned);
-                            setPhoneError("");
-                          }}
-                          keyboardType="phone-pad"
-                          maxLength={10}
-                          editable={!isLoading}
-                        />
+                {!otpVerified && (
+                  <>
+                    <View style={verificationStyles.userInfoCard}>
+                      <View style={verificationStyles.avatarContainer}>
+                        <LinearGradient
+                          colors={['#EEF2FF', '#E0E7FF']}
+                          style={verificationStyles.avatarGradient}
+                        >
+                          <Ionicons name="person" size={28} color="#4F46E5" />
+                        </LinearGradient>
                       </View>
-                      {phoneError ? (
-                        <Text style={verificationStyles.errorText}>{phoneError}</Text>
-                      ) : (
-                        <Text style={verificationStyles.helperText}>
-                          Enter your 10-digit mobile number (e.g., 9123456789)
+                      <View style={verificationStyles.userInfoCopy}>
+                        <Text style={verificationStyles.userEmail}>{email || "User"}</Text>
+                        <Text style={verificationStyles.userMessage}>
+                          We need a quick verification before opening your dashboard.
                         </Text>
-                      )}
-                    </View>
-
-                    {/* Method Selection */}
-                    <View style={verificationStyles.methodContainer}>
-                      <Text style={verificationStyles.methodLabel}>Receive code via:</Text>
-                      <View style={verificationStyles.methodButtons}>
-                        <TouchableOpacity
-                          style={[
-                            verificationStyles.methodButton,
-                            otpMethod === 'sms' && verificationStyles.methodButtonActive
-                          ]}
-                          onPress={() => setOtpMethod('sms')}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons 
-                            name="chatbubble-outline" 
-                            size={20} 
-                            color={otpMethod === 'sms' ? '#FFFFFF' : '#6B7280'} 
-                          />
-                          <Text style={[
-                            verificationStyles.methodButtonText,
-                            otpMethod === 'sms' && verificationStyles.methodButtonTextActive
-                          ]}>SMS</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                          style={[
-                            verificationStyles.methodButton,
-                            otpMethod === 'call' && verificationStyles.methodButtonActive
-                          ]}
-                          onPress={() => setOtpMethod('call')}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons 
-                            name="call-outline" 
-                            size={20} 
-                            color={otpMethod === 'call' ? '#FFFFFF' : '#6B7280'} 
-                          />
-                          <Text style={[
-                            verificationStyles.methodButtonText,
-                            otpMethod === 'call' && verificationStyles.methodButtonTextActive
-                          ]}>Voice Call</Text>
-                        </TouchableOpacity>
                       </View>
                     </View>
 
-                    {/* Send Button */}
-                    <TouchableOpacity
-                      style={[
-                        verificationStyles.sendButton,
-                        isLoading && verificationStyles.buttonDisabled
-                      ]}
-                      onPress={requestOtp}
-                      disabled={isLoading}
-                      activeOpacity={0.8}
-                    >
-                      {isLoading ? (
-                        <ActivityIndicator color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Ionicons name="send-outline" size={20} color="#FFFFFF" />
-                          <Text style={verificationStyles.sendButtonText}>Send Verification Code</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </Animated.View>
-                ) : (
-                  // OTP Input Section
-                  <Animated.View style={[verificationStyles.otpCard, { transform: [{ scale: scaleAnim }] }]}>
-                    <View style={verificationStyles.otpHeader}>
-                      <LinearGradient
-                        colors={['#EEF2FF', '#E0E7FF']}
-                        style={verificationStyles.otpIconContainer}
-                      >
-                        <Ionicons name="key-outline" size={32} color="#4F46E5" />
-                      </LinearGradient>
-                      <Text style={verificationStyles.otpTitle}>Enter Verification Code</Text>
-                      <Text style={verificationStyles.otpSubtitle}>
-                        We've sent a 6-digit code to
-                      </Text>
-                      <Text style={verificationStyles.phoneNumberDisplay}>
-                        {formatPhoneDisplay(phoneNumber)}
-                      </Text>
-                    </View>
+                    {showPhoneInput ? (
+                      <View style={verificationStyles.card}>
+                        <View style={verificationStyles.panelHeader}>
+                          <Text style={verificationStyles.sectionTitle}>Verify with Phone</Text>
+                          <Text style={verificationStyles.sectionSubtitle}>
+                            Choose how you want to receive your one-time access code.
+                          </Text>
+                        </View>
 
-                    <View style={verificationStyles.otpInputContainer}>
-                      <TextInput
-                        style={[
-                          verificationStyles.otpInput,
-                          otpError && verificationStyles.otpInputError
-                        ]}
-                        placeholder="000000"
-                        placeholderTextColor="#9CA3AF"
-                        value={otpCode}
-                        onChangeText={handleOtpChange}
-                        keyboardType="numeric"
-                        maxLength={6}
-                        autoFocus={true}
-                        editable={!isLoading}
-                      />
-                      {otpError && (
-                        <Text style={verificationStyles.otpErrorText}>{otpError}</Text>
-                      )}
-                    </View>
+                        <View style={verificationStyles.inputGroup}>
+                          <Text style={verificationStyles.label}>Mobile Number</Text>
+                          <View style={[
+                            verificationStyles.inputContainer,
+                            phoneError && verificationStyles.inputError
+                          ]}>
+                            <View style={verificationStyles.countryCode}>
+                              <Text style={verificationStyles.countryCodeText}>+63</Text>
+                            </View>
+                            <TextInput
+                              style={verificationStyles.input}
+                              placeholder="912 345 6789"
+                              placeholderTextColor="#9CA3AF"
+                              value={phoneNumber}
+                              onChangeText={(text) => {
+                                const cleaned = text.replace(/[^0-9]/g, '');
+                                setPhoneNumber(cleaned);
+                                setPhoneError("");
+                              }}
+                              keyboardType="phone-pad"
+                              maxLength={10}
+                              editable={!isLoading}
+                            />
+                          </View>
+                          {phoneError ? (
+                            <Text style={verificationStyles.errorText}>{phoneError}</Text>
+                          ) : (
+                            <Text style={verificationStyles.helperText}>
+                              Enter your 10-digit mobile number to receive a secure OTP code.
+                            </Text>
+                          )}
+                        </View>
 
-                    <View style={verificationStyles.timerContainer}>
-                      <Ionicons name="time-outline" size={16} color={canResend ? "#EF4444" : "#6B7280"} />
-                      <Text style={[
-                        verificationStyles.timerText,
-                        canResend && verificationStyles.timerExpired
-                      ]}>
-                        {canResend ? 'Code expired' : `Resend code in ${formatTimer(otpTimer)}`}
-                      </Text>
-                    </View>
+                        <View style={verificationStyles.methodContainer}>
+                          <Text style={verificationStyles.methodLabel}>Receive code via</Text>
+                          <View
+                            style={[
+                              verificationStyles.methodButtons,
+                              isCompactWidth && { flexDirection: "column" },
+                            ]}
+                          >
+                            <TouchableOpacity
+                              style={[
+                                verificationStyles.methodButton,
+                                otpMethod === 'sms' && verificationStyles.methodButtonActive
+                              ]}
+                              onPress={() => setOtpMethod('sms')}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons 
+                                name="chatbubble-outline" 
+                                size={20} 
+                                color={otpMethod === 'sms' ? '#FFFFFF' : '#6B7280'} 
+                              />
+                              <Text style={[
+                                verificationStyles.methodButtonText,
+                                otpMethod === 'sms' && verificationStyles.methodButtonTextActive
+                              ]}>SMS</Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                              style={[
+                                verificationStyles.methodButton,
+                                otpMethod === 'call' && verificationStyles.methodButtonActive
+                              ]}
+                              onPress={() => setOtpMethod('call')}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons 
+                                name="call-outline" 
+                                size={20} 
+                                color={otpMethod === 'call' ? '#FFFFFF' : '#6B7280'} 
+                              />
+                              <Text style={[
+                                verificationStyles.methodButtonText,
+                                otpMethod === 'call' && verificationStyles.methodButtonTextActive
+                              ]}>Voice Call</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
 
-                    <TouchableOpacity
-                      style={[
-                        verificationStyles.verifyButton,
-                        (isLoading || otpCode.length !== 6) && verificationStyles.buttonDisabled
-                      ]}
-                      onPress={verifyOtp}
-                      disabled={isLoading || otpCode.length !== 6}
-                      activeOpacity={0.8}
-                    >
-                      <LinearGradient
-                        colors={['#4F46E5', '#7C3AED']}
-                        style={verificationStyles.verifyGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                      >
-                        {isLoading ? (
-                          <ActivityIndicator color="#FFFFFF" />
-                        ) : (
-                          <Text style={verificationStyles.verifyButtonText}>Verify & Continue</Text>
-                        )}
-                      </LinearGradient>
-                    </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            verificationStyles.sendButton,
+                            isLoading && verificationStyles.buttonDisabled
+                          ]}
+                          onPress={requestOtp}
+                          disabled={isLoading}
+                          activeOpacity={0.8}
+                        >
+                          {isLoading ? (
+                            <ActivityIndicator color="#FFFFFF" />
+                          ) : (
+                            <>
+                              <Ionicons name="send-outline" size={20} color="#FFFFFF" />
+                              <Text style={verificationStyles.sendButtonText}>Send Verification Code</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={verificationStyles.otpCard}>
+                        <View style={verificationStyles.otpHeader}>
+                          <LinearGradient
+                            colors={['#EEF2FF', '#E0E7FF']}
+                            style={verificationStyles.otpIconContainer}
+                          >
+                            <Ionicons name="key-outline" size={30} color="#4F46E5" />
+                          </LinearGradient>
+                          <Text style={verificationStyles.otpTitle}>Enter Verification Code</Text>
+                          <Text style={verificationStyles.otpSubtitle}>
+                            We sent a 6-digit code to
+                          </Text>
+                          <Text style={verificationStyles.phoneNumberDisplay}>
+                            {formatPhoneDisplay(phoneNumber)}
+                          </Text>
+                        </View>
 
-                    <TouchableOpacity
-                      style={[
-                        verificationStyles.resendButton,
-                        (!canResend || isLoading) && verificationStyles.buttonDisabled
-                      ]}
-                      onPress={resendOtp}
-                      disabled={!canResend || isLoading}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="refresh-outline" size={18} color={canResend ? "#4F46E5" : "#9CA3AF"} />
-                      <Text style={[
-                        verificationStyles.resendButtonText,
-                        canResend && verificationStyles.resendButtonTextActive
-                      ]}>Resend Code</Text>
-                    </TouchableOpacity>
+                        <View style={verificationStyles.otpInputContainer}>
+                          <TextInput
+                            style={[
+                              verificationStyles.otpInput,
+                              otpError && verificationStyles.otpInputError,
+                              isCompactWidth && {
+                                height: 62,
+                                fontSize: 28,
+                                letterSpacing: 6,
+                                paddingHorizontal: 10,
+                              },
+                            ]}
+                            placeholder="000000"
+                            placeholderTextColor="#9CA3AF"
+                            value={otpCode}
+                            onChangeText={handleOtpChange}
+                            keyboardType="numeric"
+                            maxLength={6}
+                            autoFocus={true}
+                            editable={!isLoading}
+                          />
+                          {otpError && (
+                            <Text style={verificationStyles.otpErrorText}>{otpError}</Text>
+                          )}
+                        </View>
 
-                    <TouchableOpacity
-                      style={verificationStyles.changeMethodButton}
-                      onPress={handleChangeMethod}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="arrow-back-outline" size={14} color="#6B7280" />
-                      <Text style={verificationStyles.changeMethodText}>
-                        Use a different phone number
-                      </Text>
-                    </TouchableOpacity>
-                  </Animated.View>
+                        <View style={verificationStyles.timerContainer}>
+                          <Ionicons name="time-outline" size={16} color={canResend ? "#EF4444" : "#6B7280"} />
+                          <Text style={[
+                            verificationStyles.timerText,
+                            canResend && verificationStyles.timerExpired
+                          ]}>
+                            {canResend ? 'Code expired' : `Resend code in ${formatTimer(otpTimer)}`}
+                          </Text>
+                        </View>
+
+                        <TouchableOpacity
+                          style={[
+                            verificationStyles.verifyButton,
+                            (isLoading || otpCode.length !== 6) && verificationStyles.buttonDisabled
+                          ]}
+                          onPress={verifyOtp}
+                          disabled={isLoading || otpCode.length !== 6}
+                          activeOpacity={0.8}
+                        >
+                          <LinearGradient
+                            colors={['#1D4ED8', '#4F46E5', '#7C3AED']}
+                            style={verificationStyles.verifyGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                          >
+                            {isLoading ? (
+                              <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                              <Text style={verificationStyles.verifyButtonText}>Verify & Continue</Text>
+                            )}
+                          </LinearGradient>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            verificationStyles.resendButton,
+                            (!canResend || isLoading) && verificationStyles.buttonDisabled
+                          ]}
+                          onPress={resendOtp}
+                          disabled={!canResend || isLoading}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="refresh-outline" size={18} color={canResend ? "#4F46E5" : "#9CA3AF"} />
+                          <Text style={[
+                            verificationStyles.resendButtonText,
+                            canResend && verificationStyles.resendButtonTextActive
+                          ]}>Resend Code</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={verificationStyles.changeMethodButton}
+                          onPress={handleChangeMethod}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="arrow-back-outline" size={14} color="#6B7280" />
+                          <Text style={verificationStyles.changeMethodText}>
+                            Use a different phone number
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </>
                 )}
-              </>
-            )}
 
-            {/* Security Note */}
-            <View style={verificationStyles.securityNote}>
-              <Ionicons name="shield-checkmark-outline" size={14} color="#9CA3AF" />
-              <Text style={verificationStyles.securityNoteText}>
-                Your information is encrypted and secure
-              </Text>
+                <View style={verificationStyles.securityNote}>
+                  <Ionicons name="shield-checkmark-outline" size={14} color="#64748B" />
+                  <Text style={verificationStyles.securityNoteText}>
+                    Your information is encrypted and verified securely.
+                  </Text>
+                </View>
+              </Animated.View>
             </View>
           </Animated.View>
-        </Animated.View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

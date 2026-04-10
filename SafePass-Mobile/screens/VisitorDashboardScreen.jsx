@@ -12,9 +12,9 @@ import {
   StatusBar,
   Alert,
   Modal,
-  Dimensions,
   Vibration,
   TextInput,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,8 +33,6 @@ if (Platform.OS !== "web") {
   }
 }
 
-const { width } = Dimensions.get("window");
-const isSmallPhone = width <= 375;
 const APPOINTMENT_PURPOSE_OPTIONS = [
   "Campus Tour",
   "Meeting",
@@ -58,6 +56,12 @@ if (Platform.OS !== 'web') {
 }
 
 export default function VisitorDashboardScreen({ navigation, onLogout }) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const isWideVisitorDashboard = viewportWidth >= 960;
+  const isTabletVisitorDashboard = viewportWidth >= 680;
+  const isCompactVisitorDashboard = viewportWidth <= 420;
+  const dashboardHorizontalGutter = isCompactVisitorDashboard ? 12 : viewportWidth <= 680 ? 16 : 20;
+  const dashboardCardPadding = isCompactVisitorDashboard ? 16 : 22;
   const [visitor, setVisitor] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [appointmentFeedback, setAppointmentFeedback] = useState(null);
@@ -68,7 +72,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [showAppointmentDatePicker, setShowAppointmentDatePicker] = useState(false);
   const [showAppointmentTimePicker, setShowAppointmentTimePicker] = useState(false);
   const [showPurposeDropdown, setShowPurposeDropdown] = useState(false);
+  const [showVirtualNfcModal, setShowVirtualNfcModal] = useState(false);
+  const [showVirtualNfcSuccessModal, setShowVirtualNfcSuccessModal] = useState(false);
+  const [showCheckInModal, setShowCheckInModal] = useState(false);
+  const [showCheckInSuccessModal, setShowCheckInSuccessModal] = useState(false);
+  const [showCheckOutModal, setShowCheckOutModal] = useState(false);
+  const [showCheckOutSuccessModal, setShowCheckOutSuccessModal] = useState(false);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
+  const [isVirtualTapLoading, setIsVirtualTapLoading] = useState(false);
+  const [isCheckInLoading, setIsCheckInLoading] = useState(false);
+  const [isCheckOutLoading, setIsCheckOutLoading] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState({
     preferredDate: null,
     preferredTime: null,
@@ -85,6 +98,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [lastTapTime, setLastTapTime] = useState(0);
   const nfcListenerRef = useRef(null);
   const appointmentWebDateInputRef = useRef(null);
+  const isCompactVirtualCardView = viewportWidth <= 540;
+  const commandMetricCardWidth = isWideVisitorDashboard
+    ? "31.8%"
+    : isTabletVisitorDashboard
+      ? "48.5%"
+      : "100%";
+  const compactCommandMetricCardWidth = viewportWidth <= 560 ? "100%" : commandMetricCardWidth;
+  const approvedFactCardWidth = isWideVisitorDashboard
+    ? "31.8%"
+    : isTabletVisitorDashboard
+      ? "48.5%"
+      : "100%";
+  const approvedActionCardWidth = isTabletVisitorDashboard ? "48.5%" : "100%";
+  const compactApprovedActionCardWidth = viewportWidth <= 560 ? "100%" : approvedActionCardWidth;
   const appointmentTimeOptions = useMemo(() => {
     const options = [];
     for (let hour = 7; hour <= 18; hour += 1) {
@@ -96,6 +123,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
     return options;
   }, []);
+  const dashboardShellResponsiveStyle = {
+    paddingHorizontal: dashboardHorizontalGutter,
+    paddingBottom: isCompactVisitorDashboard ? 24 : 16,
+  };
+  const dashboardCardResponsiveStyle = {
+    marginHorizontal: 0,
+    padding: dashboardCardPadding,
+  };
+  const dashboardHeroCardResponsiveStyle = {
+    marginHorizontal: 0,
+  };
+  const dashboardSectionResponsiveStyle = {
+    marginHorizontal: 0,
+  };
+  const commandActionRowResponsiveStyle = viewportWidth <= 560 ? { gap: 10 } : null;
+  const commandActionButtonResponsiveStyle = viewportWidth <= 560 ? { width: "100%" } : null;
+  const approvedSectionHeaderResponsiveStyle = viewportWidth <= 560
+    ? { marginBottom: 12 }
+    : null;
 
   useEffect(() => {
     loadVisitorData();
@@ -650,6 +696,48 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
   };
 
+  const handleVirtualNfcCardTap = async () => {
+    if (!visitor || isVirtualTapLoading) return;
+
+    setIsVirtualTapLoading(true);
+    setNfcStatus({
+      type: "processing",
+      message: "Processing your virtual NFC tap and notifying the operations team...",
+    });
+
+    try {
+      const response = await ApiService.visitorCheckIn(visitor._id, {
+        source: "virtual_nfc_card",
+      });
+
+      if (response?.success) {
+        setShowVirtualNfcModal(false);
+        setShowVirtualNfcSuccessModal(true);
+        setNfcStatus({
+          type: "success",
+          message: "Virtual NFC card accepted. Security and admin have been notified of your check-in.",
+        });
+        await loadVisitorData();
+        return;
+      }
+
+      setNfcStatus({
+        type: "error",
+        message: response?.message || "Your virtual NFC tap could not be completed.",
+      });
+      Alert.alert("Check-In Failed", response?.message || "Unable to check in right now.");
+    } catch (error) {
+      console.error("Virtual NFC card tap error:", error);
+      setNfcStatus({
+        type: "error",
+        message: error?.message || "Virtual NFC card tap failed. Please try again.",
+      });
+      Alert.alert("Check-In Failed", error?.message || "Unable to check in right now.");
+    } finally {
+      setIsVirtualTapLoading(false);
+    }
+  };
+
   const handleCheckIn = async () => {
     if (!visitor) return;
     
@@ -704,6 +792,66 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         }
       ]
     );
+  };
+
+  const handleCheckInAction = () => {
+    if (!visitor || isCheckInLoading) return;
+    setShowCheckInModal(true);
+  };
+
+  const confirmCheckIn = async () => {
+    if (!visitor || isCheckInLoading) return;
+
+    setIsCheckInLoading(true);
+    try {
+      const response = await ApiService.visitorCheckIn(visitor._id, {
+        source: "visitor_dashboard",
+      });
+
+      if (response?.success) {
+        setShowCheckInModal(false);
+        setShowCheckInSuccessModal(true);
+        await loadVisitorData();
+        return;
+      }
+
+      Alert.alert("Check-In Failed", response?.message || "Failed to check in.");
+    } catch (error) {
+      console.error("Visitor check-in error:", error);
+      Alert.alert("Check-In Failed", error?.message || "Failed to check in.");
+    } finally {
+      setIsCheckInLoading(false);
+    }
+  };
+
+  const handleCheckOutAction = () => {
+    if (!visitor || isCheckOutLoading) return;
+    setShowCheckOutModal(true);
+  };
+
+  const confirmCheckOut = async () => {
+    if (!visitor || isCheckOutLoading) return;
+
+    setIsCheckOutLoading(true);
+    try {
+      const response = await ApiService.visitorCheckOut(visitor._id, {
+        source: "visitor_dashboard",
+      });
+
+      if (response?.success) {
+        setShowCheckOutModal(false);
+        setShowCheckOutSuccessModal(true);
+        await loadVisitorData();
+        return;
+      }
+
+      Alert.alert("Check-Out Failed", response?.message || "Failed to check out.");
+    } catch (error) {
+      console.error("Visitor check-out error:", error);
+      Alert.alert("Check-Out Failed", error?.message || "Failed to check out.");
+    } finally {
+      setIsCheckOutLoading(false);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -1001,9 +1149,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#4F46E5"]} />
         }
       >
-        <View style={visitorDashboardStyles.dashboardShell}>
-          <View style={visitorDashboardStyles.commandDeckCard}>
-            <View style={visitorDashboardStyles.commandDeckHeader}>
+        <View
+          style={[
+            visitorDashboardStyles.dashboardShell,
+            isWideVisitorDashboard && visitorDashboardStyles.dashboardShellWide,
+            dashboardShellResponsiveStyle,
+          ]}
+        >
+          <View style={[visitorDashboardStyles.commandDeckCard, dashboardCardResponsiveStyle]}>
+            <View style={[visitorDashboardStyles.commandDeckHeader, isWideVisitorDashboard && visitorDashboardStyles.commandDeckHeaderWide]}>
               <View style={visitorDashboardStyles.commandDeckTitleWrap}>
                 <Text style={visitorDashboardStyles.commandDeckEyebrow}>Visit Command</Text>
                 <Text style={visitorDashboardStyles.commandDeckTitle}>{journeyTitle}</Text>
@@ -1019,7 +1173,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
             <View style={visitorDashboardStyles.commandMetricsGrid}>
               {commandMetrics.map((item) => (
-                <View key={item.label} style={visitorDashboardStyles.commandMetricCard}>
+                <View
+                  key={item.label}
+                  style={[
+                    visitorDashboardStyles.commandMetricCard,
+                    { width: compactCommandMetricCardWidth },
+                  ]}
+                >
                   <View style={visitorDashboardStyles.commandMetricIcon}>
                     <Ionicons name={item.icon} size={16} color="#4F46E5" />
                   </View>
@@ -1032,9 +1192,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </View>
 
             {(isApprovedVisitor || canRequestNewAppointment || canCreateFreshAppointment) ? (
-              <View style={visitorDashboardStyles.commandActionRow}>
+              <View
+                style={[
+                  visitorDashboardStyles.commandActionRow,
+                  commandActionRowResponsiveStyle,
+                ]}
+              >
                 <TouchableOpacity
-                  style={visitorDashboardStyles.commandPrimaryButton}
+                  style={[
+                    visitorDashboardStyles.commandPrimaryButton,
+                    commandActionButtonResponsiveStyle,
+                  ]}
                   onPress={isApprovedVisitor ? openAppointmentModal : openAppointmentModal}
                   activeOpacity={0.9}
                 >
@@ -1046,7 +1214,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
                 {isApprovedVisitor ? (
                   <TouchableOpacity
-                    style={visitorDashboardStyles.commandSecondaryButton}
+                    style={[
+                      visitorDashboardStyles.commandSecondaryButton,
+                      commandActionButtonResponsiveStyle,
+                    ]}
                     onPress={() => setShowQRModal(true)}
                     activeOpacity={0.9}
                   >
@@ -1061,7 +1232,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         {visitor ? (
           isPendingApproval ? (
             <>
-              <View style={visitorDashboardStyles.pendingApprovalCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.pendingApprovalCard,
+                  dashboardHeroCardResponsiveStyle,
+                ]}
+              >
                 <LinearGradient
                   colors={['#F59E0B', '#D97706']}
                   style={visitorDashboardStyles.pendingApprovalGradient}
@@ -1104,7 +1280,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </LinearGradient>
               </View>
 
-              <View style={visitorDashboardStyles.pendingStepsCard}>
+              <View style={[visitorDashboardStyles.pendingStepsCard, dashboardSectionResponsiveStyle]}>
                 <Text style={visitorDashboardStyles.pendingStepsTitle}>What happens next?</Text>
                 {[
                   "Your registration has already been sent to the admin for review.",
@@ -1118,18 +1294,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ))}
               </View>
 
-              <TouchableOpacity
-                style={visitorDashboardStyles.logoutButton}
-                onPress={handleLogout}
-              >
-                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-                <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
-              </TouchableOpacity>
             </>
           ) : isPendingStaffReview ? (
             <>
               {appointmentFeedback ? (
-                <View style={visitorDashboardStyles.appointmentSuccessCard}>
+                <View
+                  style={[
+                    visitorDashboardStyles.appointmentSuccessCard,
+                    dashboardSectionResponsiveStyle,
+                  ]}
+                >
                   <View style={visitorDashboardStyles.appointmentSuccessHeader}>
                     <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
                       <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
@@ -1155,7 +1329,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               ) : null}
 
-              <View style={visitorDashboardStyles.pendingApprovalCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.pendingApprovalCard,
+                  dashboardHeroCardResponsiveStyle,
+                ]}
+              >
                 <LinearGradient
                   colors={["#2563EB", "#1D4ED8"]}
                   style={visitorDashboardStyles.pendingApprovalGradient}
@@ -1194,7 +1373,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </LinearGradient>
               </View>
 
-              <View style={visitorDashboardStyles.pendingStepsCard}>
+              <View style={[visitorDashboardStyles.pendingStepsCard, dashboardSectionResponsiveStyle]}>
                 <Text style={visitorDashboardStyles.pendingStepsTitle}>What happens next?</Text>
                 {[
                   "Staff will review your preferred date, time, and visit purpose.",
@@ -1208,17 +1387,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ))}
               </View>
 
-              <TouchableOpacity
-                style={visitorDashboardStyles.logoutButton}
-                onPress={handleLogout}
-              >
-                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-                <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
-              </TouchableOpacity>
             </>
           ) : isApprovedVisitor ? (
             <>
-              <View style={visitorDashboardStyles.approvedHeroCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.approvedHeroCard,
+                  dashboardHeroCardResponsiveStyle,
+                ]}
+              >
                 <LinearGradient
                   colors={["#0F766E", "#0EA5A4", "#2563EB"]}
                   start={{ x: 0, y: 0 }}
@@ -1254,7 +1431,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </View>
 
                   <View style={visitorDashboardStyles.approvedHeroFacts}>
-                    <View style={visitorDashboardStyles.approvedHeroFactCard}>
+                    <View style={[visitorDashboardStyles.approvedHeroFactCard, { width: approvedFactCardWidth }]}>
                       <Text style={visitorDashboardStyles.approvedHeroFactLabel}>
                         Visit Date
                       </Text>
@@ -1262,7 +1439,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         {formatDate(visitor.visitDate)}
                       </Text>
                     </View>
-                    <View style={visitorDashboardStyles.approvedHeroFactCard}>
+                    <View style={[visitorDashboardStyles.approvedHeroFactCard, { width: approvedFactCardWidth }]}>
                       <Text style={visitorDashboardStyles.approvedHeroFactLabel}>
                         Arrival Time
                       </Text>
@@ -1270,7 +1447,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         {formatTime(visitor.visitTime)}
                       </Text>
                     </View>
-                    <View style={visitorDashboardStyles.approvedHeroFactCard}>
+                    <View style={[visitorDashboardStyles.approvedHeroFactCard, { width: approvedFactCardWidth }]}>
                       <Text style={visitorDashboardStyles.approvedHeroFactLabel}>
                         Access ID
                       </Text>
@@ -1282,38 +1459,94 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </LinearGradient>
               </View>
 
-              <View style={visitorDashboardStyles.approvedActionSection}>
-                <View style={visitorDashboardStyles.approvedSectionHeader}>
+              <View
+                style={[
+                  visitorDashboardStyles.approvedActionSection,
+                  dashboardSectionResponsiveStyle,
+                ]}
+              >
+                <View
+                  style={[
+                    visitorDashboardStyles.approvedSectionHeader,
+                    approvedSectionHeaderResponsiveStyle,
+                  ]}
+                >
                   <Text style={visitorDashboardStyles.approvedSectionTitle}>
                     Access Tools
                   </Text>
                   <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
-                    Choose the fastest way to enter campus.
+                    Open your virtual access card, or switch to reader mode if you are already at the gate.
                   </Text>
                 </View>
 
                 <View style={visitorDashboardStyles.approvedActionGrid}>
                   <TouchableOpacity
-                    style={visitorDashboardStyles.approvedActionCard}
-                    onPress={() => setShowQRModal(true)}
+                    style={visitorDashboardStyles.approvedVirtualNfcCard}
+                    onPress={() => setShowVirtualNfcModal(true)}
                     activeOpacity={0.9}
+                    disabled={isVirtualTapLoading}
                   >
                     <LinearGradient
-                      colors={["#10B981", "#059669"]}
-                      style={visitorDashboardStyles.approvedActionIconWrap}
+                      colors={["#0F172A", "#1D4ED8", "#2563EB"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={visitorDashboardStyles.approvedVirtualNfcCardGradient}
                     >
-                      <Ionicons name="qr-code" size={22} color="#FFFFFF" />
+                      <View style={visitorDashboardStyles.approvedVirtualNfcHeader}>
+                        <View>
+                          <View style={visitorDashboardStyles.approvedVirtualNfcBadge}>
+                            <Ionicons name="radio" size={14} color="#DBEAFE" />
+                            <Text style={visitorDashboardStyles.approvedVirtualNfcBadgeText}>
+                              Virtual NFC Card
+                            </Text>
+                          </View>
+                          <Text style={visitorDashboardStyles.approvedVirtualNfcTitle}>
+                            View Access Card
+                          </Text>
+                          <Text style={visitorDashboardStyles.approvedVirtualNfcSubtitle}>
+                            Open your digital SafePass card in a clean portrait card view.
+                          </Text>
+                        </View>
+                        <View style={visitorDashboardStyles.approvedVirtualNfcIconWrap}>
+                          {isVirtualTapLoading ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Ionicons name="card-outline" size={28} color="#FFFFFF" />
+                          )}
+                        </View>
+                      </View>
+
+                      <View style={visitorDashboardStyles.approvedVirtualNfcCardNumberRow}>
+                        <Text style={visitorDashboardStyles.approvedVirtualNfcCardLabel}>
+                          SafePass ID
+                        </Text>
+                        <Text style={visitorDashboardStyles.approvedVirtualNfcCardNumber}>
+                          {visitor.nfcCardId || visitor.idNumber || "Assigned on approval"}
+                        </Text>
+                      </View>
+
+                      <View style={visitorDashboardStyles.approvedVirtualNfcFooter}>
+                        <View style={visitorDashboardStyles.approvedVirtualNfcFooterItem}>
+                          <Ionicons name="shield-checkmark-outline" size={15} color="#DBEAFE" />
+                          <Text style={visitorDashboardStyles.approvedVirtualNfcFooterText}>
+                            Security notified
+                          </Text>
+                        </View>
+                        <View style={visitorDashboardStyles.approvedVirtualNfcFooterItem}>
+                          <Ionicons name="desktop-outline" size={15} color="#DBEAFE" />
+                          <Text style={visitorDashboardStyles.approvedVirtualNfcFooterText}>
+                            Admin monitored
+                          </Text>
+                        </View>
+                      </View>
                     </LinearGradient>
-                    <Text style={visitorDashboardStyles.approvedActionTitle}>
-                      Show QR Pass
-                    </Text>
-                    <Text style={visitorDashboardStyles.approvedActionText}>
-                      Open your visitor pass for gate scanning.
-                    </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={visitorDashboardStyles.approvedActionCard}
+                    style={[
+                      visitorDashboardStyles.approvedActionCard,
+                      { width: compactApprovedActionCardWidth },
+                    ]}
                     onPress={isNfcReading ? stopNfcReading : startNfcReading}
                     activeOpacity={0.9}
                   >
@@ -1336,8 +1569,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={visitorDashboardStyles.approvedActionCard}
-                    onPress={handleCheckIn}
+                    style={[
+                      visitorDashboardStyles.approvedActionCard,
+                      { width: compactApprovedActionCardWidth },
+                    ]}
+                    onPress={handleCheckInAction}
                     activeOpacity={0.9}
                   >
                     <LinearGradient
@@ -1386,8 +1622,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 )}
               </View>
 
-              <View style={visitorDashboardStyles.approvedInfoCard}>
-                <View style={visitorDashboardStyles.approvedSectionHeader}>
+              <View
+                style={[
+                  visitorDashboardStyles.approvedInfoCard,
+                  dashboardSectionResponsiveStyle,
+                  { padding: dashboardCardPadding },
+                ]}
+              >
+                <View
+                  style={[
+                    visitorDashboardStyles.approvedSectionHeader,
+                    approvedSectionHeaderResponsiveStyle,
+                  ]}
+                >
                   <Text style={visitorDashboardStyles.approvedSectionTitle}>
                     Visit Snapshot
                   </Text>
@@ -1426,7 +1673,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               </View>
 
-              <View style={visitorDashboardStyles.reappointmentCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.reappointmentCard,
+                  dashboardSectionResponsiveStyle,
+                  { padding: dashboardCardPadding },
+                ]}
+              >
                 <View style={visitorDashboardStyles.reappointmentCardHeader}>
                   <View>
                     <Text style={visitorDashboardStyles.reappointmentCardTitle}>
@@ -1571,13 +1824,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               )}
 
-              <TouchableOpacity
-                style={visitorDashboardStyles.logoutButton}
-                onPress={handleLogout}
-              >
-                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-                <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
-              </TouchableOpacity>
             </>
           ) : canRequestNewAppointment ? (
             <>
@@ -1647,7 +1893,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </LinearGradient>
               </View>
 
-              <View style={visitorDashboardStyles.reappointmentCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.reappointmentCard,
+                  dashboardSectionResponsiveStyle,
+                  { padding: dashboardCardPadding },
+                ]}
+              >
                 <View style={visitorDashboardStyles.reappointmentCardHeader}>
                   <View>
                     <Text style={visitorDashboardStyles.reappointmentCardTitle}>New Appointment Request</Text>
@@ -1715,13 +1967,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               )}
 
-              <TouchableOpacity
-                style={visitorDashboardStyles.logoutButton}
-                onPress={handleLogout}
-              >
-                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-                <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
-              </TouchableOpacity>
             </>
           ) : (
           <>
@@ -1834,7 +2079,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               {visitor.status !== 'checked_in' && visitor.status !== 'checked_out' && visitor.status === 'approved' && (
                 <TouchableOpacity 
                   style={visitorDashboardStyles.quickAction}
-                  onPress={handleCheckIn}
+                  onPress={handleCheckInAction}
                 >
                   <LinearGradient
                     colors={['#4F46E5', '#7C3AED']}
@@ -1849,7 +2094,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               {visitor.status === 'checked_in' && (
                 <TouchableOpacity 
                   style={visitorDashboardStyles.quickAction}
-                  onPress={handleCheckOut}
+                  onPress={handleCheckOutAction}
                 >
                   <LinearGradient
                     colors={['#EF4444', '#DC2626']}
@@ -1996,14 +2241,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
             )}
 
-            {/* Logout Button */}
-            <TouchableOpacity
-              style={visitorDashboardStyles.logoutButton}
-              onPress={handleLogout}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-              <Text style={visitorDashboardStyles.logoutText}>Sign Out</Text>
-            </TouchableOpacity>
           </>
           )
         ) : (
@@ -2307,6 +2544,564 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showVirtualNfcModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowVirtualNfcModal(false)}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View
+            style={[
+              visitorDashboardStyles.virtualNfcModalContent,
+              isCompactVirtualCardView && visitorDashboardStyles.virtualNfcModalContentCompact,
+            ]}
+          >
+            <LinearGradient
+              colors={["#0F172A", "#1D4ED8", "#2563EB"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[
+                visitorDashboardStyles.virtualNfcModalHeader,
+                isCompactVirtualCardView && visitorDashboardStyles.virtualNfcModalHeaderCompact,
+              ]}
+            >
+              <View>
+                <Text style={visitorDashboardStyles.virtualNfcModalTitle}>Virtual NFC Card</Text>
+                <Text style={visitorDashboardStyles.virtualNfcModalSubtitle}>
+                  Rotate your phone sideways, present the pass to the reader, then confirm check-in when ready.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowVirtualNfcModal(false)}>
+                <Ionicons name="close" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <View
+              style={[
+                visitorDashboardStyles.virtualNfcModalBody,
+                isCompactVirtualCardView && visitorDashboardStyles.virtualNfcModalBodyCompact,
+              ]}
+            >
+              <View
+                style={[
+                  visitorDashboardStyles.virtualNfcDisplayRow,
+                  isCompactVirtualCardView && visitorDashboardStyles.virtualNfcDisplayRowCompact,
+                ]}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.92}
+                  onPress={handleVirtualNfcCardTap}
+                  disabled={isVirtualTapLoading}
+                  style={[
+                    visitorDashboardStyles.virtualNfcPreviewCard,
+                    isCompactVirtualCardView && visitorDashboardStyles.virtualNfcPreviewCardCompact,
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["#0F172A", "#1D4ED8", "#2563EB"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={visitorDashboardStyles.virtualNfcCardGradient}
+                  >
+                    <View style={visitorDashboardStyles.virtualNfcCardTopBar}>
+                      <View>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewBrand}>
+                          SafePass
+                        </Text>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewSchool}>
+                          Sapphire International Aviation Academy
+                        </Text>
+                      </View>
+                      <View style={visitorDashboardStyles.virtualNfcPreviewChip}>
+                        {isVirtualTapLoading ? (
+                          <ActivityIndicator size="small" color="#DBEAFE" />
+                        ) : (
+                          <Ionicons name="radio" size={16} color="#DBEAFE" />
+                        )}
+                      </View>
+                    </View>
+
+                    <View style={visitorDashboardStyles.virtualNfcCardIdentity}>
+                      <Text style={visitorDashboardStyles.virtualNfcPreviewLabel}>Visitor Name</Text>
+                      <Text style={visitorDashboardStyles.virtualNfcPreviewName}>
+                        {visitor?.fullName || "Visitor"}
+                      </Text>
+                    </View>
+
+                    <View style={visitorDashboardStyles.virtualNfcIdBand}>
+                      <Text style={visitorDashboardStyles.virtualNfcPreviewLabel}>SafePass ID</Text>
+                      <Text style={visitorDashboardStyles.virtualNfcPreviewId}>
+                        {visitor?.nfcCardId || visitor?.idNumber || "Assigned on approval"}
+                      </Text>
+                    </View>
+
+                    <View style={visitorDashboardStyles.virtualNfcDetailsGrid}>
+                      <View style={visitorDashboardStyles.virtualNfcDetailCard}>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaLabel}>Purpose</Text>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaValue}>
+                          {visitor?.purposeOfVisit || "Approved visit"}
+                        </Text>
+                      </View>
+                      <View style={visitorDashboardStyles.virtualNfcDetailCard}>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaLabel}>Status</Text>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaValue}>
+                          Approved
+                        </Text>
+                      </View>
+                      <View style={visitorDashboardStyles.virtualNfcDetailCard}>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaLabel}>Visit Date</Text>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaValue}>
+                          {formatDate(visitor?.visitDate)}
+                        </Text>
+                      </View>
+                      <View style={visitorDashboardStyles.virtualNfcDetailCard}>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaLabel}>Arrival Time</Text>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaValue}>
+                          {formatTime(visitor?.visitTime)}
+                        </Text>
+                      </View>
+                      <View style={visitorDashboardStyles.virtualNfcDetailCardWide}>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaLabel}>Assigned Staff</Text>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaValue}>
+                          {visitor?.assignedStaffName || visitor?.host || "Front Office"}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={visitorDashboardStyles.virtualNfcTapHint}>
+                      <View style={visitorDashboardStyles.virtualNfcTapHintIcon}>
+                        <Ionicons name="finger-print-outline" size={18} color="#0F172A" />
+                      </View>
+                      <View style={visitorDashboardStyles.virtualNfcTapHintCopy}>
+                        <Text style={visitorDashboardStyles.virtualNfcTapHintTitle}>
+                          Tap This Card To Check In
+                        </Text>
+                        <Text style={visitorDashboardStyles.virtualNfcTapHintText}>
+                          Present this digital pass and tap once you are ready to enter campus.
+                        </Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+
+              <View
+                style={[
+                  visitorDashboardStyles.virtualNfcInfoCard,
+                  isCompactVirtualCardView && visitorDashboardStyles.virtualNfcInfoCardCompact,
+                ]}
+              >
+                {[
+                  "Use the card view above to verify your approved access details.",
+                  "Security will receive the visitor check-in notification.",
+                  "Admin monitoring will also record this check-in event.",
+                ].map((item) => (
+                  <View key={item} style={visitorDashboardStyles.virtualNfcInfoRow}>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#2563EB" />
+                    <Text style={visitorDashboardStyles.virtualNfcInfoText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View
+                style={[
+                  visitorDashboardStyles.virtualNfcModalFooter,
+                  isCompactVirtualCardView && visitorDashboardStyles.virtualNfcModalFooterCompact,
+                ]}
+              >
+                <TouchableOpacity
+                  style={visitorDashboardStyles.virtualNfcSecondaryButton}
+                  onPress={() => setShowVirtualNfcModal(false)}
+                  disabled={isVirtualTapLoading}
+                >
+                  <Text style={visitorDashboardStyles.virtualNfcSecondaryButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={visitorDashboardStyles.virtualNfcPrimaryButton}
+                  onPress={handleVirtualNfcCardTap}
+                  disabled={isVirtualTapLoading}
+                >
+                  {isVirtualTapLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
+                      <Text style={visitorDashboardStyles.virtualNfcPrimaryButtonText}>
+                        Check In With Card
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCheckInModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCheckInModal(false)}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.accessFlowModalContent}>
+            <LinearGradient
+              colors={["#0F766E", "#0EA5A4", "#2563EB"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={visitorDashboardStyles.accessFlowHero}
+            >
+              <View style={visitorDashboardStyles.accessFlowHeroTop}>
+                <View style={visitorDashboardStyles.accessFlowHeroBadge}>
+                  <Ionicons name="log-in-outline" size={15} color="#0F766E" />
+                  <Text style={visitorDashboardStyles.accessFlowHeroBadgeText}>Arrival Flow</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowCheckInModal(false)}>
+                  <Ionicons name="close" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+              <Text style={visitorDashboardStyles.accessFlowTitle}>Ready To Check In?</Text>
+              <Text style={visitorDashboardStyles.accessFlowSubtitle}>
+                Confirm your arrival to activate your visit and notify the monitoring team.
+              </Text>
+            </LinearGradient>
+
+            <View style={visitorDashboardStyles.accessFlowBody}>
+              <View style={visitorDashboardStyles.checkInArrivalCard}>
+                <View style={visitorDashboardStyles.checkInArrivalTopRow}>
+                  <View style={visitorDashboardStyles.checkInArrivalIdentity}>
+                    <View style={visitorDashboardStyles.checkInArrivalAvatar}>
+                      <Text style={visitorDashboardStyles.checkInArrivalInitials}>
+                        {visitor?.fullName
+                          ?.split(" ")
+                          .map((name) => name[0])
+                          .join("")
+                          .substring(0, 2)
+                          .toUpperCase() || "VP"}
+                      </Text>
+                    </View>
+                    <View style={visitorDashboardStyles.checkInArrivalCopy}>
+                      <Text style={visitorDashboardStyles.checkInArrivalName}>
+                        {visitor?.fullName || "Visitor"}
+                      </Text>
+                      <Text style={visitorDashboardStyles.checkInArrivalPurpose}>
+                        {visitor?.purposeOfVisit || "Approved visit"}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={visitorDashboardStyles.checkInArrivalStatusPill}>
+                    <Ionicons name="shield-checkmark-outline" size={14} color="#0F766E" />
+                    <Text style={visitorDashboardStyles.checkInArrivalStatusText}>Approved</Text>
+                  </View>
+                </View>
+
+                <View style={visitorDashboardStyles.checkInArrivalMetaGrid}>
+                  <View style={visitorDashboardStyles.checkInArrivalMetaCard}>
+                    <Text style={visitorDashboardStyles.checkInArrivalMetaLabel}>Visit Date</Text>
+                    <Text style={visitorDashboardStyles.checkInArrivalMetaValue}>{formatDate(visitor?.visitDate)}</Text>
+                  </View>
+                  <View style={visitorDashboardStyles.checkInArrivalMetaCard}>
+                    <Text style={visitorDashboardStyles.checkInArrivalMetaLabel}>Arrival Time</Text>
+                    <Text style={visitorDashboardStyles.checkInArrivalMetaValue}>{formatTime(visitor?.visitTime)}</Text>
+                  </View>
+                  <View style={visitorDashboardStyles.checkInArrivalMetaCardWide}>
+                    <Text style={visitorDashboardStyles.checkInArrivalMetaLabel}>Assigned Staff</Text>
+                    <Text style={visitorDashboardStyles.checkInArrivalMetaValue}>
+                      {visitor?.assignedStaffName || visitor?.host || "Front Office"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={visitorDashboardStyles.checkInArrivalGuideCard}>
+                <Text style={visitorDashboardStyles.checkInArrivalGuideTitle}>What happens after check-in?</Text>
+                {[
+                  "Your visitor status will switch to checked in.",
+                  "Security and admin monitoring will receive your arrival event.",
+                  "Your access activity will be recorded in the dashboard history.",
+                ].map((item) => (
+                  <View key={item} style={visitorDashboardStyles.checkInArrivalGuideRow}>
+                    <View style={visitorDashboardStyles.checkInArrivalGuideIcon}>
+                      <Ionicons name="checkmark" size={12} color="#0F766E" />
+                    </View>
+                    <Text style={visitorDashboardStyles.checkInArrivalGuideText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={visitorDashboardStyles.accessFlowFooter}>
+                <TouchableOpacity
+                  style={visitorDashboardStyles.accessFlowSecondaryButton}
+                  onPress={() => setShowCheckInModal(false)}
+                  disabled={isCheckInLoading}
+                >
+                  <Text style={visitorDashboardStyles.accessFlowSecondaryButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={visitorDashboardStyles.accessFlowPrimaryButton}
+                  onPress={confirmCheckIn}
+                  disabled={isCheckInLoading}
+                >
+                  {isCheckInLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
+                      <Text style={visitorDashboardStyles.accessFlowPrimaryButtonText}>Confirm Check In</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showVirtualNfcSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowVirtualNfcSuccessModal(false)}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.accessFlowSuccessContent}>
+            <View style={visitorDashboardStyles.accessFlowSuccessIconWrap}>
+              <Ionicons name="checkmark-circle" size={54} color="#0F766E" />
+            </View>
+            <Text style={visitorDashboardStyles.accessFlowSuccessTitle}>Checked In Successfully</Text>
+            <Text style={visitorDashboardStyles.accessFlowSuccessText}>
+              Your virtual NFC card was accepted. Security and admin have been notified of your arrival.
+            </Text>
+
+            <View style={visitorDashboardStyles.accessFlowSuccessMetaCard}>
+              <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Visitor</Text>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>
+                  {visitor?.fullName || "Visitor"}
+                </Text>
+              </View>
+              <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Checked In Via</Text>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>Virtual NFC Card</Text>
+              </View>
+              <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Visit Time</Text>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>
+                  {formatTime(visitor?.visitTime)}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={visitorDashboardStyles.accessFlowPrimaryButton}
+              onPress={() => setShowVirtualNfcSuccessModal(false)}
+            >
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              <Text style={visitorDashboardStyles.accessFlowPrimaryButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCheckInSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCheckInSuccessModal(false)}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.accessFlowSuccessContent}>
+            <View style={visitorDashboardStyles.accessFlowSuccessIconWrap}>
+              <Ionicons name="checkmark-circle" size={54} color="#0F766E" />
+            </View>
+            <Text style={visitorDashboardStyles.accessFlowSuccessTitle}>Arrival Confirmed</Text>
+            <Text style={visitorDashboardStyles.accessFlowSuccessText}>
+              Your visitor access is now active and the system has recorded your check-in.
+            </Text>
+
+            <View style={visitorDashboardStyles.checkInSuccessStamp}>
+              <View style={visitorDashboardStyles.checkInSuccessStampHeader}>
+                <Text style={visitorDashboardStyles.checkInSuccessStampLabel}>Campus Access Active</Text>
+                <Text style={visitorDashboardStyles.checkInSuccessStampStatus}>Checked In</Text>
+              </View>
+              <Text style={visitorDashboardStyles.checkInSuccessStampName}>
+                {visitor?.fullName || "Visitor"}
+              </Text>
+              <Text style={visitorDashboardStyles.checkInSuccessStampSubtext}>
+                Proceed to your destination and keep your SafePass ready if requested by staff or security.
+              </Text>
+            </View>
+
+            <View style={visitorDashboardStyles.accessFlowSuccessMetaCard}>
+              <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Arrival Time</Text>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>{formatTime(visitor?.visitTime)}</Text>
+              </View>
+              <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Visit Date</Text>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>{formatDate(visitor?.visitDate)}</Text>
+              </View>
+              <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Assigned Staff</Text>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>
+                  {visitor?.assignedStaffName || visitor?.host || "Front Office"}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={visitorDashboardStyles.accessFlowPrimaryButton}
+              onPress={() => setShowCheckInSuccessModal(false)}
+            >
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              <Text style={visitorDashboardStyles.accessFlowPrimaryButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCheckOutModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCheckOutModal(false)}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.accessFlowModalContent}>
+            <LinearGradient
+              colors={["#7F1D1D", "#DC2626", "#EF4444"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={visitorDashboardStyles.accessFlowHero}
+            >
+              <View style={visitorDashboardStyles.accessFlowHeroTop}>
+                <View style={[visitorDashboardStyles.accessFlowHeroBadge, visitorDashboardStyles.accessFlowHeroBadgeDanger]}>
+                  <Ionicons name="log-out-outline" size={15} color="#991B1B" />
+                  <Text style={[visitorDashboardStyles.accessFlowHeroBadgeText, visitorDashboardStyles.accessFlowHeroBadgeTextDanger]}>
+                    Departure Flow
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowCheckOutModal(false)}>
+                  <Ionicons name="close" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+              <Text style={visitorDashboardStyles.accessFlowTitle}>Check Out</Text>
+              <Text style={visitorDashboardStyles.accessFlowSubtitle}>
+                  Confirm that you are leaving campus so your visit can be completed properly.
+              </Text>
+            </LinearGradient>
+
+            <View style={visitorDashboardStyles.accessFlowBody}>
+              <View style={visitorDashboardStyles.accessFlowSummaryCard}>
+                <View style={visitorDashboardStyles.accessFlowSummaryRow}>
+                  <Text style={visitorDashboardStyles.accessFlowSummaryLabel}>Visitor</Text>
+                  <Text style={visitorDashboardStyles.accessFlowSummaryValue}>
+                    {visitor?.fullName || "Visitor"}
+                  </Text>
+                </View>
+                <View style={visitorDashboardStyles.accessFlowSummaryRow}>
+                  <Text style={visitorDashboardStyles.accessFlowSummaryLabel}>Status</Text>
+                  <Text style={visitorDashboardStyles.accessFlowSummaryValue}>Checked In</Text>
+                </View>
+                <View style={visitorDashboardStyles.accessFlowSummaryRow}>
+                  <Text style={visitorDashboardStyles.accessFlowSummaryLabel}>Visit Schedule</Text>
+                  <Text style={visitorDashboardStyles.accessFlowSummaryValue}>
+                    {formatDate(visitor?.visitDate)} at {formatTime(visitor?.visitTime)}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={visitorDashboardStyles.accessFlowTimelineCard}>
+                {[
+                  "This will mark your visit as completed in the system.",
+                  "Security and admin monitoring can track that you have checked out.",
+                  "Your account will remain active for future appointments.",
+                ].map((item) => (
+                  <View key={item} style={visitorDashboardStyles.accessFlowTimelineRow}>
+                    <View style={[visitorDashboardStyles.accessFlowTimelineDot, visitorDashboardStyles.accessFlowTimelineDotDanger]} />
+                    <Text style={visitorDashboardStyles.accessFlowTimelineText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={visitorDashboardStyles.accessFlowFooter}>
+                <TouchableOpacity
+                  style={visitorDashboardStyles.accessFlowSecondaryButton}
+                  onPress={() => setShowCheckOutModal(false)}
+                  disabled={isCheckOutLoading}
+                >
+                  <Text style={visitorDashboardStyles.accessFlowSecondaryButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={visitorDashboardStyles.accessFlowDangerButton}
+                  onPress={confirmCheckOut}
+                  disabled={isCheckOutLoading}
+                >
+                  {isCheckOutLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
+                      <Text style={visitorDashboardStyles.accessFlowPrimaryButtonText}>
+                        Confirm Check Out
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCheckOutSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCheckOutSuccessModal(false)}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.accessFlowSuccessContent}>
+            <View style={[visitorDashboardStyles.accessFlowSuccessIconWrap, visitorDashboardStyles.accessFlowSuccessIconWrapDanger]}>
+              <Ionicons name="log-out-outline" size={46} color="#DC2626" />
+            </View>
+            <Text style={visitorDashboardStyles.accessFlowSuccessTitle}>Checked Out Successfully</Text>
+            <Text style={visitorDashboardStyles.accessFlowSuccessText}>
+              Your visit has been completed. The monitoring system can now see that you have checked out.
+            </Text>
+
+            <View style={visitorDashboardStyles.accessFlowSuccessMetaCard}>
+              <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Visitor</Text>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>
+                  {visitor?.fullName || "Visitor"}
+                </Text>
+              </View>
+              <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Status</Text>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>Checked Out</Text>
+              </View>
+              <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Account</Text>
+                <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>Still active for reappointment</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={visitorDashboardStyles.accessFlowDangerButton}
+              onPress={() => setShowCheckOutSuccessModal(false)}
+            >
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              <Text style={visitorDashboardStyles.accessFlowPrimaryButtonText}>Continue</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

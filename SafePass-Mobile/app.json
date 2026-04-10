@@ -4,7 +4,7 @@
     "slug": "safepass-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/LogoSapphire.jpg",
+    "icon": "./assets/LogoSapphireAppIcon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/LogoSapphire.jpg",
@@ -23,7 +23,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/LogoSapphire.jpg",
+        "foregroundImage": "./assets/LogoSapphireAppIcon.png",
         "backgroundColor": "#041E42"
       },
       "permissions": [

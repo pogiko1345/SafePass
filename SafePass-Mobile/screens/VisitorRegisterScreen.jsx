@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Modal,
   Linking,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -337,6 +338,56 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
 
 // ================= MAIN COMPONENT =================
 export default function VisitorRegisterScreen({ navigation }) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const isCompactRegister = viewportWidth <= 420;
+  const isTabletRegister = viewportWidth >= 768;
+  const registerHorizontalMargin = isCompactRegister ? 12 : 16;
+  const registerShellMaxWidth = Math.min(
+    860,
+    Math.max(viewportWidth - registerHorizontalMargin * 2, 300)
+  );
+  const headerResponsiveStyle = {
+    paddingBottom: isCompactRegister ? 34 : 42,
+  };
+  const headerButtonsResponsiveStyle = {
+    left: registerHorizontalMargin,
+    right: registerHorizontalMargin,
+  };
+  const headerContentResponsiveStyle = {
+    paddingHorizontal: isCompactRegister ? 16 : 22,
+    maxWidth: isTabletRegister ? 720 : 640,
+  };
+  const headerIconGradientResponsiveStyle = {
+    width: isCompactRegister ? 64 : 72,
+    height: isCompactRegister ? 64 : 72,
+    borderRadius: isCompactRegister ? 32 : 36,
+  };
+  const headerTitleResponsiveStyle = {
+    fontSize: isCompactRegister ? 24 : undefined,
+    lineHeight: isCompactRegister ? 30 : undefined,
+  };
+  const headerDescriptionResponsiveStyle = {
+    lineHeight: isCompactRegister ? 20 : 22,
+  };
+  const formShellResponsiveStyle = Platform.OS === "web"
+    ? { maxWidth: registerShellMaxWidth }
+    : null;
+  const sectionCardResponsiveStyle = {
+    marginHorizontal: registerHorizontalMargin,
+  };
+  const contentResponsiveStyle = {
+    padding: isCompactRegister ? 16 : 22,
+  };
+  const sectionHeaderResponsiveStyle = isCompactRegister
+    ? { flexDirection: "column", alignItems: "flex-start" }
+    : null;
+  const actionRowResponsiveStyle = isCompactRegister
+    ? { flexDirection: "column", gap: 10 }
+    : null;
+  const actionButtonResponsiveStyle = isCompactRegister
+    ? { width: "100%", flex: 0 }
+    : null;
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -1563,9 +1614,9 @@ export default function VisitorRegisterScreen({ navigation }) {
             colors={["#063B34", "#047857", "#059669"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={visitorRegisterStyles.header}
+            style={[visitorRegisterStyles.header, headerResponsiveStyle]}
           >
-            <View style={visitorRegisterStyles.headerButtons}>
+            <View style={[visitorRegisterStyles.headerButtons, headerButtonsResponsiveStyle]}>
               <TouchableOpacity
                 style={visitorRegisterStyles.backButton}
                 onPress={handleBack}
@@ -1574,7 +1625,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                 <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            <View style={visitorRegisterStyles.headerContent}>
+            <View style={[visitorRegisterStyles.headerContent, headerContentResponsiveStyle]}>
               <View style={visitorRegisterStyles.headerBadge}>
                 <Image
                   source={Logo}
@@ -1593,25 +1644,33 @@ export default function VisitorRegisterScreen({ navigation }) {
               <View style={visitorRegisterStyles.headerIconContainer}>
                 <LinearGradient
                   colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.05)"]}
-                  style={visitorRegisterStyles.headerIconGradient}
+                  style={[
+                    visitorRegisterStyles.headerIconGradient,
+                    headerIconGradientResponsiveStyle,
+                  ]}
                 >
                   <Ionicons name="person-add" size={32} color="#FFFFFF" />
                 </LinearGradient>
               </View>
-              <Text style={visitorRegisterStyles.headerTitle}>
+              <Text style={[visitorRegisterStyles.headerTitle, headerTitleResponsiveStyle]}>
                 Request Your Campus Visit
               </Text>
               <Text style={visitorRegisterStyles.headerSubtitle}>
                 {stepConfig.title}
               </Text>
-              <Text style={visitorRegisterStyles.headerDescription}>
+              <Text
+                style={[
+                  visitorRegisterStyles.headerDescription,
+                  headerDescriptionResponsiveStyle,
+                ]}
+              >
                 Complete this short guided form to submit your visit for approval and receive your SafePass access details.
               </Text>
             </View>
           </LinearGradient>
 
-          <View style={visitorRegisterStyles.formShell}>
-            <View style={visitorRegisterStyles.progressContainer}>
+          <View style={[visitorRegisterStyles.formShell, formShellResponsiveStyle]}>
+            <View style={[visitorRegisterStyles.progressContainer, sectionCardResponsiveStyle]}>
               <View style={visitorRegisterStyles.progressHeader}>
                 <Text style={visitorRegisterStyles.progressTitle}>
                   Registration Progress
@@ -1630,7 +1689,12 @@ export default function VisitorRegisterScreen({ navigation }) {
               </View>
             </View>
 
-            <View style={visitorRegisterStyles.stepIndicatorContainer}>
+            <View
+              style={[
+                visitorRegisterStyles.stepIndicatorContainer,
+                sectionCardResponsiveStyle,
+              ]}
+            >
               <View style={visitorRegisterStyles.stepWrapper}>
                 <View
                   style={[
@@ -1721,8 +1785,8 @@ export default function VisitorRegisterScreen({ navigation }) {
               </View>
             </View>
 
-            <View style={visitorRegisterStyles.content}>
-              <View style={visitorRegisterStyles.sectionHeader}>
+            <View style={[visitorRegisterStyles.content, contentResponsiveStyle]}>
+              <View style={[visitorRegisterStyles.sectionHeader, sectionHeaderResponsiveStyle]}>
                 <View style={visitorRegisterStyles.sectionTextBlock}>
                   <Text style={visitorRegisterStyles.sectionTitle}>
                     {stepConfig.title}
@@ -1744,9 +1808,12 @@ export default function VisitorRegisterScreen({ navigation }) {
                 {currentStep === 2 && renderStep2()}
                 {currentStep === 3 && renderStep3()}
               </View>
-              <View style={visitorRegisterStyles.actionRow}>
+              <View style={[visitorRegisterStyles.actionRow, actionRowResponsiveStyle]}>
                 <TouchableOpacity
-                  style={visitorRegisterStyles.secondaryActionButton}
+                  style={[
+                    visitorRegisterStyles.secondaryActionButton,
+                    actionButtonResponsiveStyle,
+                  ]}
                   onPress={handleBack}
                   activeOpacity={0.8}
                 >
@@ -1761,7 +1828,10 @@ export default function VisitorRegisterScreen({ navigation }) {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={visitorRegisterStyles.continueButton}
+                  style={[
+                    visitorRegisterStyles.continueButton,
+                    actionButtonResponsiveStyle,
+                  ]}
                   onPress={currentStep === 3 ? handleSubmit : handleNext}
                   activeOpacity={0.8}
                   disabled={isSubmitting}

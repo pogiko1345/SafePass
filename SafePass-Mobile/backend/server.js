@@ -645,15 +645,12 @@ app.post("/api/visitors/register", async (req, res) => {
       visitDate: new Date(visitorData.visitDate),
       visitTime: new Date(visitorData.visitTime),
       registeredAt: new Date(),
-      status: "pending",
-      approvalStatus: "pending",
       requestCategory: "registration",
       approvalFlow: "admin",
-      appointmentStatus: "pending",
-      appointmentRequestedAt: new Date(),
       temporaryPassword: tempPassword,
     });
 
+    visitor.markRegistrationPending();
     await visitor.save();
     createdVisitor = visitor;
     console.log("✅ Visitor registered:", visitorData.email);
@@ -800,9 +797,10 @@ app.get("/api/admin/visitors/pending", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    // Get ALL visitors with status 'pending' OR approvalStatus 'pending'
     const visitors = await Visitor.find({
-      $or: [{ status: "pending" }, { approvalStatus: "pending" }],
+      requestCategory: "registration",
+      approvalFlow: "admin",
+      approvalStatus: "pending",
     }).sort({ registeredAt: -1 });
 
     console.log(`\n📋 Found ${visitors.length} pending visitors:`);
@@ -838,13 +836,28 @@ app.get("/api/admin/visitors", authMiddleware, async (req, res) => {
       query.status = status;
     }
 
-    // Also search by approvalStatus if status is pending/approved/rejected
     if (status === "pending") {
-      query.$or = [{ status: "pending" }, { approvalStatus: "pending" }];
+      delete query.status;
+      query.$or = [
+        { requestCategory: "registration", approvalStatus: "pending" },
+        { requestCategory: "appointment", appointmentStatus: "pending" },
+      ];
     } else if (status === "approved") {
-      query.$or = [{ status: "approved" }, { approvalStatus: "approved" }];
+      delete query.status;
+      query.approvalStatus = "approved";
+      query.$or = [
+        { requestCategory: "registration" },
+        {
+          requestCategory: "appointment",
+          appointmentStatus: { $in: ["approved", "adjusted"] },
+        },
+      ];
     } else if (status === "rejected") {
-      query.$or = [{ status: "rejected" }, { approvalStatus: "rejected" }];
+      delete query.status;
+      query.$or = [
+        { requestCategory: "registration", approvalStatus: "rejected" },
+        { requestCategory: "appointment", appointmentStatus: "rejected" },
+      ];
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -923,17 +936,8 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
 
     // Update visitor status - THIS IS THE KEY PART
     console.log("\n📝 UPDATING VISITOR...");
-    visitor.approvalStatus = "approved";
-    visitor.status = "approved";
-    visitor.approvedAt = new Date();
-    visitor.approvedBy = req.user._id;
-    visitor.adminNotes = adminNotes || "";
+    visitor.approveRegistration(req.user._id, adminNotes || "");
     visitor.temporaryPassword = tempPassword;
-    visitor.requestCategory = visitor.requestCategory || "registration";
-    visitor.approvalFlow = "admin";
-    visitor.appointmentStatus = "approved";
-    visitor.appointmentRequestedAt =
-      visitor.appointmentRequestedAt || visitor.registeredAt || new Date();
 
     await visitor.save();
     console.log("✅ Visitor updated in database");
@@ -1076,13 +1080,7 @@ app.put("/api/admin/visitors/:id/reject", authMiddleware, async (req, res) => {
         .json({ success: false, message: "Visitor not found" });
     }
 
-    // Update visitor status
-    visitor.status = "rejected";
-    visitor.approvalStatus = "rejected";
-    visitor.appointmentStatus = "rejected";
-    visitor.rejectedAt = new Date();
-    visitor.rejectedBy = req.user._id;
-    visitor.rejectionReason = reason || "No reason provided";
+    visitor.rejectRegistration(req.user._id, reason || "No reason provided");
     await visitor.save();
 
     // Send rejection email (simulated)
@@ -2080,6 +2078,11 @@ app.delete("/api/visitors/:id", authMiddleware, async (req, res) => {
 app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
+    const checkInSource = String(req.body?.source || "mobile_app")
+      .trim()
+      .toLowerCase();
+    const sourceLabel =
+      checkInSource === "virtual_nfc_card" ? "virtual NFC card" : "mobile app";
 
     if (!visitor) {
       return res.status(404).json({
@@ -2088,28 +2091,35 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    const hasApprovedAppointment =
-      visitor.approvalStatus === "approved" &&
-      ["approved", "adjusted", "not_requested"].includes(
-        visitor.appointmentStatus || "not_requested",
-      );
-
-    if (!hasApprovedAppointment) {
+    if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
         message: "Your visit is still waiting for approval.",
       });
     }
 
-    visitor.status = "checked_in";
-    visitor.checkedInAt = new Date();
+    if (visitor.status === "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "You are already checked in for this visit.",
+      });
+    }
+
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been completed.",
+      });
+    }
+
+    visitor.markCheckedIn(req.user._id);
     await visitor.save();
 
     // Create access log
     const accessLog = new AccessLog({
       userEmail: visitor.email,
       userName: visitor.fullName,
-      location: "Mobile App",
+      location: checkInSource === "virtual_nfc_card" ? "Virtual NFC Card" : "Mobile App",
       accessType: "entry",
       activityType: "visitor_self_checkin",
       status: "granted",
@@ -2119,10 +2129,43 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       metadata: {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
+        source: checkInSource,
       },
-      notes: "Visitor self check-in via mobile app",
+      notes: `Visitor self check-in via ${sourceLabel}`,
     });
     await accessLog.save();
+
+    await createRoleNotification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} checked in using the ${sourceLabel}.`,
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkin",
+        source: checkInSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} checked in using the ${sourceLabel}.`,
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkin",
+        source: checkInSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     res.json({
       success: true,
@@ -2142,6 +2185,11 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
 app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
+    const checkOutSource = String(req.body?.source || "mobile_app")
+      .trim()
+      .toLowerCase();
+    const sourceLabel =
+      checkOutSource === "visitor_dashboard" ? "visitor dashboard" : "mobile app";
 
     if (!visitor) {
       return res.status(404).json({
@@ -2150,15 +2198,28 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       });
     }
 
-    visitor.status = "checked_out";
-    visitor.checkedOutAt = new Date();
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been checked out.",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "You must be checked in before you can check out.",
+      });
+    }
+
+    visitor.markCheckedOut(req.user._id);
     await visitor.save();
 
     // Create access log
     const accessLog = new AccessLog({
       userEmail: visitor.email,
       userName: visitor.fullName,
-      location: "Mobile App",
+      location: checkOutSource === "visitor_dashboard" ? "Visitor Dashboard" : "Mobile App",
       accessType: "exit",
       activityType: "visitor_self_checkout",
       status: "granted",
@@ -2168,10 +2229,43 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       metadata: {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
+        source: checkOutSource,
       },
-      notes: "Visitor self check-out via mobile app",
+      notes: `Visitor self check-out via ${sourceLabel}`,
     });
     await accessLog.save();
+
+    await createRoleNotification({
+      title: "Visitor Checked Out",
+      message: `${visitor.fullName} checked out using the ${sourceLabel}.`,
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkout",
+        source: checkOutSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Visitor Checked Out",
+      message: `${visitor.fullName} checked out using the ${sourceLabel}.`,
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkout",
+        source: checkOutSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     res.json({
       success: true,
@@ -2272,15 +2366,11 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         email: user.email,
         phoneNumber: user.phone,
         idNumber: user.employeeId || `VIS-${Date.now().toString().slice(-6)}`,
+      });
+      visitor.queueAppointmentRequest({
         purposeOfVisit: String(purposeOfVisit).trim(),
         visitDate: new Date(finalVisitDate),
         visitTime: new Date(finalVisitTime),
-        status: "pending",
-        approvalStatus: "approved",
-        requestCategory: "appointment",
-        approvalFlow: "staff",
-        appointmentStatus: "pending",
-        appointmentRequestedAt: new Date(),
       });
       await visitor.save();
       user.visitorId = visitor._id;
@@ -2288,23 +2378,11 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     } else {
       visitor.fullName = visitor.fullName || visitorFullName;
       visitor.phoneNumber = user.phone || visitor.phoneNumber;
-      visitor.purposeOfVisit = String(purposeOfVisit).trim();
-      visitor.visitDate = new Date(finalVisitDate);
-      visitor.visitTime = new Date(finalVisitTime);
-      visitor.status = "pending";
-      visitor.requestCategory = "appointment";
-      visitor.approvalFlow = "staff";
-      visitor.appointmentStatus = "pending";
-      visitor.appointmentRequestedAt = new Date();
-      visitor.staffActionBy = null;
-      visitor.staffActionAt = null;
-      visitor.staffAdjustmentNote = "";
-      visitor.staffRejectionReason = "";
-      visitor.assignedStaff = null;
-      visitor.assignedStaffName = "";
-      if (visitor.approvalStatus !== "approved") {
-        visitor.approvalStatus = "approved";
-      }
+      visitor.queueAppointmentRequest({
+        purposeOfVisit: String(purposeOfVisit).trim(),
+        visitDate: new Date(finalVisitDate),
+        visitTime: new Date(finalVisitTime),
+      });
       await visitor.save();
     }
 
@@ -2456,17 +2534,7 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       });
     }
 
-    visitor.status = "approved";
-    visitor.approvalStatus = "approved";
-    visitor.requestCategory = "appointment";
-    visitor.approvalFlow = "staff";
-    visitor.appointmentStatus = "approved";
-    visitor.assignedStaff = req.user._id;
-    visitor.assignedStaffName = getFullName(req.user);
-    visitor.staffActionBy = req.user._id;
-    visitor.staffActionAt = new Date();
-    visitor.staffAdjustmentNote = String(req.body?.note || "").trim();
-    visitor.staffRejectionReason = "";
+    visitor.approveAppointment(req.user, req.body?.note || "");
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
@@ -2570,21 +2638,11 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       });
     }
 
-    if (finalVisitDate) {
-      visitor.visitDate = new Date(finalVisitDate);
-    }
-    visitor.visitTime = new Date(finalVisitTime);
-    visitor.status = "approved";
-    visitor.approvalStatus = "approved";
-    visitor.requestCategory = "appointment";
-    visitor.approvalFlow = "staff";
-    visitor.appointmentStatus = "adjusted";
-    visitor.assignedStaff = req.user._id;
-    visitor.assignedStaffName = getFullName(req.user);
-    visitor.staffActionBy = req.user._id;
-    visitor.staffActionAt = new Date();
-    visitor.staffAdjustmentNote = String(note || "Preferred time adjusted by staff.").trim();
-    visitor.staffRejectionReason = "";
+    visitor.adjustAppointment(req.user, {
+      visitDate: finalVisitDate ? new Date(finalVisitDate) : null,
+      visitTime: new Date(finalVisitTime),
+      note,
+    });
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
@@ -2684,15 +2742,7 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
       req.body?.reason || "Appointment request declined by staff.",
     ).trim();
 
-    visitor.status = "rejected";
-    visitor.requestCategory = "appointment";
-    visitor.approvalFlow = "staff";
-    visitor.appointmentStatus = "rejected";
-    visitor.assignedStaff = req.user._id;
-    visitor.assignedStaffName = getFullName(req.user);
-    visitor.staffActionBy = req.user._id;
-    visitor.staffActionAt = new Date();
-    visitor.staffRejectionReason = rejectionReason;
+    visitor.rejectAppointment(req.user, rejectionReason);
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
@@ -2765,7 +2815,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    if (visitor.approvalStatus !== "approved") {
+    if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
         message: "Visitor is still waiting for admin approval",
@@ -2786,9 +2836,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    visitor.status = "checked_in";
-    visitor.checkedInAt = new Date();
-    visitor.checkedInBy = req.user._id;
+    visitor.markCheckedIn(req.user._id);
     await visitor.save();
 
     const accessLog = new AccessLog({
@@ -2849,7 +2897,7 @@ app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
       });
     }
 
-    if (visitor.approvalStatus !== "approved") {
+    if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
         message: "Visitor is not approved for checkout flow",
@@ -2863,9 +2911,7 @@ app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
       });
     }
 
-    visitor.status = "checked_out";
-    visitor.checkedOutAt = new Date();
-    visitor.checkedOutBy = req.user._id;
+    visitor.markCheckedOut(req.user._id);
     await visitor.save();
 
     const accessLog = new AccessLog({
@@ -3192,6 +3238,7 @@ app.get("/api/admin/activities", authMiddleware, async (req, res) => {
       .populate("relatedUser", "firstName lastName email role department");
 
     const summary = {
+      registrationRequests: activities.filter((item) => item.activityType === "visitor_registration_request").length,
       appointmentRequests: activities.filter((item) => item.activityType === "visitor_appointment_request").length,
       staffActions: activities.filter((item) =>
         ["staff_approved_appointment", "staff_adjusted_appointment", "staff_rejected_appointment"].includes(item.activityType),
@@ -3225,6 +3272,27 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
+    const pendingRegistrationRequestsQuery = {
+      requestCategory: "registration",
+      approvalFlow: "admin",
+      approvalStatus: "pending",
+    };
+    const pendingAppointmentRequestsQuery = {
+      requestCategory: "appointment",
+      approvalFlow: "staff",
+      appointmentStatus: "pending",
+    };
+    const approvedVisitWindowsQuery = {
+      approvalStatus: "approved",
+      $or: [
+        { requestCategory: "registration" },
+        {
+          requestCategory: "appointment",
+          appointmentStatus: { $in: ["approved", "adjusted"] },
+        },
+      ],
+    };
+
     const totalUsers = await User.countDocuments();
     const activeUsers = await User.countDocuments({ status: "active" });
     const today = new Date();
@@ -3234,16 +3302,23 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
       timestamp: { $gte: today },
     });
 
-    const totalStudents = await User.countDocuments({ role: "student" });
+    const totalAdmins = await User.countDocuments({ role: "admin" });
     const totalStaff = await User.countDocuments({ role: "staff" });
-    // Fix: Count both "guard" and "security" roles for total security
     const totalSecurity = await User.countDocuments({ 
       role: { $in: ["guard", "security"] } 
     });
     const totalVisitors = await Visitor.countDocuments();
-    const pendingApprovals = await Visitor.countDocuments({
-      status: "pending",
-    });
+    const pendingRegistrationRequests = await Visitor.countDocuments(
+      pendingRegistrationRequestsQuery,
+    );
+    const pendingAppointmentRequests = await Visitor.countDocuments(
+      pendingAppointmentRequestsQuery,
+    );
+    const pendingApprovals =
+      pendingRegistrationRequests + pendingAppointmentRequests;
+    const approvedVisits = await Visitor.countDocuments(approvedVisitWindowsQuery);
+    const checkedInVisitors = await Visitor.countDocuments({ status: "checked_in" });
+    const completedVisits = await Visitor.countDocuments({ status: "checked_out" });
 
     const totalAccess = await AccessLog.countDocuments();
     const grantedAccess = await AccessLog.countDocuments({ status: "granted" });
@@ -3253,7 +3328,7 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
         : "0%";
 
     const pendingIssues =
-      (await Visitor.countDocuments({ status: "pending" })) +
+      pendingApprovals +
       (await AccessLog.countDocuments({
         status: "denied",
         timestamp: { $gte: today },
@@ -3268,12 +3343,17 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
         activeUsers,
         todayAccess,
         pendingIssues,
-        totalStudents,
+        totalAdmins,
         totalStaff,
         totalSecurity,
         totalVisitors,
         successRate,
         pendingApprovals,
+        pendingRegistrationRequests,
+        pendingAppointmentRequests,
+        approvedVisits,
+        checkedInVisitors,
+        completedVisits,
       },
     });
   } catch (error) {
@@ -3823,82 +3903,6 @@ app.get("/api/admin/security-logs", authMiddleware, async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to get security logs" });
-  }
-});
-
-// Get recent activities
-app.get("/api/admin/activities", authMiddleware, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
-    const { limit = 10 } = req.query;
-
-    // Get recent access logs
-    const accessLogs = await AccessLog.find()
-      .sort({ timestamp: -1 })
-      .limit(parseInt(limit))
-      .populate("userId", "firstName lastName email role");
-
-    const activities = accessLogs.map((log, index) => {
-      let activity = "";
-      let type = "system";
-      let severity = "info";
-
-      if (log.status === "denied") {
-        severity = "warning";
-      } else if (log.status === "granted") {
-        severity = "success";
-      }
-
-      if (log.userId) {
-        const userName =
-          `${log.userId.firstName || ""} ${log.userId.lastName || ""}`.trim() ||
-          "Unknown";
-        activity = `${userName} ${log.status} access at ${log.location || "unknown location"}`;
-        type = log.userId.role || "user";
-      } else {
-        activity = `${log.status} access attempt at ${log.location || "unknown location"}`;
-      }
-
-      const timeDiff = Date.now() - new Date(log.timestamp).getTime();
-      let timeAgo = "";
-
-      if (timeDiff < 60000) {
-        timeAgo = "Just now";
-      } else if (timeDiff < 3600000) {
-        const mins = Math.floor(timeDiff / 60000);
-        timeAgo = `${mins} min${mins > 1 ? "s" : ""} ago`;
-      } else if (timeDiff < 86400000) {
-        const hours = Math.floor(timeDiff / 3600000);
-        timeAgo = `${hours} hour${hours > 1 ? "s" : ""} ago`;
-      } else {
-        const days = Math.floor(timeDiff / 86400000);
-        timeAgo = `${days} day${days > 1 ? "s" : ""} ago`;
-      }
-
-      return {
-        id: index + 1,
-        text: activity,
-        time: timeAgo,
-        type,
-        severity,
-        userId: log.userId?._id,
-        location: log.location,
-        timestamp: log.timestamp,
-      };
-    });
-
-    res.json({
-      success: true,
-      activities,
-    });
-  } catch (error) {
-    console.error("Get recent activities error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to get activities" });
   }
 });
 

@@ -1,33 +1,85 @@
 // utils/printUtils.js
 import * as Print from "expo-print";
 import { shareAsync } from "expo-sharing";
-import { Platform } from "react-native";
+import { Image, Platform } from "react-native";
 import { getPrintHTML } from "../styles/PrintStyles";
+
+const toAbsoluteAssetUrl = (uri) => {
+  if (!uri) return "";
+  if (/^data:/i.test(uri) || /^https?:/i.test(uri)) return uri;
+  if (typeof window !== "undefined" && window.location?.origin) {
+    try {
+      return new URL(uri, window.location.origin).href;
+    } catch (error) {
+      return uri;
+    }
+  }
+  return uri;
+};
+
+const getSchoolLogoSource = () => {
+  try {
+    const assetModule = require("../assets/LogoSapphire.jpg");
+
+    if (typeof assetModule === "string") {
+      return toAbsoluteAssetUrl(assetModule);
+    }
+
+    if (assetModule?.uri) {
+      return toAbsoluteAssetUrl(assetModule.uri);
+    }
+
+    return toAbsoluteAssetUrl(
+      Image.resolveAssetSource(assetModule)?.uri || "",
+    );
+  } catch (error) {
+    console.warn("Unable to resolve school logo for print:", error);
+    return "";
+  }
+};
+
+const convertAssetToDataUrl = async (assetUri) => {
+  if (!assetUri || Platform.OS !== "web" || typeof fetch === "undefined") {
+    return assetUri;
+  }
+
+  try {
+    const response = await fetch(assetUri);
+    const blob = await response.blob();
+
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result || assetUri);
+      reader.onerror = () => reject(new Error("Failed to convert logo to data URL."));
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.warn("Unable to convert print logo to embedded data URL:", error);
+    return assetUri;
+  }
+};
 
 export const printUserList = async (users, title, activeMenu) => {
   if (!users || users.length === 0) {
     throw new Error("No users to print");
   }
 
-  const htmlContent = getPrintHTML(users, title, activeMenu);
+  const schoolLogoSource = await convertAssetToDataUrl(getSchoolLogoSource());
+  const htmlContent = getPrintHTML(users, title, activeMenu, schoolLogoSource);
 
   try {
-    const { uri } = await Print.printToFileAsync({
-      html: htmlContent,
-      base64: false,
-    });
-
-    if (Platform.OS !== "web") {
+    if (Platform.OS === "web") {
+      await printUserListWeb(users, title, activeMenu);
+    } else {
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+      });
       await shareAsync(uri, {
         mimeType: "application/pdf",
         dialogTitle: "Print Users List",
         UTI: "com.adobe.pdf",
       });
-    } else {
-      const printWindow = window.open();
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.print();
     }
     
     return { success: true };
@@ -38,97 +90,96 @@ export const printUserList = async (users, title, activeMenu) => {
 };
 
 // Web-only fallback print function
-export const printUserListWeb = (users, title, activeMenu) => {
+export const printUserListWeb = async (users, title, activeMenu) => {
   if (!users || users.length === 0) {
     throw new Error("No users to print");
   }
 
-  const htmlContent = getPrintHTML(users, title, activeMenu);
-  
-  const printWindow = window.open("", "_blank");
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>${title} - Sapphire Aviation</title>
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-          padding: 20px;
-          background: white;
-        }
-        .print-header {
-          text-align: center;
-          margin-bottom: 20px;
-          padding-bottom: 10px;
-          border-bottom: 2px solid #3B82F6;
-        }
-        .print-header h2 {
-          color: #1E3A5F;
-          font-size: 18px;
-          margin-bottom: 4px;
-        }
-        .print-header p {
-          color: #64748B;
-          font-size: 11px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 12px;
-        }
-        th {
-          background: #F1F5F9;
-          color: #1E293B;
-          padding: 10px 8px;
-          text-align: left;
-          font-weight: 600;
-          border-bottom: 2px solid #E2E8F0;
-        }
-        td {
-          padding: 8px;
-          border-bottom: 1px solid #E2E8F0;
-        }
-        .role-badge {
-          display: inline-block;
-          padding: 2px 8px;
-          border-radius: 10px;
-          font-size: 10px;
-          font-weight: 600;
-        }
-        .role-admin { background: #EFF6FF; color: #3B82F6; }
-        .role-staff { background: #D1FAE5; color: #10B981; }
-        .role-guard { background: #FEF3C7; color: #F59E0B; }
-        .role-visitor { background: #EDE9FE; color: #8B5CF6; }
-        .status-active { color: #10B981; font-weight: 600; }
-        .status-inactive { color: #EF4444; font-weight: 600; }
-        .print-footer {
-          margin-top: 20px;
-          text-align: center;
-          font-size: 10px;
-          color: #94A3B8;
-          padding-top: 10px;
-          border-top: 1px solid #E2E8F0;
-        }
-        @media print {
-          body { padding: 10px; }
-        }
-      </style>
-    </head>
-    <body>
-      ${htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i)[1]}
-    </body>
-    </html>
-  `);
-  printWindow.document.close();
-  
-  printWindow.onload = () => {
-    printWindow.print();
-    setTimeout(() => printWindow.close(), 500);
+  if (typeof document === "undefined") {
+    throw new Error("Print preview is only available in a browser.");
+  }
+
+  const startPrintPreview = async () => {
+    const schoolLogoSource = await convertAssetToDataUrl(getSchoolLogoSource());
+    const htmlContent = getPrintHTML(users, title, activeMenu, schoolLogoSource);
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.setAttribute("aria-hidden", "true");
+
+    document.body.appendChild(iframe);
+
+    const frameDocument =
+      iframe.contentWindow?.document || iframe.contentDocument || null;
+
+    if (!frameDocument) {
+      document.body.removeChild(iframe);
+      throw new Error("Unable to create print preview.");
+    }
+
+    frameDocument.open();
+    frameDocument.write(htmlContent);
+    frameDocument.close();
+
+  const cleanup = () => {
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }, 1200);
   };
+
+    let hasPrinted = false;
+    const triggerPrint = () => {
+      if (hasPrinted) return;
+      hasPrinted = true;
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      cleanup();
+    };
+
+    const waitForImagesThenPrint = () => {
+      const images = Array.from(frameDocument.images || []);
+      const pendingImages = images.filter((image) => !image.complete);
+
+      if (pendingImages.length === 0) {
+        triggerPrint();
+        return;
+      }
+
+      let remaining = pendingImages.length;
+      const finish = () => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          triggerPrint();
+        }
+      };
+
+      pendingImages.forEach((image) => {
+        image.addEventListener("load", finish, { once: true });
+        image.addEventListener("error", finish, { once: true });
+      });
+
+      setTimeout(() => {
+        if (remaining > 0) {
+          triggerPrint();
+        }
+      }, 1500);
+    };
+
+    iframe.onload = () => {
+      waitForImagesThenPrint();
+    };
+
+    if (frameDocument.readyState === "complete") {
+      waitForImagesThenPrint();
+    }
+  };
+
+  return startPrintPreview();
 };

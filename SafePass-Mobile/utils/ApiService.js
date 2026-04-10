@@ -4,12 +4,17 @@ let AsyncStorage;
 if (Platform.OS === 'web') {
   AsyncStorage = require('./webStorage').default;
 } else {
-  AsyncStorage = require('@react-native-async-storage/async-storage');
+  AsyncStorage = require('@react-native-async-storage/async-storage').default;
 }
 import * as ImageManipulator from 'expo-image-manipulator';
 
 const WEB_FALLBACK_API_BASE_URL = (() => {
-  if (typeof window === "undefined") {
+  if (
+    typeof window === "undefined" ||
+    !window.location ||
+    !window.location.protocol ||
+    !window.location.hostname
+  ) {
     return "http://localhost:5000/api";
   }
 
@@ -713,10 +718,11 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async visitorCheckIn(visitorId) {
+  async visitorCheckIn(visitorId, payload = {}) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/self-checkin`, {
         method: "PUT",
+        body: payload,
       });
       return response;
     } catch (error) {
@@ -725,10 +731,11 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async visitorCheckOut(visitorId) {
+  async visitorCheckOut(visitorId, payload = {}) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/self-checkout`, {
         method: "PUT",
+        body: payload,
       });
       return response;
     } catch (error) {
