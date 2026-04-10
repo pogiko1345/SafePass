@@ -4,10 +4,33 @@ import { shareAsync } from "expo-sharing";
 import { Image, Platform } from "react-native";
 import { getPrintHTML } from "../styles/PrintStyles";
 
+const toAbsoluteAssetUrl = (uri) => {
+  if (!uri) return "";
+  if (/^data:/i.test(uri) || /^https?:/i.test(uri)) return uri;
+  if (typeof window !== "undefined" && window.location?.origin) {
+    try {
+      return new URL(uri, window.location.origin).href;
+    } catch (error) {
+      return uri;
+    }
+  }
+  return uri;
+};
+
 const getSchoolLogoSource = () => {
   try {
-    return (
-      Image.resolveAssetSource(require("../assets/LogoSapphire.jpg"))?.uri || ""
+    const assetModule = require("../assets/LogoSapphire.jpg");
+
+    if (typeof assetModule === "string") {
+      return toAbsoluteAssetUrl(assetModule);
+    }
+
+    if (assetModule?.uri) {
+      return toAbsoluteAssetUrl(assetModule.uri);
+    }
+
+    return toAbsoluteAssetUrl(
+      Image.resolveAssetSource(assetModule)?.uri || "",
     );
   } catch (error) {
     console.warn("Unable to resolve school logo for print:", error);
@@ -103,15 +126,18 @@ export const printUserListWeb = async (users, title, activeMenu) => {
     frameDocument.write(htmlContent);
     frameDocument.close();
 
-    const cleanup = () => {
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1200);
-    };
+  const cleanup = () => {
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }, 1200);
+  };
 
+    let hasPrinted = false;
     const triggerPrint = () => {
+      if (hasPrinted) return;
+      hasPrinted = true;
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
       cleanup();

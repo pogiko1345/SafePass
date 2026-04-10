@@ -36,15 +36,24 @@ import RoleSelectScreen from "./screens/RoleSelectScreen";
 
 import ApiService from "./utils/ApiService";
 import { getDashboardRoute, isRecognizedRole, normalizeRole } from "./utils/authFlow";
+import {
+  APP_DISPLAY_NAME,
+  APP_ORGANIZATION_NAME,
+  IS_VISITOR_ONLY_APP,
+  getVariantBlockedRoleMessage,
+  getVariantInitialRoute,
+  getVisitorBuildNavigationParams,
+  isRoleAllowedInCurrentVariant,
+} from "./utils/appVariant";
 
 const Storage = Platform.OS === "web"
   ? require("./utils/webStorage").default
-  : require("@react-native-async-storage/async-storage");
+  : require("@react-native-async-storage/async-storage").default;
 
 
 const Stack = createNativeStackNavigator();
-const APP_NAME = "SafePass";
-const APP_ORGANIZATION = "Sapphire International Aviation Academy";
+const APP_NAME = APP_DISPLAY_NAME;
+const APP_ORGANIZATION = APP_ORGANIZATION_NAME;
 const WEB_ROUTE_TITLES = {
   RoleSelect: `Access Portal | ${APP_ORGANIZATION}`,
   Login: `Login | ${APP_ORGANIZATION}`,
@@ -123,10 +132,14 @@ export default function App() {
 
         const normalizedRole = normalizeRole(user.role);
         const normalizedUser = { ...user, role: normalizedRole };
-        if (isRecognizedRole(normalizedRole)) {
+        if (isRecognizedRole(normalizedRole) && isRoleAllowedInCurrentVariant(normalizedRole)) {
           setCurrentUser(normalizedUser);
         } else {
-          console.log("Invalid user role detected:", user.role);
+          console.log("User role is not available in this app build:", user.role);
+          if (normalizedRole && !isRoleAllowedInCurrentVariant(normalizedRole)) {
+            console.log(getVariantBlockedRoleMessage(normalizedRole));
+          }
+          await ApiService.clearAuth();
           setCurrentUser(null);
         }
       } else {
@@ -226,9 +239,9 @@ export default function App() {
     );
   }
 
-  let initialRoute = "RoleSelect";
+  let initialRoute = getVariantInitialRoute({ currentUser: null, isNewRegistration });
   if (!isNewRegistration && currentUser) {
-    initialRoute = getDashboardRoute(currentUser);
+    initialRoute = IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(currentUser);
   }
   
   console.log("App.js initialRoute:", initialRoute);
@@ -250,8 +263,21 @@ export default function App() {
         }}
       >
         {/* Auth & Role Selection */}
-        <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
+        {!IS_VISITOR_ONLY_APP && <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />}
+        <Stack.Screen name="Login">
+          {(props) => (
+            <LoginScreen
+              {...props}
+              route={{
+                ...props.route,
+                params: {
+                  ...(props.route?.params || {}),
+                  ...(IS_VISITOR_ONLY_APP ? getVisitorBuildNavigationParams() : {}),
+                },
+              }}
+            />
+          )}
+        </Stack.Screen>
         <Stack.Screen name="VisitorRegister" component={VisitorRegisterScreen} />
         <Stack.Screen name="Verification" component={VerificationScreen} />
         
@@ -259,15 +285,21 @@ export default function App() {
         <Stack.Screen name="Help" component={HelpScreen} />
         
         {/* Dashboard Screens */}
-        <Stack.Screen name="AdminDashboard">
-          {(props) => <AdminDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}
-        </Stack.Screen>
-        <Stack.Screen name="StaffDashboard">
-          {(props) => <StaffDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}
-        </Stack.Screen>
-        <Stack.Screen name="SecurityDashboard">
-          {(props) => <SecurityDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}
-        </Stack.Screen>
+        {!IS_VISITOR_ONLY_APP && (
+          <Stack.Screen name="AdminDashboard">
+            {(props) => <AdminDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}
+          </Stack.Screen>
+        )}
+        {!IS_VISITOR_ONLY_APP && (
+          <Stack.Screen name="StaffDashboard">
+            {(props) => <StaffDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}
+          </Stack.Screen>
+        )}
+        {!IS_VISITOR_ONLY_APP && (
+          <Stack.Screen name="SecurityDashboard">
+            {(props) => <SecurityDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}
+          </Stack.Screen>
+        )}
         <Stack.Screen name="VisitorDashboard">
           {(props) => <VisitorDashboardScreen {...props} onLogout={() => setCurrentUser(null)} />}
         </Stack.Screen>
@@ -284,11 +316,11 @@ export default function App() {
         <Stack.Screen name="NFCScan" component={NFCScanScreen} />
         
         {/* Admin Management Screens */}
-        <Stack.Screen name="VisitorManagement" component={VisitorManagementScreen} />
-        <Stack.Screen name="NFCManagement" component={NFCManagementScreen} />
-        <Stack.Screen name="Reports" component={ReportsScreen} />
-        <Stack.Screen name="SecurityLogs" component={SecurityLogsScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
+        {!IS_VISITOR_ONLY_APP && <Stack.Screen name="VisitorManagement" component={VisitorManagementScreen} />}
+        {!IS_VISITOR_ONLY_APP && <Stack.Screen name="NFCManagement" component={NFCManagementScreen} />}
+        {!IS_VISITOR_ONLY_APP && <Stack.Screen name="Reports" component={ReportsScreen} />}
+        {!IS_VISITOR_ONLY_APP && <Stack.Screen name="SecurityLogs" component={SecurityLogsScreen} />}
+        {!IS_VISITOR_ONLY_APP && <Stack.Screen name="Settings" component={SettingsScreen} />}
       </Stack.Navigator>
     </NavigationContainer>
   );

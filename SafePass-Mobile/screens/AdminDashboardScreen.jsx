@@ -27,7 +27,7 @@ import styles from "../styles/AdminDashboardStyles";
 const { width, height } = Dimensions.get("window");
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
-  : require("@react-native-async-storage/async-storage");
+  : require("@react-native-async-storage/async-storage").default;
 
 const storageGetItem = async (key) => {
   if (Storage && typeof Storage.getItem === "function") {

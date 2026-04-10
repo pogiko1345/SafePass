@@ -12,7 +12,6 @@ import {
   StatusBar,
   Alert,
   Modal,
-  Dimensions,
   Vibration,
   TextInput,
   useWindowDimensions,
@@ -34,8 +33,6 @@ if (Platform.OS !== "web") {
   }
 }
 
-const { width } = Dimensions.get("window");
-const isSmallPhone = width <= 375;
 const APPOINTMENT_PURPOSE_OPTIONS = [
   "Campus Tour",
   "Meeting",
@@ -62,6 +59,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isWideVisitorDashboard = viewportWidth >= 960;
   const isTabletVisitorDashboard = viewportWidth >= 680;
+  const isCompactVisitorDashboard = viewportWidth <= 420;
+  const dashboardHorizontalGutter = isCompactVisitorDashboard ? 12 : viewportWidth <= 680 ? 16 : 20;
+  const dashboardCardPadding = isCompactVisitorDashboard ? 16 : 22;
   const [visitor, setVisitor] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [appointmentFeedback, setAppointmentFeedback] = useState(null);
@@ -104,12 +104,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     : isTabletVisitorDashboard
       ? "48.5%"
       : "100%";
+  const compactCommandMetricCardWidth = viewportWidth <= 560 ? "100%" : commandMetricCardWidth;
   const approvedFactCardWidth = isWideVisitorDashboard
     ? "31.8%"
     : isTabletVisitorDashboard
       ? "48.5%"
       : "100%";
   const approvedActionCardWidth = isTabletVisitorDashboard ? "48.5%" : "100%";
+  const compactApprovedActionCardWidth = viewportWidth <= 560 ? "100%" : approvedActionCardWidth;
   const appointmentTimeOptions = useMemo(() => {
     const options = [];
     for (let hour = 7; hour <= 18; hour += 1) {
@@ -121,6 +123,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
     return options;
   }, []);
+  const dashboardShellResponsiveStyle = {
+    paddingHorizontal: dashboardHorizontalGutter,
+    paddingBottom: isCompactVisitorDashboard ? 24 : 16,
+  };
+  const dashboardCardResponsiveStyle = {
+    marginHorizontal: 0,
+    padding: dashboardCardPadding,
+  };
+  const dashboardHeroCardResponsiveStyle = {
+    marginHorizontal: 0,
+  };
+  const dashboardSectionResponsiveStyle = {
+    marginHorizontal: 0,
+  };
+  const commandActionRowResponsiveStyle = viewportWidth <= 560 ? { gap: 10 } : null;
+  const commandActionButtonResponsiveStyle = viewportWidth <= 560 ? { width: "100%" } : null;
+  const approvedSectionHeaderResponsiveStyle = viewportWidth <= 560
+    ? { marginBottom: 12 }
+    : null;
 
   useEffect(() => {
     loadVisitorData();
@@ -1128,8 +1149,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#4F46E5"]} />
         }
       >
-        <View style={[visitorDashboardStyles.dashboardShell, isWideVisitorDashboard && visitorDashboardStyles.dashboardShellWide]}>
-          <View style={visitorDashboardStyles.commandDeckCard}>
+        <View
+          style={[
+            visitorDashboardStyles.dashboardShell,
+            isWideVisitorDashboard && visitorDashboardStyles.dashboardShellWide,
+            dashboardShellResponsiveStyle,
+          ]}
+        >
+          <View style={[visitorDashboardStyles.commandDeckCard, dashboardCardResponsiveStyle]}>
             <View style={[visitorDashboardStyles.commandDeckHeader, isWideVisitorDashboard && visitorDashboardStyles.commandDeckHeaderWide]}>
               <View style={visitorDashboardStyles.commandDeckTitleWrap}>
                 <Text style={visitorDashboardStyles.commandDeckEyebrow}>Visit Command</Text>
@@ -1148,7 +1175,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               {commandMetrics.map((item) => (
                 <View
                   key={item.label}
-                  style={[visitorDashboardStyles.commandMetricCard, { width: commandMetricCardWidth }]}
+                  style={[
+                    visitorDashboardStyles.commandMetricCard,
+                    { width: compactCommandMetricCardWidth },
+                  ]}
                 >
                   <View style={visitorDashboardStyles.commandMetricIcon}>
                     <Ionicons name={item.icon} size={16} color="#4F46E5" />
@@ -1162,9 +1192,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </View>
 
             {(isApprovedVisitor || canRequestNewAppointment || canCreateFreshAppointment) ? (
-              <View style={visitorDashboardStyles.commandActionRow}>
+              <View
+                style={[
+                  visitorDashboardStyles.commandActionRow,
+                  commandActionRowResponsiveStyle,
+                ]}
+              >
                 <TouchableOpacity
-                  style={visitorDashboardStyles.commandPrimaryButton}
+                  style={[
+                    visitorDashboardStyles.commandPrimaryButton,
+                    commandActionButtonResponsiveStyle,
+                  ]}
                   onPress={isApprovedVisitor ? openAppointmentModal : openAppointmentModal}
                   activeOpacity={0.9}
                 >
@@ -1176,7 +1214,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
                 {isApprovedVisitor ? (
                   <TouchableOpacity
-                    style={visitorDashboardStyles.commandSecondaryButton}
+                    style={[
+                      visitorDashboardStyles.commandSecondaryButton,
+                      commandActionButtonResponsiveStyle,
+                    ]}
                     onPress={() => setShowQRModal(true)}
                     activeOpacity={0.9}
                   >
@@ -1191,7 +1232,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         {visitor ? (
           isPendingApproval ? (
             <>
-              <View style={visitorDashboardStyles.pendingApprovalCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.pendingApprovalCard,
+                  dashboardHeroCardResponsiveStyle,
+                ]}
+              >
                 <LinearGradient
                   colors={['#F59E0B', '#D97706']}
                   style={visitorDashboardStyles.pendingApprovalGradient}
@@ -1234,7 +1280,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </LinearGradient>
               </View>
 
-              <View style={visitorDashboardStyles.pendingStepsCard}>
+              <View style={[visitorDashboardStyles.pendingStepsCard, dashboardSectionResponsiveStyle]}>
                 <Text style={visitorDashboardStyles.pendingStepsTitle}>What happens next?</Text>
                 {[
                   "Your registration has already been sent to the admin for review.",
@@ -1252,7 +1298,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           ) : isPendingStaffReview ? (
             <>
               {appointmentFeedback ? (
-                <View style={visitorDashboardStyles.appointmentSuccessCard}>
+                <View
+                  style={[
+                    visitorDashboardStyles.appointmentSuccessCard,
+                    dashboardSectionResponsiveStyle,
+                  ]}
+                >
                   <View style={visitorDashboardStyles.appointmentSuccessHeader}>
                     <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
                       <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
@@ -1278,7 +1329,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               ) : null}
 
-              <View style={visitorDashboardStyles.pendingApprovalCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.pendingApprovalCard,
+                  dashboardHeroCardResponsiveStyle,
+                ]}
+              >
                 <LinearGradient
                   colors={["#2563EB", "#1D4ED8"]}
                   style={visitorDashboardStyles.pendingApprovalGradient}
@@ -1317,7 +1373,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </LinearGradient>
               </View>
 
-              <View style={visitorDashboardStyles.pendingStepsCard}>
+              <View style={[visitorDashboardStyles.pendingStepsCard, dashboardSectionResponsiveStyle]}>
                 <Text style={visitorDashboardStyles.pendingStepsTitle}>What happens next?</Text>
                 {[
                   "Staff will review your preferred date, time, and visit purpose.",
@@ -1334,7 +1390,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </>
           ) : isApprovedVisitor ? (
             <>
-              <View style={visitorDashboardStyles.approvedHeroCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.approvedHeroCard,
+                  dashboardHeroCardResponsiveStyle,
+                ]}
+              >
                 <LinearGradient
                   colors={["#0F766E", "#0EA5A4", "#2563EB"]}
                   start={{ x: 0, y: 0 }}
@@ -1398,8 +1459,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </LinearGradient>
               </View>
 
-              <View style={visitorDashboardStyles.approvedActionSection}>
-                <View style={visitorDashboardStyles.approvedSectionHeader}>
+              <View
+                style={[
+                  visitorDashboardStyles.approvedActionSection,
+                  dashboardSectionResponsiveStyle,
+                ]}
+              >
+                <View
+                  style={[
+                    visitorDashboardStyles.approvedSectionHeader,
+                    approvedSectionHeaderResponsiveStyle,
+                  ]}
+                >
                   <Text style={visitorDashboardStyles.approvedSectionTitle}>
                     Access Tools
                   </Text>
@@ -1472,7 +1543,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[visitorDashboardStyles.approvedActionCard, { width: approvedActionCardWidth }]}
+                    style={[
+                      visitorDashboardStyles.approvedActionCard,
+                      { width: compactApprovedActionCardWidth },
+                    ]}
                     onPress={isNfcReading ? stopNfcReading : startNfcReading}
                     activeOpacity={0.9}
                   >
@@ -1495,7 +1569,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[visitorDashboardStyles.approvedActionCard, { width: approvedActionCardWidth }]}
+                    style={[
+                      visitorDashboardStyles.approvedActionCard,
+                      { width: compactApprovedActionCardWidth },
+                    ]}
                     onPress={handleCheckInAction}
                     activeOpacity={0.9}
                   >
@@ -1545,8 +1622,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 )}
               </View>
 
-              <View style={visitorDashboardStyles.approvedInfoCard}>
-                <View style={visitorDashboardStyles.approvedSectionHeader}>
+              <View
+                style={[
+                  visitorDashboardStyles.approvedInfoCard,
+                  dashboardSectionResponsiveStyle,
+                  { padding: dashboardCardPadding },
+                ]}
+              >
+                <View
+                  style={[
+                    visitorDashboardStyles.approvedSectionHeader,
+                    approvedSectionHeaderResponsiveStyle,
+                  ]}
+                >
                   <Text style={visitorDashboardStyles.approvedSectionTitle}>
                     Visit Snapshot
                   </Text>
@@ -1585,7 +1673,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               </View>
 
-              <View style={visitorDashboardStyles.reappointmentCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.reappointmentCard,
+                  dashboardSectionResponsiveStyle,
+                  { padding: dashboardCardPadding },
+                ]}
+              >
                 <View style={visitorDashboardStyles.reappointmentCardHeader}>
                   <View>
                     <Text style={visitorDashboardStyles.reappointmentCardTitle}>
@@ -1799,7 +1893,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </LinearGradient>
               </View>
 
-              <View style={visitorDashboardStyles.reappointmentCard}>
+              <View
+                style={[
+                  visitorDashboardStyles.reappointmentCard,
+                  dashboardSectionResponsiveStyle,
+                  { padding: dashboardCardPadding },
+                ]}
+              >
                 <View style={visitorDashboardStyles.reappointmentCardHeader}>
                   <View>
                     <Text style={visitorDashboardStyles.reappointmentCardTitle}>New Appointment Request</Text>

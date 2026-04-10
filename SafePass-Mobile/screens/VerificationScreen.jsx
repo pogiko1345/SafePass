@@ -19,11 +19,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import ApiService from "../utils/ApiService";
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
+import {
+  IS_VISITOR_ONLY_APP,
+  getVariantBlockedRoleMessage,
+  isRoleAllowedInCurrentVariant,
+} from "../utils/appVariant";
 import verificationStyles from "../styles/VerificationStyles";
 
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
-  : require("@react-native-async-storage/async-storage");
+  : require("@react-native-async-storage/async-storage").default;
 
 // Helper function to safely store data
 const storeData = async (key, value) => {
@@ -289,6 +294,22 @@ export default function VerificationScreen({ navigation, route }) {
       
       const userRole = normalizeRole(finalUser.role) || "visitor";
 
+      if (!isRoleAllowedInCurrentVariant(userRole)) {
+        await ApiService.clearAuth();
+        await Storage.removeItem("currentUser");
+        Alert.alert("Visitor App Only", getVariantBlockedRoleMessage(userRole), [
+          {
+            text: "Back to Login",
+            onPress: () =>
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              }),
+          },
+        ]);
+        return;
+      }
+
       // Store user data
       await storeData("currentUser", JSON.stringify({ ...finalUser, role: userRole }));
       console.log("✅ User data stored");
@@ -305,7 +326,7 @@ export default function VerificationScreen({ navigation, route }) {
       // Clear new registration flag
       await Storage.removeItem("isNewRegistration");
       
-      const dashboardRoute = getDashboardRoute(userRole);
+      const dashboardRoute = IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(userRole);
       
       console.log('✅ Verification complete - Navigating to:', dashboardRoute, 'Role:', userRole);
       
