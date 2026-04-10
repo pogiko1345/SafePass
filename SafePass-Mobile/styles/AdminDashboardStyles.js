@@ -338,6 +338,94 @@ export default StyleSheet.create({
     marginBottom: 18,
   },
 
+  adminSectionShell: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 18,
+  },
+
+  adminSectionShellHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 18,
+    flexWrap: "wrap",
+  },
+
+  adminSectionShellCopy: {
+    flex: 1,
+    minWidth: 220,
+  },
+
+  adminSectionShellTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+
+  adminSectionShellBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+
+  adminSectionShellBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+
+  adminSectionShellActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  adminFeedbackBanner: {
+    marginHorizontal: 22,
+    marginTop: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  adminFeedbackAccent: {
+    width: 4,
+    alignSelf: "stretch",
+    borderRadius: 999,
+  },
+
+  adminFeedbackCopy: {
+    flex: 1,
+  },
+
+  adminFeedbackTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 2,
+  },
+
+  adminFeedbackMessage: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  adminFeedbackDismiss: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   pageTitle: {
     fontSize: 25,
     fontWeight: "800",

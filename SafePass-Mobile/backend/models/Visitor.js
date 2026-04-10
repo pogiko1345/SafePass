@@ -1,5 +1,44 @@
 const mongoose = require('mongoose');
 
+const APPOINTMENT_APPROVED_STATUSES = ["approved", "adjusted"];
+
+const deriveVisitProgressStatus = (visitor) => {
+  if (visitor.checkedOutAt) {
+    return "checked_out";
+  }
+
+  if (visitor.checkedInAt) {
+    return "checked_in";
+  }
+
+  if (
+    visitor.approvalStatus === "rejected" ||
+    visitor.appointmentStatus === "rejected"
+  ) {
+    return "rejected";
+  }
+
+  if (visitor.requestCategory === "appointment") {
+    if (APPOINTMENT_APPROVED_STATUSES.includes(visitor.appointmentStatus)) {
+      return "approved";
+    }
+
+    if (visitor.appointmentStatus === "pending") {
+      return "pending";
+    }
+  }
+
+  if (visitor.approvalStatus === "approved") {
+    return "approved";
+  }
+
+  if (visitor.approvalStatus === "pending") {
+    return "pending";
+  }
+
+  return visitor.status || "pending";
+};
+
 const visitorSchema = new mongoose.Schema({
   // ============ Personal Information ============
   fullName: { 
@@ -253,40 +292,226 @@ visitorSchema.virtual('visitDateTime').get(function() {
   return new Date(Math.max(date, time));
 });
 
+visitorSchema.virtual("workflowState").get(function () {
+  return deriveVisitProgressStatus(this);
+});
+
 // ============ Methods ============
 visitorSchema.methods = {
-  // Approve visitor
-  async approve(adminId, notes = '') {
-    this.approvalStatus = 'approved';
-    this.status = 'approved';
+  syncWorkflowState() {
+    const category = this.requestCategory === "appointment" ? "appointment" : "registration";
+    this.requestCategory = category;
+    this.approvalFlow = category === "appointment" ? "staff" : "admin";
+
+    if (category === "registration") {
+      this.appointmentStatus = "not_requested";
+      this.appointmentRequestedAt = null;
+      this.assignedStaff = null;
+      this.assignedStaffName = "";
+      this.staffActionBy = null;
+      this.staffActionAt = null;
+      this.staffAdjustmentNote = "";
+      this.staffRejectionReason = "";
+    } else {
+      if (this.approvalStatus !== "approved") {
+        this.approvalStatus = "approved";
+      }
+      if (!this.appointmentStatus || this.appointmentStatus === "not_requested") {
+        this.appointmentStatus = "pending";
+      }
+      this.appointmentRequestedAt =
+        this.appointmentRequestedAt || this.registeredAt || new Date();
+    }
+
+    this.status = deriveVisitProgressStatus(this);
+    return this.status;
+  },
+
+  hasApprovedVisitWindow() {
+    const category = this.requestCategory === "appointment" ? "appointment" : "registration";
+
+    if (category === "appointment") {
+      return (
+        this.approvalStatus === "approved" &&
+        APPOINTMENT_APPROVED_STATUSES.includes(this.appointmentStatus)
+      );
+    }
+
+    return this.approvalStatus === "approved";
+  },
+
+  markRegistrationPending() {
+    this.requestCategory = "registration";
+    this.approvalFlow = "admin";
+    this.approvalStatus = "pending";
+    this.approvedBy = null;
+    this.approvedAt = null;
+    this.rejectionReason = null;
+    this.adminNotes = null;
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  approveRegistration(adminId, notes = "") {
+    this.requestCategory = "registration";
+    this.approvalFlow = "admin";
+    this.approvalStatus = "approved";
     this.approvedBy = adminId;
     this.approvedAt = new Date();
-    if (notes) this.adminNotes = notes;
-    return this.save();
+    this.rejectionReason = null;
+    this.adminNotes = notes || "";
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
   },
-  
-  // Reject visitor
-  async reject(adminId, reason = '') {
-    this.approvalStatus = 'rejected';
-    this.status = 'rejected';
+
+  rejectRegistration(adminId, reason = "") {
+    this.requestCategory = "registration";
+    this.approvalFlow = "admin";
+    this.approvalStatus = "rejected";
     this.approvedBy = adminId;
-    this.rejectionReason = reason;
-    return this.save();
+    this.approvedAt = new Date();
+    this.rejectionReason = reason || "No reason provided";
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
   },
-  
-  // Check in
-  async checkIn(securityId) {
-    this.status = 'checked_in';
+
+  queueAppointmentRequest({ visitDate, visitTime, purposeOfVisit }) {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    this.visitDate = visitDate;
+    this.visitTime = visitTime;
+    this.purposeOfVisit = purposeOfVisit;
+    this.appointmentStatus = "pending";
+    this.appointmentRequestedAt = new Date();
+    this.staffActionBy = null;
+    this.staffActionAt = null;
+    this.staffAdjustmentNote = "";
+    this.staffRejectionReason = "";
+    this.assignedStaff = null;
+    this.assignedStaffName = "";
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  approveAppointment(staffUser, note = "") {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    this.appointmentStatus = "approved";
+    this.assignedStaff = staffUser?._id || null;
+    this.assignedStaffName = staffUser
+      ? `${staffUser.firstName || ""} ${staffUser.lastName || ""}`.trim()
+      : this.assignedStaffName;
+    this.staffActionBy = staffUser?._id || null;
+    this.staffActionAt = new Date();
+    this.staffAdjustmentNote = String(note || "").trim();
+    this.staffRejectionReason = "";
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  adjustAppointment(staffUser, { visitDate, visitTime, note = "" } = {}) {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    if (visitDate) {
+      this.visitDate = visitDate;
+    }
+    if (visitTime) {
+      this.visitTime = visitTime;
+    }
+    this.appointmentStatus = "adjusted";
+    this.assignedStaff = staffUser?._id || null;
+    this.assignedStaffName = staffUser
+      ? `${staffUser.firstName || ""} ${staffUser.lastName || ""}`.trim()
+      : this.assignedStaffName;
+    this.staffActionBy = staffUser?._id || null;
+    this.staffActionAt = new Date();
+    this.staffAdjustmentNote = String(note || "Preferred time adjusted by staff.").trim();
+    this.staffRejectionReason = "";
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  rejectAppointment(staffUser, reason = "") {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    this.appointmentStatus = "rejected";
+    this.assignedStaff = staffUser?._id || null;
+    this.assignedStaffName = staffUser
+      ? `${staffUser.firstName || ""} ${staffUser.lastName || ""}`.trim()
+      : this.assignedStaffName;
+    this.staffActionBy = staffUser?._id || null;
+    this.staffActionAt = new Date();
+    this.staffRejectionReason = String(reason || "Appointment request declined by staff.").trim();
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  markCheckedIn(actorId) {
     this.checkedInAt = new Date();
-    this.checkedInBy = securityId;
+    this.checkedInBy = actorId || null;
+    this.checkedOutAt = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  markCheckedOut(actorId) {
+    this.checkedOutAt = new Date();
+    this.checkedOutBy = actorId || null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  // Backward-compatible aliases
+  async approve(adminId, notes = '') {
+    this.approveRegistration(adminId, notes);
     return this.save();
   },
   
-  // Check out
+  async reject(adminId, reason = '') {
+    this.rejectRegistration(adminId, reason);
+    return this.save();
+  },
+  
+  async checkIn(securityId) {
+    this.markCheckedIn(securityId);
+    return this.save();
+  },
+  
   async checkOut(securityId) {
-    this.status = 'checked_out';
-    this.checkedOutAt = new Date();
-    this.checkedOutBy = securityId;
+    this.markCheckedOut(securityId);
     return this.save();
   },
   
@@ -319,8 +544,8 @@ visitorSchema.statics = {
   findPending() {
     return this.find({
       $or: [
-        { status: 'pending' },
-        { approvalStatus: 'pending' }
+        { requestCategory: 'registration', approvalStatus: 'pending' },
+        { requestCategory: 'appointment', appointmentStatus: 'pending' }
       ]
     }).sort({ registeredAt: -1 });
   },
@@ -329,6 +554,10 @@ visitorSchema.statics = {
   findApproved() {
     return this.find({
       approvalStatus: 'approved',
+      $or: [
+        { requestCategory: 'registration' },
+        { requestCategory: 'appointment', appointmentStatus: { $in: APPOINTMENT_APPROVED_STATUSES } }
+      ],
       status: { $ne: 'checked_out' }
     }).sort({ visitDate: 1 });
   },
@@ -381,14 +610,8 @@ visitorSchema.pre('save', function(next) {
   next();
 });
 
-// Before saving, ensure status and approvalStatus are consistent
 visitorSchema.pre('save', function(next) {
-  if (this.approvalStatus === 'approved' && this.status === 'pending') {
-    this.status = 'approved';
-  }
-  if (this.approvalStatus === 'rejected' && this.status !== 'rejected') {
-    this.status = 'rejected';
-  }
+  this.syncWorkflowState();
   next();
 });
 

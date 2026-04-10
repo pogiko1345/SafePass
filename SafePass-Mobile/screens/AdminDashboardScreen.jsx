@@ -182,7 +182,124 @@ const getUserInitials = (user) => {
 
 const getRequestStatus = (request) => {
   if (!request) return "unknown";
-  return request.approvalStatus || request.status || "unknown";
+  const requestCategory = String(request.requestCategory || "").toLowerCase();
+  const appointmentStatus = String(request.appointmentStatus || "").toLowerCase();
+  const approvalStatus = String(request.approvalStatus || "").toLowerCase();
+  const visitStatus = String(request.status || "").toLowerCase();
+
+  if (requestCategory === "appointment") {
+    if (appointmentStatus === "pending") return "pending";
+    if (appointmentStatus === "rejected") return "rejected";
+    if (appointmentStatus === "approved" || appointmentStatus === "adjusted") {
+      return "approved";
+    }
+  }
+
+  if (approvalStatus === "pending" || visitStatus === "pending") return "pending";
+  if (approvalStatus === "rejected" || visitStatus === "rejected") return "rejected";
+  if (approvalStatus === "approved" || ["approved", "checked_in", "checked_out"].includes(visitStatus)) {
+    return "approved";
+  }
+
+  return approvalStatus || visitStatus || "unknown";
+};
+
+const AdminSectionShell = ({
+  title,
+  subtitle,
+  badge,
+  actions,
+  children,
+  isDarkMode,
+  theme,
+}) => (
+  <View
+    style={[
+      styles.adminSectionShell,
+      {
+        backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
+        borderColor: theme.borderColor,
+      },
+    ]}
+  >
+    <View style={styles.adminSectionShellHeader}>
+      <View style={styles.adminSectionShellCopy}>
+        <View style={styles.adminSectionShellTitleRow}>
+          <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>{title}</Text>
+          {badge ? (
+            <View
+              style={[
+                styles.adminSectionShellBadge,
+                {
+                  backgroundColor: isDarkMode ? "#0F172A" : "#EFF6FF",
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.adminSectionShellBadgeText,
+                  { color: isDarkMode ? "#BFDBFE" : "#1D4ED8" },
+                ]}
+              >
+                {badge}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        {subtitle ? (
+          <Text style={[styles.headerSubtitle, isDarkMode && styles.darkTextSecondary]}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {actions ? <View style={styles.adminSectionShellActions}>{actions}</View> : null}
+    </View>
+    {children}
+  </View>
+);
+
+const AdminFeedbackBanner = ({ notice, isDarkMode, theme, onDismiss }) => {
+  if (!notice) return null;
+
+  const palette =
+    notice.type === "success"
+      ? { background: isDarkMode ? "#052E16" : "#ECFDF5", border: "#86EFAC", icon: "#16A34A" }
+      : notice.type === "error"
+        ? { background: isDarkMode ? "#450A0A" : "#FEF2F2", border: "#FECACA", icon: "#DC2626" }
+        : { background: isDarkMode ? "#082F49" : "#EFF6FF", border: "#BFDBFE", icon: "#2563EB" };
+
+  return (
+    <View
+      style={[
+        styles.adminFeedbackBanner,
+        {
+          backgroundColor: palette.background,
+          borderColor: palette.border,
+        },
+      ]}
+    >
+      <View style={[styles.adminFeedbackAccent, { backgroundColor: palette.icon }]} />
+      <Ionicons
+        name={notice.type === "error" ? "alert-circle-outline" : "checkmark-circle-outline"}
+        size={20}
+        color={palette.icon}
+      />
+      <View style={styles.adminFeedbackCopy}>
+        <Text style={[styles.adminFeedbackTitle, { color: theme.textPrimary }]}>
+          {notice.title}
+        </Text>
+        {notice.message ? (
+          <Text style={[styles.adminFeedbackMessage, { color: theme.textSecondary }]}>
+            {notice.message}
+          </Text>
+        ) : null}
+      </View>
+      <TouchableOpacity onPress={onDismiss} style={styles.adminFeedbackDismiss}>
+        <Ionicons name="close" size={16} color={theme.textSecondary} />
+      </TouchableOpacity>
+    </View>
+  );
 };
 
 const ADMIN_MAP_FLOORS = [{ id: "all", name: "Campus", icon: "map-outline" }];
@@ -457,7 +574,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     totalDepartments: 0,
     activeVisitors: 0,
     upcomingVisits: 0,
+    totalAdmins: 0,
+    checkedInVisitors: 0,
+    completedVisits: 0,
   });
+  const [adminNotice, setAdminNotice] = useState(null);
 
   const menuItems = [
     { icon: "grid-outline", label: "Dashboard", action: "dashboard", color: "#2563EB" },
@@ -803,6 +924,24 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     ]);
   }, [navigation]);
 
+  const publishAdminNotice = useCallback((type, title, message = "") => {
+    setAdminNotice({
+      id: `${type}-${Date.now()}`,
+      type,
+      title,
+      message,
+    });
+  }, []);
+
+  const ensureAdminAccess = useCallback(() => {
+    const normalizedRole = String(user?.role || "").toLowerCase();
+    if (normalizedRole !== "admin") {
+      Alert.alert("Admin Required", "Only admin accounts can perform this action.");
+      return false;
+    }
+    return true;
+  }, [user]);
+
   // FIXED: Load All Visit Requests
   const loadAllVisitRequests = async () => {
     try {
@@ -887,6 +1026,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           totalUsers: users.length,
           totalStaff: staff.length,
           totalGuards: security.length,
+          totalAdmin: users.filter((u) => u.role === "admin").length,
           activeUsers: users.filter((u) => u.status === "active" || u.isActive).length,
           totalDepartments: departments.size,
         }));
@@ -926,6 +1066,31 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
   }, [handleAuthError]);
 
+  const loadAdminStats = useCallback(async () => {
+    try {
+      const response = await ApiService.getAdminStats();
+      const snapshot = response?.stats;
+      if (!snapshot) return;
+
+      setStats((prev) => ({
+        ...prev,
+        totalUsers: snapshot.totalUsers ?? prev.totalUsers,
+        activeUsers: snapshot.activeUsers ?? prev.activeUsers,
+        totalStaff: snapshot.totalStaff ?? prev.totalStaff,
+        totalGuards: snapshot.totalSecurity ?? prev.totalGuards,
+        totalAdmin: snapshot.totalAdmins ?? prev.totalAdmin,
+        pendingRequests: snapshot.pendingApprovals ?? prev.pendingRequests,
+        checkedInVisitors: snapshot.checkedInVisitors ?? prev.checkedInVisitors,
+        completedVisits: snapshot.completedVisits ?? prev.completedVisits,
+      }));
+    } catch (error) {
+      console.error("Load admin stats error:", error);
+      if (isAuthError(error)) {
+        await handleAuthError();
+      }
+    }
+  }, [handleAuthError]);
+
 const loadDashboardData = useCallback(async () => {
   authErrorHandledRef.current = false;
   setIsLoading(true);
@@ -939,7 +1104,12 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
     setUser(currentUser);
-    await Promise.all([loadAllVisitRequests(), loadAllUsers(), loadRecentActivities()]);
+    await Promise.all([
+      loadAdminStats(),
+      loadAllVisitRequests(),
+      loadAllUsers(),
+      loadRecentActivities(),
+    ]);
   } catch (error) {
     console.error("Load dashboard error:", error);
     if (isAuthError(error)) {
@@ -951,7 +1121,7 @@ const loadDashboardData = useCallback(async () => {
     setIsLoading(false);
     setRefreshing(false);
   }
-}, [navigation, handleAuthError, loadRecentActivities]);
+}, [navigation, handleAuthError, loadRecentActivities, loadAdminStats]);
 
   useEffect(() => {
     loadDashboardData();
@@ -994,6 +1164,12 @@ const loadDashboardData = useCallback(async () => {
     const timer = setTimeout(() => setCreateUserMessage(""), 5000);
     return () => clearTimeout(timer);
   }, [createUserMessage]);
+
+  useEffect(() => {
+    if (!adminNotice) return undefined;
+    const timer = setTimeout(() => setAdminNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [adminNotice]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -1355,10 +1531,7 @@ const loadDashboardData = useCallback(async () => {
       Alert.alert("Error", "Cannot find visitor ID. Please refresh and try again.");
       return;
     }
-    if (String(user?.role || "").toLowerCase() !== "admin") {
-      Alert.alert("Admin Required", "Only admin accounts can approve visit requests.");
-      return;
-    }
+    if (!ensureAdminAccess()) return;
     if (processingId === id) return;
 
     setProcessingId(id);
@@ -1379,18 +1552,23 @@ const loadDashboardData = useCallback(async () => {
         });
 
         setVisitRequests(updatedRequests);
-        setPendingRequests(updatedRequests.filter(r => (r.approvalStatus || r.status) === "pending"));
-        setApprovedRequests(updatedRequests.filter(r => (r.approvalStatus || r.status) === "approved"));
+        setPendingRequests(updatedRequests.filter((r) => getRequestStatus(r) === "pending"));
+        setApprovedRequests(updatedRequests.filter((r) => getRequestStatus(r) === "approved"));
 
         setStats(prev => ({
           ...prev,
-          pendingRequests: updatedRequests.filter(r => (r.approvalStatus || r.status) === "pending").length,
-          approvedRequests: updatedRequests.filter(r => (r.approvalStatus || r.status) === "approved").length,
+          pendingRequests: updatedRequests.filter((r) => getRequestStatus(r) === "pending").length,
+          approvedRequests: updatedRequests.filter((r) => getRequestStatus(r) === "approved").length,
         }));
 
         setShowRequestDetailsModal(false);
         setSelectedRequest(null);
         await loadAllVisitRequests();
+        publishAdminNotice(
+          "success",
+          "Visitor approved",
+          `${approvedVisitor.fullName || request.fullName || "Visitor"} is now active and visible to security.`,
+        );
 
         Alert.alert(
           "Visitor Approved",
@@ -1401,6 +1579,7 @@ const loadDashboardData = useCallback(async () => {
       }
     } catch (error) {
       console.error("Approve error:", error);
+      publishAdminNotice("error", "Approval failed", error?.message || "Unable to approve the selected request.");
       Alert.alert(
         "Approval Failed",
         error?.status === 403
@@ -1418,6 +1597,7 @@ const loadDashboardData = useCallback(async () => {
       Alert.alert("Error", "Please provide a reason for rejection");
       return;
     }
+    if (!ensureAdminAccess()) return;
     const id = selectedRequest?._id || selectedRequest?.id;
     if (!id) {
       Alert.alert("Error", "Cannot find visitor ID");
@@ -1441,15 +1621,20 @@ const loadDashboardData = useCallback(async () => {
               });
               
               setVisitRequests(updatedRequests);
-              setPendingRequests(updatedRequests.filter(r => r.status === "pending"));
-              setRejectedRequests(updatedRequests.filter(r => r.status === "rejected"));
+              setPendingRequests(updatedRequests.filter((r) => getRequestStatus(r) === "pending"));
+              setRejectedRequests(updatedRequests.filter((r) => getRequestStatus(r) === "rejected"));
               
               setStats(prev => ({
                 ...prev,
-                pendingRequests: updatedRequests.filter(r => r.status === "pending").length,
-                rejectedRequests: updatedRequests.filter(r => r.status === "rejected").length,
+                pendingRequests: updatedRequests.filter((r) => getRequestStatus(r) === "pending").length,
+                rejectedRequests: updatedRequests.filter((r) => getRequestStatus(r) === "rejected").length,
               }));
               
+              publishAdminNotice(
+                "success",
+                "Request rejected",
+                `${selectedRequest?.fullName || "Visitor"} was rejected and removed from the pending queue.`,
+              );
               Alert.alert("Success", `${selectedRequest?.fullName} has been rejected.`);
               setShowRejectModal(false);
               setRejectionReason("");
@@ -1459,6 +1644,7 @@ const loadDashboardData = useCallback(async () => {
             }
           } catch (error) {
             console.error("Reject error:", error);
+            publishAdminNotice("error", "Rejection failed", error?.message || "Unable to reject the request right now.");
             Alert.alert("Error", error.message || "Failed to reject request. Please try again.");
           } finally {
             setProcessingId(null);
@@ -1470,6 +1656,7 @@ const loadDashboardData = useCallback(async () => {
 
   // FIXED: Handle Create User
   const handleCreateUser = async () => {
+    if (!ensureAdminAccess()) return;
     if (!newUserData.firstName || !newUserData.lastName || !newUserData.email || !newUserData.phone) {
       Alert.alert("Error", "Please fill all required fields (*)");
       return;
@@ -1566,11 +1753,17 @@ const loadDashboardData = useCallback(async () => {
           deliveryNote: `Login credentials have been sent to ${newUserData.email}.`,
         });
         setShowCreateSuccessModal(true);
+        publishAdminNotice(
+          "success",
+          `${isSecurityRole ? "Security" : "Staff"} account created`,
+          `${createdName} was created successfully and can now log in.`,
+        );
       } else {
         Alert.alert("Error", response?.message || response?.error || "Failed to create account");
       }
     } catch (error) {
       console.error("Create user error:", error);
+      publishAdminNotice("error", "Account creation failed", error?.message || "Unable to create the selected account.");
       const message = String(error?.message || "");
       if (message.toLowerCase().includes("email already")) {
         Alert.alert("Email Already Used", "This email is already registered. Please use another email address.");
@@ -1626,6 +1819,7 @@ const loadDashboardData = useCallback(async () => {
 
   // FIXED: Confirm Edit User
   const confirmEditUser = async () => {
+    if (!ensureAdminAccess()) return;
     if (!editUserData.firstName || !editUserData.lastName) {
       Alert.alert("Error", "Please fill all required fields");
       return;
@@ -1665,6 +1859,11 @@ const loadDashboardData = useCallback(async () => {
         setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
         setSelectedUser(updatedSelectedUser);
         
+        publishAdminNotice(
+          "success",
+          "User updated",
+          `${editUserData.firstName} ${editUserData.lastName}'s account details were saved.`,
+        );
         Alert.alert("Success", "User has been updated successfully!");
         setShowEditUserModal(false);
       } else {
@@ -1672,6 +1871,7 @@ const loadDashboardData = useCallback(async () => {
       }
     } catch (error) {
       console.error("Update user error:", error);
+      publishAdminNotice("error", "Update failed", error?.message || "Unable to update the selected user.");
       Alert.alert("Error", error.message || "Failed to update user");
     } finally {
       setProcessingId(null);
@@ -1680,6 +1880,7 @@ const loadDashboardData = useCallback(async () => {
 
   // FIXED: Handle Delete User
   const handleDeleteUser = () => {
+    if (!ensureAdminAccess()) return;
     const selectedId = selectedUser?._id || selectedUser?.id;
     if (!selectedId) {
       Alert.alert("Error", "Cannot find user ID. Please refresh and try again.");
@@ -1710,6 +1911,11 @@ const loadDashboardData = useCallback(async () => {
                 activeUsers: updatedUsers.filter(u => u.status === "active" || u.isActive).length,
               }));
               
+              publishAdminNotice(
+                "success",
+                "User deleted",
+                `${selectedUser?.firstName || "The selected user"} was removed from the directory.`,
+              );
               Alert.alert("Success", "User deleted successfully");
               setShowDeleteUserModal(false);
             } else {
@@ -1717,6 +1923,7 @@ const loadDashboardData = useCallback(async () => {
             }
           } catch (error) {
             console.error("Delete user error:", error);
+            publishAdminNotice("error", "Delete failed", "Unable to delete the selected user.");
             Alert.alert("Error", "Failed to delete user. Please try again.");
           }
         },
@@ -1733,13 +1940,20 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const saveSettings = async () => {
+    if (!ensureAdminAccess()) return;
     setIsSavingSettings(true);
     try {
       await storageSetItem("adminSettings", JSON.stringify(settings));
       const response = await ApiService.updateSystemSettings(settings);
+      publishAdminNotice(
+        "success",
+        "Settings saved",
+        response?.success ? "System settings were saved successfully." : "Settings were stored locally for this admin session.",
+      );
       Alert.alert("Success", response?.success ? "Settings saved successfully!" : "Settings saved locally!");
     } catch (error) {
       console.error("Save settings error:", error);
+      publishAdminNotice("error", "Settings save failed", "The latest settings could not be saved.");
       Alert.alert("Error", "Failed to save settings");
     } finally {
       setIsSavingSettings(false);
@@ -3327,19 +3541,20 @@ const loadDashboardData = useCallback(async () => {
   const renderAdminMapPage = () => (
     <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.pageContainer}>
-        <View style={styles.pageHeader}>
-          <View>
-            <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Campus Map</Text>
-            <Text style={[styles.headerSubtitle, isDarkMode && styles.darkTextSecondary]}>
-              Monitoring view for approved visitors, check-ins, and live system actions.
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.pageRefreshButton} onPress={loadRecentActivities}>
-            <Ionicons name="refresh-outline" size={22} color="#10B981" />
-          </TouchableOpacity>
-        </View>
-
-        {renderAdminMapWorkspace()}
+        <AdminSectionShell
+          title="Campus Map"
+          subtitle="Monitoring view for approved visitors, check-ins, and live system actions."
+          badge={`${monitoredMapVisitors.length || 0} live markers`}
+          isDarkMode={isDarkMode}
+          theme={theme}
+          actions={
+            <TouchableOpacity style={styles.pageRefreshButton} onPress={loadRecentActivities}>
+              <Ionicons name="refresh-outline" size={22} color="#10B981" />
+            </TouchableOpacity>
+          }
+        >
+          {renderAdminMapWorkspace()}
+        </AdminSectionShell>
       </View>
     </ScrollView>
   );
@@ -3436,6 +3651,13 @@ const loadDashboardData = useCallback(async () => {
             </View>
           </Animated.View>
 
+          <AdminFeedbackBanner
+            notice={adminNotice}
+            isDarkMode={isDarkMode}
+            theme={theme}
+            onDismiss={() => setAdminNotice(null)}
+          />
+
           {activeMenu === "dashboard" && renderDashboardContent()}
           {activeMenu === "webmap" && renderAdminMapPage()}
           {activeMenu === "analytics" && renderAnalyticsContent()}
@@ -3444,7 +3666,18 @@ const loadDashboardData = useCallback(async () => {
           {activeMenu === "requests" && (
             <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
               <View style={styles.pageContainer}>
-                <View style={styles.pageHeader}><Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Visit Requests</Text><TouchableOpacity onPress={loadAllVisitRequests}><Ionicons name="refresh-outline" size={24} color="#3B82F6" /></TouchableOpacity></View>
+                <AdminSectionShell
+                  title="Visit Requests"
+                  subtitle="Review new visitor registrations and appointment approvals from one queue."
+                  badge={`${getFilteredRequestsCount()} visible`}
+                  isDarkMode={isDarkMode}
+                  theme={theme}
+                  actions={
+                    <TouchableOpacity style={styles.pageRefreshButton} onPress={loadAllVisitRequests}>
+                      <Ionicons name="refresh-outline" size={22} color="#3B82F6" />
+                    </TouchableOpacity>
+                  }
+                >
                 <View style={[styles.searchContainer, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
                   <Ionicons name="search-outline" size={20} color="#9CA3AF" />
                   <TextInput style={[styles.searchInput, isDarkMode && styles.darkText]} placeholder="Search by name, email, or phone..." placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"} value={searchQuery} onChangeText={setSearchQuery} />
@@ -3504,6 +3737,7 @@ const loadDashboardData = useCallback(async () => {
                     <Text style={[styles.emptyStateSubtitle, isDarkMode && styles.darkTextSecondary]}>{searchQuery ? "No requests match your search criteria." : requestFilter === "pending" ? "All caught up! No pending requests to review." : requestFilter === "approved" ? "No approved requests yet." : "No rejected requests."}</Text>
                   </View>
                 )}
+                </AdminSectionShell>
               </View>
             </ScrollView>
           )}
