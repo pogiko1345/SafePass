@@ -15,10 +15,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import MapStyles from "../styles/MapStyles";
 import CampusMap from "../components/CampusMap";
+import {
+  MONITORING_MAP_BLUEPRINTS,
+  MONITORING_MAP_FLOORS,
+  MONITORING_MAP_OFFICES,
+  MONITORING_MAP_OFFICE_POSITIONS,
+} from "../utils/monitoringMapConfig";
 
 const CAMPUS_LOCATIONS = [
   {
     name: "Main Gate",
+    floor: "ground",
     description: "Visitor entrance and primary security checkpoint.",
     icon: "business",
     coordinates: { lat: 14.5995, lng: 120.9842 },
@@ -32,6 +39,7 @@ const CAMPUS_LOCATIONS = [
   },
   {
     name: "Administration Building",
+    floor: "ground",
     description: "Visitor registration, approvals, and admin office support.",
     icon: "business",
     coordinates: { lat: 14.6001, lng: 120.985 },
@@ -45,6 +53,7 @@ const CAMPUS_LOCATIONS = [
   },
   {
     name: "Library",
+    floor: "third",
     description: "Student resource center and quiet study hall.",
     icon: "library",
     coordinates: { lat: 14.5988, lng: 120.9848 },
@@ -58,6 +67,7 @@ const CAMPUS_LOCATIONS = [
   },
   {
     name: "Cafeteria",
+    floor: "third",
     description: "Dining area and food court for students and staff.",
     icon: "restaurant",
     coordinates: { lat: 14.5992, lng: 120.9835 },
@@ -71,6 +81,7 @@ const CAMPUS_LOCATIONS = [
   },
   {
     name: "Aviation Hangar",
+    floor: "ground",
     description: "Flight training center and aircraft storage area.",
     icon: "airplane",
     coordinates: { lat: 14.6005, lng: 120.9825 },
@@ -84,6 +95,7 @@ const CAMPUS_LOCATIONS = [
   },
   {
     name: "Flight Simulator Lab",
+    floor: "first",
     description: "Simulator training and guided practice area.",
     icon: "desktop",
     coordinates: { lat: 14.5978, lng: 120.9855 },
@@ -97,6 +109,7 @@ const CAMPUS_LOCATIONS = [
   },
   {
     name: "Security Office",
+    floor: "ground",
     description: "Main security office and manual assistance point.",
     icon: "shield",
     coordinates: { lat: 14.599, lng: 120.9838 },
@@ -110,6 +123,7 @@ const CAMPUS_LOCATIONS = [
   },
   {
     name: "Parking Area",
+    floor: "ground",
     description: "Visitor and staff parking zone near the entrance lane.",
     icon: "car",
     coordinates: { lat: 14.5985, lng: 120.9828 },
@@ -149,6 +163,7 @@ export default function WebMapScreen({ navigation }) {
         purpose: location.description,
         status: location.name === selectedLocation.name ? "checked_in" : "active",
         location: {
+          floor: location.floor,
           coordinates: location.mapPosition,
         },
       })),
@@ -312,10 +327,12 @@ export default function WebMapScreen({ navigation }) {
 
             <CampusMap
               visitors={campusMapVisitors}
-              floors={[{ id: "all", name: "Campus", icon: "map-outline" }]}
-              offices={[]}
-              selectedFloor="all"
+              floors={MONITORING_MAP_FLOORS}
+              offices={MONITORING_MAP_OFFICES}
+              selectedFloor="ground"
               selectedOffice="all"
+              mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+              officePositions={MONITORING_MAP_OFFICE_POSITIONS}
             />
           </View>
 

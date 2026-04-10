@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import FloorBlueprintDiagram from "./FloorBlueprintDiagram";
 import styles from "../styles/CampusMapStyles";
 
 const { width, height } = Dimensions.get("window");
@@ -20,7 +21,7 @@ const CampusMap = ({
   visitors = [],
   floors = [],
   offices = [],
-  selectedFloor = "all",
+  selectedFloor = "ground",
   selectedOffice = "all",
   onVisitorHover,
   onVisitorLeave,
@@ -31,27 +32,62 @@ const CampusMap = ({
   mapBlueprints = null,
   officePositions = {}, 
 }) => {
+  const defaultFloorId = floors[0]?.id || "ground";
   const [mapScale, setMapScale] = useState(1);
   const [mapPan, setMapPan] = useState({ x: 0, y: 0 });
-  const [activeFloor, setActiveFloor] = useState(selectedFloor);
+  const [activeFloor, setActiveFloor] = useState(selectedFloor || defaultFloorId);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const panAnim = useRef(new Animated.ValueXY()).current;
 
+  const normalizeFloorId = (floorId) => {
+    if (floorId === "mezzanine") {
+      return "first";
+    }
+    return floorId;
+  };
+
+  const getDisplayFloorName = (floorId) => {
+    const normalizedFloorId = normalizeFloorId(floorId);
+    const matchingFloor = floors.find((floor) => normalizeFloorId(floor.id) === normalizedFloorId);
+
+    if (matchingFloor?.name) {
+      return matchingFloor.name;
+    }
+
+    return `${normalizedFloorId.charAt(0).toUpperCase()}${normalizedFloorId.slice(1)} Floor`;
+  };
+
   // Update active floor when selected floor changes
   useEffect(() => {
-    setActiveFloor(selectedFloor);
+    setActiveFloor(selectedFloor || defaultFloorId);
     setImageLoading(true);
     setImageError(false);
-  }, [selectedFloor]);
+  }, [defaultFloorId, selectedFloor]);
 
   // Get floor plan image based on selected floor from blueprints
   const getFloorPlanImage = () => {
-    if (mapBlueprints && mapBlueprints[activeFloor]) {
+    if (!mapBlueprints) {
+      return null;
+    }
+
+    if (mapBlueprints[activeFloor]) {
       return mapBlueprints[activeFloor];
     }
+
+    const normalizedFloorId = normalizeFloorId(activeFloor);
+    const aliasFloorId = normalizedFloorId === "first" ? "mezzanine" : normalizedFloorId;
+
+    if (mapBlueprints[normalizedFloorId]) {
+      return mapBlueprints[normalizedFloorId];
+    }
+
+    if (mapBlueprints[aliasFloorId]) {
+      return mapBlueprints[aliasFloorId];
+    }
+
     return null;
   };
 
@@ -143,10 +179,10 @@ const CampusMap = ({
     
     let displayOffices = offices.filter(o => o.id !== "all");
     
-    // Filter by selected floor
-    if (activeFloor !== "all") {
-      displayOffices = displayOffices.filter(o => o.floor === activeFloor);
-    }
+    const normalizedActiveFloor = normalizeFloorId(activeFloor);
+    displayOffices = displayOffices.filter(
+      (office) => normalizeFloorId(office.floor) === normalizedActiveFloor
+    );
     
     // Filter by selected office
     if (selectedOffice !== "all") {
@@ -178,8 +214,14 @@ const CampusMap = ({
   // Render visitor markers
   const renderVisitorMarkers = () => {
     if (!visitors || visitors.length === 0) return null;
-    
-    return visitors.map((visitor) => {
+
+    const normalizedActiveFloor = normalizeFloorId(activeFloor);
+    const visibleVisitors = visitors.filter((visitor) => {
+      const visitorFloor = normalizeFloorId(visitor?.location?.floor);
+      return !visitorFloor || visitorFloor === normalizedActiveFloor;
+    });
+
+    return visibleVisitors.map((visitor) => {
       const statusColor = getVisitorStatusColor(visitor.status);
       const positionStyle = getVisitorPositionStyle(visitor);
       const isHovered = hoveredVisitor?.id === visitor.id;
@@ -241,7 +283,12 @@ const CampusMap = ({
   };
 
   const floorPlanImage = getFloorPlanImage();
-  const hasBlueprint = floorPlanImage !== null && !imageError;
+  const isDiagramBlueprint =
+    floorPlanImage &&
+    typeof floorPlanImage === "object" &&
+    floorPlanImage.type === "diagram";
+  const hasBlueprint = floorPlanImage !== null && (isDiagramBlueprint || !imageError);
+  const shouldShowOfficeLabels = !hasBlueprint || isDiagramBlueprint;
 
   return (
     <View style={[styles.mapContainer, fullscreen && styles.mapContainerFullscreen]}>
@@ -250,14 +297,18 @@ const CampusMap = ({
       <View style={styles.mapCanvas}>
         {/* Floor Plan Image or Placeholder */}
         {hasBlueprint ? (
-          <Image
-            source={floorPlanImage}
-            style={styles.floorPlanImage}
-            resizeMode="contain"
-            onLoadStart={() => setImageLoading(true)}
-            onLoadEnd={() => setImageLoading(false)}
-            onError={() => setImageError(true)}
-          />
+          isDiagramBlueprint ? (
+            <FloorBlueprintDiagram floorId={floorPlanImage.floorId} />
+          ) : (
+            <Image
+              source={floorPlanImage}
+              style={styles.floorPlanImage}
+              resizeMode="contain"
+              onLoadStart={() => setImageLoading(true)}
+              onLoadEnd={() => setImageLoading(false)}
+              onError={() => setImageError(true)}
+            />
+          )
         ) : (
           <View style={styles.floorPlanPlaceholder}>
             <View style={styles.floorPlanContent}>
@@ -267,7 +318,7 @@ const CampusMap = ({
                 color="#9CA3AF" 
               />
               <Text style={styles.floorPlanTitle}>
-                {activeFloor === "all" ? "Campus Map" : `${activeFloor.charAt(0).toUpperCase() + activeFloor.slice(1)} Floor`}
+                {getDisplayFloorName(activeFloor)}
               </Text>
               <Text style={styles.floorPlanSubtitle}>
                 {!mapBlueprints ? "Upload map blueprints to start tracking" : "Loading map blueprint..."}
@@ -282,7 +333,7 @@ const CampusMap = ({
                 <View style={styles.featureItem}>
                   <Ionicons name="layers-outline" size={14} color="#6B7280" />
                   <Text style={styles.featureText}>
-                    {floors.filter(f => f.id !== "all").length} Floors
+                    {floors.length} Floors
                   </Text>
                 </View>
               </View>
@@ -290,8 +341,8 @@ const CampusMap = ({
           </View>
         )}
         
-        {/* Office Labels - Only show if we have office positions */}
-        {renderOfficeLabels()}
+        {/* Office labels are suppressed on real blueprint images to avoid duplicating printed room names. */}
+        {shouldShowOfficeLabels ? renderOfficeLabels() : null}
         
         {/* Visitor Markers */}
         {renderVisitorMarkers()}
@@ -331,13 +382,13 @@ const CampusMap = ({
       <View style={styles.floorLegend}>
         <Text style={styles.floorLegendTitle}>Floor Legend</Text>
         <View style={styles.floorLegendItems}>
-          {floors.filter(f => f.id !== "all").map((floor) => (
+          {floors.map((floor) => (
             <View key={floor.id} style={styles.floorLegendItem}>
               <View style={[
                 styles.floorLegendColor, 
                 { backgroundColor: 
                   floor.id === "ground" ? "#EFF6FF" :
-                  floor.id === "first" ? "#ECFDF5" :
+                  floor.id === "first" || floor.id === "mezzanine" ? "#ECFDF5" :
                   floor.id === "second" ? "#FEF3C7" : "#EDE9FE"
                 }
               ]} />

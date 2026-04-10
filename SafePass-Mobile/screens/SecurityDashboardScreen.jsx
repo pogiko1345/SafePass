@@ -27,6 +27,12 @@ import styles from "../styles/SecurityDashboardStyles";
 
 // Import map components
 import SharedMonitoringMap from "../components/SharedMonitoringMap";
+import {
+  MONITORING_MAP_BLUEPRINTS,
+  MONITORING_MAP_FLOORS,
+  MONITORING_MAP_OFFICES,
+  MONITORING_MAP_OFFICE_POSITIONS,
+} from "../utils/monitoringMapConfig";
 
 const { width, height } = Dimensions.get("window");
 const isDesktop = width >= 1024;
@@ -83,7 +89,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   });
   
   // Map and tracking states
-  const [selectedFloor, setSelectedFloor] = useState('all');
+  const [selectedFloor, setSelectedFloor] = useState('ground');
   const [selectedOffice, setSelectedOffice] = useState('all');
   const [hoveredVisitor, setHoveredVisitor] = useState(null);
   const [visitorLocations, setVisitorLocations] = useState([]);
@@ -134,25 +140,13 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [reportType, setReportType] = useState('daily');
   
   // Floors and offices data
-  const floors = [
-    { id: 'all', name: 'All Floors', icon: 'layers-outline' },
-    { id: 'ground', name: 'Ground Floor', icon: 'home-outline' },
-    { id: 'first', name: '1st Floor', icon: 'arrow-up-outline' },
-    { id: 'second', name: '2nd Floor', icon: 'arrow-up-outline' },
-    { id: 'third', name: '3rd Floor', icon: 'arrow-up-outline' },
-  ];
+  const floors = MONITORING_MAP_FLOORS;
   
-  const offices = [
-    { id: 'admin', name: 'Administration', floor: 'ground', icon: 'business-outline' },
-    { id: 'registrar', name: 'Registrar\'s Office', floor: 'ground', icon: 'document-text-outline' },
-    { id: 'accounting', name: 'Accounting Office', floor: 'ground', icon: 'calculator-outline' },
-    { id: 'admissions', name: 'Admissions Office', floor: 'first', icon: 'school-outline' },
-    { id: 'dean', name: 'Dean\'s Office', floor: 'first', icon: 'people-outline' },
-    { id: 'hr', name: 'HR Department', floor: 'second', icon: 'people-circle-outline' },
-    { id: 'it', name: 'IT Department', floor: 'second', icon: 'desktop-outline' },
-    { id: 'library', name: 'Library', floor: 'third', icon: 'book-outline' },
-    { id: 'cafeteria', name: 'Cafeteria', floor: 'third', icon: 'restaurant-outline' },
-  ];
+  const offices = MONITORING_MAP_OFFICES;
+
+  const mapBlueprints = MONITORING_MAP_BLUEPRINTS;
+
+  const officePositions = MONITORING_MAP_OFFICE_POSITIONS;
 
   // ============ LOGOUT FUNCTIONS ============
   const handleLogoutPress = () => {
@@ -628,6 +622,13 @@ export default function SecurityDashboardScreen({ navigation }) {
     const floorsList = ['ground', 'first', 'second', 'third'];
     return floorsList[Math.floor(Math.random() * floorsList.length)];
   };
+
+  const normalizeFloorId = (floorId) => {
+    if (floorId === 'mezzanine') {
+      return 'first';
+    }
+    return floorId;
+  };
   
   const getRandomOffice = () => {
     const officeNames = offices.filter(o => o.id !== 'all').map(o => o.name);
@@ -636,7 +637,9 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const getFilteredVisitorLocations = () => {
     return visitorLocations.filter(visitor => {
-      if (selectedFloor !== 'all' && visitor.location.floor !== selectedFloor) {
+      if (
+        normalizeFloorId(visitor.location.floor) !== normalizeFloorId(selectedFloor)
+      ) {
         return false;
       }
       if (selectedOffice !== 'all' && visitor.location.office !== selectedOffice) {
@@ -1325,6 +1328,19 @@ export default function SecurityDashboardScreen({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('map')}>
+            <LinearGradient
+              colors={['#0F766E', '#0EA5A4']}
+              style={styles.quickActionGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="map-outline" size={24} color="#FFFFFF" />
+              <Text style={styles.quickActionTitle}>Monitoring Map</Text>
+              <Text style={styles.quickActionSubtitle}>Track active visitors by floor and office in real time</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.quickActionCard} onPress={() => {
             setVisitorFilter('all');
             setActiveTab('visitors');
@@ -1461,6 +1477,8 @@ export default function SecurityDashboardScreen({ navigation }) {
           offices={offices}
           selectedFloor={selectedFloor}
           selectedOffice={selectedOffice}
+          mapBlueprints={mapBlueprints}
+          officePositions={officePositions}
           onVisitorHover={handleVisitorHover}
           onVisitorLeave={handleVisitorLeave}
           onVisitorSelect={handleVisitorSelect}
@@ -1780,33 +1798,31 @@ export default function SecurityDashboardScreen({ navigation }) {
         </ScrollView>
       </View>
       
-      {selectedFloor !== 'all' && (
-        <View style={styles.filterGroup}>
-          <Text style={styles.filterLabel}>Office:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+      <View style={styles.filterGroup}>
+        <Text style={styles.filterLabel}>Office:</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+          <TouchableOpacity
+            style={[styles.filterChip, selectedOffice === 'all' && styles.filterChipActive]}
+            onPress={() => setSelectedOffice('all')}
+          >
+            <Text style={[styles.filterChipText, selectedOffice === 'all' && styles.filterChipTextActive]}>
+              All Offices
+            </Text>
+          </TouchableOpacity>
+          {offices.filter((office) => normalizeFloorId(office.floor) === normalizeFloorId(selectedFloor)).map((office) => (
             <TouchableOpacity
-              style={[styles.filterChip, selectedOffice === 'all' && styles.filterChipActive]}
-              onPress={() => setSelectedOffice('all')}
+              key={office.id}
+              style={[styles.filterChip, selectedOffice === office.name && styles.filterChipActive]}
+              onPress={() => setSelectedOffice(office.name)}
             >
-              <Text style={[styles.filterChipText, selectedOffice === 'all' && styles.filterChipTextActive]}>
-                All Offices
+              <Ionicons name={office.icon} size={16} color={selectedOffice === office.name ? "#FFFFFF" : "#6B7280"} />
+              <Text style={[styles.filterChipText, selectedOffice === office.name && styles.filterChipTextActive]}>
+                {office.name}
               </Text>
             </TouchableOpacity>
-            {offices.filter(o => o.id !== 'all' && o.floor === selectedFloor).map((office) => (
-              <TouchableOpacity
-                key={office.id}
-                style={[styles.filterChip, selectedOffice === office.name && styles.filterChipActive]}
-                onPress={() => setSelectedOffice(office.name)}
-              >
-                <Ionicons name={office.icon} size={16} color={selectedOffice === office.name ? "#FFFFFF" : "#6B7280"} />
-                <Text style={[styles.filterChipText, selectedOffice === office.name && styles.filterChipTextActive]}>
-                  {office.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+          ))}
+        </ScrollView>
+      </View>
       
       <View style={styles.mapLegend}>
         <View style={styles.legendItem}>
@@ -2119,6 +2135,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   // Menu Items
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline', color: '#DC2626' },
+    { id: 'map', label: 'Monitoring Map', icon: 'map-outline', color: '#0F766E' },
     { id: 'visitors', label: 'Visitors', icon: 'people-outline', color: '#0A3D91' },
     { id: 'alerts', label: 'Alerts', icon: 'warning-outline', color: '#F59E0B' },
     { id: 'logs', label: 'Access Logs', icon: 'time-outline', color: '#059669' },
@@ -2299,6 +2316,8 @@ export default function SecurityDashboardScreen({ navigation }) {
               offices={offices}
               selectedFloor={selectedFloor}
               selectedOffice={selectedOffice}
+              mapBlueprints={mapBlueprints}
+              officePositions={officePositions}
               onVisitorHover={handleVisitorHover}
               onVisitorLeave={handleVisitorLeave}
               onVisitorSelect={handleVisitorSelect}

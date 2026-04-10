@@ -16,6 +16,8 @@ export default function SharedMonitoringMap({
   offices = [],
   selectedFloor = "all",
   selectedOffice = "all",
+  mapBlueprints = null,
+  officePositions = {},
   onVisitorHover,
   onVisitorLeave,
   onVisitorSelect,
@@ -90,6 +92,8 @@ export default function SharedMonitoringMap({
           offices={offices}
           selectedFloor={selectedFloor}
           selectedOffice={selectedOffice}
+          mapBlueprints={mapBlueprints}
+          officePositions={officePositions}
           onVisitorHover={onVisitorHover}
           onVisitorLeave={onVisitorLeave}
           onVisitorSelect={onVisitorSelect}

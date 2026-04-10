@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 const APP_VARIANTS = {
   FULL: "full",
@@ -27,6 +28,10 @@ const getExpoExtra = () => {
 };
 
 const resolveVariant = () => {
+  if (Platform.OS === "web") {
+    return APP_VARIANTS.FULL;
+  }
+
   const extra = getExpoExtra();
   return normalizeVariant(process.env.EXPO_PUBLIC_APP_VARIANT || extra.appVariant);
 };

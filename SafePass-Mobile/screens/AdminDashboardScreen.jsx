@@ -22,6 +22,12 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import ApiService from "../utils/ApiService";
 import SharedMonitoringMap from "../components/SharedMonitoringMap";
 import { printUserList } from "../utils/printUtils";
+import {
+  MONITORING_MAP_BLUEPRINTS,
+  MONITORING_MAP_FLOORS,
+  MONITORING_MAP_OFFICES,
+  MONITORING_MAP_OFFICE_POSITIONS,
+} from "../utils/monitoringMapConfig";
 import styles from "../styles/AdminDashboardStyles";
 
 const { width, height } = Dimensions.get("window");
@@ -301,7 +307,7 @@ const AdminFeedbackBanner = ({ notice, isDarkMode, theme, onDismiss }) => {
   );
 };
 
-const ADMIN_MAP_FLOORS = [{ id: "all", name: "Campus", icon: "map-outline" }];
+const ADMIN_MAP_FLOORS = MONITORING_MAP_FLOORS;
 const ADMIN_MAP_ACTIVITY_TYPES = new Set([
   "visitor_registration_request",
   "visitor_appointment_request",
@@ -395,6 +401,46 @@ const getActivityCoordinates = (activity, index = 0) => {
     x: clampValue(baseZone.x + offsetX, 8, 92),
     y: clampValue(baseZone.y + offsetY, 10, 90),
   };
+};
+
+const getActivityFloor = (activity) => {
+  const haystack = [
+    activity?.location,
+    activity?.notes,
+    activity?.activityType,
+    activity?.relatedVisitor?.assignedOffice,
+    activity?.relatedVisitor?.host,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    [
+      "conference room",
+      "chairman",
+      "flight operations",
+      "head of training",
+      "i.t room",
+      "it room",
+      "faculty room",
+      "academy director",
+      "sto",
+      "mezzanine",
+    ].some((keyword) => haystack.includes(keyword))
+  ) {
+    return "first";
+  }
+
+  if (["hr department", "it department", "second floor"].some((keyword) => haystack.includes(keyword))) {
+    return "second";
+  }
+
+  if (["library", "cafeteria", "third floor"].some((keyword) => haystack.includes(keyword))) {
+    return "third";
+  }
+
+  return "ground";
 };
 
 export default function AdminDashboardScreen({ navigation, onLogout }) {
@@ -1253,6 +1299,7 @@ const loadDashboardData = useCallback(async () => {
             getActivityLabel(activity?.activityType),
           status: getActivityMarkerStatus(activity),
           location: {
+            floor: getActivityFloor(activity),
             coordinates: getActivityCoordinates(activity, index),
           },
           activityType: activity?.activityType,
@@ -2209,9 +2256,11 @@ const loadDashboardData = useCallback(async () => {
           controls={renderAdminMapFilters()}
           visitors={monitoredMapVisitors}
           floors={ADMIN_MAP_FLOORS}
-          offices={[]}
-          selectedFloor="all"
+          offices={MONITORING_MAP_OFFICES}
+          selectedFloor="ground"
           selectedOffice="all"
+          mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+          officePositions={MONITORING_MAP_OFFICE_POSITIONS}
           onVisitorSelect={(item) => setSelectedMapActivity(item)}
           hoveredVisitor={activeMapActivity}
           backgroundColor={isDarkMode ? "#0F172A" : "#F8FAFC"}
@@ -2299,9 +2348,11 @@ const loadDashboardData = useCallback(async () => {
             controls={renderAdminMapFilters()}
             visitors={monitoredMapVisitors}
             floors={ADMIN_MAP_FLOORS}
-            offices={[]}
-            selectedFloor="all"
+            offices={MONITORING_MAP_OFFICES}
+            selectedFloor="ground"
             selectedOffice="all"
+            mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+            officePositions={MONITORING_MAP_OFFICE_POSITIONS}
             onVisitorSelect={(item) => setSelectedMapActivity(item)}
             hoveredVisitor={activeMapActivity}
             backgroundColor={theme.cardBackground}
@@ -4613,9 +4664,11 @@ const loadDashboardData = useCallback(async () => {
                 controls={renderAdminMapFilters()}
                 visitors={monitoredMapVisitors}
                 floors={ADMIN_MAP_FLOORS}
-                offices={[]}
-                selectedFloor="all"
+                offices={MONITORING_MAP_OFFICES}
+                selectedFloor="ground"
                 selectedOffice="all"
+                mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+                officePositions={MONITORING_MAP_OFFICE_POSITIONS}
                 onVisitorSelect={(item) => setSelectedMapActivity(item)}
                 hoveredVisitor={activeMapActivity}
                 fullscreen
