@@ -12,23 +12,87 @@ import {
   StatusBar,
   Modal,
   SafeAreaView,
-  Dimensions,
   Animated,
   Image,
+  Linking,
+  useWindowDimensions,
 } from "react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
 import loginStyles from "../styles/LoginStyles";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
+import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
+import {
+  APP_ORGANIZATION_NAME,
+  IS_VISITOR_ONLY_APP,
+  getVariantBlockedRoleMessage,
+  isRoleAllowedInCurrentVariant,
+} from "../utils/appVariant";
 import Logo from "../assets/LogoSapphire.jpg";
 
-const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
-const isSmallPhone = width <= 375;
+const Storage = Platform.OS === "web"
+  ? require("../utils/webStorage").default
+  : require("@react-native-async-storage/async-storage").default;
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
-  const { role } = route?.params || { role: 'visitor' };
+  const { role, initialEmail = "", initialPassword = "" } = route?.params || { role: "visitor" };
+  const effectiveRole = IS_VISITOR_ONLY_APP ? "visitor" : role;
+  const { width: viewportWidth } = useWindowDimensions();
+  const isCompactLogin = viewportWidth <= 420;
+  const isTabletLogin = viewportWidth >= 768;
+  const loginHorizontalPadding = isCompactLogin ? 12 : 20;
+  const loginMaxContentWidth = Math.min(
+    520,
+    Math.max(viewportWidth - loginHorizontalPadding * 2, 280)
+  );
+  const headerResponsiveStyle = {
+    paddingHorizontal: isCompactLogin ? 18 : isTabletLogin ? 28 : 24,
+    paddingBottom: isCompactLogin ? 72 : 88,
+  };
+  const logoResponsiveStyle = {
+    width: isCompactLogin ? 88 : isTabletLogin ? 116 : 108,
+    height: isCompactLogin ? 88 : isTabletLogin ? 116 : 108,
+    borderRadius: isCompactLogin ? 44 : isTabletLogin ? 58 : 54,
+  };
+  const appNameResponsiveStyle = {
+    fontSize: isCompactLogin ? 20 : isTabletLogin ? 26 : 24,
+    lineHeight: isCompactLogin ? 27 : isTabletLogin ? 34 : 32,
+  };
+  const cardResponsiveStyle = {
+    marginHorizontal: loginHorizontalPadding,
+    marginTop: isCompactLogin ? -34 : -42,
+    padding: isCompactLogin ? 18 : 24,
+    ...(isWeb ? { maxWidth: loginMaxContentWidth } : null),
+  };
+  const roleHeroResponsiveStyle = isCompactLogin
+    ? { padding: 12, alignItems: "flex-start" }
+    : null;
+  const roleIconResponsiveStyle = isCompactLogin
+    ? { width: 42, height: 42, borderRadius: 14, marginRight: 10 }
+    : null;
+  const welcomeTitleResponsiveStyle = {
+    fontSize: isCompactLogin ? 24 : isTabletLogin ? 30 : 28,
+    lineHeight: isCompactLogin ? 30 : 34,
+  };
+  const welcomeSubtitleResponsiveStyle = {
+    marginBottom: isCompactLogin ? 20 : 24,
+  };
+  const authRowResponsiveStyle = isCompactLogin
+    ? { flexDirection: "column", alignItems: "flex-start", gap: 12, marginBottom: 20 }
+    : null;
+  const footerResponsiveStyle = {
+    paddingHorizontal: loginHorizontalPadding,
+    paddingBottom: isCompactLogin ? 28 : 22,
+  };
+  const footerContactCardResponsiveStyle = {
+    padding: isCompactLogin ? 14 : 16,
+    ...(isWeb ? { maxWidth: loginMaxContentWidth } : null),
+  };
+  const footerLinkRowResponsiveStyle = isCompactLogin ? { width: "100%" } : null;
+  const footerLinkChipResponsiveStyle = isCompactLogin
+    ? { width: "100%", justifyContent: "center" }
+    : null;
   
   // ============ STATE MANAGEMENT ============
   const [email, setEmail] = useState("");
@@ -91,6 +155,21 @@ export default function LoginScreen({ navigation, route }) {
     ]).start();
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.title = `Login | ${APP_ORGANIZATION_NAME}`;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (initialEmail) {
+      setEmail(initialEmail);
+    }
+    if (initialPassword) {
+      setPassword(initialPassword);
+    }
+  }, [initialEmail, initialPassword]);
+
   // ============ AUTH CHECK ============
   useEffect(() => {
     checkAuthAndConnection();
@@ -114,34 +193,32 @@ export default function LoginScreen({ navigation, route }) {
       const connected = await ApiService.testConnection();
       setApiConnected(connected);
       
-      const isNewRegistration = await AsyncStorage.getItem('isNewRegistration');
+      const isNewRegistration = await Storage.getItem('isNewRegistration');
       
       if (isNewRegistration === 'true') {
         console.log("📝 New registration detected - clearing token");
-        await AsyncStorage.multiRemove(['authToken', 'userToken', 'currentUser', 'isNewRegistration']);
+        await Storage.multiRemove(['authToken', 'userToken', 'currentUser', 'isNewRegistration']);
         setIsCheckingAuth(false);
         return;
       }
       
-      const token = await AsyncStorage.getItem('authToken');
-      const userJson = await AsyncStorage.getItem('currentUser');
+      const token = await ApiService.getToken();
+      const userJson = await Storage.getItem('currentUser');
       
       if (token && userJson) {
         const user = JSON.parse(userJson);
         console.log("🔑 Auto-login detected for:", user.email);
         
-        // Check if visitor is pending
-        if (user.role === 'visitor' && user.status === 'pending') {
-          console.log("Visitor pending - clearing token");
+        const normalizedRole = normalizeRole(user.role);
+        if (!isRoleAllowedInCurrentVariant(normalizedRole)) {
           await ApiService.clearAuth();
-          setIsCheckingAuth(false);
+          setLoginError(getVariantBlockedRoleMessage(normalizedRole));
           return;
         }
-        
-        const route = getInitialRoute(user);
+        const route = getDashboardRoute({ ...user, role: normalizedRole });
         navigation.reset({
           index: 0,
-          routes: [{ name: route }],
+          routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : route }],
         });
       }
     } catch (error) {
@@ -184,6 +261,28 @@ export default function LoginScreen({ navigation, route }) {
     if (errors.password) {
       setErrors({ ...errors, password: "" });
     }
+  };
+
+  const persistAuthenticatedSession = async ({ token, user, rememberEmail }) => {
+    const normalizedUser = {
+      ...user,
+      role: normalizeRole(user?.role) || "visitor",
+    };
+
+    if (token) {
+      await ApiService.setToken(token);
+    }
+
+    await Storage.setItem("currentUser", JSON.stringify(normalizedUser));
+
+    if (rememberEmail) {
+      await Storage.setItem("rememberedEmail", email.trim());
+    } else {
+      await Storage.removeItem("rememberedEmail");
+    }
+
+    await Storage.removeItem("isNewRegistration");
+    return normalizedUser;
   };
 
   // ============ FORGOT PASSWORD VALIDATION ============
@@ -452,25 +551,37 @@ export default function LoginScreen({ navigation, route }) {
       console.log('📥 Verify response:', verifyResponse);
       
       if (verifyResponse.success) {
-        // Check if user is pending
-        if (verifyResponse.user?.status === 'pending') {
-          console.log('⏳ User account is pending');
-          Alert.alert(
-            "Account Pending Approval",
-            "Your account is pending admin approval. You will receive an email once approved.",
-            [{ text: "OK" }]
-          );
-          setIsLoading(false);
+        const normalizedUser = {
+          ...verifyResponse.user,
+          role: normalizeRole(verifyResponse.user?.role) || "visitor",
+        };
+
+        if (!isRoleAllowedInCurrentVariant(normalizedUser.role)) {
+          await ApiService.clearAuth();
+          setLoginError(getVariantBlockedRoleMessage(normalizedUser.role));
           return;
         }
-        
-        // 2FA for EVERYONE - always require verification
+
+        if (verifyResponse.requires2FA === false) {
+          await persistAuthenticatedSession({
+            token: verifyResponse.tempToken,
+            user: normalizedUser,
+            rememberEmail: rememberMe,
+          });
+
+          navigation.reset({
+            index: 0,
+            routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(normalizedUser) }],
+          });
+          return;
+        }
+
         navigation.navigate("Verification", {
           email: email,
           password: password,
           rememberMe: rememberMe,
           tempToken: verifyResponse.tempToken,
-          user: verifyResponse.user
+          user: normalizedUser
         });
       }
     } catch (error) {
@@ -490,16 +601,54 @@ export default function LoginScreen({ navigation, route }) {
     }
   };
 
-  const getInitialRoute = (user) => {
-    switch(user?.role) {
-      case 'security': 
-        return "SecurityDashboard";
-      case 'admin': 
-        return "AdminDashboard";
-      case 'visitor': 
-        return "VisitorDashboard";
-      default: 
-        return "RoleSelect";
+  const getRoleConfig = () => {
+    switch (effectiveRole) {
+      case "visitor":
+        return {
+          label: "Visitor Access",
+          title: "Continue Your Visit Journey",
+          subtitle: "Track approvals, manage appointments, and keep your Sapphire visit details in one secure place.",
+          icon: "person-outline",
+          accent: "#0F766E",
+          panel: "Visitor Coordination",
+        };
+      case "security":
+      case "guard":
+        return {
+          label: "Security Access",
+          title: "Checkpoint Team Sign-In",
+          subtitle: "Enter the secure operations workspace for approvals, arrival monitoring, and access validation.",
+          icon: "shield-checkmark-outline",
+          accent: "#0A3D91",
+          panel: "Operations Console",
+        };
+      case "staff":
+        return {
+          label: "Staff Access",
+          title: "Appointment Desk Sign-In",
+          subtitle: "Review visitor appointments, adjust schedules, and respond to requests from the staff dashboard.",
+          icon: "briefcase-outline",
+          accent: "#0F766E",
+          panel: "Staff Coordination",
+        };
+      case "admin":
+        return {
+          label: "Administrative Access",
+          title: "Command and Oversight Login",
+          subtitle: "Open the administrative control center for user review, access supervision, and reporting.",
+          icon: "settings-outline",
+          accent: "#7C3AED",
+          panel: "Admin Control",
+        };
+      default:
+        return {
+          label: "System Access",
+          title: "Welcome Back",
+          subtitle: "Sign in to continue with your secure SafePass workflow.",
+          icon: "log-in-outline",
+          accent: "#0A3D91",
+          panel: "Secure Entry",
+        };
     }
   };
 
@@ -511,20 +660,37 @@ export default function LoginScreen({ navigation, route }) {
     }
   };
 
+  const openExternalLink = async (url) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert("Link Unavailable", "This link could not be opened on your device.");
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert("Link Error", "Unable to open the school link right now.");
+    }
+  };
+
   // ============ SPLASH SCREEN ============
   if (isCheckingAuth) {
     return (
       <View style={loginStyles.splashContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+        <StatusBar barStyle="light-content" backgroundColor="#1A2A6C" />
         <ActivityIndicator size="large" color="#FFFFFF" />
         <Text style={loginStyles.splashText}>Loading...</Text>
       </View>
     );
   }
 
+  const roleConfig = getRoleConfig();
+  const showVisitorRegisterEntry =
+    IS_VISITOR_ONLY_APP || normalizeRole(effectiveRole) === "visitor";
+
   return (
     <SafeAreaView style={loginStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+      <StatusBar barStyle="light-content" backgroundColor="#1A2A6C" />
       
       <KeyboardAvoidingView
         style={loginStyles.container}
@@ -540,16 +706,30 @@ export default function LoginScreen({ navigation, route }) {
           >
             {/* Header with Logo */}
             <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
-              <View style={loginStyles.header}>
+              <View style={[loginStyles.header, headerResponsiveStyle]}>
                 <View style={loginStyles.headerContent}>
-                  {/* Logo Image */}
+                  <View style={loginStyles.brandBadge}>
+                    <Image
+                      source={Logo}
+                      style={loginStyles.brandBadgeLogo}
+                      resizeMode="contain"
+                    />
+                    <View style={loginStyles.brandBadgeTextWrap}>
+                      <Text style={loginStyles.brandBadgeEyebrow}>Secure Login Portal</Text>
+                      <Text style={loginStyles.brandBadgeTitle}>SafePass Command Center</Text>
+                    </View>
+                  </View>
+
                   <Image 
                     source={Logo} 
-                    style={loginStyles.logoImage}
+                    style={[loginStyles.logoImage, logoResponsiveStyle]}
                     resizeMode="contain"
                   />
-                  <Text style={loginStyles.appName}>
+                  <Text style={[loginStyles.appName, appNameResponsiveStyle]}>
                     Sapphire International{"\n"}Aviation Academy
+                  </Text>
+                  <Text style={loginStyles.headerTagline}>
+                    Campus arrival, access, and visitor authentication in one secure checkpoint flow
                   </Text>
                   
                   {/* API Status Badge */}
@@ -559,33 +739,51 @@ export default function LoginScreen({ navigation, route }) {
                   ]}>
                     <View style={loginStyles.statusDot} />
                     <Text style={loginStyles.statusText}>
-                      {apiConnected ? '● SYSTEM ONLINE' : '● SERVER OFFLINE'}
+                      {apiConnected ? 'SYSTEM ONLINE' : 'SERVER OFFLINE'}
                     </Text>
                   </View>
                 </View>
               </View>
 
               {/* Login Card */}
-              <View style={loginStyles.card}>
+              <View style={[loginStyles.card, cardResponsiveStyle]}>
                 {/* Back to Role Select */}
-                <TouchableOpacity
-                  style={loginStyles.backToRoleButton}
-                  onPress={() => navigation.navigate("RoleSelect")}
-                  activeOpacity={0.7}
-                  {...(isWeb && {
-                    onKeyPress: (e) => handleKeyPress(e, () => navigation.navigate("RoleSelect")),
-                    tabIndex: 0,
-                  })}
-                >
-                  <Ionicons name="arrow-back" size={20} color="#4F46E5" />
-                  <Text style={loginStyles.backToRoleText}>Change Role</Text>
-                </TouchableOpacity>
+                {!IS_VISITOR_ONLY_APP && (
+                  <TouchableOpacity
+                    style={loginStyles.backToRoleButton}
+                    onPress={() => navigation.navigate("RoleSelect")}
+                    activeOpacity={0.7}
+                    {...(isWeb && {
+                      onKeyPress: (e) => handleKeyPress(e, () => navigation.navigate("RoleSelect")),
+                      tabIndex: 0,
+                    })}
+                  >
+                    <Ionicons name="arrow-back" size={20} color="#1A2A6C" />
+                    <Text style={loginStyles.backToRoleText}>Change Role</Text>
+                  </TouchableOpacity>
+                )}
 
-                <Text style={loginStyles.welcomeTitle}>Welcome Back</Text>
-                <Text style={loginStyles.welcomeSubtitle}>
-                  {role === 'visitor' ? 'Visitor Login' : 
-                   role === 'security' ? 'Security Login' : 
-                   role === 'admin' ? 'Admin Login' : 'System Access'}
+                <View style={[loginStyles.roleHero, roleHeroResponsiveStyle]}>
+                  <View
+                    style={[
+                      loginStyles.roleIconWrap,
+                      roleIconResponsiveStyle,
+                      { backgroundColor: roleConfig.accent },
+                    ]}
+                  >
+                    <Ionicons name={roleConfig.icon} size={22} color="#FFFFFF" />
+                  </View>
+                  <View style={loginStyles.roleHeroText}>
+                    <Text style={loginStyles.roleEyebrow}>{roleConfig.label}</Text>
+                    <Text style={loginStyles.rolePanel}>{roleConfig.panel}</Text>
+                  </View>
+                </View>
+
+                <Text style={[loginStyles.welcomeTitle, welcomeTitleResponsiveStyle]}>
+                  {roleConfig.title}
+                </Text>
+                <Text style={[loginStyles.welcomeSubtitle, welcomeSubtitleResponsiveStyle]}>
+                  {roleConfig.subtitle}
                 </Text>
 
                 {/* STANDARD LOGIN FORM */}
@@ -657,7 +855,7 @@ export default function LoginScreen({ navigation, route }) {
                   </View>
 
                   {/* Remember Me & Forgot Password */}
-                  <View style={loginStyles.row}>
+                  <View style={[loginStyles.row, authRowResponsiveStyle]}>
                     <TouchableOpacity 
                       style={loginStyles.rememberBox}
                       onPress={() => setRememberMe(!rememberMe)}
@@ -706,11 +904,75 @@ export default function LoginScreen({ navigation, route }) {
 
                   {/* 2FA Info */}
                   <View style={loginStyles.twoFactorInfo}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color="#4F46E5" />
+                    <Ionicons name="shield-checkmark-outline" size={16} color="#1A2A6C" />
                     <Text style={loginStyles.twoFactorText}>
                       Secure login with 2-factor authentication
                     </Text>
                   </View>
+
+                  {showVisitorRegisterEntry ? (
+                    <View
+                      style={{
+                        marginBottom: 16,
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: "#DDE7F3",
+                        backgroundColor: "#F8FBFE",
+                        paddingHorizontal: isCompactLogin ? 14 : 16,
+                        paddingVertical: isCompactLogin ? 14 : 16,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: "800",
+                          color: "#0F172A",
+                          textAlign: "center",
+                          marginBottom: 4,
+                        }}
+                      >
+                        New Visitor?
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          lineHeight: 19,
+                          color: "#64748B",
+                          textAlign: "center",
+                          marginBottom: 12,
+                        }}
+                      >
+                        Create your visitor account here in the app before signing in.
+                      </Text>
+                      <TouchableOpacity
+                        style={{
+                          borderWidth: 1,
+                          borderColor: "#C7D2FE",
+                          backgroundColor: "#EEF2FF",
+                          borderRadius: 14,
+                          paddingVertical: 13,
+                          paddingHorizontal: 16,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 8,
+                        }}
+                        onPress={() => navigation.navigate("VisitorRegister")}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="person-add-outline" size={18} color="#4F46E5" />
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: "800",
+                            color: "#4338CA",
+                          }}
+                        >
+                          Create Account
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
                 </>
 
                 {/* Server Info - Only when offline */}
@@ -725,11 +987,47 @@ export default function LoginScreen({ navigation, route }) {
               </View>
 
               {/* Footer */}
-              <View style={loginStyles.footer}>
+              <View style={[loginStyles.footer, footerResponsiveStyle]}>
                 <Text style={loginStyles.footerText}>
                   {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date().toLocaleDateString()}
                 </Text>
                 <Text style={loginStyles.footerText}>Secure Campus Access System v2.0</Text>
+                <View style={[loginStyles.footerContactCard, footerContactCardResponsiveStyle]}>
+                  <Text style={loginStyles.footerContactTitle}>
+                    Sapphire International Aviation Academy
+                  </Text>
+                  <Text style={loginStyles.footerContactLine}>Tel No: (02) 7091 - 3362</Text>
+                  <Text style={loginStyles.footerContactLine}>Mobile No: 0917 580 4858</Text>
+                  <View style={[loginStyles.footerLinkRow, footerLinkRowResponsiveStyle]}>
+                    <TouchableOpacity
+                      style={[loginStyles.footerLinkChip, footerLinkChipResponsiveStyle]}
+                      onPress={() => openExternalLink("https://sapphireaviationacademy.edu.ph/")}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="globe-outline" size={14} color="#0A3D91" />
+                      <Text style={loginStyles.footerLinkText}>Website</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[loginStyles.footerLinkChip, footerLinkChipResponsiveStyle]}
+                      onPress={() => openExternalLink("https://www.facebook.com/sapphireaviationacademy/")}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="logo-facebook" size={14} color="#0A3D91" />
+                      <Text style={loginStyles.footerLinkText}>Facebook</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[loginStyles.footerLinkChip, footerLinkChipResponsiveStyle]}
+                      onPress={() => openExternalLink("https://www.youtube.com/@sapphireaviation5105")}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="logo-youtube" size={14} color="#0A3D91" />
+                      <Text style={loginStyles.footerLinkText}>YouTube</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={loginStyles.footerCopyright}>
+                    ©2024. Sapphire International Aviation Academy
+                  </Text>
+                </View>
               </View>
             </Animated.View>
           </ScrollView>
@@ -745,7 +1043,7 @@ export default function LoginScreen({ navigation, route }) {
           <View style={loginStyles.modalOverlay}>
             <View style={loginStyles.modalContent}>
               <View style={loginStyles.modalHeader}>
-                <Ionicons name="lock-open-outline" size={32} color="#4F46E5" />
+                <Ionicons name="lock-open-outline" size={32} color="#1A2A6C" />
                 <Text style={loginStyles.modalTitle}>
                   {resetStep === 1 ? 'Reset Password' : 
                    resetStep === 2 ? 'Verify Code' : 
@@ -1090,3 +1388,4 @@ export default function LoginScreen({ navigation, route }) {
     </SafeAreaView>
   );
 }
+

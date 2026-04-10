@@ -1,5 +1,5 @@
 // styles/PrintStyles.js
-export const getPrintHTML = (users, title, activeMenu) => {
+export const getPrintHTML = (users, title, activeMenu, logoSrc = "") => {
   const getTitle = () => {
     switch (activeMenu) {
       case "staff":
@@ -16,7 +16,7 @@ export const getPrintHTML = (users, title, activeMenu) => {
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>${getTitle()} - Sapphire Aviation</title>
+      <title>${getTitle()} - Sapphire International Aviation Academy</title>
       <style>
         * {
           margin: 0;
@@ -29,10 +29,24 @@ export const getPrintHTML = (users, title, activeMenu) => {
           background: white;
         }
         .print-header {
-          text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
           margin-bottom: 20px;
           padding-bottom: 10px;
           border-bottom: 2px solid #3B82F6;
+        }
+        .print-header-brand {
+          width: 56px;
+          height: 56px;
+          border-radius: 28px;
+          border: 1px solid #DBEAFE;
+          object-fit: cover;
+          flex-shrink: 0;
+        }
+        .print-header-copy {
+          text-align: left;
         }
         .print-header h2 {
           color: #1E3A5F;
@@ -89,8 +103,11 @@ export const getPrintHTML = (users, title, activeMenu) => {
     </head>
     <body>
       <div class="print-header">
-        <h2>Sapphire Aviation Academy</h2>
-        <p>${getTitle()} | Generated: ${new Date().toLocaleDateString()}</p>
+        ${logoSrc ? `<img src="${logoSrc}" alt="Sapphire International Aviation Academy Logo" class="print-header-brand" />` : ""}
+        <div class="print-header-copy">
+          <h2>Sapphire International Aviation Academy</h2>
+          <p>${getTitle()} | Generated: ${new Date().toLocaleDateString()}</p>
+        </div>
       </div>
 
       <table>

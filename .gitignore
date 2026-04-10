@@ -1,0 +1,4 @@
+.vercel
+.env*.local
+SafePass-Mobile/.gradle-local/
+SafePass-Mobile/visitor-build.log

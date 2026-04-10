@@ -22,10 +22,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import ApiService from "../utils/ApiService";
+import { canAccessSecurityDashboard, normalizeRole } from "../utils/authFlow";
 import styles from "../styles/SecurityDashboardStyles";
 
 // Import map components
-import CampusMap from "../components/CampusMap";
+import SharedMonitoringMap from "../components/SharedMonitoringMap";
 
 const { width, height } = Dimensions.get("window");
 const isDesktop = width >= 1024;
@@ -90,7 +91,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   
   // UI State
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [visitorFilter, setVisitorFilter] = useState('active');
+  const [visitorFilter, setVisitorFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showVisitorModal, setShowVisitorModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -99,6 +100,8 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [processingVisitorId, setProcessingVisitorId] = useState(null);
+  const [resolvingAlertId, setResolvingAlertId] = useState(null);
   
   // Form State
   const [newVisitor, setNewVisitor] = useState({
@@ -190,27 +193,32 @@ export default function SecurityDashboardScreen({ navigation }) {
   }, []);
 
   const initializeScreen = async () => {
-    await loadUserData();
-    await loadDashboardData();
-    await loadVisitors();
-    await loadNotifications();
-    await loadAnalytics();
-    await loadVisitorLocations();
-    await loadAccessLogs();
-    await loadReports();
-    
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-    ]).start();
+    try {
+      const currentUser = await loadUserData();
+      if (!currentUser) {
+        return;
+      }
+
+      await Promise.all([
+        loadOperationalData(),
+        loadNotifications(currentUser),
+      ]);
+
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]).start();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const requestPermissions = async () => {
@@ -233,196 +241,387 @@ export default function SecurityDashboardScreen({ navigation }) {
     setSidebarOpen(!sidebarOpen);
   };
 
+  const getStartOfToday = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  };
+
+  const normalizeNotificationReadState = (notification, currentUserId) => {
+    if (!notification || !currentUserId) {
+      return false;
+    }
+
+    return Array.isArray(notification.readBy) && notification.readBy.some((entry) => {
+      const readByUserId =
+        typeof entry?.user === 'object' ? entry?.user?._id : entry?.user;
+      return String(readByUserId) === String(currentUserId);
+    });
+  };
+
+  const normalizeNotifications = (items = [], currentUserId = user?._id) =>
+    items.map((notification) => ({
+      ...notification,
+      read: normalizeNotificationReadState(notification, currentUserId),
+    }));
+
+  const isActiveAlertNotification = (notification) => {
+    if (!notification || notification.read) {
+      return false;
+    }
+
+    const type = String(notification.type || "").toLowerCase();
+    const severity = String(notification.severity || "").toLowerCase();
+
+    return (
+      type === "alert" ||
+      type.includes("security") ||
+      severity === "high" ||
+      severity === "medium"
+    );
+  };
+
+  const COMPLETED_VISITOR_HISTORY_DAYS = 30;
+
+  const isWithinCompletedHistoryWindow = (visitor) => {
+    const completedAt =
+      visitor?.checkedOutAt ||
+      visitor?.updatedAt ||
+      visitor?.visitDate;
+
+    if (!completedAt) {
+      return false;
+    }
+
+    const completedDate = new Date(completedAt);
+    if (Number.isNaN(completedDate.getTime())) {
+      return false;
+    }
+
+    const cutoffDate = new Date();
+    cutoffDate.setHours(0, 0, 0, 0);
+    cutoffDate.setDate(cutoffDate.getDate() - COMPLETED_VISITOR_HISTORY_DAYS);
+
+    return completedDate >= cutoffDate;
+  };
+
+  const getCompletedHistoryDaysLeft = (visitor) => {
+    const completedAt =
+      visitor?.checkedOutAt ||
+      visitor?.updatedAt ||
+      visitor?.visitDate;
+
+    if (!completedAt) {
+      return null;
+    }
+
+    const completedDate = new Date(completedAt);
+    if (Number.isNaN(completedDate.getTime())) {
+      return null;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    completedDate.setHours(0, 0, 0, 0);
+
+    const elapsedDays = Math.floor((today - completedDate) / 86400000);
+    return Math.max(0, COMPLETED_VISITOR_HISTORY_DAYS - elapsedDays);
+  };
+
+  const deriveVisitorCollections = (all = []) => {
+    const active = all.filter((visitor) => visitor.status === 'checked_in');
+    const pending = all.filter((visitor) => visitor.approvalStatus === 'pending');
+    const approved = all.filter(
+      (visitor) =>
+        visitor.approvalStatus === 'approved' &&
+        visitor.status !== 'checked_in' &&
+        visitor.status !== 'checked_out',
+    );
+    const completed = all.filter(
+      (visitor) =>
+        visitor.status === 'checked_out' &&
+        isWithinCompletedHistoryWindow(visitor),
+    );
+    const allVisible = [...active, ...pending, ...approved, ...completed].sort(
+      (a, b) => new Date(b.updatedAt || b.createdAt || b.visitDate) - new Date(a.updatedAt || a.createdAt || a.visitDate)
+    );
+
+    return { active, pending, approved, completed, all: allVisible };
+  };
+
+  const deriveVisitorStats = (all = [], active = [], pending = []) => {
+    const today = getStartOfToday();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const now = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo = new Date(now);
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+    return {
+      totalToday: all.filter((visitor) => {
+        const visitDate = new Date(visitor.visitDate);
+        return visitDate >= today && visitDate < tomorrow;
+      }).length,
+      totalThisWeek: all.filter((visitor) => new Date(visitor.visitDate) >= weekAgo).length,
+      totalThisMonth: all.filter((visitor) => new Date(visitor.visitDate) >= monthAgo).length,
+      activeNow: active.length,
+      pendingApproval: pending.length,
+    };
+  };
+
+  const deriveAnalytics = (all = []) => {
+    const officeCount = {};
+    const purposeCount = {};
+    const visitsByHour = new Array(24).fill(0);
+    const visitDurations = [];
+
+    all.forEach((visitor) => {
+      const office = visitor.assignedOffice || visitor.host;
+      if (office) {
+        officeCount[office] = (officeCount[office] || 0) + 1;
+      }
+
+      const purpose = visitor.purposeOfVisit;
+      if (purpose) {
+        purposeCount[purpose] = (purposeCount[purpose] || 0) + 1;
+      }
+
+      if (visitor.visitTime) {
+        const visitHour = new Date(visitor.visitTime).getHours();
+        if (!Number.isNaN(visitHour)) {
+          visitsByHour[visitHour] += 1;
+        }
+      }
+
+      if (visitor.checkedInAt && visitor.checkedOutAt) {
+        const durationMinutes =
+          (new Date(visitor.checkedOutAt) - new Date(visitor.checkedInAt)) / 60000;
+        if (durationMinutes > 0) {
+          visitDurations.push(durationMinutes);
+        }
+      }
+    });
+
+    const totalVisitors = all.length || 1;
+    const mostVisitedOffices = Object.entries(officeCount)
+      .map(([office, count]) => ({
+        office,
+        count,
+        percentage: Math.round((count / totalVisitors) * 100),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const popularVisitPurposes = Object.entries(purposeCount)
+      .map(([purpose, count]) => ({ purpose, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const averageVisitDuration =
+      visitDurations.length > 0
+        ? Math.round(
+            visitDurations.reduce((sum, minutes) => sum + minutes, 0) /
+              visitDurations.length,
+          )
+        : 0;
+
+    return {
+      mostVisitedOffices,
+      visitorsByHour: visitsByHour.map((count, hour) => ({ hour, count })),
+      popularVisitPurposes,
+      averageVisitDuration,
+    };
+  };
+
+  const deriveVisitorLocations = (activeVisitors = []) =>
+    activeVisitors.map((visitor, index) => ({
+      id: visitor._id,
+      name: visitor.fullName,
+      phone: visitor.phoneNumber,
+      purpose: visitor.purposeOfVisit,
+      host: visitor.host,
+      checkInTime: visitor.checkedInAt,
+      status: visitor.status,
+      idPhoto: visitor.idImage,
+      location: {
+        floor: getRandomFloor(),
+        office: visitor.assignedOffice || getRandomOffice(),
+        coordinates: {
+          x: 15 + ((index * 17) % 70),
+          y: 15 + ((index * 23) % 70),
+        },
+        timestamp: new Date(),
+      },
+      movement: [],
+    }));
+
+  const deriveAccessLogs = (all = []) =>
+    all
+      .flatMap((visitor) => {
+        const officeLocation =
+          visitor.assignedOffice || visitor.host || 'Main Gate';
+        const entries = [];
+
+        if (visitor.approvedAt) {
+          entries.push({
+            _id: `${visitor._id}-approved`,
+            userName: visitor.fullName,
+            location: officeLocation,
+            status: 'granted',
+            accessType: 'approval',
+            notes: 'Visitor approved for entry',
+            timestamp: visitor.approvedAt,
+          });
+        }
+
+        if (visitor.checkedInAt) {
+          entries.push({
+            _id: `${visitor._id}-checked-in`,
+            userName: visitor.fullName,
+            location: officeLocation,
+            status: 'granted',
+            accessType: 'entry',
+            notes: 'Checked in by security',
+            timestamp: visitor.checkedInAt,
+          });
+        }
+
+        if (visitor.checkedOutAt) {
+          entries.push({
+            _id: `${visitor._id}-checked-out`,
+            userName: visitor.fullName,
+            location: officeLocation,
+            status: 'granted',
+            accessType: 'exit',
+            notes: 'Checked out by security',
+            timestamp: visitor.checkedOutAt,
+          });
+        }
+
+        return entries;
+      })
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  const deriveReports = (all = []) =>
+    all
+      .flatMap((visitor) =>
+        (visitor.reports || []).map((report, index) => ({
+          _id: `${visitor._id}-report-${index}`,
+          reason: report.reason || 'Security incident',
+          createdAt: report.reportedAt,
+          visitorName: visitor.fullName,
+          status: report.resolved ? 'Resolved' : 'Open',
+          resolved: !!report.resolved,
+        })),
+      )
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
   // ============ DATA LOADING FUNCTIONS ============
   const loadUserData = async () => {
     try {
-      const currentUser = await ApiService.getCurrentUser();
-      if (!currentUser || (currentUser.role !== 'security' && currentUser.role !== 'admin')) {
+      const [currentUser, token] = await Promise.all([
+        ApiService.getCurrentUser(),
+        ApiService.getToken(),
+      ]);
+
+      if (!token) {
+        await ApiService.clearAuth();
         navigation.replace("Login");
         return;
       }
-      setUser(currentUser);
+
+      const normalizedRole = normalizeRole(currentUser?.role);
+      if (!currentUser || !canAccessSecurityDashboard(normalizedRole)) {
+        navigation.replace("Login");
+        return null;
+      }
+      const normalizedUser = { ...currentUser, role: normalizedRole };
+      setUser(normalizedUser);
+      return normalizedUser;
     } catch (error) {
       console.error("Load user error:", error);
       Alert.alert("Error", "Failed to load user data");
-    } finally {
-      setIsLoading(false);
+      return null;
     }
   };
 
-  const loadDashboardData = async () => {
+  const loadOperationalData = async () => {
     try {
-      const activeUsersRes = await ApiService.getAllUsers({ status: 'active', isActive: true });
-      const activeUsersList = activeUsersRes.users || [];
-      setActiveUsers(activeUsersList);
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      
-      const todayVisitors = await ApiService.getVisitors({
-        visitDate: { $gte: today, $lt: tomorrow }
-      });
-      
-      const alertsRes = await ApiService.getSecurityLogs({ 
-        type: 'alert',
-        resolved: false 
-      });
-      
-      const accessLogs = await ApiService.getAccessLogs(1, 10);
-      
-      setDashboardStats({
-        activeUsers: activeUsersList.length,
-        totalVisitorsToday: todayVisitors.visitors?.length || 0,
-        activeAlerts: alertsRes.logs?.length || 0,
-        recentAccess: accessLogs.accessLogs?.length || 0,
-        occupancyRate: await calculateOccupancyRate(),
-      });
-      
-      setRecentAccess(accessLogs.accessLogs || []);
-      setAlerts(alertsRes.logs || []);
-      
+      const allVisitorsRes = await ApiService.getVisitors({});
+      const allVisitors = allVisitorsRes.visitors || [];
+      const collections = deriveVisitorCollections(allVisitors);
+      const stats = deriveVisitorStats(
+        collections.all,
+        collections.active,
+        collections.pending,
+      );
+      const operationalAnalytics = deriveAnalytics(collections.all);
+      const derivedLogs = deriveAccessLogs(collections.all);
+      const derivedReports = deriveReports(collections.all);
+
+      setVisitors(collections);
+      setVisitorStats(stats);
+      setAnalytics(operationalAnalytics);
+      setVisitorLocations(deriveVisitorLocations(collections.active));
+      setAccessLogs(derivedLogs);
+      setLogsTotal(derivedLogs.length);
+      setReports(derivedReports);
+      setActiveUsers(collections.active);
+      setRecentAccess(derivedLogs.slice(0, 10));
+      setDashboardStats((current) => ({
+        ...current,
+        activeUsers: collections.active.length,
+        totalVisitorsToday: stats.totalToday,
+        recentAccess: derivedLogs.length,
+        occupancyRate: 0,
+      }));
     } catch (error) {
-      console.error("Load dashboard error:", error);
+      console.error("Load operational data error:", error);
     }
   };
 
-  const calculateOccupancyRate = async () => {
-    try {
-      const settings = await ApiService.getSystemSettings();
-      const totalCapacity = settings.campusCapacity || 500;
-      const currentOccupancy = await ApiService.getActiveUserCount();
-      return Math.round((currentOccupancy / totalCapacity) * 100);
-    } catch {
-      return 0;
-    }
-  };
-
-  const loadVisitors = async () => {
-    try {
-      const [activeRes, pendingRes, approvedRes, completedRes, allRes] = await Promise.all([
-        ApiService.getVisitors({ status: 'checked_in' }),
-        ApiService.getVisitors({ approvalStatus: 'pending' }),
-        ApiService.getVisitors({ approvalStatus: 'approved', status: { $ne: 'checked_in' } }),
-        ApiService.getVisitors({ status: 'checked_out' }),
-        ApiService.getVisitors({}),
-      ]);
-      
-      const active = activeRes.visitors || [];
-      const pending = pendingRes.visitors || [];
-      const approved = approvedRes.visitors || [];
-      const completed = completedRes.visitors || [];
-      const all = allRes.visitors || [];
-      
-      setVisitors({ active, pending, approved, completed, all });
-      
-      const now = new Date();
-      const today = new Date(now.setHours(0, 0, 0, 0));
-      const weekAgo = new Date(now);
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      const monthAgo = new Date(now);
-      monthAgo.setMonth(monthAgo.getMonth() - 1);
-      
-      setVisitorStats({
-        totalToday: all.filter(v => new Date(v.visitDate).setHours(0,0,0,0) === today.getTime()).length,
-        totalThisWeek: all.filter(v => new Date(v.visitDate) >= weekAgo).length,
-        totalThisMonth: all.filter(v => new Date(v.visitDate) >= monthAgo).length,
-        activeNow: active.length,
-        pendingApproval: pending.length,
-      });
-      
-    } catch (error) {
-      console.error("Load visitors error:", error);
-    }
-  };
+  const loadDashboardData = loadOperationalData;
+  const loadVisitors = loadOperationalData;
 
   const loadAccessLogs = async () => {
-    try {
-      const response = await ApiService.getAccessLogs(logsPage, 20);
-      setAccessLogs(response.accessLogs || []);
-      setLogsTotal(response.total || 0);
-    } catch (error) {
-      console.error("Load access logs error:", error);
-    }
+    await loadOperationalData();
   };
 
   const loadReports = async () => {
-    try {
-      const response = await ApiService.getSecurityReports();
-      setReports(response.reports || []);
-    } catch (error) {
-      console.error("Load reports error:", error);
-    }
+    await loadOperationalData();
   };
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (currentUser = user) => {
     try {
-      const response = await ApiService.getNotifications({ read: false });
-      setNotifications(response.notifications || []);
-      setUnreadCount(response.unreadCount || 0);
+      const response = await ApiService.getNotifications({ limit: 100 });
+      const normalizedNotifications = normalizeNotifications(
+        response.notifications || [],
+        currentUser?._id,
+      );
+      const unreadNotifications = normalizedNotifications.filter((notification) => !notification.read);
+      const alertNotifications = unreadNotifications.filter(isActiveAlertNotification);
+
+      setNotifications(normalizedNotifications);
+      setUnreadCount(unreadNotifications.length);
+      setAlerts(alertNotifications);
+      setDashboardStats((current) => ({
+        ...current,
+        activeAlerts: alertNotifications.length,
+      }));
     } catch (error) {
       console.error("Load notifications error:", error);
     }
   };
 
   const loadAnalytics = async () => {
-    try {
-      const allVisitors = visitors.all.length ? visitors.all : await ApiService.getVisitors({});
-      const officeCount = {};
-      
-      (allVisitors.visitors || []).forEach(visitor => {
-        const office = visitor.assignedOffice;
-        if (office) {
-          officeCount[office] = (officeCount[office] || 0) + 1;
-        }
-      });
-      
-      const mostVisited = Object.entries(officeCount)
-        .map(([office, count]) => ({ office, count, percentage: Math.round((count / (allVisitors.visitors?.length || 1)) * 100) }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-      
-      setAnalytics({
-        mostVisitedOffices: mostVisited,
-        visitorsByHour: [],
-        popularVisitPurposes: [],
-        averageVisitDuration: 0,
-      });
-      
-    } catch (error) {
-      console.error("Load analytics error:", error);
-    }
+    await loadOperationalData();
   };
 
   const loadVisitorLocations = async () => {
-    try {
-      const activeVisitors = visitors.active;
-      const locations = activeVisitors.map((visitor, index) => ({
-        id: visitor._id,
-        name: visitor.fullName,
-        phone: visitor.phoneNumber,
-        purpose: visitor.purposeOfVisit,
-        host: visitor.host,
-        checkInTime: visitor.checkedInAt,
-        status: visitor.status,
-        idPhoto: visitor.idImage,
-        location: {
-          floor: getRandomFloor(),
-          office: visitor.assignedOffice || getRandomOffice(),
-          coordinates: {
-            x: 15 + ((index * 17) % 70),
-            y: 15 + ((index * 23) % 70),
-          },
-          timestamp: new Date(),
-        },
-        movement: [],
-      }));
-      
-      setVisitorLocations(locations);
-    } catch (error) {
-      console.error("Load visitor locations error:", error);
-    }
+    await loadOperationalData();
   };
 
   const getRandomFloor = () => {
@@ -463,16 +662,14 @@ export default function SecurityDashboardScreen({ navigation }) {
   // ============ HELPER FUNCTIONS ============
   const refreshData = async () => {
     setRefreshing(true);
-    await Promise.all([
-      loadDashboardData(),
-      loadVisitors(),
-      loadNotifications(),
-      loadAnalytics(),
-      loadVisitorLocations(),
-      loadAccessLogs(),
-      loadReports(),
-    ]);
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        loadOperationalData(),
+        loadNotifications(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const formatDate = (date) => {
@@ -519,6 +716,8 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
     return { bg: '#F3F4F6', text: '#6B7280', label: 'UNKNOWN' };
   };
+
+  const isVisitorProcessing = (visitorId) => processingVisitorId === visitorId;
 
   // ============ VISITOR MANAGEMENT ============
   const handleRegisterVisitor = () => {
@@ -583,7 +782,14 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const submitVisitor = async () => {
-    if (!newVisitor.fullName || !newVisitor.purposeOfVisit || !newVisitor.host || !newVisitor.phoneNumber) {
+    if (
+      !newVisitor.fullName ||
+      !newVisitor.purposeOfVisit ||
+      !newVisitor.host ||
+      !newVisitor.phoneNumber ||
+      !newVisitor.email ||
+      !newVisitor.idNumber
+    ) {
       Alert.alert("Error", "Please fill in all required fields");
       return;
     }
@@ -616,8 +822,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       
       if (response.success) {
         setShowVisitorModal(false);
-        await loadVisitors();
-        await loadAnalytics();
+        await refreshData();
         Alert.alert("Success", "Visitor registered successfully");
       } else {
         throw new Error(response.message);
@@ -630,19 +835,69 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const handleCheckIn = async (visitor) => {
+    if (isVisitorProcessing(visitor._id)) {
+      return;
+    }
+
+    if (visitor.approvalStatus !== 'approved') {
+      Alert.alert("Approval Required", `${visitor.fullName} is still waiting for admin approval.`);
+      return;
+    }
+
+    if (visitor.status === 'checked_in') {
+      Alert.alert("Already Checked In", `${visitor.fullName} is already checked in.`);
+      return;
+    }
+
+    if (visitor.status === 'checked_out') {
+      Alert.alert("Visit Completed", `${visitor.fullName} has already checked out.`);
+      return;
+    }
+
     try {
-      const response = await ApiService.visitorCheckIn(visitor._id);
+      setProcessingVisitorId(visitor._id);
+      const response = await ApiService.securityCheckIn(visitor._id);
       if (response.success) {
-        await loadVisitors();
-        await loadVisitorLocations();
+        await refreshData();
         Alert.alert("Success", `${visitor.fullName} checked in successfully`);
       }
     } catch (error) {
-      Alert.alert("Error", error.message);
+      Alert.alert("Error", error.message || "Failed to check in visitor");
+    } finally {
+      setProcessingVisitorId(null);
     }
   };
 
   const handleCheckOut = async (visitor) => {
+    if (isVisitorProcessing(visitor._id)) {
+      return;
+    }
+
+    if (visitor.status !== 'checked_in') {
+      Alert.alert("Check-in Required", `${visitor.fullName} must be checked in before checkout.`);
+      return;
+    }
+
+    const performCheckOut = async () => {
+      try {
+        setProcessingVisitorId(visitor._id);
+        const response = await ApiService.securityCheckOut(visitor._id);
+        if (response.success) {
+          await refreshData();
+          Alert.alert("Success", `${visitor.fullName} checked out successfully`);
+        }
+      } catch (error) {
+        Alert.alert("Error", error.message || "Failed to check out visitor");
+      } finally {
+        setProcessingVisitorId(null);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      await performCheckOut();
+      return;
+    }
+
     Alert.alert(
       "Confirm Check-out",
       `Check out ${visitor.fullName}?`,
@@ -650,18 +905,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         { text: "Cancel", style: "cancel" },
         {
           text: "Check Out",
-          onPress: async () => {
-            try {
-              const response = await ApiService.visitorCheckOut(visitor._id);
-              if (response.success) {
-                await loadVisitors();
-                await loadVisitorLocations();
-                Alert.alert("Success", `${visitor.fullName} checked out successfully`);
-              }
-            } catch (error) {
-              Alert.alert("Error", error.message);
-            }
-          }
+          onPress: performCheckOut
         }
       ]
     );
@@ -684,6 +928,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const submitReport = async (visitor, reason) => {
     try {
       await ApiService.reportVisitor(visitor._id, { reason, reportedBy: user._id });
+      await refreshData();
       Alert.alert("Report Submitted", "Security team has been notified");
     } catch (error) {
       Alert.alert("Error", "Failed to submit report");
@@ -702,6 +947,37 @@ export default function SecurityDashboardScreen({ navigation }) {
       await loadNotifications();
     } catch (error) {
       console.error("Mark as read error:", error);
+    }
+  };
+
+  const handleResolveAlert = async (alert) => {
+    if (!alert?._id || resolvingAlertId === alert._id) {
+      return;
+    }
+
+    try {
+      setResolvingAlertId(alert._id);
+      const result = await ApiService.resolveAlert(alert._id);
+      if (!result?.success) {
+        throw new Error("Failed to resolve alert");
+      }
+
+      setNotifications((current) =>
+        current.map((item) =>
+          item._id === alert._id ? { ...item, read: true } : item
+        )
+      );
+      setAlerts((current) => current.filter((item) => item._id !== alert._id));
+      setUnreadCount((current) => Math.max(0, current - 1));
+      setDashboardStats((current) => ({
+        ...current,
+        activeAlerts: Math.max(0, current.activeAlerts - 1),
+      }));
+    } catch (error) {
+      console.error("Resolve alert error:", error);
+      Alert.alert("Error", "Failed to resolve alert. Please try again.");
+    } finally {
+      setResolvingAlertId(null);
     }
   };
 
@@ -758,6 +1034,66 @@ export default function SecurityDashboardScreen({ navigation }) {
         <RefreshControl refreshing={refreshing} onRefresh={refreshData} />
       }
     >
+      <View style={styles.dashboardShell}>
+      <View style={styles.securityHeroSection}>
+        <LinearGradient
+          colors={['#7F1D1D', '#DC2626', '#B91C1C']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.securityHeroCard}
+        >
+          <View style={styles.securityHeroTop}>
+            <View style={styles.securityHeroBadge}>
+              <Ionicons name="shield-checkmark-outline" size={14} color="#FECACA" />
+              <Text style={styles.securityHeroBadgeText}>Security Operations Center</Text>
+            </View>
+            <View style={styles.securityHeroShiftBadge}>
+              <Text style={styles.securityHeroShiftText}>On Duty</Text>
+            </View>
+          </View>
+
+          <Text style={styles.securityHeroTitle}>Keep campus access moving safely and visibly.</Text>
+          <Text style={styles.securityHeroSubtitle}>
+            Track approved visitors, monitor live movement, and respond to alerts from one command workspace.
+          </Text>
+
+          <View style={styles.securityHeroStats}>
+            <View style={styles.securityHeroStatCard}>
+              <Text style={styles.securityHeroStatValue}>{visitorStats.activeNow}</Text>
+              <Text style={styles.securityHeroStatLabel}>Active Visitors</Text>
+            </View>
+            <View style={styles.securityHeroStatCard}>
+              <Text style={styles.securityHeroStatValue}>{visitorStats.totalToday}</Text>
+              <Text style={styles.securityHeroStatLabel}>Today's Visits</Text>
+            </View>
+            <View style={styles.securityHeroStatCard}>
+              <Text style={styles.securityHeroStatValue}>{unreadCount}</Text>
+              <Text style={styles.securityHeroStatLabel}>Unread Alerts</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.securityHeroSideCards}>
+          <View style={styles.securityHeroSideCard}>
+            <View style={[styles.securityHeroSideIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="people-circle-outline" size={18} color="#D97706" />
+            </View>
+            <Text style={styles.securityHeroSideValue}>{dashboardStats.activeUsers}</Text>
+            <Text style={styles.securityHeroSideLabel}>On-Site Now</Text>
+            <Text style={styles.securityHeroSideMeta}>{visitorStats.pendingApproval} awaiting admin review</Text>
+          </View>
+
+          <View style={styles.securityHeroSideCard}>
+            <View style={[styles.securityHeroSideIcon, { backgroundColor: '#EDE9FE' }]}>
+              <Ionicons name="document-text-outline" size={18} color="#7C3AED" />
+            </View>
+            <Text style={styles.securityHeroSideValue}>{reports.length}</Text>
+            <Text style={styles.securityHeroSideLabel}>Reports Logged</Text>
+            <Text style={styles.securityHeroSideMeta}>{alerts.length} security alert{alerts.length === 1 ? '' : 's'} tracked</Text>
+          </View>
+        </View>
+      </View>
+
       {/* Quick Stats */}
       <View style={styles.statsContainer}>
         <LinearGradient
@@ -771,10 +1107,10 @@ export default function SecurityDashboardScreen({ navigation }) {
               <Ionicons name="people" size={28} color="#DC2626" />
             </View>
             <Text style={styles.statCardLargeValue}>{visitorStats.activeNow}</Text>
-            <Text style={styles.statCardLargeLabel}>Active Visitors</Text>
+            <Text style={styles.statCardLargeLabel}>Visitors currently being monitored across active access points</Text>
             <View style={styles.statBadge}>
-              <Ionicons name="trending-up" size={12} color="#10B981" />
-              <Text style={styles.statBadgeText}>+{Math.floor(Math.random() * 20)}% today</Text>
+              <Ionicons name="shield-checkmark-outline" size={12} color="#10B981" />
+              <Text style={styles.statBadgeText}>{unreadCount} unread notifications for this shift</Text>
             </View>
           </View>
         </LinearGradient>
@@ -785,8 +1121,8 @@ export default function SecurityDashboardScreen({ navigation }) {
               <Ionicons name="people-circle" size={20} color="#F59E0B" />
             </View>
             <Text style={styles.statValueLarge}>{dashboardStats.activeUsers}</Text>
-            <Text style={styles.statLabel}>Active Users</Text>
-            <Text style={styles.statTrend}>+12 today</Text>
+            <Text style={styles.statLabel}>On-Site Visitors</Text>
+            <Text style={styles.statTrend}>{visitorStats.pendingApproval} waiting on admin approval</Text>
           </View>
 
           <View style={styles.statCardMedium}>
@@ -795,39 +1131,135 @@ export default function SecurityDashboardScreen({ navigation }) {
             </View>
             <Text style={styles.statValueLarge}>{visitorStats.totalToday}</Text>
             <Text style={styles.statLabel}>Today's Visitors</Text>
-            <Text style={styles.statTrend}>Expected +8</Text>
+            <Text style={styles.statTrend}>{reports.length} incident report{reports.length === 1 ? '' : 's'} filed</Text>
           </View>
         </View>
       </View>
 
-      {/* Campus Map Section */}
-      <View style={styles.mapSection}>
+      <View style={styles.securityWorkspaceGrid}>
+      {/* Live Operations Queue */}
+      <View style={styles.securityWorkspacePrimary}>
+        <View style={styles.securityPanelCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="pulse-outline" size={20} color="#10B981" />
+              <View>
+                <Text style={styles.sectionTitle}>Live Operations Queue</Text>
+                <Text style={styles.securitySectionSubtitle}>Monitor active visitors and recent status changes without the campus map.</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => setActiveTab('visitors')}>
+              <Text style={styles.viewAll}>Open Visitors</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.securityMiniStats}>
+            <View style={styles.securityMiniStatCard}>
+              <Text style={styles.securityMiniStatValue}>{visitors.active.length}</Text>
+              <Text style={styles.securityMiniStatLabel}>Checked In</Text>
+            </View>
+            <View style={styles.securityMiniStatCard}>
+              <Text style={styles.securityMiniStatValue}>{visitors.approved.length}</Text>
+              <Text style={styles.securityMiniStatLabel}>Approved</Text>
+            </View>
+            <View style={styles.securityMiniStatCard}>
+              <Text style={styles.securityMiniStatValue}>{visitors.pending.length}</Text>
+              <Text style={styles.securityMiniStatLabel}>Pending</Text>
+            </View>
+          </View>
+
+          <View style={styles.activityList}>
+            {[...visitors.active, ...visitors.approved].slice(0, 6).map((visitor, index) => (
+              <TouchableOpacity
+                key={visitor._id || `${visitor.email}-${index}`}
+                style={styles.activityItem}
+                onPress={() => handleViewDetails(visitor)}
+              >
+                <View style={[styles.activityIcon, {
+                  backgroundColor: visitor.status === 'checked_in' ? '#D1FAE5' : '#DBEAFE',
+                }]}>
+                  <Ionicons
+                    name={visitor.status === 'checked_in' ? 'log-in-outline' : 'checkmark-circle-outline'}
+                    size={16}
+                    color={visitor.status === 'checked_in' ? '#059669' : '#2563EB'}
+                  />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>{visitor.fullName}</Text>
+                  <Text style={styles.activityLocation}>
+                    {visitor.status === 'checked_in' ? 'Currently on site' : 'Ready for arrival'} • {visitor.assignedOffice || visitor.host || 'Campus access'}
+                  </Text>
+                </View>
+                <Text style={styles.activityTime}>
+                  {formatTime(visitor.checkedInAt || visitor.visitTime)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            {[...visitors.active, ...visitors.approved].length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="pulse-outline" size={44} color="#D1D5DB" />
+                <Text style={styles.emptyStateTitle}>No live visitor activity</Text>
+                <Text style={styles.emptyStateSubtitle}>Approved arrivals and active check-ins will appear here automatically.</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Operations Overview */}
+      <View style={[styles.activitySection, styles.securityWorkspaceSecondary]}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
-            <Ionicons name="map-outline" size={20} color="#10B981" />
-            <Text style={styles.sectionTitle}>Live Visitor Tracking</Text>
+            <Ionicons name="clipboard-outline" size={20} color="#10B981" />
+            <Text style={styles.sectionTitle}>Operations Snapshot</Text>
           </View>
-          <TouchableOpacity onPress={() => setShowMapModal(true)}>
-            <Text style={styles.viewAll}>Full Screen</Text>
-          </TouchableOpacity>
+                  <TouchableOpacity onPress={() => {
+                    setVisitorFilter('all');
+                    setActiveTab('visitors');
+                  }}>
+                    <Text style={styles.viewAll}>Manage Visitors</Text>
+                  </TouchableOpacity>
         </View>
-        
-        {renderMapFilters()}
-        
-        <View style={styles.mapContainer}>
-          <CampusMap
-            visitors={getFilteredVisitorLocations()}
-            floors={floors}
-            offices={offices}
-            selectedFloor={selectedFloor}
-            selectedOffice={selectedOffice}
-            onVisitorHover={handleVisitorHover}
-            onVisitorLeave={handleVisitorLeave}
-            onVisitorSelect={handleVisitorSelect}
-            hoveredVisitor={hoveredVisitor}
-            renderHoverCard={renderHoverCard}
-          />
+
+        <View style={styles.reportStatsGrid}>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{visitors.approved.length}</Text>
+            <Text style={styles.reportStatLabel}>Approved Visits</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{visitors.pending.length}</Text>
+            <Text style={styles.reportStatLabel}>Pending Review</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{visitors.completed.length}</Text>
+            <Text style={styles.reportStatLabel}>Completed Today</Text>
+          </View>
         </View>
+
+        <View style={styles.activityList}>
+          {analytics.mostVisitedOffices.slice(0, 3).map((office, index) => (
+            <View key={office.office || index} style={styles.activityItem}>
+              <View style={[styles.activityIcon, { backgroundColor: '#DBEAFE' }]}>
+                <Ionicons name="business-outline" size={16} color="#0A3D91" />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>{office.office}</Text>
+                <Text style={styles.activityLocation}>{office.count} scheduled visit{office.count === 1 ? '' : 's'}</Text>
+              </View>
+              <Text style={styles.activityTime}>{office.percentage}%</Text>
+            </View>
+          ))}
+
+          {analytics.mostVisitedOffices.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="business-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyStateTitle}>No Office Traffic Yet</Text>
+              <Text style={styles.emptyStateSubtitle}>Visitor assignments will appear here once registrations come in</Text>
+            </View>
+          )}
+        </View>
+      </View>
       </View>
 
       {/* Pending Approval Banner */}
@@ -859,7 +1291,10 @@ export default function SecurityDashboardScreen({ navigation }) {
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="flash-outline" size={20} color="#F59E0B" />
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View>
+              <Text style={styles.sectionTitle}>Command Actions</Text>
+              <Text style={styles.securitySectionSubtitle}>Jump into the most common guard tasks without leaving the dashboard.</Text>
+            </View>
           </View>
         </View>
         
@@ -873,24 +1308,27 @@ export default function SecurityDashboardScreen({ navigation }) {
             >
               <Ionicons name="person-add-outline" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionTitle}>Register Visitor</Text>
-              <Text style={styles.quickActionSubtitle}>Add new visitor to system</Text>
+              <Text style={styles.quickActionSubtitle}>Add a new visitor record for manual intake</Text>
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('map')}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('alerts')}>
             <LinearGradient
               colors={['#10B981', '#059669']}
               style={styles.quickActionGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Ionicons name="map-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>View Map</Text>
-              <Text style={styles.quickActionSubtitle}>Track visitor locations</Text>
+              <Ionicons name="warning-outline" size={24} color="#FFFFFF" />
+              <Text style={styles.quickActionTitle}>Alerts Center</Text>
+              <Text style={styles.quickActionSubtitle}>Review alerts and resolve incidents quickly</Text>
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('visitors')}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => {
+            setVisitorFilter('all');
+            setActiveTab('visitors');
+          }}>
             <LinearGradient
               colors={['#F59E0B', '#D97706']}
               style={styles.quickActionGradient}
@@ -898,8 +1336,8 @@ export default function SecurityDashboardScreen({ navigation }) {
               end={{ x: 1, y: 1 }}
             >
               <Ionicons name="list-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>View All</Text>
-              <Text style={styles.quickActionSubtitle}>See all visitors</Text>
+              <Text style={styles.quickActionTitle}>Visitor Queue</Text>
+              <Text style={styles.quickActionSubtitle}>Review all visitor records and statuses</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -912,7 +1350,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             >
               <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionTitle}>Quick Scan</Text>
-              <Text style={styles.quickActionSubtitle}>Scan visitor QR/ID</Text>
+              <Text style={styles.quickActionSubtitle}>Launch QR and ID scanning tools</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -1003,6 +1441,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           ))}
         </View>
       )}
+      </View>
     </ScrollView>
   );
 
@@ -1010,32 +1449,32 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderMapTab = () => (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.mapSectionFull}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="map-outline" size={20} color="#10B981" />
-            <Text style={styles.sectionTitle}>Live Visitor Tracking Map</Text>
-          </View>
-          <TouchableOpacity onPress={() => setShowMapModal(true)}>
-            <Text style={styles.viewAll}>Full Screen</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {renderMapFilters()}
-        
-        <View style={styles.mapContainerFull}>
-          <CampusMap
-            visitors={getFilteredVisitorLocations()}
-            floors={floors}
-            offices={offices}
-            selectedFloor={selectedFloor}
-            selectedOffice={selectedOffice}
-            onVisitorHover={handleVisitorHover}
-            onVisitorLeave={handleVisitorLeave}
-            onVisitorSelect={handleVisitorSelect}
-            hoveredVisitor={hoveredVisitor}
-            renderHoverCard={renderHoverCard}
-          />
-        </View>
+        <SharedMonitoringMap
+          title="Live Visitor Tracking Map"
+          iconName="map-outline"
+          iconColor="#10B981"
+          actionLabel="Full Screen"
+          onActionPress={() => setShowMapModal(true)}
+          controls={renderMapFilters()}
+          visitors={getFilteredVisitorLocations()}
+          floors={floors}
+          offices={offices}
+          selectedFloor={selectedFloor}
+          selectedOffice={selectedOffice}
+          onVisitorHover={handleVisitorHover}
+          onVisitorLeave={handleVisitorLeave}
+          onVisitorSelect={handleVisitorSelect}
+          hoveredVisitor={hoveredVisitor}
+          renderHoverCard={renderHoverCard}
+          backgroundColor="#FFFFFF"
+          borderColor="#E5E7EB"
+          summaryItems={[
+            { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
+            { label: "Approved", value: visitors.approved.length || 0, color: "#2563EB" },
+            { label: "Checked In", value: visitors.active.length || 0, color: "#F59E0B" },
+          ]}
+          statusLabel="Security monitoring"
+        />
       </View>
     </ScrollView>
   );
@@ -1047,7 +1486,12 @@ export default function SecurityDashboardScreen({ navigation }) {
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="people-outline" size={20} color="#0A3D91" />
-            <Text style={styles.sectionTitle}>Visitor Management</Text>
+            <View>
+              <Text style={styles.sectionTitle}>Visitor Management</Text>
+              <Text style={styles.securitySectionSubtitle}>
+                Completed visits stay here for 30 days, then roll off the history view automatically.
+              </Text>
+            </View>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={handleRegisterVisitor}>
             <Ionicons name="add" size={20} color="#FFFFFF" />
@@ -1057,7 +1501,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
         {/* Filter Tabs */}
         <View style={styles.filterTabs}>
-          {['active', 'pending', 'approved', 'completed', 'all'].map((filter) => (
+          {['all', 'active', 'pending', 'approved', 'completed'].map((filter) => (
             <TouchableOpacity
               key={filter}
               style={[styles.filterTab, visitorFilter === filter && styles.filterTabActive]}
@@ -1067,7 +1511,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               }}
             >
               <Text style={[styles.filterTabText, visitorFilter === filter && styles.filterTabTextActive]}>
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                {filter === 'completed' ? 'Completed' : filter.charAt(0).toUpperCase() + filter.slice(1)}
                 {filter === 'active' && ` (${visitors.active.length})`}
                 {filter === 'pending' && ` (${visitors.pending.length})`}
                 {filter === 'approved' && ` (${visitors.approved.length})`}
@@ -1103,7 +1547,11 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name="people-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyStateTitle}>No visitors found</Text>
             <Text style={styles.emptyStateSubtitle}>
-              {searchQuery ? 'Try a different search term' : 'No visitors in this category'}
+              {searchQuery
+                ? 'Try a different search term'
+                : visitorFilter === 'completed'
+                  ? 'No completed visits are available in the last 30 days'
+                  : 'No visitors in this category'}
             </Text>
           </View>
         )}
@@ -1151,12 +1599,14 @@ export default function SecurityDashboardScreen({ navigation }) {
               {!alert.resolved && (
                 <TouchableOpacity 
                   style={styles.resolveButton}
-                  onPress={async () => {
-                    await ApiService.resolveAlert(alert._id);
-                    refreshData();
-                  }}
+                  onPress={() => handleResolveAlert(alert)}
+                  disabled={resolvingAlertId === alert._id}
                 >
-                  <Text style={styles.resolveButtonText}>Mark as Resolved</Text>
+                  {resolvingAlertId === alert._id ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.resolveButtonText}>Mark as Resolved</Text>
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -1236,10 +1686,10 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
           <TouchableOpacity 
             style={styles.generateButton}
-            onPress={() => Alert.alert('Generate Report', 'Report generation feature coming soon')}
+            onPress={refreshData}
           >
-            <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.generateButtonText}>Export</Text>
+            <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.generateButtonText}>Refresh</Text>
           </TouchableOpacity>
         </View>
 
@@ -1292,6 +1742,14 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Text style={styles.reportCardStatus}>Status: {report.status}</Text>
               </View>
             ))}
+          </View>
+        )}
+
+        {reports.length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="shield-checkmark-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateTitle}>No Security Reports</Text>
+            <Text style={styles.emptyStateSubtitle}>Reported visitor incidents will appear here</Text>
           </View>
         )}
       </View>
@@ -1410,6 +1868,10 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderVisitorCard = (visitor) => {
     const statusBadge = getStatusBadge(visitor);
     const isCheckedIn = visitor.status === 'checked_in';
+    const isProcessing = isVisitorProcessing(visitor._id);
+    const historyDaysLeft = visitor.status === 'checked_out'
+      ? getCompletedHistoryDaysLeft(visitor)
+      : null;
     
     return (
       <TouchableOpacity
@@ -1468,22 +1930,41 @@ export default function SecurityDashboardScreen({ navigation }) {
               {formatDate(visitor.visitDate)}
             </Text>
           </View>
+          {historyDaysLeft !== null && (
+            <View style={[styles.visitorCardFooterItem, styles.visitorHistoryCountdown]}>
+              <Ionicons name="time-outline" size={14} color="#D97706" />
+              <Text style={styles.visitorHistoryCountdownText}>
+                {historyDaysLeft} day{historyDaysLeft === 1 ? '' : 's'} left
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.visitorCardActions}>
           {visitor.approvalStatus === 'approved' && (
             <TouchableOpacity 
-              style={[styles.visitorCardAction, styles.visitorCardActionPrimary]}
+              style={[
+                styles.visitorCardAction,
+                styles.visitorCardActionPrimary,
+                isProcessing && styles.buttonDisabled,
+              ]}
               onPress={() => isCheckedIn ? handleCheckOut(visitor) : handleCheckIn(visitor)}
+              disabled={isProcessing}
             >
-              <Ionicons 
-                name={isCheckedIn ? "log-out-outline" : "log-in-outline"} 
-                size={18} 
-                color="#FFFFFF" 
-              />
-              <Text style={styles.visitorCardActionText}>
-                {isCheckedIn ? 'Check Out' : 'Check In'}
-              </Text>
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons 
+                    name={isCheckedIn ? "log-out-outline" : "log-in-outline"} 
+                    size={18} 
+                    color="#FFFFFF" 
+                  />
+                  <Text style={styles.visitorCardActionText}>
+                    {isCheckedIn ? 'Check Out' : 'Check In'}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
 
@@ -1638,7 +2119,6 @@ export default function SecurityDashboardScreen({ navigation }) {
   // Menu Items
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline', color: '#DC2626' },
-    { id: 'map', label: 'Live Map', icon: 'map-outline', color: '#10B981' },
     { id: 'visitors', label: 'Visitors', icon: 'people-outline', color: '#0A3D91' },
     { id: 'alerts', label: 'Alerts', icon: 'warning-outline', color: '#F59E0B' },
     { id: 'logs', label: 'Access Logs', icon: 'time-outline', color: '#059669' },
@@ -1808,8 +2288,12 @@ export default function SecurityDashboardScreen({ navigation }) {
             </TouchableOpacity>
           </View>
           <View style={styles.fullscreenMapContainer}>
-            {renderMapFilters()}
-            <CampusMap
+            <SharedMonitoringMap
+              title="Live Visitor Tracking"
+              subtitle="Monitor approved visitors, check-ins, and on-site movement from one shared monitoring map."
+              iconName="map-outline"
+              iconColor="#10B981"
+              controls={renderMapFilters()}
               visitors={getFilteredVisitorLocations()}
               floors={floors}
               offices={offices}
@@ -1820,7 +2304,18 @@ export default function SecurityDashboardScreen({ navigation }) {
               onVisitorSelect={handleVisitorSelect}
               hoveredVisitor={hoveredVisitor}
               renderHoverCard={renderHoverCard}
-              fullscreen={true}
+              fullscreen
+              backgroundColor="#111827"
+              borderColor="#374151"
+              mapBackgroundColor="#111827"
+              textPrimary="#FFFFFF"
+              textSecondary="#CBD5E1"
+              summaryItems={[
+                { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
+                { label: "Approved", value: visitors.approved.length || 0, color: "#60A5FA" },
+                { label: "Checked In", value: visitors.active.length || 0, color: "#FBBF24" },
+              ]}
+              statusLabel="Security monitoring"
             />
           </View>
         </View>
@@ -2039,122 +2534,157 @@ export default function SecurityDashboardScreen({ navigation }) {
         onRequestClose={() => setShowDetailModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Visitor Details</Text>
+          <View style={[styles.modalContent, styles.visitorDetailModalContent]}>
+            <View style={[styles.modalHeader, styles.visitorDetailHeader]}>
+              <View>
+                <Text style={styles.modalTitle}>Visitor Profile</Text>
+                <Text style={styles.visitorDetailHeaderSubtitle}>Review identity, schedule, and access status before taking action.</Text>
+              </View>
               <TouchableOpacity onPress={() => setShowDetailModal(false)}>
                 <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
             {selectedVisitor && (
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                <View style={styles.detailPhotoSection}>
-                  {selectedVisitor.idPhoto ? (
-                    <Image 
-                      source={{ uri: selectedVisitor.idPhoto }} 
-                      style={styles.detailIdPhoto} 
-                    />
-                  ) : (
-                    <View style={styles.detailIdPlaceholder}>
-                      <Ionicons name="id-card-outline" size={60} color="#9CA3AF" />
-                      <Text style={styles.detailIdPlaceholderText}>No ID photo available</Text>
-                    </View>
-                  )}
-                  <View style={[styles.statusBadge, { 
-                    backgroundColor: getStatusBadge(selectedVisitor).bg,
-                    alignSelf: 'center',
-                    marginTop: 10,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                  }]}>
-                    <Text style={[styles.statusBadgeText, { 
-                      color: getStatusBadge(selectedVisitor).text 
-                    }]}>
-                      {getStatusBadge(selectedVisitor).label}
+              <ScrollView style={styles.modalBody} contentContainerStyle={styles.visitorDetailBody} showsVerticalScrollIndicator={false}>
+                {selectedVisitor.status === 'checked_out' && getCompletedHistoryDaysLeft(selectedVisitor) !== null ? (
+                  <View style={styles.visitorHistoryNotice}>
+                    <Ionicons name="archive-outline" size={18} color="#D97706" />
+                    <Text style={styles.visitorHistoryNoticeText}>
+                      This visit history will remain visible for {getCompletedHistoryDaysLeft(selectedVisitor)} more day{getCompletedHistoryDaysLeft(selectedVisitor) === 1 ? '' : 's'} before it rolls off Visitor Management. The visitor account will stay active in the system.
                     </Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.visitorDetailHero}>
+                  <View style={styles.detailPhotoSection}>
+                    {selectedVisitor.idImage ? (
+                      <Image 
+                        source={{ uri: selectedVisitor.idImage }} 
+                        style={styles.detailIdPhoto} 
+                      />
+                    ) : (
+                      <View style={styles.detailIdPlaceholder}>
+                        <Ionicons name="id-card-outline" size={60} color="#9CA3AF" />
+                        <Text style={styles.detailIdPlaceholderText}>No ID photo available</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.visitorDetailHeroCopy}>
+                    <View style={styles.visitorDetailBadgeRow}>
+                      <View style={[styles.visitorDetailStatusPill, { backgroundColor: getStatusBadge(selectedVisitor).bg }]}>
+                        <Text style={[styles.visitorDetailStatusPillText, { color: getStatusBadge(selectedVisitor).text }]}>
+                          {getStatusBadge(selectedVisitor).label}
+                        </Text>
+                      </View>
+                      <View style={styles.visitorDetailAccessPill}>
+                        <Ionicons name="shield-checkmark-outline" size={12} color="#0A3D91" />
+                        <Text style={styles.visitorDetailAccessPillText}>
+                          {selectedVisitor.approvalStatus === 'approved' ? 'Cleared for access' : 'Awaiting clearance'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.detailName}>{selectedVisitor.fullName}</Text>
+                    <Text style={styles.visitorDetailPurpose}>{selectedVisitor.purposeOfVisit || 'No purpose recorded'}</Text>
+
+                    <View style={styles.visitorDetailQuickInfo}>
+                      <View style={styles.visitorDetailQuickInfoCard}>
+                        <Text style={styles.visitorDetailQuickInfoLabel}>Visit Date</Text>
+                        <Text style={styles.visitorDetailQuickInfoValue}>{formatDate(selectedVisitor.visitDate)}</Text>
+                      </View>
+                      <View style={styles.visitorDetailQuickInfoCard}>
+                        <Text style={styles.visitorDetailQuickInfoLabel}>Visit Time</Text>
+                        <Text style={styles.visitorDetailQuickInfoValue}>{formatTime(selectedVisitor.visitTime)}</Text>
+                      </View>
+                      <View style={styles.visitorDetailQuickInfoCard}>
+                        <Text style={styles.visitorDetailQuickInfoLabel}>Host</Text>
+                        <Text style={styles.visitorDetailQuickInfoValue}>{selectedVisitor.host || 'Not assigned'}</Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
 
-                <View style={styles.detailInfoSection}>
-                  <Text style={styles.detailName}>{selectedVisitor.fullName}</Text>
-                  
-                  <View style={styles.detailItem}>
-                    <Ionicons name="call-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>{selectedVisitor.phoneNumber}</Text>
-                  </View>
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="mail-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>{selectedVisitor.email}</Text>
-                  </View>
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="card-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>ID: {selectedVisitor.idNumber}</Text>
-                  </View>
-
-                  <View style={styles.detailDivider} />
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="document-text-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>{selectedVisitor.purposeOfVisit}</Text>
-                  </View>
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="person-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>Host: {selectedVisitor.host}</Text>
-                  </View>
-
-                  {selectedVisitor.assignedOffice && (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="business-outline" size={18} color="#6B7280" />
-                      <Text style={styles.detailText}>Office: {selectedVisitor.assignedOffice}</Text>
+                <View style={styles.visitorDetailSection}>
+                  <Text style={styles.visitorDetailSectionTitle}>Identity & Contact</Text>
+                  <View style={styles.visitorDetailInfoGrid}>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Phone</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.phoneNumber || 'No phone number'}</Text>
                     </View>
-                  )}
-
-                  {selectedVisitor.vehicleNumber && (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="car-outline" size={18} color="#6B7280" />
-                      <Text style={styles.detailText}>Vehicle: {selectedVisitor.vehicleNumber}</Text>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Email</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.email || 'No email address'}</Text>
                     </View>
-                  )}
-
-                  <View style={styles.detailDivider} />
-
-                  <View style={styles.detailItem}>
-                    <Ionicons name="calendar-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>Visit Date: {formatDate(selectedVisitor.visitDate)}</Text>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>ID Number</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.idNumber || 'No ID recorded'}</Text>
+                    </View>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Vehicle</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.vehicleNumber || 'No vehicle listed'}</Text>
+                    </View>
                   </View>
+                </View>
 
-                  <View style={styles.detailItem}>
-                    <Ionicons name="time-outline" size={18} color="#6B7280" />
-                    <Text style={styles.detailText}>Visit Time: {formatTime(selectedVisitor.visitTime)}</Text>
+                <View style={styles.visitorDetailSection}>
+                  <Text style={styles.visitorDetailSectionTitle}>Visit Assignment</Text>
+                  <View style={styles.visitorDetailInfoGrid}>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Host / Department</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.host || 'Not set'}</Text>
+                    </View>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Assigned Office</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.assignedOffice || 'Not assigned'}</Text>
+                    </View>
                   </View>
+                </View>
 
-                  {selectedVisitor.checkedInAt && (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="log-in-outline" size={18} color="#10B981" />
-                      <Text style={styles.detailText}>
-                        Checked In: {formatDateTime(selectedVisitor.checkedInAt)}
-                      </Text>
+                <View style={styles.visitorDetailSection}>
+                  <Text style={styles.visitorDetailSectionTitle}>Access Timeline</Text>
+                  <View style={styles.visitorDetailTimeline}>
+                    <View style={styles.visitorDetailTimelineItem}>
+                      <View style={[styles.visitorDetailTimelineDot, { backgroundColor: '#3B82F6' }]} />
+                      <View style={styles.visitorDetailTimelineCopy}>
+                        <Text style={styles.visitorDetailTimelineTitle}>Scheduled Arrival</Text>
+                        <Text style={styles.visitorDetailTimelineText}>
+                          {formatDate(selectedVisitor.visitDate)} at {formatTime(selectedVisitor.visitTime)}
+                        </Text>
+                      </View>
                     </View>
-                  )}
 
-                  {selectedVisitor.checkedOutAt && (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-                      <Text style={styles.detailText}>
-                        Checked Out: {formatDateTime(selectedVisitor.checkedOutAt)}
-                      </Text>
-                    </View>
-                  )}
+                    {selectedVisitor.checkedInAt ? (
+                      <View style={styles.visitorDetailTimelineItem}>
+                        <View style={[styles.visitorDetailTimelineDot, { backgroundColor: '#10B981' }]} />
+                        <View style={styles.visitorDetailTimelineCopy}>
+                          <Text style={styles.visitorDetailTimelineTitle}>Checked In</Text>
+                          <Text style={styles.visitorDetailTimelineText}>{formatDateTime(selectedVisitor.checkedInAt)}</Text>
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {selectedVisitor.checkedOutAt ? (
+                      <View style={styles.visitorDetailTimelineItem}>
+                        <View style={[styles.visitorDetailTimelineDot, { backgroundColor: '#DC2626' }]} />
+                        <View style={styles.visitorDetailTimelineCopy}>
+                          <Text style={styles.visitorDetailTimelineTitle}>Checked Out</Text>
+                          <Text style={styles.visitorDetailTimelineText}>{formatDateTime(selectedVisitor.checkedOutAt)}</Text>
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
 
                 <View style={styles.detailActions}>
                   {selectedVisitor.approvalStatus === 'approved' && selectedVisitor.status !== 'checked_out' && (
                     <TouchableOpacity 
-                      style={[styles.detailActionButton, styles.detailActionPrimary]}
+                      style={[
+                        styles.detailActionButton,
+                        styles.detailActionPrimary,
+                        isVisitorProcessing(selectedVisitor._id) && styles.buttonDisabled,
+                      ]}
                       onPress={() => {
                         setShowDetailModal(false);
                         if (selectedVisitor.status === 'checked_in') {
@@ -2163,15 +2693,22 @@ export default function SecurityDashboardScreen({ navigation }) {
                           handleCheckIn(selectedVisitor);
                         }
                       }}
+                      disabled={isVisitorProcessing(selectedVisitor._id)}
                     >
-                      <Ionicons 
-                        name={selectedVisitor.status === 'checked_in' ? "log-out-outline" : "log-in-outline"} 
-                        size={20} 
-                        color="#FFFFFF" 
-                      />
-                      <Text style={styles.detailActionText}>
-                        {selectedVisitor.status === 'checked_in' ? 'Check Out' : 'Check In'}
-                      </Text>
+                      {isVisitorProcessing(selectedVisitor._id) ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons 
+                            name={selectedVisitor.status === 'checked_in' ? "log-out-outline" : "log-in-outline"} 
+                            size={20} 
+                            color="#FFFFFF" 
+                          />
+                          <Text style={styles.detailActionText}>
+                            {selectedVisitor.status === 'checked_in' ? 'Check Out' : 'Check In'}
+                          </Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   )}
 

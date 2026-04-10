@@ -304,7 +304,7 @@ export default function VisitorScreen({ navigation, route }) {
             <View style={visitorScreenStyles.cardHeader}>
               <View>
                 <Text style={visitorScreenStyles.cardTitle}>VISITOR ACCESS</Text>
-                <Text style={visitorScreenStyles.cardSubtitle}>Sapphire Aviation Academy</Text>
+                <Text style={visitorScreenStyles.cardSubtitle}>Sapphire International Aviation Academy</Text>
               </View>
               <View style={visitorScreenStyles.cardLogo}>
                 <Ionicons name="airplane" size={24} color="#FFFFFF" />

@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "SafePass Mobile",
+    "name": "Sapphire International Aviation Academy",
     "slug": "safepass-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/LogoSapphireAppIcon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/LogoSapphire.jpg",
       "resizeMode": "contain",
-      "backgroundColor": "#0A3D91"
+      "backgroundColor": "#041E42"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -23,8 +23,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0A3D91"
+        "foregroundImage": "./assets/LogoSapphireAppIcon.png",
+        "backgroundColor": "#041E42"
       },
       "permissions": [
         "android.permission.CAMERA",
@@ -33,7 +33,10 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon-school.png",
+      "build": {
+        "output": "static"
+      }
     },
     "plugins": [
       [

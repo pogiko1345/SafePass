@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npm run build:web",
+  "outputDirectory": "static",
+  "devCommand": "npm run web",
+  "installCommand": "npm install",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/((?!static/|favicon\\.ico|favicon-16\\.png|favicon-32\\.png|manifest\\.json|asyncStorageMock\\.js|pwa/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

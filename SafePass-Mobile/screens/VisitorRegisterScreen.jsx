@@ -1,6 +1,4 @@
-// VisitorRegisterScreen.jsx (Safe Version – Full UI + Animations)
-
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,31 +14,24 @@ import {
   ActivityIndicator,
   Modal,
   Linking,
-  Animated,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import visitorRegisterStyles from "../styles/VisitorRegisterStyles";
-
-// Safe service imports – prevent crash if files are missing
-let ApiService = null;
-let IDScannerService = null;
-try {
-  ApiService = require("../utils/ApiService").default;
-  IDScannerService = require("../utils/IDScannerService").default;
-} catch (e) {
-  console.warn("Service import failed – using fallback:", e.message);
-}
+import ApiService from "../utils/ApiService";
+import IDScannerService from "../utils/IDScannerService";
+import Logo from "../assets/LogoSapphire.jpg";
 
 let DateTimePickerComponent = null;
-if (Platform.OS !== 'web') {
+if (Platform.OS !== "web") {
   try {
-    const DateTimePickerModule = require('@react-native-community/datetimepicker');
+    const DateTimePickerModule = require("@react-native-community/datetimepicker");
     DateTimePickerComponent = DateTimePickerModule.default;
   } catch (error) {
-    console.warn('DateTimePicker not available:', error);
+    console.warn("DateTimePicker not available:", error);
   }
 }
 
@@ -53,61 +44,98 @@ const purposeOptions = [
   "Emergency",
   "Interview",
   "Event Participation",
-  "Other"
+  "Other",
 ];
 
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({ visible, credentials, onConfirm }) => {
   const handleCopy = (text, type) => {
-    if (Platform.OS === 'web') {
-      navigator.clipboard.writeText(text);
+    if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text).catch(() => {});
     }
     Alert.alert("Copied", `${type} copied to clipboard`);
   };
 
   return (
-    <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onConfirm}>
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onConfirm}
+    >
       <View style={visitorRegisterStyles.modalOverlay}>
         <View style={visitorRegisterStyles.successModalContainer}>
           <View style={visitorRegisterStyles.successIconContainer}>
-            <LinearGradient colors={['#10B981', '#059669']} style={visitorRegisterStyles.successIconGradient}>
+            <LinearGradient
+              colors={["#10B981", "#059669"]}
+              style={visitorRegisterStyles.successIconGradient}
+            >
               <Ionicons name="checkmark-done" size={48} color="#FFFFFF" />
             </LinearGradient>
           </View>
-          <Text style={visitorRegisterStyles.successTitle}>Registration Submitted!</Text>
+          <Text style={visitorRegisterStyles.successTitle}>
+            Registration Submitted!
+          </Text>
           <Text style={visitorRegisterStyles.successMessage}>
-            Your visitor registration has been submitted and is pending admin approval.
-            You will receive an email once approved.
+            Your request has been sent to the admin for approval. You can log in
+            now using these credentials, and your dashboard will show that your
+            visit is waiting for approval.
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
-            <Text style={visitorRegisterStyles.credentialsTitle}>
-              <Ionicons name="mail-outline" size={16} color="#059669" /> Your Credentials
-            </Text>
+            <View style={visitorRegisterStyles.credentialsTitleRow}>
+              <Ionicons name="mail-outline" size={16} color="#059669" />
+              <Text style={visitorRegisterStyles.credentialsTitle}>
+                Your Credentials
+              </Text>
+            </View>
             <Text style={visitorRegisterStyles.credentialsInfo}>
-              These credentials will be activated after admin approval.
+              Save these login details. Your account is already available for sign in.
             </Text>
             {credentials && (
               <>
                 <View style={visitorRegisterStyles.credentialRow}>
-                  <Text style={visitorRegisterStyles.credentialLabel}>Email:</Text>
-                  <Text style={visitorRegisterStyles.credentialValue}>{credentials.email}</Text>
-                  <TouchableOpacity onPress={() => handleCopy(credentials.email, "Email")} style={visitorRegisterStyles.copyButton}>
+                  <Text style={visitorRegisterStyles.credentialLabel}>
+                    Email:
+                  </Text>
+                  <Text style={visitorRegisterStyles.credentialValue}>
+                    {credentials.email}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => handleCopy(credentials.email, "Email")}
+                    style={visitorRegisterStyles.copyButton}
+                  >
                     <Ionicons name="copy-outline" size={18} color="#059669" />
                   </TouchableOpacity>
                 </View>
                 <View style={visitorRegisterStyles.credentialRow}>
-                  <Text style={visitorRegisterStyles.credentialLabel}>Password:</Text>
-                  <Text style={visitorRegisterStyles.credentialValue}>{credentials.password}</Text>
-                  <TouchableOpacity onPress={() => handleCopy(credentials.password, "Password")} style={visitorRegisterStyles.copyButton}>
+                  <Text style={visitorRegisterStyles.credentialLabel}>
+                    Password:
+                  </Text>
+                  <Text style={visitorRegisterStyles.credentialValue}>
+                    {credentials.password}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => handleCopy(credentials.password, "Password")}
+                    style={visitorRegisterStyles.copyButton}
+                  >
                     <Ionicons name="copy-outline" size={18} color="#059669" />
                   </TouchableOpacity>
                 </View>
               </>
             )}
           </View>
-          <TouchableOpacity style={visitorRegisterStyles.successButton} onPress={onConfirm} activeOpacity={0.7}>
-            <LinearGradient colors={['#059669', '#047857']} style={visitorRegisterStyles.successGradient}>
-              <Text style={visitorRegisterStyles.successButtonText}>Return to Login</Text>
+          <TouchableOpacity
+            style={visitorRegisterStyles.successButton}
+            onPress={onConfirm}
+            activeOpacity={0.7}
+          >
+            <LinearGradient
+              colors={["#059669", "#047857"]}
+              style={visitorRegisterStyles.successGradient}
+            >
+              <Text style={visitorRegisterStyles.successButtonText}>
+                Go to Login
+              </Text>
               <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
             </LinearGradient>
           </TouchableOpacity>
@@ -122,86 +150,182 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
   const [accepted, setAccepted] = useState(false);
 
   return (
-    <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onDecline}>
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onDecline}
+    >
       <View style={visitorRegisterStyles.modalOverlay}>
         <View style={visitorRegisterStyles.privacyModalContainer}>
           <View style={visitorRegisterStyles.privacyModalHeader}>
             <View style={visitorRegisterStyles.privacyIconContainer}>
-              <LinearGradient colors={['#059669', '#047857']} style={visitorRegisterStyles.privacyIconGradient}>
+              <LinearGradient
+                colors={["#059669", "#047857"]}
+                style={visitorRegisterStyles.privacyIconGradient}
+              >
                 <Ionicons name="shield-checkmark" size={28} color="#FFFFFF" />
               </LinearGradient>
             </View>
-            <Text style={visitorRegisterStyles.privacyModalTitle}>Data Privacy Agreement</Text>
-            <Text style={visitorRegisterStyles.privacyModalSubtitle}>Please review and accept our data privacy policy</Text>
+            <Text style={visitorRegisterStyles.privacyModalTitle}>
+              Data Privacy Agreement
+            </Text>
+            <Text style={visitorRegisterStyles.privacyModalSubtitle}>
+              Please review and accept our data privacy policy
+            </Text>
           </View>
-          <ScrollView style={visitorRegisterStyles.privacyModalContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={visitorRegisterStyles.privacyModalContent}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
                 <Ionicons name="information-circle" size={20} color="#059669" />
-                <Text style={visitorRegisterStyles.privacySectionTitle}>Information We Collect</Text>
+                <Text style={visitorRegisterStyles.privacySectionTitle}>
+                  Information We Collect
+                </Text>
               </View>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Full name and contact information (email, phone number)</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Government-issued ID number and photo</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Visit details including purpose, date, and time</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Vehicle information (if applicable)</Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Full name and contact information (email, phone number)
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Government-issued ID number and photo
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Visit details including purpose, date, and time
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Vehicle information (if applicable)
+              </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
                 <Ionicons name="shield" size={20} color="#059669" />
-                <Text style={visitorRegisterStyles.privacySectionTitle}>How We Use Your Data</Text>
+                <Text style={visitorRegisterStyles.privacySectionTitle}>
+                  How We Use Your Data
+                </Text>
               </View>
-              <Text style={visitorRegisterStyles.privacySectionText}>• To verify your identity for campus access</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• To maintain security logs and access records</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• To contact you regarding your visit</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• For compliance with legal and regulatory requirements</Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • To verify your identity for campus access
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • To maintain security logs and access records
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • To contact you regarding your visit
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • For compliance with legal and regulatory requirements
+              </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
                 <Ionicons name="lock-closed" size={20} color="#059669" />
-                <Text style={visitorRegisterStyles.privacySectionTitle}>Data Protection</Text>
+                <Text style={visitorRegisterStyles.privacySectionTitle}>
+                  Data Protection
+                </Text>
               </View>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Your data is encrypted using 256-bit encryption</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• We never share your information with third parties</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• You can request data deletion at any time</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Records are automatically deleted after 30 days</Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Your data is encrypted using 256-bit encryption
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • We never share your information with third parties
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • You can request data deletion at any time
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Records are automatically deleted after 30 days
+              </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
                 <Ionicons name="time" size={20} color="#059669" />
-                <Text style={visitorRegisterStyles.privacySectionTitle}>Retention Period</Text>
+                <Text style={visitorRegisterStyles.privacySectionTitle}>
+                  Retention Period
+                </Text>
               </View>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Visitor records are kept for 30 days for security purposes</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• After 30 days, all personal data is automatically anonymized</Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Visitor records are kept for 30 days for security purposes
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • After 30 days, all personal data is automatically anonymized
+              </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
                 <Ionicons name="document-text" size={20} color="#059669" />
-                <Text style={visitorRegisterStyles.privacySectionTitle}>Your Rights</Text>
+                <Text style={visitorRegisterStyles.privacySectionTitle}>
+                  Your Rights
+                </Text>
               </View>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Right to access your personal data</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Right to rectification of inaccurate data</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Right to erasure (right to be forgotten)</Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>• Right to restrict processing</Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Right to access your personal data
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Right to rectification of inaccurate data
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Right to erasure (right to be forgotten)
+              </Text>
+              <Text style={visitorRegisterStyles.privacySectionText}>
+                • Right to restrict processing
+              </Text>
             </View>
           </ScrollView>
-          <TouchableOpacity style={visitorRegisterStyles.privacyCheckboxContainer} onPress={() => setAccepted(!accepted)} activeOpacity={0.7}>
-            <View style={[visitorRegisterStyles.privacyCheckbox, accepted && visitorRegisterStyles.privacyCheckboxChecked]}>
-              {accepted && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+          <TouchableOpacity
+            style={visitorRegisterStyles.privacyCheckboxContainer}
+            onPress={() => setAccepted(!accepted)}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[
+                visitorRegisterStyles.privacyCheckbox,
+                accepted && visitorRegisterStyles.privacyCheckboxChecked,
+              ]}
+            >
+              {accepted && (
+                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+              )}
             </View>
             <Text style={visitorRegisterStyles.privacyCheckboxText}>
-              I have read and agree to the{' '}
-              <Text style={visitorRegisterStyles.privacyLinkText} onPress={() => Linking.openURL('https://example.com/privacy')}>
+              I have read and agree to the{" "}
+              <Text
+                style={visitorRegisterStyles.privacyLinkText}
+                onPress={() => Linking.openURL("https://example.com/privacy")}
+              >
                 Privacy Policy
               </Text>
             </Text>
           </TouchableOpacity>
           <View style={visitorRegisterStyles.privacyModalActions}>
-            <TouchableOpacity style={visitorRegisterStyles.privacyDeclineButton} onPress={onDecline} activeOpacity={0.7}>
-              <Text style={visitorRegisterStyles.privacyDeclineText}>Decline</Text>
+            <TouchableOpacity
+              style={visitorRegisterStyles.privacyDeclineButton}
+              onPress={onDecline}
+              activeOpacity={0.7}
+            >
+              <Text style={visitorRegisterStyles.privacyDeclineText}>
+                Decline
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[visitorRegisterStyles.privacyAcceptButton, !accepted && visitorRegisterStyles.privacyAcceptButtonDisabled]} onPress={() => accepted && onAccept()} disabled={!accepted} activeOpacity={0.7}>
-              <LinearGradient colors={accepted ? ['#059669', '#047857'] : ['#9CA3AF', '#9CA3AF']} style={visitorRegisterStyles.privacyAcceptGradient}>
-                <Text style={visitorRegisterStyles.privacyAcceptText}>Accept & Continue</Text>
+            <TouchableOpacity
+              style={[
+                visitorRegisterStyles.privacyAcceptButton,
+                !accepted && visitorRegisterStyles.privacyAcceptButtonDisabled,
+              ]}
+              onPress={() => accepted && onAccept()}
+              disabled={!accepted}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={
+                  accepted ? ["#059669", "#047857"] : ["#9CA3AF", "#9CA3AF"]
+                }
+                style={visitorRegisterStyles.privacyAcceptGradient}
+              >
+                <Text style={visitorRegisterStyles.privacyAcceptText}>
+                  Accept & Continue
+                </Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
               </LinearGradient>
             </TouchableOpacity>
@@ -214,6 +338,56 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
 
 // ================= MAIN COMPONENT =================
 export default function VisitorRegisterScreen({ navigation }) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const isCompactRegister = viewportWidth <= 420;
+  const isTabletRegister = viewportWidth >= 768;
+  const registerHorizontalMargin = isCompactRegister ? 12 : 16;
+  const registerShellMaxWidth = Math.min(
+    860,
+    Math.max(viewportWidth - registerHorizontalMargin * 2, 300)
+  );
+  const headerResponsiveStyle = {
+    paddingBottom: isCompactRegister ? 34 : 42,
+  };
+  const headerButtonsResponsiveStyle = {
+    left: registerHorizontalMargin,
+    right: registerHorizontalMargin,
+  };
+  const headerContentResponsiveStyle = {
+    paddingHorizontal: isCompactRegister ? 16 : 22,
+    maxWidth: isTabletRegister ? 720 : 640,
+  };
+  const headerIconGradientResponsiveStyle = {
+    width: isCompactRegister ? 64 : 72,
+    height: isCompactRegister ? 64 : 72,
+    borderRadius: isCompactRegister ? 32 : 36,
+  };
+  const headerTitleResponsiveStyle = {
+    fontSize: isCompactRegister ? 24 : undefined,
+    lineHeight: isCompactRegister ? 30 : undefined,
+  };
+  const headerDescriptionResponsiveStyle = {
+    lineHeight: isCompactRegister ? 20 : 22,
+  };
+  const formShellResponsiveStyle = Platform.OS === "web"
+    ? { maxWidth: registerShellMaxWidth }
+    : null;
+  const sectionCardResponsiveStyle = {
+    marginHorizontal: registerHorizontalMargin,
+  };
+  const contentResponsiveStyle = {
+    padding: isCompactRegister ? 16 : 22,
+  };
+  const sectionHeaderResponsiveStyle = isCompactRegister
+    ? { flexDirection: "column", alignItems: "flex-start" }
+    : null;
+  const actionRowResponsiveStyle = isCompactRegister
+    ? { flexDirection: "column", gap: 10 }
+    : null;
+  const actionButtonResponsiveStyle = isCompactRegister
+    ? { width: "100%", flex: 0 }
+    : null;
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -221,18 +395,6 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [showPurposePicker, setShowPurposePicker] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
-  
-  // Animation for step transitions (content fade/slide)
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  
-  // Animation for progress bar width
-  const progressWidthAnim = useRef(new Animated.Value(33)).current; // start at 33% for step 1
-  
-  // Animation for step circles (scale effect)
-  const stepScale1 = useRef(new Animated.Value(1)).current;
-  const stepScale2 = useRef(new Animated.Value(1)).current;
-  const stepScale3 = useRef(new Animated.Value(1)).current;
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -259,76 +421,70 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const [idImage, setIdImage] = useState(null);
   const [idImageBase64, setIdImageBase64] = useState(null);
+  const [idImageFileName, setIdImageFileName] = useState("");
   const [focusedField, setFocusedField] = useState(null);
   const [completedFields, setCompletedFields] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [webDate, setWebDate] = useState(new Date().toISOString().split('T')[0]);
-  const [webTime, setWebTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
+  const [webDate, setWebDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [webTime, setWebTime] = useState(
+    new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }),
+  );
   const [registeredVisitor, setRegisteredVisitor] = useState(null);
 
   useEffect(() => {
     checkPermissions();
   }, []);
 
-  // Animate when step changes
   useEffect(() => {
-    // Animate progress bar width
-    let targetPercent = 33;
-    if (currentStep === 1) targetPercent = 33;
-    else if (currentStep === 2) targetPercent = 66;
-    else if (currentStep === 3) targetPercent = 100;
-    
-    Animated.timing(progressWidthAnim, {
-      toValue: targetPercent,
-      duration: 400,
-      useNativeDriver: false, // width animation requires native driver false
-    }).start();
-    
-    // Animate the active step circle (pulse effect)
-    if (currentStep === 1) {
-      animateStepCircle(stepScale1);
-    } else if (currentStep === 2) {
-      animateStepCircle(stepScale2);
-    } else if (currentStep === 3) {
-      animateStepCircle(stepScale3);
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.title =
+        "Visitor Registration | Sapphire International Aviation Academy";
     }
-    
-    // Animate content fade and slide
-    fadeAnim.setValue(0);
-    slideAnim.setValue(20);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [currentStep]);
+  }, []);
 
-  const animateStepCircle = (scaleAnim) => {
-    scaleAnim.setValue(1);
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 1.2,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const getStepConfig = () => {
+    switch (currentStep) {
+      case 1:
+        return {
+          title: "Personal Information",
+          subtitle:
+            "Provide your basic details and a valid government ID so the campus team can verify your visit request.",
+          icon: "person-circle-outline",
+        };
+      case 2:
+        return {
+          title: "Visit Details",
+          subtitle:
+            "Tell us why you are visiting, when you plan to arrive, and any optional vehicle details for gate coordination.",
+          icon: "calendar-clear-outline",
+        };
+      case 3:
+        return {
+          title: "Review & Submit",
+          subtitle:
+            "Confirm your registration details before sending them for approval. You can still go back and edit anything.",
+          icon: "checkmark-done-circle-outline",
+        };
+      default:
+        return {
+          title: "Visitor Registration",
+          subtitle: "Complete your registration to request campus access.",
+          icon: "document-text-outline",
+        };
+    }
   };
 
+  const stepConfig = getStepConfig();
+
   const checkPermissions = async () => {
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== "web") {
       try {
         await ImagePicker.getCameraPermissionsAsync();
         await ImagePicker.getMediaLibraryPermissionsAsync();
@@ -343,38 +499,46 @@ export default function VisitorRegisterScreen({ navigation }) {
       Alert.alert("No ID Photo", "Please upload an ID photo first to scan.");
       return;
     }
-    if (!IDScannerService) {
-      Alert.alert("Service Error", "ID Scanner service not available.");
-      return;
-    }
     setIsScanning(true);
     setScanProgress(0);
     try {
       const progressInterval = setInterval(() => {
-        setScanProgress(prev => Math.min(prev + 10, 90));
+        setScanProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
-      const scannedData = await IDScannerService.scanIDImage(idImage);
+      const scannedData = await IDScannerService.scanIDImage({
+        uri: idImage,
+        base64: idImageBase64,
+        fileName: idImageFileName,
+      });
       clearInterval(progressInterval);
       setScanProgress(100);
-      if (scannedData) {
+      if (scannedData?.success) {
         let filledFields = [];
         if (scannedData.fullName) {
-          setFormData(prev => ({ ...prev, fullName: scannedData.fullName }));
-          setCompletedFields(prev => ({ ...prev, fullName: true }));
-          filledFields.push('Full Name');
+          setFormData((prev) => ({ ...prev, fullName: scannedData.fullName }));
+          setCompletedFields((prev) => ({ ...prev, fullName: true }));
+          filledFields.push("Full Name");
         }
         if (scannedData.idNumber) {
-          setFormData(prev => ({ ...prev, idNumber: scannedData.idNumber }));
-          setCompletedFields(prev => ({ ...prev, idNumber: true }));
-          filledFields.push('ID Number');
+          setFormData((prev) => ({ ...prev, idNumber: scannedData.idNumber }));
+          setCompletedFields((prev) => ({ ...prev, idNumber: true }));
+          filledFields.push("ID Number");
         }
         if (filledFields.length > 0) {
-          Alert.alert("Scan Complete", `Extracted: ${filledFields.join(', ')}`);
+          Alert.alert("Scan Complete", `Extracted: ${filledFields.join(", ")}`);
         } else {
-          Alert.alert("Could Not Read ID", "Please ensure the ID is clear and well-lit.");
+          Alert.alert(
+            "Could Not Read ID",
+            "Please ensure the ID is clear and well-lit.",
+          );
         }
+      } else if (scannedData?.message) {
+        Alert.alert("ID Scan", scannedData.message);
       } else {
-        Alert.alert("Scan Failed", "Could not process the ID image. Please try again.");
+        Alert.alert(
+          "Scan Failed",
+          "Could not process the ID image. Please try again.",
+        );
       }
     } catch (error) {
       Alert.alert("Scan Error", "An error occurred while scanning.");
@@ -419,7 +583,8 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const validatePurposeOfVisit = (purpose) => {
-    if (!purpose || purpose.trim() === "") return "Purpose of visit is required";
+    if (!purpose || purpose.trim() === "")
+      return "Purpose of visit is required";
     return "";
   };
 
@@ -427,7 +592,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     let error = "";
     switch (field) {
       case "fullName":
-        const filteredName = value.replace(/[^A-Za-z\s\-']/g, '');
+        const filteredName = value.replace(/[^A-Za-z\s\-']/g, "");
         setFormData({ ...formData, [field]: filteredName });
         error = validateName(filteredName);
         break;
@@ -436,7 +601,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         error = validateEmail(value);
         break;
       case "phoneNumber":
-        const filteredPhone = value.replace(/[^\d]/g, '').slice(0, 11);
+        const filteredPhone = value.replace(/[^\d]/g, "").slice(0, 11);
         setFormData({ ...formData, [field]: filteredPhone });
         error = validatePhoneNumber(filteredPhone);
         break;
@@ -465,7 +630,8 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const pickImage = async () => {
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
         Alert.alert("Permission Required", "Please allow gallery access.");
         return;
@@ -480,13 +646,16 @@ export default function VisitorRegisterScreen({ navigation }) {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         let uri = result.assets[0].uri;
         let base64 = result.assets[0].base64;
+        let fileName = result.assets[0].fileName || "";
         if (Platform.OS === "android" && !uri.startsWith("file://")) {
           uri = "file://" + uri;
         }
+        IDScannerService.clearCache();
         setIdImage(uri);
         setIdImageBase64(base64);
-        setErrors(prev => ({ ...prev, idImage: "" }));
-        setCompletedFields(prev => ({ ...prev, idImage: true }));
+        setIdImageFileName(fileName);
+        setErrors((prev) => ({ ...prev, idImage: "" }));
+        setCompletedFields((prev) => ({ ...prev, idImage: true }));
         Alert.alert("Success", "ID photo uploaded successfully!");
       }
     } catch (error) {
@@ -495,12 +664,12 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const onDateChange = (event, selectedDate) => {
-    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (Platform.OS === "android") setShowDatePicker(false);
     if (selectedDate) setVisitData({ ...visitData, visitDate: selectedDate });
   };
 
   const onTimeChange = (event, selectedTime) => {
-    if (Platform.OS === 'android') setShowTimePicker(false);
+    if (Platform.OS === "android") setShowTimePicker(false);
     if (selectedTime) setVisitData({ ...visitData, visitTime: selectedTime });
   };
 
@@ -508,27 +677,34 @@ export default function VisitorRegisterScreen({ navigation }) {
     setWebDate(text);
     if (text) {
       const newDate = new Date(text);
-      if (!isNaN(newDate.getTime())) setVisitData({ ...visitData, visitDate: newDate });
+      if (!isNaN(newDate.getTime()))
+        setVisitData({ ...visitData, visitDate: newDate });
     }
   };
 
   const handleWebTimeChange = (text) => {
     setWebTime(text);
     if (text) {
-      const [hours, minutes] = text.split(':').map(Number);
+      const [hours, minutes] = text.split(":").map(Number);
       const newDate = new Date(visitData.visitTime);
       newDate.setHours(hours, minutes);
       setVisitData({ ...visitData, visitTime: newDate });
     }
   };
 
-  const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+  const formatTime = (date) =>
+    date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
 
+  // Helper to show validation errors
   const showValidationAlert = (errorsList) => {
     Alert.alert(
       "Missing Information",
-      `Please fix the following:\n\n${errorsList.join('\n')}`,
-      [{ text: "OK" }]
+      `Please fix the following:\n\n${errorsList.join("\n")}`,
+      [{ text: "OK" }],
     );
   };
 
@@ -548,8 +724,9 @@ export default function VisitorRegisterScreen({ navigation }) {
       idImage: imageError,
     });
 
-    const hasErrors = nameError || emailError || phoneError || idError || imageError;
-    
+    const hasErrors =
+      nameError || emailError || phoneError || idError || imageError;
+
     if (hasErrors) {
       const errorMessages = [];
       if (nameError) errorMessages.push(`• Full Name: ${nameError}`);
@@ -596,13 +773,17 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const handleSubmit = async () => {
+    // Final validation before showing privacy modal
     const isStep1Valid = validateStep1();
     const isStep2Valid = validateStep2();
-    
+
     if (isStep1Valid && isStep2Valid) {
       setShowDataPrivacy(true);
     } else {
-      Alert.alert("Incomplete Information", "Please complete all required fields before submitting.");
+      Alert.alert(
+        "Incomplete Information",
+        "Please complete all required fields before submitting.",
+      );
     }
   };
 
@@ -611,7 +792,9 @@ export default function VisitorRegisterScreen({ navigation }) {
     setIsSubmitting(true);
     try {
       if (!ApiService) {
-        throw new Error("ApiService is not configured. Please check your utils/ApiService.js");
+        throw new Error(
+          "ApiService is not configured. Please check your utils/ApiService.js",
+        );
       }
 
       const emailExists = await ApiService.checkEmailExists(formData.email);
@@ -620,15 +803,15 @@ export default function VisitorRegisterScreen({ navigation }) {
           "Email Already Registered",
           "An account with this email already exists. Please login instead.",
           [
-            { 
-              text: "Go to Login", 
+            {
+              text: "Go to Login",
               onPress: () => {
                 setIsSubmitting(false);
                 navigation.navigate("Login", { role: "visitor" });
-              }
+              },
             },
-            { text: "OK", style: "cancel" }
-          ]
+            { text: "OK", style: "cancel" },
+          ],
         );
         return;
       }
@@ -638,7 +821,9 @@ export default function VisitorRegisterScreen({ navigation }) {
         email: formData.email,
         phoneNumber: formData.phoneNumber,
         idNumber: formData.idNumber,
-        idImage: idImageBase64 ? `data:image/jpeg;base64,${idImageBase64}` : null,
+        idImage: idImageBase64
+          ? `data:image/jpeg;base64,${idImageBase64}`
+          : null,
         purposeOfVisit: visitData.purposeOfVisit,
         vehicleNumber: visitData.vehicleNumber || "",
         visitDate: visitData.visitDate.toISOString(),
@@ -651,30 +836,79 @@ export default function VisitorRegisterScreen({ navigation }) {
       const response = await ApiService.registerVisitor(visitorData);
 
       if (response && response.success) {
-        setRegisteredVisitor({
+        const submittedVisitor = {
           fullName: formData.fullName,
           email: formData.email,
           userEmail: response.credentials?.email || formData.email,
           userPassword: response.credentials?.password || "Check your email",
-        });
-        setShowSuccess(true);
+        };
+
+        setRegisteredVisitor(submittedVisitor);
+
+        // Give the privacy modal a beat to close before showing the success popup.
+        setTimeout(() => {
+          setShowSuccess(true);
+        }, Platform.OS === "web" ? 180 : 80);
+
       } else {
-        Alert.alert("Registration Error", response?.message || "Failed to register. Please try again.");
+        Alert.alert(
+          "Registration Error",
+          response?.message || "Failed to register. Please try again.",
+        );
       }
     } catch (error) {
       console.error("Registration error:", error);
-      let errorMessage = error.message || "Failed to connect to server.";
-      if (errorMessage.includes("already exists")) {
+      let errorMessage =
+        error?.data?.message || error.message || "Failed to connect to server.";
+      const normalizedMessage = errorMessage.toLowerCase();
+
+      if (
+        normalizedMessage.includes("pending registration") ||
+        normalizedMessage.includes("track your approval status")
+      ) {
+        Alert.alert(
+          "Registration Already Submitted",
+          "This visitor already has a pending registration. You can log in now to view the waiting-for-approval screen.",
+          [
+            {
+              text: "Go to Login",
+              onPress: () =>
+                navigation.navigate("Login", {
+                  role: "visitor",
+                  initialEmail: formData.email.trim(),
+                }),
+            },
+            { text: "OK", style: "cancel" },
+          ],
+        );
+      } else if (
+        normalizedMessage.includes("already exists") ||
+        normalizedMessage.includes("duplicate entry") ||
+        normalizedMessage.includes("duplicate")
+      ) {
         Alert.alert(
           "Email Already Registered",
-          "A visitor account with this email already exists. Please login or use a different email.",
+          "A visitor account with this email already exists. Please log in instead, or use Forgot Password if you no longer have the password.",
           [
-            { text: "Go to Login", onPress: () => navigation.navigate("Login", { role: "visitor" }) },
-            { text: "OK", style: "cancel" }
-          ]
+            {
+              text: "Go to Login",
+              onPress: () =>
+                navigation.navigate("Login", {
+                  role: "visitor",
+                  initialEmail: formData.email.trim(),
+                }),
+            },
+            { text: "OK", style: "cancel" },
+          ],
         );
-      } else if (errorMessage.includes("Network request failed")) {
-        Alert.alert("Network Error", "Cannot connect to the server. Please check your internet connection.");
+      } else if (
+        normalizedMessage.includes("network request failed") ||
+        normalizedMessage.includes("cannot connect to backend")
+      ) {
+        Alert.alert(
+          "Network Error",
+          "Cannot connect to the server. Please check your internet connection.",
+        );
       } else {
         Alert.alert("Registration Error", errorMessage);
       }
@@ -685,16 +919,43 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const handlePrivacyDecline = () => {
     setShowDataPrivacy(false);
-    Alert.alert("Privacy Policy Required", "You must accept the data privacy policy to continue.");
+    Alert.alert(
+      "Privacy Policy Required",
+      "You must accept the data privacy policy to continue.",
+    );
   };
 
   const handleSuccessConfirm = async () => {
+    const loginEmail = registeredVisitor?.userEmail || formData.email;
+    const loginPassword =
+      registeredVisitor?.userPassword || "Check your email";
+
     setShowSuccess(false);
-    await AsyncStorage.removeItem('pendingVisitor');
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "RoleSelect", params: { registrationSuccess: true, message: "Registration submitted for approval." } }],
-    });
+
+    await AsyncStorage.multiRemove([
+      "pendingVisitor",
+      "authToken",
+      "userToken",
+      "currentUser",
+    ]);
+    await AsyncStorage.setItem("isNewRegistration", "true");
+
+    setTimeout(() => {
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: "Login",
+            params: {
+              role: "visitor",
+              initialEmail: loginEmail,
+              initialPassword: loginPassword,
+            },
+          },
+        ],
+      });
+      setRegisteredVisitor(null);
+    }, Platform.OS === "web" ? 60 : 150);
   };
 
   const getProgressPercentage = () => {
@@ -703,29 +964,173 @@ export default function VisitorRegisterScreen({ navigation }) {
     return 100;
   };
 
+  const personalCompletionCount = [
+    completedFields.fullName,
+    completedFields.email,
+    completedFields.phoneNumber,
+    completedFields.idNumber,
+    completedFields.idImage,
+  ].filter(Boolean).length;
+
+  const visitCompletionCount = [
+    completedFields.purposeOfVisit,
+    !!visitData.visitDate,
+    !!visitData.visitTime,
+  ].filter(Boolean).length;
+
+  const renderStepInsights = () => {
+    if (currentStep === 1) {
+      return (
+        <View style={visitorRegisterStyles.stepInsightCard}>
+          <View style={visitorRegisterStyles.stepInsightHeader}>
+            <View style={visitorRegisterStyles.stepInsightIcon}>
+              <Ionicons name="shield-checkmark-outline" size={18} color="#047857" />
+            </View>
+            <View style={visitorRegisterStyles.stepInsightTextWrap}>
+              <Text style={visitorRegisterStyles.stepInsightTitle}>Identity Checkpoint</Text>
+              <Text style={visitorRegisterStyles.stepInsightSubtitle}>
+                Upload your ID and complete the required contact fields so the campus team can verify you quickly.
+              </Text>
+            </View>
+          </View>
+          <View style={visitorRegisterStyles.stepInsightStats}>
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{personalCompletionCount}/5</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Complete</Text>
+            </View>
+            <View style={visitorRegisterStyles.stepInsightDivider} />
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>AI</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>ID auto-fill</Text>
+            </View>
+            <View style={visitorRegisterStyles.stepInsightDivider} />
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>Secure</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Encrypted upload</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (currentStep === 2) {
+      return (
+        <View style={visitorRegisterStyles.stepInsightCard}>
+          <View style={visitorRegisterStyles.stepInsightHeader}>
+            <View style={visitorRegisterStyles.stepInsightIcon}>
+              <Ionicons name="calendar-outline" size={18} color="#047857" />
+            </View>
+            <View style={visitorRegisterStyles.stepInsightTextWrap}>
+              <Text style={visitorRegisterStyles.stepInsightTitle}>Visit Scheduling</Text>
+              <Text style={visitorRegisterStyles.stepInsightSubtitle}>
+                Add the reason for your visit and confirm your preferred arrival date and time for smoother gate coordination.
+              </Text>
+            </View>
+          </View>
+          <View style={visitorRegisterStyles.stepInsightStats}>
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitCompletionCount}/3</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Ready</Text>
+            </View>
+            <View style={visitorRegisterStyles.stepInsightDivider} />
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitData.purposeOfVisit ? "Set" : "Pick"}</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Visit purpose</Text>
+            </View>
+            <View style={visitorRegisterStyles.stepInsightDivider} />
+            <View style={visitorRegisterStyles.stepInsightStat}>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{formatTime(visitData.visitTime)}</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Arrival time</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={visitorRegisterStyles.stepInsightCard}>
+        <View style={visitorRegisterStyles.stepInsightHeader}>
+          <View style={visitorRegisterStyles.stepInsightIcon}>
+            <Ionicons name="checkmark-done-outline" size={18} color="#047857" />
+          </View>
+          <View style={visitorRegisterStyles.stepInsightTextWrap}>
+            <Text style={visitorRegisterStyles.stepInsightTitle}>Final Review</Text>
+            <Text style={visitorRegisterStyles.stepInsightSubtitle}>
+              Double-check your details before submitting. Once approved, your temporary visitor credentials will be activated.
+            </Text>
+          </View>
+        </View>
+        <View style={visitorRegisterStyles.reviewChecklist}>
+          {[
+            { label: "Personal details completed", done: personalCompletionCount === 5 },
+            { label: "Visit purpose selected", done: !!visitData.purposeOfVisit },
+            { label: "Preferred visit schedule confirmed", done: !!visitData.visitDate && !!visitData.visitTime },
+          ].map((item) => (
+            <View key={item.label} style={visitorRegisterStyles.reviewChecklistItem}>
+              <Ionicons
+                name={item.done ? "checkmark-circle" : "ellipse-outline"}
+                size={16}
+                color={item.done ? "#059669" : "#94A3B8"}
+              />
+              <Text style={visitorRegisterStyles.reviewChecklistText}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
   const renderStep1 = () => (
     <>
       <View style={visitorRegisterStyles.idUploadSection}>
         <View style={visitorRegisterStyles.idCardContainer}>
           <Text style={visitorRegisterStyles.idCardTitle}>Government ID</Text>
-          <Text style={visitorRegisterStyles.idCardSubtitle}>Upload a valid government-issued ID</Text>
+          <Text style={visitorRegisterStyles.idCardSubtitle}>
+            Upload a valid government-issued ID
+          </Text>
         </View>
-        <View style={[visitorRegisterStyles.formCard, errors.idImage && visitorRegisterStyles.formCardError]}>
+        <View
+          style={[
+            visitorRegisterStyles.formCard,
+            errors.idImage && visitorRegisterStyles.formCardError,
+          ]}
+        >
           <View style={visitorRegisterStyles.cardHeader}>
-            <View style={[visitorRegisterStyles.cardIcon, { backgroundColor: '#ECFDF5' }]}>
+            <View
+              style={[
+                visitorRegisterStyles.cardIcon,
+                { backgroundColor: "#ECFDF5" },
+              ]}
+            >
               <Ionicons name="card" size={20} color="#059669" />
             </View>
             <Text style={visitorRegisterStyles.cardLabel}>ID Photo</Text>
             <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
           </View>
-          <TouchableOpacity style={[visitorRegisterStyles.uploadArea, errors.idImage && visitorRegisterStyles.uploadAreaError]} onPress={pickImage} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={[
+              visitorRegisterStyles.uploadArea,
+              errors.idImage && visitorRegisterStyles.uploadAreaError,
+            ]}
+            onPress={pickImage}
+            activeOpacity={0.7}
+          >
             {idImage ? (
               <View style={visitorRegisterStyles.uploadPreview}>
-                <Image source={{ uri: idImage }} style={visitorRegisterStyles.previewImage} resizeMode="cover" />
+                <Image
+                  source={{ uri: idImage }}
+                  style={visitorRegisterStyles.previewImage}
+                  resizeMode="cover"
+                />
                 <View style={visitorRegisterStyles.uploadOverlay}>
-                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={visitorRegisterStyles.uploadGradient}>
+                  <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.6)"]}
+                    style={visitorRegisterStyles.uploadGradient}
+                  >
                     <Ionicons name="camera-reverse" size={24} color="#FFFFFF" />
-                    <Text style={visitorRegisterStyles.changePhotoText}>Change Photo</Text>
+                    <Text style={visitorRegisterStyles.changePhotoText}>
+                      Change Photo
+                    </Text>
                   </LinearGradient>
                 </View>
               </View>
@@ -735,49 +1140,116 @@ export default function VisitorRegisterScreen({ navigation }) {
                   <Ionicons name="cloud-upload" size={32} color="#059669" />
                 </View>
                 <Text style={visitorRegisterStyles.uploadTitle}>Upload ID</Text>
-                <Text style={visitorRegisterStyles.uploadSubtitle}>Tap to select from gallery</Text>
+                <Text style={visitorRegisterStyles.uploadSubtitle}>
+                  Tap to select from gallery
+                </Text>
               </View>
             )}
           </TouchableOpacity>
           {idImage && !isScanning && (
-            <TouchableOpacity style={visitorRegisterStyles.scanButton} onPress={handleScanID} activeOpacity={0.8}>
-              <LinearGradient colors={['#059669', '#047857']} style={visitorRegisterStyles.scanGradient}>
+            <TouchableOpacity
+              style={visitorRegisterStyles.scanButton}
+              onPress={handleScanID}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#059669", "#047857"]}
+                style={visitorRegisterStyles.scanGradient}
+              >
                 <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
-                <Text style={visitorRegisterStyles.scanButtonText}>Scan ID to Auto-Fill</Text>
+                <Text style={visitorRegisterStyles.scanButtonText}>
+                  Scan ID to Auto-Fill
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           )}
           {isScanning && (
             <View style={visitorRegisterStyles.scanningContainer}>
               <ActivityIndicator size="small" color="#059669" />
-              <Text style={visitorRegisterStyles.scanningText}>Scanning ID Card... {scanProgress}%</Text>
+              <Text style={visitorRegisterStyles.scanningText}>
+                Scanning ID Card... {scanProgress}%
+              </Text>
               <View style={visitorRegisterStyles.scanProgressContainer}>
-                <View style={[visitorRegisterStyles.scanProgressBar, { width: `${scanProgress}%` }]} />
+                <View
+                  style={[
+                    visitorRegisterStyles.scanProgressBar,
+                    { width: `${scanProgress}%` },
+                  ]}
+                />
               </View>
             </View>
           )}
-          {errors.idImage && <Text style={visitorRegisterStyles.errorText}>{errors.idImage}</Text>}
+          {errors.idImage && (
+            <Text style={visitorRegisterStyles.errorText}>
+              {errors.idImage}
+            </Text>
+          )}
         </View>
       </View>
 
       {["fullName", "email", "phoneNumber", "idNumber"].map((field) => {
         const labels = {
-          fullName: { label: "Full Name", icon: "person", placeholder: "Enter your full name", keyboard: "default" },
-          email: { label: "Email Address", icon: "mail", placeholder: "your@email.com", keyboard: "email-address" },
-          phoneNumber: { label: "Phone Number", icon: "call", placeholder: "09123456789", keyboard: "phone-pad" },
-          idNumber: { label: "ID Number", icon: "card", placeholder: "Enter your ID number", keyboard: "default" },
+          fullName: {
+            label: "Full Name",
+            icon: "person",
+            placeholder: "Enter your full name",
+            keyboard: "default",
+          },
+          email: {
+            label: "Email Address",
+            icon: "mail",
+            placeholder: "your@email.com",
+            keyboard: "email-address",
+          },
+          phoneNumber: {
+            label: "Phone Number",
+            icon: "call",
+            placeholder: "09123456789",
+            keyboard: "phone-pad",
+          },
+          idNumber: {
+            label: "ID Number",
+            icon: "card",
+            placeholder: "Enter your ID number",
+            keyboard: "default",
+          },
         };
         return (
-          <View key={field} style={[visitorRegisterStyles.formCard, focusedField === field && visitorRegisterStyles.formCardFocused, errors[field] && visitorRegisterStyles.formCardError]}>
+          <View
+            key={field}
+            style={[
+              visitorRegisterStyles.formCard,
+              focusedField === field && visitorRegisterStyles.formCardFocused,
+              errors[field] && visitorRegisterStyles.formCardError,
+            ]}
+          >
             <View style={visitorRegisterStyles.cardHeader}>
-              <View style={[visitorRegisterStyles.cardIcon, { backgroundColor: '#ECFDF5' }]}>
+              <View
+                style={[
+                  visitorRegisterStyles.cardIcon,
+                  { backgroundColor: "#ECFDF5" },
+                ]}
+              >
                 <Ionicons name={labels[field].icon} size={20} color="#059669" />
               </View>
-              <Text style={visitorRegisterStyles.cardLabel}>{labels[field].label}</Text>
+              <Text style={visitorRegisterStyles.cardLabel}>
+                {labels[field].label}
+              </Text>
               <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
             </View>
-            <View style={[visitorRegisterStyles.inputContainer, focusedField === field && visitorRegisterStyles.inputContainerFocused, errors[field] && visitorRegisterStyles.inputContainerError]}>
-              <Ionicons name={`${labels[field].icon}-outline`} size={18} color={errors[field] ? "#EF4444" : "#9CA3AF"} />
+            <View
+              style={[
+                visitorRegisterStyles.inputContainer,
+                focusedField === field &&
+                  visitorRegisterStyles.inputContainerFocused,
+                errors[field] && visitorRegisterStyles.inputContainerError,
+              ]}
+            >
+              <Ionicons
+                name={`${labels[field].icon}-outline`}
+                size={18}
+                color={errors[field] ? "#EF4444" : "#9CA3AF"}
+              />
               <TextInput
                 style={visitorRegisterStyles.input}
                 placeholder={labels[field].placeholder}
@@ -785,12 +1257,19 @@ export default function VisitorRegisterScreen({ navigation }) {
                 value={formData[field]}
                 onChangeText={(text) => handleInputChange(field, text)}
                 onFocus={() => setFocusedField(field)}
-                onBlur={() => { setFocusedField(null); handleInputChange(field, formData[field]); }}
+                onBlur={() => {
+                  setFocusedField(null);
+                  handleInputChange(field, formData[field]);
+                }}
                 keyboardType={labels[field].keyboard}
                 autoCapitalize={field === "email" ? "none" : "words"}
               />
             </View>
-            {errors[field] && <Text style={visitorRegisterStyles.errorText}>{errors[field]}</Text>}
+            {errors[field] && (
+              <Text style={visitorRegisterStyles.errorText}>
+                {errors[field]}
+              </Text>
+            )}
           </View>
         );
       })}
@@ -799,35 +1278,89 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const renderStep2 = () => (
     <>
-      <View style={[visitorRegisterStyles.formCard, errors.purposeOfVisit && visitorRegisterStyles.formCardError]}>
+      <View
+        style={[
+          visitorRegisterStyles.formCard,
+          errors.purposeOfVisit && visitorRegisterStyles.formCardError,
+        ]}
+      >
         <View style={visitorRegisterStyles.cardHeader}>
-          <View style={[visitorRegisterStyles.cardIcon, { backgroundColor: '#ECFDF5' }]}>
+          <View
+            style={[
+              visitorRegisterStyles.cardIcon,
+              { backgroundColor: "#ECFDF5" },
+            ]}
+          >
             <Ionicons name="document-text" size={20} color="#059669" />
           </View>
           <Text style={visitorRegisterStyles.cardLabel}>Purpose of Visit</Text>
           <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
         </View>
-        <TouchableOpacity style={visitorRegisterStyles.dropdownButton} onPress={() => setShowPurposePicker(true)} activeOpacity={0.7}>
-          <Text style={[visitorRegisterStyles.dropdownButtonText, !visitData.purposeOfVisit && visitorRegisterStyles.dropdownButtonPlaceholder]}>
+        <TouchableOpacity
+          style={visitorRegisterStyles.dropdownButton}
+          onPress={() => setShowPurposePicker(true)}
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[
+              visitorRegisterStyles.dropdownButtonText,
+              !visitData.purposeOfVisit &&
+                visitorRegisterStyles.dropdownButtonPlaceholder,
+            ]}
+          >
             {visitData.purposeOfVisit || "Select purpose of visit"}
           </Text>
           <Ionicons name="chevron-down" size={20} color="#64748B" />
         </TouchableOpacity>
-        {errors.purposeOfVisit && <Text style={visitorRegisterStyles.errorText}>{errors.purposeOfVisit}</Text>}
+        {errors.purposeOfVisit && (
+          <Text style={visitorRegisterStyles.errorText}>
+            {errors.purposeOfVisit}
+          </Text>
+        )}
       </View>
 
-      <Modal visible={showPurposePicker} transparent={true} animationType="slide" onRequestClose={() => setShowPurposePicker(false)}>
+      <Modal
+        visible={showPurposePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPurposePicker(false)}
+      >
         <View style={visitorRegisterStyles.pickerModalOverlay}>
           <View style={visitorRegisterStyles.pickerModalContainer}>
             <View style={visitorRegisterStyles.pickerModalHeader}>
-              <Text style={visitorRegisterStyles.pickerModalTitle}>Select Purpose</Text>
-              <TouchableOpacity onPress={() => setShowPurposePicker(false)}><Ionicons name="close" size={24} color="#6B7280" /></TouchableOpacity>
+              <Text style={visitorRegisterStyles.pickerModalTitle}>
+                Select Purpose
+              </Text>
+              <TouchableOpacity onPress={() => setShowPurposePicker(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
             </View>
             <ScrollView>
               {purposeOptions.map((option) => (
-                <TouchableOpacity key={option} style={[visitorRegisterStyles.pickerModalOption, visitData.purposeOfVisit === option && visitorRegisterStyles.pickerModalOptionActive]} onPress={() => { handleInputChange("purposeOfVisit", option); setShowPurposePicker(false); }}>
-                  <Text style={[visitorRegisterStyles.pickerModalOptionText, visitData.purposeOfVisit === option && visitorRegisterStyles.pickerModalOptionTextActive]}>{option}</Text>
-                  {visitData.purposeOfVisit === option && <Ionicons name="checkmark" size={20} color="#059669" />}
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    visitorRegisterStyles.pickerModalOption,
+                    visitData.purposeOfVisit === option &&
+                      visitorRegisterStyles.pickerModalOptionActive,
+                  ]}
+                  onPress={() => {
+                    handleInputChange("purposeOfVisit", option);
+                    setShowPurposePicker(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      visitorRegisterStyles.pickerModalOptionText,
+                      visitData.purposeOfVisit === option &&
+                        visitorRegisterStyles.pickerModalOptionTextActive,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                  {visitData.purposeOfVisit === option && (
+                    <Ionicons name="checkmark" size={20} color="#059669" />
+                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -835,37 +1368,63 @@ export default function VisitorRegisterScreen({ navigation }) {
         </View>
       </Modal>
 
+      {/* Compact Date and Time Row */}
       <View style={visitorRegisterStyles.formRow}>
-        <View style={[visitorRegisterStyles.formCard, visitorRegisterStyles.halfCard]}>
+        <View
+          style={[
+            visitorRegisterStyles.formCard,
+            visitorRegisterStyles.halfCard,
+          ]}
+        >
           <View style={visitorRegisterStyles.cardHeader}>
-            <View style={[visitorRegisterStyles.cardIcon, { backgroundColor: '#ECFDF5' }]}>
+            <View
+              style={[
+                visitorRegisterStyles.cardIcon,
+                { backgroundColor: "#ECFDF5" },
+              ]}
+            >
               <Ionicons name="calendar" size={18} color="#059669" />
             </View>
             <Text style={visitorRegisterStyles.cardLabelSmall}>Visit Date</Text>
           </View>
-          {Platform.OS === 'web' ? (
+          {Platform.OS === "web" ? (
             <input
               type="date"
               value={webDate}
               onChange={(e) => handleWebDateChange(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
+              min={new Date().toISOString().split("T")[0]}
               style={visitorRegisterStyles.webDateInputCompact}
             />
           ) : (
-            <TouchableOpacity style={visitorRegisterStyles.datePickerButtonCompact} onPress={() => setShowDatePicker(true)}>
+            <TouchableOpacity
+              style={visitorRegisterStyles.datePickerButtonCompact}
+              onPress={() => setShowDatePicker(true)}
+            >
               <Ionicons name="calendar-outline" size={16} color="#059669" />
-              <Text style={visitorRegisterStyles.datePickerTextCompact}>{visitData.visitDate.toLocaleDateString()}</Text>
+              <Text style={visitorRegisterStyles.datePickerTextCompact}>
+                {visitData.visitDate.toLocaleDateString()}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
-        <View style={[visitorRegisterStyles.formCard, visitorRegisterStyles.halfCard]}>
+        <View
+          style={[
+            visitorRegisterStyles.formCard,
+            visitorRegisterStyles.halfCard,
+          ]}
+        >
           <View style={visitorRegisterStyles.cardHeader}>
-            <View style={[visitorRegisterStyles.cardIcon, { backgroundColor: '#ECFDF5' }]}>
+            <View
+              style={[
+                visitorRegisterStyles.cardIcon,
+                { backgroundColor: "#ECFDF5" },
+              ]}
+            >
               <Ionicons name="time" size={18} color="#059669" />
             </View>
             <Text style={visitorRegisterStyles.cardLabelSmall}>Visit Time</Text>
           </View>
-          {Platform.OS === 'web' ? (
+          {Platform.OS === "web" ? (
             <input
               type="time"
               value={webTime}
@@ -873,17 +1432,27 @@ export default function VisitorRegisterScreen({ navigation }) {
               style={visitorRegisterStyles.webTimeInputCompact}
             />
           ) : (
-            <TouchableOpacity style={visitorRegisterStyles.datePickerButtonCompact} onPress={() => setShowTimePicker(true)}>
+            <TouchableOpacity
+              style={visitorRegisterStyles.datePickerButtonCompact}
+              onPress={() => setShowTimePicker(true)}
+            >
               <Ionicons name="time-outline" size={16} color="#059669" />
-              <Text style={visitorRegisterStyles.datePickerTextCompact}>{formatTime(visitData.visitTime)}</Text>
+              <Text style={visitorRegisterStyles.datePickerTextCompact}>
+                {formatTime(visitData.visitTime)}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
-            
+
       <View style={visitorRegisterStyles.formCard}>
         <View style={visitorRegisterStyles.cardHeader}>
-          <View style={[visitorRegisterStyles.cardIcon, { backgroundColor: '#F3F4F6' }]}>
+          <View
+            style={[
+              visitorRegisterStyles.cardIcon,
+              { backgroundColor: "#F3F4F6" },
+            ]}
+          >
             <Ionicons name="car" size={20} color="#6B7280" />
           </View>
           <Text style={visitorRegisterStyles.cardLabel}>Vehicle Number</Text>
@@ -891,15 +1460,32 @@ export default function VisitorRegisterScreen({ navigation }) {
         </View>
         <View style={visitorRegisterStyles.inputContainer}>
           <Ionicons name="car-outline" size={18} color="#9CA3AF" />
-          <TextInput style={visitorRegisterStyles.input} placeholder="Enter vehicle number (if applicable)" placeholderTextColor="#9CA3AF" value={visitData.vehicleNumber} onChangeText={(text) => handleInputChange("vehicleNumber", text)} />
+          <TextInput
+            style={visitorRegisterStyles.input}
+            placeholder="Enter vehicle number (if applicable)"
+            placeholderTextColor="#9CA3AF"
+            value={visitData.vehicleNumber}
+            onChangeText={(text) => handleInputChange("vehicleNumber", text)}
+          />
         </View>
       </View>
 
-      {Platform.OS !== 'web' && showDatePicker && DateTimePickerComponent && (
-        <DateTimePickerComponent value={visitData.visitDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={onDateChange} minimumDate={new Date()} />
+      {Platform.OS !== "web" && showDatePicker && DateTimePickerComponent && (
+        <DateTimePickerComponent
+          value={visitData.visitDate}
+          mode="date"
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onChange={onDateChange}
+          minimumDate={new Date()}
+        />
       )}
-      {Platform.OS !== 'web' && showTimePicker && DateTimePickerComponent && (
-        <DateTimePickerComponent value={visitData.visitTime} mode="time" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={onTimeChange} />
+      {Platform.OS !== "web" && showTimePicker && DateTimePickerComponent && (
+        <DateTimePickerComponent
+          value={visitData.visitTime}
+          mode="time"
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onChange={onTimeChange}
+        />
       )}
     </>
   );
@@ -909,42 +1495,101 @@ export default function VisitorRegisterScreen({ navigation }) {
       <View style={visitorRegisterStyles.reviewCard}>
         <View style={visitorRegisterStyles.reviewHeader}>
           <Ionicons name="person-circle" size={22} color="#059669" />
-          <Text style={visitorRegisterStyles.reviewHeaderText}>Personal Information</Text>
-          <TouchableOpacity style={visitorRegisterStyles.editButton} onPress={handleEditPersonal}>
+          <Text style={visitorRegisterStyles.reviewHeaderText}>
+            Personal Information
+          </Text>
+          <TouchableOpacity
+            style={visitorRegisterStyles.editButton}
+            onPress={handleEditPersonal}
+          >
             <Ionicons name="pencil" size={16} color="#059669" />
             <Text style={visitorRegisterStyles.editButtonText}>Edit</Text>
           </TouchableOpacity>
         </View>
-        <View style={visitorRegisterStyles.reviewItem}><Text style={visitorRegisterStyles.reviewLabel}>Full Name</Text><Text style={visitorRegisterStyles.reviewValue}>{formData.fullName || '—'}</Text></View>
-        <View style={visitorRegisterStyles.reviewItem}><Text style={visitorRegisterStyles.reviewLabel}>Email</Text><Text style={visitorRegisterStyles.reviewValue}>{formData.email || '—'}</Text></View>
-        <View style={visitorRegisterStyles.reviewItem}><Text style={visitorRegisterStyles.reviewLabel}>Phone</Text><Text style={visitorRegisterStyles.reviewValue}>{formData.phoneNumber || '—'}</Text></View>
-        <View style={visitorRegisterStyles.reviewItem}><Text style={visitorRegisterStyles.reviewLabel}>ID Number</Text><Text style={visitorRegisterStyles.reviewValue}>{formData.idNumber || '—'}</Text></View>
+        <View style={visitorRegisterStyles.reviewItem}>
+          <Text style={visitorRegisterStyles.reviewLabel}>Full Name</Text>
+          <Text style={visitorRegisterStyles.reviewValue}>
+            {formData.fullName || "—"}
+          </Text>
+        </View>
+        <View style={visitorRegisterStyles.reviewItem}>
+          <Text style={visitorRegisterStyles.reviewLabel}>Email</Text>
+          <Text style={visitorRegisterStyles.reviewValue}>
+            {formData.email || "—"}
+          </Text>
+        </View>
+        <View style={visitorRegisterStyles.reviewItem}>
+          <Text style={visitorRegisterStyles.reviewLabel}>Phone</Text>
+          <Text style={visitorRegisterStyles.reviewValue}>
+            {formData.phoneNumber || "—"}
+          </Text>
+        </View>
+        <View style={visitorRegisterStyles.reviewItem}>
+          <Text style={visitorRegisterStyles.reviewLabel}>ID Number</Text>
+          <Text style={visitorRegisterStyles.reviewValue}>
+            {formData.idNumber || "—"}
+          </Text>
+        </View>
       </View>
       <View style={visitorRegisterStyles.reviewCard}>
         <View style={visitorRegisterStyles.reviewHeader}>
           <Ionicons name="calendar" size={22} color="#059669" />
-          <Text style={visitorRegisterStyles.reviewHeaderText}>Visit Details</Text>
-          <TouchableOpacity style={visitorRegisterStyles.editButton} onPress={handleEditVisit}>
+          <Text style={visitorRegisterStyles.reviewHeaderText}>
+            Visit Details
+          </Text>
+          <TouchableOpacity
+            style={visitorRegisterStyles.editButton}
+            onPress={handleEditVisit}
+          >
             <Ionicons name="pencil" size={16} color="#059669" />
             <Text style={visitorRegisterStyles.editButtonText}>Edit</Text>
           </TouchableOpacity>
         </View>
-        <View style={visitorRegisterStyles.reviewItem}><Text style={visitorRegisterStyles.reviewLabel}>Purpose</Text><Text style={visitorRegisterStyles.reviewValue}>{visitData.purposeOfVisit || '—'}</Text></View>
-        <View style={visitorRegisterStyles.reviewItem}><Text style={visitorRegisterStyles.reviewLabel}>Date</Text><Text style={visitorRegisterStyles.reviewValue}>{visitData.visitDate.toLocaleDateString()}</Text></View>
-        <View style={visitorRegisterStyles.reviewItem}><Text style={visitorRegisterStyles.reviewLabel}>Time</Text><Text style={visitorRegisterStyles.reviewValue}>{formatTime(visitData.visitTime)}</Text></View>
-        {visitData.vehicleNumber && <View style={visitorRegisterStyles.reviewItem}><Text style={visitorRegisterStyles.reviewLabel}>Vehicle</Text><Text style={visitorRegisterStyles.reviewValue}>{visitData.vehicleNumber}</Text></View>}
+        <View style={visitorRegisterStyles.reviewItem}>
+          <Text style={visitorRegisterStyles.reviewLabel}>Purpose</Text>
+          <Text style={visitorRegisterStyles.reviewValue}>
+            {visitData.purposeOfVisit || "—"}
+          </Text>
+        </View>
+        <View style={visitorRegisterStyles.reviewItem}>
+          <Text style={visitorRegisterStyles.reviewLabel}>Date</Text>
+          <Text style={visitorRegisterStyles.reviewValue}>
+            {visitData.visitDate.toLocaleDateString()}
+          </Text>
+        </View>
+        <View style={visitorRegisterStyles.reviewItem}>
+          <Text style={visitorRegisterStyles.reviewLabel}>Time</Text>
+          <Text style={visitorRegisterStyles.reviewValue}>
+            {formatTime(visitData.visitTime)}
+          </Text>
+        </View>
+        {visitData.vehicleNumber && (
+          <View style={visitorRegisterStyles.reviewItem}>
+            <Text style={visitorRegisterStyles.reviewLabel}>Vehicle</Text>
+            <Text style={visitorRegisterStyles.reviewValue}>
+              {visitData.vehicleNumber}
+            </Text>
+          </View>
+        )}
       </View>
       {idImage && (
         <View style={visitorRegisterStyles.reviewCard}>
           <View style={visitorRegisterStyles.reviewHeader}>
             <Ionicons name="card" size={22} color="#059669" />
             <Text style={visitorRegisterStyles.reviewHeaderText}>ID Photo</Text>
-            <TouchableOpacity style={visitorRegisterStyles.editButton} onPress={handleEditPersonal}>
+            <TouchableOpacity
+              style={visitorRegisterStyles.editButton}
+              onPress={handleEditPersonal}
+            >
               <Ionicons name="pencil" size={16} color="#059669" />
               <Text style={visitorRegisterStyles.editButtonText}>Edit</Text>
             </TouchableOpacity>
           </View>
-          <Image source={{ uri: idImage }} style={visitorRegisterStyles.reviewImage} resizeMode="cover" />
+          <Image
+            source={{ uri: idImage }}
+            style={visitorRegisterStyles.reviewImage}
+            resizeMode="cover"
+          />
         </View>
       )}
     </>
@@ -953,121 +1598,290 @@ export default function VisitorRegisterScreen({ navigation }) {
   return (
     <SafeAreaView style={visitorRegisterStyles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#059669" />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={visitorRegisterStyles.keyboardView}>
-        <ScrollView 
-          showsVerticalScrollIndicator={false} 
-          contentContainerStyle={visitorRegisterStyles.fullScrollContainer}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 12}
+        style={visitorRegisterStyles.keyboardView}
+      >
+        <ScrollView
+          style={visitorRegisterStyles.mainScrollView}
+          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          bounces={false}
+          contentContainerStyle={visitorRegisterStyles.scrollContainer}
         >
-          <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={visitorRegisterStyles.header}>
-            <View style={visitorRegisterStyles.headerButtons}>
-              <TouchableOpacity style={visitorRegisterStyles.backButton} onPress={handleBack} activeOpacity={0.7}>
+          <LinearGradient
+            colors={["#063B34", "#047857", "#059669"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[visitorRegisterStyles.header, headerResponsiveStyle]}
+          >
+            <View style={[visitorRegisterStyles.headerButtons, headerButtonsResponsiveStyle]}>
+              <TouchableOpacity
+                style={visitorRegisterStyles.backButton}
+                onPress={handleBack}
+                activeOpacity={0.7}
+              >
                 <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            <View style={visitorRegisterStyles.headerContent}>
+            <View style={[visitorRegisterStyles.headerContent, headerContentResponsiveStyle]}>
+              <View style={visitorRegisterStyles.headerBadge}>
+                <Image
+                  source={Logo}
+                  style={visitorRegisterStyles.headerBadgeLogo}
+                  resizeMode="contain"
+                />
+                <View style={visitorRegisterStyles.headerBadgeTextWrap}>
+                  <Text style={visitorRegisterStyles.headerBadgeEyebrow}>
+                    Sapphire Access Portal
+                  </Text>
+                  <Text style={visitorRegisterStyles.headerBadgeTitle}>
+                    SafePass Visitor Registration
+                  </Text>
+                </View>
+              </View>
               <View style={visitorRegisterStyles.headerIconContainer}>
-                <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.05)']} style={visitorRegisterStyles.headerIconGradient}>
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.05)"]}
+                  style={[
+                    visitorRegisterStyles.headerIconGradient,
+                    headerIconGradientResponsiveStyle,
+                  ]}
+                >
                   <Ionicons name="person-add" size={32} color="#FFFFFF" />
                 </LinearGradient>
               </View>
-              <Text style={visitorRegisterStyles.headerTitle}>Visitor Registration</Text>
+              <Text style={[visitorRegisterStyles.headerTitle, headerTitleResponsiveStyle]}>
+                Request Your Campus Visit
+              </Text>
               <Text style={visitorRegisterStyles.headerSubtitle}>
-                {currentStep === 1 && "Personal Information"}
-                {currentStep === 2 && "Visit Details"}
-                {currentStep === 3 && "Review & Submit"}
+                {stepConfig.title}
+              </Text>
+              <Text
+                style={[
+                  visitorRegisterStyles.headerDescription,
+                  headerDescriptionResponsiveStyle,
+                ]}
+              >
+                Complete this short guided form to submit your visit for approval and receive your SafePass access details.
               </Text>
             </View>
           </LinearGradient>
 
-          <View style={visitorRegisterStyles.progressContainer}>
-            <View style={visitorRegisterStyles.progressHeader}>
-              <Text style={visitorRegisterStyles.progressTitle}>Registration Progress</Text>
-              <Text style={visitorRegisterStyles.progressPercentage}>{getProgressPercentage()}%</Text>
-            </View>
-            <View style={visitorRegisterStyles.progressBarContainer}>
-              <Animated.View 
-                style={[
-                  visitorRegisterStyles.progressBar, 
-                  { width: progressWidthAnim.interpolate({
-                      inputRange: [0, 100],
-                      outputRange: ['0%', '100%']
-                    }) 
-                  }
-                ]} 
-              />
-            </View>
-          </View>
-
-          <View style={visitorRegisterStyles.stepIndicatorContainer}>
-            <View style={visitorRegisterStyles.stepWrapper}>
-              <Animated.View style={[visitorRegisterStyles.stepCircle, currentStep >= 1 && visitorRegisterStyles.stepCircleActive, { transform: [{ scale: stepScale1 }] }]}>
-                <Text style={[visitorRegisterStyles.stepCircleText, currentStep >= 1 && visitorRegisterStyles.stepCircleTextActive]}>1</Text>
-              </Animated.View>
-              <View style={[visitorRegisterStyles.stepConnector, currentStep > 1 && visitorRegisterStyles.stepConnectorActive]} />
-              <Animated.View style={[visitorRegisterStyles.stepCircle, currentStep >= 2 && visitorRegisterStyles.stepCircleActive, { transform: [{ scale: stepScale2 }] }]}>
-                <Text style={[visitorRegisterStyles.stepCircleText, currentStep >= 2 && visitorRegisterStyles.stepCircleTextActive]}>2</Text>
-              </Animated.View>
-              <View style={[visitorRegisterStyles.stepConnector, currentStep > 2 && visitorRegisterStyles.stepConnectorActive]} />
-              <Animated.View style={[visitorRegisterStyles.stepCircle, currentStep >= 3 && visitorRegisterStyles.stepCircleActive, { transform: [{ scale: stepScale3 }] }]}>
-                <Text style={[visitorRegisterStyles.stepCircleText, currentStep >= 3 && visitorRegisterStyles.stepCircleTextActive]}>3</Text>
-              </Animated.View>
-            </View>
-            <View style={visitorRegisterStyles.stepLabels}>
-              <Text style={[visitorRegisterStyles.stepLabel, currentStep >= 1 && visitorRegisterStyles.stepLabelActive]}>Personal</Text>
-              <Text style={[visitorRegisterStyles.stepLabel, currentStep >= 2 && visitorRegisterStyles.stepLabelActive]}>Visit</Text>
-              <Text style={[visitorRegisterStyles.stepLabel, currentStep >= 3 && visitorRegisterStyles.stepLabelActive]}>Review</Text>
-            </View>
-          </View>
-
-          <Animated.View 
-            style={[
-              visitorRegisterStyles.animatedContent,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              }
-            ]}
-          >
-            <View style={visitorRegisterStyles.content}>
-              <View style={visitorRegisterStyles.sectionHeader}>
-                <Text style={visitorRegisterStyles.sectionTitle}>
-                  {currentStep === 1 && "Personal Information"}
-                  {currentStep === 2 && "Visit Details"}
-                  {currentStep === 3 && "Review & Submit"}
+          <View style={[visitorRegisterStyles.formShell, formShellResponsiveStyle]}>
+            <View style={[visitorRegisterStyles.progressContainer, sectionCardResponsiveStyle]}>
+              <View style={visitorRegisterStyles.progressHeader}>
+                <Text style={visitorRegisterStyles.progressTitle}>
+                  Registration Progress
                 </Text>
-                <View style={visitorRegisterStyles.sectionBadge}>
-                  <Ionicons name="document-text" size={14} color="#059669" />
-                  <Text style={visitorRegisterStyles.sectionBadgeText}>Step {currentStep}/3</Text>
+                <Text style={visitorRegisterStyles.progressPercentage}>
+                  {getProgressPercentage()}%
+                </Text>
+              </View>
+              <View style={visitorRegisterStyles.progressBarContainer}>
+                <View
+                  style={[
+                    visitorRegisterStyles.progressBar,
+                    { width: `${getProgressPercentage()}%` },
+                  ]}
+                />
+              </View>
+            </View>
+
+            <View
+              style={[
+                visitorRegisterStyles.stepIndicatorContainer,
+                sectionCardResponsiveStyle,
+              ]}
+            >
+              <View style={visitorRegisterStyles.stepWrapper}>
+                <View
+                  style={[
+                    visitorRegisterStyles.stepCircle,
+                    currentStep >= 1 && visitorRegisterStyles.stepCircleActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      visitorRegisterStyles.stepCircleText,
+                      currentStep >= 1 &&
+                        visitorRegisterStyles.stepCircleTextActive,
+                    ]}
+                  >
+                    1
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    visitorRegisterStyles.stepConnector,
+                    currentStep > 1 && visitorRegisterStyles.stepConnectorActive,
+                  ]}
+                />
+                <View
+                  style={[
+                    visitorRegisterStyles.stepCircle,
+                    currentStep >= 2 && visitorRegisterStyles.stepCircleActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      visitorRegisterStyles.stepCircleText,
+                      currentStep >= 2 &&
+                        visitorRegisterStyles.stepCircleTextActive,
+                    ]}
+                  >
+                    2
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    visitorRegisterStyles.stepConnector,
+                    currentStep > 2 && visitorRegisterStyles.stepConnectorActive,
+                  ]}
+                />
+                <View
+                  style={[
+                    visitorRegisterStyles.stepCircle,
+                    currentStep >= 3 && visitorRegisterStyles.stepCircleActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      visitorRegisterStyles.stepCircleText,
+                      currentStep >= 3 &&
+                        visitorRegisterStyles.stepCircleTextActive,
+                    ]}
+                  >
+                    3
+                  </Text>
                 </View>
               </View>
+              <View style={visitorRegisterStyles.stepLabels}>
+                <Text
+                  style={[
+                    visitorRegisterStyles.stepLabel,
+                    currentStep >= 1 && visitorRegisterStyles.stepLabelActive,
+                  ]}
+                >
+                  Personal
+                </Text>
+                <Text
+                  style={[
+                    visitorRegisterStyles.stepLabel,
+                    currentStep >= 2 && visitorRegisterStyles.stepLabelActive,
+                  ]}
+                >
+                  Visit
+                </Text>
+                <Text
+                  style={[
+                    visitorRegisterStyles.stepLabel,
+                    currentStep >= 3 && visitorRegisterStyles.stepLabelActive,
+                  ]}
+                >
+                  Review
+                </Text>
+              </View>
+            </View>
+
+            <View style={[visitorRegisterStyles.content, contentResponsiveStyle]}>
+              <View style={[visitorRegisterStyles.sectionHeader, sectionHeaderResponsiveStyle]}>
+                <View style={visitorRegisterStyles.sectionTextBlock}>
+                  <Text style={visitorRegisterStyles.sectionTitle}>
+                    {stepConfig.title}
+                  </Text>
+                  <Text style={visitorRegisterStyles.sectionDescription}>
+                    {stepConfig.subtitle}
+                  </Text>
+                </View>
+                <View style={visitorRegisterStyles.sectionBadge}>
+                  <Ionicons name={stepConfig.icon} size={14} color="#047857" />
+                  <Text style={visitorRegisterStyles.sectionBadgeText}>
+                    Step {currentStep}/3
+                  </Text>
+                </View>
+              </View>
+              {renderStepInsights()}
               <View style={visitorRegisterStyles.formGrid}>
                 {currentStep === 1 && renderStep1()}
                 {currentStep === 2 && renderStep2()}
                 {currentStep === 3 && renderStep3()}
               </View>
-              <TouchableOpacity style={visitorRegisterStyles.continueButton} onPress={currentStep === 3 ? handleSubmit : handleNext} activeOpacity={0.8} disabled={isSubmitting}>
-                <LinearGradient colors={['#059669', '#047857']} style={visitorRegisterStyles.gradientButton}>
-                  {isSubmitting ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Text style={visitorRegisterStyles.continueButtonText}>
-                        {currentStep === 1 && "Continue"}
-                        {currentStep === 2 && "Review"}
-                        {currentStep === 3 && "Submit Registration"}
-                      </Text>
-                      <Ionicons name={currentStep === 3 ? "checkmark-circle" : "arrow-forward"} size={20} color="#FFFFFF" />
-                    </>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
+              <View style={[visitorRegisterStyles.actionRow, actionRowResponsiveStyle]}>
+                <TouchableOpacity
+                  style={[
+                    visitorRegisterStyles.secondaryActionButton,
+                    actionButtonResponsiveStyle,
+                  ]}
+                  onPress={handleBack}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={currentStep === 1 ? "arrow-back" : "chevron-back"}
+                    size={18}
+                    color="#475569"
+                  />
+                  <Text style={visitorRegisterStyles.secondaryActionText}>
+                    {currentStep === 1 ? "Back to Portal" : "Previous Step"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    visitorRegisterStyles.continueButton,
+                    actionButtonResponsiveStyle,
+                  ]}
+                  onPress={currentStep === 3 ? handleSubmit : handleNext}
+                  activeOpacity={0.8}
+                  disabled={isSubmitting}
+                >
+                  <LinearGradient
+                    colors={["#059669", "#047857"]}
+                    style={visitorRegisterStyles.gradientButton}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Text style={visitorRegisterStyles.continueButtonText}>
+                          {currentStep === 1 && "Continue"}
+                          {currentStep === 2 && "Review"}
+                          {currentStep === 3 && "Submit Registration"}
+                        </Text>
+                        <Ionicons
+                          name={
+                            currentStep === 3 ? "checkmark-circle" : "arrow-forward"
+                          }
+                          size={20}
+                          color="#FFFFFF"
+                        />
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
-          </Animated.View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <DataPrivacyModal visible={showDataPrivacy} onAccept={handlePrivacyAccept} onDecline={handlePrivacyDecline} />
-      <SuccessModal visible={showSuccess} credentials={registeredVisitor ? { email: registeredVisitor.userEmail, password: registeredVisitor.userPassword } : null} onConfirm={handleSuccessConfirm} />
+      <DataPrivacyModal
+        visible={showDataPrivacy}
+        onAccept={handlePrivacyAccept}
+        onDecline={handlePrivacyDecline}
+      />
+      <SuccessModal
+        visible={showSuccess}
+        credentials={
+          registeredVisitor
+            ? {
+                email: registeredVisitor.userEmail,
+                password: registeredVisitor.userPassword,
+              }
+            : null
+        }
+        onConfirm={handleSuccessConfirm}
+      />
     </SafeAreaView>
   );
 }
