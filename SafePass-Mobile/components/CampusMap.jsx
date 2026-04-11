@@ -10,6 +10,7 @@ import {
   Animated,
   Image,
   ActivityIndicator,
+  PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import FloorBlueprintDiagram from "./FloorBlueprintDiagram";
@@ -41,6 +42,71 @@ const CampusMap = ({
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const panAnim = useRef(new Animated.ValueXY()).current;
+  const mapScaleRef = useRef(1);
+  const mapPanRef = useRef({ x: 0, y: 0 });
+  const mapSizeRef = useRef({ width: 0, height: 500 });
+
+  useEffect(() => {
+    mapScaleRef.current = mapScale;
+  }, [mapScale]);
+
+  const clampPan = (pan, scale = mapScaleRef.current) => {
+    const mapWidth = mapSizeRef.current.width || width || 320;
+    const mapHeight = mapSizeRef.current.height || 500;
+    const limitX = Math.max(0, (mapWidth * (scale - 1)) / 2);
+    const limitY = Math.max(0, (mapHeight * (scale - 1)) / 2);
+
+    return {
+      x: Math.max(-limitX, Math.min(limitX, pan.x)),
+      y: Math.max(-limitY, Math.min(limitY, pan.y)),
+    };
+  };
+
+  const setPanPosition = (nextPan, animated = true) => {
+    const clampedPan = clampPan(nextPan);
+    mapPanRef.current = clampedPan;
+    setMapPan(clampedPan);
+
+    if (animated) {
+      Animated.spring(panAnim, {
+        toValue: clampedPan,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    panAnim.setValue(clampedPan);
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4,
+      onPanResponderGrant: () => {
+        panAnim.stopAnimation();
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const nextPan = clampPan({
+          x: mapPanRef.current.x + gestureState.dx,
+          y: mapPanRef.current.y + gestureState.dy,
+        });
+        panAnim.setValue(nextPan);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        setPanPosition({
+          x: mapPanRef.current.x + gestureState.dx,
+          y: mapPanRef.current.y + gestureState.dy,
+        });
+      },
+      onPanResponderTerminate: (_, gestureState) => {
+        setPanPosition({
+          x: mapPanRef.current.x + gestureState.dx,
+          y: mapPanRef.current.y + gestureState.dy,
+        });
+      },
+    }),
+  ).current;
 
   const normalizeFloorId = (floorId) => {
     if (floorId === "mezzanine") {
@@ -251,6 +317,7 @@ const CampusMap = ({
   // Handle zoom
   const handleZoomIn = () => {
     const newScale = Math.min(mapScale + 0.2, 3);
+    mapScaleRef.current = newScale;
     setMapScale(newScale);
     Animated.spring(scaleAnim, {
       toValue: newScale,
@@ -260,14 +327,26 @@ const CampusMap = ({
 
   const handleZoomOut = () => {
     const newScale = Math.max(mapScale - 0.2, 0.5);
+    mapScaleRef.current = newScale;
     setMapScale(newScale);
-    Animated.spring(scaleAnim, {
-      toValue: newScale,
-      useNativeDriver: true,
-    }).start();
+    const nextPan = clampPan(mapPanRef.current, newScale);
+    mapPanRef.current = nextPan;
+    setMapPan(nextPan);
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: newScale,
+        useNativeDriver: true,
+      }),
+      Animated.spring(panAnim, {
+        toValue: nextPan,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   const handleReset = () => {
+    mapScaleRef.current = 1;
+    mapPanRef.current = { x: 0, y: 0 };
     setMapScale(1);
     setMapPan({ x: 0, y: 0 });
     Animated.parallel([
@@ -294,58 +373,78 @@ const CampusMap = ({
     <View style={[styles.mapContainer, fullscreen && styles.mapContainerFullscreen]}>
       {renderFloorNavigation()}
       
-      <View style={styles.mapCanvas}>
-        {/* Floor Plan Image or Placeholder */}
-        {hasBlueprint ? (
-          isDiagramBlueprint ? (
-            <FloorBlueprintDiagram floorId={floorPlanImage.floorId} />
-          ) : (
-            <Image
-              source={floorPlanImage}
-              style={styles.floorPlanImage}
-              resizeMode="contain"
-              onLoadStart={() => setImageLoading(true)}
-              onLoadEnd={() => setImageLoading(false)}
-              onError={() => setImageError(true)}
-            />
-          )
-        ) : (
-          <View style={styles.floorPlanPlaceholder}>
-            <View style={styles.floorPlanContent}>
-              <Ionicons 
-                name="map-outline" 
-                size={64} 
-                color="#9CA3AF" 
+      <View
+        style={styles.mapCanvas}
+        onLayout={(event) => {
+          mapSizeRef.current = event.nativeEvent.layout;
+          setPanPosition(mapPanRef.current, false);
+        }}
+      >
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={[
+            styles.mapZoomLayer,
+            {
+              transform: [
+                { translateX: panAnim.x },
+                { translateY: panAnim.y },
+                { scale: scaleAnim },
+              ],
+            },
+          ]}
+        >
+          {/* Floor Plan Image or Placeholder */}
+          {hasBlueprint ? (
+            isDiagramBlueprint ? (
+              <FloorBlueprintDiagram floorId={floorPlanImage.floorId} />
+            ) : (
+              <Image
+                source={floorPlanImage}
+                style={styles.floorPlanImage}
+                resizeMode="contain"
+                onLoadStart={() => setImageLoading(true)}
+                onLoadEnd={() => setImageLoading(false)}
+                onError={() => setImageError(true)}
               />
-              <Text style={styles.floorPlanTitle}>
-                {getDisplayFloorName(activeFloor)}
-              </Text>
-              <Text style={styles.floorPlanSubtitle}>
-                {!mapBlueprints ? "Upload map blueprints to start tracking" : "Loading map blueprint..."}
-              </Text>
-              <View style={styles.floorPlanFeatures}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="people-outline" size={14} color="#6B7280" />
-                  <Text style={styles.featureText}>
-                    {visitors.length} Active Visitors
-                  </Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="layers-outline" size={14} color="#6B7280" />
-                  <Text style={styles.featureText}>
-                    {floors.length} Floors
-                  </Text>
+            )
+          ) : (
+            <View style={styles.floorPlanPlaceholder}>
+              <View style={styles.floorPlanContent}>
+                <Ionicons 
+                  name="map-outline" 
+                  size={64} 
+                  color="#9CA3AF" 
+                />
+                <Text style={styles.floorPlanTitle}>
+                  {getDisplayFloorName(activeFloor)}
+                </Text>
+                <Text style={styles.floorPlanSubtitle}>
+                  {!mapBlueprints ? "Upload map blueprints to start tracking" : "Loading map blueprint..."}
+                </Text>
+                <View style={styles.floorPlanFeatures}>
+                  <View style={styles.featureItem}>
+                    <Ionicons name="people-outline" size={14} color="#6B7280" />
+                    <Text style={styles.featureText}>
+                      {visitors.length} Active Visitors
+                    </Text>
+                  </View>
+                  <View style={styles.featureItem}>
+                    <Ionicons name="layers-outline" size={14} color="#6B7280" />
+                    <Text style={styles.featureText}>
+                      {floors.length} Floors
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
-        )}
-        
-        {/* Office labels are suppressed on real blueprint images to avoid duplicating printed room names. */}
-        {shouldShowOfficeLabels ? renderOfficeLabels() : null}
-        
-        {/* Visitor Markers */}
-        {renderVisitorMarkers()}
+          )}
+          
+          {/* Office labels are suppressed on real blueprint images to avoid duplicating printed room names. */}
+          {shouldShowOfficeLabels ? renderOfficeLabels() : null}
+          
+          {/* Visitor Markers */}
+          {renderVisitorMarkers()}
+        </Animated.View>
         
         {/* Map Controls */}
         <View style={styles.mapControls}>
@@ -375,6 +474,10 @@ const CampusMap = ({
           <Text style={styles.activeVisitorsBadgeText}>
             {visitors.length} Active
           </Text>
+        </View>
+
+        <View style={styles.zoomLevelBadge}>
+          <Text style={styles.zoomLevelText}>{Math.round(mapScale * 100)}%</Text>
         </View>
       </View>
       

@@ -88,6 +88,15 @@ export default StyleSheet.create({
     backgroundColor: "#F9FAFB",
   },
 
+  mapZoomLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    minHeight: 500,
+  },
+
   floorPlanImage: {
     width: "100%",
     height: "100%",
@@ -265,6 +274,23 @@ export default StyleSheet.create({
   activeVisitorsBadgeText: {
     fontSize: 12,
     fontWeight: "600",
+    color: "#FFFFFF",
+  },
+
+  zoomLevelBadge: {
+    position: "absolute",
+    top: 56,
+    right: 16,
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    zIndex: 20,
+  },
+
+  zoomLevelText: {
+    fontSize: 11,
+    fontWeight: "800",
     color: "#FFFFFF",
   },
 
