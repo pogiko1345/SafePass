@@ -275,26 +275,6 @@ export default StyleSheet.create({
     textAlign: "center",
   },
 
-  mapLoadingBadge: {
-    position: "absolute",
-    top: 16,
-    left: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(15, 23, 42, 0.72)",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    zIndex: 20,
-  },
-
-  mapLoadingText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-
   officeLabel: {
     position: "absolute",
     backgroundColor: "#0A3D91",

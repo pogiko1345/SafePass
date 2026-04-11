@@ -589,7 +589,6 @@ const userData = {
   employeeId: employeeId || undefined,
   department: req.body.department || '',
   position: req.body.position || '',     
-  shift: req.body.shift || 'Morning',     
   status: status || (role === 'visitor' ? 'pending' : 'active'),
   visitorId: visitorId || null,
 };
@@ -1536,7 +1535,6 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       role: "guard",
       nfcCardId,
       employeeId: finalEmployeeId,
-      shift: shift || "Morning",
       position: position || "Security Guard",
       status: "active",
       isActive: true,
@@ -1561,7 +1559,6 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
         `👤 Name: ${user.firstName} ${user.lastName}\n` +
         `🎭 Role: SECURITY GUARD\n` +
         `🆔 Employee ID: ${user.employeeId}\n` +
-        `⏰ Shift: ${shift || "Morning"}\n` +
         `📱 Phone: ${user.phone}\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
         `Please login to the app and change your password for security.\n\n` +

@@ -9,7 +9,6 @@ import {
   Platform,
   Animated,
   Image,
-  ActivityIndicator,
   PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,25 +22,6 @@ const TRACKING_FRESHNESS = {
   RECENT: "recent",
   AGING: "aging",
   STALE: "stale",
-};
-
-const getImageSourceKey = (source) => {
-  if (!source) return null;
-
-  const resolvedSource =
-    typeof Image.resolveAssetSource === "function"
-      ? Image.resolveAssetSource(source)
-      : null;
-
-  if (resolvedSource?.uri) return resolvedSource.uri;
-  if (typeof source === "string" || typeof source === "number") {
-    return String(source);
-  }
-  if (typeof source === "object") {
-    return source.uri || source.default || JSON.stringify(source);
-  }
-
-  return null;
 };
 
 const CampusMap = ({
@@ -65,7 +45,6 @@ const CampusMap = ({
   const [mapScale, setMapScale] = useState(1);
   const [mapPan, setMapPan] = useState({ x: 0, y: 0 });
   const [activeFloor, setActiveFloor] = useState(selectedFloor || defaultFloorId);
-  const [loadingImageKey, setLoadingImageKey] = useState(null);
   const [imageError, setImageError] = useState(false);
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -504,11 +483,6 @@ const CampusMap = ({
     floorPlanImage &&
     typeof floorPlanImage === "object" &&
     floorPlanImage.type === "diagram";
-  const imageSourceKey =
-    floorPlanImage && !isDiagramBlueprint
-      ? getImageSourceKey(floorPlanImage)
-      : null;
-  const isImageBlueprintLoading = Boolean(imageSourceKey && loadingImageKey === imageSourceKey);
   const hasBlueprint = floorPlanImage !== null && (isDiagramBlueprint || !imageError);
   const shouldShowOfficeLabels = !hasBlueprint || isDiagramBlueprint;
   const visibleVisitors = getVisibleVisitors();
@@ -546,16 +520,7 @@ const CampusMap = ({
                 source={floorPlanImage}
                 style={styles.floorPlanImage}
                 resizeMode="contain"
-                onLoadStart={() => setLoadingImageKey(imageSourceKey)}
-                onLoadEnd={() => setLoadingImageKey((currentKey) => (
-                  currentKey === imageSourceKey ? null : currentKey
-                ))}
-                onError={() => {
-                  setImageError(true);
-                  setLoadingImageKey((currentKey) => (
-                    currentKey === imageSourceKey ? null : currentKey
-                  ));
-                }}
+                onError={() => setImageError(true)}
               />
             )
           ) : (
@@ -599,13 +564,6 @@ const CampusMap = ({
 
         {renderMapEmptyState(visibleVisitors)}
 
-        {isImageBlueprintLoading && hasBlueprint ? (
-          <View pointerEvents="none" style={styles.mapLoadingBadge}>
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            <Text style={styles.mapLoadingText}>Loading map</Text>
-          </View>
-        ) : null}
-        
         {/* Map Controls */}
         <View style={styles.mapControls}>
           <TouchableOpacity

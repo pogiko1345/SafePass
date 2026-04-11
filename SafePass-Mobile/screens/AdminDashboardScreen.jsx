@@ -35,6 +35,57 @@ const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
   : require("@react-native-async-storage/async-storage").default;
 
+const STAFF_DEPARTMENT_OPTIONS = [
+  { value: "Admissions", label: "Admissions", area: "Ground Floor" },
+  { value: "Registrar", label: "Registrar", area: "Ground Floor" },
+  { value: "Finance", label: "Finance Office", area: "Ground Floor" },
+  { value: "Student Services", label: "Student Services", area: "Ground Floor" },
+  { value: "Flight Operations", label: "Flight Operations", area: "Mezzanine" },
+  { value: "Training", label: "Head of Training Room", area: "Mezzanine" },
+  { value: "I.T Room", label: "I.T Room", area: "Mezzanine" },
+  { value: "Faculty Room", label: "Faculty Room", area: "Mezzanine" },
+  { value: "Administration", label: "Administration", area: "Mezzanine" },
+];
+
+const STAFF_OFFICER_OPTIONS_BY_DEPARTMENT = {
+  Admissions: [
+    { value: "Admissions Officer", label: "Admissions Officer" },
+    { value: "Front Desk Officer", label: "Front Desk Officer" },
+  ],
+  Registrar: [
+    { value: "Registrar Officer", label: "Registrar Officer" },
+    { value: "Records Officer", label: "Records Officer" },
+  ],
+  Finance: [
+    { value: "Finance Officer", label: "Finance Officer" },
+    { value: "Cashier", label: "Cashier" },
+  ],
+  "Student Services": [
+    { value: "Student Services Officer", label: "Student Services Officer" },
+    { value: "Guidance Officer", label: "Guidance Officer" },
+  ],
+  "Flight Operations": [
+    { value: "Flight Operations Officer", label: "Flight Operations Officer" },
+    { value: "Operations Coordinator", label: "Operations Coordinator" },
+  ],
+  Training: [
+    { value: "Training Officer", label: "Training Officer" },
+    { value: "Training Coordinator", label: "Training Coordinator" },
+  ],
+  "I.T Room": [
+    { value: "I.T Officer", label: "I.T Officer" },
+    { value: "Technical Support Officer", label: "Technical Support Officer" },
+  ],
+  "Faculty Room": [
+    { value: "Faculty Officer", label: "Faculty Officer" },
+    { value: "Faculty Coordinator", label: "Faculty Coordinator" },
+  ],
+  Administration: [
+    { value: "Administrative Officer", label: "Administrative Officer" },
+    { value: "Academy Director", label: "Academy Director" },
+  ],
+};
+
 const storageGetItem = async (key) => {
   if (Storage && typeof Storage.getItem === "function") {
     return Storage.getItem(key);
@@ -637,6 +688,20 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
 
   const [activeChartDataset, setActiveChartDataset] = useState("daily");
 
+  const createEmptyUserForm = (role = "staff") => ({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    phone: "",
+    role,
+    department: role === "security" ? "Security Department" : "Admissions",
+    employeeId: "",
+    position: role === "security" ? "Security Personnel" : "Admissions Officer",
+    shift: "",
+    status: "active",
+  });
+
   // Form States
   const [selectedUser, setSelectedUser] = useState(null);
   const [editUserData, setEditUserData] = useState({
@@ -652,19 +717,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     isActive: true,
   });
 
-  const [newUserData, setNewUserData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    password: "",
-    phone: "",
-    role: "staff",
-    department: "",
-    employeeId: "",
-    position: "",
-    shift: "Morning",
-    status: "active",
-  });
+  const [newUserData, setNewUserData] = useState(createEmptyUserForm("staff"));
+  const [staffDropdownOpen, setStaffDropdownOpen] = useState(null);
 
   // Stats
   const [stats, setStats] = useState({
@@ -1819,6 +1873,125 @@ const loadDashboardData = useCallback(async () => {
     ]);
   };
 
+  const openCreateUserModal = (role = activeMenu === "security" ? "security" : "staff") => {
+    setNewUserData(createEmptyUserForm(role));
+    setStaffDropdownOpen(null);
+    setShowAddUserModal(true);
+  };
+
+  const getStaffDepartmentOption = (department) =>
+    STAFF_DEPARTMENT_OPTIONS.find((item) => item.value === department) || STAFF_DEPARTMENT_OPTIONS[0];
+
+  const getStaffOfficerOptions = (department) =>
+    STAFF_OFFICER_OPTIONS_BY_DEPARTMENT[getStaffDepartmentOption(department)?.value] ||
+    STAFF_OFFICER_OPTIONS_BY_DEPARTMENT.Admissions;
+
+  const getDefaultStaffPosition = (department) =>
+    getStaffOfficerOptions(department)[0]?.value || "Staff Officer";
+
+  const updateStaffDepartment = (target, department) => {
+    const updateForm = target === "edit" ? setEditUserData : setNewUserData;
+    updateForm((currentForm) => ({
+      ...currentForm,
+      department,
+      position: getDefaultStaffPosition(department),
+    }));
+    setStaffDropdownOpen(null);
+  };
+
+  const updateStaffPosition = (target, position) => {
+    const updateForm = target === "edit" ? setEditUserData : setNewUserData;
+    updateForm((currentForm) => ({
+      ...currentForm,
+      position,
+    }));
+    setStaffDropdownOpen(null);
+  };
+
+  const renderStaffDropdown = ({
+    target,
+    label,
+    value,
+    options,
+    placeholder,
+    icon = "chevron-down-outline",
+    onSelect,
+  }) => {
+    const dropdownKey = `${target}-${label}`;
+    const isOpen = staffDropdownOpen === dropdownKey;
+    const selectedOption = options.find((item) => item.value === value);
+
+    return (
+      <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>{label}</Text>
+        <TouchableOpacity
+          style={[
+            styles.staffDropdownTrigger,
+            isDarkMode && { backgroundColor: "#334155", borderColor: "#475569" },
+          ]}
+          onPress={() => setStaffDropdownOpen(isOpen ? null : dropdownKey)}
+          activeOpacity={0.85}
+        >
+          <View style={styles.staffDropdownValueWrap}>
+            <Ionicons name={icon} size={16} color="#64748B" />
+            <Text style={[styles.staffDropdownValue, isDarkMode && styles.darkText]}>
+              {selectedOption?.label || placeholder}
+            </Text>
+          </View>
+          <Ionicons name={isOpen ? "chevron-up-outline" : "chevron-down-outline"} size={18} color="#64748B" />
+        </TouchableOpacity>
+
+        {isOpen ? (
+          <View
+            style={[
+              styles.staffDropdownMenu,
+              isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+            ]}
+          >
+            {options.map((item) => {
+              const isSelected = item.value === value;
+              return (
+                <TouchableOpacity
+                  key={item.value}
+                  style={[
+                    styles.staffDropdownOption,
+                    isSelected && styles.staffDropdownOptionActive,
+                    isDarkMode && !isSelected && { borderColor: theme.borderColor },
+                  ]}
+                  onPress={() => onSelect(item.value)}
+                >
+                  <View>
+                    <Text
+                      style={[
+                        styles.staffDropdownOptionText,
+                        isSelected && styles.staffDropdownOptionTextActive,
+                        isDarkMode && !isSelected && styles.darkText,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                    {item.area ? (
+                      <Text
+                        style={[
+                          styles.staffDropdownOptionMeta,
+                          isSelected && styles.staffDropdownOptionMetaActive,
+                          isDarkMode && !isSelected && styles.darkTextSecondary,
+                        ]}
+                      >
+                        {item.area}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {isSelected ? <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" /> : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
   // FIXED: Handle Create User
   const handleCreateUser = async () => {
     if (!ensureAdminAccess()) return;
@@ -1860,7 +2033,6 @@ const loadDashboardData = useCallback(async () => {
         userPayload.position = newUserData.position || "Staff Member";
         userPayload.employeeId = newUserData.employeeId || `STF-${Date.now().toString().slice(-6)}`;
       } else if (newUserData.role === "security" || newUserData.role === "guard") {
-        userPayload.shift = newUserData.shift || "Morning";
         userPayload.position = newUserData.position || "Security Personnel";
         userPayload.employeeId = newUserData.employeeId || `SEC-${Date.now().toString().slice(-6)}`;
         userPayload.department = "Security Department";
@@ -1874,7 +2046,6 @@ const loadDashboardData = useCallback(async () => {
             email: userPayload.email,
             password: userPayload.password,
             phone: userPayload.phone,
-            shift: userPayload.shift,
             position: userPayload.position,
             employeeId: userPayload.employeeId,
           })
@@ -1951,7 +2122,7 @@ const loadDashboardData = useCallback(async () => {
       role: userItem.role || "staff",
       department: userItem.department || "",
       employeeId: userItem.employeeId || "",
-      shift: userItem.shift || "Morning",
+      shift: userItem.shift || "",
       position: userItem.position || "",
       status: userItem.status || "active",
       isActive: userItem.isActive !== false,
@@ -1968,10 +2139,7 @@ const loadDashboardData = useCallback(async () => {
     const createdName = createdUserSummary?.name || "New user";
     setShowCreateSuccessModal(false);
     setCreatedUserSummary(null);
-    setNewUserData({
-      firstName: "", lastName: "", email: "", password: "", phone: "",
-      role: "staff", department: "", employeeId: "", position: "", shift: "Morning", status: "active",
-    });
+    setNewUserData(createEmptyUserForm("staff"));
     await loadDashboardData();
     setActiveMenu("users");
     setUserFilter("all");
@@ -1998,7 +2166,6 @@ const loadDashboardData = useCallback(async () => {
         phone: editUserData.phone,
         role: editUserData.role,
         department: editUserData.department,
-        shift: editUserData.shift,
         position: editUserData.position,
         status: editUserData.status,
         isActive: editUserData.status === "active",
@@ -3482,7 +3649,7 @@ const loadDashboardData = useCallback(async () => {
             {userManagementConfig.primaryActionLabel ? (
               <TouchableOpacity
                 style={[styles.managementPrimaryButton, { backgroundColor: userManagementConfig.accent }]}
-                onPress={() => setShowAddUserModal(true)}
+                onPress={() => openCreateUserModal(activeMenu === "security" ? "security" : "staff")}
               >
                 <Ionicons name="person-add-outline" size={18} color="#FFFFFF" />
                 <Text style={styles.managementPrimaryButtonText}>
@@ -4144,7 +4311,23 @@ const loadDashboardData = useCallback(async () => {
                         newUserData.role === role && styles.roleOptionActive,
                         isDarkMode && newUserData.role !== role && { backgroundColor: "#334155", borderColor: "#475569" },
                       ]}
-                      onPress={() => setNewUserData({ ...newUserData, role })}
+                      onPress={() => setNewUserData((currentForm) => ({
+                        ...currentForm,
+                        role,
+                        department:
+                          role === "security"
+                            ? "Security Department"
+                            : currentForm.department === "Security Department" || !currentForm.department
+                              ? "Admissions"
+                              : currentForm.department,
+                        position:
+                          role === "security"
+                            ? currentForm.position || "Security Personnel"
+                            : currentForm.position === "Security Personnel"
+                              ? getDefaultStaffPosition(currentForm.department)
+                              : currentForm.position || getDefaultStaffPosition(currentForm.department),
+                        shift: "",
+                      }))}
                     >
                       <Text
                         style={[
@@ -4219,25 +4402,32 @@ const loadDashboardData = useCallback(async () => {
                 <View style={styles.userEditorSection}>
                   <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Staff Details</Text>
                   <View style={styles.userEditorGrid}>
+                    {renderStaffDropdown({
+                      target: "create",
+                      label: "Department",
+                      value: newUserData.department,
+                      options: STAFF_DEPARTMENT_OPTIONS,
+                      placeholder: "Choose department",
+                      icon: "business-outline",
+                      onSelect: (department) => updateStaffDepartment("create", department),
+                    })}
+                    {renderStaffDropdown({
+                      target: "create",
+                      label: "Officer Type",
+                      value: newUserData.position,
+                      options: getStaffOfficerOptions(newUserData.department),
+                      placeholder: "Choose officer type",
+                      icon: "id-card-outline",
+                      onSelect: (position) => updateStaffPosition("create", position),
+                    })}
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Department</Text>
-                      <TextInput
-                        style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                        placeholder="e.g., Admissions, Registrar, Academics"
-                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                        value={newUserData.department}
-                        onChangeText={(text) => setNewUserData({ ...newUserData, department: text })}
-                      />
-                    </View>
-                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Position</Text>
-                      <TextInput
-                        style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                        placeholder="e.g., Admissions Officer"
-                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                        value={newUserData.position}
-                        onChangeText={(text) => setNewUserData({ ...newUserData, position: text })}
-                      />
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Assigned Area</Text>
+                      <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                        <Ionicons name="location-outline" size={16} color="#64748B" />
+                        <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                          {getStaffDepartmentOption(newUserData.department)?.area || "General Area"}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -4245,21 +4435,11 @@ const loadDashboardData = useCallback(async () => {
               {newUserData.role === "security" && (
                 <View style={styles.userEditorSection}>
                   <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Security Details</Text>
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Shift Schedule *</Text>
-                    <View style={styles.roleSelector}>
-                      {["Morning", "Afternoon", "Night"].map((shift) => (
-                        <TouchableOpacity
-                          key={shift}
-                          style={[styles.roleOption, newUserData.shift === shift && styles.roleOptionActive, isDarkMode && newUserData.shift !== shift && { backgroundColor: "#334155", borderColor: "#475569" }]}
-                          onPress={() => setNewUserData({ ...newUserData, shift })}
-                        >
-                          <Text style={[styles.roleText, newUserData.shift === shift && styles.roleTextActive, isDarkMode && !(newUserData.shift === shift) && { color: "#CBD5E1" }]}>
-                            {shift}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
+                  <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                    <Ionicons name="time-outline" size={16} color="#64748B" />
+                    <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                      Shift schedule is handled operationally and is not fixed on the account.
+                    </Text>
                   </View>
                 </View>
               )}
@@ -4387,11 +4567,9 @@ const loadDashboardData = useCallback(async () => {
                     </Text>
                   </View>
                   <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                    <Text style={styles.userProfileInfoLabel}>
-                      {isSecurityRole(selectedUser?.role) ? "Shift" : "Position"}
-                    </Text>
+                    <Text style={styles.userProfileInfoLabel}>Position</Text>
                     <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
-                      {isSecurityRole(selectedUser?.role) ? (selectedUser?.shift || "Not set") : (selectedUser?.position || "Not set")}
+                      {selectedUser?.position || (isSecurityRole(selectedUser?.role) ? "Security Personnel" : "Not set")}
                     </Text>
                   </View>
                 </View>
@@ -4554,7 +4732,26 @@ const loadDashboardData = useCallback(async () => {
                           editUserData.role === role && styles.roleOptionActive,
                           isDarkMode && editUserData.role !== role && { backgroundColor: "#334155", borderColor: "#475569" },
                         ]}
-                        onPress={() => setEditUserData({ ...editUserData, role })}
+                        onPress={() => setEditUserData((currentForm) => {
+                          const nextDepartment =
+                            role === "security"
+                              ? "Security Department"
+                              : currentForm.department === "Security Department" || !currentForm.department
+                                ? "Admissions"
+                                : currentForm.department;
+                          return {
+                            ...currentForm,
+                            role,
+                            department: nextDepartment,
+                            position:
+                              role === "security"
+                                ? currentForm.position || "Security Personnel"
+                                : currentForm.position === "Security Personnel"
+                                  ? getDefaultStaffPosition(nextDepartment)
+                                  : currentForm.position || getDefaultStaffPosition(nextDepartment),
+                            shift: "",
+                          };
+                        })}
                       >
                         <Text style={[styles.roleText, editUserData.role === role && styles.roleTextActive, isDarkMode && editUserData.role !== role && { color: "#CBD5E1" }]}>
                           {role.charAt(0).toUpperCase() + role.slice(1)}
@@ -4598,25 +4795,32 @@ const loadDashboardData = useCallback(async () => {
                 <View style={styles.userEditorSection}>
                   <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Staff Details</Text>
                   <View style={styles.userEditorGrid}>
+                    {renderStaffDropdown({
+                      target: "edit",
+                      label: "Department",
+                      value: editUserData.department,
+                      options: STAFF_DEPARTMENT_OPTIONS,
+                      placeholder: "Choose department",
+                      icon: "business-outline",
+                      onSelect: (department) => updateStaffDepartment("edit", department),
+                    })}
+                    {renderStaffDropdown({
+                      target: "edit",
+                      label: "Officer Type",
+                      value: editUserData.position,
+                      options: getStaffOfficerOptions(editUserData.department),
+                      placeholder: "Choose officer type",
+                      icon: "id-card-outline",
+                      onSelect: (position) => updateStaffPosition("edit", position),
+                    })}
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Department</Text>
-                      <TextInput
-                        style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                        value={editUserData.department}
-                        onChangeText={(text) => setEditUserData({ ...editUserData, department: text })}
-                        placeholder="Department"
-                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                      />
-                    </View>
-                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Position</Text>
-                      <TextInput
-                        style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                        value={editUserData.position}
-                        onChangeText={(text) => setEditUserData({ ...editUserData, position: text })}
-                        placeholder="Position"
-                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                      />
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Assigned Area</Text>
+                      <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                        <Ionicons name="location-outline" size={16} color="#64748B" />
+                        <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                          {getStaffDepartmentOption(editUserData.department)?.area || "General Area"}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -4625,21 +4829,11 @@ const loadDashboardData = useCallback(async () => {
               {isSecurityRole(editUserData.role) && (
                 <View style={styles.userEditorSection}>
                   <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Security Details</Text>
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Shift Schedule</Text>
-                    <View style={styles.roleSelector}>
-                      {["Morning", "Afternoon", "Night"].map((shift) => (
-                        <TouchableOpacity
-                          key={shift}
-                          style={[styles.roleOption, editUserData.shift === shift && styles.roleOptionActive, isDarkMode && editUserData.shift !== shift && { backgroundColor: "#334155", borderColor: "#475569" }]}
-                          onPress={() => setEditUserData({ ...editUserData, shift })}
-                        >
-                          <Text style={[styles.roleText, editUserData.shift === shift && styles.roleTextActive, isDarkMode && editUserData.shift !== shift && { color: "#CBD5E1" }]}>
-                            {shift}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
+                  <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                    <Ionicons name="time-outline" size={16} color="#64748B" />
+                    <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                      Shift schedule is not stored here because assignments can rotate anytime.
+                    </Text>
                   </View>
                 </View>
               )}

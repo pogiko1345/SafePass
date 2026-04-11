@@ -2328,6 +2328,81 @@ export default StyleSheet.create({
     fontWeight: "600",
   },
 
+  staffDropdownTrigger: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 30,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#F8FAFC",
+  },
+
+  staffDropdownValueWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  staffDropdownValue: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "700",
+  },
+
+  staffDropdownMenu: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+
+  staffDropdownOption: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  staffDropdownOptionActive: {
+    backgroundColor: "#10B981",
+    borderBottomColor: "#10B981",
+  },
+
+  staffDropdownOptionText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  staffDropdownOptionTextActive: {
+    color: "#FFFFFF",
+  },
+
+  staffDropdownOptionMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  staffDropdownOptionMetaActive: {
+    color: "rgba(255,255,255,0.82)",
+  },
+
   userEditorRoleWrap: {
     flexDirection: "row",
     flexWrap: "wrap",

@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema({
   
   department: { type: String, default: "" },
   position: { type: String, default: "" },
-  shift: { type: String, default: "Morning" },
+  shift: { type: String, default: "" },
   
 role: {
   type: String,
