@@ -1014,211 +1014,133 @@ app.post("/api/check-email", async (req, res) => {
 
 // Register a new visitor (Complete version with UNIQUE NFC ID for pending visitors)
 app.post("/api/visitors/register", async (req, res) => {
-  let createdVisitor = null;
-  let createdUser = null;
-
   try {
     const visitorData = req.body || {};
-    const normalizedEmail = String(visitorData.email || "")
-      .toLowerCase()
-      .trim();
     const normalizedFullName = String(visitorData.fullName || "").trim();
-    const normalizedPhoneNumber = String(visitorData.phoneNumber || "").trim();
-    const normalizedIdNumber = String(visitorData.idNumber || "").trim();
-    const normalizedPurpose = String(visitorData.purposeOfVisit || "").trim();
-    const normalizedVehicleNumber = String(visitorData.vehicleNumber || "").trim();
+    const normalizedEmail = normalizeEmailValue(visitorData.email);
+    const normalizedUsername = normalizeUsernameValue(visitorData.username);
+    const password = String(visitorData.password || "");
 
-    // 1. Check if user already exists
+    if (!normalizedFullName || !normalizedEmail || !normalizedUsername || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Full name, email, username, and password are required.",
+      });
+    }
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long.",
+      });
+    }
+
     const existingUser = await User.findOne({
-      email: normalizedEmail,
+      $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
     });
-    if (existingUser) {
-      const existingVisitorForUser = await Visitor.findOne({
-        email: normalizedEmail,
-      }).sort({ registeredAt: -1 });
 
+    if (existingUser) {
       return res.status(400).json({
         success: false,
         message:
-          existingUser.role === "visitor" &&
-          (existingUser.status === "pending" ||
-            existingVisitorForUser?.approvalStatus === "pending")
-            ? "You already have a pending registration. Please log in to track your approval status."
-            : "An account with this email already exists. Please login instead.",
+          existingUser.email === normalizedEmail
+            ? "An account with this email already exists. Please log in instead."
+            : "That username is already taken. Please choose another username.",
       });
     }
 
-    // 2. Check if visitor already exists
-    const existingVisitor = await Visitor.findOne({
-      email: normalizedEmail,
-    }).sort({ registeredAt: -1 });
-    if (existingVisitor) {
-      if (existingVisitor.approvalStatus === "pending") {
-        return res.status(400).json({
-          success: false,
-          message:
-            "You already have a pending registration. Please log in to track your approval status.",
-        });
-      } else if (existingVisitor.approvalStatus === "approved") {
-        return res.status(400).json({
-          success: false,
-          message:
-            "You already have an approved visitor account. Please login instead.",
-        });
-      }
-      return res.status(400).json({
-        success: false,
-        message: "A visitor with this email already exists.",
-      });
-    }
-
-    // 3. Generate the temporary visitor password before creating linked records
-    const tempPassword = `VIS${Math.random().toString(36).slice(-8).toUpperCase()}`;
-
-    // 4. Create new visitor
-    const visitor = new Visitor({
-      fullName: normalizedFullName,
-      email: normalizedEmail,
-      phoneNumber: normalizedPhoneNumber,
-      idNumber: normalizedIdNumber,
-      idImage: visitorData.idImage,
-      purposeOfVisit: normalizedPurpose,
-      host: String(visitorData.host || "").trim(),
-      assignedOffice: String(visitorData.assignedOffice || "").trim(),
-      vehicleNumber: normalizedVehicleNumber,
-      visitDate: new Date(visitorData.visitDate),
-      visitTime: new Date(visitorData.visitTime),
-      registeredAt: new Date(),
-      requestCategory: "registration",
-      approvalFlow: "admin",
-      temporaryPassword: tempPassword,
+    const existingVisitor = await Visitor.findOne({ email: normalizedEmail }).sort({
+      registeredAt: -1,
     });
+    const nameParts = normalizedFullName.split(/\s+/).filter(Boolean);
+    const firstName = nameParts.shift() || "Visitor";
+    const lastName = nameParts.join(" ") || "User";
 
-    visitor.markRegistrationPending();
-    await visitor.save();
-    createdVisitor = visitor;
-    console.log("✅ Visitor registered:", visitorData.email);
-
-    // 5. Generate UNIQUE temporary NFC card ID (KEY FIX!)
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substr(2, 10).toUpperCase();
-    const tempNfcCardId = `PENDING-${timestamp}-${randomString}`;
-
-    // 6. Create user account with UNIQUE NFC card ID (NOT NULL!)
     const user = new User({
-      firstName: normalizedFullName.split(" ")[0] || "Visitor",
-      lastName: normalizedFullName.split(" ").slice(1).join(" ") || "User",
+      firstName,
+      lastName,
+      username: normalizedUsername,
       email: normalizedEmail,
-      password: tempPassword,
-      phone: normalizedPhoneNumber,
+      password,
+      phone: "",
       role: "visitor",
-      status: "pending",
-      isActive: false,
-      visitorId: visitor._id,
-      nfcCardId: tempNfcCardId,
+      status: "active",
+      isActive: true,
+      visitorId: existingVisitor?._id || null,
+      nfcCardId: null,
     });
 
     await user.save();
-    createdUser = user;
-    console.log("✅ User account created with NFC ID:", tempNfcCardId);
-
-    // 7. Create notifications for ALL admins
-    const admins = await User.find({ role: "admin", isActive: true });
-
-    for (const admin of admins) {
-      const notification = new Notification({
-        title: "New Visitor Registration",
-        message:
-          `${visitorData.fullName} (${visitorData.email}) has registered for a visit.\n\n` +
-          `Purpose: ${visitorData.purposeOfVisit}\n` +
-          `Date: ${new Date(visitorData.visitDate).toLocaleDateString()}\n` +
-          `Time: ${new Date(visitorData.visitTime).toLocaleTimeString()}\n` +
-          `Phone: ${visitorData.phoneNumber}`,
-        type: "visitor",
-        severity: "medium",
-        targetRole: "admin",
-        targetUser: admin._id,
-        relatedVisitor: visitor._id,
-        metadata: {
-          visitorName: visitorData.fullName,
-          visitorEmail: visitorData.email,
-          purpose: visitorData.purposeOfVisit,
-          visitDate: visitorData.visitDate,
-          visitTime: visitorData.visitTime,
-          phoneNumber: visitorData.phoneNumber,
-        },
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
-
-      await notification.save();
-    }
-
-    console.log(
-      `📢 Created ${admins.length} admin notifications for new visitor`,
-    );
+    console.log("Visitor account created:", normalizedEmail);
 
     await createSystemActivity({
       actorUser: user,
-      relatedVisitor: visitor,
+      relatedVisitor: existingVisitor?._id ? existingVisitor : null,
       relatedUser: user,
-      activityType: "visitor_registration_request",
-      status: "pending",
-      location: visitor.assignedOffice || visitor.host || "Visitor Registration",
-      notes: `${visitor.fullName} submitted a visitor registration request.`,
+      activityType: "visitor_account_registration",
+      status: "granted",
+      location: "Visitor Registration",
+      notes: `${normalizedFullName} created a visitor account.`,
       metadata: {
-        requestCategory: "registration",
-        visitDate: visitor.visitDate,
-        visitTime: visitor.visitTime,
-        purposeOfVisit: visitor.purposeOfVisit,
+        username: user.username,
+        email: user.email,
       },
     });
 
-    // 8. Return response with credentials
+    await AccessLog.create({
+      userId: user._id,
+      userEmail: user.email,
+      userName: normalizedFullName,
+      actorRole: "visitor",
+      location: "Visitor Registration",
+      accessType: "system",
+      activityType: "visitor_account_registration",
+      status: "granted",
+      relatedUser: user._id,
+      relatedVisitor: existingVisitor?._id || null,
+      notes: "Visitor account created successfully",
+    });
+
     res.status(201).json({
       success: true,
-      message:
-        "Visitor registration submitted successfully. Pending admin approval.",
-      visitor: {
-        _id: visitor._id,
-        fullName: visitor.fullName,
-        email: visitor.email,
-        status: "pending",
-        approvalStatus: "pending",
+      message: "Visitor account created successfully.",
+      user: {
+        _id: user._id,
+        fullName: normalizedFullName,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        status: user.status,
       },
       credentials: {
+        username: user.username,
         email: user.email,
-        password: tempPassword,
+        password,
       },
     });
   } catch (error) {
     console.error("Visitor registration error:", error);
 
-    // Handle duplicate key error specifically
     if (error.code === 11000) {
       const duplicateField =
         Object.keys(error.keyPattern || {})[0] ||
         Object.keys(error.keyValue || {})[0] ||
         "";
 
-      if (createdVisitor && !createdUser) {
-        try {
-          await Visitor.deleteOne({ _id: createdVisitor._id });
-          console.log(
-            "↩️ Rolled back partial visitor record after duplicate registration error:",
-            createdVisitor.email,
-          );
-        } catch (rollbackError) {
-          console.error("Visitor rollback error:", rollbackError);
-        }
-      }
-
       return res.status(400).json({
         success: false,
         message:
           duplicateField === "email"
             ? "An account with this email already exists. Please log in instead."
-            : duplicateField === "nfcCardId"
-              ? "Unable to assign a visitor access card right now. Please try submitting again."
+            : duplicateField === "username"
+              ? "That username is already taken. Please choose another username."
               : "A duplicate entry was found. Please try again with different details.",
         duplicateField,
       });
@@ -4843,3 +4765,4 @@ process.on("SIGINT", () => {
     });
   });
 });
+
