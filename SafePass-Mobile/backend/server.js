@@ -21,7 +21,7 @@ app.use(
     origin: true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "x-device-key"],
   }),
 );
 
@@ -162,6 +162,141 @@ const createRoleNotification = async ({
   }
 };
 
+const CHECKPOINT_LOCATIONS = {
+  main_gate: {
+    floor: "ground",
+    office: "Main Gate",
+    coordinates: { x: 18, y: 78 },
+  },
+  administration: {
+    floor: "ground",
+    office: "Administration",
+    coordinates: { x: 18, y: 36 },
+  },
+  registrar: {
+    floor: "ground",
+    office: "Registrar's Office",
+    coordinates: { x: 45, y: 44 },
+  },
+  accounting: {
+    floor: "ground",
+    office: "Accounting Office",
+    coordinates: { x: 66, y: 42 },
+  },
+  conference_room: {
+    floor: "first",
+    office: "Conference Room",
+    coordinates: { x: 10, y: 36 },
+  },
+  chairman: {
+    floor: "first",
+    office: "Chairman",
+    coordinates: { x: 21, y: 40 },
+  },
+  flight_operations: {
+    floor: "first",
+    office: "Flight Operations",
+    coordinates: { x: 33, y: 43 },
+  },
+  head_of_training_room: {
+    floor: "first",
+    office: "Head Of Training Room",
+    coordinates: { x: 45, y: 42 },
+  },
+  it_room: {
+    floor: "first",
+    office: "I.T Room",
+    coordinates: { x: 57, y: 42 },
+  },
+  faculty_room: {
+    floor: "first",
+    office: "Faculty Room",
+    coordinates: { x: 69, y: 36 },
+  },
+  academy_director: {
+    floor: "first",
+    office: "Academy Director",
+    coordinates: { x: 82, y: 37 },
+  },
+  cr: {
+    floor: "first",
+    office: "CR",
+    coordinates: { x: 94, y: 25 },
+  },
+  sto: {
+    floor: "first",
+    office: "STO",
+    coordinates: { x: 94, y: 44 },
+  },
+};
+
+const normalizeCheckpointId = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const clampMapCoordinate = (value, min = 5, max = 95) =>
+  Math.max(min, Math.min(max, value));
+
+const mapGpsToCampusCoordinates = (latitude, longitude) => {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { x: null, y: null };
+  }
+
+  const latMin = Number(process.env.CAMPUS_LAT_MIN || 14.5976);
+  const latMax = Number(process.env.CAMPUS_LAT_MAX || 14.6007);
+  const lngMin = Number(process.env.CAMPUS_LNG_MIN || 120.9823);
+  const lngMax = Number(process.env.CAMPUS_LNG_MAX || 120.9857);
+
+  const x = ((lng - lngMin) / (lngMax - lngMin)) * 100;
+  const y = (1 - (lat - latMin) / (latMax - latMin)) * 100;
+
+  return {
+    x: Number(clampMapCoordinate(x).toFixed(2)),
+    y: Number(clampMapCoordinate(y).toFixed(2)),
+  };
+};
+
+const getTapLocationFromRequest = (body = {}) => {
+  const checkpointId = normalizeCheckpointId(body.checkpointId || body.checkpoint || body.office);
+  const knownCheckpoint = CHECKPOINT_LOCATIONS[checkpointId] || null;
+  const coordinates = body.coordinates || {};
+
+  return {
+    checkpointId,
+    floor: String(body.floor || knownCheckpoint?.floor || "").trim(),
+    office: String(body.office || knownCheckpoint?.office || checkpointId || "Unknown Checkpoint").trim(),
+    coordinates: {
+      x: Number.isFinite(Number(coordinates.x ?? knownCheckpoint?.coordinates?.x))
+        ? Number(coordinates.x ?? knownCheckpoint?.coordinates?.x)
+        : null,
+      y: Number.isFinite(Number(coordinates.y ?? knownCheckpoint?.coordinates?.y))
+        ? Number(coordinates.y ?? knownCheckpoint?.coordinates?.y)
+        : null,
+    },
+    source: String(body.source || "arduino_tap").trim(),
+  };
+};
+
+const validateDeviceKey = (req, res, next) => {
+  const expectedKey = process.env.ARDUINO_DEVICE_KEY || "safepass-device-key";
+  const providedKey = req.header("x-device-key") || req.body?.deviceKey;
+
+  if (!providedKey || providedKey !== expectedKey) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid device key",
+    });
+  }
+
+  next();
+};
+
 // ========== EMAIL SIMULATION (for demo) ==========
 const sendEmail = (to, subject, body) => {
   console.log(`\n📧 ========== EMAIL SIMULATION ==========`);
@@ -184,7 +319,287 @@ app.get("/api/test", (req, res) => {
   });
 });
 
+app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
+  try {
+    const cardId = String(
+      req.body?.nfcCardId ||
+        req.body?.cardId ||
+        req.body?.uid ||
+        req.body?.tagId ||
+        "",
+    ).trim();
+    const deviceId = String(req.body?.deviceId || "arduino-reader").trim();
+    const tapLocation = getTapLocationFromRequest(req.body || {});
+
+    if (!cardId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing NFC card ID",
+      });
+    }
+
+    if (!tapLocation.floor || !tapLocation.office) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing checkpoint floor or office",
+      });
+    }
+
+    const visitorUser = await User.findOne({
+      nfcCardId: cardId,
+      role: "visitor",
+    }).select("_id email firstName lastName nfcCardId role");
+
+    if (!visitorUser) {
+      await AccessLog.create({
+        userEmail: "",
+        userName: "Unknown NFC Card",
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "arduino_location_tap",
+        status: "denied",
+        nfcCardId: cardId,
+        metadata: {
+          deviceId,
+          tapLocation,
+        },
+        notes: `Unknown NFC card tapped at ${tapLocation.office}`,
+      });
+
+      return res.status(404).json({
+        success: false,
+        message: "NFC card is not assigned to a visitor",
+      });
+    }
+
+    const visitor = await Visitor.findOne({
+      email: visitorUser.email,
+      status: "checked_in",
+    }).sort({ checkedInAt: -1 });
+
+    if (!visitor) {
+      await AccessLog.create({
+        userId: visitorUser._id,
+        userEmail: visitorUser.email,
+        userName: `${visitorUser.firstName || ""} ${visitorUser.lastName || ""}`.trim(),
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "arduino_location_tap",
+        status: "denied",
+        nfcCardId: cardId,
+        relatedUser: visitorUser._id,
+        metadata: {
+          deviceId,
+          tapLocation,
+        },
+        notes: `Card tapped at ${tapLocation.office}, but visitor is not checked in`,
+      });
+
+      return res.status(409).json({
+        success: false,
+        message: "Visitor must be checked in before tracking can start",
+      });
+    }
+
+    visitor.updateCurrentLocation(tapLocation, { deviceId });
+    await visitor.save();
+
+    await AccessLog.create({
+      userId: visitorUser._id,
+      userEmail: visitor.email,
+      userName: visitor.fullName,
+      actorRole: "device",
+      location: tapLocation.office,
+      accessType: "system",
+      activityType: "arduino_location_tap",
+      status: "granted",
+      nfcCardId: cardId,
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser._id,
+      metadata: {
+        deviceId,
+        currentLocation: visitor.currentLocation,
+      },
+      notes: `${visitor.fullName} tapped at ${tapLocation.office}`,
+    });
+
+    res.json({
+      success: true,
+      message: "Visitor location updated",
+      visitorId: visitor._id,
+      currentLocation: visitor.currentLocation,
+      visitor: {
+        _id: visitor._id,
+        fullName: visitor.fullName,
+        email: visitor.email,
+        status: visitor.status,
+        currentLocation: visitor.currentLocation,
+      },
+    });
+  } catch (error) {
+    console.error("Arduino location tap error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update visitor location",
+    });
+  }
+});
+
+app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+
+    if (!visitor) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor not found",
+      });
+    }
+
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const isOwnVisitorRecord =
+      requesterRole === "visitor" &&
+      String(visitor.email || "").toLowerCase() === String(req.user.email || "").toLowerCase();
+    const canUpdateTrackedLocation =
+      isOwnVisitorRecord || ["admin", "security", "guard"].includes(requesterRole);
+
+    if (!canUpdateTrackedLocation) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot update this visitor location",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(409).json({
+        success: false,
+        message: "Visitor must be checked in before phone GPS tracking can start",
+      });
+    }
+
+    const latitude = Number(req.body?.latitude);
+    const longitude = Number(req.body?.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid latitude and longitude are required",
+      });
+    }
+
+    const coordinates = mapGpsToCampusCoordinates(latitude, longitude);
+    visitor.updateCurrentLocation(
+      {
+        floor: req.body?.floor || visitor.currentLocation?.floor || "ground",
+        office: req.body?.office || visitor.currentLocation?.office || "Phone GPS",
+        checkpointId: "phone_gps",
+        coordinates,
+        gps: {
+          latitude,
+          longitude,
+          accuracy: req.body?.accuracy,
+          altitude: req.body?.altitude,
+          heading: req.body?.heading,
+          speed: req.body?.speed,
+        },
+        source: "phone_gps",
+      },
+      {
+        deviceId: req.body?.deviceId || `phone-${req.user._id}`,
+      },
+    );
+
+    await visitor.save();
+
+    res.json({
+      success: true,
+      message: "Phone GPS location updated",
+      visitorId: visitor._id,
+      currentLocation: visitor.currentLocation,
+    });
+  } catch (error) {
+    console.error("Phone GPS location update error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update phone GPS location",
+    });
+  }
+});
+
 // 1. REGISTER
+const normalizeEmailValue = (value = "") => String(value || "").toLowerCase().trim();
+const normalizeUsernameValue = (value = "") => String(value || "").toLowerCase().trim();
+const isValidEmailValue = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+const normalizeDepartmentValue = (value = "") => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/&/g, "and")
+    .replace(/\s+/g, " ");
+
+  const aliases = {
+    "registrars office": "registrar",
+    registrar: "registrar",
+    "finance office": "accounting",
+    finance: "accounting",
+    accounting: "accounting",
+    cashier: "accounting",
+    guidance: "guidance",
+    "guidance office": "guidance",
+    "student services": "guidance",
+    administration: "administration",
+    "administration office": "administration",
+    admissions: "admissions",
+    "admissions office": "admissions",
+    "flight operations": "flight operations",
+    training: "training",
+    "head of training room": "training",
+    "i.t room": "i.t room",
+    "it room": "i.t room",
+    "faculty room": "faculty room",
+  };
+
+  return aliases[normalized] || normalized;
+};
+
+const formatDepartmentLabel = (value = "") =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const getStaffDepartmentQuery = (department = "") => {
+  const normalizedDepartment = normalizeDepartmentValue(department);
+  const aliasGroups = {
+    registrar: ["Registrar", "Registrar's Office"],
+    accounting: ["Accounting", "Finance", "Finance Office", "Cashier"],
+    guidance: ["Guidance", "Guidance Office", "Student Services"],
+    administration: ["Administration", "Administration Office"],
+    admissions: ["Admissions", "Admissions Office"],
+    "flight operations": ["Flight Operations"],
+    training: ["Training", "Head of Training Room"],
+    "i.t room": ["I.T Room", "IT Room"],
+    "faculty room": ["Faculty Room"],
+  };
+
+  const labels = aliasGroups[normalizedDepartment] || [department];
+  return { $in: labels.map((label) => new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")) };
+};
+
+const isStaffAllowedForAppointment = (staffUser = {}, visitor = {}) => {
+  if (String(staffUser.role).toLowerCase() === "admin") return true;
+
+  const staffDepartment = normalizeDepartmentValue(staffUser.department);
+  const appointmentDepartment = normalizeDepartmentValue(
+    visitor.appointmentDepartment || visitor.assignedOffice || visitor.host,
+  );
+
+  return Boolean(staffDepartment && appointmentDepartment && staffDepartment === appointmentDepartment);
+};
+
 app.post("/api/register", async (req, res) => {
   console.log("📝 Registration attempt:", req.body);
 
@@ -192,6 +607,7 @@ app.post("/api/register", async (req, res) => {
     const {
       firstName,
       lastName,
+      username,
       email,
       password,
       phone,
@@ -208,10 +624,35 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedUsername = normalizeUsernameValue(username);
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        error: "Invalid email format",
+        field: "email",
+      });
+    }
+
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const duplicateChecks = [{ email: normalizedEmail }];
+    if (normalizedUsername) {
+      duplicateChecks.push({ username: normalizedUsername });
+    }
+
+    const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
+      const duplicateField =
+        existingUser.email === normalizedEmail
+          ? "email"
+          : existingUser.username === normalizedUsername
+            ? "username"
+            : "email";
+
+      return res.status(400).json({
+        error: duplicateField === "username" ? "Username already registered" : "Email already registered",
+        field: duplicateField,
+      });
     }
 
     let nfcCardId = null;
@@ -237,7 +678,8 @@ app.post("/api/register", async (req, res) => {
 const userData = {
   firstName,
   lastName,
-  email: email.toLowerCase().trim(),
+  username: normalizedUsername || undefined,
+  email: normalizedEmail,
   password,
   phone,
   role: role || 'visitor',
@@ -245,7 +687,6 @@ const userData = {
   employeeId: employeeId || undefined,
   department: req.body.department || '',
   position: req.body.position || '',     
-  shift: req.body.shift || 'Morning',     
   status: status || (role === 'visitor' ? 'pending' : 'active'),
   visitorId: visitorId || null,
 };
@@ -383,15 +824,18 @@ app.post("/api/login", async (req, res) => {
 
   try {
     const { email, password } = req.body;
+    const loginIdentifier = String(email || "").toLowerCase().trim();
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ error: "Username/email and password are required" });
     }
 
-    // Find user
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    // Visitors can sign in using either their username or email address.
+    const user = await User.findOne({
+      $or: [{ email: loginIdentifier }, { username: loginIdentifier }],
+    });
     if (!user) {
-      console.log("User not found:", email);
+      console.log("User not found:", loginIdentifier);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
@@ -403,7 +847,7 @@ app.post("/api/login", async (req, res) => {
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      console.log("Invalid password for:", email);
+      console.log("Invalid password for:", loginIdentifier);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
@@ -645,15 +1089,12 @@ app.post("/api/visitors/register", async (req, res) => {
       visitDate: new Date(visitorData.visitDate),
       visitTime: new Date(visitorData.visitTime),
       registeredAt: new Date(),
-      status: "pending",
-      approvalStatus: "pending",
       requestCategory: "registration",
       approvalFlow: "admin",
-      appointmentStatus: "pending",
-      appointmentRequestedAt: new Date(),
       temporaryPassword: tempPassword,
     });
 
+    visitor.markRegistrationPending();
     await visitor.save();
     createdVisitor = visitor;
     console.log("✅ Visitor registered:", visitorData.email);
@@ -800,9 +1241,10 @@ app.get("/api/admin/visitors/pending", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    // Get ALL visitors with status 'pending' OR approvalStatus 'pending'
     const visitors = await Visitor.find({
-      $or: [{ status: "pending" }, { approvalStatus: "pending" }],
+      requestCategory: "registration",
+      approvalFlow: "admin",
+      approvalStatus: "pending",
     }).sort({ registeredAt: -1 });
 
     console.log(`\n📋 Found ${visitors.length} pending visitors:`);
@@ -838,13 +1280,28 @@ app.get("/api/admin/visitors", authMiddleware, async (req, res) => {
       query.status = status;
     }
 
-    // Also search by approvalStatus if status is pending/approved/rejected
     if (status === "pending") {
-      query.$or = [{ status: "pending" }, { approvalStatus: "pending" }];
+      delete query.status;
+      query.$or = [
+        { requestCategory: "registration", approvalStatus: "pending" },
+        { requestCategory: "appointment", appointmentStatus: "pending" },
+      ];
     } else if (status === "approved") {
-      query.$or = [{ status: "approved" }, { approvalStatus: "approved" }];
+      delete query.status;
+      query.approvalStatus = "approved";
+      query.$or = [
+        { requestCategory: "registration" },
+        {
+          requestCategory: "appointment",
+          appointmentStatus: { $in: ["approved", "adjusted"] },
+        },
+      ];
     } else if (status === "rejected") {
-      query.$or = [{ status: "rejected" }, { approvalStatus: "rejected" }];
+      delete query.status;
+      query.$or = [
+        { requestCategory: "registration", approvalStatus: "rejected" },
+        { requestCategory: "appointment", appointmentStatus: "rejected" },
+      ];
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -923,17 +1380,8 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
 
     // Update visitor status - THIS IS THE KEY PART
     console.log("\n📝 UPDATING VISITOR...");
-    visitor.approvalStatus = "approved";
-    visitor.status = "approved";
-    visitor.approvedAt = new Date();
-    visitor.approvedBy = req.user._id;
-    visitor.adminNotes = adminNotes || "";
+    visitor.approveRegistration(req.user._id, adminNotes || "");
     visitor.temporaryPassword = tempPassword;
-    visitor.requestCategory = visitor.requestCategory || "registration";
-    visitor.approvalFlow = "admin";
-    visitor.appointmentStatus = "approved";
-    visitor.appointmentRequestedAt =
-      visitor.appointmentRequestedAt || visitor.registeredAt || new Date();
 
     await visitor.save();
     console.log("✅ Visitor updated in database");
@@ -1076,13 +1524,7 @@ app.put("/api/admin/visitors/:id/reject", authMiddleware, async (req, res) => {
         .json({ success: false, message: "Visitor not found" });
     }
 
-    // Update visitor status
-    visitor.status = "rejected";
-    visitor.approvalStatus = "rejected";
-    visitor.appointmentStatus = "rejected";
-    visitor.rejectedAt = new Date();
-    visitor.rejectedBy = req.user._id;
-    visitor.rejectionReason = reason || "No reason provided";
+    visitor.rejectRegistration(req.user._id, reason || "No reason provided");
     await visitor.save();
 
     // Send rejection email (simulated)
@@ -1135,6 +1577,164 @@ app.put("/api/admin/visitors/:id/reject", authMiddleware, async (req, res) => {
 });
 
 // ============ SECURITY GUARD MANAGEMENT ROUTES ============
+
+// Create staff account (admin only)
+app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const {
+      firstName,
+      lastName,
+      username,
+      email,
+      password,
+      phone,
+      department,
+      position,
+      employeeId,
+      status,
+    } = req.body;
+
+    if (!firstName || !lastName || !username || !email || !password || !phone || !department) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+        required: ["firstName", "lastName", "username", "email", "password", "phone", "department"],
+      });
+    }
+
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedUsername = normalizeUsernameValue(username);
+    const normalizedEmployeeId = employeeId ? String(employeeId).trim() : "";
+    const normalizedStatus = status === "inactive" ? "inactive" : "active";
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format",
+        field: "email",
+      });
+    }
+
+    const duplicateChecks = [
+      { email: normalizedEmail },
+      { username: normalizedUsername },
+    ];
+
+    if (normalizedEmployeeId) {
+      duplicateChecks.push({ employeeId: normalizedEmployeeId });
+    }
+
+    const existingUser = await User.findOne({ $or: duplicateChecks });
+    if (existingUser) {
+      const duplicateField =
+        existingUser.email === normalizedEmail
+          ? "email"
+          : existingUser.username === normalizedUsername
+            ? "username"
+            : "employeeId";
+
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "username"
+            ? "Username already registered"
+            : duplicateField === "employeeId"
+              ? "Staff ID already registered"
+              : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
+    let finalEmployeeId = normalizedEmployeeId;
+    if (!finalEmployeeId) {
+      const timestamp = Date.now().toString().slice(-6);
+      const random = Math.random().toString(36).substr(2, 3).toUpperCase();
+      finalEmployeeId = `STF-${timestamp}-${random}`;
+    }
+
+    const nfcCardId = `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+    const user = new User({
+      firstName: String(firstName).trim(),
+      lastName: String(lastName).trim(),
+      username: normalizedUsername,
+      email: normalizedEmail,
+      password,
+      phone: String(phone).trim(),
+      role: "staff",
+      status: normalizedStatus,
+      isActive: normalizedStatus === "active",
+      employeeId: finalEmployeeId,
+      department: String(department).trim(),
+      position: String(position || "Staff Member").trim(),
+      nfcCardId,
+    });
+
+    await user.save();
+
+    const accessLog = new AccessLog({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      userName: `${req.user.firstName} ${req.user.lastName}`,
+      location: "Admin Panel",
+      accessType: "system",
+      status: "granted",
+      notes: `Created staff account: ${user.email}`,
+    });
+    await accessLog.save();
+
+    sendEmail(
+      user.email,
+      `Welcome to Sapphire Aviation - Staff Account`,
+      `Dear ${user.firstName} ${user.lastName},\n\n` +
+        `Your staff account has been created by the administrator.\n\n` +
+        `Username: ${user.username}\n` +
+        `Email: ${user.email}\n` +
+        `Password: ${password}\n` +
+        `Staff ID: ${user.employeeId}\n` +
+        `Department: ${user.department}\n` +
+        `Status: ${user.status.toUpperCase()}\n\n` +
+        `Please sign in and change your password as soon as possible.\n\n` +
+        `Thank you,\n` +
+        `Sapphire Aviation Security Team`,
+    );
+
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({
+      success: true,
+      message: "Staff account created successfully",
+      user: userResponse,
+    });
+  } catch (error) {
+    console.error("Create staff account error:", error);
+
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "username"
+            ? "Username already registered"
+            : duplicateField === "employeeId"
+              ? "Staff ID already registered"
+              : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to create staff account",
+      error: error.message,
+    });
+  }
+});
 
 // Create security guard (admin only)
 app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
@@ -1194,7 +1794,6 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       role: "guard",
       nfcCardId,
       employeeId: finalEmployeeId,
-      shift: shift || "Morning",
       position: position || "Security Guard",
       status: "active",
       isActive: true,
@@ -1219,7 +1818,6 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
         `👤 Name: ${user.firstName} ${user.lastName}\n` +
         `🎭 Role: SECURITY GUARD\n` +
         `🆔 Employee ID: ${user.employeeId}\n` +
-        `⏰ Shift: ${shift || "Morning"}\n` +
         `📱 Phone: ${user.phone}\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
         `Please login to the app and change your password for security.\n\n` +
@@ -2080,6 +2678,11 @@ app.delete("/api/visitors/:id", authMiddleware, async (req, res) => {
 app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
+    const checkInSource = String(req.body?.source || "mobile_app")
+      .trim()
+      .toLowerCase();
+    const sourceLabel =
+      checkInSource === "virtual_nfc_card" ? "virtual NFC card" : "mobile app";
 
     if (!visitor) {
       return res.status(404).json({
@@ -2088,28 +2691,35 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    const hasApprovedAppointment =
-      visitor.approvalStatus === "approved" &&
-      ["approved", "adjusted", "not_requested"].includes(
-        visitor.appointmentStatus || "not_requested",
-      );
-
-    if (!hasApprovedAppointment) {
+    if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
         message: "Your visit is still waiting for approval.",
       });
     }
 
-    visitor.status = "checked_in";
-    visitor.checkedInAt = new Date();
+    if (visitor.status === "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "You are already checked in for this visit.",
+      });
+    }
+
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been completed.",
+      });
+    }
+
+    visitor.markCheckedIn(req.user._id);
     await visitor.save();
 
     // Create access log
     const accessLog = new AccessLog({
       userEmail: visitor.email,
       userName: visitor.fullName,
-      location: "Mobile App",
+      location: checkInSource === "virtual_nfc_card" ? "Virtual NFC Card" : "Mobile App",
       accessType: "entry",
       activityType: "visitor_self_checkin",
       status: "granted",
@@ -2119,10 +2729,43 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       metadata: {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
+        source: checkInSource,
       },
-      notes: "Visitor self check-in via mobile app",
+      notes: `Visitor self check-in via ${sourceLabel}`,
     });
     await accessLog.save();
+
+    await createRoleNotification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} checked in using the ${sourceLabel}.`,
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkin",
+        source: checkInSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} checked in using the ${sourceLabel}.`,
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkin",
+        source: checkInSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     res.json({
       success: true,
@@ -2142,6 +2785,11 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
 app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
+    const checkOutSource = String(req.body?.source || "mobile_app")
+      .trim()
+      .toLowerCase();
+    const sourceLabel =
+      checkOutSource === "visitor_dashboard" ? "visitor dashboard" : "mobile app";
 
     if (!visitor) {
       return res.status(404).json({
@@ -2150,15 +2798,28 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       });
     }
 
-    visitor.status = "checked_out";
-    visitor.checkedOutAt = new Date();
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been checked out.",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "You must be checked in before you can check out.",
+      });
+    }
+
+    visitor.markCheckedOut(req.user._id);
     await visitor.save();
 
     // Create access log
     const accessLog = new AccessLog({
       userEmail: visitor.email,
       userName: visitor.fullName,
-      location: "Mobile App",
+      location: checkOutSource === "visitor_dashboard" ? "Visitor Dashboard" : "Mobile App",
       accessType: "exit",
       activityType: "visitor_self_checkout",
       status: "granted",
@@ -2168,10 +2829,43 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       metadata: {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
+        source: checkOutSource,
       },
-      notes: "Visitor self check-out via mobile app",
+      notes: `Visitor self check-out via ${sourceLabel}`,
     });
     await accessLog.save();
+
+    await createRoleNotification({
+      title: "Visitor Checked Out",
+      message: `${visitor.fullName} checked out using the ${sourceLabel}.`,
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkout",
+        source: checkOutSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Visitor Checked Out",
+      message: `${visitor.fullName} checked out using the ${sourceLabel}.`,
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkout",
+        source: checkOutSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     res.json({
       success: true,
@@ -2223,16 +2917,64 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
   try {
     const requestedUserId =
       req.user.role === "visitor" ? req.user._id : req.params.userId;
-    const { visitDate, preferredDate, visitTime, preferredTime, purposeOfVisit } =
-      req.body || {};
+    const {
+      visitDate,
+      preferredDate,
+      visitTime,
+      preferredTime,
+      purposeOfVisit,
+      purposeCategory,
+      customPurposeOfVisit,
+      department,
+      officeToVisit,
+      assignedOffice,
+      appointmentDepartment,
+    } = req.body || {};
 
     const finalVisitDate = visitDate || preferredDate;
     const finalVisitTime = visitTime || preferredTime;
+    const normalizedPurposeCategory = String(purposeCategory || "").trim();
+    const normalizedCustomPurpose = String(customPurposeOfVisit || "").trim();
+    const requestedDepartment = String(
+      appointmentDepartment || department || officeToVisit || assignedOffice || "",
+    ).trim();
+    const resolvedPurpose =
+      normalizedPurposeCategory === "Other" && normalizedCustomPurpose
+        ? normalizedCustomPurpose
+        : String(purposeOfVisit || normalizedPurposeCategory || "").trim();
 
-    if (!finalVisitDate || !finalVisitTime || !purposeOfVisit) {
+    if (!finalVisitDate || !finalVisitTime || !resolvedPurpose) {
       return res.status(400).json({
         success: false,
         message: "Preferred date, preferred time, and purpose of visit are required.",
+      });
+    }
+
+    if (normalizedPurposeCategory === "Other" && !normalizedCustomPurpose) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter your custom purpose of visit.",
+      });
+    }
+
+    if (!requestedDepartment) {
+      return res.status(400).json({
+        success: false,
+        message: "Office or department is required for this appointment.",
+      });
+    }
+
+    const routedStaff = await User.findOne({
+      role: "staff",
+      isActive: true,
+      status: "active",
+      department: getStaffDepartmentQuery(requestedDepartment),
+    }).sort({ lastLogin: -1, createdAt: 1 });
+
+    if (!routedStaff) {
+      return res.status(400).json({
+        success: false,
+        message: `No active staff account is assigned to ${requestedDepartment}. Please choose another office or contact admin.`,
       });
     }
 
@@ -2272,15 +3014,16 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         email: user.email,
         phoneNumber: user.phone,
         idNumber: user.employeeId || `VIS-${Date.now().toString().slice(-6)}`,
-        purposeOfVisit: String(purposeOfVisit).trim(),
+      });
+      visitor.queueAppointmentRequest({
+        purposeOfVisit: resolvedPurpose,
+        purposeCategory: normalizedPurposeCategory || undefined,
+        customPurposeOfVisit: normalizedCustomPurpose || undefined,
         visitDate: new Date(finalVisitDate),
         visitTime: new Date(finalVisitTime),
-        status: "pending",
-        approvalStatus: "approved",
-        requestCategory: "appointment",
-        approvalFlow: "staff",
-        appointmentStatus: "pending",
-        appointmentRequestedAt: new Date(),
+        department: formatDepartmentLabel(requestedDepartment),
+        assignedStaff: routedStaff._id,
+        assignedStaffName: getFullName(routedStaff),
       });
       await visitor.save();
       user.visitorId = visitor._id;
@@ -2288,56 +3031,42 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     } else {
       visitor.fullName = visitor.fullName || visitorFullName;
       visitor.phoneNumber = user.phone || visitor.phoneNumber;
-      visitor.purposeOfVisit = String(purposeOfVisit).trim();
-      visitor.visitDate = new Date(finalVisitDate);
-      visitor.visitTime = new Date(finalVisitTime);
-      visitor.status = "pending";
-      visitor.requestCategory = "appointment";
-      visitor.approvalFlow = "staff";
-      visitor.appointmentStatus = "pending";
-      visitor.appointmentRequestedAt = new Date();
-      visitor.staffActionBy = null;
-      visitor.staffActionAt = null;
-      visitor.staffAdjustmentNote = "";
-      visitor.staffRejectionReason = "";
-      visitor.assignedStaff = null;
-      visitor.assignedStaffName = "";
-      if (visitor.approvalStatus !== "approved") {
-        visitor.approvalStatus = "approved";
-      }
+      visitor.queueAppointmentRequest({
+        purposeOfVisit: resolvedPurpose,
+        purposeCategory: normalizedPurposeCategory || undefined,
+        customPurposeOfVisit: normalizedCustomPurpose || undefined,
+        visitDate: new Date(finalVisitDate),
+        visitTime: new Date(finalVisitTime),
+        department: formatDepartmentLabel(requestedDepartment),
+        assignedStaff: routedStaff._id,
+        assignedStaffName: getFullName(routedStaff),
+      });
       await visitor.save();
     }
 
-    const staffMembers = await User.find({
-      role: "staff",
-      isActive: true,
-      status: "active",
-    }).select("_id");
-
-    await Promise.all(
-      staffMembers.map((staffMember) =>
-        createRoleNotification({
-          title: "New Appointment Request",
-          message: `${visitor.fullName} requested a visit on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}. Purpose: ${visitor.purposeOfVisit}`,
-          type: "visitor",
-          severity: "medium",
-          targetRole: "staff",
-          targetUser: staffMember._id,
-          relatedVisitor: visitor._id,
-          relatedUser: user._id,
-          metadata: {
-            activityType: "visitor_appointment_request",
-            visitDate: visitor.visitDate,
-            visitTime: visitor.visitTime,
-            purposeOfVisit: visitor.purposeOfVisit,
-          },
-        }),
-      ),
-    );
+    await createRoleNotification({
+      title: "New Department Appointment Request",
+      message: `${visitor.fullName} requested ${visitor.appointmentDepartment || visitor.assignedOffice} on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}. Purpose: ${visitor.purposeOfVisit}`,
+      type: "visitor",
+      severity: "medium",
+      targetRole: "staff",
+      targetUser: routedStaff._id,
+      relatedVisitor: visitor._id,
+      relatedUser: user._id,
+      metadata: {
+        activityType: "visitor_appointment_request",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        purposeCategory: visitor.purposeCategory,
+        customPurposeOfVisit: visitor.customPurposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+      },
+    });
 
     await createRoleNotification({
       title: "Visitor Appointment Requested",
-      message: `${visitor.fullName} submitted a new appointment request for staff review.`,
+      message: `${visitor.fullName} submitted a new appointment request for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
       type: "info",
       severity: "medium",
       targetRole: "admin",
@@ -2348,6 +3077,8 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
         purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
       },
     });
 
@@ -2357,14 +3088,16 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       relatedUser: user,
       activityType: "visitor_appointment_request",
       status: "pending",
-      location: visitor.assignedOffice || visitor.host || "Appointment Request",
-      notes: `${visitor.fullName} requested a new appointment.`,
+      location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment Request",
+      notes: `${visitor.fullName} requested a new appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
       metadata: {
         requestCategory: "appointment",
         approvalFlow: "staff",
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
         purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
       },
     });
 
@@ -2396,9 +3129,11 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
     };
 
     if (normalizedRole === "staff") {
+      const staffDepartmentQuery = getStaffDepartmentQuery(req.user.department);
       query.$or = [
         { assignedStaff: req.user._id },
-        { appointmentStatus: "pending" },
+        { appointmentDepartment: staffDepartmentQuery },
+        { assignedOffice: staffDepartmentQuery },
       ];
     }
 
@@ -2449,6 +3184,13 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       });
     }
 
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only approve appointments assigned to your department.",
+      });
+    }
+
     if ((visitor.appointmentStatus || "pending") !== "pending") {
       return res.status(400).json({
         success: false,
@@ -2456,17 +3198,7 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       });
     }
 
-    visitor.status = "approved";
-    visitor.approvalStatus = "approved";
-    visitor.requestCategory = "appointment";
-    visitor.approvalFlow = "staff";
-    visitor.appointmentStatus = "approved";
-    visitor.assignedStaff = req.user._id;
-    visitor.assignedStaffName = getFullName(req.user);
-    visitor.staffActionBy = req.user._id;
-    visitor.staffActionAt = new Date();
-    visitor.staffAdjustmentNote = String(req.body?.note || "").trim();
-    visitor.staffRejectionReason = "";
+    visitor.approveAppointment(req.user, req.body?.note || "");
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
@@ -2563,6 +3295,13 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       });
     }
 
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only adjust appointments assigned to your department.",
+      });
+    }
+
     if ((visitor.appointmentStatus || "pending") !== "pending") {
       return res.status(400).json({
         success: false,
@@ -2570,21 +3309,11 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       });
     }
 
-    if (finalVisitDate) {
-      visitor.visitDate = new Date(finalVisitDate);
-    }
-    visitor.visitTime = new Date(finalVisitTime);
-    visitor.status = "approved";
-    visitor.approvalStatus = "approved";
-    visitor.requestCategory = "appointment";
-    visitor.approvalFlow = "staff";
-    visitor.appointmentStatus = "adjusted";
-    visitor.assignedStaff = req.user._id;
-    visitor.assignedStaffName = getFullName(req.user);
-    visitor.staffActionBy = req.user._id;
-    visitor.staffActionAt = new Date();
-    visitor.staffAdjustmentNote = String(note || "Preferred time adjusted by staff.").trim();
-    visitor.staffRejectionReason = "";
+    visitor.adjustAppointment(req.user, {
+      visitDate: finalVisitDate ? new Date(finalVisitDate) : null,
+      visitTime: new Date(finalVisitTime),
+      note,
+    });
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
@@ -2673,6 +3402,13 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
       });
     }
 
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only reject appointments assigned to your department.",
+      });
+    }
+
     if ((visitor.appointmentStatus || "pending") !== "pending") {
       return res.status(400).json({
         success: false,
@@ -2684,15 +3420,7 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
       req.body?.reason || "Appointment request declined by staff.",
     ).trim();
 
-    visitor.status = "rejected";
-    visitor.requestCategory = "appointment";
-    visitor.approvalFlow = "staff";
-    visitor.appointmentStatus = "rejected";
-    visitor.assignedStaff = req.user._id;
-    visitor.assignedStaffName = getFullName(req.user);
-    visitor.staffActionBy = req.user._id;
-    visitor.staffActionAt = new Date();
-    visitor.staffRejectionReason = rejectionReason;
+    visitor.rejectAppointment(req.user, rejectionReason);
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
@@ -2765,7 +3493,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    if (visitor.approvalStatus !== "approved") {
+    if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
         message: "Visitor is still waiting for admin approval",
@@ -2786,9 +3514,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    visitor.status = "checked_in";
-    visitor.checkedInAt = new Date();
-    visitor.checkedInBy = req.user._id;
+    visitor.markCheckedIn(req.user._id);
     await visitor.save();
 
     const accessLog = new AccessLog({
@@ -2849,7 +3575,7 @@ app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
       });
     }
 
-    if (visitor.approvalStatus !== "approved") {
+    if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
         message: "Visitor is not approved for checkout flow",
@@ -2863,9 +3589,7 @@ app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
       });
     }
 
-    visitor.status = "checked_out";
-    visitor.checkedOutAt = new Date();
-    visitor.checkedOutBy = req.user._id;
+    visitor.markCheckedOut(req.user._id);
     await visitor.save();
 
     const accessLog = new AccessLog({
@@ -3192,6 +3916,7 @@ app.get("/api/admin/activities", authMiddleware, async (req, res) => {
       .populate("relatedUser", "firstName lastName email role department");
 
     const summary = {
+      registrationRequests: activities.filter((item) => item.activityType === "visitor_registration_request").length,
       appointmentRequests: activities.filter((item) => item.activityType === "visitor_appointment_request").length,
       staffActions: activities.filter((item) =>
         ["staff_approved_appointment", "staff_adjusted_appointment", "staff_rejected_appointment"].includes(item.activityType),
@@ -3225,6 +3950,27 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
+    const pendingRegistrationRequestsQuery = {
+      requestCategory: "registration",
+      approvalFlow: "admin",
+      approvalStatus: "pending",
+    };
+    const pendingAppointmentRequestsQuery = {
+      requestCategory: "appointment",
+      approvalFlow: "staff",
+      appointmentStatus: "pending",
+    };
+    const approvedVisitWindowsQuery = {
+      approvalStatus: "approved",
+      $or: [
+        { requestCategory: "registration" },
+        {
+          requestCategory: "appointment",
+          appointmentStatus: { $in: ["approved", "adjusted"] },
+        },
+      ],
+    };
+
     const totalUsers = await User.countDocuments();
     const activeUsers = await User.countDocuments({ status: "active" });
     const today = new Date();
@@ -3234,16 +3980,23 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
       timestamp: { $gte: today },
     });
 
-    const totalStudents = await User.countDocuments({ role: "student" });
+    const totalAdmins = await User.countDocuments({ role: "admin" });
     const totalStaff = await User.countDocuments({ role: "staff" });
-    // Fix: Count both "guard" and "security" roles for total security
     const totalSecurity = await User.countDocuments({ 
       role: { $in: ["guard", "security"] } 
     });
     const totalVisitors = await Visitor.countDocuments();
-    const pendingApprovals = await Visitor.countDocuments({
-      status: "pending",
-    });
+    const pendingRegistrationRequests = await Visitor.countDocuments(
+      pendingRegistrationRequestsQuery,
+    );
+    const pendingAppointmentRequests = await Visitor.countDocuments(
+      pendingAppointmentRequestsQuery,
+    );
+    const pendingApprovals =
+      pendingRegistrationRequests + pendingAppointmentRequests;
+    const approvedVisits = await Visitor.countDocuments(approvedVisitWindowsQuery);
+    const checkedInVisitors = await Visitor.countDocuments({ status: "checked_in" });
+    const completedVisits = await Visitor.countDocuments({ status: "checked_out" });
 
     const totalAccess = await AccessLog.countDocuments();
     const grantedAccess = await AccessLog.countDocuments({ status: "granted" });
@@ -3253,7 +4006,7 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
         : "0%";
 
     const pendingIssues =
-      (await Visitor.countDocuments({ status: "pending" })) +
+      pendingApprovals +
       (await AccessLog.countDocuments({
         status: "denied",
         timestamp: { $gte: today },
@@ -3268,12 +4021,17 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
         activeUsers,
         todayAccess,
         pendingIssues,
-        totalStudents,
+        totalAdmins,
         totalStaff,
         totalSecurity,
         totalVisitors,
         successRate,
         pendingApprovals,
+        pendingRegistrationRequests,
+        pendingAppointmentRequests,
+        approvedVisits,
+        checkedInVisitors,
+        completedVisits,
       },
     });
   } catch (error) {
@@ -3362,10 +4120,54 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const updates = req.body;
+    const updates = { ...req.body };
     delete updates.password; // Don't allow password update through this route
     delete updates._id;
     delete updates.__v;
+
+    if (updates.username !== undefined) {
+      const normalizedUsername = normalizeUsernameValue(updates.username);
+      if (!normalizedUsername) {
+        delete updates.username;
+      } else {
+        const usernameConflict = await User.findOne({
+          username: normalizedUsername,
+          _id: { $ne: req.params.id },
+        });
+
+        if (usernameConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Username already registered",
+            field: "username",
+          });
+        }
+
+        updates.username = normalizedUsername;
+      }
+    }
+
+    if (updates.employeeId !== undefined) {
+      const normalizedEmployeeId = String(updates.employeeId || "").trim();
+      if (!normalizedEmployeeId) {
+        delete updates.employeeId;
+      } else {
+        const employeeIdConflict = await User.findOne({
+          employeeId: normalizedEmployeeId,
+          _id: { $ne: req.params.id },
+        });
+
+        if (employeeIdConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Staff ID already registered",
+            field: "employeeId",
+          });
+        }
+
+        updates.employeeId = normalizedEmployeeId;
+      }
+    }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
@@ -3823,82 +4625,6 @@ app.get("/api/admin/security-logs", authMiddleware, async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to get security logs" });
-  }
-});
-
-// Get recent activities
-app.get("/api/admin/activities", authMiddleware, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
-    const { limit = 10 } = req.query;
-
-    // Get recent access logs
-    const accessLogs = await AccessLog.find()
-      .sort({ timestamp: -1 })
-      .limit(parseInt(limit))
-      .populate("userId", "firstName lastName email role");
-
-    const activities = accessLogs.map((log, index) => {
-      let activity = "";
-      let type = "system";
-      let severity = "info";
-
-      if (log.status === "denied") {
-        severity = "warning";
-      } else if (log.status === "granted") {
-        severity = "success";
-      }
-
-      if (log.userId) {
-        const userName =
-          `${log.userId.firstName || ""} ${log.userId.lastName || ""}`.trim() ||
-          "Unknown";
-        activity = `${userName} ${log.status} access at ${log.location || "unknown location"}`;
-        type = log.userId.role || "user";
-      } else {
-        activity = `${log.status} access attempt at ${log.location || "unknown location"}`;
-      }
-
-      const timeDiff = Date.now() - new Date(log.timestamp).getTime();
-      let timeAgo = "";
-
-      if (timeDiff < 60000) {
-        timeAgo = "Just now";
-      } else if (timeDiff < 3600000) {
-        const mins = Math.floor(timeDiff / 60000);
-        timeAgo = `${mins} min${mins > 1 ? "s" : ""} ago`;
-      } else if (timeDiff < 86400000) {
-        const hours = Math.floor(timeDiff / 3600000);
-        timeAgo = `${hours} hour${hours > 1 ? "s" : ""} ago`;
-      } else {
-        const days = Math.floor(timeDiff / 86400000);
-        timeAgo = `${days} day${days > 1 ? "s" : ""} ago`;
-      }
-
-      return {
-        id: index + 1,
-        text: activity,
-        time: timeAgo,
-        type,
-        severity,
-        userId: log.userId?._id,
-        location: log.location,
-        timestamp: log.timestamp,
-      };
-    });
-
-    res.json({
-      success: true,
-      activities,
-    });
-  } catch (error) {
-    console.error("Get recent activities error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to get activities" });
   }
 });
 

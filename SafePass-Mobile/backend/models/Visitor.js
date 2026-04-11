@@ -1,5 +1,44 @@
 const mongoose = require('mongoose');
 
+const APPOINTMENT_APPROVED_STATUSES = ["approved", "adjusted"];
+
+const deriveVisitProgressStatus = (visitor) => {
+  if (visitor.checkedOutAt) {
+    return "checked_out";
+  }
+
+  if (visitor.checkedInAt) {
+    return "checked_in";
+  }
+
+  if (
+    visitor.approvalStatus === "rejected" ||
+    visitor.appointmentStatus === "rejected"
+  ) {
+    return "rejected";
+  }
+
+  if (visitor.requestCategory === "appointment") {
+    if (APPOINTMENT_APPROVED_STATUSES.includes(visitor.appointmentStatus)) {
+      return "approved";
+    }
+
+    if (visitor.appointmentStatus === "pending") {
+      return "pending";
+    }
+  }
+
+  if (visitor.approvalStatus === "approved") {
+    return "approved";
+  }
+
+  if (visitor.approvalStatus === "pending") {
+    return "pending";
+  }
+
+  return visitor.status || "pending";
+};
+
 const visitorSchema = new mongoose.Schema({
   // ============ Personal Information ============
   fullName: { 
@@ -38,6 +77,16 @@ const visitorSchema = new mongoose.Schema({
     required: [true, 'Purpose of visit is required'],
     trim: true
   },
+  purposeCategory: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  customPurposeOfVisit: {
+    type: String,
+    default: "",
+    trim: true,
+  },
   host: {
     type: String,
     default: "",
@@ -47,6 +96,12 @@ const visitorSchema = new mongoose.Schema({
     type: String,
     default: "",
     trim: true,
+  },
+  appointmentDepartment: {
+    type: String,
+    default: "",
+    trim: true,
+    index: true,
   },
   vehicleNumber: { 
     type: String, 
@@ -164,6 +219,80 @@ const visitorSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+
+  // ============ Live Location Tracking ============
+  currentLocation: {
+    floor: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    office: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    checkpointId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    coordinates: {
+      x: { type: Number, default: null },
+      y: { type: Number, default: null },
+    },
+    gps: {
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
+      accuracy: { type: Number, default: null },
+      altitude: { type: Number, default: null },
+      heading: { type: Number, default: null },
+      speed: { type: Number, default: null },
+    },
+    source: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    deviceId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    lastSeenAt: {
+      type: Date,
+      default: null,
+    },
+    isActive: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  locationHistory: [
+    {
+      floor: String,
+      office: String,
+      checkpointId: String,
+      coordinates: {
+        x: Number,
+        y: Number,
+      },
+      gps: {
+        latitude: Number,
+        longitude: Number,
+        accuracy: Number,
+        altitude: Number,
+        heading: Number,
+        speed: Number,
+      },
+      source: String,
+      deviceId: String,
+      tappedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
   
   // ============ Notifications ============
   hostNotified: { 
@@ -253,40 +382,284 @@ visitorSchema.virtual('visitDateTime').get(function() {
   return new Date(Math.max(date, time));
 });
 
+visitorSchema.virtual("workflowState").get(function () {
+  return deriveVisitProgressStatus(this);
+});
+
 // ============ Methods ============
 visitorSchema.methods = {
-  // Approve visitor
-  async approve(adminId, notes = '') {
-    this.approvalStatus = 'approved';
-    this.status = 'approved';
+  syncWorkflowState() {
+    const category = this.requestCategory === "appointment" ? "appointment" : "registration";
+    this.requestCategory = category;
+    this.approvalFlow = category === "appointment" ? "staff" : "admin";
+
+    if (category === "registration") {
+      this.appointmentStatus = "not_requested";
+      this.appointmentRequestedAt = null;
+      this.assignedStaff = null;
+      this.assignedStaffName = "";
+      this.staffActionBy = null;
+      this.staffActionAt = null;
+      this.staffAdjustmentNote = "";
+      this.staffRejectionReason = "";
+    } else {
+      if (this.approvalStatus !== "approved") {
+        this.approvalStatus = "approved";
+      }
+      if (!this.appointmentStatus || this.appointmentStatus === "not_requested") {
+        this.appointmentStatus = "pending";
+      }
+      this.appointmentRequestedAt =
+        this.appointmentRequestedAt || this.registeredAt || new Date();
+    }
+
+    this.status = deriveVisitProgressStatus(this);
+    return this.status;
+  },
+
+  hasApprovedVisitWindow() {
+    const category = this.requestCategory === "appointment" ? "appointment" : "registration";
+
+    if (category === "appointment") {
+      return (
+        this.approvalStatus === "approved" &&
+        APPOINTMENT_APPROVED_STATUSES.includes(this.appointmentStatus)
+      );
+    }
+
+    return this.approvalStatus === "approved";
+  },
+
+  markRegistrationPending() {
+    this.requestCategory = "registration";
+    this.approvalFlow = "admin";
+    this.approvalStatus = "pending";
+    this.approvedBy = null;
+    this.approvedAt = null;
+    this.rejectionReason = null;
+    this.adminNotes = null;
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  approveRegistration(adminId, notes = "") {
+    this.requestCategory = "registration";
+    this.approvalFlow = "admin";
+    this.approvalStatus = "approved";
     this.approvedBy = adminId;
     this.approvedAt = new Date();
-    if (notes) this.adminNotes = notes;
-    return this.save();
+    this.rejectionReason = null;
+    this.adminNotes = notes || "";
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
   },
-  
-  // Reject visitor
-  async reject(adminId, reason = '') {
-    this.approvalStatus = 'rejected';
-    this.status = 'rejected';
+
+  rejectRegistration(adminId, reason = "") {
+    this.requestCategory = "registration";
+    this.approvalFlow = "admin";
+    this.approvalStatus = "rejected";
     this.approvedBy = adminId;
-    this.rejectionReason = reason;
-    return this.save();
+    this.approvedAt = new Date();
+    this.rejectionReason = reason || "No reason provided";
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
   },
-  
-  // Check in
-  async checkIn(securityId) {
-    this.status = 'checked_in';
+
+  queueAppointmentRequest({
+    visitDate,
+    visitTime,
+    purposeOfVisit,
+    purposeCategory = "",
+    customPurposeOfVisit = "",
+    department = "",
+    assignedStaff = null,
+    assignedStaffName = "",
+  }) {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    this.visitDate = visitDate;
+    this.visitTime = visitTime;
+    this.purposeOfVisit = purposeOfVisit;
+    this.purposeCategory = String(purposeCategory || "").trim();
+    this.customPurposeOfVisit = String(customPurposeOfVisit || "").trim();
+    this.appointmentDepartment = String(department || "").trim();
+    this.assignedOffice = this.appointmentDepartment || this.assignedOffice || "";
+    this.host = this.appointmentDepartment || this.host || "";
+    this.appointmentStatus = "pending";
+    this.appointmentRequestedAt = new Date();
+    this.staffActionBy = null;
+    this.staffActionAt = null;
+    this.staffAdjustmentNote = "";
+    this.staffRejectionReason = "";
+    this.assignedStaff = assignedStaff || null;
+    this.assignedStaffName = String(assignedStaffName || "").trim();
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  approveAppointment(staffUser, note = "") {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    this.appointmentStatus = "approved";
+    this.assignedStaff = staffUser?._id || null;
+    this.assignedStaffName = staffUser
+      ? `${staffUser.firstName || ""} ${staffUser.lastName || ""}`.trim()
+      : this.assignedStaffName;
+    this.staffActionBy = staffUser?._id || null;
+    this.staffActionAt = new Date();
+    this.staffAdjustmentNote = String(note || "").trim();
+    this.staffRejectionReason = "";
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  adjustAppointment(staffUser, { visitDate, visitTime, note = "" } = {}) {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    if (visitDate) {
+      this.visitDate = visitDate;
+    }
+    if (visitTime) {
+      this.visitTime = visitTime;
+    }
+    this.appointmentStatus = "adjusted";
+    this.assignedStaff = staffUser?._id || null;
+    this.assignedStaffName = staffUser
+      ? `${staffUser.firstName || ""} ${staffUser.lastName || ""}`.trim()
+      : this.assignedStaffName;
+    this.staffActionBy = staffUser?._id || null;
+    this.staffActionAt = new Date();
+    this.staffAdjustmentNote = String(note || "Preferred time adjusted by staff.").trim();
+    this.staffRejectionReason = "";
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  rejectAppointment(staffUser, reason = "") {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    this.appointmentStatus = "rejected";
+    this.assignedStaff = staffUser?._id || null;
+    this.assignedStaffName = staffUser
+      ? `${staffUser.firstName || ""} ${staffUser.lastName || ""}`.trim()
+      : this.assignedStaffName;
+    this.staffActionBy = staffUser?._id || null;
+    this.staffActionAt = new Date();
+    this.staffRejectionReason = String(reason || "Appointment request declined by staff.").trim();
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  markCheckedIn(actorId) {
     this.checkedInAt = new Date();
-    this.checkedInBy = securityId;
+    this.checkedInBy = actorId || null;
+    this.checkedOutAt = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  markCheckedOut(actorId) {
+    this.checkedOutAt = new Date();
+    this.checkedOutBy = actorId || null;
+    this.currentLocation = {
+      ...(this.currentLocation || {}),
+      isActive: false,
+      lastSeenAt: this.currentLocation?.lastSeenAt || new Date(),
+    };
+    this.syncWorkflowState();
+    return this;
+  },
+
+  updateCurrentLocation(location = {}, metadata = {}) {
+    const now = new Date();
+    const coordinates = location.coordinates || {};
+    const gps = location.gps || {};
+    const nextLocation = {
+      floor: String(location.floor || "").trim(),
+      office: String(location.office || "").trim(),
+      checkpointId: String(location.checkpointId || "").trim(),
+      coordinates: {
+        x: Number.isFinite(Number(coordinates.x)) ? Number(coordinates.x) : null,
+        y: Number.isFinite(Number(coordinates.y)) ? Number(coordinates.y) : null,
+      },
+      gps: {
+        latitude: Number.isFinite(Number(gps.latitude)) ? Number(gps.latitude) : null,
+        longitude: Number.isFinite(Number(gps.longitude)) ? Number(gps.longitude) : null,
+        accuracy: Number.isFinite(Number(gps.accuracy)) ? Number(gps.accuracy) : null,
+        altitude: Number.isFinite(Number(gps.altitude)) ? Number(gps.altitude) : null,
+        heading: Number.isFinite(Number(gps.heading)) ? Number(gps.heading) : null,
+        speed: Number.isFinite(Number(gps.speed)) ? Number(gps.speed) : null,
+      },
+      source: String(location.source || "arduino_tap").trim(),
+      deviceId: String(metadata.deviceId || location.deviceId || "").trim(),
+      lastSeenAt: now,
+      isActive: this.status === "checked_in",
+    };
+
+    this.currentLocation = nextLocation;
+    this.locationHistory.push({
+      ...nextLocation,
+      tappedAt: now,
+    });
+
+    if (this.locationHistory.length > 50) {
+      this.locationHistory = this.locationHistory.slice(-50);
+    }
+
+    return this;
+  },
+
+  // Backward-compatible aliases
+  async approve(adminId, notes = '') {
+    this.approveRegistration(adminId, notes);
     return this.save();
   },
   
-  // Check out
+  async reject(adminId, reason = '') {
+    this.rejectRegistration(adminId, reason);
+    return this.save();
+  },
+  
+  async checkIn(securityId) {
+    this.markCheckedIn(securityId);
+    return this.save();
+  },
+  
   async checkOut(securityId) {
-    this.status = 'checked_out';
-    this.checkedOutAt = new Date();
-    this.checkedOutBy = securityId;
+    this.markCheckedOut(securityId);
     return this.save();
   },
   
@@ -319,8 +692,8 @@ visitorSchema.statics = {
   findPending() {
     return this.find({
       $or: [
-        { status: 'pending' },
-        { approvalStatus: 'pending' }
+        { requestCategory: 'registration', approvalStatus: 'pending' },
+        { requestCategory: 'appointment', appointmentStatus: 'pending' }
       ]
     }).sort({ registeredAt: -1 });
   },
@@ -329,6 +702,10 @@ visitorSchema.statics = {
   findApproved() {
     return this.find({
       approvalStatus: 'approved',
+      $or: [
+        { requestCategory: 'registration' },
+        { requestCategory: 'appointment', appointmentStatus: { $in: APPOINTMENT_APPROVED_STATUSES } }
+      ],
       status: { $ne: 'checked_out' }
     }).sort({ visitDate: 1 });
   },
@@ -381,14 +758,8 @@ visitorSchema.pre('save', function(next) {
   next();
 });
 
-// Before saving, ensure status and approvalStatus are consistent
 visitorSchema.pre('save', function(next) {
-  if (this.approvalStatus === 'approved' && this.status === 'pending') {
-    this.status = 'approved';
-  }
-  if (this.approvalStatus === 'rejected' && this.status !== 'rejected') {
-    this.status = 'rejected';
-  }
+  this.syncWorkflowState();
   next();
 });
 

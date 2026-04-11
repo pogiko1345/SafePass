@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Modal,
   Linking,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -23,6 +24,10 @@ import visitorRegisterStyles from "../styles/VisitorRegisterStyles";
 import ApiService from "../utils/ApiService";
 import IDScannerService from "../utils/IDScannerService";
 import Logo from "../assets/LogoSapphire.jpg";
+import {
+  MONITORING_MAP_FLOORS,
+  MONITORING_MAP_OFFICES,
+} from "../utils/monitoringMapConfig";
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== "web") {
@@ -35,6 +40,7 @@ if (Platform.OS !== "web") {
 }
 
 const purposeOptions = [
+  "Enrollment",
   "Meeting with Staff",
   "Maintenance Work",
   "Package Delivery",
@@ -45,6 +51,14 @@ const purposeOptions = [
   "Event Participation",
   "Other",
 ];
+
+const officeOptions = MONITORING_MAP_OFFICES.map((office) => {
+  const floor = MONITORING_MAP_FLOORS.find((item) => item.id === office.floor);
+  return {
+    ...office,
+    floorName: floor?.name || "Campus",
+  };
+});
 
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({ visible, credentials, onConfirm }) => {
@@ -337,11 +351,62 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
 
 // ================= MAIN COMPONENT =================
 export default function VisitorRegisterScreen({ navigation }) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const isCompactRegister = viewportWidth <= 420;
+  const isTabletRegister = viewportWidth >= 768;
+  const registerHorizontalMargin = isCompactRegister ? 12 : 16;
+  const registerShellMaxWidth = Math.min(
+    860,
+    Math.max(viewportWidth - registerHorizontalMargin * 2, 300)
+  );
+  const headerResponsiveStyle = {
+    paddingBottom: isCompactRegister ? 34 : 42,
+  };
+  const headerButtonsResponsiveStyle = {
+    left: registerHorizontalMargin,
+    right: registerHorizontalMargin,
+  };
+  const headerContentResponsiveStyle = {
+    paddingHorizontal: isCompactRegister ? 16 : 22,
+    maxWidth: isTabletRegister ? 720 : 640,
+  };
+  const headerIconGradientResponsiveStyle = {
+    width: isCompactRegister ? 64 : 72,
+    height: isCompactRegister ? 64 : 72,
+    borderRadius: isCompactRegister ? 32 : 36,
+  };
+  const headerTitleResponsiveStyle = {
+    fontSize: isCompactRegister ? 24 : undefined,
+    lineHeight: isCompactRegister ? 30 : undefined,
+  };
+  const headerDescriptionResponsiveStyle = {
+    lineHeight: isCompactRegister ? 20 : 22,
+  };
+  const formShellResponsiveStyle = Platform.OS === "web"
+    ? { maxWidth: registerShellMaxWidth }
+    : null;
+  const sectionCardResponsiveStyle = {
+    marginHorizontal: registerHorizontalMargin,
+  };
+  const contentResponsiveStyle = {
+    padding: isCompactRegister ? 16 : 22,
+  };
+  const sectionHeaderResponsiveStyle = isCompactRegister
+    ? { flexDirection: "column", alignItems: "flex-start" }
+    : null;
+  const actionRowResponsiveStyle = isCompactRegister
+    ? { flexDirection: "column", gap: 10 }
+    : null;
+  const actionButtonResponsiveStyle = isCompactRegister
+    ? { width: "100%", flex: 0 }
+    : null;
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDataPrivacy, setShowDataPrivacy] = useState(false);
   const [showPurposePicker, setShowPurposePicker] = useState(false);
+  const [showOfficePicker, setShowOfficePicker] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
 
@@ -354,6 +419,10 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const [visitData, setVisitData] = useState({
     purposeOfVisit: "",
+    customPurposeOfVisit: "",
+    assignedOffice: "",
+    assignedOfficeId: "",
+    assignedFloor: "",
     vehicleNumber: "",
     visitDate: new Date(),
     visitTime: new Date(),
@@ -366,6 +435,8 @@ export default function VisitorRegisterScreen({ navigation }) {
     idNumber: "",
     idImage: "",
     purposeOfVisit: "",
+    customPurposeOfVisit: "",
+    assignedOffice: "",
   });
 
   const [idImage, setIdImage] = useState(null);
@@ -531,9 +602,17 @@ export default function VisitorRegisterScreen({ navigation }) {
     return "";
   };
 
-  const validatePurposeOfVisit = (purpose) => {
+  const validatePurposeOfVisit = (purpose, customPurpose = visitData.customPurposeOfVisit) => {
     if (!purpose || purpose.trim() === "")
       return "Purpose of visit is required";
+    if (purpose === "Other" && (!customPurpose || customPurpose.trim() === "")) {
+      return "Please type your purpose of visit";
+    }
+    return "";
+  };
+
+  const validateAssignedOffice = (office) => {
+    if (!office || office.trim() === "") return "Office to visit is required";
     return "";
   };
 
@@ -559,8 +638,21 @@ export default function VisitorRegisterScreen({ navigation }) {
         error = validateIdNumber(value);
         break;
       case "purposeOfVisit":
-        setVisitData({ ...visitData, [field]: value });
-        error = validatePurposeOfVisit(value);
+        setVisitData({
+          ...visitData,
+          purposeOfVisit: value,
+          customPurposeOfVisit: value === "Other" ? visitData.customPurposeOfVisit : "",
+        });
+        error = validatePurposeOfVisit(value, value === "Other" ? visitData.customPurposeOfVisit : "");
+        break;
+      case "customPurposeOfVisit":
+        setVisitData({ ...visitData, customPurposeOfVisit: value });
+        error = validatePurposeOfVisit(visitData.purposeOfVisit, value);
+        field = "purposeOfVisit";
+        break;
+      case "assignedOffice":
+        setVisitData({ ...visitData, assignedOffice: value });
+        error = validateAssignedOffice(value);
         break;
       case "vehicleNumber":
         setVisitData({ ...visitData, [field]: value });
@@ -621,6 +713,28 @@ export default function VisitorRegisterScreen({ navigation }) {
     if (Platform.OS === "android") setShowTimePicker(false);
     if (selectedTime) setVisitData({ ...visitData, visitTime: selectedTime });
   };
+
+  const handleOfficeSelect = (office) => {
+    setVisitData({
+      ...visitData,
+      assignedOffice: office.name,
+      assignedOfficeId: office.id,
+      assignedFloor: office.floor,
+    });
+    setErrors({ ...errors, assignedOffice: "" });
+    setCompletedFields({ ...completedFields, assignedOffice: true });
+    setShowOfficePicker(false);
+  };
+
+  const getSelectedOffice = () =>
+    officeOptions.find((office) => office.id === visitData.assignedOfficeId) ||
+    officeOptions.find((office) => office.name === visitData.assignedOffice) ||
+    null;
+
+  const getResolvedPurposeOfVisit = () =>
+    visitData.purposeOfVisit === "Other"
+      ? visitData.customPurposeOfVisit.trim()
+      : visitData.purposeOfVisit;
 
   const handleWebDateChange = (text) => {
     setWebDate(text);
@@ -690,10 +804,23 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const validateStep2 = () => {
-    const purposeError = validatePurposeOfVisit(visitData.purposeOfVisit);
-    setErrors({ ...errors, purposeOfVisit: purposeError });
+    const purposeError = validatePurposeOfVisit(
+      visitData.purposeOfVisit,
+      visitData.customPurposeOfVisit,
+    );
+    const officeError = validateAssignedOffice(visitData.assignedOffice);
+    setErrors({
+      ...errors,
+      purposeOfVisit: purposeError,
+      assignedOffice: officeError,
+    });
 
-    if (purposeError) {
+    if (purposeError || officeError) {
+      const errorMessages = [];
+      if (purposeError) errorMessages.push(`- Purpose of Visit: ${purposeError}`);
+      if (officeError) errorMessages.push(`- Office to Visit: ${officeError}`);
+      showValidationAlert(errorMessages);
+      return false;
       showValidationAlert([`• Purpose of Visit: ${purposeError}`]);
       return false;
     }
@@ -773,7 +900,9 @@ export default function VisitorRegisterScreen({ navigation }) {
         idImage: idImageBase64
           ? `data:image/jpeg;base64,${idImageBase64}`
           : null,
-        purposeOfVisit: visitData.purposeOfVisit,
+        purposeOfVisit: getResolvedPurposeOfVisit(),
+        host: visitData.assignedOffice,
+        assignedOffice: visitData.assignedOffice,
         vehicleNumber: visitData.vehicleNumber || "",
         visitDate: visitData.visitDate.toISOString(),
         visitTime: visitData.visitTime.toISOString(),
@@ -923,6 +1052,7 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const visitCompletionCount = [
     completedFields.purposeOfVisit,
+    completedFields.assignedOffice,
     !!visitData.visitDate,
     !!visitData.visitTime,
   ].filter(Boolean).length;
@@ -978,13 +1108,13 @@ export default function VisitorRegisterScreen({ navigation }) {
           </View>
           <View style={visitorRegisterStyles.stepInsightStats}>
             <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitCompletionCount}/3</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitCompletionCount}/4</Text>
               <Text style={visitorRegisterStyles.stepInsightStatLabel}>Ready</Text>
             </View>
             <View style={visitorRegisterStyles.stepInsightDivider} />
             <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitData.purposeOfVisit ? "Set" : "Pick"}</Text>
-              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Visit purpose</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitData.assignedOffice ? "Set" : "Pick"}</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Office to visit</Text>
             </View>
             <View style={visitorRegisterStyles.stepInsightDivider} />
             <View style={visitorRegisterStyles.stepInsightStat}>
@@ -1012,7 +1142,8 @@ export default function VisitorRegisterScreen({ navigation }) {
         <View style={visitorRegisterStyles.reviewChecklist}>
           {[
             { label: "Personal details completed", done: personalCompletionCount === 5 },
-            { label: "Visit purpose selected", done: !!visitData.purposeOfVisit },
+            { label: "Visit purpose selected", done: !!getResolvedPurposeOfVisit() },
+            { label: "Office destination selected", done: !!visitData.assignedOffice },
             { label: "Preferred visit schedule confirmed", done: !!visitData.visitDate && !!visitData.visitTime },
           ].map((item) => (
             <View key={item.label} style={visitorRegisterStyles.reviewChecklistItem}>
@@ -1257,10 +1388,27 @@ export default function VisitorRegisterScreen({ navigation }) {
                 visitorRegisterStyles.dropdownButtonPlaceholder,
             ]}
           >
-            {visitData.purposeOfVisit || "Select purpose of visit"}
+            {visitData.purposeOfVisit === "Other" && visitData.customPurposeOfVisit
+              ? `Other: ${visitData.customPurposeOfVisit}`
+              : visitData.purposeOfVisit || "Select purpose of visit"}
           </Text>
           <Ionicons name="chevron-down" size={20} color="#64748B" />
         </TouchableOpacity>
+
+        {visitData.purposeOfVisit === "Other" && (
+          <TextInput
+            style={[
+              visitorRegisterStyles.otherPurposeInput,
+              errors.purposeOfVisit && visitorRegisterStyles.otherPurposeInputError,
+            ]}
+            placeholder="Type your purpose of visit"
+            placeholderTextColor="#94A3B8"
+            value={visitData.customPurposeOfVisit}
+            onChangeText={(text) => handleInputChange("customPurposeOfVisit", text)}
+            multiline
+            textAlignVertical="top"
+          />
+        )}
         {errors.purposeOfVisit && (
           <Text style={visitorRegisterStyles.errorText}>
             {errors.purposeOfVisit}
@@ -1312,6 +1460,107 @@ export default function VisitorRegisterScreen({ navigation }) {
                   )}
                 </TouchableOpacity>
               ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <View
+        style={[
+          visitorRegisterStyles.formCard,
+          errors.assignedOffice && visitorRegisterStyles.formCardError,
+        ]}
+      >
+        <View style={visitorRegisterStyles.cardHeader}>
+          <View
+            style={[
+              visitorRegisterStyles.cardIcon,
+              { backgroundColor: "#EFF6FF" },
+            ]}
+          >
+            <Ionicons name="business" size={20} color="#2563EB" />
+          </View>
+          <Text style={visitorRegisterStyles.cardLabel}>Office to Visit</Text>
+          <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
+        </View>
+        <TouchableOpacity
+          style={visitorRegisterStyles.dropdownButton}
+          onPress={() => setShowOfficePicker(true)}
+          activeOpacity={0.7}
+        >
+          <View style={visitorRegisterStyles.dropdownButtonContent}>
+            <Text
+              style={[
+                visitorRegisterStyles.dropdownButtonText,
+                !visitData.assignedOffice &&
+                  visitorRegisterStyles.dropdownButtonPlaceholder,
+              ]}
+            >
+              {visitData.assignedOffice || "Select office or room"}
+            </Text>
+            {getSelectedOffice()?.floorName ? (
+              <Text style={visitorRegisterStyles.dropdownButtonMeta}>
+                {getSelectedOffice().floorName}
+              </Text>
+            ) : null}
+          </View>
+          <Ionicons name="chevron-down" size={20} color="#64748B" />
+        </TouchableOpacity>
+        {errors.assignedOffice && (
+          <Text style={visitorRegisterStyles.errorText}>
+            {errors.assignedOffice}
+          </Text>
+        )}
+      </View>
+
+      <Modal
+        visible={showOfficePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowOfficePicker(false)}
+      >
+        <View style={visitorRegisterStyles.pickerModalOverlay}>
+          <View style={visitorRegisterStyles.pickerModalContainer}>
+            <View style={visitorRegisterStyles.pickerModalHeader}>
+              <Text style={visitorRegisterStyles.pickerModalTitle}>
+                Select Office
+              </Text>
+              <TouchableOpacity onPress={() => setShowOfficePicker(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {officeOptions.map((office) => {
+                const isSelected = visitData.assignedOfficeId === office.id;
+                return (
+                  <TouchableOpacity
+                    key={office.id}
+                    style={[
+                      visitorRegisterStyles.pickerModalOption,
+                      isSelected && visitorRegisterStyles.pickerModalOptionActive,
+                    ]}
+                    onPress={() => handleOfficeSelect(office)}
+                  >
+                    <View style={visitorRegisterStyles.pickerModalOptionContent}>
+                      <Text
+                        style={[
+                          visitorRegisterStyles.pickerModalOptionText,
+                          isSelected &&
+                            visitorRegisterStyles.pickerModalOptionTextActive,
+                        ]}
+                      >
+                        {office.name}
+                      </Text>
+                      <Text style={visitorRegisterStyles.pickerModalOptionMeta}>
+                        {office.floorName}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark" size={20} color="#059669" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -1497,7 +1746,13 @@ export default function VisitorRegisterScreen({ navigation }) {
         <View style={visitorRegisterStyles.reviewItem}>
           <Text style={visitorRegisterStyles.reviewLabel}>Purpose</Text>
           <Text style={visitorRegisterStyles.reviewValue}>
-            {visitData.purposeOfVisit || "—"}
+            {getResolvedPurposeOfVisit() || "—"}
+          </Text>
+        </View>
+        <View style={visitorRegisterStyles.reviewItem}>
+          <Text style={visitorRegisterStyles.reviewLabel}>Office</Text>
+          <Text style={visitorRegisterStyles.reviewValue}>
+            {visitData.assignedOffice || "—"}
           </Text>
         </View>
         <View style={visitorRegisterStyles.reviewItem}>
@@ -1563,9 +1818,9 @@ export default function VisitorRegisterScreen({ navigation }) {
             colors={["#063B34", "#047857", "#059669"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={visitorRegisterStyles.header}
+            style={[visitorRegisterStyles.header, headerResponsiveStyle]}
           >
-            <View style={visitorRegisterStyles.headerButtons}>
+            <View style={[visitorRegisterStyles.headerButtons, headerButtonsResponsiveStyle]}>
               <TouchableOpacity
                 style={visitorRegisterStyles.backButton}
                 onPress={handleBack}
@@ -1574,7 +1829,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                 <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            <View style={visitorRegisterStyles.headerContent}>
+            <View style={[visitorRegisterStyles.headerContent, headerContentResponsiveStyle]}>
               <View style={visitorRegisterStyles.headerBadge}>
                 <Image
                   source={Logo}
@@ -1593,25 +1848,33 @@ export default function VisitorRegisterScreen({ navigation }) {
               <View style={visitorRegisterStyles.headerIconContainer}>
                 <LinearGradient
                   colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.05)"]}
-                  style={visitorRegisterStyles.headerIconGradient}
+                  style={[
+                    visitorRegisterStyles.headerIconGradient,
+                    headerIconGradientResponsiveStyle,
+                  ]}
                 >
                   <Ionicons name="person-add" size={32} color="#FFFFFF" />
                 </LinearGradient>
               </View>
-              <Text style={visitorRegisterStyles.headerTitle}>
+              <Text style={[visitorRegisterStyles.headerTitle, headerTitleResponsiveStyle]}>
                 Request Your Campus Visit
               </Text>
               <Text style={visitorRegisterStyles.headerSubtitle}>
                 {stepConfig.title}
               </Text>
-              <Text style={visitorRegisterStyles.headerDescription}>
+              <Text
+                style={[
+                  visitorRegisterStyles.headerDescription,
+                  headerDescriptionResponsiveStyle,
+                ]}
+              >
                 Complete this short guided form to submit your visit for approval and receive your SafePass access details.
               </Text>
             </View>
           </LinearGradient>
 
-          <View style={visitorRegisterStyles.formShell}>
-            <View style={visitorRegisterStyles.progressContainer}>
+          <View style={[visitorRegisterStyles.formShell, formShellResponsiveStyle]}>
+            <View style={[visitorRegisterStyles.progressContainer, sectionCardResponsiveStyle]}>
               <View style={visitorRegisterStyles.progressHeader}>
                 <Text style={visitorRegisterStyles.progressTitle}>
                   Registration Progress
@@ -1630,7 +1893,12 @@ export default function VisitorRegisterScreen({ navigation }) {
               </View>
             </View>
 
-            <View style={visitorRegisterStyles.stepIndicatorContainer}>
+            <View
+              style={[
+                visitorRegisterStyles.stepIndicatorContainer,
+                sectionCardResponsiveStyle,
+              ]}
+            >
               <View style={visitorRegisterStyles.stepWrapper}>
                 <View
                   style={[
@@ -1721,8 +1989,8 @@ export default function VisitorRegisterScreen({ navigation }) {
               </View>
             </View>
 
-            <View style={visitorRegisterStyles.content}>
-              <View style={visitorRegisterStyles.sectionHeader}>
+            <View style={[visitorRegisterStyles.content, contentResponsiveStyle]}>
+              <View style={[visitorRegisterStyles.sectionHeader, sectionHeaderResponsiveStyle]}>
                 <View style={visitorRegisterStyles.sectionTextBlock}>
                   <Text style={visitorRegisterStyles.sectionTitle}>
                     {stepConfig.title}
@@ -1744,9 +2012,12 @@ export default function VisitorRegisterScreen({ navigation }) {
                 {currentStep === 2 && renderStep2()}
                 {currentStep === 3 && renderStep3()}
               </View>
-              <View style={visitorRegisterStyles.actionRow}>
+              <View style={[visitorRegisterStyles.actionRow, actionRowResponsiveStyle]}>
                 <TouchableOpacity
-                  style={visitorRegisterStyles.secondaryActionButton}
+                  style={[
+                    visitorRegisterStyles.secondaryActionButton,
+                    actionButtonResponsiveStyle,
+                  ]}
                   onPress={handleBack}
                   activeOpacity={0.8}
                 >
@@ -1761,7 +2032,10 @@ export default function VisitorRegisterScreen({ navigation }) {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={visitorRegisterStyles.continueButton}
+                  style={[
+                    visitorRegisterStyles.continueButton,
+                    actionButtonResponsiveStyle,
+                  ]}
                   onPress={currentStep === 3 ? handleSubmit : handleNext}
                   activeOpacity={0.8}
                   disabled={isSubmitting}

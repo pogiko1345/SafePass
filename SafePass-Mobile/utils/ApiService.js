@@ -4,12 +4,17 @@ let AsyncStorage;
 if (Platform.OS === 'web') {
   AsyncStorage = require('./webStorage').default;
 } else {
-  AsyncStorage = require('@react-native-async-storage/async-storage');
+  AsyncStorage = require('@react-native-async-storage/async-storage').default;
 }
 import * as ImageManipulator from 'expo-image-manipulator';
 
 const WEB_FALLBACK_API_BASE_URL = (() => {
-  if (typeof window === "undefined") {
+  if (
+    typeof window === "undefined" ||
+    !window.location ||
+    !window.location.protocol ||
+    !window.location.hostname
+  ) {
     return "http://localhost:5000/api";
   }
 
@@ -257,9 +262,19 @@ async register(userData) {
         status: staffData?.status || "active",
         isActive: staffData?.isActive ?? true,
       };
-      return await this.register(payload);
+      return await this.fetch("/admin/staff/create", {
+        method: "POST",
+        body: payload,
+      });
     } catch (error) {
-      const message = error?.message || "Failed to create staff account";
+      const errorMessage = String(error?.message || "").toLowerCase();
+      const message = errorMessage.includes("username already")
+        ? "Username already registered. Please use another username."
+        : errorMessage.includes("staff id already") || errorMessage.includes("employeeid")
+          ? "Staff ID already registered. Please use another staff ID."
+          : errorMessage.includes("email already")
+            ? "Email already registered. Please use another email address."
+            : error?.message || "Failed to create staff account";
       throw new Error(message);
     }
   }
@@ -713,10 +728,11 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async visitorCheckIn(visitorId) {
+  async visitorCheckIn(visitorId, payload = {}) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/self-checkin`, {
         method: "PUT",
+        body: payload,
       });
       return response;
     } catch (error) {
@@ -725,14 +741,28 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async visitorCheckOut(visitorId) {
+  async visitorCheckOut(visitorId, payload = {}) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/self-checkout`, {
         method: "PUT",
+        body: payload,
       });
       return response;
     } catch (error) {
       console.error("Visitor check-out error:", error);
+      throw error;
+    }
+  }
+
+  async updateVisitorPhoneLocation(visitorId, locationData) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/phone-location`, {
+        method: "PUT",
+        body: locationData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Update visitor phone location error:", error);
       throw error;
     }
   }
