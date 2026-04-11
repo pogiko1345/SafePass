@@ -327,6 +327,32 @@ const clampValue = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const normalizeMonitoringFloor = (floorId) => (floorId === "mezzanine" ? "first" : floorId);
 
+const getMapTrackingSourceLabel = (item) => {
+  const source = String(
+    item?.trackingSource ||
+      item?.location?.source ||
+      item?.sourceVisitor?.currentLocation?.source ||
+      "",
+  ).toLowerCase();
+
+  if (source.includes("phone")) return "Phone GPS";
+  if (source.includes("arduino") || source.includes("tap") || source.includes("nfc")) return "Tap checkpoint";
+  if (source.includes("manual")) return "Manual update";
+  if (source.includes("estimate")) return "Estimated location";
+  return "Tracking update";
+};
+
+const getMapFreshnessLabel = (dateValue) => {
+  const timestamp = new Date(dateValue).getTime();
+  if (!Number.isFinite(timestamp)) return "No recent update";
+
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSeconds < 45) return "Live now";
+  if (diffSeconds < 180) return `${Math.max(1, Math.floor(diffSeconds / 60))}m ago`;
+  if (diffSeconds < 900) return `${Math.floor(diffSeconds / 60)}m ago`;
+  return "Stale update";
+};
+
 const getActivityLabel = (activityType) => {
   switch (activityType) {
     case "visitor_appointment_request":
@@ -1360,6 +1386,12 @@ const loadDashboardData = useCallback(async () => {
               visitor?.assignedOffice ||
               visitor?.host ||
               "On-site visitor",
+            source: visitor?.currentLocation?.source || "system_estimate",
+            timestamp:
+              visitor?.currentLocation?.lastSeenAt ||
+              visitor?.checkedInAt ||
+              visitor?.updatedAt ||
+              visitor?.createdAt,
             coordinates: getVisitorMonitorCoordinates(visitor, index),
           },
           activityType: "security_checkin",
@@ -2470,6 +2502,9 @@ const loadDashboardData = useCallback(async () => {
               <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
                 {activeMapActivity.detail}
               </Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 8 }}>
+                {getMapTrackingSourceLabel(activeMapActivity)} · {getMapFreshnessLabel(activeMapActivity.lastUpdate)}
+              </Text>
             </View>
           ) : (
             <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>
@@ -2603,6 +2638,9 @@ const loadDashboardData = useCallback(async () => {
                 {activeMapActivity.detail}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 8 }}>
+                {getMapTrackingSourceLabel(activeMapActivity)} · {getMapFreshnessLabel(activeMapActivity.lastUpdate)}
+              </Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4 }}>
                 {formatDateTime(activeMapActivity.lastUpdate)}
               </Text>
             </View>

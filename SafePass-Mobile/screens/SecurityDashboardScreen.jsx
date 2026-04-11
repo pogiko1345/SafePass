@@ -1886,6 +1886,32 @@ export default function SecurityDashboardScreen({ navigation }) {
     </View>
   );
 
+  const getTrackingSourceLabel = (source) => {
+    const normalizedSource = String(source || '').toLowerCase();
+    if (normalizedSource.includes('phone')) return 'Phone GPS';
+    if (
+      normalizedSource.includes('arduino') ||
+      normalizedSource.includes('tap') ||
+      normalizedSource.includes('nfc')
+    ) {
+      return 'Tap checkpoint';
+    }
+    if (normalizedSource.includes('manual')) return 'Manual update';
+    if (normalizedSource.includes('estimate')) return 'Estimated location';
+    return 'Tracking update';
+  };
+
+  const getFreshnessLabel = (dateValue) => {
+    const timestamp = new Date(dateValue).getTime();
+    if (!Number.isFinite(timestamp)) return 'No recent update';
+
+    const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    if (diffSeconds < 45) return 'Live now';
+    if (diffSeconds < 180) return `${Math.max(1, Math.floor(diffSeconds / 60))}m ago`;
+    if (diffSeconds < 900) return `${Math.floor(diffSeconds / 60)}m ago`;
+    return 'Stale update';
+  };
+
   // Render Hover Card
   const renderHoverCard = () => {
     if (!hoveredVisitor) return null;
@@ -1913,6 +1939,18 @@ export default function SecurityDashboardScreen({ navigation }) {
           <View style={styles.hoverCardDetail}>
             <Ionicons name="location-outline" size={14} color="#6B7280" />
             <Text style={styles.hoverCardDetailText}>{hoveredVisitor.location.office}</Text>
+          </View>
+          <View style={styles.hoverCardDetail}>
+            <Ionicons name="navigate-outline" size={14} color="#6B7280" />
+            <Text style={styles.hoverCardDetailText}>
+              {getTrackingSourceLabel(hoveredVisitor.location.source)}
+            </Text>
+          </View>
+          <View style={styles.hoverCardDetail}>
+            <Ionicons name="time-outline" size={14} color="#6B7280" />
+            <Text style={styles.hoverCardDetailText}>
+              Last seen: {getFreshnessLabel(hoveredVisitor.location.timestamp)}
+            </Text>
           </View>
         </View>
         <TouchableOpacity 

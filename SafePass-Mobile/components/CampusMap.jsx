@@ -18,6 +18,32 @@ import styles from "../styles/CampusMapStyles";
 
 const { width, height } = Dimensions.get("window");
 
+const TRACKING_FRESHNESS = {
+  LIVE: "live",
+  RECENT: "recent",
+  AGING: "aging",
+  STALE: "stale",
+};
+
+const getImageSourceKey = (source) => {
+  if (!source) return null;
+
+  const resolvedSource =
+    typeof Image.resolveAssetSource === "function"
+      ? Image.resolveAssetSource(source)
+      : null;
+
+  if (resolvedSource?.uri) return resolvedSource.uri;
+  if (typeof source === "string" || typeof source === "number") {
+    return String(source);
+  }
+  if (typeof source === "object") {
+    return source.uri || source.default || JSON.stringify(source);
+  }
+
+  return null;
+};
+
 const CampusMap = ({
   visitors = [],
   floors = [],
@@ -39,7 +65,7 @@ const CampusMap = ({
   const [mapScale, setMapScale] = useState(1);
   const [mapPan, setMapPan] = useState({ x: 0, y: 0 });
   const [activeFloor, setActiveFloor] = useState(selectedFloor || defaultFloorId);
-  const [imageLoading, setImageLoading] = useState(true);
+  const [loadingImageKey, setLoadingImageKey] = useState(null);
   const [imageError, setImageError] = useState(false);
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -131,7 +157,6 @@ const CampusMap = ({
   // Update active floor when selected floor changes
   useEffect(() => {
     setActiveFloor(selectedFloor || defaultFloorId);
-    setImageLoading(true);
     setImageError(false);
     resetMapView();
   }, [defaultFloorId, selectedFloor]);
@@ -148,7 +173,6 @@ const CampusMap = ({
   const handleFloorSelect = (floorId) => {
     if (!floorId || floorId === activeFloor) return;
     setActiveFloor(floorId);
-    setImageLoading(true);
     setImageError(false);
     resetMapView();
     onFloorChange?.(floorId);
@@ -225,6 +249,50 @@ const CampusMap = ({
     }
   };
 
+  const getVisitorLastSeenAt = (visitor) =>
+    visitor?.lastUpdate ||
+    visitor?.location?.timestamp ||
+    visitor?.location?.lastSeenAt ||
+    visitor?.sourceVisitor?.currentLocation?.lastSeenAt ||
+    visitor?.sourceVisitor?.updatedAt;
+
+  const formatFreshnessLabel = (dateValue) => {
+    const timestamp = new Date(dateValue).getTime();
+    if (!Number.isFinite(timestamp)) {
+      return { label: "No recent update", state: TRACKING_FRESHNESS.STALE, color: "#64748B" };
+    }
+
+    const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    if (diffSeconds < 45) {
+      return { label: "Live now", state: TRACKING_FRESHNESS.LIVE, color: "#10B981" };
+    }
+    if (diffSeconds < 180) {
+      return { label: `${Math.max(1, Math.floor(diffSeconds / 60))}m ago`, state: TRACKING_FRESHNESS.RECENT, color: "#2563EB" };
+    }
+    if (diffSeconds < 900) {
+      return { label: `${Math.floor(diffSeconds / 60)}m ago`, state: TRACKING_FRESHNESS.AGING, color: "#F59E0B" };
+    }
+
+    return { label: "Stale", state: TRACKING_FRESHNESS.STALE, color: "#64748B" };
+  };
+
+  const getVisitorFreshness = (visitor) => formatFreshnessLabel(getVisitorLastSeenAt(visitor));
+
+  const getTrackingSourceLabel = (visitor) => {
+    const source = String(
+      visitor?.trackingSource ||
+        visitor?.location?.source ||
+        visitor?.sourceVisitor?.currentLocation?.source ||
+        "",
+    ).toLowerCase();
+
+    if (source.includes("phone")) return "Phone GPS";
+    if (source.includes("arduino") || source.includes("tap") || source.includes("nfc")) return "Tap checkpoint";
+    if (source.includes("manual")) return "Manual";
+    if (source.includes("estimate")) return "Estimated";
+    return "Tracking";
+  };
+
   const getVisibleVisitors = () => {
     if (!visitors || visitors.length === 0) return [];
 
@@ -233,6 +301,27 @@ const CampusMap = ({
       const visitorFloor = normalizeFloorId(visitor?.location?.floor);
       return !visitorFloor || visitorFloor === normalizedActiveFloor;
     });
+  };
+
+  const renderMapEmptyState = (visibleVisitors) => {
+    if (visibleVisitors.length > 0) return null;
+
+    const floorName = getDisplayFloorName(activeFloor);
+    const officeLabel = selectedOffice !== "all" ? selectedOffice : floorName;
+
+    return (
+      <View pointerEvents="none" style={styles.mapEmptyState}>
+        <View style={styles.mapEmptyStateCard}>
+          <View style={styles.mapEmptyStateIcon}>
+            <Ionicons name="location-outline" size={22} color="#64748B" />
+          </View>
+          <Text style={styles.mapEmptyStateTitle}>No active markers here</Text>
+          <Text style={styles.mapEmptyStateText}>
+            No checked-in visitors are currently showing for {officeLabel}. Try another floor or office.
+          </Text>
+        </View>
+      </View>
+    );
   };
 
   // Render floor navigation
@@ -309,12 +398,15 @@ const CampusMap = ({
   };
 
   // Render visitor markers
-  const renderVisitorMarkers = () => {
-    const visibleVisitors = getVisibleVisitors();
+  const renderVisitorMarkers = (visibleVisitors) => {
     if (visibleVisitors.length === 0) return null;
 
     return visibleVisitors.map((visitor) => {
-      const statusColor = getVisitorStatusColor(visitor.status);
+      const freshness = getVisitorFreshness(visitor);
+      const statusColor =
+        visitor.status === "checked_in" || visitor.status === "active"
+          ? freshness.color
+          : getVisitorStatusColor(visitor.status);
       const positionStyle = getVisitorPositionStyle(visitor);
       const isHovered = hoveredVisitor?.id === visitor.id;
       
@@ -333,8 +425,28 @@ const CampusMap = ({
             onMouseLeave={() => onVisitorLeave?.()}
           >
             <View style={[styles.visitorMarkerPulse, { backgroundColor: statusColor + "40" }]} />
+            <View style={[styles.visitorMarkerSourceBadge, { borderColor: statusColor }]}>
+              <Text style={[styles.visitorMarkerSourceText, { color: statusColor }]}>
+                {getTrackingSourceLabel(visitor).charAt(0)}
+              </Text>
+            </View>
           </TouchableOpacity>
-          {isHovered && renderHoverCard?.()}
+          {isHovered && (renderHoverCard?.() || (
+            <View style={styles.hoverCard}>
+              <Text style={styles.hoverCardName}>{visitor.name}</Text>
+              <Text style={styles.hoverCardPurpose}>{visitor.purpose || "On-site visitor"}</Text>
+              <View style={styles.hoverCardDetails}>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="time-outline" size={14} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText}>{freshness.label}</Text>
+                </View>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="navigate-outline" size={14} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText}>{getTrackingSourceLabel(visitor)}</Text>
+                </View>
+              </View>
+            </View>
+          ))}
         </Animated.View>
       );
     });
@@ -392,8 +504,14 @@ const CampusMap = ({
     floorPlanImage &&
     typeof floorPlanImage === "object" &&
     floorPlanImage.type === "diagram";
+  const imageSourceKey =
+    floorPlanImage && !isDiagramBlueprint
+      ? getImageSourceKey(floorPlanImage)
+      : null;
+  const isImageBlueprintLoading = Boolean(imageSourceKey && loadingImageKey === imageSourceKey);
   const hasBlueprint = floorPlanImage !== null && (isDiagramBlueprint || !imageError);
   const shouldShowOfficeLabels = !hasBlueprint || isDiagramBlueprint;
+  const visibleVisitors = getVisibleVisitors();
 
   return (
     <View style={[styles.mapContainer, fullscreen && styles.mapContainerFullscreen]}>
@@ -428,9 +546,16 @@ const CampusMap = ({
                 source={floorPlanImage}
                 style={styles.floorPlanImage}
                 resizeMode="contain"
-                onLoadStart={() => setImageLoading(true)}
-                onLoadEnd={() => setImageLoading(false)}
-                onError={() => setImageError(true)}
+                onLoadStart={() => setLoadingImageKey(imageSourceKey)}
+                onLoadEnd={() => setLoadingImageKey((currentKey) => (
+                  currentKey === imageSourceKey ? null : currentKey
+                ))}
+                onError={() => {
+                  setImageError(true);
+                  setLoadingImageKey((currentKey) => (
+                    currentKey === imageSourceKey ? null : currentKey
+                  ));
+                }}
               />
             )
           ) : (
@@ -469,8 +594,17 @@ const CampusMap = ({
           {shouldShowOfficeLabels ? renderOfficeLabels() : null}
           
           {/* Visitor Markers */}
-          {renderVisitorMarkers()}
+          {renderVisitorMarkers(visibleVisitors)}
         </Animated.View>
+
+        {renderMapEmptyState(visibleVisitors)}
+
+        {isImageBlueprintLoading && hasBlueprint ? (
+          <View pointerEvents="none" style={styles.mapLoadingBadge}>
+            <ActivityIndicator size="small" color="#FFFFFF" />
+            <Text style={styles.mapLoadingText}>Loading map</Text>
+          </View>
+        ) : null}
         
         {/* Map Controls */}
         <View style={styles.mapControls}>
@@ -498,7 +632,7 @@ const CampusMap = ({
         <View style={styles.activeVisitorsBadge}>
           <Ionicons name="people" size={16} color="#FFFFFF" />
           <Text style={styles.activeVisitorsBadgeText}>
-            {getVisibleVisitors().length} Active
+            {visibleVisitors.length} Active
           </Text>
         </View>
 
