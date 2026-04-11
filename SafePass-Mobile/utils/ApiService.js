@@ -1482,7 +1482,19 @@ generateRandomPassword(length = 10) {
 
   async testConnection() {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), 5000)
+        : null;
+
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        signal: controller?.signal,
+      });
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       const data = await response.json();
       return data.status === "OK";
     } catch {
