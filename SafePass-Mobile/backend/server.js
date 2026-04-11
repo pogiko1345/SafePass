@@ -41,7 +41,11 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("✅ MongoDB Connected (Local)"))
+  .then(() =>
+    console.log(
+      `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
+    ),
+  )
   .catch((err) => {
     console.error("❌ MongoDB Connection Error:", err);
     console.log("Trying to connect to:", MONGODB_URI);
