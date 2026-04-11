@@ -14,6 +14,7 @@ const otpStore = new Map();
 require("dotenv").config();
 
 const app = express();
+const isVercelRuntime = Boolean(process.env.VERCEL);
 
 // ========== ENHANCED CORS CONFIGURATION ==========
 app.use(
@@ -36,20 +37,36 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/sapphire_aviation";
 
-mongoose
-  .connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() =>
-    console.log(
-      `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
-    ),
-  )
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error:", err);
-    console.log("Trying to connect to:", MONGODB_URI);
-  });
+let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
+
+const connectToDatabase = () => {
+  if (!mongoConnectionPromise) {
+    mongoConnectionPromise = mongoose
+      .connect(MONGODB_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      })
+      .then(() => {
+        console.log(
+          `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
+        );
+        return mongoose.connection;
+      })
+      .catch((err) => {
+        console.error("❌ MongoDB Connection Error:", err);
+        console.log("Trying to connect to:", MONGODB_URI);
+        mongoConnectionPromise = null;
+        global.__safepassMongoConnectionPromise = null;
+        throw err;
+      });
+
+    global.__safepassMongoConnectionPromise = mongoConnectionPromise;
+  }
+
+  return mongoConnectionPromise;
+};
+
+connectToDatabase();
 
 // ========== HELPER FUNCTIONS ==========
 // Generate JWT Token
@@ -4736,37 +4753,38 @@ app.use((err, req, res, next) => {
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 5000;
 
-// Check if port is available
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📁 Database: ${MONGODB_URI}`);
-  console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
-  console.log(`✅ Test endpoint: http://localhost:${PORT}/api/health`);
-  console.log(`✅ Test endpoint: http://localhost:${PORT}/api/test`);
-  console.log(`👑 Admin routes available at /api/admin/*`);
-  console.log(`📝 Visitor approval routes available at /api/admin/visitors/*`);
-});
+if (!isVercelRuntime && require.main === module) {
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📁 Database: ${MONGODB_URI}`);
+    console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
+    console.log(`✅ Test endpoint: http://localhost:${PORT}/api/health`);
+    console.log(`✅ Test endpoint: http://localhost:${PORT}/api/test`);
+    console.log(`👑 Admin routes available at /api/admin/*`);
+    console.log(`📝 Visitor approval routes available at /api/admin/visitors/*`);
+  });
 
-// Handle server errors
-server.on("error", (error) => {
-  if (error.code === "EADDRINUSE") {
-    console.error(`❌ Port ${PORT} is already in use. Try a different port:`);
-    console.log(`   Try: PORT=5001 npm run dev`);
-    process.exit(1);
-  } else {
-    console.error("❌ Server error:", error);
-  }
-});
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(`❌ Port ${PORT} is already in use. Try a different port:`);
+      console.log(`   Try: PORT=5001 npm run dev`);
+      process.exit(1);
+    } else {
+      console.error("❌ Server error:", error);
+    }
+  });
 
-// Handle graceful shutdown
-process.on("SIGINT", () => {
-  console.log("\n🛑 Shutting down server...");
-  server.close(() => {
-    console.log("✅ Server closed");
-    mongoose.connection.close(false, () => {
-      console.log("✅ MongoDB connection closed");
-      process.exit(0);
+  process.on("SIGINT", () => {
+    console.log("\n🛑 Shutting down server...");
+    server.close(() => {
+      console.log("✅ Server closed");
+      mongoose.connection.close(false, () => {
+        console.log("✅ MongoDB connection closed");
+        process.exit(0);
+      });
     });
   });
-});
+}
+
+module.exports = app;
 
