@@ -24,6 +24,10 @@ import visitorRegisterStyles from "../styles/VisitorRegisterStyles";
 import ApiService from "../utils/ApiService";
 import IDScannerService from "../utils/IDScannerService";
 import Logo from "../assets/LogoSapphire.jpg";
+import {
+  MONITORING_MAP_FLOORS,
+  MONITORING_MAP_OFFICES,
+} from "../utils/monitoringMapConfig";
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== "web") {
@@ -46,6 +50,14 @@ const purposeOptions = [
   "Event Participation",
   "Other",
 ];
+
+const officeOptions = MONITORING_MAP_OFFICES.map((office) => {
+  const floor = MONITORING_MAP_FLOORS.find((item) => item.id === office.floor);
+  return {
+    ...office,
+    floorName: floor?.name || "Campus",
+  };
+});
 
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({ visible, credentials, onConfirm }) => {
@@ -393,6 +405,7 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDataPrivacy, setShowDataPrivacy] = useState(false);
   const [showPurposePicker, setShowPurposePicker] = useState(false);
+  const [showOfficePicker, setShowOfficePicker] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
 
@@ -405,6 +418,9 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const [visitData, setVisitData] = useState({
     purposeOfVisit: "",
+    assignedOffice: "",
+    assignedOfficeId: "",
+    assignedFloor: "",
     vehicleNumber: "",
     visitDate: new Date(),
     visitTime: new Date(),
@@ -417,6 +433,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     idNumber: "",
     idImage: "",
     purposeOfVisit: "",
+    assignedOffice: "",
   });
 
   const [idImage, setIdImage] = useState(null);
@@ -588,6 +605,11 @@ export default function VisitorRegisterScreen({ navigation }) {
     return "";
   };
 
+  const validateAssignedOffice = (office) => {
+    if (!office || office.trim() === "") return "Office to visit is required";
+    return "";
+  };
+
   const handleInputChange = (field, value) => {
     let error = "";
     switch (field) {
@@ -612,6 +634,10 @@ export default function VisitorRegisterScreen({ navigation }) {
       case "purposeOfVisit":
         setVisitData({ ...visitData, [field]: value });
         error = validatePurposeOfVisit(value);
+        break;
+      case "assignedOffice":
+        setVisitData({ ...visitData, assignedOffice: value });
+        error = validateAssignedOffice(value);
         break;
       case "vehicleNumber":
         setVisitData({ ...visitData, [field]: value });
@@ -672,6 +698,23 @@ export default function VisitorRegisterScreen({ navigation }) {
     if (Platform.OS === "android") setShowTimePicker(false);
     if (selectedTime) setVisitData({ ...visitData, visitTime: selectedTime });
   };
+
+  const handleOfficeSelect = (office) => {
+    setVisitData({
+      ...visitData,
+      assignedOffice: office.name,
+      assignedOfficeId: office.id,
+      assignedFloor: office.floor,
+    });
+    setErrors({ ...errors, assignedOffice: "" });
+    setCompletedFields({ ...completedFields, assignedOffice: true });
+    setShowOfficePicker(false);
+  };
+
+  const getSelectedOffice = () =>
+    officeOptions.find((office) => office.id === visitData.assignedOfficeId) ||
+    officeOptions.find((office) => office.name === visitData.assignedOffice) ||
+    null;
 
   const handleWebDateChange = (text) => {
     setWebDate(text);
@@ -742,9 +785,19 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const validateStep2 = () => {
     const purposeError = validatePurposeOfVisit(visitData.purposeOfVisit);
-    setErrors({ ...errors, purposeOfVisit: purposeError });
+    const officeError = validateAssignedOffice(visitData.assignedOffice);
+    setErrors({
+      ...errors,
+      purposeOfVisit: purposeError,
+      assignedOffice: officeError,
+    });
 
-    if (purposeError) {
+    if (purposeError || officeError) {
+      const errorMessages = [];
+      if (purposeError) errorMessages.push(`- Purpose of Visit: ${purposeError}`);
+      if (officeError) errorMessages.push(`- Office to Visit: ${officeError}`);
+      showValidationAlert(errorMessages);
+      return false;
       showValidationAlert([`• Purpose of Visit: ${purposeError}`]);
       return false;
     }
@@ -825,6 +878,8 @@ export default function VisitorRegisterScreen({ navigation }) {
           ? `data:image/jpeg;base64,${idImageBase64}`
           : null,
         purposeOfVisit: visitData.purposeOfVisit,
+        host: visitData.assignedOffice,
+        assignedOffice: visitData.assignedOffice,
         vehicleNumber: visitData.vehicleNumber || "",
         visitDate: visitData.visitDate.toISOString(),
         visitTime: visitData.visitTime.toISOString(),
@@ -974,6 +1029,7 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const visitCompletionCount = [
     completedFields.purposeOfVisit,
+    completedFields.assignedOffice,
     !!visitData.visitDate,
     !!visitData.visitTime,
   ].filter(Boolean).length;
@@ -1029,13 +1085,13 @@ export default function VisitorRegisterScreen({ navigation }) {
           </View>
           <View style={visitorRegisterStyles.stepInsightStats}>
             <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitCompletionCount}/3</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitCompletionCount}/4</Text>
               <Text style={visitorRegisterStyles.stepInsightStatLabel}>Ready</Text>
             </View>
             <View style={visitorRegisterStyles.stepInsightDivider} />
             <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitData.purposeOfVisit ? "Set" : "Pick"}</Text>
-              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Visit purpose</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitData.assignedOffice ? "Set" : "Pick"}</Text>
+              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Office to visit</Text>
             </View>
             <View style={visitorRegisterStyles.stepInsightDivider} />
             <View style={visitorRegisterStyles.stepInsightStat}>
@@ -1064,6 +1120,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           {[
             { label: "Personal details completed", done: personalCompletionCount === 5 },
             { label: "Visit purpose selected", done: !!visitData.purposeOfVisit },
+            { label: "Office destination selected", done: !!visitData.assignedOffice },
             { label: "Preferred visit schedule confirmed", done: !!visitData.visitDate && !!visitData.visitTime },
           ].map((item) => (
             <View key={item.label} style={visitorRegisterStyles.reviewChecklistItem}>
@@ -1368,6 +1425,107 @@ export default function VisitorRegisterScreen({ navigation }) {
         </View>
       </Modal>
 
+      <View
+        style={[
+          visitorRegisterStyles.formCard,
+          errors.assignedOffice && visitorRegisterStyles.formCardError,
+        ]}
+      >
+        <View style={visitorRegisterStyles.cardHeader}>
+          <View
+            style={[
+              visitorRegisterStyles.cardIcon,
+              { backgroundColor: "#EFF6FF" },
+            ]}
+          >
+            <Ionicons name="business" size={20} color="#2563EB" />
+          </View>
+          <Text style={visitorRegisterStyles.cardLabel}>Office to Visit</Text>
+          <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
+        </View>
+        <TouchableOpacity
+          style={visitorRegisterStyles.dropdownButton}
+          onPress={() => setShowOfficePicker(true)}
+          activeOpacity={0.7}
+        >
+          <View style={visitorRegisterStyles.dropdownButtonContent}>
+            <Text
+              style={[
+                visitorRegisterStyles.dropdownButtonText,
+                !visitData.assignedOffice &&
+                  visitorRegisterStyles.dropdownButtonPlaceholder,
+              ]}
+            >
+              {visitData.assignedOffice || "Select office or room"}
+            </Text>
+            {getSelectedOffice()?.floorName ? (
+              <Text style={visitorRegisterStyles.dropdownButtonMeta}>
+                {getSelectedOffice().floorName}
+              </Text>
+            ) : null}
+          </View>
+          <Ionicons name="chevron-down" size={20} color="#64748B" />
+        </TouchableOpacity>
+        {errors.assignedOffice && (
+          <Text style={visitorRegisterStyles.errorText}>
+            {errors.assignedOffice}
+          </Text>
+        )}
+      </View>
+
+      <Modal
+        visible={showOfficePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowOfficePicker(false)}
+      >
+        <View style={visitorRegisterStyles.pickerModalOverlay}>
+          <View style={visitorRegisterStyles.pickerModalContainer}>
+            <View style={visitorRegisterStyles.pickerModalHeader}>
+              <Text style={visitorRegisterStyles.pickerModalTitle}>
+                Select Office
+              </Text>
+              <TouchableOpacity onPress={() => setShowOfficePicker(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {officeOptions.map((office) => {
+                const isSelected = visitData.assignedOfficeId === office.id;
+                return (
+                  <TouchableOpacity
+                    key={office.id}
+                    style={[
+                      visitorRegisterStyles.pickerModalOption,
+                      isSelected && visitorRegisterStyles.pickerModalOptionActive,
+                    ]}
+                    onPress={() => handleOfficeSelect(office)}
+                  >
+                    <View style={visitorRegisterStyles.pickerModalOptionContent}>
+                      <Text
+                        style={[
+                          visitorRegisterStyles.pickerModalOptionText,
+                          isSelected &&
+                            visitorRegisterStyles.pickerModalOptionTextActive,
+                        ]}
+                      >
+                        {office.name}
+                      </Text>
+                      <Text style={visitorRegisterStyles.pickerModalOptionMeta}>
+                        {office.floorName}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark" size={20} color="#059669" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Compact Date and Time Row */}
       <View style={visitorRegisterStyles.formRow}>
         <View
@@ -1549,6 +1707,12 @@ export default function VisitorRegisterScreen({ navigation }) {
           <Text style={visitorRegisterStyles.reviewLabel}>Purpose</Text>
           <Text style={visitorRegisterStyles.reviewValue}>
             {visitData.purposeOfVisit || "—"}
+          </Text>
+        </View>
+        <View style={visitorRegisterStyles.reviewItem}>
+          <Text style={visitorRegisterStyles.reviewLabel}>Office</Text>
+          <Text style={visitorRegisterStyles.reviewValue}>
+            {visitData.assignedOffice || "—"}
           </Text>
         </View>
         <View style={visitorRegisterStyles.reviewItem}>

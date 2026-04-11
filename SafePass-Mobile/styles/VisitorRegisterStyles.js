@@ -717,6 +717,16 @@ export default StyleSheet.create({
     color: "#0F172A",
     flex: 1,
   },
+  dropdownButtonContent: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  dropdownButtonMeta: {
+    marginTop: 3,
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    fontWeight: "600",
+  },
   dropdownButtonPlaceholder: {
     color: "#94A3B8",
   },
@@ -766,6 +776,16 @@ export default StyleSheet.create({
   pickerModalOptionText: {
     fontSize: fontSizes.base,
     color: "#0F172A",
+  },
+  pickerModalOptionContent: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  pickerModalOptionMeta: {
+    marginTop: 3,
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    fontWeight: "600",
   },
   pickerModalOptionTextActive: {
     color: "#059669",
