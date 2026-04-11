@@ -529,6 +529,10 @@ app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => 
 });
 
 // 1. REGISTER
+const normalizeEmailValue = (value = "") => String(value || "").toLowerCase().trim();
+const normalizeUsernameValue = (value = "") => String(value || "").toLowerCase().trim();
+const isValidEmailValue = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+
 app.post("/api/register", async (req, res) => {
   console.log("📝 Registration attempt:", req.body);
 
@@ -536,6 +540,7 @@ app.post("/api/register", async (req, res) => {
     const {
       firstName,
       lastName,
+      username,
       email,
       password,
       phone,
@@ -552,10 +557,35 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedUsername = normalizeUsernameValue(username);
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        error: "Invalid email format",
+        field: "email",
+      });
+    }
+
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const duplicateChecks = [{ email: normalizedEmail }];
+    if (normalizedUsername) {
+      duplicateChecks.push({ username: normalizedUsername });
+    }
+
+    const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
+      const duplicateField =
+        existingUser.email === normalizedEmail
+          ? "email"
+          : existingUser.username === normalizedUsername
+            ? "username"
+            : "email";
+
+      return res.status(400).json({
+        error: duplicateField === "username" ? "Username already registered" : "Email already registered",
+        field: duplicateField,
+      });
     }
 
     let nfcCardId = null;
@@ -581,7 +611,8 @@ app.post("/api/register", async (req, res) => {
 const userData = {
   firstName,
   lastName,
-  email: email.toLowerCase().trim(),
+  username: normalizedUsername || undefined,
+  email: normalizedEmail,
   password,
   phone,
   role: role || 'visitor',
@@ -1476,6 +1507,164 @@ app.put("/api/admin/visitors/:id/reject", authMiddleware, async (req, res) => {
 });
 
 // ============ SECURITY GUARD MANAGEMENT ROUTES ============
+
+// Create staff account (admin only)
+app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const {
+      firstName,
+      lastName,
+      username,
+      email,
+      password,
+      phone,
+      department,
+      position,
+      employeeId,
+      status,
+    } = req.body;
+
+    if (!firstName || !lastName || !username || !email || !password || !phone || !department) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+        required: ["firstName", "lastName", "username", "email", "password", "phone", "department"],
+      });
+    }
+
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedUsername = normalizeUsernameValue(username);
+    const normalizedEmployeeId = employeeId ? String(employeeId).trim() : "";
+    const normalizedStatus = status === "inactive" ? "inactive" : "active";
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format",
+        field: "email",
+      });
+    }
+
+    const duplicateChecks = [
+      { email: normalizedEmail },
+      { username: normalizedUsername },
+    ];
+
+    if (normalizedEmployeeId) {
+      duplicateChecks.push({ employeeId: normalizedEmployeeId });
+    }
+
+    const existingUser = await User.findOne({ $or: duplicateChecks });
+    if (existingUser) {
+      const duplicateField =
+        existingUser.email === normalizedEmail
+          ? "email"
+          : existingUser.username === normalizedUsername
+            ? "username"
+            : "employeeId";
+
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "username"
+            ? "Username already registered"
+            : duplicateField === "employeeId"
+              ? "Staff ID already registered"
+              : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
+    let finalEmployeeId = normalizedEmployeeId;
+    if (!finalEmployeeId) {
+      const timestamp = Date.now().toString().slice(-6);
+      const random = Math.random().toString(36).substr(2, 3).toUpperCase();
+      finalEmployeeId = `STF-${timestamp}-${random}`;
+    }
+
+    const nfcCardId = `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+    const user = new User({
+      firstName: String(firstName).trim(),
+      lastName: String(lastName).trim(),
+      username: normalizedUsername,
+      email: normalizedEmail,
+      password,
+      phone: String(phone).trim(),
+      role: "staff",
+      status: normalizedStatus,
+      isActive: normalizedStatus === "active",
+      employeeId: finalEmployeeId,
+      department: String(department).trim(),
+      position: String(position || "Staff Member").trim(),
+      nfcCardId,
+    });
+
+    await user.save();
+
+    const accessLog = new AccessLog({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      userName: `${req.user.firstName} ${req.user.lastName}`,
+      location: "Admin Panel",
+      accessType: "system",
+      status: "granted",
+      notes: `Created staff account: ${user.email}`,
+    });
+    await accessLog.save();
+
+    sendEmail(
+      user.email,
+      `Welcome to Sapphire Aviation - Staff Account`,
+      `Dear ${user.firstName} ${user.lastName},\n\n` +
+        `Your staff account has been created by the administrator.\n\n` +
+        `Username: ${user.username}\n` +
+        `Email: ${user.email}\n` +
+        `Password: ${password}\n` +
+        `Staff ID: ${user.employeeId}\n` +
+        `Department: ${user.department}\n` +
+        `Status: ${user.status.toUpperCase()}\n\n` +
+        `Please sign in and change your password as soon as possible.\n\n` +
+        `Thank you,\n` +
+        `Sapphire Aviation Security Team`,
+    );
+
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({
+      success: true,
+      message: "Staff account created successfully",
+      user: userResponse,
+    });
+  } catch (error) {
+    console.error("Create staff account error:", error);
+
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "username"
+            ? "Username already registered"
+            : duplicateField === "employeeId"
+              ? "Staff ID already registered"
+              : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to create staff account",
+      error: error.message,
+    });
+  }
+});
 
 // Create security guard (admin only)
 app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
@@ -3783,10 +3972,54 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const updates = req.body;
+    const updates = { ...req.body };
     delete updates.password; // Don't allow password update through this route
     delete updates._id;
     delete updates.__v;
+
+    if (updates.username !== undefined) {
+      const normalizedUsername = normalizeUsernameValue(updates.username);
+      if (!normalizedUsername) {
+        delete updates.username;
+      } else {
+        const usernameConflict = await User.findOne({
+          username: normalizedUsername,
+          _id: { $ne: req.params.id },
+        });
+
+        if (usernameConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Username already registered",
+            field: "username",
+          });
+        }
+
+        updates.username = normalizedUsername;
+      }
+    }
+
+    if (updates.employeeId !== undefined) {
+      const normalizedEmployeeId = String(updates.employeeId || "").trim();
+      if (!normalizedEmployeeId) {
+        delete updates.employeeId;
+      } else {
+        const employeeIdConflict = await User.findOne({
+          employeeId: normalizedEmployeeId,
+          _id: { $ne: req.params.id },
+        });
+
+        if (employeeIdConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Staff ID already registered",
+            field: "employeeId",
+          });
+        }
+
+        updates.employeeId = normalizedEmployeeId;
+      }
+    }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,

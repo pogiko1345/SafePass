@@ -262,9 +262,19 @@ async register(userData) {
         status: staffData?.status || "active",
         isActive: staffData?.isActive ?? true,
       };
-      return await this.register(payload);
+      return await this.fetch("/admin/staff/create", {
+        method: "POST",
+        body: payload,
+      });
     } catch (error) {
-      const message = error?.message || "Failed to create staff account";
+      const errorMessage = String(error?.message || "").toLowerCase();
+      const message = errorMessage.includes("username already")
+        ? "Username already registered. Please use another username."
+        : errorMessage.includes("staff id already") || errorMessage.includes("employeeid")
+          ? "Staff ID already registered. Please use another staff ID."
+          : errorMessage.includes("email already")
+            ? "Email already registered. Please use another email address."
+            : error?.message || "Failed to create staff account";
       throw new Error(message);
     }
   }

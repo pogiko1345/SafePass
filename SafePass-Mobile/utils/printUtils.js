@@ -2,7 +2,7 @@
 import * as Print from "expo-print";
 import { shareAsync } from "expo-sharing";
 import { Image, Platform } from "react-native";
-import { getPrintHTML } from "../styles/PrintStyles";
+import { getPrintHTML, getPrintTableHTML } from "../styles/PrintStyles";
 
 const toAbsoluteAssetUrl = (uri) => {
   if (!uri) return "";
@@ -85,6 +85,100 @@ export const printUserList = async (users, title, activeMenu) => {
     return { success: true };
   } catch (error) {
     console.error("Print error:", error);
+    throw error;
+  }
+};
+
+export const printRecordsTable = async ({
+  title,
+  subtitle = "",
+  columns = [],
+  rows = [],
+  totalLabel = "records",
+  dialogTitle,
+}) => {
+  if (!rows || rows.length === 0) {
+    throw new Error("No records to print");
+  }
+
+  const schoolLogoSource = await convertAssetToDataUrl(getSchoolLogoSource());
+  const htmlContent = getPrintTableHTML(
+    {
+      title,
+      subtitle,
+      columns,
+      rows,
+      totalLabel,
+    },
+    schoolLogoSource,
+  );
+
+  try {
+    if (Platform.OS === "web") {
+      if (typeof document === "undefined") {
+        throw new Error("Print preview is only available in a browser.");
+      }
+
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.setAttribute("aria-hidden", "true");
+
+      document.body.appendChild(iframe);
+
+      const frameDocument =
+        iframe.contentWindow?.document || iframe.contentDocument || null;
+
+      if (!frameDocument) {
+        document.body.removeChild(iframe);
+        throw new Error("Unable to create print preview.");
+      }
+
+      frameDocument.open();
+      frameDocument.write(htmlContent);
+      frameDocument.close();
+
+      const cleanup = () => {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1200);
+      };
+
+      let hasPrinted = false;
+      const triggerPrint = () => {
+        if (hasPrinted) return;
+        hasPrinted = true;
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        cleanup();
+      };
+
+      iframe.onload = () => triggerPrint();
+      if (frameDocument.readyState === "complete") {
+        triggerPrint();
+      }
+    } else {
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+      });
+
+      await shareAsync(uri, {
+        mimeType: "application/pdf",
+        dialogTitle: dialogTitle || title || "Print Records",
+        UTI: "com.adobe.pdf",
+      });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Print table error:", error);
     throw error;
   }
 };
