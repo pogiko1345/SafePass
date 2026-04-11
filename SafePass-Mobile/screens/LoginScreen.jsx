@@ -233,9 +233,7 @@ export default function LoginScreen({ navigation, route }) {
     const newErrors = {};
     
     if (!email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = "Please enter a valid email";
+      newErrors.email = "Username or email is required";
     }
     
     if (!password.trim()) {
@@ -788,23 +786,23 @@ export default function LoginScreen({ navigation, route }) {
 
                 {/* STANDARD LOGIN FORM */}
                 <>
-                  {/* Email Input */}
+                  {/* Username / Email Input */}
                   <View style={loginStyles.inputBox}>
-                    <Text style={loginStyles.label}>Email Address</Text>
+                    <Text style={loginStyles.label}>Username</Text>
                     <View style={[
                       loginStyles.inputContainer,
                       errors.email && loginStyles.inputError
                     ]}>
-                      <Ionicons name="mail-outline" size={20} color="#6B7280" />
+                      <Ionicons name="person-outline" size={20} color="#6B7280" />
                       <TextInput
                         ref={emailInputRef}
                         style={loginStyles.input}
-                        placeholder="your.email@sapphire.edu"
+                        placeholder="Enter username or email"
                         placeholderTextColor="#9CA3AF"
                         value={email}
                         onChangeText={handleEmailChange}
                         onBlur={() => validateForm()}
-                        keyboardType="email-address"
+                        keyboardType="default"
                         autoCapitalize="none"
                         editable={!isLoading}
                         returnKeyType="next"

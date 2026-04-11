@@ -535,7 +535,9 @@ const CampusMap = ({
                   {getDisplayFloorName(activeFloor)}
                 </Text>
                 <Text style={styles.floorPlanSubtitle}>
-                  {!mapBlueprints ? "Upload map blueprints to start tracking" : "Loading map blueprint..."}
+                  {!mapBlueprints
+                    ? "Upload map blueprints to start tracking"
+                    : "Floor blueprint not uploaded yet."}
                 </Text>
                 <View style={styles.floorPlanFeatures}>
                   <View style={styles.featureItem}>

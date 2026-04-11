@@ -40,8 +40,8 @@ const Storage = Platform.OS === "web"
 const STAFF_DEPARTMENT_OPTIONS = [
   { value: "Admissions", label: "Admissions", area: "Ground Floor" },
   { value: "Registrar", label: "Registrar", area: "Ground Floor" },
-  { value: "Finance", label: "Finance Office", area: "Ground Floor" },
-  { value: "Student Services", label: "Student Services", area: "Ground Floor" },
+  { value: "Accounting", label: "Accounting", area: "Ground Floor" },
+  { value: "Guidance", label: "Guidance", area: "Ground Floor" },
   { value: "Flight Operations", label: "Flight Operations", area: "Mezzanine" },
   { value: "Training", label: "Head of Training Room", area: "Mezzanine" },
   { value: "I.T Room", label: "I.T Room", area: "Mezzanine" },
@@ -58,13 +58,13 @@ const STAFF_OFFICER_OPTIONS_BY_DEPARTMENT = {
     { value: "Registrar Officer", label: "Registrar Officer" },
     { value: "Records Officer", label: "Records Officer" },
   ],
-  Finance: [
-    { value: "Finance Officer", label: "Finance Officer" },
+  Accounting: [
+    { value: "Accounting Officer", label: "Accounting Officer" },
     { value: "Cashier", label: "Cashier" },
   ],
-  "Student Services": [
-    { value: "Student Services Officer", label: "Student Services Officer" },
+  Guidance: [
     { value: "Guidance Officer", label: "Guidance Officer" },
+    { value: "Student Services Officer", label: "Student Services Officer" },
   ],
   "Flight Operations": [
     { value: "Flight Operations Officer", label: "Flight Operations Officer" },

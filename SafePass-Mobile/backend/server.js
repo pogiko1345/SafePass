@@ -532,6 +532,73 @@ app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => 
 const normalizeEmailValue = (value = "") => String(value || "").toLowerCase().trim();
 const normalizeUsernameValue = (value = "") => String(value || "").toLowerCase().trim();
 const isValidEmailValue = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+const normalizeDepartmentValue = (value = "") => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/&/g, "and")
+    .replace(/\s+/g, " ");
+
+  const aliases = {
+    "registrars office": "registrar",
+    registrar: "registrar",
+    "finance office": "accounting",
+    finance: "accounting",
+    accounting: "accounting",
+    cashier: "accounting",
+    guidance: "guidance",
+    "guidance office": "guidance",
+    "student services": "guidance",
+    administration: "administration",
+    "administration office": "administration",
+    admissions: "admissions",
+    "admissions office": "admissions",
+    "flight operations": "flight operations",
+    training: "training",
+    "head of training room": "training",
+    "i.t room": "i.t room",
+    "it room": "i.t room",
+    "faculty room": "faculty room",
+  };
+
+  return aliases[normalized] || normalized;
+};
+
+const formatDepartmentLabel = (value = "") =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const getStaffDepartmentQuery = (department = "") => {
+  const normalizedDepartment = normalizeDepartmentValue(department);
+  const aliasGroups = {
+    registrar: ["Registrar", "Registrar's Office"],
+    accounting: ["Accounting", "Finance", "Finance Office", "Cashier"],
+    guidance: ["Guidance", "Guidance Office", "Student Services"],
+    administration: ["Administration", "Administration Office"],
+    admissions: ["Admissions", "Admissions Office"],
+    "flight operations": ["Flight Operations"],
+    training: ["Training", "Head of Training Room"],
+    "i.t room": ["I.T Room", "IT Room"],
+    "faculty room": ["Faculty Room"],
+  };
+
+  const labels = aliasGroups[normalizedDepartment] || [department];
+  return { $in: labels.map((label) => new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")) };
+};
+
+const isStaffAllowedForAppointment = (staffUser = {}, visitor = {}) => {
+  if (String(staffUser.role).toLowerCase() === "admin") return true;
+
+  const staffDepartment = normalizeDepartmentValue(staffUser.department);
+  const appointmentDepartment = normalizeDepartmentValue(
+    visitor.appointmentDepartment || visitor.assignedOffice || visitor.host,
+  );
+
+  return Boolean(staffDepartment && appointmentDepartment && staffDepartment === appointmentDepartment);
+};
 
 app.post("/api/register", async (req, res) => {
   console.log("📝 Registration attempt:", req.body);
@@ -757,15 +824,18 @@ app.post("/api/login", async (req, res) => {
 
   try {
     const { email, password } = req.body;
+    const loginIdentifier = String(email || "").toLowerCase().trim();
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ error: "Username/email and password are required" });
     }
 
-    // Find user
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    // Visitors can sign in using either their username or email address.
+    const user = await User.findOne({
+      $or: [{ email: loginIdentifier }, { username: loginIdentifier }],
+    });
     if (!user) {
-      console.log("User not found:", email);
+      console.log("User not found:", loginIdentifier);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
@@ -777,7 +847,7 @@ app.post("/api/login", async (req, res) => {
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      console.log("Invalid password for:", email);
+      console.log("Invalid password for:", loginIdentifier);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
@@ -2847,16 +2917,64 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
   try {
     const requestedUserId =
       req.user.role === "visitor" ? req.user._id : req.params.userId;
-    const { visitDate, preferredDate, visitTime, preferredTime, purposeOfVisit } =
-      req.body || {};
+    const {
+      visitDate,
+      preferredDate,
+      visitTime,
+      preferredTime,
+      purposeOfVisit,
+      purposeCategory,
+      customPurposeOfVisit,
+      department,
+      officeToVisit,
+      assignedOffice,
+      appointmentDepartment,
+    } = req.body || {};
 
     const finalVisitDate = visitDate || preferredDate;
     const finalVisitTime = visitTime || preferredTime;
+    const normalizedPurposeCategory = String(purposeCategory || "").trim();
+    const normalizedCustomPurpose = String(customPurposeOfVisit || "").trim();
+    const requestedDepartment = String(
+      appointmentDepartment || department || officeToVisit || assignedOffice || "",
+    ).trim();
+    const resolvedPurpose =
+      normalizedPurposeCategory === "Other" && normalizedCustomPurpose
+        ? normalizedCustomPurpose
+        : String(purposeOfVisit || normalizedPurposeCategory || "").trim();
 
-    if (!finalVisitDate || !finalVisitTime || !purposeOfVisit) {
+    if (!finalVisitDate || !finalVisitTime || !resolvedPurpose) {
       return res.status(400).json({
         success: false,
         message: "Preferred date, preferred time, and purpose of visit are required.",
+      });
+    }
+
+    if (normalizedPurposeCategory === "Other" && !normalizedCustomPurpose) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter your custom purpose of visit.",
+      });
+    }
+
+    if (!requestedDepartment) {
+      return res.status(400).json({
+        success: false,
+        message: "Office or department is required for this appointment.",
+      });
+    }
+
+    const routedStaff = await User.findOne({
+      role: "staff",
+      isActive: true,
+      status: "active",
+      department: getStaffDepartmentQuery(requestedDepartment),
+    }).sort({ lastLogin: -1, createdAt: 1 });
+
+    if (!routedStaff) {
+      return res.status(400).json({
+        success: false,
+        message: `No active staff account is assigned to ${requestedDepartment}. Please choose another office or contact admin.`,
       });
     }
 
@@ -2898,9 +3016,14 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         idNumber: user.employeeId || `VIS-${Date.now().toString().slice(-6)}`,
       });
       visitor.queueAppointmentRequest({
-        purposeOfVisit: String(purposeOfVisit).trim(),
+        purposeOfVisit: resolvedPurpose,
+        purposeCategory: normalizedPurposeCategory || undefined,
+        customPurposeOfVisit: normalizedCustomPurpose || undefined,
         visitDate: new Date(finalVisitDate),
         visitTime: new Date(finalVisitTime),
+        department: formatDepartmentLabel(requestedDepartment),
+        assignedStaff: routedStaff._id,
+        assignedStaffName: getFullName(routedStaff),
       });
       await visitor.save();
       user.visitorId = visitor._id;
@@ -2909,43 +3032,41 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       visitor.fullName = visitor.fullName || visitorFullName;
       visitor.phoneNumber = user.phone || visitor.phoneNumber;
       visitor.queueAppointmentRequest({
-        purposeOfVisit: String(purposeOfVisit).trim(),
+        purposeOfVisit: resolvedPurpose,
+        purposeCategory: normalizedPurposeCategory || undefined,
+        customPurposeOfVisit: normalizedCustomPurpose || undefined,
         visitDate: new Date(finalVisitDate),
         visitTime: new Date(finalVisitTime),
+        department: formatDepartmentLabel(requestedDepartment),
+        assignedStaff: routedStaff._id,
+        assignedStaffName: getFullName(routedStaff),
       });
       await visitor.save();
     }
 
-    const staffMembers = await User.find({
-      role: "staff",
-      isActive: true,
-      status: "active",
-    }).select("_id");
-
-    await Promise.all(
-      staffMembers.map((staffMember) =>
-        createRoleNotification({
-          title: "New Appointment Request",
-          message: `${visitor.fullName} requested a visit on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}. Purpose: ${visitor.purposeOfVisit}`,
-          type: "visitor",
-          severity: "medium",
-          targetRole: "staff",
-          targetUser: staffMember._id,
-          relatedVisitor: visitor._id,
-          relatedUser: user._id,
-          metadata: {
-            activityType: "visitor_appointment_request",
-            visitDate: visitor.visitDate,
-            visitTime: visitor.visitTime,
-            purposeOfVisit: visitor.purposeOfVisit,
-          },
-        }),
-      ),
-    );
+    await createRoleNotification({
+      title: "New Department Appointment Request",
+      message: `${visitor.fullName} requested ${visitor.appointmentDepartment || visitor.assignedOffice} on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}. Purpose: ${visitor.purposeOfVisit}`,
+      type: "visitor",
+      severity: "medium",
+      targetRole: "staff",
+      targetUser: routedStaff._id,
+      relatedVisitor: visitor._id,
+      relatedUser: user._id,
+      metadata: {
+        activityType: "visitor_appointment_request",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        purposeCategory: visitor.purposeCategory,
+        customPurposeOfVisit: visitor.customPurposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+      },
+    });
 
     await createRoleNotification({
       title: "Visitor Appointment Requested",
-      message: `${visitor.fullName} submitted a new appointment request for staff review.`,
+      message: `${visitor.fullName} submitted a new appointment request for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
       type: "info",
       severity: "medium",
       targetRole: "admin",
@@ -2956,6 +3077,8 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
         purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
       },
     });
 
@@ -2965,14 +3088,16 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       relatedUser: user,
       activityType: "visitor_appointment_request",
       status: "pending",
-      location: visitor.assignedOffice || visitor.host || "Appointment Request",
-      notes: `${visitor.fullName} requested a new appointment.`,
+      location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment Request",
+      notes: `${visitor.fullName} requested a new appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
       metadata: {
         requestCategory: "appointment",
         approvalFlow: "staff",
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
         purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
       },
     });
 
@@ -3004,9 +3129,11 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
     };
 
     if (normalizedRole === "staff") {
+      const staffDepartmentQuery = getStaffDepartmentQuery(req.user.department);
       query.$or = [
         { assignedStaff: req.user._id },
-        { appointmentStatus: "pending" },
+        { appointmentDepartment: staffDepartmentQuery },
+        { assignedOffice: staffDepartmentQuery },
       ];
     }
 
@@ -3054,6 +3181,13 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       return res.status(400).json({
         success: false,
         message: "Only staff appointment requests can be approved here.",
+      });
+    }
+
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only approve appointments assigned to your department.",
       });
     }
 
@@ -3161,6 +3295,13 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       });
     }
 
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only adjust appointments assigned to your department.",
+      });
+    }
+
     if ((visitor.appointmentStatus || "pending") !== "pending") {
       return res.status(400).json({
         success: false,
@@ -3258,6 +3399,13 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
       return res.status(400).json({
         success: false,
         message: "Only staff appointment requests can be rejected here.",
+      });
+    }
+
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only reject appointments assigned to your department.",
       });
     }
 

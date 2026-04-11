@@ -40,6 +40,7 @@ if (Platform.OS !== "web") {
 }
 
 const purposeOptions = [
+  "Enrollment",
   "Meeting with Staff",
   "Maintenance Work",
   "Package Delivery",
@@ -418,6 +419,7 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const [visitData, setVisitData] = useState({
     purposeOfVisit: "",
+    customPurposeOfVisit: "",
     assignedOffice: "",
     assignedOfficeId: "",
     assignedFloor: "",
@@ -433,6 +435,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     idNumber: "",
     idImage: "",
     purposeOfVisit: "",
+    customPurposeOfVisit: "",
     assignedOffice: "",
   });
 
@@ -599,9 +602,12 @@ export default function VisitorRegisterScreen({ navigation }) {
     return "";
   };
 
-  const validatePurposeOfVisit = (purpose) => {
+  const validatePurposeOfVisit = (purpose, customPurpose = visitData.customPurposeOfVisit) => {
     if (!purpose || purpose.trim() === "")
       return "Purpose of visit is required";
+    if (purpose === "Other" && (!customPurpose || customPurpose.trim() === "")) {
+      return "Please type your purpose of visit";
+    }
     return "";
   };
 
@@ -632,8 +638,17 @@ export default function VisitorRegisterScreen({ navigation }) {
         error = validateIdNumber(value);
         break;
       case "purposeOfVisit":
-        setVisitData({ ...visitData, [field]: value });
-        error = validatePurposeOfVisit(value);
+        setVisitData({
+          ...visitData,
+          purposeOfVisit: value,
+          customPurposeOfVisit: value === "Other" ? visitData.customPurposeOfVisit : "",
+        });
+        error = validatePurposeOfVisit(value, value === "Other" ? visitData.customPurposeOfVisit : "");
+        break;
+      case "customPurposeOfVisit":
+        setVisitData({ ...visitData, customPurposeOfVisit: value });
+        error = validatePurposeOfVisit(visitData.purposeOfVisit, value);
+        field = "purposeOfVisit";
         break;
       case "assignedOffice":
         setVisitData({ ...visitData, assignedOffice: value });
@@ -716,6 +731,11 @@ export default function VisitorRegisterScreen({ navigation }) {
     officeOptions.find((office) => office.name === visitData.assignedOffice) ||
     null;
 
+  const getResolvedPurposeOfVisit = () =>
+    visitData.purposeOfVisit === "Other"
+      ? visitData.customPurposeOfVisit.trim()
+      : visitData.purposeOfVisit;
+
   const handleWebDateChange = (text) => {
     setWebDate(text);
     if (text) {
@@ -784,7 +804,10 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const validateStep2 = () => {
-    const purposeError = validatePurposeOfVisit(visitData.purposeOfVisit);
+    const purposeError = validatePurposeOfVisit(
+      visitData.purposeOfVisit,
+      visitData.customPurposeOfVisit,
+    );
     const officeError = validateAssignedOffice(visitData.assignedOffice);
     setErrors({
       ...errors,
@@ -877,7 +900,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         idImage: idImageBase64
           ? `data:image/jpeg;base64,${idImageBase64}`
           : null,
-        purposeOfVisit: visitData.purposeOfVisit,
+        purposeOfVisit: getResolvedPurposeOfVisit(),
         host: visitData.assignedOffice,
         assignedOffice: visitData.assignedOffice,
         vehicleNumber: visitData.vehicleNumber || "",
@@ -1119,7 +1142,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         <View style={visitorRegisterStyles.reviewChecklist}>
           {[
             { label: "Personal details completed", done: personalCompletionCount === 5 },
-            { label: "Visit purpose selected", done: !!visitData.purposeOfVisit },
+            { label: "Visit purpose selected", done: !!getResolvedPurposeOfVisit() },
             { label: "Office destination selected", done: !!visitData.assignedOffice },
             { label: "Preferred visit schedule confirmed", done: !!visitData.visitDate && !!visitData.visitTime },
           ].map((item) => (
@@ -1365,10 +1388,27 @@ export default function VisitorRegisterScreen({ navigation }) {
                 visitorRegisterStyles.dropdownButtonPlaceholder,
             ]}
           >
-            {visitData.purposeOfVisit || "Select purpose of visit"}
+            {visitData.purposeOfVisit === "Other" && visitData.customPurposeOfVisit
+              ? `Other: ${visitData.customPurposeOfVisit}`
+              : visitData.purposeOfVisit || "Select purpose of visit"}
           </Text>
           <Ionicons name="chevron-down" size={20} color="#64748B" />
         </TouchableOpacity>
+
+        {visitData.purposeOfVisit === "Other" && (
+          <TextInput
+            style={[
+              visitorRegisterStyles.otherPurposeInput,
+              errors.purposeOfVisit && visitorRegisterStyles.otherPurposeInputError,
+            ]}
+            placeholder="Type your purpose of visit"
+            placeholderTextColor="#94A3B8"
+            value={visitData.customPurposeOfVisit}
+            onChangeText={(text) => handleInputChange("customPurposeOfVisit", text)}
+            multiline
+            textAlignVertical="top"
+          />
+        )}
         {errors.purposeOfVisit && (
           <Text style={visitorRegisterStyles.errorText}>
             {errors.purposeOfVisit}
@@ -1706,7 +1746,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         <View style={visitorRegisterStyles.reviewItem}>
           <Text style={visitorRegisterStyles.reviewLabel}>Purpose</Text>
           <Text style={visitorRegisterStyles.reviewValue}>
-            {visitData.purposeOfVisit || "—"}
+            {getResolvedPurposeOfVisit() || "—"}
           </Text>
         </View>
         <View style={visitorRegisterStyles.reviewItem}>

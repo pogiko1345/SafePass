@@ -22,7 +22,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
 import * as Location from "expo-location";
 import ApiService from "../utils/ApiService";
+import CampusMap from "../components/CampusMap";
 import visitorDashboardStyles from "../styles/VisitorDashboardStyles";
+import {
+  MONITORING_MAP_BLUEPRINTS,
+  MONITORING_MAP_FLOORS,
+  MONITORING_MAP_OFFICES,
+  MONITORING_MAP_OFFICE_POSITIONS,
+} from "../utils/monitoringMapConfig";
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== "web") {
@@ -35,14 +42,59 @@ if (Platform.OS !== "web") {
 }
 
 const APPOINTMENT_PURPOSE_OPTIONS = [
-  "Campus Tour",
-  "Meeting",
-  "Document Submission",
-  "Training",
-  "Interview",
-  "Official Business",
+  "Enrollment",
+  "Payment",
+  "Inquiry",
+  "Document Request",
   "Other",
 ];
+
+const APPOINTMENT_DEPARTMENT_OPTIONS = [
+  "Registrar",
+  "Accounting",
+  "Information Desk",
+];
+
+const VISITOR_MODULES = [
+  {
+    id: "home",
+    label: "Home",
+    description: "Overview and quick actions",
+    icon: "home-outline",
+  },
+  {
+    id: "appointment-request",
+    label: "Appointment Request",
+    description: "Create a new visit request",
+    icon: "calendar-outline",
+  },
+  {
+    id: "appointment-status",
+    label: "Appointment Status",
+    description: "Track pending, approved, or rejected visits",
+    icon: "list-circle-outline",
+  },
+  {
+    id: "map",
+    label: "Campus Map",
+    description: "Ground, mezzanine, second, and third floor guide",
+    icon: "map-outline",
+  },
+];
+
+const getDefaultDepartmentForPurpose = (purpose = "") => {
+  switch (purpose) {
+    case "Enrollment":
+    case "Document Request":
+      return "Registrar";
+    case "Payment":
+      return "Accounting";
+    case "Inquiry":
+      return "Information Desk";
+    default:
+      return "";
+  }
+};
 
 const PHONE_TRACKING_INTERVAL_MS = 15000;
 const PHONE_TRACKING_DISTANCE_METERS = 8;
@@ -68,6 +120,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const dashboardCardPadding = isCompactVisitorDashboard ? 16 : 22;
   const [visitor, setVisitor] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [selectedVisitorSection, setSelectedVisitorSection] = useState("home");
+  const [selectedVisitorMapFloor, setSelectedVisitorMapFloor] = useState("ground");
   const [appointmentFeedback, setAppointmentFeedback] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -76,6 +130,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [showAppointmentDatePicker, setShowAppointmentDatePicker] = useState(false);
   const [showAppointmentTimePicker, setShowAppointmentTimePicker] = useState(false);
   const [showPurposeDropdown, setShowPurposeDropdown] = useState(false);
+  const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
   const [showVirtualNfcModal, setShowVirtualNfcModal] = useState(false);
   const [showVirtualNfcSuccessModal, setShowVirtualNfcSuccessModal] = useState(false);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
@@ -89,7 +144,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [appointmentForm, setAppointmentForm] = useState({
     preferredDate: null,
     preferredTime: null,
-    purposeSelection: "Campus Tour",
+    department: "Registrar",
+    purposeSelection: "Enrollment",
     customPurpose: "",
   });
   const [accessLogs, setAccessLogs] = useState([]);
@@ -705,6 +761,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleAppointmentDatePress = () => {
     setShowAppointmentTimePicker(false);
     setShowPurposeDropdown(false);
+    setShowDepartmentDropdown(false);
 
     if (Platform.OS === "web") {
       const input = appointmentWebDateInputRef.current;
@@ -742,18 +799,32 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const populateAppointmentForm = () => {
+    const existingCategory = String(visitor?.purposeCategory || "").trim();
     const existingPurpose = String(visitor?.purposeOfVisit || "").trim();
-    const matchedPurpose = APPOINTMENT_PURPOSE_OPTIONS.includes(existingPurpose)
-      ? existingPurpose
-      : existingPurpose
-        ? "Other"
-        : "Campus Tour";
+    const matchedPurpose = APPOINTMENT_PURPOSE_OPTIONS.includes(existingCategory)
+      ? existingCategory
+      : APPOINTMENT_PURPOSE_OPTIONS.includes(existingPurpose)
+        ? existingPurpose
+        : existingPurpose
+          ? "Other"
+          : "Enrollment";
+    const existingDepartment = String(
+      visitor?.appointmentDepartment || visitor?.assignedOffice || visitor?.host || "",
+    ).trim();
+    const mappedDepartment =
+      matchedPurpose === "Other"
+        ? existingDepartment
+        : getDefaultDepartmentForPurpose(matchedPurpose) || existingDepartment;
 
     setAppointmentForm({
       preferredDate: getDefaultAppointmentDate(),
       preferredTime: getDefaultAppointmentTime(),
+      department: mappedDepartment,
       purposeSelection: matchedPurpose,
-      customPurpose: matchedPurpose === "Other" ? existingPurpose : "",
+      customPurpose:
+        matchedPurpose === "Other"
+          ? String(visitor?.customPurposeOfVisit || existingPurpose || "").trim()
+          : "",
     });
   };
 
@@ -762,6 +833,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setShowAppointmentDatePicker(false);
     setShowAppointmentTimePicker(false);
     setShowPurposeDropdown(false);
+    setShowDepartmentDropdown(false);
     setShowAppointmentModal(true);
   };
 
@@ -769,24 +841,43 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setShowAppointmentDatePicker(false);
     setShowAppointmentTimePicker(false);
     setShowPurposeDropdown(false);
+    setShowDepartmentDropdown(false);
     setShowAppointmentModal(false);
   };
 
   const handleRequestAppointment = async () => {
     const preferredDate = appointmentForm.preferredDate;
     const preferredTime = appointmentForm.preferredTime;
-    const purposeOfVisit =
-      appointmentForm.purposeSelection === "Other"
-        ? appointmentForm.customPurpose.trim()
-        : appointmentForm.purposeSelection.trim();
+    const isOtherPurpose = appointmentForm.purposeSelection === "Other";
+    const purposeCategory = String(appointmentForm.purposeSelection || "").trim();
+    const customPurposeOfVisit = String(appointmentForm.customPurpose || "").trim();
+    const purposeOfVisit = isOtherPurpose ? customPurposeOfVisit : purposeCategory;
+    const department = isOtherPurpose
+      ? String(appointmentForm.department || "").trim()
+      : getDefaultDepartmentForPurpose(purposeCategory);
 
     if (!currentUser?._id) {
       Alert.alert("Login Required", "Please sign in again before requesting a new appointment.");
       return;
     }
 
-    if (!preferredDate || !preferredTime || !purposeOfVisit) {
-      Alert.alert("Missing Details", "Please complete the preferred date, time, and purpose of visit.");
+    if (!purposeCategory) {
+      Alert.alert("Missing Details", "Please select a purpose of visit.");
+      return;
+    }
+
+    if (isOtherPurpose && !customPurposeOfVisit) {
+      Alert.alert("Missing Details", "Please enter your purpose of visit.");
+      return;
+    }
+
+    if (!preferredDate || !preferredTime) {
+      Alert.alert("Missing Details", "Please select the preferred date and time.");
+      return;
+    }
+
+    if (!department) {
+      Alert.alert("Missing Details", "Please provide the office or department to visit.");
       return;
     }
 
@@ -802,6 +893,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       const response = await ApiService.requestVisitorAppointment(currentUser._id, {
         preferredDate: new Date(preferredDate).toISOString(),
         preferredTime: combinedDateTime.toISOString(),
+        purposeCategory,
+        customPurposeOfVisit: isOtherPurpose ? customPurposeOfVisit : "",
+        department,
+        officeToVisit: department,
+        assignedOffice: department,
+        appointmentDepartment: department,
         purposeOfVisit,
       });
 
@@ -813,6 +910,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             "Your new visit request has been sent to staff for review. You can track approval, time adjustments, or rejection updates from this dashboard.",
           date: formatDate(preferredDate),
           time: formatTime(preferredTime),
+          department,
           purpose: purposeOfVisit,
         });
         Alert.alert("Appointment Submitted", "Your request was sent to staff for review.");
@@ -1214,6 +1312,296 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         },
       ];
 
+  const renderVisitorModuleNavigation = () => (
+    <View style={[visitorDashboardStyles.visitorModuleCard, dashboardSectionResponsiveStyle]}>
+      <View style={visitorDashboardStyles.visitorModuleHeader}>
+        <View>
+          <Text style={visitorDashboardStyles.visitorModuleEyebrow}>Visitor System</Text>
+          <Text style={visitorDashboardStyles.visitorModuleTitle}>Choose What You Need</Text>
+        </View>
+        <View style={visitorDashboardStyles.visitorModuleHeaderBadge}>
+          <Ionicons name="phone-portrait-outline" size={14} color="#0F766E" />
+          <Text style={visitorDashboardStyles.visitorModuleHeaderBadgeText}>Mobile Flow</Text>
+        </View>
+      </View>
+
+      <View style={visitorDashboardStyles.visitorModuleGrid}>
+        {VISITOR_MODULES.map((module) => {
+          const isActive = selectedVisitorSection === module.id;
+
+          return (
+            <TouchableOpacity
+              key={module.id}
+              style={[
+                visitorDashboardStyles.visitorModuleButton,
+                isActive && visitorDashboardStyles.visitorModuleButtonActive,
+              ]}
+              onPress={() => setSelectedVisitorSection(module.id)}
+              activeOpacity={0.86}
+            >
+              <View
+                style={[
+                  visitorDashboardStyles.visitorModuleIconWrap,
+                  isActive && visitorDashboardStyles.visitorModuleIconWrapActive,
+                ]}
+              >
+                <Ionicons
+                  name={module.icon}
+                  size={19}
+                  color={isActive ? "#FFFFFF" : "#2563EB"}
+                />
+              </View>
+              <View style={visitorDashboardStyles.visitorModuleCopy}>
+                <Text
+                  style={[
+                    visitorDashboardStyles.visitorModuleButtonTitle,
+                    isActive && visitorDashboardStyles.visitorModuleButtonTitleActive,
+                  ]}
+                >
+                  {module.label}
+                </Text>
+                <Text
+                  style={[
+                    visitorDashboardStyles.visitorModuleButtonText,
+                    isActive && visitorDashboardStyles.visitorModuleButtonTextActive,
+                  ]}
+                >
+                  {module.description}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  const renderAppointmentRequestPanel = () => (
+    <View style={[visitorDashboardStyles.visitorFlowPanel, dashboardSectionResponsiveStyle]}>
+      <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
+        <View style={visitorDashboardStyles.visitorFlowPanelIcon}>
+          <Ionicons name="calendar-outline" size={22} color="#2563EB" />
+        </View>
+        <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
+          <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Appointment Module</Text>
+          <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Appointment Request</Text>
+          <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
+            Create a visit request with purpose, office, preferred date, and time.
+          </Text>
+        </View>
+      </View>
+
+      {appointmentFeedback ? (
+        <View style={visitorDashboardStyles.appointmentSuccessCard}>
+          <View style={visitorDashboardStyles.appointmentSuccessHeader}>
+            <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
+              <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
+            </View>
+            <View style={visitorDashboardStyles.appointmentSuccessTextWrap}>
+              <Text style={visitorDashboardStyles.appointmentSuccessTitle}>
+                {appointmentFeedback.title}
+              </Text>
+              <Text style={visitorDashboardStyles.appointmentSuccessText}>
+                {appointmentFeedback.message}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={visitorDashboardStyles.visitorFlowChecklist}>
+        {[
+          "Choose your purpose. If you select Other, type the exact reason.",
+          "Office will be assigned based on purpose. Choose manually for Other.",
+          "Pick your preferred date and time before sending the request.",
+        ].map((item) => (
+          <View key={item} style={visitorDashboardStyles.visitorFlowChecklistRow}>
+            <Ionicons name="checkmark-circle-outline" size={18} color="#0F766E" />
+            <Text style={visitorDashboardStyles.visitorFlowChecklistText}>{item}</Text>
+          </View>
+        ))}
+      </View>
+
+      <TouchableOpacity
+        style={visitorDashboardStyles.visitorFlowPrimaryButton}
+        onPress={openAppointmentModal}
+        activeOpacity={0.9}
+      >
+        <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
+        <Text style={visitorDashboardStyles.visitorFlowPrimaryButtonText}>
+          Create Appointment Request
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderAppointmentStatusPanel = () => {
+    const appointmentStatusLabel = visitor
+      ? statusText
+      : canCreateFreshAppointment
+        ? "No Active Appointment"
+        : "Register Required";
+    const appointmentStatusDescription = visitor
+      ? isPendingApproval
+        ? "Your first visit is pending admin approval."
+        : isPendingStaffReview
+          ? "Your request is pending staff review."
+          : visitor?.appointmentStatus === "rejected"
+            ? visitor?.staffRejectionReason || "Your previous request was rejected."
+            : isApprovedVisitor
+              ? "Your appointment is approved and your SafePass tools are available."
+              : "Your appointment details are shown below."
+      : canCreateFreshAppointment
+        ? "You can create a new appointment request from this account."
+        : "Create a visitor account first to track appointment status.";
+
+    return (
+      <View style={[visitorDashboardStyles.visitorFlowPanel, dashboardSectionResponsiveStyle]}>
+        <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
+          <View style={[visitorDashboardStyles.visitorFlowPanelIcon, { backgroundColor: `${statusColor}16` }]}>
+            <Ionicons name={statusIcon} size={22} color={statusColor} />
+          </View>
+          <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
+            <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Appointment Module</Text>
+            <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Appointment Status</Text>
+            <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
+              See whether your appointment is pending, approved, or rejected.
+            </Text>
+          </View>
+        </View>
+
+        <View style={[visitorDashboardStyles.appointmentStatusHero, { borderColor: `${statusColor}44` }]}>
+          <View style={[visitorDashboardStyles.appointmentStatusIcon, { backgroundColor: statusColor }]}>
+            <Ionicons name={statusIcon} size={24} color="#FFFFFF" />
+          </View>
+          <View style={visitorDashboardStyles.appointmentStatusCopy}>
+            <Text style={visitorDashboardStyles.appointmentStatusLabel}>{appointmentStatusLabel}</Text>
+            <Text style={visitorDashboardStyles.appointmentStatusText}>{appointmentStatusDescription}</Text>
+          </View>
+        </View>
+
+        <View style={visitorDashboardStyles.appointmentStatusDetails}>
+          <View style={visitorDashboardStyles.appointmentStatusRow}>
+            <Text style={visitorDashboardStyles.appointmentStatusRowLabel}>Purpose</Text>
+            <Text style={visitorDashboardStyles.appointmentStatusRowValue}>
+              {visitor?.purposeOfVisit || appointmentFeedback?.purpose || "Not set"}
+            </Text>
+          </View>
+          <View style={visitorDashboardStyles.appointmentStatusRow}>
+            <Text style={visitorDashboardStyles.appointmentStatusRowLabel}>Office / Department</Text>
+            <Text style={visitorDashboardStyles.appointmentStatusRowValue}>
+              {visitor?.appointmentDepartment || visitor?.assignedOffice || visitor?.host || appointmentFeedback?.department || "Not assigned"}
+            </Text>
+          </View>
+          <View style={visitorDashboardStyles.appointmentStatusRow}>
+            <Text style={visitorDashboardStyles.appointmentStatusRowLabel}>Date</Text>
+            <Text style={visitorDashboardStyles.appointmentStatusRowValue}>
+              {visitor?.visitDate ? formatDate(visitor.visitDate) : appointmentFeedback?.date || "Not scheduled"}
+            </Text>
+          </View>
+          <View style={visitorDashboardStyles.appointmentStatusRow}>
+            <Text style={visitorDashboardStyles.appointmentStatusRowLabel}>Time</Text>
+            <Text style={visitorDashboardStyles.appointmentStatusRowValue}>
+              {visitor?.visitTime ? formatTime(visitor.visitTime) : appointmentFeedback?.time || "Not scheduled"}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={visitorDashboardStyles.visitorFlowSecondaryButton}
+          onPress={onRefresh}
+          activeOpacity={0.86}
+        >
+          <Ionicons name="refresh-outline" size={18} color="#2563EB" />
+          <Text style={visitorDashboardStyles.visitorFlowSecondaryButtonText}>Refresh Status</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderVisitorMapPanel = () => (
+    <View style={[visitorDashboardStyles.visitorMapPanel, dashboardSectionResponsiveStyle]}>
+      <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
+        <View style={visitorDashboardStyles.visitorFlowPanelIcon}>
+          <Ionicons name="map-outline" size={22} color="#2563EB" />
+        </View>
+        <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
+          <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Map Module</Text>
+          <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Campus Map And Directions</Text>
+          <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
+            View floor layouts only. Editing rooms stays with admin.
+          </Text>
+        </View>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={visitorDashboardStyles.visitorFloorTabsScroll}
+      >
+        <View style={visitorDashboardStyles.visitorFloorTabs}>
+          {MONITORING_MAP_FLOORS.map((floor) => {
+            const isActive = selectedVisitorMapFloor === floor.id;
+
+            return (
+              <TouchableOpacity
+                key={floor.id}
+                style={[
+                  visitorDashboardStyles.visitorFloorTab,
+                  isActive && visitorDashboardStyles.visitorFloorTabActive,
+                ]}
+                onPress={() => setSelectedVisitorMapFloor(floor.id)}
+                activeOpacity={0.86}
+              >
+                <Ionicons
+                  name={floor.icon}
+                  size={15}
+                  color={isActive ? "#FFFFFF" : "#64748B"}
+                />
+                <Text
+                  style={[
+                    visitorDashboardStyles.visitorFloorTabText,
+                    isActive && visitorDashboardStyles.visitorFloorTabTextActive,
+                  ]}
+                >
+                  {floor.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      <CampusMap
+        visitors={[]}
+        floors={MONITORING_MAP_FLOORS}
+        offices={MONITORING_MAP_OFFICES}
+        selectedFloor={selectedVisitorMapFloor}
+        selectedOffice="all"
+        mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+        officePositions={MONITORING_MAP_OFFICE_POSITIONS}
+        onFloorChange={setSelectedVisitorMapFloor}
+      />
+
+      <View style={visitorDashboardStyles.visitorMapNote}>
+        <Ionicons name="information-circle-outline" size={18} color="#0F766E" />
+        <Text style={visitorDashboardStyles.visitorMapNoteText}>
+          Use pinch/zoom controls and drag the map to inspect the floor. For external directions,
+          open the full campus map.
+        </Text>
+      </View>
+
+      <TouchableOpacity
+        style={visitorDashboardStyles.visitorFlowSecondaryButton}
+        onPress={() => navigation.navigate("WebMapScreen")}
+        activeOpacity={0.86}
+      >
+        <Ionicons name="navigate-outline" size={18} color="#2563EB" />
+        <Text style={visitorDashboardStyles.visitorFlowSecondaryButtonText}>Open Full Directions</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={visitorDashboardStyles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
@@ -1389,7 +1777,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             ) : null}
           </View>
 
-        {visitor ? (
+          {renderVisitorModuleNavigation()}
+
+        {selectedVisitorSection === "home" ? (
+          visitor ? (
           isPendingApproval ? (
             <>
               <View
@@ -1481,6 +1872,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <View style={visitorDashboardStyles.appointmentSuccessMetaRow}>
                     <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
                       {appointmentFeedback.date} at {appointmentFeedback.time}
+                    </Text>
+                    <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
+                      Office: {appointmentFeedback.department || "Assigned office"}
                     </Text>
                     <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
                       {appointmentFeedback.purpose}
@@ -1821,7 +2215,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <View style={visitorDashboardStyles.approvedInfoRow}>
                     <Text style={visitorDashboardStyles.approvedInfoLabel}>Assigned Staff</Text>
                     <Text style={visitorDashboardStyles.approvedInfoValue}>
-                      {visitor.assignedStaffName || visitor.host || "Front Office"}
+                      {visitor.assignedStaffName || visitor.appointmentDepartment || visitor.assignedOffice || visitor.host || "Front Office"}
                     </Text>
                   </View>
                   <View style={visitorDashboardStyles.approvedInfoRow}>
@@ -2006,6 +2400,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <View style={visitorDashboardStyles.appointmentSuccessMetaRow}>
                     <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
                       {appointmentFeedback.date} at {appointmentFeedback.time}
+                    </Text>
+                    <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
+                      Office: {appointmentFeedback.department || "Assigned office"}
                     </Text>
                     <Text style={visitorDashboardStyles.appointmentSuccessMeta}>
                       {appointmentFeedback.purpose}
@@ -2403,7 +2800,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
           </>
           )
-        ) : (
+          ) : (
           <View style={visitorDashboardStyles.emptyState}>
             <View style={visitorDashboardStyles.emptyIconContainer}>
               <Ionicons name="id-card-outline" size={80} color="#9CA3AF" />
@@ -2448,6 +2845,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </LinearGradient>
             </TouchableOpacity>
           </View>
+          )
+        ) : selectedVisitorSection === "appointment-request" ? (
+          renderAppointmentRequestPanel()
+        ) : selectedVisitorSection === "appointment-status" ? (
+          renderAppointmentStatusPanel()
+        ) : (
+          renderVisitorMapPanel()
         )}
         </View>
       </ScrollView>
@@ -2538,6 +2942,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     setShowAppointmentTimePicker((current) => !current);
                     setShowAppointmentDatePicker(false);
                     setShowPurposeDropdown(false);
+                    setShowDepartmentDropdown(false);
                   }}
                   activeOpacity={0.85}
                 >
@@ -2603,10 +3008,40 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
 
               <View style={visitorDashboardStyles.appointmentField}>
+                <Text style={visitorDashboardStyles.appointmentFieldLabel}>Office to Visit</Text>
+                {appointmentForm.purposeSelection === "Other" ? (
+                  <TextInput
+                    style={visitorDashboardStyles.appointmentFieldInput}
+                    placeholder="Enter office or department"
+                    placeholderTextColor="#94A3B8"
+                    value={appointmentForm.department}
+                    onChangeText={(text) =>
+                      setAppointmentForm((prev) => ({ ...prev, department: text }))
+                    }
+                  />
+                ) : (
+                  <View style={visitorDashboardStyles.appointmentReadOnlyField}>
+                    <Ionicons name="business-outline" size={18} color="#475569" />
+                    <Text style={visitorDashboardStyles.appointmentReadOnlyText}>
+                      {getDefaultDepartmentForPurpose(appointmentForm.purposeSelection) || "Assigned automatically"}
+                    </Text>
+                  </View>
+                )}
+                <Text style={visitorDashboardStyles.appointmentAutoHint}>
+                  {appointmentForm.purposeSelection === "Other"
+                    ? "You can type the office or department for custom visits."
+                    : "This is automatically assigned based on the selected purpose."}
+                </Text>
+              </View>
+
+              <View style={visitorDashboardStyles.appointmentField}>
                 <Text style={visitorDashboardStyles.appointmentFieldLabel}>Purpose Of Visit</Text>
                 <TouchableOpacity
                   style={visitorDashboardStyles.appointmentPickerField}
-                  onPress={() => setShowPurposeDropdown((current) => !current)}
+                  onPress={() => {
+                    setShowPurposeDropdown((current) => !current);
+                    setShowDepartmentDropdown(false);
+                  }}
                   activeOpacity={0.85}
                 >
                   <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
@@ -2639,9 +3074,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             isSelected && visitorDashboardStyles.purposeOptionItemActive,
                           ]}
                           onPress={() => {
+                            const nextDepartment =
+                              option === "Other"
+                                ? ""
+                                : getDefaultDepartmentForPurpose(option);
                             setAppointmentForm((prev) => ({
                               ...prev,
                               purposeSelection: option,
+                              department: nextDepartment,
                               customPurpose: option === "Other" ? prev.customPurpose : "",
                             }));
                             setShowPurposeDropdown(false);
@@ -2828,7 +3268,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       <View style={visitorDashboardStyles.virtualNfcDetailCardWide}>
                         <Text style={visitorDashboardStyles.virtualNfcPreviewMetaLabel}>Assigned Staff</Text>
                         <Text style={visitorDashboardStyles.virtualNfcPreviewMetaValue}>
-                          {visitor?.assignedStaffName || visitor?.host || "Front Office"}
+                          {visitor?.assignedStaffName || visitor?.appointmentDepartment || visitor?.assignedOffice || visitor?.host || "Front Office"}
                         </Text>
                       </View>
                     </View>
@@ -2974,7 +3414,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <View style={visitorDashboardStyles.checkInArrivalMetaCardWide}>
                     <Text style={visitorDashboardStyles.checkInArrivalMetaLabel}>Assigned Staff</Text>
                     <Text style={visitorDashboardStyles.checkInArrivalMetaValue}>
-                      {visitor?.assignedStaffName || visitor?.host || "Front Office"}
+                      {visitor?.assignedStaffName || visitor?.appointmentDepartment || visitor?.assignedOffice || visitor?.host || "Front Office"}
                     </Text>
                   </View>
                 </View>
@@ -3111,7 +3551,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.accessFlowSuccessMetaRow}>
                 <Text style={visitorDashboardStyles.accessFlowSuccessMetaLabel}>Assigned Staff</Text>
                 <Text style={visitorDashboardStyles.accessFlowSuccessMetaValue}>
-                  {visitor?.assignedStaffName || visitor?.host || "Front Office"}
+                  {visitor?.assignedStaffName || visitor?.appointmentDepartment || visitor?.assignedOffice || visitor?.host || "Front Office"}
                 </Text>
               </View>
             </View>

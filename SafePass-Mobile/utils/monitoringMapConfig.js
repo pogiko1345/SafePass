@@ -3,6 +3,8 @@ const MEZZANINE_BLUEPRINT = require("../assets/maps/Mezzanine.png");
 export const MONITORING_MAP_FLOORS = [
   { id: "ground", name: "Ground Floor", icon: "home-outline" },
   { id: "first", name: "Mezzanine", icon: "arrow-up-outline" },
+  { id: "second", name: "Second Floor", icon: "layers-outline" },
+  { id: "third", name: "Third Floor", icon: "layers-outline" },
 ];
 
 export const MONITORING_MAP_OFFICES = [

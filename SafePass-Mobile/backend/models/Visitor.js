@@ -77,6 +77,16 @@ const visitorSchema = new mongoose.Schema({
     required: [true, 'Purpose of visit is required'],
     trim: true
   },
+  purposeCategory: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  customPurposeOfVisit: {
+    type: String,
+    default: "",
+    trim: true,
+  },
   host: {
     type: String,
     default: "",
@@ -86,6 +96,12 @@ const visitorSchema = new mongoose.Schema({
     type: String,
     default: "",
     trim: true,
+  },
+  appointmentDepartment: {
+    type: String,
+    default: "",
+    trim: true,
+    index: true,
   },
   vehicleNumber: { 
     type: String, 
@@ -461,21 +477,35 @@ visitorSchema.methods = {
     return this;
   },
 
-  queueAppointmentRequest({ visitDate, visitTime, purposeOfVisit }) {
+  queueAppointmentRequest({
+    visitDate,
+    visitTime,
+    purposeOfVisit,
+    purposeCategory = "",
+    customPurposeOfVisit = "",
+    department = "",
+    assignedStaff = null,
+    assignedStaffName = "",
+  }) {
     this.requestCategory = "appointment";
     this.approvalFlow = "staff";
     this.approvalStatus = "approved";
     this.visitDate = visitDate;
     this.visitTime = visitTime;
     this.purposeOfVisit = purposeOfVisit;
+    this.purposeCategory = String(purposeCategory || "").trim();
+    this.customPurposeOfVisit = String(customPurposeOfVisit || "").trim();
+    this.appointmentDepartment = String(department || "").trim();
+    this.assignedOffice = this.appointmentDepartment || this.assignedOffice || "";
+    this.host = this.appointmentDepartment || this.host || "";
     this.appointmentStatus = "pending";
     this.appointmentRequestedAt = new Date();
     this.staffActionBy = null;
     this.staffActionAt = null;
     this.staffAdjustmentNote = "";
     this.staffRejectionReason = "";
-    this.assignedStaff = null;
-    this.assignedStaffName = "";
+    this.assignedStaff = assignedStaff || null;
+    this.assignedStaffName = String(assignedStaffName || "").trim();
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;

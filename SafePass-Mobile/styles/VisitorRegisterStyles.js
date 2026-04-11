@@ -563,6 +563,25 @@ export default StyleSheet.create({
     marginTop: 4,
   },
 
+  otherPurposeInput: {
+    minHeight: 92,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: "#D7E3EE",
+    borderRadius: 16,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: spacing.base,
+    paddingVertical: 12,
+    fontSize: fontSizes.base,
+    color: "#0F172A",
+    lineHeight: 22,
+  },
+
+  otherPurposeInputError: {
+    borderColor: "#EF4444",
+    backgroundColor: "#FEF2F2",
+  },
+
   uploadArea: {
     borderRadius: 18,
     overflow: "hidden",
