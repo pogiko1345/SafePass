@@ -32,6 +32,8 @@ const CampusMap = ({
   fullscreen = false,
   mapBlueprints = null,
   officePositions = {}, 
+  onFloorChange,
+  showFloorNavigation = true,
 }) => {
   const defaultFloorId = floors[0]?.id || "ground";
   const [mapScale, setMapScale] = useState(1);
@@ -131,7 +133,26 @@ const CampusMap = ({
     setActiveFloor(selectedFloor || defaultFloorId);
     setImageLoading(true);
     setImageError(false);
+    resetMapView();
   }, [defaultFloorId, selectedFloor]);
+
+  const resetMapView = () => {
+    mapScaleRef.current = 1;
+    mapPanRef.current = { x: 0, y: 0 };
+    setMapScale(1);
+    setMapPan({ x: 0, y: 0 });
+    scaleAnim.setValue(1);
+    panAnim.setValue({ x: 0, y: 0 });
+  };
+
+  const handleFloorSelect = (floorId) => {
+    if (!floorId || floorId === activeFloor) return;
+    setActiveFloor(floorId);
+    setImageLoading(true);
+    setImageError(false);
+    resetMapView();
+    onFloorChange?.(floorId);
+  };
 
   // Get floor plan image based on selected floor from blueprints
   const getFloorPlanImage = () => {
@@ -204,6 +225,16 @@ const CampusMap = ({
     }
   };
 
+  const getVisibleVisitors = () => {
+    if (!visitors || visitors.length === 0) return [];
+
+    const normalizedActiveFloor = normalizeFloorId(activeFloor);
+    return visitors.filter((visitor) => {
+      const visitorFloor = normalizeFloorId(visitor?.location?.floor);
+      return !visitorFloor || visitorFloor === normalizedActiveFloor;
+    });
+  };
+
   // Render floor navigation
   const renderFloorNavigation = () => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.floorNavigationScroll}>
@@ -215,7 +246,7 @@ const CampusMap = ({
               styles.floorButton,
               activeFloor === floor.id && styles.floorButtonActive,
             ]}
-            onPress={() => setActiveFloor(floor.id)}
+            onPress={() => handleFloorSelect(floor.id)}
           >
             <Ionicons 
               name={floor.icon} 
@@ -279,13 +310,8 @@ const CampusMap = ({
 
   // Render visitor markers
   const renderVisitorMarkers = () => {
-    if (!visitors || visitors.length === 0) return null;
-
-    const normalizedActiveFloor = normalizeFloorId(activeFloor);
-    const visibleVisitors = visitors.filter((visitor) => {
-      const visitorFloor = normalizeFloorId(visitor?.location?.floor);
-      return !visitorFloor || visitorFloor === normalizedActiveFloor;
-    });
+    const visibleVisitors = getVisibleVisitors();
+    if (visibleVisitors.length === 0) return null;
 
     return visibleVisitors.map((visitor) => {
       const statusColor = getVisitorStatusColor(visitor.status);
@@ -371,7 +397,7 @@ const CampusMap = ({
 
   return (
     <View style={[styles.mapContainer, fullscreen && styles.mapContainerFullscreen]}>
-      {renderFloorNavigation()}
+      {showFloorNavigation ? renderFloorNavigation() : null}
       
       <View
         style={styles.mapCanvas}
@@ -472,7 +498,7 @@ const CampusMap = ({
         <View style={styles.activeVisitorsBadge}>
           <Ionicons name="people" size={16} color="#FFFFFF" />
           <Text style={styles.activeVisitorsBadgeText}>
-            {visitors.length} Active
+            {getVisibleVisitors().length} Active
           </Text>
         </View>
 

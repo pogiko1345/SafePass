@@ -36,6 +36,7 @@ import {
 
 const { width, height } = Dimensions.get("window");
 const isDesktop = width >= 1024;
+const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
 
 export default function SecurityDashboardScreen({ navigation }) {
   // ============ STATE MANAGEMENT ============
@@ -52,6 +53,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const sidebarAnim = useRef(new Animated.Value(isDesktop ? 1 : 0)).current;
+  const liveMapRefreshRef = useRef(false);
   
   // Dashboard Data
   const [dashboardStats, setDashboardStats] = useState({
@@ -692,6 +694,26 @@ export default function SecurityDashboardScreen({ navigation }) {
       setRefreshing(false);
     }
   };
+
+  const refreshLiveMapData = async () => {
+    if (liveMapRefreshRef.current) return;
+    liveMapRefreshRef.current = true;
+    try {
+      await loadOperationalData();
+    } finally {
+      liveMapRefreshRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    const isMapVisible = activeTab === 'map' || showMapModal;
+    if (!isMapVisible) return undefined;
+
+    refreshLiveMapData();
+    const interval = setInterval(refreshLiveMapData, LIVE_MAP_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [activeTab, showMapModal]);
 
   const formatDate = (date) => {
     if (!date) return 'N/A';
@@ -1497,6 +1519,10 @@ export default function SecurityDashboardScreen({ navigation }) {
           selectedOffice={selectedOffice}
           mapBlueprints={mapBlueprints}
           officePositions={officePositions}
+          onFloorChange={(floorId) => {
+            setSelectedFloor(floorId);
+            setSelectedOffice('all');
+          }}
           onVisitorHover={handleVisitorHover}
           onVisitorLeave={handleVisitorLeave}
           onVisitorSelect={handleVisitorSelect}
@@ -1510,6 +1536,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             { label: "Checked In", value: visitors.active.length || 0, color: "#F59E0B" },
           ]}
           statusLabel="Security monitoring"
+          showFloorNavigation={false}
         />
       </View>
     </ScrollView>
@@ -2336,6 +2363,10 @@ export default function SecurityDashboardScreen({ navigation }) {
               selectedOffice={selectedOffice}
               mapBlueprints={mapBlueprints}
               officePositions={officePositions}
+              onFloorChange={(floorId) => {
+                setSelectedFloor(floorId);
+                setSelectedOffice('all');
+              }}
               onVisitorHover={handleVisitorHover}
               onVisitorLeave={handleVisitorLeave}
               onVisitorSelect={handleVisitorSelect}
@@ -2353,6 +2384,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 { label: "Checked In", value: visitors.active.length || 0, color: "#FBBF24" },
               ]}
               statusLabel="Security monitoring"
+              showFloorNavigation={false}
             />
           </View>
         </View>

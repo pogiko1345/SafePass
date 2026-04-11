@@ -52,59 +52,59 @@ const CAMPUS_LOCATIONS = [
     ],
   },
   {
-    name: "Library",
-    floor: "third",
-    description: "Student resource center and quiet study hall.",
-    icon: "library",
-    coordinates: { lat: 14.5988, lng: 120.9848 },
-    mapPosition: { x: 58, y: 48 },
-    arrivalNote: "Best for academic meetings, consultations, and research visits.",
-    steps: [
-      "Walk past the administration building toward the central corridor.",
-      "Turn left at the study wing sign and continue to the library entrance.",
-      "Check in with the library desk if your host is meeting you inside.",
-    ],
-  },
-  {
-    name: "Cafeteria",
-    floor: "third",
-    description: "Dining area and food court for students and staff.",
-    icon: "restaurant",
-    coordinates: { lat: 14.5992, lng: 120.9835 },
-    mapPosition: { x: 34, y: 58 },
-    arrivalNote: "Useful for waiting, meetups, and visitor rest stops.",
-    steps: [
-      "Follow the main path from the gate toward the courtyard.",
-      "Turn right at the open dining sign near the parking lane.",
-      "Use the side entry if you are meeting staff during meal hours.",
-    ],
-  },
-  {
-    name: "Aviation Hangar",
+    name: "Registrar's Office",
     floor: "ground",
-    description: "Flight training center and aircraft storage area.",
-    icon: "airplane",
-    coordinates: { lat: 14.6005, lng: 120.9825 },
-    mapPosition: { x: 46, y: 70 },
-    arrivalNote: "Restricted training zone. Wait for staff escort before entering.",
+    description: "Records, enrollment help, and visitor document routing.",
+    icon: "document-text",
+    coordinates: { lat: 14.5998, lng: 120.9849 },
+    mapPosition: { x: 45, y: 44 },
+    arrivalNote: "Best for document-related appointments and records assistance.",
     steps: [
-      "Proceed from the gate through the operations path toward the hangar lane.",
-      "Stop at the restricted area marker and wait for your assigned staff member.",
-      "Enter only after staff confirmation and security clearance.",
+      "Enter through the main gate and proceed toward the administration corridor.",
+      "Follow the office signage to the registrar counter.",
+      "Prepare your SafePass approval and valid ID before approaching the desk.",
     ],
   },
   {
-    name: "Flight Simulator Lab",
+    name: "Accounting Office",
+    floor: "ground",
+    description: "Payment, billing, and finance-related visitor assistance.",
+    icon: "calculator",
+    coordinates: { lat: 14.5999, lng: 120.9851 },
+    mapPosition: { x: 66, y: 42 },
+    arrivalNote: "Use this stop for official payments and billing concerns.",
+    steps: [
+      "Proceed from the main gate to the ground-floor office row.",
+      "Move past the registrar area toward the accounting counter.",
+      "Wait for staff confirmation before submitting documents or payments.",
+    ],
+  },
+  {
+    name: "Conference Room",
     floor: "first",
-    description: "Simulator training and guided practice area.",
+    description: "Mezzanine meeting space for scheduled visitor appointments.",
+    icon: "people",
+    coordinates: { lat: 14.6005, lng: 120.9825 },
+    mapPosition: { x: 10, y: 36 },
+    arrivalNote: "Proceed here only for scheduled meetings or escorted visits.",
+    steps: [
+      "Complete check-in at the ground-floor security point first.",
+      "Use the stair access to reach the mezzanine level.",
+      "Proceed to the left-side conference room and wait for your host.",
+    ],
+  },
+  {
+    name: "I.T Room",
+    floor: "first",
+    description: "Mezzanine technology support and IT coordination room.",
     icon: "desktop",
     coordinates: { lat: 14.5978, lng: 120.9855 },
-    mapPosition: { x: 68, y: 58 },
-    arrivalNote: "Ideal for scheduled simulator sessions and guided demonstrations.",
+    mapPosition: { x: 57, y: 42 },
+    arrivalNote: "Best for approved IT-related appointments and support visits.",
     steps: [
-      "Walk past the administration wing toward the training corridor.",
-      "Keep left at the simulator signage and continue to the lab entrance.",
-      "Show your SafePass appointment to the assigned staff on entry.",
+      "Check in at the ground floor before moving upstairs.",
+      "Take the stairs to the mezzanine and follow the room labels.",
+      "Stop at the I.T Room and wait for staff acknowledgement.",
     ],
   },
   {
@@ -136,6 +136,8 @@ const CAMPUS_LOCATIONS = [
     ],
   },
 ];
+
+const normalizeMapFloor = (floorId) => (floorId === "mezzanine" ? "first" : floorId);
 
 export default function WebMapScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
@@ -243,7 +245,9 @@ export default function WebMapScreen({ navigation }) {
               <Ionicons name="compass-outline" size={16} color="#0F766E" />
               <Text style={MapStyles.heroBadgeText}>Wayfinding Assistant</Text>
             </View>
-            <Text style={MapStyles.heroSupportText}>8 destination points</Text>
+            <Text style={MapStyles.heroSupportText}>
+              {CAMPUS_LOCATIONS.length} destination points
+            </Text>
           </View>
 
           <Text style={MapStyles.heroTitle}>
@@ -329,10 +333,18 @@ export default function WebMapScreen({ navigation }) {
               visitors={campusMapVisitors}
               floors={MONITORING_MAP_FLOORS}
               offices={MONITORING_MAP_OFFICES}
-              selectedFloor="ground"
+              selectedFloor={selectedLocation.floor}
               selectedOffice="all"
               mapBlueprints={MONITORING_MAP_BLUEPRINTS}
               officePositions={MONITORING_MAP_OFFICE_POSITIONS}
+              onFloorChange={(floorId) => {
+                const firstLocationOnFloor = CAMPUS_LOCATIONS.find(
+                  (location) => normalizeMapFloor(location.floor) === normalizeMapFloor(floorId),
+                );
+                if (firstLocationOnFloor) {
+                  setSelectedLocationName(firstLocationOnFloor.name);
+                }
+              }}
             />
           </View>
 

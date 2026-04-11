@@ -308,6 +308,7 @@ const AdminFeedbackBanner = ({ notice, isDarkMode, theme, onDismiss }) => {
 };
 
 const ADMIN_MAP_FLOORS = MONITORING_MAP_FLOORS;
+const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
 const ADMIN_MAP_ACTIVITY_TYPES = new Set([
   "visitor_registration_request",
   "visitor_appointment_request",
@@ -323,6 +324,8 @@ const ADMIN_MAP_ACTIVITY_TYPES = new Set([
 ]);
 
 const clampValue = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const normalizeMonitoringFloor = (floorId) => (floorId === "mezzanine" ? "first" : floorId);
 
 const getActivityLabel = (activityType) => {
   switch (activityType) {
@@ -480,6 +483,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const mainScrollViewRef = useRef(null);
   const sidebarScrollViewRef = useRef(null);
   const authErrorHandledRef = useRef(false);
+  const adminMapRefreshRef = useRef(false);
 
   // User State
   const [user, setUser] = useState(null);
@@ -582,6 +586,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [selectedMapActivity, setSelectedMapActivity] = useState(null);
   const [showAdminMapModal, setShowAdminMapModal] = useState(false);
   const [adminMapFilter, setAdminMapFilter] = useState("all");
+  const [selectedAdminMapFloor, setSelectedAdminMapFloor] = useState("ground");
+  const [selectedAdminMapOffice, setSelectedAdminMapOffice] = useState("all");
   const [showAdminMapDock, setShowAdminMapDock] = useState(false);
 
   // Chart Data
@@ -1020,7 +1026,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   }, [user]);
 
   // FIXED: Load All Visit Requests
-  const loadAllVisitRequests = async () => {
+  const loadAllVisitRequests = async ({ silent = false } = {}) => {
     try {
       const response = await ApiService.getAllVisitors({ limit: 500 });
       if (response && response.visitors) {
@@ -1079,7 +1085,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         await handleAuthError();
         return;
       }
-      Alert.alert("Error", "Failed to load visit requests. Please check your connection.");
+      if (!silent) {
+        Alert.alert("Error", "Failed to load visit requests. Please check your connection.");
+      }
     }
   };
 
@@ -1253,6 +1261,29 @@ const loadDashboardData = useCallback(async () => {
     loadDashboardData();
   }, [loadDashboardData]);
 
+  const refreshAdminMapData = async () => {
+    if (adminMapRefreshRef.current) return;
+    adminMapRefreshRef.current = true;
+    try {
+      await Promise.all([
+        loadAllVisitRequests({ silent: true }),
+        loadRecentActivities(),
+      ]);
+    } finally {
+      adminMapRefreshRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    const isMapVisible = activeMenu === "webmap" || showAdminMapModal || showAdminMapDock;
+    if (!isMapVisible) return undefined;
+
+    refreshAdminMapData();
+    const interval = setInterval(refreshAdminMapData, LIVE_MAP_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [activeMenu, showAdminMapModal, showAdminMapDock]);
+
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 100],
     outputRange: [1, 0.96],
@@ -1324,6 +1355,11 @@ const loadDashboardData = useCallback(async () => {
           status: "checked_in",
           location: {
             floor: getVisitorMonitorFloor(visitor),
+            office:
+              visitor?.currentLocation?.office ||
+              visitor?.assignedOffice ||
+              visitor?.host ||
+              "On-site visitor",
             coordinates: getVisitorMonitorCoordinates(visitor, index),
           },
           activityType: "security_checkin",
@@ -1343,14 +1379,36 @@ const loadDashboardData = useCallback(async () => {
     [visitRequests],
   );
 
+  const visibleAdminMapVisitors = useMemo(
+    () =>
+      monitoredMapVisitors.filter((visitor) => {
+        const visitorFloor = normalizeMonitoringFloor(visitor?.location?.floor);
+        const selectedFloor = normalizeMonitoringFloor(selectedAdminMapFloor);
+
+        if (visitorFloor && visitorFloor !== selectedFloor) {
+          return false;
+        }
+
+        if (
+          selectedAdminMapOffice !== "all" &&
+          visitor?.location?.office !== selectedAdminMapOffice
+        ) {
+          return false;
+        }
+
+        return true;
+      }),
+    [monitoredMapVisitors, selectedAdminMapFloor, selectedAdminMapOffice],
+  );
+
   const activeMapActivity = useMemo(() => {
-    if (!selectedMapActivity) return monitoredMapVisitors[0] || null;
+    if (!selectedMapActivity) return visibleAdminMapVisitors[0] || null;
     return (
-      monitoredMapVisitors.find((item) => item.id === selectedMapActivity.id) ||
-      monitoredMapVisitors[0] ||
+      visibleAdminMapVisitors.find((item) => item.id === selectedMapActivity.id) ||
+      visibleAdminMapVisitors[0] ||
       null
     );
-  }, [monitoredMapVisitors, selectedMapActivity]);
+  }, [visibleAdminMapVisitors, selectedMapActivity]);
 
   const activeMenuMeta = useMemo(() => {
     switch (activeMenu) {
@@ -1515,10 +1573,10 @@ const loadDashboardData = useCallback(async () => {
   ]), [mapActivities]);
 
   const adminMapSummaryItems = useMemo(() => ([
-    { label: "Tracked", value: monitoredMapVisitors.length || 0, color: "#10B981" },
+    { label: "Tracked", value: visibleAdminMapVisitors.length || 0, color: "#10B981" },
     { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: "#2563EB" },
     { label: "Issues", value: adminMapFilters.find((item) => item.key === "issues")?.count || 0, color: "#DC2626" },
-  ]), [adminMapFilters, monitoredMapVisitors.length]);
+  ]), [adminMapFilters, visibleAdminMapVisitors.length]);
 
   const handleMenuAction = (action) => {
     setActiveMenu(action);
@@ -2215,21 +2273,66 @@ const loadDashboardData = useCallback(async () => {
         },
       ]}
     >
+      <Text style={[styles.adminMapFilterLabel, isDarkMode && styles.darkTextSecondary]}>Floor</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.adminMapFilterRow}>
-        {adminMapFilters.map((filterItem) => {
-          const isActive = adminMapFilter === filterItem.key;
+        {ADMIN_MAP_FLOORS.map((floor) => {
+          const isActive = selectedAdminMapFloor === floor.id;
           return (
             <TouchableOpacity
-              key={filterItem.key}
+              key={floor.id}
               style={[
                 styles.adminMapFilterChip,
                 isActive && styles.adminMapFilterChipActive,
                 isDarkMode && !isActive && { backgroundColor: "#111827", borderColor: theme.borderColor },
               ]}
-              onPress={() => setAdminMapFilter(filterItem.key)}
+              onPress={() => {
+                setSelectedAdminMapFloor(floor.id);
+                setSelectedAdminMapOffice("all");
+              }}
             >
               <Text style={[styles.adminMapFilterChipText, isActive && styles.adminMapFilterChipTextActive]}>
-                {filterItem.label} ({filterItem.count})
+                {floor.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      <Text style={[styles.adminMapFilterLabel, isDarkMode && styles.darkTextSecondary]}>Office</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.adminMapFilterRow}>
+        <TouchableOpacity
+          style={[
+            styles.adminMapFilterChip,
+            selectedAdminMapOffice === "all" && styles.adminMapFilterChipActive,
+            isDarkMode && selectedAdminMapOffice !== "all" && { backgroundColor: "#111827", borderColor: theme.borderColor },
+          ]}
+          onPress={() => setSelectedAdminMapOffice("all")}
+        >
+          <Text
+            style={[
+              styles.adminMapFilterChipText,
+              selectedAdminMapOffice === "all" && styles.adminMapFilterChipTextActive,
+            ]}
+          >
+            All Offices
+          </Text>
+        </TouchableOpacity>
+        {MONITORING_MAP_OFFICES.filter(
+          (office) => normalizeMonitoringFloor(office.floor) === normalizeMonitoringFloor(selectedAdminMapFloor),
+        ).map((office) => {
+          const isActive = selectedAdminMapOffice === office.name;
+          return (
+            <TouchableOpacity
+              key={office.id}
+              style={[
+                styles.adminMapFilterChip,
+                isActive && styles.adminMapFilterChipActive,
+                isDarkMode && !isActive && { backgroundColor: "#111827", borderColor: theme.borderColor },
+              ]}
+              onPress={() => setSelectedAdminMapOffice(office.name)}
+            >
+              <Text style={[styles.adminMapFilterChipText, isActive && styles.adminMapFilterChipTextActive]}>
+                {office.name}
               </Text>
             </TouchableOpacity>
           );
@@ -2249,6 +2352,40 @@ const loadDashboardData = useCallback(async () => {
           </View>
         ))}
       </View>
+    </View>
+  );
+
+  const renderAdminActivityFilters = () => (
+    <View
+      style={[
+        styles.adminMapActivityFilterPanel,
+        {
+          backgroundColor: isDarkMode ? "#111827" : "#FFFFFF",
+          borderColor: theme.borderColor,
+        },
+      ]}
+    >
+      <Text style={[styles.adminMapFilterLabel, isDarkMode && styles.darkTextSecondary]}>Activity Type</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.adminMapFilterRow}>
+        {adminMapFilters.map((filterItem) => {
+          const isActive = adminMapFilter === filterItem.key;
+          return (
+            <TouchableOpacity
+              key={filterItem.key}
+              style={[
+                styles.adminMapFilterChip,
+                isActive && styles.adminMapFilterChipActive,
+                isDarkMode && !isActive && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+              ]}
+              onPress={() => setAdminMapFilter(filterItem.key)}
+            >
+              <Text style={[styles.adminMapFilterChipText, isActive && styles.adminMapFilterChipTextActive]}>
+                {filterItem.label} ({filterItem.count})
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 
@@ -2283,13 +2420,17 @@ const loadDashboardData = useCallback(async () => {
           actionLabel="Expand"
           onActionPress={() => setShowAdminMapModal(true)}
           controls={renderAdminMapFilters()}
-          visitors={monitoredMapVisitors}
+          visitors={visibleAdminMapVisitors}
           floors={ADMIN_MAP_FLOORS}
           offices={MONITORING_MAP_OFFICES}
-          selectedFloor="ground"
-          selectedOffice="all"
+          selectedFloor={selectedAdminMapFloor}
+          selectedOffice={selectedAdminMapOffice}
           mapBlueprints={MONITORING_MAP_BLUEPRINTS}
           officePositions={MONITORING_MAP_OFFICE_POSITIONS}
+          onFloorChange={(floorId) => {
+            setSelectedAdminMapFloor(floorId);
+            setSelectedAdminMapOffice("all");
+          }}
           onVisitorSelect={(item) => setSelectedMapActivity(item)}
           hoveredVisitor={activeMapActivity}
           backgroundColor={isDarkMode ? "#0F172A" : "#F8FAFC"}
@@ -2299,6 +2440,7 @@ const loadDashboardData = useCallback(async () => {
           textSecondary={theme.textSecondary}
           summaryItems={adminMapSummaryItems}
           statusLabel="Admin monitoring"
+          showFloorNavigation={false}
         />
 
         <View style={[styles.adminMapSideCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
@@ -2335,9 +2477,11 @@ const loadDashboardData = useCallback(async () => {
             </Text>
           )}
 
+          {renderAdminActivityFilters()}
+
           <View style={styles.adminMapActivityList}>
             {filteredMapActivities.length > 0 ? filteredMapActivities.slice(0, 6).map((activity, index) => {
-              const marker = monitoredMapVisitors[index];
+              const marker = visibleAdminMapVisitors[index];
               return (
                 <TouchableOpacity
                   key={activity._id || `${activity.activityType}-${index}-dock`}
@@ -2375,13 +2519,17 @@ const loadDashboardData = useCallback(async () => {
             actionLabel="Full Screen"
             onActionPress={() => setShowAdminMapModal(true)}
             controls={renderAdminMapFilters()}
-            visitors={monitoredMapVisitors}
+            visitors={visibleAdminMapVisitors}
             floors={ADMIN_MAP_FLOORS}
             offices={MONITORING_MAP_OFFICES}
-            selectedFloor="ground"
-            selectedOffice="all"
+            selectedFloor={selectedAdminMapFloor}
+            selectedOffice={selectedAdminMapOffice}
             mapBlueprints={MONITORING_MAP_BLUEPRINTS}
             officePositions={MONITORING_MAP_OFFICE_POSITIONS}
+            onFloorChange={(floorId) => {
+              setSelectedAdminMapFloor(floorId);
+              setSelectedAdminMapOffice("all");
+            }}
             onVisitorSelect={(item) => setSelectedMapActivity(item)}
             hoveredVisitor={activeMapActivity}
             backgroundColor={theme.cardBackground}
@@ -2391,6 +2539,7 @@ const loadDashboardData = useCallback(async () => {
             textSecondary={theme.textSecondary}
             summaryItems={adminMapSummaryItems}
             statusLabel="Admin monitoring"
+            showFloorNavigation={false}
             containerStyle={{ padding: 0, borderWidth: 0 }}
             mapWrapperStyle={styles.adminMapContainer}
           />
@@ -2408,6 +2557,8 @@ const loadDashboardData = useCallback(async () => {
               <Text style={styles.viewAll}>Refresh</Text>
             </TouchableOpacity>
           </View>
+
+          {renderAdminActivityFilters()}
 
           <View style={styles.adminMapSummaryGrid}>
             {[
@@ -2463,7 +2614,7 @@ const loadDashboardData = useCallback(async () => {
 
           <View style={styles.adminMapActivityList}>
             {filteredMapActivities.length > 0 ? filteredMapActivities.slice(0, 5).map((activity, index) => {
-              const marker = monitoredMapVisitors[index];
+              const marker = visibleAdminMapVisitors[index];
               return (
                 <TouchableOpacity
                   key={activity._id || `${activity.activityType}-${index}`}
@@ -4691,13 +4842,17 @@ const loadDashboardData = useCallback(async () => {
                 iconName="map-outline"
                 iconColor="#10B981"
                 controls={renderAdminMapFilters()}
-                visitors={monitoredMapVisitors}
+                visitors={visibleAdminMapVisitors}
                 floors={ADMIN_MAP_FLOORS}
                 offices={MONITORING_MAP_OFFICES}
-                selectedFloor="ground"
-                selectedOffice="all"
+                selectedFloor={selectedAdminMapFloor}
+                selectedOffice={selectedAdminMapOffice}
                 mapBlueprints={MONITORING_MAP_BLUEPRINTS}
                 officePositions={MONITORING_MAP_OFFICE_POSITIONS}
+                onFloorChange={(floorId) => {
+                  setSelectedAdminMapFloor(floorId);
+                  setSelectedAdminMapOffice("all");
+                }}
                 onVisitorSelect={(item) => setSelectedMapActivity(item)}
                 hoveredVisitor={activeMapActivity}
                 fullscreen
@@ -4706,6 +4861,7 @@ const loadDashboardData = useCallback(async () => {
                 mapBackgroundColor={isDarkMode ? "#0F172A" : "#FFFFFF"}
                 textPrimary={theme.textPrimary}
                 textSecondary={theme.textSecondary}
+                showFloorNavigation={false}
                 containerStyle={{ padding: 0, borderWidth: 0 }}
                 mapWrapperStyle={styles.adminMapModalMapWrap}
               />
@@ -4718,8 +4874,10 @@ const loadDashboardData = useCallback(async () => {
                   </View>
                 </View>
 
+                {renderAdminActivityFilters()}
+
                 {filteredMapActivities.length > 0 ? filteredMapActivities.slice(0, 8).map((activity, index) => {
-                  const marker = monitoredMapVisitors[index];
+                  const marker = visibleAdminMapVisitors[index];
                   return (
                     <TouchableOpacity
                       key={activity._id || `${activity.activityType}-${index}-modal`}

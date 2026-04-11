@@ -684,6 +684,23 @@ export default StyleSheet.create({
 
   adminMapFilterRow: {
     paddingRight: 8,
+    paddingBottom: 10,
+  },
+
+  adminMapFilterLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+
+  adminMapActivityFilterPanel: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
   },
 
   adminMapFilterChip: {

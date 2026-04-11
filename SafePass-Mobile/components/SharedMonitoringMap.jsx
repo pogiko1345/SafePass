@@ -18,6 +18,7 @@ export default function SharedMonitoringMap({
   selectedOffice = "all",
   mapBlueprints = null,
   officePositions = {},
+  onFloorChange,
   onVisitorHover,
   onVisitorLeave,
   onVisitorSelect,
@@ -31,6 +32,7 @@ export default function SharedMonitoringMap({
   textSecondary = "#64748B",
   summaryItems = [],
   statusLabel = "Live monitoring",
+  showFloorNavigation = true,
   containerStyle,
   mapWrapperStyle,
 }) {
@@ -94,12 +96,14 @@ export default function SharedMonitoringMap({
           selectedOffice={selectedOffice}
           mapBlueprints={mapBlueprints}
           officePositions={officePositions}
+          onFloorChange={onFloorChange}
           onVisitorHover={onVisitorHover}
           onVisitorLeave={onVisitorLeave}
           onVisitorSelect={onVisitorSelect}
           hoveredVisitor={hoveredVisitor}
           renderHoverCard={renderHoverCard}
           fullscreen={fullscreen}
+          showFloorNavigation={showFloorNavigation}
         />
       </View>
     </View>

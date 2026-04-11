@@ -3,8 +3,6 @@ const MEZZANINE_BLUEPRINT = require("../assets/maps/Mezzanine.png");
 export const MONITORING_MAP_FLOORS = [
   { id: "ground", name: "Ground Floor", icon: "home-outline" },
   { id: "first", name: "Mezzanine", icon: "arrow-up-outline" },
-  { id: "second", name: "2nd Floor", icon: "arrow-up-outline" },
-  { id: "third", name: "3rd Floor", icon: "arrow-up-outline" },
 ];
 
 export const MONITORING_MAP_OFFICES = [
@@ -20,10 +18,6 @@ export const MONITORING_MAP_OFFICES = [
   { id: "academy-director", name: "Academy Director", floor: "first", icon: "briefcase-outline" },
   { id: "cr", name: "CR", floor: "first", icon: "water-outline" },
   { id: "sto", name: "STO", floor: "first", icon: "clipboard-outline" },
-  { id: "hr", name: "HR Department", floor: "second", icon: "people-circle-outline" },
-  { id: "it", name: "IT Department", floor: "second", icon: "desktop-outline" },
-  { id: "library", name: "Library", floor: "third", icon: "book-outline" },
-  { id: "cafeteria", name: "Cafeteria", floor: "third", icon: "restaurant-outline" },
 ];
 
 export const MONITORING_MAP_BLUEPRINTS = {
