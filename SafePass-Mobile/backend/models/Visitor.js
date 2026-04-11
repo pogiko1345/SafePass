@@ -203,6 +203,80 @@ const visitorSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+
+  // ============ Live Location Tracking ============
+  currentLocation: {
+    floor: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    office: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    checkpointId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    coordinates: {
+      x: { type: Number, default: null },
+      y: { type: Number, default: null },
+    },
+    gps: {
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
+      accuracy: { type: Number, default: null },
+      altitude: { type: Number, default: null },
+      heading: { type: Number, default: null },
+      speed: { type: Number, default: null },
+    },
+    source: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    deviceId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    lastSeenAt: {
+      type: Date,
+      default: null,
+    },
+    isActive: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  locationHistory: [
+    {
+      floor: String,
+      office: String,
+      checkpointId: String,
+      coordinates: {
+        x: Number,
+        y: Number,
+      },
+      gps: {
+        latitude: Number,
+        longitude: Number,
+        accuracy: Number,
+        altitude: Number,
+        heading: Number,
+        speed: Number,
+      },
+      source: String,
+      deviceId: String,
+      tappedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
   
   // ============ Notifications ============
   hostNotified: { 
@@ -490,7 +564,51 @@ visitorSchema.methods = {
   markCheckedOut(actorId) {
     this.checkedOutAt = new Date();
     this.checkedOutBy = actorId || null;
+    this.currentLocation = {
+      ...(this.currentLocation || {}),
+      isActive: false,
+      lastSeenAt: this.currentLocation?.lastSeenAt || new Date(),
+    };
     this.syncWorkflowState();
+    return this;
+  },
+
+  updateCurrentLocation(location = {}, metadata = {}) {
+    const now = new Date();
+    const coordinates = location.coordinates || {};
+    const gps = location.gps || {};
+    const nextLocation = {
+      floor: String(location.floor || "").trim(),
+      office: String(location.office || "").trim(),
+      checkpointId: String(location.checkpointId || "").trim(),
+      coordinates: {
+        x: Number.isFinite(Number(coordinates.x)) ? Number(coordinates.x) : null,
+        y: Number.isFinite(Number(coordinates.y)) ? Number(coordinates.y) : null,
+      },
+      gps: {
+        latitude: Number.isFinite(Number(gps.latitude)) ? Number(gps.latitude) : null,
+        longitude: Number.isFinite(Number(gps.longitude)) ? Number(gps.longitude) : null,
+        accuracy: Number.isFinite(Number(gps.accuracy)) ? Number(gps.accuracy) : null,
+        altitude: Number.isFinite(Number(gps.altitude)) ? Number(gps.altitude) : null,
+        heading: Number.isFinite(Number(gps.heading)) ? Number(gps.heading) : null,
+        speed: Number.isFinite(Number(gps.speed)) ? Number(gps.speed) : null,
+      },
+      source: String(location.source || "arduino_tap").trim(),
+      deviceId: String(metadata.deviceId || location.deviceId || "").trim(),
+      lastSeenAt: now,
+      isActive: this.status === "checked_in",
+    };
+
+    this.currentLocation = nextLocation;
+    this.locationHistory.push({
+      ...nextLocation,
+      tappedAt: now,
+    });
+
+    if (this.locationHistory.length > 50) {
+      this.locationHistory = this.locationHistory.slice(-50);
+    }
+
     return this;
   },
 

@@ -275,6 +275,52 @@ export default StyleSheet.create({
     color: "#0F172A",
   },
 
+  phoneTrackingCard: {
+    marginTop: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  phoneTrackingCardActive: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0",
+  },
+
+  phoneTrackingCardInactive: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+  },
+
+  phoneTrackingIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+
+  phoneTrackingCopy: {
+    flex: 1,
+  },
+
+  phoneTrackingTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+
+  phoneTrackingText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+  },
+
   commandActionRow: {
     flexDirection: "row",
     flexWrap: "wrap",

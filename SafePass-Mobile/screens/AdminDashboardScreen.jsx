@@ -443,6 +443,38 @@ const getActivityFloor = (activity) => {
   return "ground";
 };
 
+const hasVisitorLiveLocation = (visitor) =>
+  Boolean(
+    visitor?.currentLocation?.isActive &&
+      visitor?.currentLocation?.floor &&
+      Number.isFinite(Number(visitor?.currentLocation?.coordinates?.x)) &&
+      Number.isFinite(Number(visitor?.currentLocation?.coordinates?.y)),
+  );
+
+const getVisitorMonitorFloor = (visitor) =>
+  hasVisitorLiveLocation(visitor)
+    ? visitor.currentLocation.floor
+    : getActivityFloor({
+    location: visitor?.assignedOffice,
+    notes: visitor?.purposeOfVisit,
+    relatedVisitor: visitor,
+  });
+
+const getVisitorMonitorCoordinates = (visitor, index = 0) =>
+  hasVisitorLiveLocation(visitor)
+    ? {
+        x: Number(visitor.currentLocation.coordinates.x),
+        y: Number(visitor.currentLocation.coordinates.y),
+      }
+    : getActivityCoordinates(
+        {
+          location: visitor?.assignedOffice,
+          notes: visitor?.purposeOfVisit,
+          relatedVisitor: visitor,
+        },
+        index,
+      );
+
 export default function AdminDashboardScreen({ navigation, onLogout }) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const mainScrollViewRef = useRef(null);
@@ -1282,37 +1314,33 @@ const loadDashboardData = useCallback(async () => {
 
   const monitoredMapVisitors = useMemo(
     () =>
-      filteredMapActivities.slice(0, 18).map((activity, index) => {
-        const relatedVisitor = activity?.relatedVisitor;
-        const relatedUser = activity?.relatedUser;
-        const displayName =
-          relatedVisitor?.fullName ||
-          [relatedUser?.firstName, relatedUser?.lastName].filter(Boolean).join(" ") ||
-          activity?.userName ||
-          "System Activity";
-
-        return {
-          id: activity?._id || `${activity?.activityType || "activity"}-${index}`,
-          name: displayName,
-          purpose:
-            relatedVisitor?.purposeOfVisit ||
-            getActivityLabel(activity?.activityType),
-          status: getActivityMarkerStatus(activity),
+      visitRequests
+        .filter((visitor) => visitor?.status === "checked_in")
+        .slice(0, 18)
+        .map((visitor, index) => ({
+          id: visitor?._id || `checked-in-visitor-${index}`,
+          name: visitor?.fullName || "Checked-In Visitor",
+          purpose: visitor?.purposeOfVisit || "On-site visit",
+          status: "checked_in",
           location: {
-            floor: getActivityFloor(activity),
-            coordinates: getActivityCoordinates(activity, index),
+            floor: getVisitorMonitorFloor(visitor),
+            coordinates: getVisitorMonitorCoordinates(visitor, index),
           },
-          activityType: activity?.activityType,
-          eventLabel: getActivityLabel(activity?.activityType),
-          lastUpdate: activity?.timestamp,
+          activityType: "security_checkin",
+          eventLabel: "Checked In",
+          lastUpdate:
+            visitor?.currentLocation?.lastSeenAt ||
+            visitor?.checkedInAt ||
+            visitor?.updatedAt ||
+            visitor?.createdAt,
           detail:
-            activity?.notes ||
-            activity?.message ||
-            "Recent system activity",
-          sourceActivity: activity,
-        };
-      }),
-    [filteredMapActivities],
+            visitor?.currentLocation?.office ||
+            visitor?.assignedOffice ||
+            visitor?.host ||
+            "Visitor is currently on site.",
+          sourceVisitor: visitor,
+        })),
+    [visitRequests],
   );
 
   const activeMapActivity = useMemo(() => {
@@ -1487,9 +1515,9 @@ const loadDashboardData = useCallback(async () => {
   ]), [mapActivities]);
 
   const adminMapSummaryItems = useMemo(() => ([
-    { label: "Live", value: monitoredMapVisitors.length || 0, color: "#10B981" },
-    { label: "Approvals", value: adminMapFilters.find((item) => item.key === "approvals")?.count || 0, color: "#10B981" },
+    { label: "Tracked", value: monitoredMapVisitors.length || 0, color: "#10B981" },
     { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: "#2563EB" },
+    { label: "Issues", value: adminMapFilters.find((item) => item.key === "issues")?.count || 0, color: "#DC2626" },
   ]), [adminMapFilters, monitoredMapVisitors.length]);
 
   const handleMenuAction = (action) => {
@@ -1500,6 +1528,7 @@ const loadDashboardData = useCallback(async () => {
         break;
       case "webmap":
         loadRecentActivities();
+        loadAllVisitRequests();
         break;
       case "requests":
         setRequestFilter("pending");

@@ -744,6 +744,19 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async updateVisitorPhoneLocation(visitorId, locationData) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/phone-location`, {
+        method: "PUT",
+        body: locationData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Update visitor phone location error:", error);
+      throw error;
+    }
+  }
+
   async securityCheckIn(visitorId) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/checkin`, {

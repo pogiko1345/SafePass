@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
+import * as Location from "expo-location";
 import ApiService from "../utils/ApiService";
 import visitorDashboardStyles from "../styles/VisitorDashboardStyles";
 
@@ -42,6 +43,9 @@ const APPOINTMENT_PURPOSE_OPTIONS = [
   "Official Business",
   "Other",
 ];
+
+const PHONE_TRACKING_INTERVAL_MS = 15000;
+const PHONE_TRACKING_DISTANCE_METERS = 8;
 
 // NFC Configuration
 // For web: Use Web NFC API
@@ -94,9 +98,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [isNfcEnabled, setIsNfcEnabled] = useState(false);
   const [isNfcReading, setIsNfcReading] = useState(false);
   const [nfcStatus, setNfcStatus] = useState(null);
+  const [phoneTrackingStatus, setPhoneTrackingStatus] = useState({
+    active: false,
+    permission: "unknown",
+    message: "Phone GPS tracking starts after check-in.",
+    lastSentAt: null,
+  });
   const [tapCount, setTapCount] = useState(0);
   const [lastTapTime, setLastTapTime] = useState(0);
   const nfcListenerRef = useRef(null);
+  const phoneLocationSubscriptionRef = useRef(null);
   const appointmentWebDateInputRef = useRef(null);
   const isCompactVirtualCardView = viewportWidth <= 540;
   const commandMetricCardWidth = isWideVisitorDashboard
@@ -150,8 +161,130 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     
     return () => {
       stopNfcReading();
+      stopPhoneLocationTracking();
     };
   }, []);
+
+  useEffect(() => {
+    if (visitor?.status === "checked_in") {
+      startPhoneLocationTracking(visitor);
+    } else {
+      stopPhoneLocationTracking();
+    }
+  }, [visitor?._id, visitor?.status]);
+
+  const stopPhoneLocationTracking = async () => {
+    if (phoneLocationSubscriptionRef.current) {
+      phoneLocationSubscriptionRef.current.remove();
+      phoneLocationSubscriptionRef.current = null;
+    }
+
+    setPhoneTrackingStatus((current) => ({
+      ...current,
+      active: false,
+      message:
+        current.permission === "denied"
+          ? "Location permission is disabled."
+          : "Phone GPS tracking is off.",
+    }));
+  };
+
+  const sendPhoneLocationUpdate = async (visitorRecord, location) => {
+    const coords = location?.coords;
+    if (!visitorRecord?._id || !coords) return;
+
+    await ApiService.updateVisitorPhoneLocation(visitorRecord._id, {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      accuracy: coords.accuracy,
+      altitude: coords.altitude,
+      heading: coords.heading,
+      speed: coords.speed,
+      floor: visitorRecord.currentLocation?.floor || "ground",
+      office: visitorRecord.currentLocation?.office || "Phone GPS",
+      deviceId: `visitor-phone-${visitorRecord._id}`,
+    });
+
+    setPhoneTrackingStatus({
+      active: true,
+      permission: "granted",
+      message: `Last phone GPS update sent at ${new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}.`,
+      lastSentAt: new Date().toISOString(),
+    });
+  };
+
+  const startPhoneLocationTracking = async (visitorRecord = visitor) => {
+    if (Platform.OS === "web" || !visitorRecord?._id || phoneLocationSubscriptionRef.current) {
+      return;
+    }
+
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        setPhoneTrackingStatus({
+          active: false,
+          permission: "disabled",
+          message: "Turn on Location Services to allow live visitor tracking.",
+          lastSentAt: null,
+        });
+        return;
+      }
+
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        setPhoneTrackingStatus({
+          active: false,
+          permission: "denied",
+          message: "Location permission is required for live visitor tracking.",
+          lastSentAt: null,
+        });
+        return;
+      }
+
+      setPhoneTrackingStatus({
+        active: true,
+        permission: "granted",
+        message: "Phone GPS tracking is active while you are checked in.",
+        lastSentAt: null,
+      });
+
+      const currentPosition = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      await sendPhoneLocationUpdate(visitorRecord, currentPosition);
+
+      phoneLocationSubscriptionRef.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: PHONE_TRACKING_INTERVAL_MS,
+          distanceInterval: PHONE_TRACKING_DISTANCE_METERS,
+        },
+        async (position) => {
+          try {
+            await sendPhoneLocationUpdate(visitorRecord, position);
+          } catch (error) {
+            console.error("Phone GPS tracking update error:", error);
+            setPhoneTrackingStatus((current) => ({
+              ...current,
+              active: false,
+              message: "Unable to send phone GPS update. It will retry while this screen is open.",
+            }));
+          }
+        },
+      );
+    } catch (error) {
+      console.error("Start phone GPS tracking error:", error);
+      setPhoneTrackingStatus({
+        active: false,
+        permission: "error",
+        message: "Phone GPS tracking could not start.",
+        lastSentAt: null,
+      });
+    }
+  };
 
   const setGreetingMessage = () => {
     const hour = new Date().getHours();
@@ -1190,6 +1323,33 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               ))}
             </View>
+
+            {visitor?.status === "checked_in" ? (
+              <View
+                style={[
+                  visitorDashboardStyles.phoneTrackingCard,
+                  phoneTrackingStatus.active
+                    ? visitorDashboardStyles.phoneTrackingCardActive
+                    : visitorDashboardStyles.phoneTrackingCardInactive,
+                ]}
+              >
+                <View style={visitorDashboardStyles.phoneTrackingIconWrap}>
+                  <Ionicons
+                    name={phoneTrackingStatus.active ? "location" : "location-outline"}
+                    size={18}
+                    color={phoneTrackingStatus.active ? "#047857" : "#B45309"}
+                  />
+                </View>
+                <View style={visitorDashboardStyles.phoneTrackingCopy}>
+                  <Text style={visitorDashboardStyles.phoneTrackingTitle}>
+                    Phone GPS Tracking
+                  </Text>
+                  <Text style={visitorDashboardStyles.phoneTrackingText}>
+                    {phoneTrackingStatus.message}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
 
             {(isApprovedVisitor || canRequestNewAppointment || canCreateFreshAppointment) ? (
               <View

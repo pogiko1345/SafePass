@@ -21,7 +21,7 @@ app.use(
     origin: true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "x-device-key"],
   }),
 );
 
@@ -162,6 +162,141 @@ const createRoleNotification = async ({
   }
 };
 
+const CHECKPOINT_LOCATIONS = {
+  main_gate: {
+    floor: "ground",
+    office: "Main Gate",
+    coordinates: { x: 18, y: 78 },
+  },
+  administration: {
+    floor: "ground",
+    office: "Administration",
+    coordinates: { x: 18, y: 36 },
+  },
+  registrar: {
+    floor: "ground",
+    office: "Registrar's Office",
+    coordinates: { x: 45, y: 44 },
+  },
+  accounting: {
+    floor: "ground",
+    office: "Accounting Office",
+    coordinates: { x: 66, y: 42 },
+  },
+  conference_room: {
+    floor: "first",
+    office: "Conference Room",
+    coordinates: { x: 10, y: 36 },
+  },
+  chairman: {
+    floor: "first",
+    office: "Chairman",
+    coordinates: { x: 21, y: 40 },
+  },
+  flight_operations: {
+    floor: "first",
+    office: "Flight Operations",
+    coordinates: { x: 33, y: 43 },
+  },
+  head_of_training_room: {
+    floor: "first",
+    office: "Head Of Training Room",
+    coordinates: { x: 45, y: 42 },
+  },
+  it_room: {
+    floor: "first",
+    office: "I.T Room",
+    coordinates: { x: 57, y: 42 },
+  },
+  faculty_room: {
+    floor: "first",
+    office: "Faculty Room",
+    coordinates: { x: 69, y: 36 },
+  },
+  academy_director: {
+    floor: "first",
+    office: "Academy Director",
+    coordinates: { x: 82, y: 37 },
+  },
+  cr: {
+    floor: "first",
+    office: "CR",
+    coordinates: { x: 94, y: 25 },
+  },
+  sto: {
+    floor: "first",
+    office: "STO",
+    coordinates: { x: 94, y: 44 },
+  },
+};
+
+const normalizeCheckpointId = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const clampMapCoordinate = (value, min = 5, max = 95) =>
+  Math.max(min, Math.min(max, value));
+
+const mapGpsToCampusCoordinates = (latitude, longitude) => {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { x: null, y: null };
+  }
+
+  const latMin = Number(process.env.CAMPUS_LAT_MIN || 14.5976);
+  const latMax = Number(process.env.CAMPUS_LAT_MAX || 14.6007);
+  const lngMin = Number(process.env.CAMPUS_LNG_MIN || 120.9823);
+  const lngMax = Number(process.env.CAMPUS_LNG_MAX || 120.9857);
+
+  const x = ((lng - lngMin) / (lngMax - lngMin)) * 100;
+  const y = (1 - (lat - latMin) / (latMax - latMin)) * 100;
+
+  return {
+    x: Number(clampMapCoordinate(x).toFixed(2)),
+    y: Number(clampMapCoordinate(y).toFixed(2)),
+  };
+};
+
+const getTapLocationFromRequest = (body = {}) => {
+  const checkpointId = normalizeCheckpointId(body.checkpointId || body.checkpoint || body.office);
+  const knownCheckpoint = CHECKPOINT_LOCATIONS[checkpointId] || null;
+  const coordinates = body.coordinates || {};
+
+  return {
+    checkpointId,
+    floor: String(body.floor || knownCheckpoint?.floor || "").trim(),
+    office: String(body.office || knownCheckpoint?.office || checkpointId || "Unknown Checkpoint").trim(),
+    coordinates: {
+      x: Number.isFinite(Number(coordinates.x ?? knownCheckpoint?.coordinates?.x))
+        ? Number(coordinates.x ?? knownCheckpoint?.coordinates?.x)
+        : null,
+      y: Number.isFinite(Number(coordinates.y ?? knownCheckpoint?.coordinates?.y))
+        ? Number(coordinates.y ?? knownCheckpoint?.coordinates?.y)
+        : null,
+    },
+    source: String(body.source || "arduino_tap").trim(),
+  };
+};
+
+const validateDeviceKey = (req, res, next) => {
+  const expectedKey = process.env.ARDUINO_DEVICE_KEY || "safepass-device-key";
+  const providedKey = req.header("x-device-key") || req.body?.deviceKey;
+
+  if (!providedKey || providedKey !== expectedKey) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid device key",
+    });
+  }
+
+  next();
+};
+
 // ========== EMAIL SIMULATION (for demo) ==========
 const sendEmail = (to, subject, body) => {
   console.log(`\n📧 ========== EMAIL SIMULATION ==========`);
@@ -182,6 +317,215 @@ app.get("/api/test", (req, res) => {
     database:
       mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
   });
+});
+
+app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
+  try {
+    const cardId = String(
+      req.body?.nfcCardId ||
+        req.body?.cardId ||
+        req.body?.uid ||
+        req.body?.tagId ||
+        "",
+    ).trim();
+    const deviceId = String(req.body?.deviceId || "arduino-reader").trim();
+    const tapLocation = getTapLocationFromRequest(req.body || {});
+
+    if (!cardId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing NFC card ID",
+      });
+    }
+
+    if (!tapLocation.floor || !tapLocation.office) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing checkpoint floor or office",
+      });
+    }
+
+    const visitorUser = await User.findOne({
+      nfcCardId: cardId,
+      role: "visitor",
+    }).select("_id email firstName lastName nfcCardId role");
+
+    if (!visitorUser) {
+      await AccessLog.create({
+        userEmail: "",
+        userName: "Unknown NFC Card",
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "arduino_location_tap",
+        status: "denied",
+        nfcCardId: cardId,
+        metadata: {
+          deviceId,
+          tapLocation,
+        },
+        notes: `Unknown NFC card tapped at ${tapLocation.office}`,
+      });
+
+      return res.status(404).json({
+        success: false,
+        message: "NFC card is not assigned to a visitor",
+      });
+    }
+
+    const visitor = await Visitor.findOne({
+      email: visitorUser.email,
+      status: "checked_in",
+    }).sort({ checkedInAt: -1 });
+
+    if (!visitor) {
+      await AccessLog.create({
+        userId: visitorUser._id,
+        userEmail: visitorUser.email,
+        userName: `${visitorUser.firstName || ""} ${visitorUser.lastName || ""}`.trim(),
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "arduino_location_tap",
+        status: "denied",
+        nfcCardId: cardId,
+        relatedUser: visitorUser._id,
+        metadata: {
+          deviceId,
+          tapLocation,
+        },
+        notes: `Card tapped at ${tapLocation.office}, but visitor is not checked in`,
+      });
+
+      return res.status(409).json({
+        success: false,
+        message: "Visitor must be checked in before tracking can start",
+      });
+    }
+
+    visitor.updateCurrentLocation(tapLocation, { deviceId });
+    await visitor.save();
+
+    await AccessLog.create({
+      userId: visitorUser._id,
+      userEmail: visitor.email,
+      userName: visitor.fullName,
+      actorRole: "device",
+      location: tapLocation.office,
+      accessType: "system",
+      activityType: "arduino_location_tap",
+      status: "granted",
+      nfcCardId: cardId,
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser._id,
+      metadata: {
+        deviceId,
+        currentLocation: visitor.currentLocation,
+      },
+      notes: `${visitor.fullName} tapped at ${tapLocation.office}`,
+    });
+
+    res.json({
+      success: true,
+      message: "Visitor location updated",
+      visitorId: visitor._id,
+      currentLocation: visitor.currentLocation,
+      visitor: {
+        _id: visitor._id,
+        fullName: visitor.fullName,
+        email: visitor.email,
+        status: visitor.status,
+        currentLocation: visitor.currentLocation,
+      },
+    });
+  } catch (error) {
+    console.error("Arduino location tap error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update visitor location",
+    });
+  }
+});
+
+app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+
+    if (!visitor) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor not found",
+      });
+    }
+
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const isOwnVisitorRecord =
+      requesterRole === "visitor" &&
+      String(visitor.email || "").toLowerCase() === String(req.user.email || "").toLowerCase();
+    const canUpdateTrackedLocation =
+      isOwnVisitorRecord || ["admin", "security", "guard"].includes(requesterRole);
+
+    if (!canUpdateTrackedLocation) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot update this visitor location",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(409).json({
+        success: false,
+        message: "Visitor must be checked in before phone GPS tracking can start",
+      });
+    }
+
+    const latitude = Number(req.body?.latitude);
+    const longitude = Number(req.body?.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid latitude and longitude are required",
+      });
+    }
+
+    const coordinates = mapGpsToCampusCoordinates(latitude, longitude);
+    visitor.updateCurrentLocation(
+      {
+        floor: req.body?.floor || visitor.currentLocation?.floor || "ground",
+        office: req.body?.office || visitor.currentLocation?.office || "Phone GPS",
+        checkpointId: "phone_gps",
+        coordinates,
+        gps: {
+          latitude,
+          longitude,
+          accuracy: req.body?.accuracy,
+          altitude: req.body?.altitude,
+          heading: req.body?.heading,
+          speed: req.body?.speed,
+        },
+        source: "phone_gps",
+      },
+      {
+        deviceId: req.body?.deviceId || `phone-${req.user._id}`,
+      },
+    );
+
+    await visitor.save();
+
+    res.json({
+      success: true,
+      message: "Phone GPS location updated",
+      visitorId: visitor._id,
+      currentLocation: visitor.currentLocation,
+    });
+  } catch (error) {
+    console.error("Phone GPS location update error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update phone GPS location",
+    });
+  }
 });
 
 // 1. REGISTER

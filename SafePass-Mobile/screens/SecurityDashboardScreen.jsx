@@ -431,26 +431,44 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const deriveVisitorLocations = (activeVisitors = []) =>
-    activeVisitors.map((visitor, index) => ({
-      id: visitor._id,
-      name: visitor.fullName,
-      phone: visitor.phoneNumber,
-      purpose: visitor.purposeOfVisit,
-      host: visitor.host,
-      checkInTime: visitor.checkedInAt,
-      status: visitor.status,
-      idPhoto: visitor.idImage,
-      location: {
-        floor: getRandomFloor(),
-        office: visitor.assignedOffice || getRandomOffice(),
-        coordinates: {
-          x: 15 + ((index * 17) % 70),
-          y: 15 + ((index * 23) % 70),
-        },
-        timestamp: new Date(),
-      },
-      movement: [],
-    }));
+    activeVisitors
+      .filter((visitor) => visitor?.status === 'checked_in')
+      .map((visitor, index) => {
+        const liveLocation = visitor.currentLocation?.isActive
+          ? visitor.currentLocation
+          : null;
+        const liveCoordinates = liveLocation?.coordinates || {};
+        const hasLiveCoordinates =
+          Number.isFinite(Number(liveCoordinates.x)) &&
+          Number.isFinite(Number(liveCoordinates.y));
+
+        return {
+          id: visitor._id,
+          name: visitor.fullName,
+          phone: visitor.phoneNumber,
+          purpose: visitor.purposeOfVisit,
+          host: visitor.host,
+          checkInTime: visitor.checkedInAt,
+          status: visitor.status,
+          idPhoto: visitor.idImage,
+          location: {
+            floor: liveLocation?.floor || 'ground',
+            office: liveLocation?.office || visitor.assignedOffice || getRandomOffice(),
+            coordinates: hasLiveCoordinates
+              ? {
+                  x: Number(liveCoordinates.x),
+                  y: Number(liveCoordinates.y),
+                }
+              : {
+                  x: 15 + ((index * 17) % 70),
+                  y: 15 + ((index * 23) % 70),
+                },
+            timestamp: liveLocation?.lastSeenAt || new Date(),
+            source: liveLocation?.source || 'system_estimate',
+          },
+          movement: visitor.locationHistory || [],
+        };
+      });
 
   const deriveAccessLogs = (all = []) =>
     all
