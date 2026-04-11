@@ -1,22 +1,33 @@
 {
-  "buildCommand": "npm run build:web",
-  "outputDirectory": "static",
-  "devCommand": "npm run web",
-  "installCommand": "npm install",
-  "framework": null,
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.js"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "static"
+      }
     },
     {
-      "source": "/((?!static/|favicon\\.ico|favicon-16\\.png|favicon-32\\.png|manifest\\.json|asyncStorageMock\\.js|pwa/).*)",
-      "destination": "/index.html"
+      "src": "api/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 30,
+        "includeFiles": "backend/**"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
