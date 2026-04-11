@@ -19,7 +19,14 @@ const WEB_FALLBACK_API_BASE_URL = (() => {
   }
 
   const { protocol, hostname } = window.location;
-  return `${protocol}//${hostname}:5000/api`;
+  const isLocalHost =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0";
+
+  return isLocalHost
+    ? `${protocol}//${hostname}:5000/api`
+    : `${protocol}//${hostname}/api`;
 })();
 
 const DEFAULT_API_BASE_URL = Platform.select({
