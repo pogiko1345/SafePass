@@ -26,7 +26,7 @@ const WEB_FALLBACK_API_BASE_URL = (() => {
 
   return isLocalHost
     ? `${protocol}//${hostname}:5000/api`
-    : `${protocol}//${hostname}/api`;
+    : "https://safepass-052h.onrender.com/api";
 })();
 
 const DEFAULT_API_BASE_URL = Platform.select({
