@@ -264,8 +264,13 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
             activeOpacity={0.8}
             onPress={() => setAccepted((previous) => !previous)}
           >
-            <View style={visitorRegisterStyles.privacyCheckbox}>
-              {accepted ? <Ionicons name="checkmark" size={16} color="#059669" /> : null}
+            <View
+              style={[
+                visitorRegisterStyles.privacyCheckbox,
+                accepted && visitorRegisterStyles.privacyCheckboxChecked,
+              ]}
+            >
+              {accepted ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}
             </View>
             <Text style={visitorRegisterStyles.privacyCheckboxText}>
               I understand and accept the data privacy policy.
