@@ -3898,12 +3898,81 @@ const loadDashboardData = useCallback(async () => {
     <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.pageContainer}>
         <AdminSectionShell
-          title="Create Staff Account"
-          subtitle="Admins can create staff accounts here, validate credentials before submission, and immediately sync the records list."
+          title="Creation of Account"
+          subtitle="Admins can create both staff and security accounts here from the same control area."
           badge="Admin only"
           isDarkMode={isDarkMode}
           theme={theme}
         >
+          <View
+            style={[
+              styles.modularInfoPanel,
+              {
+                backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                borderColor: theme.borderColor,
+                marginBottom: 16,
+              },
+            ]}
+          >
+            <Text style={[styles.modularInfoTitle, isDarkMode && styles.darkText]}>
+              Quick account creation
+            </Text>
+            <Text style={[styles.createUserHeroText, isDarkMode && styles.darkTextSecondary, { marginBottom: 14 }]}>
+              Use the launcher below to choose whether you are creating a staff or a security account.
+            </Text>
+            <View style={styles.managementQuickStatsRow}>
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[
+                  styles.managementQuickStatCard,
+                  {
+                    backgroundColor: isDarkMode ? "#111827" : "#FFFFFF",
+                    borderColor: theme.borderColor,
+                    flex: 1,
+                  },
+                ]}
+                onPress={() => resetCreateUserForm("staff")}
+              >
+                <View style={[styles.managementQuickStatIcon, { backgroundColor: "rgba(16,185,129,0.14)" }]}>
+                  <Ionicons name="briefcase-outline" size={18} color="#10B981" />
+                </View>
+                <Text style={[styles.managementQuickStatValue, { color: "#10B981" }]}>{staffUsers.length}</Text>
+                <Text style={[styles.managementQuickStatLabel, isDarkMode && styles.darkTextSecondary]}>
+                  Staff Accounts
+                </Text>
+                <Text style={[styles.managementQuickStatMeta, isDarkMode && styles.darkTextSecondary]}>
+                  Continue below
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[
+                  styles.managementQuickStatCard,
+                  {
+                    backgroundColor: isDarkMode ? "#111827" : "#FFFFFF",
+                    borderColor: theme.borderColor,
+                    flex: 1,
+                  },
+                ]}
+                onPress={() => {
+                  resetCreateUserForm("security");
+                  setShowAddUserModal(true);
+                }}
+              >
+                <View style={[styles.managementQuickStatIcon, { backgroundColor: "rgba(139,92,246,0.14)" }]}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#8B5CF6" />
+                </View>
+                <Text style={[styles.managementQuickStatValue, { color: "#8B5CF6" }]}>{guardUsers.length}</Text>
+                <Text style={[styles.managementQuickStatLabel, isDarkMode && styles.darkTextSecondary]}>
+                  Security Accounts
+                </Text>
+                <Text style={[styles.managementQuickStatMeta, isDarkMode && styles.darkTextSecondary]}>
+                  Open security form
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
           <View style={styles.staffCreationLayout}>
             <View
               style={[
