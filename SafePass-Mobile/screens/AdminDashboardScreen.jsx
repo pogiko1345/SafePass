@@ -6351,224 +6351,957 @@ const loadDashboardData = useCallback(async () => {
         </View>
       </Modal>
 
-      {/* Add User Modal */}
-      <Modal visible={showAddUserModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.createUserModal, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
-            <View style={[styles.modalHeader, isDarkMode && { borderBottomColor: theme.borderColor }]}>
-              <View>
-                <Text style={[styles.modalTitle, isDarkMode && styles.darkText]}>
-                  Add New {newUserData.role === "staff" ? "Staff Member" : "Security Personnel"}
-                </Text>
-                <Text style={[styles.createUserSubtitle, isDarkMode && styles.darkTextSecondary]}>
-                  Create an active account that can sign in right away and route to the correct dashboard.
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowAddUserModal(false)}>
-                <Ionicons name="close" size={24} color={isDarkMode ? "#94A3B8" : "#6B7280"} />
-              </TouchableOpacity>
+{/* Add User Modal */}
+<Modal visible={showAddUserModal} transparent animationType="slide">
+  <View style={styles.modalOverlay}>
+    <View
+      style={[
+        styles.createUserModal,
+        isDarkMode && {
+          backgroundColor: theme.cardBackground,
+          borderColor: theme.borderColor,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.modalHeader,
+          isDarkMode && { borderBottomColor: theme.borderColor },
+        ]}
+      >
+        <View style={styles.createAccountHeaderCopy}>
+          <View style={styles.createAccountHeaderTitleRow}>
+            <View
+              style={[
+                styles.createAccountHeaderIcon,
+                { backgroundColor: `${getRoleColor(newUserData.role)}18` },
+              ]}
+            >
+              <Ionicons
+                name={getRoleIcon(newUserData.role)}
+                size={20}
+                color={getRoleColor(newUserData.role)}
+              />
             </View>
-            <ScrollView style={styles.modalBody} contentContainerStyle={styles.createUserBody} showsVerticalScrollIndicator={false}>
-              <View style={[styles.createUserHero, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                <View style={[styles.userProfileAvatar, { backgroundColor: `${getRoleColor(newUserData.role)}16` }]}>
-                  <Text style={[styles.userProfileAvatarText, { color: getRoleColor(newUserData.role) }]}>
-                    {newUserData.role === "staff" ? "ST" : "SG"}
+
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.modalTitle, isDarkMode && styles.darkText]}>
+                Create New Account
+              </Text>
+              <Text
+                style={[
+                  styles.createUserSubtitle,
+                  isDarkMode && styles.darkTextSecondary,
+                ]}
+              >
+                Add a staff or security account with a cleaner setup flow and
+                live preview.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity onPress={() => setShowAddUserModal(false)}>
+          <Ionicons
+            name="close"
+            size={24}
+            color={isDarkMode ? "#94A3B8" : "#6B7280"}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.modalBody}
+        contentContainerStyle={styles.createUserBody}
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          style={[
+            styles.createAccountLayout,
+            isDarkMode && { borderColor: theme.borderColor },
+          ]}
+        >
+          {/* LEFT SIDE */}
+          <View style={styles.createAccountFormColumn}>
+            <View
+              style={[
+                styles.createAccountSectionCard,
+                isDarkMode && {
+                  backgroundColor: "#0F172A",
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={styles.createAccountSectionHeader}>
+                <Ionicons
+                  name="layers-outline"
+                  size={18}
+                  color={getRoleColor(newUserData.role)}
+                />
+                <View>
+                  <Text
+                    style={[
+                      styles.createAccountSectionTitle,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    Account Type
                   </Text>
-                </View>
-                <View style={styles.createUserHeroCopy}>
-                  <Text style={[styles.createUserHeroTitle, isDarkMode && styles.darkText]}>
-                    {newUserData.role === "staff" ? "Staff Account Setup" : "Security Account Setup"}
-                  </Text>
-                  <Text style={[styles.createUserHeroText, isDarkMode && styles.darkTextSecondary]}>
-                    Fill in the core details below. A secure random password and employee ID will be generated automatically if you leave them blank.
+                  <Text
+                    style={[
+                      styles.createAccountSectionSubtitle,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Choose what kind of account you want to create.
                   </Text>
                 </View>
               </View>
 
-              <View style={styles.userEditorSection}>
-                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Account Type</Text>
-                <View style={styles.userEditorRoleWrap}>
-                  {["staff", "security"].map((role) => (
+              <View style={styles.roleCardRow}>
+                {["staff", "security"].map((role) => {
+                  const active = newUserData.role === role;
+                  return (
                     <TouchableOpacity
                       key={role}
+                      activeOpacity={0.9}
                       style={[
-                        styles.userEditorRoleOption,
-                        newUserData.role === role && styles.roleOptionActive,
-                        isDarkMode && newUserData.role !== role && { backgroundColor: "#334155", borderColor: "#475569" },
+                        styles.roleCard,
+                        active && styles.roleCardActive,
+                        {
+                          borderColor: active
+                            ? getRoleColor(role)
+                            : isDarkMode
+                              ? theme.borderColor
+                              : "#E2E8F0",
+                          backgroundColor: active
+                            ? `${getRoleColor(role)}12`
+                            : isDarkMode
+                              ? "#111827"
+                              : "#FFFFFF",
+                        },
                       ]}
-                      onPress={() => setNewUserData((currentForm) => ({
-                        ...currentForm,
-                        role,
-                        department:
-                          role === "security"
-                            ? "Security Department"
-                            : currentForm.department === "Security Department" || !currentForm.department
-                              ? "Admissions"
-                              : currentForm.department,
-                        position:
-                          role === "security"
-                            ? currentForm.position || "Security Personnel"
-                            : currentForm.position === "Security Personnel"
-                              ? getDefaultStaffPosition(currentForm.department)
-                              : currentForm.position || getDefaultStaffPosition(currentForm.department),
-                        shift: "",
-                      }))}
+                      onPress={() => {
+                        resetCreateUserForm(role);
+                      }}
                     >
+                      <View
+                        style={[
+                          styles.roleCardIcon,
+                          { backgroundColor: `${getRoleColor(role)}18` },
+                        ]}
+                      >
+                        <Ionicons
+                          name={getRoleIcon(role)}
+                          size={18}
+                          color={getRoleColor(role)}
+                        />
+                      </View>
+
                       <Text
                         style={[
-                          styles.roleText,
-                          newUserData.role === role && styles.roleTextActive,
-                          isDarkMode && !(newUserData.role === role) && { color: "#CBD5E1" },
+                          styles.roleCardTitle,
+                          isDarkMode && styles.darkText,
                         ]}
                       >
                         {role === "staff" ? "Staff Member" : "Security Personnel"}
                       </Text>
+
+                      <Text
+                        style={[
+                          styles.roleCardText,
+                          isDarkMode && styles.darkTextSecondary,
+                        ]}
+                      >
+                        {role === "staff"
+                          ? "Office staff, records, and appointment handling."
+                          : "Checkpoint, access control, and visitor verification."}
+                      </Text>
                     </TouchableOpacity>
-                  ))}
+                  );
+                })}
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.createAccountSectionCard,
+                isDarkMode && {
+                  backgroundColor: "#0F172A",
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={styles.createAccountSectionHeader}>
+                <Ionicons
+                  name="person-outline"
+                  size={18}
+                  color={getRoleColor(newUserData.role)}
+                />
+                <View>
+                  <Text
+                    style={[
+                      styles.createAccountSectionTitle,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    Personal Information
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountSectionSubtitle,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Enter the basic identity and contact details.
+                  </Text>
                 </View>
               </View>
 
-              <View style={styles.userEditorSection}>
-                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Identity</Text>
-                <View style={styles.userEditorGrid}>
-                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>First Name *</Text>
-                    <TextInput
-                      style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                      placeholder="Enter first name"
-                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                      value={newUserData.firstName}
-                      onChangeText={(text) => setNewUserData({ ...newUserData, firstName: text })}
-                    />
-                  </View>
-                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Last Name *</Text>
-                    <TextInput
-                      style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                      placeholder="Enter last name"
-                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                      value={newUserData.lastName}
-                      onChangeText={(text) => setNewUserData({ ...newUserData, lastName: text })}
-                    />
-                  </View>
+              <View style={styles.userEditorRow}>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    First Name
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      createUserErrors.firstName && styles.inputError,
+                      isDarkMode && {
+                        backgroundColor: "#111827",
+                        borderColor: theme.borderColor,
+                        color: "#F8FAFC",
+                      },
+                    ]}
+                    placeholder="Enter first name"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    value={newUserData.firstName}
+                    onChangeText={(text) =>
+                      setNewUserData((prev) => ({ ...prev, firstName: text }))
+                    }
+                  />
+                  {renderCreateUserFieldError("firstName")}
+                </View>
+
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Last Name
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      createUserErrors.lastName && styles.inputError,
+                      isDarkMode && {
+                        backgroundColor: "#111827",
+                        borderColor: theme.borderColor,
+                        color: "#F8FAFC",
+                      },
+                    ]}
+                    placeholder="Enter last name"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    value={newUserData.lastName}
+                    onChangeText={(text) =>
+                      setNewUserData((prev) => ({ ...prev, lastName: text }))
+                    }
+                  />
+                  {renderCreateUserFieldError("lastName")}
                 </View>
               </View>
 
-              <View style={styles.userEditorSection}>
-                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Contact</Text>
-                <View style={styles.userEditorGrid}>
-                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Email *</Text>
-                    <TextInput
-                      style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                      placeholder="Enter email address"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                      value={newUserData.email}
-                      onChangeText={(text) => setNewUserData({ ...newUserData, email: text })}
-                    />
-                  </View>
-                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Phone *</Text>
-                    <TextInput
-                      style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                      placeholder="Enter phone number"
-                      keyboardType="phone-pad"
-                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                      value={newUserData.phone}
-                      onChangeText={(text) => setNewUserData({ ...newUserData, phone: text })}
-                    />
-                  </View>
+              <View style={styles.userEditorRow}>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Email Address
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      createUserErrors.email && styles.inputError,
+                      isDarkMode && {
+                        backgroundColor: "#111827",
+                        borderColor: theme.borderColor,
+                        color: "#F8FAFC",
+                      },
+                    ]}
+                    placeholder="Enter email address"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={newUserData.email}
+                    onChangeText={(text) =>
+                      setNewUserData((prev) => ({ ...prev, email: text }))
+                    }
+                  />
+                  {renderCreateUserFieldError("email")}
+                </View>
+
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Phone Number
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      createUserErrors.phone && styles.inputError,
+                      isDarkMode && {
+                        backgroundColor: "#111827",
+                        borderColor: theme.borderColor,
+                        color: "#F8FAFC",
+                      },
+                    ]}
+                    placeholder="Enter phone number"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    keyboardType="phone-pad"
+                    value={newUserData.phone}
+                    onChangeText={(text) =>
+                      setNewUserData((prev) => ({ ...prev, phone: text }))
+                    }
+                  />
+                  {renderCreateUserFieldError("phone")}
+                </View>
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.createAccountSectionCard,
+                isDarkMode && {
+                  backgroundColor: "#0F172A",
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={styles.createAccountSectionHeader}>
+                <Ionicons
+                  name="briefcase-outline"
+                  size={18}
+                  color={getRoleColor(newUserData.role)}
+                />
+                <View>
+                  <Text
+                    style={[
+                      styles.createAccountSectionTitle,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    Work Details
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountSectionSubtitle,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Assign role-specific work information.
+                  </Text>
                 </View>
               </View>
 
-              {newUserData.role === "staff" && (
-                <View style={styles.userEditorSection}>
-                  <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Staff Details</Text>
-                  <View style={styles.userEditorGrid}>
+              {newUserData.role === "staff" ? (
+                <>
+                  <View style={styles.userEditorRow}>
                     {renderStaffDropdown({
-                      target: "create",
+                      target: "department",
                       label: "Department",
                       value: newUserData.department,
                       options: STAFF_DEPARTMENT_OPTIONS,
-                      placeholder: "Choose department",
+                      placeholder: "Select department",
                       icon: "business-outline",
-                      onSelect: (department) => updateStaffDepartment("create", department),
+                      onSelect: (value) => {
+                        const firstOfficer =
+                          STAFF_OFFICER_OPTIONS_BY_DEPARTMENT[value]?.[0]?.value ||
+                          "";
+                        setNewUserData((prev) => ({
+                          ...prev,
+                          department: value,
+                          position: firstOfficer,
+                        }));
+                        setStaffDropdownOpen(null);
+                      },
                     })}
+
                     {renderStaffDropdown({
-                      target: "create",
+                      target: "position",
                       label: "Officer Type",
                       value: newUserData.position,
-                      options: getStaffOfficerOptions(newUserData.department),
-                      placeholder: "Choose officer type",
+                      options:
+                        STAFF_OFFICER_OPTIONS_BY_DEPARTMENT[
+                          newUserData.department
+                        ] || [],
+                      placeholder: "Select officer type",
                       icon: "id-card-outline",
-                      onSelect: (position) => updateStaffPosition("create", position),
+                      onSelect: (value) => {
+                        setNewUserData((prev) => ({ ...prev, position: value }));
+                        setStaffDropdownOpen(null);
+                      },
                     })}
+                  </View>
+
+                  <View style={styles.userEditorRow}>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Assigned Area</Text>
-                      <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                        <Ionicons name="location-outline" size={16} color="#64748B" />
-                        <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
-                          {getStaffDepartmentOption(newUserData.department)?.area || "General Area"}
-                        </Text>
-                      </View>
+                      <Text
+                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
+                      >
+                        Employee ID
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FAFC",
+                          },
+                        ]}
+                        placeholder="Auto-generate if blank"
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.employeeId}
+                        onChangeText={(text) =>
+                          setNewUserData((prev) => ({
+                            ...prev,
+                            employeeId: text,
+                          }))
+                        }
+                      />
+                    </View>
+
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text
+                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
+                      >
+                        Shift
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FAFC",
+                          },
+                        ]}
+                        placeholder="e.g. 8:00 AM - 5:00 PM"
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.shift}
+                        onChangeText={(text) =>
+                          setNewUserData((prev) => ({ ...prev, shift: text }))
+                        }
+                      />
                     </View>
                   </View>
-                </View>
-              )}
-              {newUserData.role === "security" && (
-                <View style={styles.userEditorSection}>
-                  <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Security Details</Text>
-                  <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                    <Ionicons name="time-outline" size={16} color="#64748B" />
-                    <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
-                      Shift schedule is handled operationally and is not fixed on the account.
-                    </Text>
-                  </View>
-                </View>
-              )}
+                </>
+              ) : (
+                <>
+                  <View style={styles.userEditorRow}>
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text
+                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
+                      >
+                        Department
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FAFC",
+                          },
+                        ]}
+                        placeholder="Security Department"
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.department}
+                        onChangeText={(text) =>
+                          setNewUserData((prev) => ({
+                            ...prev,
+                            department: text,
+                          }))
+                        }
+                      />
+                    </View>
 
-              <View style={[styles.createUserPreviewCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                <View style={styles.createUserPreviewHeader}>
-                  <Ionicons name="sparkles-outline" size={18} color="#10B981" />
-                  <Text style={[styles.createUserPreviewTitle, isDarkMode && styles.darkText]}>
-                    Account Preview
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text
+                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
+                      >
+                        Position
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FAFC",
+                          },
+                        ]}
+                        placeholder="Security Personnel"
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.position}
+                        onChangeText={(text) =>
+                          setNewUserData((prev) => ({
+                            ...prev,
+                            position: text,
+                          }))
+                        }
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.userEditorRow}>
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text
+                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
+                      >
+                        Employee ID
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FAFC",
+                          },
+                        ]}
+                        placeholder="Auto-generate if blank"
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.employeeId}
+                        onChangeText={(text) =>
+                          setNewUserData((prev) => ({
+                            ...prev,
+                            employeeId: text,
+                          }))
+                        }
+                      />
+                    </View>
+
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text
+                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
+                      >
+                        Shift
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FAFC",
+                          },
+                        ]}
+                        placeholder="e.g. Day Shift / Night Shift"
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.shift}
+                        onChangeText={(text) =>
+                          setNewUserData((prev) => ({ ...prev, shift: text }))
+                        }
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
+            </View>
+
+            <View
+              style={[
+                styles.createAccountSectionCard,
+                isDarkMode && {
+                  backgroundColor: "#0F172A",
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={styles.createAccountSectionHeader}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={18}
+                  color={getRoleColor(newUserData.role)}
+                />
+                <View>
+                  <Text
+                    style={[
+                      styles.createAccountSectionTitle,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    Login Details
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountSectionSubtitle,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Set the account credentials. Leave password blank if your
+                    logic auto-generates one.
                   </Text>
                 </View>
-                <View style={styles.userProfileInfoGrid}>
-                  <View style={[styles.userProfileInfoCard, styles.createUserPreviewInfoCard, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
-                    <Text style={styles.userProfileInfoLabel}>Role</Text>
-                    <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
-                      {newUserData.role === "staff" ? "Staff Member" : "Security Personnel"}
-                    </Text>
-                  </View>
-                  <View style={[styles.userProfileInfoCard, styles.createUserPreviewInfoCard, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
-                    <Text style={styles.userProfileInfoLabel}>Auto Employee ID</Text>
-                    <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
-                      {newUserData.role === "staff" ? "STF-XXXXXX" : "SEC-XXXXXX"}
-                    </Text>
-                  </View>
-                  <View style={[styles.userProfileInfoCard, styles.createUserPreviewInfoCard, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
-                    <Text style={styles.userProfileInfoLabel}>Initial Status</Text>
-                    <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
-                      Active and ready to sign in
+              </View>
+
+              <View style={styles.userEditorRow}>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Username
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      createUserErrors.username && styles.inputError,
+                      isDarkMode && {
+                        backgroundColor: "#111827",
+                        borderColor: theme.borderColor,
+                        color: "#F8FAFC",
+                      },
+                    ]}
+                    placeholder="Enter username"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    autoCapitalize="none"
+                    value={newUserData.username}
+                    onChangeText={(text) =>
+                      setNewUserData((prev) => ({ ...prev, username: text }))
+                    }
+                  />
+                  {renderCreateUserFieldError("username")}
+                </View>
+
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Status
+                  </Text>
+                  <View
+                    style={[
+                      styles.createAccountStatusBadge,
+                      {
+                        backgroundColor:
+                          newUserData.status === "active"
+                            ? "rgba(16,185,129,0.12)"
+                            : "rgba(148,163,184,0.12)",
+                        borderColor:
+                          newUserData.status === "active"
+                            ? "rgba(16,185,129,0.28)"
+                            : "rgba(148,163,184,0.24)",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.createAccountStatusText,
+                        {
+                          color:
+                            newUserData.status === "active"
+                              ? "#10B981"
+                              : "#64748B",
+                        },
+                      ]}
+                    >
+                      {newUserData.status === "active"
+                        ? "Active account"
+                        : "Inactive account"}
                     </Text>
                   </View>
                 </View>
               </View>
-            </ScrollView>
-            <View style={[styles.modalFooter, isDarkMode && { borderTopColor: theme.borderColor }]}>
-              <TouchableOpacity style={[styles.cancelButton, isDarkMode && { backgroundColor: "#334155" }]} onPress={() => setShowAddUserModal(false)}>
-                <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.submitButton} onPress={handleCreateUser} disabled={processingId === "create-user"}>
-                {processingId === "create-user" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Create {newUserData.role === "staff" ? "Staff" : "Security"}</Text>}
-              </TouchableOpacity>
+
+              <View style={styles.userEditorRow}>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Password
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      createUserErrors.password && styles.inputError,
+                      isDarkMode && {
+                        backgroundColor: "#111827",
+                        borderColor: theme.borderColor,
+                        color: "#F8FAFC",
+                      },
+                    ]}
+                    placeholder="Enter password or leave blank"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    secureTextEntry
+                    value={newUserData.password}
+                    onChangeText={(text) =>
+                      setNewUserData((prev) => ({ ...prev, password: text }))
+                    }
+                  />
+                  {renderCreateUserFieldError("password")}
+                </View>
+
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Confirm Password
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      createUserErrors.confirmPassword && styles.inputError,
+                      isDarkMode && {
+                        backgroundColor: "#111827",
+                        borderColor: theme.borderColor,
+                        color: "#F8FAFC",
+                      },
+                    ]}
+                    placeholder="Confirm password"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    secureTextEntry
+                    value={newUserData.confirmPassword}
+                    onChangeText={(text) =>
+                      setNewUserData((prev) => ({
+                        ...prev,
+                        confirmPassword: text,
+                      }))
+                    }
+                  />
+                  {renderCreateUserFieldError("confirmPassword")}
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* RIGHT SIDE */}
+          <View style={styles.createAccountPreviewColumn}>
+            <View
+              style={[
+                styles.previewStickyCard,
+                isDarkMode && {
+                  backgroundColor: "#0F172A",
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={styles.createAccountPreviewTop}>
+                <View
+                  style={[
+                    styles.createAccountPreviewAvatar,
+                    { backgroundColor: `${getRoleColor(newUserData.role)}16` },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.createAccountPreviewAvatarText,
+                      { color: getRoleColor(newUserData.role) },
+                    ]}
+                  >
+                    {`${(newUserData.firstName || "A").charAt(0)}${(
+                      newUserData.lastName || "U"
+                    ).charAt(0)}`.toUpperCase()}
+                  </Text>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewName,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    {`${newUserData.firstName || "New"} ${newUserData.lastName || "User"}`}
+                  </Text>
+                  <View
+                    style={[
+                      styles.createAccountPreviewRoleBadge,
+                      { backgroundColor: `${getRoleColor(newUserData.role)}14` },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.createAccountPreviewRoleText,
+                        { color: getRoleColor(newUserData.role) },
+                      ]}
+                    >
+                      {newUserData.role === "staff"
+                        ? "Staff Account"
+                        : "Security Account"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.createAccountPreviewList}>
+                <View style={styles.createAccountPreviewItem}>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewLabel,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Email
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewValue,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    {newUserData.email || "No email yet"}
+                  </Text>
+                </View>
+
+                <View style={styles.createAccountPreviewItem}>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewLabel,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Phone
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewValue,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    {newUserData.phone || "No phone yet"}
+                  </Text>
+                </View>
+
+                <View style={styles.createAccountPreviewItem}>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewLabel,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Department
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewValue,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    {newUserData.department || "Not assigned"}
+                  </Text>
+                </View>
+
+                <View style={styles.createAccountPreviewItem}>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewLabel,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Position
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewValue,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    {newUserData.position || "Not assigned"}
+                  </Text>
+                </View>
+
+                <View style={styles.createAccountPreviewItem}>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewLabel,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Employee ID
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewValue,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    {newUserData.employeeId || "Will auto-generate"}
+                  </Text>
+                </View>
+
+                <View style={styles.createAccountPreviewItem}>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewLabel,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Username
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountPreviewValue,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    {newUserData.username || "No username yet"}
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={[
+                  styles.createAccountPreviewNote,
+                  isDarkMode && {
+                    backgroundColor: "#111827",
+                    borderColor: theme.borderColor,
+                  },
+                ]}
+              >
+                <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                <Text
+                  style={[
+                    styles.createAccountPreviewNoteText,
+                    isDarkMode && styles.darkTextSecondary,
+                  ]}
+                >
+                  Review all details before saving. This account will be routed
+                  to the proper dashboard after login.
+                </Text>
+              </View>
             </View>
           </View>
         </View>
-      </Modal>
+      </ScrollView>
+
+      <View
+        style={[
+          styles.modalFooter,
+          isDarkMode && { borderTopColor: theme.borderColor },
+        ]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.cancelButton,
+            isDarkMode && { backgroundColor: "#334155" },
+          ]}
+          onPress={() => resetCreateUserForm(newUserData.role)}
+        >
+          <Text
+            style={[
+              styles.cancelButtonText,
+              isDarkMode && styles.darkTextSecondary,
+            ]}
+          >
+            Clear Form
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.addButton, { backgroundColor: getRoleColor(newUserData.role) }]}
+          onPress={handleCreateUser}
+          disabled={processingId === "create-user"}
+        >
+          {processingId === "create-user" ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="person-add-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>Create Account</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
 
       {/* Edit User Modal */}
       <Modal visible={showViewUserModal} transparent animationType="fade" onRequestClose={() => setShowViewUserModal(false)}>
