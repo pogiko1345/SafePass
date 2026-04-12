@@ -2493,18 +2493,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       color={visitor?.appointmentStatus === "rejected" ? "#991B1B" : "#0F766E"}
                     />
                     <Text style={visitorDashboardStyles.reappointmentHeroBadgeText}>
-                      {visitor?.appointmentStatus === "rejected" ? "Appointment Declined" : "Ready for Another Visit"}
+                      {visitor?.appointmentStatus === "rejected" ? "Appointment Declined" : "Ready to Register an Appointment"}
                     </Text>
                   </View>
                   <Text style={visitorDashboardStyles.reappointmentHeroTitle}>
                     {visitor?.appointmentStatus === "rejected"
-                      ? "Request A New Schedule"
-                      : "Book Your Next Appointment"}
+                      ? "Register a New Appointment"
+                      : "Register an Appointment"}
                   </Text>
                   <Text style={visitorDashboardStyles.reappointmentHeroText}>
                     {visitor?.appointmentStatus === "rejected"
-                      ? visitor?.staffRejectionReason || "Your previous appointment was declined. You can submit a new request here without registering again."
-                      : "Your visitor account is active. Enter your preferred date, time, and purpose to send a new request directly to staff."}
+                      ? visitor?.staffRejectionReason || "Your previous appointment was declined. You can register a new appointment here without creating another visitor account."
+                      : "Your visitor account is active. Enter your preferred date, time, and purpose to register an appointment and send it directly to staff."}
                   </Text>
 
                   <View style={visitorDashboardStyles.reappointmentMetaGrid}>
@@ -2529,7 +2529,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               >
                 <View style={visitorDashboardStyles.reappointmentCardHeader}>
                   <View>
-                    <Text style={visitorDashboardStyles.reappointmentCardTitle}>New Appointment Request</Text>
+                    <Text style={visitorDashboardStyles.reappointmentCardTitle}>Register an Appointment</Text>
                     <Text style={visitorDashboardStyles.reappointmentCardSubtitle}>
                       Staff will receive your preferred schedule and visit purpose.
                     </Text>
@@ -2540,14 +2540,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     activeOpacity={0.9}
                   >
                     <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
-                    <Text style={visitorDashboardStyles.reappointmentPrimaryButtonText}>Request Visit</Text>
+                    <Text style={visitorDashboardStyles.reappointmentPrimaryButtonText}>Register Appointment</Text>
                   </TouchableOpacity>
                 </View>
 
                 <View style={visitorDashboardStyles.reappointmentChecklist}>
                   {[
                     "Use your existing visitor account. No need to register again.",
-                    "Choose your preferred date and time for the next visit.",
+                    "Choose your preferred date and time for the appointment.",
                     "Staff will approve, adjust, or reject the request from their dashboard.",
                   ].map((item) => (
                     <View key={item} style={visitorDashboardStyles.reappointmentChecklistRow}>

@@ -370,6 +370,21 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [completedFields, setCompletedFields] = useState({});
   const [registeredVisitor, setRegisteredVisitor] = useState(null);
 
+  const goToVisitorLogin = (overrides = {}) => {
+    navigation.reset({
+      index: 0,
+      routes: [
+        {
+          name: "Login",
+          params: {
+            role: "visitor",
+            ...overrides,
+          },
+        },
+      ],
+    });
+  };
+
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
       document.title =
@@ -485,8 +500,7 @@ export default function VisitorRegisterScreen({ navigation }) {
               text: "Go to Login",
               onPress: () => {
                 setIsSubmitting(false);
-                navigation.navigate("Login", {
-                  role: "visitor",
+                goToVisitorLogin({
                   initialEmail: formData.email,
                 });
               },
@@ -543,7 +557,7 @@ export default function VisitorRegisterScreen({ navigation }) {
             {
               text: "Go to Login",
               onPress: () =>
-                navigation.navigate("Login", {
+                goToVisitorLogin({
                   role: "visitor",
                   initialEmail: formData.email,
                 }),
@@ -593,18 +607,9 @@ export default function VisitorRegisterScreen({ navigation }) {
     ]);
     await AsyncStorage.setItem("isNewRegistration", "true");
 
-    navigation.reset({
-      index: 0,
-      routes: [
-        {
-          name: "Login",
-          params: {
-            role: "visitor",
-            initialEmail: loginIdentifier,
-            initialPassword: loginPassword,
-          },
-        },
-      ],
+    goToVisitorLogin({
+      initialEmail: loginIdentifier,
+      initialPassword: loginPassword,
     });
   };
 
@@ -916,12 +921,12 @@ export default function VisitorRegisterScreen({ navigation }) {
                     visitorRegisterStyles.secondaryActionButton,
                     actionButtonResponsiveStyle,
                   ]}
-                  onPress={() => navigation.goBack()}
+                  onPress={() => goToVisitorLogin()}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="arrow-back" size={18} color="#475569" />
                   <Text style={visitorRegisterStyles.secondaryActionText}>
-                    Back to Portal
+                    Back to Login
                   </Text>
                 </TouchableOpacity>
 

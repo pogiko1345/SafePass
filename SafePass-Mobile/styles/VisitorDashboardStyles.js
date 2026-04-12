@@ -2343,6 +2343,8 @@ export default StyleSheet.create({
     marginTop: -25,
     borderRadius: 26,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -2357,6 +2359,7 @@ export default StyleSheet.create({
 
   reappointmentHeroGradient: {
     padding: 22,
+    minHeight: 228,
   },
 
   reappointmentHeroBadge: {
@@ -2393,11 +2396,14 @@ export default StyleSheet.create({
   },
 
   reappointmentMetaGrid: {
+    marginTop: 4,
     gap: 12,
   },
 
   reappointmentMetaCard: {
     backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
     borderRadius: 16,
     padding: 14,
   },
@@ -2424,7 +2430,7 @@ export default StyleSheet.create({
     padding: 20,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#DCE7F3",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -2433,11 +2439,15 @@ export default StyleSheet.create({
         shadowRadius: 10,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 3px 10px rgba(15,23,42,0.06)" },
+      web: { boxShadow: "0px 8px 22px rgba(15,23,42,0.07)" },
     }),
   },
 
   reappointmentCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
     gap: 14,
     marginBottom: 18,
   },
@@ -2461,10 +2471,20 @@ export default StyleSheet.create({
     justifyContent: "center",
     alignSelf: "flex-start",
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
     backgroundColor: "#0F766E",
     borderRadius: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F766E",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 10px 20px rgba(15,118,110,0.18)" },
+    }),
   },
 
   reappointmentPrimaryButtonText: {
@@ -2475,6 +2495,7 @@ export default StyleSheet.create({
 
   reappointmentChecklist: {
     gap: 12,
+    paddingTop: 6,
   },
 
   reappointmentChecklistRow: {
