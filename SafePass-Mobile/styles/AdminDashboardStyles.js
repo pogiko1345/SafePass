@@ -4832,6 +4832,47 @@ export default StyleSheet.create({
     gap: 18,
   },
 
+  managementQuickStatsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+  },
+
+  managementQuickStatCard: {
+    minWidth: 180,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+    gap: 6,
+  },
+
+  managementQuickStatIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+
+  managementQuickStatValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  managementQuickStatLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#334155",
+  },
+
+  managementQuickStatMeta: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
   staffChecklist: {
     gap: 12,
     marginTop: 8,
