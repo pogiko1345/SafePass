@@ -528,6 +528,10 @@ export default StyleSheet.create({
     backgroundColor: "#FEF2F2",
   },
 
+  noteBoxComplete: {
+    backgroundColor: "#F1F5F9",
+  },
+
   noteText: {
     flex: 1,
     fontSize: 13,
@@ -537,6 +541,10 @@ export default StyleSheet.create({
 
   noteTextReject: {
     color: "#991B1B",
+  },
+
+  noteTextComplete: {
+    color: "#334155",
   },
 
   actionRow: {
@@ -598,6 +606,24 @@ export default StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     color: "#DC2626",
+  },
+
+  completeAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minWidth: 180,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: "#475569",
+  },
+
+  completeActionText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
 
   disabledAction: {

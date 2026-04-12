@@ -892,6 +892,18 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async completeStaffAppointment(visitorId, note = "") {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/complete`, {
+        method: "PUT",
+        body: { note },
+      });
+    } catch (error) {
+      console.error("Complete staff appointment error:", error);
+      throw error;
+    }
+  }
+
   // ================= ADMIN VISITOR APPROVAL METHODS =================
 
   async getPendingVisitors() {

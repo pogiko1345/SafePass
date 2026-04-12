@@ -201,6 +201,24 @@ const visitorSchema = new mongoose.Schema({
     default: "",
     trim: true,
   },
+  appointmentCompletedAt: {
+    type: Date,
+    default: null,
+  },
+  appointmentCompletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  appointmentCompletionNote: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  overstayAlertedAt: {
+    type: Date,
+    default: null,
+  },
   
   // ============ Check-in/out Status ============
   status: { 
@@ -410,8 +428,14 @@ visitorSchema.methods = {
       this.staffActionAt = null;
       this.staffAdjustmentNote = "";
       this.staffRejectionReason = "";
+      this.appointmentCompletedAt = null;
+      this.appointmentCompletedBy = null;
+      this.appointmentCompletionNote = "";
+      this.overstayAlertedAt = null;
     } else {
-      if (this.approvalStatus !== "approved") {
+      if (this.appointmentStatus === "rejected") {
+        this.approvalStatus = "rejected";
+      } else if (this.approvalStatus !== "approved") {
         this.approvalStatus = "approved";
       }
       if (!this.appointmentStatus || this.appointmentStatus === "not_requested") {
@@ -512,6 +536,10 @@ visitorSchema.methods = {
     this.staffActionAt = null;
     this.staffAdjustmentNote = "";
     this.staffRejectionReason = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.overstayAlertedAt = null;
     this.assignedStaff = assignedStaff || null;
     this.assignedStaffName = String(assignedStaffName || "").trim();
     this.checkedInAt = null;
@@ -535,6 +563,10 @@ visitorSchema.methods = {
     this.staffActionAt = new Date();
     this.staffAdjustmentNote = String(note || "").trim();
     this.staffRejectionReason = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.overstayAlertedAt = null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;
@@ -562,6 +594,10 @@ visitorSchema.methods = {
     this.staffActionAt = new Date();
     this.staffAdjustmentNote = String(note || "Preferred time adjusted by staff.").trim();
     this.staffRejectionReason = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.overstayAlertedAt = null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;
@@ -573,7 +609,7 @@ visitorSchema.methods = {
   rejectAppointment(staffUser, reason = "") {
     this.requestCategory = "appointment";
     this.approvalFlow = "staff";
-    this.approvalStatus = "approved";
+    this.approvalStatus = "rejected";
     this.appointmentStatus = "rejected";
     this.assignedStaff = staffUser?._id || null;
     this.assignedStaffName = staffUser
@@ -582,10 +618,38 @@ visitorSchema.methods = {
     this.staffActionBy = staffUser?._id || null;
     this.staffActionAt = new Date();
     this.staffRejectionReason = String(reason || "Appointment request declined by staff.").trim();
+    this.staffAdjustmentNote = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.overstayAlertedAt = null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;
     this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  completeAppointment(staffUser, note = "") {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    if (!APPOINTMENT_APPROVED_STATUSES.includes(this.appointmentStatus)) {
+      this.appointmentStatus = "approved";
+    }
+    this.assignedStaff = staffUser?._id || this.assignedStaff || null;
+    this.assignedStaffName = staffUser
+      ? `${staffUser.firstName || ""} ${staffUser.lastName || ""}`.trim()
+      : this.assignedStaffName;
+    this.staffActionBy = staffUser?._id || null;
+    this.staffActionAt = new Date();
+    this.appointmentCompletedAt = new Date();
+    this.appointmentCompletedBy = staffUser?._id || null;
+    this.appointmentCompletionNote = String(
+      note || "Appointment completed. Visitor can proceed to check-out.",
+    ).trim();
+    this.overstayAlertedAt = null;
     this.syncWorkflowState();
     return this;
   },
@@ -595,6 +659,7 @@ visitorSchema.methods = {
     this.checkedInBy = actorId || null;
     this.checkedOutAt = null;
     this.checkedOutBy = null;
+    this.overstayAlertedAt = null;
     this.syncWorkflowState();
     return this;
   },
@@ -607,6 +672,7 @@ visitorSchema.methods = {
       isActive: false,
       lastSeenAt: this.currentLocation?.lastSeenAt || new Date(),
     };
+    this.overstayAlertedAt = null;
     this.syncWorkflowState();
     return this;
   },

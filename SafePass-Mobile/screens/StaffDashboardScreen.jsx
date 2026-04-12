@@ -54,6 +54,7 @@ const getStatusMeta = (status) => {
 
 const getAppointmentStatus = (appointment) => {
   if (!appointment) return "pending";
+  if (appointment.appointmentCompletedAt) return "completed";
   if (appointment.status === "checked_out") return "completed";
   return String(appointment.appointmentStatus || "pending").toLowerCase();
 };
@@ -458,6 +459,48 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     }
   };
 
+  const handleComplete = async (appointment) => {
+    if (!appointment?._id || processingId) return;
+
+    const performComplete = async () => {
+      setProcessingId(appointment._id);
+      try {
+        const response = await ApiService.completeStaffAppointment(appointment._id);
+        if (response?.visitor) {
+          mergeAppointment(response.visitor);
+        }
+        await loadData();
+        Alert.alert(
+          "Appointment Completed",
+          "Security, admin, and the visitor have been notified for checkout follow-up.",
+        );
+      } catch (error) {
+        Alert.alert("Complete Failed", error?.message || "Could not complete appointment.");
+      } finally {
+        setProcessingId(null);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmed = globalThis?.window?.confirm?.(
+        "Mark this appointment as complete and notify security for checkout?",
+      );
+      if (confirmed) {
+        await performComplete();
+      }
+      return;
+    }
+
+    Alert.alert(
+      "Complete Appointment",
+      "Mark this appointment as complete and notify security for checkout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Complete", onPress: performComplete },
+      ],
+    );
+  };
+
   const handleLogout = async () => {
     await ApiService.logout();
     if (typeof onLogout === "function") onLogout();
@@ -468,6 +511,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     const appointmentStatus = getAppointmentStatus(appointment);
     const statusMeta = getStatusMeta(appointmentStatus);
     const isPending = appointmentStatus === "pending";
+    const canComplete =
+      appointment.status === "checked_in" &&
+      !appointment.checkedOutAt &&
+      !appointment.appointmentCompletedAt;
     const isProcessing = processingId === appointment._id;
 
     return (
@@ -537,6 +584,15 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
         ) : null}
 
+        {appointment.appointmentCompletionNote ? (
+          <View style={[styles.noteBox, styles.noteBoxComplete]}>
+            <Ionicons name="checkmark-done-outline" size={16} color="#475569" />
+            <Text style={[styles.noteText, styles.noteTextComplete]}>
+              {appointment.appointmentCompletionNote}
+            </Text>
+          </View>
+        ) : null}
+
         {allowActions && isPending ? (
           <View style={styles.actionRow}>
             <TouchableOpacity
@@ -570,6 +626,25 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             >
               <Ionicons name="close-outline" size={16} color="#DC2626" />
               <Text style={styles.rejectActionText}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {allowActions && canComplete ? (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.completeAction, isProcessing && styles.disabledAction]}
+              onPress={() => handleComplete(appointment)}
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.completeActionText}>Complete Appointment</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         ) : null}

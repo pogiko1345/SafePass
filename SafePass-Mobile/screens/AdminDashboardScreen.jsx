@@ -421,6 +421,7 @@ const ADMIN_MAP_ACTIVITY_TYPES = new Set([
   "staff_approved_appointment",
   "staff_adjusted_appointment",
   "staff_rejected_appointment",
+  "staff_completed_appointment",
   "security_checkin",
   "visitor_self_checkin",
   "security_checkout",
@@ -473,6 +474,8 @@ const getActivityLabel = (activityType) => {
       return "Time Adjusted";
     case "staff_rejected_appointment":
       return "Staff Rejection";
+    case "staff_completed_appointment":
+      return "Appointment Complete";
     case "security_checkin":
     case "visitor_self_checkin":
       return "Check In";

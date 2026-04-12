@@ -186,6 +186,101 @@ const createRoleNotification = async ({
   }
 };
 
+const formatVisitSchedule = (visitDate, visitTime) => {
+  const resolvedDate = visitDate ? new Date(visitDate) : null;
+  const resolvedTime = visitTime ? new Date(visitTime) : null;
+  const dateLabel = resolvedDate
+    ? resolvedDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "an upcoming date";
+  const timeLabel = resolvedTime
+    ? resolvedTime.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "the scheduled time";
+
+  return `${dateLabel} at ${timeLabel}`;
+};
+
+const ensureOverstayAlerts = async () => {
+  try {
+    const graceMinutes = Math.max(
+      5,
+      parseInt(process.env.VISITOR_OVERSTAY_GRACE_MINUTES || "15", 10),
+    );
+    const threshold = new Date(Date.now() - graceMinutes * 60 * 1000);
+
+    const overstayedVisitors = await Visitor.find({
+      requestCategory: "appointment",
+      status: "checked_in",
+      appointmentCompletedAt: { $ne: null, $lte: threshold },
+      checkedOutAt: null,
+      overstayAlertedAt: null,
+    }).limit(50);
+
+    for (const visitor of overstayedVisitors) {
+      const visitorUser = await User.findOne({ email: visitor.email });
+      const scheduleLabel = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+
+      await createRoleNotification({
+        title: "Visitor Overstay Alert",
+        message: `${visitor.fullName} has not checked out ${graceMinutes} minutes after appointment completion. Scheduled visit was ${scheduleLabel}.`,
+        type: "alert",
+        severity: "high",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_overstay_alert",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes,
+        },
+      });
+
+      await createRoleNotification({
+        title: "Visitor Overstay Alert",
+        message: `${visitor.fullName} has not checked out after the appointment was marked complete.`,
+        type: "alert",
+        severity: "high",
+        targetRole: "admin",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_overstay_alert",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes,
+        },
+      });
+
+      await createSystemActivity({
+        actorUser: null,
+        relatedVisitor: visitor,
+        relatedUser: visitorUser,
+        activityType: "visitor_overstay_alert",
+        status: "flagged",
+        location: visitor.assignedOffice || visitor.host || "Campus",
+        notes: `${visitor.fullName} remained checked in after appointment completion.`,
+        metadata: {
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes,
+        },
+      });
+
+      visitor.overstayAlertedAt = new Date();
+      await visitor.save();
+    }
+  } catch (error) {
+    console.error("Ensure overstay alerts error:", error);
+  }
+};
+
 const CHECKPOINT_LOCATIONS = {
   main_gate: {
     floor: "ground",
@@ -3393,13 +3488,14 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     const updatedVisitor = await Visitor.findById(visitor._id)
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
 
     await createRoleNotification({
       title: "Appointment Approved",
-      message: `${visitor.fullName}'s appointment was approved by ${getFullName(req.user)}.`,
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was approved by ${getFullName(req.user)}.`,
       type: "success",
       severity: "low",
       targetRole: "security",
@@ -3415,7 +3511,7 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
     if (visitorUser) {
       await createRoleNotification({
         title: "Your Appointment Is Approved",
-        message: `Your visit on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()} has been approved.`,
+        message: `Your visit on ${visitSchedule} has been approved. Please provide internet before going to the site.`,
         type: "success",
         severity: "low",
         targetRole: "visitor",
@@ -3427,6 +3523,21 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
         },
       });
     }
+
+    await createRoleNotification({
+      title: "Appointment Approved",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} has been approved and recorded.`,
+      type: "success",
+      severity: "low",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_approved_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     await createSystemActivity({
       actorUser: req.user,
@@ -3508,13 +3619,14 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     const updatedVisitor = await Visitor.findById(visitor._id)
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
 
     await createRoleNotification({
       title: "Appointment Time Adjusted",
-      message: `${getFullName(req.user)} adjusted ${visitor.fullName}'s appointment to ${new Date(visitor.visitTime).toLocaleTimeString()}.`,
+      message: `${getFullName(req.user)} adjusted ${visitor.fullName}'s appointment to ${visitSchedule}.`,
       type: "warning",
       severity: "medium",
       targetRole: "security",
@@ -3531,7 +3643,7 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     if (visitorUser) {
       await createRoleNotification({
         title: "Appointment Time Updated",
-        message: `Your appointment was adjusted to ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}.`,
+        message: `Your appointment was adjusted to ${visitSchedule}. Please provide internet before going to the site.`,
         type: "warning",
         severity: "medium",
         targetRole: "visitor",
@@ -3544,6 +3656,22 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
         },
       });
     }
+
+    await createRoleNotification({
+      title: "Appointment Time Adjusted",
+      message: `${visitor.fullName}'s appointment has been updated to ${visitSchedule}.`,
+      type: "warning",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_adjusted_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: visitor.staffAdjustmentNote,
+      },
+    });
 
     await createSystemActivity({
       actorUser: req.user,
@@ -3615,6 +3743,7 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     const updatedVisitor = await Visitor.findById(visitor._id)
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
@@ -3635,6 +3764,38 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
         },
       });
     }
+
+    await createRoleNotification({
+      title: "Appointment Request Declined",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was declined. Reason: ${rejectionReason}`,
+      type: "alert",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_rejected_appointment",
+        reason: rejectionReason,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Appointment Request Declined",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was declined by ${getFullName(req.user)}.`,
+      type: "alert",
+      severity: "medium",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_rejected_appointment",
+        reason: rejectionReason,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     await createSystemActivity({
       actorUser: req.user,
@@ -3665,6 +3826,144 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
   }
 });
 
+app.put("/api/staff/appointments/:id/complete", authMiddleware, async (req, res) => {
+  try {
+    if (!["staff", "admin"].includes(String(req.user.role).toLowerCase())) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be completed here.",
+      });
+    }
+
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only complete appointments assigned to your department.",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "The visitor must be checked in before the appointment can be completed.",
+      });
+    }
+
+    if (visitor.checkedOutAt) {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been checked out.",
+      });
+    }
+
+    if (visitor.appointmentCompletedAt) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment has already been marked complete.",
+      });
+    }
+
+    const completionNote = String(
+      req.body?.note || "Appointment completed. Visitor can proceed to check-out.",
+    ).trim();
+
+    visitor.completeAppointment(req.user, completionNote);
+    await visitor.save();
+
+    const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department")
+      .populate("appointmentCompletedBy", "firstName lastName email department");
+
+    await createRoleNotification({
+      title: "Appointment Completed",
+      message: `${getFullName(req.user)} marked ${visitor.fullName}'s appointment complete. Please prepare for check-out.`,
+      type: "info",
+      severity: "medium",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_completed_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: completionNote,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Appointment Completed",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was marked complete by ${getFullName(req.user)}.`,
+      type: "info",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_completed_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: completionNote,
+      },
+    });
+
+    if (visitorUser) {
+      await createRoleNotification({
+        title: "Appointment Completed",
+        message: "Your appointment is complete. Please proceed to check-out with security before leaving the site.",
+        type: "info",
+        severity: "medium",
+        targetRole: "visitor",
+        targetUser: visitorUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser._id,
+        metadata: {
+          activityType: "staff_completed_appointment",
+          note: completionNote,
+        },
+      });
+    }
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "staff_completed_appointment",
+      status: "granted",
+      location: visitor.assignedOffice || visitor.host || req.user.department || "Staff Office",
+      notes: `${getFullName(req.user)} completed ${visitor.fullName}'s appointment.`,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: completionNote,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Appointment marked complete successfully",
+      visitor: updatedVisitor,
+    });
+  } catch (error) {
+    console.error("Staff complete appointment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to complete appointment",
+    });
+  }
+});
+
 // Check-in visitor (by security)
 app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
   try {
@@ -3687,7 +3986,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
     if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
-        message: "Visitor is still waiting for admin approval",
+        message: "Visitor does not have an approved visit window yet",
       });
     }
 
@@ -3769,7 +4068,7 @@ app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
     if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
-        message: "Visitor is not approved for checkout flow",
+        message: "Visitor does not have an approved visit window yet",
       });
     }
 
@@ -3870,6 +4169,8 @@ app.post("/api/visitors/:id/report", authMiddleware, async (req, res) => {
 // Get notifications (for security dashboard)
 app.get("/api/notifications", authMiddleware, async (req, res) => {
   try {
+    await ensureOverstayAlerts();
+
     const { read, limit = 50 } = req.query;
     const targetRoles = getNotificationTargetRoles(req.user.role);
 
@@ -4110,7 +4411,12 @@ app.get("/api/admin/activities", authMiddleware, async (req, res) => {
       registrationRequests: activities.filter((item) => item.activityType === "visitor_registration_request").length,
       appointmentRequests: activities.filter((item) => item.activityType === "visitor_appointment_request").length,
       staffActions: activities.filter((item) =>
-        ["staff_approved_appointment", "staff_adjusted_appointment", "staff_rejected_appointment"].includes(item.activityType),
+        [
+          "staff_approved_appointment",
+          "staff_adjusted_appointment",
+          "staff_rejected_appointment",
+          "staff_completed_appointment",
+        ].includes(item.activityType),
       ).length,
       completedVisits: activities.filter((item) =>
         item.activityType === "security_checkout" || item.activityType === "visitor_self_checkout",

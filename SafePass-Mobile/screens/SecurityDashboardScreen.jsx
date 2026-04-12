@@ -341,10 +341,14 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const deriveVisitorCollections = (all = []) => {
     const active = all.filter((visitor) => visitor.status === 'checked_in');
-    const pending = all.filter((visitor) => visitor.approvalStatus === 'pending');
+    const pending = all.filter(
+      (visitor) =>
+        visitor.appointmentStatus === 'pending' ||
+        (!visitor.appointmentStatus && visitor.approvalStatus === 'pending'),
+    );
     const approved = all.filter(
       (visitor) =>
-        visitor.approvalStatus === 'approved' &&
+        hasApprovedVisitWindow(visitor) &&
         visitor.status !== 'checked_in' &&
         visitor.status !== 'checked_out',
     );
@@ -862,17 +866,32 @@ export default function SecurityDashboardScreen({ navigation }) {
     });
   };
 
+  const hasApprovedVisitWindow = (visitor) => {
+    if (!visitor) return false;
+    const appointmentStatus = String(visitor.appointmentStatus || "").toLowerCase();
+    const approvalStatus = String(visitor.approvalStatus || "").toLowerCase();
+
+    if (visitor.requestCategory === "appointment") {
+      return approvalStatus === "approved" && ["approved", "adjusted"].includes(appointmentStatus);
+    }
+
+    return approvalStatus === "approved";
+  };
+
   const getStatusBadge = (visitor) => {
     if (visitor.status === 'checked_in') {
       return { bg: '#D1FAE5', text: '#059669', label: 'CHECKED IN' };
     } else if (visitor.status === 'checked_out') {
       return { bg: '#F3F4F6', text: '#6B7280', label: 'CHECKED OUT' };
-    } else if (visitor.approvalStatus === 'pending') {
-      return { bg: '#FEF3C7', text: '#D97706', label: 'PENDING' };
-    } else if (visitor.approvalStatus === 'approved') {
-      return { bg: '#DBEAFE', text: '#3B82F6', label: 'APPROVED' };
-    } else if (visitor.approvalStatus === 'rejected') {
+    } else if (visitor.appointmentStatus === 'rejected' || visitor.approvalStatus === 'rejected') {
       return { bg: '#FEE2E2', text: '#DC2626', label: 'REJECTED' };
+    } else if (
+      visitor.appointmentStatus === 'pending' ||
+      (!visitor.appointmentStatus && visitor.approvalStatus === 'pending')
+    ) {
+      return { bg: '#FEF3C7', text: '#D97706', label: 'PENDING' };
+    } else if (hasApprovedVisitWindow(visitor)) {
+      return { bg: '#DBEAFE', text: '#3B82F6', label: 'APPROVED' };
     }
     return { bg: '#F3F4F6', text: '#6B7280', label: 'UNKNOWN' };
   };
@@ -999,8 +1018,8 @@ export default function SecurityDashboardScreen({ navigation }) {
       return;
     }
 
-    if (visitor.approvalStatus !== 'approved') {
-      Alert.alert("Approval Required", `${visitor.fullName} is still waiting for admin approval.`);
+    if (!hasApprovedVisitWindow(visitor)) {
+      Alert.alert("Approval Required", `${visitor.fullName} does not have an approved visit window yet.`);
       return;
     }
 
@@ -2277,7 +2296,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
 
         <View style={styles.visitorCardActions}>
-          {visitor.approvalStatus === 'approved' && (
+          {hasApprovedVisitWindow(visitor) && (
             <TouchableOpacity 
               style={[
                 styles.visitorCardAction,
@@ -3033,7 +3052,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                       <View style={styles.visitorDetailAccessPill}>
                         <Ionicons name="shield-checkmark-outline" size={12} color="#0A3D91" />
                         <Text style={styles.visitorDetailAccessPillText}>
-                          {selectedVisitor.approvalStatus === 'approved' ? 'Cleared for access' : 'Awaiting clearance'}
+                          {hasApprovedVisitWindow(selectedVisitor) ? 'Cleared for access' : 'Awaiting clearance'}
                         </Text>
                       </View>
                     </View>
@@ -3130,7 +3149,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 </View>
 
                 <View style={styles.detailActions}>
-                  {selectedVisitor.approvalStatus === 'approved' && selectedVisitor.status !== 'checked_out' && (
+                  {hasApprovedVisitWindow(selectedVisitor) && selectedVisitor.status !== 'checked_out' && (
                     <TouchableOpacity 
                       style={[
                         styles.detailActionButton,
