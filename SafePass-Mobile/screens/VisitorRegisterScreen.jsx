@@ -88,8 +88,7 @@ const SuccessModal = ({ visible, credentials, onConfirm, onVerifySimulation }) =
           </View>
           <Text style={visitorRegisterStyles.successTitle}>Registration Successful</Text>
           <Text style={visitorRegisterStyles.successMessage}>
-            Registration successful. Please verify your account first using the
-            link we sent to your email before logging in.
+            Please verify your account first before logging in.
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
             <View style={visitorRegisterStyles.credentialsTitleRow}>
@@ -167,13 +166,13 @@ const SuccessModal = ({ visible, credentials, onConfirm, onVerifySimulation }) =
           >
             <LinearGradient
               colors={["#059669", "#047857"]}
-              style={visitorRegisterStyles.successGradient}
-            >
-              <Text style={visitorRegisterStyles.successButtonText}>
-                Go to Login
-              </Text>
-              <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
-            </LinearGradient>
+                style={visitorRegisterStyles.successGradient}
+              >
+                <Text style={visitorRegisterStyles.successButtonText}>
+                  Continue to Login
+                </Text>
+                <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
+              </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
