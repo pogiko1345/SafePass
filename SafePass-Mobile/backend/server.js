@@ -1279,7 +1279,6 @@ app.post("/api/visitors/register", async (req, res) => {
       dataPrivacyAcceptedAt,
       isActive: true,
       visitorId: existingVisitor?._id || null,
-      nfcCardId: null,
     });
 
     const verification = sendVerificationEmailSimulation(req, user);

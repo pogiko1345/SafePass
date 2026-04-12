@@ -78,6 +78,10 @@ userSchema.pre("save", async function (next) {
     this.username = undefined;
   }
 
+  if (this.nfcCardId === null || this.nfcCardId === "") {
+    this.nfcCardId = undefined;
+  }
+
   if (this.email) {
     this.email = String(this.email).toLowerCase().trim();
   }
