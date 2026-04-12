@@ -1210,6 +1210,10 @@ app.post("/api/visitors/register", async (req, res) => {
     const normalizedEmail = normalizeEmailValue(visitorData.email);
     const normalizedUsername = normalizeUsernameValue(visitorData.username);
     const password = String(visitorData.password || "");
+    const dataPrivacyAccepted = visitorData.privacyAccepted === true;
+    const dataPrivacyAcceptedAt = visitorData.privacyAcceptedAt
+      ? new Date(visitorData.privacyAcceptedAt)
+      : new Date();
 
     if (!normalizedFullName || !normalizedEmail || !normalizedUsername || !password) {
       return res.status(400).json({
@@ -1229,6 +1233,14 @@ app.post("/api/visitors/register", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Password must be at least 6 characters long.",
+      });
+    }
+
+    if (!dataPrivacyAccepted) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "By registering, you must agree that your personal data will be collected and used for visitor monitoring and security purposes.",
       });
     }
 
@@ -1263,6 +1275,8 @@ app.post("/api/visitors/register", async (req, res) => {
       role: "visitor",
       status: "active",
       isVerified: false,
+      dataPrivacyAccepted: true,
+      dataPrivacyAcceptedAt,
       isActive: true,
       visitorId: existingVisitor?._id || null,
       nfcCardId: null,
@@ -1299,6 +1313,24 @@ app.post("/api/visitors/register", async (req, res) => {
       relatedUser: user._id,
       relatedVisitor: existingVisitor?._id || null,
       notes: "Visitor account created and waiting for email verification",
+    });
+
+    await createRoleNotification({
+      title: "New Visitor Account Registered",
+      message: `New visitor account registered: ${normalizedFullName}`,
+      targetRole: "admin",
+      relatedVisitor: existingVisitor?._id || null,
+      relatedUser: user._id,
+      type: "visitor",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_account_registration",
+        userId: user._id,
+        email: user.email,
+        fullName: normalizedFullName,
+        isVerified: false,
+        timestamp: new Date().toISOString(),
+      },
     });
 
     res.status(201).json({

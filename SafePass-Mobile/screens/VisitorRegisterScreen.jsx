@@ -61,7 +61,7 @@ const officeOptions = MONITORING_MAP_OFFICES.map((office) => {
 });
 
 // ================= SUCCESS MODAL COMPONENT =================
-const SuccessModal = ({ visible, credentials, onConfirm }) => {
+const SuccessModal = ({ visible, credentials, onConfirm, onVerifySimulation }) => {
   const handleCopy = (text, type) => {
     if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(text).catch(() => {});
@@ -86,10 +86,10 @@ const SuccessModal = ({ visible, credentials, onConfirm }) => {
               <Ionicons name="checkmark-done" size={48} color="#FFFFFF" />
             </LinearGradient>
           </View>
-          <Text style={visitorRegisterStyles.successTitle}>Account Created!</Text>
+          <Text style={visitorRegisterStyles.successTitle}>Registration Successful</Text>
           <Text style={visitorRegisterStyles.successMessage}>
-            Your visitor account is ready. Sign in using these credentials, then
-            create and track appointments from your dashboard.
+            Registration successful. Please verify your account first using the
+            link we sent to your email before logging in.
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
             <View style={visitorRegisterStyles.credentialsTitleRow}>
@@ -99,7 +99,8 @@ const SuccessModal = ({ visible, credentials, onConfirm }) => {
               </Text>
             </View>
             <Text style={visitorRegisterStyles.credentialsInfo}>
-              Save these details so you can sign in right away.
+              This is a simulation only. You can verify the account first, then use
+              these credentials to sign in.
             </Text>
             {credentials && (
               <>
@@ -142,6 +143,23 @@ const SuccessModal = ({ visible, credentials, onConfirm }) => {
               </>
             )}
           </View>
+          {credentials?.verificationLink ? (
+            <TouchableOpacity
+              style={visitorRegisterStyles.successButton}
+              onPress={onVerifySimulation}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={["#2563EB", "#1D4ED8"]}
+                style={visitorRegisterStyles.successGradient}
+              >
+                <Text style={visitorRegisterStyles.successButtonText}>
+                  Verify Account
+                </Text>
+                <Ionicons name="mail-open-outline" size={20} color="#FFFFFF" />
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             style={visitorRegisterStyles.successButton}
             onPress={onConfirm}
@@ -194,7 +212,7 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
               Data Privacy Agreement
             </Text>
             <Text style={visitorRegisterStyles.privacyModalSubtitle}>
-              Please review and accept before creating your visitor account.
+              By registering, you agree that your personal data will be collected and used for visitor monitoring and security purposes.
             </Text>
           </View>
           <ScrollView
@@ -209,7 +227,7 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • Full name, email address, username, and your password for account access.
+                â€¢ Full name, email address, username, and your password for account access.
               </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
@@ -220,10 +238,10 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • To create your visitor account and securely link future appointments to you.
+                â€¢ To create your visitor account and securely link future appointments to you.
               </Text>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • To let you log in, request appointments, and track approval status.
+                â€¢ To let you log in, request appointments, and track approval status.
               </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
@@ -234,10 +252,10 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • Your account details are stored securely and used only inside the SafePass system.
+                â€¢ Your account details are stored securely and used only inside the SafePass system.
               </Text>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • Only authorized personnel can view appointment-related records when needed.
+                â€¢ Only authorized personnel can view appointment-related records when needed.
               </Text>
             </View>
           </ScrollView>
@@ -432,7 +450,7 @@ export default function VisitorRegisterScreen({ navigation }) {
 
     const errorMessages = Object.entries(nextErrors)
       .filter(([, message]) => Boolean(message))
-      .map(([field, message]) => `• ${labels[field]}: ${message}`);
+      .map(([field, message]) => `â€¢ ${labels[field]}: ${message}`);
 
     if (errorMessages.length > 0) {
       showValidationAlert(errorMessages);
@@ -489,6 +507,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           username: response.credentials?.username || formData.username,
           userEmail: response.credentials?.email || formData.email,
           userPassword: response.credentials?.password || formData.password,
+          verificationLink: response.verificationLink || "",
         });
         setTimeout(() => {
           setShowSuccess(true);
@@ -583,6 +602,36 @@ export default function VisitorRegisterScreen({ navigation }) {
         },
       ],
     });
+  };
+
+  const handleVerifySimulation = async () => {
+    const verificationLink = registeredVisitor?.verificationLink;
+
+    if (!verificationLink) {
+      Alert.alert(
+        "Simulation Link Missing",
+        "No verification link was returned. Please check the backend logs.",
+      );
+      return;
+    }
+
+    try {
+      if (Platform.OS === "web") {
+        window.open(verificationLink, "_blank", "noopener,noreferrer");
+      } else {
+        await Linking.openURL(verificationLink);
+      }
+
+      Alert.alert(
+        "Verification Opened",
+        "Open the verification page, complete the simulation, then return here and log in.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Unable to Open Verification",
+        "Please copy the verification link from the backend logs and open it manually.",
+      );
+    }
   };
 
   const completionCount = [
@@ -915,10 +964,12 @@ export default function VisitorRegisterScreen({ navigation }) {
                 username: registeredVisitor.username,
                 email: registeredVisitor.userEmail,
                 password: registeredVisitor.userPassword,
+                verificationLink: registeredVisitor.verificationLink,
               }
             : null
         }
         onConfirm={handleSuccessConfirm}
+        onVerifySimulation={handleVerifySimulation}
       />
     </SafeAreaView>
   );

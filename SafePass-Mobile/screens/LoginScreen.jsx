@@ -585,7 +585,9 @@ export default function LoginScreen({ navigation, route }) {
     } catch (error) {
       console.error("Login error:", error);
       
-      if (error.message.includes("pending")) {
+      if (error.message.includes("not yet verified") || error.message.includes("verify your email")) {
+        setLoginError("Your account is not yet verified. Please verify your email first.");
+      } else if (error.message.includes("pending")) {
         setLoginError("Your account is pending approval. Please wait for admin approval.");
       } else if (error.message.includes("Invalid email") || error.message.includes("password")) {
         setLoginError("Incorrect email or password. Please try again.");

@@ -461,6 +461,8 @@ const getActivityLabel = (activityType) => {
   switch (activityType) {
     case "visitor_appointment_request":
       return "Appointment Request";
+    case "visitor_account_registration":
+      return "Visitor Account";
     case "admin_approved_registration":
       return "Admin Approval";
     case "admin_rejected_registration":

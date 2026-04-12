@@ -301,6 +301,13 @@ async register(userData) {
     } catch (error) {
       console.error("Login API error:", error);
       
+      if (error?.data?.requiresEmailVerification || error?.status === 403) {
+        throw new Error(
+          error?.data?.message ||
+            "Your account is not yet verified. Please verify your email first."
+        );
+      }
+
       if (error.message.includes("401")) {
         throw new Error("Invalid email or password. Please check your credentials.");
       }
@@ -407,7 +414,11 @@ async verifyCredentials(email, password) {
     console.error("Verify credentials error:", error);
 
     if (!this.isDevFallbackEnabled()) {
-      throw new Error(error.message || "Invalid email or password");
+      throw new Error(
+        error?.data?.message ||
+          error.message ||
+          "Invalid email or password"
+      );
     }
 
     // Demo accounts (development fallback if backend not running)

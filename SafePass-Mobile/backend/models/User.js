@@ -59,6 +59,8 @@ role: {
   verificationTokenHash: { type: String, default: "" },
   verificationExpiresAt: { type: Date, default: null },
   verifiedAt: { type: Date, default: null },
+  dataPrivacyAccepted: { type: Boolean, default: false },
+  dataPrivacyAcceptedAt: { type: Date, default: null },
 
   isActive: { type: Boolean, default: true },
   lastLogin: Date,
