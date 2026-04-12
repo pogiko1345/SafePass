@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
 import * as Location from "expo-location";
+import * as ImagePicker from "expo-image-picker";
 import ApiService from "../utils/ApiService";
 import CampusMap from "../components/CampusMap";
 import visitorDashboardStyles from "../styles/VisitorDashboardStyles";
@@ -147,6 +148,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     department: "Registrar",
     purposeSelection: "Enrollment",
     customPurpose: "",
+    idNumber: "",
+    idImage: null,
+    privacyAccepted: false,
   });
   const [accessLogs, setAccessLogs] = useState([]);
   const [greeting, setGreeting] = useState("");
@@ -825,7 +829,49 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         matchedPurpose === "Other"
           ? String(visitor?.customPurposeOfVisit || existingPurpose || "").trim()
           : "",
+      idNumber: String(visitor?.idNumber || "").startsWith("VIS-")
+        ? ""
+        : String(visitor?.idNumber || "").trim(),
+      idImage: visitor?.idImage || null,
+      privacyAccepted: false,
     });
+  };
+
+  const handlePickAppointmentIdImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission Needed",
+          "Please allow photo access so you can upload a valid ID picture.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.75,
+        base64: true,
+      });
+
+      if (result.canceled) return;
+
+      const asset = result.assets?.[0];
+      if (!asset?.uri) return;
+
+      const imageValue = asset.base64
+        ? `data:${asset.mimeType || "image/jpeg"};base64,${asset.base64}`
+        : asset.uri;
+
+      setAppointmentForm((prev) => ({
+        ...prev,
+        idImage: imageValue,
+      }));
+    } catch (error) {
+      console.error("Pick appointment ID image error:", error);
+      Alert.alert("Upload Failed", "Unable to select the ID image. Please try again.");
+    }
   };
 
   const openAppointmentModal = () => {
@@ -855,6 +901,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const department = isOtherPurpose
       ? String(appointmentForm.department || "").trim()
       : getDefaultDepartmentForPurpose(purposeCategory);
+    const idNumber = String(appointmentForm.idNumber || "").trim();
+    const idImage = appointmentForm.idImage;
 
     if (!currentUser?._id) {
       Alert.alert("Login Required", "Please sign in again before requesting a new appointment.");
@@ -881,6 +929,24 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
+    if (!idNumber) {
+      Alert.alert("Missing Valid ID", "Please enter the ID number shown on your valid ID.");
+      return;
+    }
+
+    if (!idImage) {
+      Alert.alert("Missing Valid ID Picture", "Please upload a clear picture of your valid ID before submitting.");
+      return;
+    }
+
+    if (!appointmentForm.privacyAccepted) {
+      Alert.alert(
+        "Data Privacy Confirmation",
+        "Please confirm that you allow Sapphire SafePass to collect your appointment and ID information for visit verification.",
+      );
+      return;
+    }
+
     const combinedDateTime = new Date(preferredDate);
     combinedDateTime.setHours(preferredTime.getHours(), preferredTime.getMinutes(), 0, 0);
     if (Number.isNaN(combinedDateTime.getTime())) {
@@ -900,6 +966,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         assignedOffice: department,
         appointmentDepartment: department,
         purposeOfVisit,
+        idNumber,
+        idImage,
+        dataPrivacyAccepted: true,
+        dataPrivacyAcceptedAt: new Date().toISOString(),
       });
 
       if (response?.success) {
@@ -3118,6 +3188,92 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   />
                 ) : null}
               </View>
+
+              <View style={visitorDashboardStyles.appointmentField}>
+                <Text style={visitorDashboardStyles.appointmentFieldLabel}>Valid ID Number</Text>
+                <TextInput
+                  style={visitorDashboardStyles.appointmentFieldInput}
+                  placeholder="Enter the ID number shown on your valid ID"
+                  placeholderTextColor="#94A3B8"
+                  value={appointmentForm.idNumber}
+                  onChangeText={(text) =>
+                    setAppointmentForm((prev) => ({ ...prev, idNumber: text }))
+                  }
+                  autoCapitalize="characters"
+                />
+                <Text style={visitorDashboardStyles.appointmentAutoHint}>
+                  This ID will be checked by security when you arrive on site.
+                </Text>
+              </View>
+
+              <View style={visitorDashboardStyles.appointmentField}>
+                <Text style={visitorDashboardStyles.appointmentFieldLabel}>Valid ID Picture</Text>
+                <TouchableOpacity
+                  style={visitorDashboardStyles.appointmentIdUploadCard}
+                  onPress={handlePickAppointmentIdImage}
+                  activeOpacity={0.85}
+                >
+                  {appointmentForm.idImage ? (
+                    <Image
+                      source={{ uri: appointmentForm.idImage }}
+                      style={visitorDashboardStyles.appointmentIdPreview}
+                    />
+                  ) : (
+                    <View style={visitorDashboardStyles.appointmentIdPlaceholder}>
+                      <Ionicons name="image-outline" size={28} color="#64748B" />
+                      <Text style={visitorDashboardStyles.appointmentIdPlaceholderTitle}>
+                        Upload valid ID picture
+                      </Text>
+                      <Text style={visitorDashboardStyles.appointmentIdPlaceholderText}>
+                        Use a clear school, government, or company ID image.
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                {appointmentForm.idImage ? (
+                  <TouchableOpacity
+                    style={visitorDashboardStyles.appointmentChangeIdButton}
+                    onPress={handlePickAppointmentIdImage}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="refresh-outline" size={16} color="#0F766E" />
+                    <Text style={visitorDashboardStyles.appointmentChangeIdText}>
+                      Change ID picture
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  visitorDashboardStyles.appointmentPrivacyCard,
+                  appointmentForm.privacyAccepted &&
+                    visitorDashboardStyles.appointmentPrivacyCardAccepted,
+                ]}
+                onPress={() =>
+                  setAppointmentForm((prev) => ({
+                    ...prev,
+                    privacyAccepted: !prev.privacyAccepted,
+                  }))
+                }
+                activeOpacity={0.85}
+              >
+                <View
+                  style={[
+                    visitorDashboardStyles.appointmentPrivacyCheckbox,
+                    appointmentForm.privacyAccepted &&
+                      visitorDashboardStyles.appointmentPrivacyCheckboxChecked,
+                  ]}
+                >
+                  {appointmentForm.privacyAccepted ? (
+                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                  ) : null}
+                </View>
+                <Text style={visitorDashboardStyles.appointmentPrivacyText}>
+                  I confirm that the information and valid ID picture I provide are accurate,
+                  and I allow Sapphire SafePass to use them for appointment and visit verification.
+                </Text>
+              </TouchableOpacity>
 
               <View style={visitorDashboardStyles.appointmentModalFooter}>
                 <TouchableOpacity

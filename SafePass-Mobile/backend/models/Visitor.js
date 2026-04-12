@@ -70,6 +70,14 @@ const visitorSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  dataPrivacyAccepted: {
+    type: Boolean,
+    default: false,
+  },
+  dataPrivacyAcceptedAt: {
+    type: Date,
+    default: null,
+  },
   
   // ============ Visit Details ============
   purposeOfVisit: { 

@@ -3050,6 +3050,10 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       officeToVisit,
       assignedOffice,
       appointmentDepartment,
+      idNumber,
+      idImage,
+      dataPrivacyAccepted,
+      dataPrivacyAcceptedAt,
     } = req.body || {};
 
     const finalVisitDate = visitDate || preferredDate;
@@ -3082,6 +3086,30 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Office or department is required for this appointment.",
+      });
+    }
+
+    const normalizedIdNumber = String(idNumber || "").trim();
+    const normalizedIdImage = String(idImage || "").trim();
+
+    if (!normalizedIdNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid ID number is required for appointment verification.",
+      });
+    }
+
+    if (!normalizedIdImage) {
+      return res.status(400).json({
+        success: false,
+        message: "A clear valid ID picture is required for appointment verification.",
+      });
+    }
+
+    if (dataPrivacyAccepted !== true) {
+      return res.status(400).json({
+        success: false,
+        message: "Please confirm the data privacy agreement before submitting.",
       });
     }
 
@@ -3133,8 +3161,13 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       visitor = new Visitor({
         fullName: visitorFullName,
         email: user.email,
-        phoneNumber: user.phone,
-        idNumber: user.employeeId || `VIS-${Date.now().toString().slice(-6)}`,
+        phoneNumber: user.phone || "Not provided",
+        idNumber: normalizedIdNumber,
+        idImage: normalizedIdImage,
+        dataPrivacyAccepted: true,
+        dataPrivacyAcceptedAt: dataPrivacyAcceptedAt
+          ? new Date(dataPrivacyAcceptedAt)
+          : new Date(),
       });
       visitor.queueAppointmentRequest({
         purposeOfVisit: resolvedPurpose,
@@ -3152,6 +3185,12 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     } else {
       visitor.fullName = visitor.fullName || visitorFullName;
       visitor.phoneNumber = user.phone || visitor.phoneNumber;
+      visitor.idNumber = normalizedIdNumber;
+      visitor.idImage = normalizedIdImage;
+      visitor.dataPrivacyAccepted = true;
+      visitor.dataPrivacyAcceptedAt = dataPrivacyAcceptedAt
+        ? new Date(dataPrivacyAcceptedAt)
+        : new Date();
       visitor.queueAppointmentRequest({
         purposeOfVisit: resolvedPurpose,
         purposeCategory: normalizedPurposeCategory || undefined,

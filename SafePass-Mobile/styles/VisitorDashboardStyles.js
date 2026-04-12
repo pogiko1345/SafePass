@@ -2689,6 +2689,102 @@ export default StyleSheet.create({
     marginTop: -2,
   },
 
+  appointmentIdUploadCard: {
+    minHeight: 160,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderStyle: "dashed",
+    backgroundColor: "#F8FAFC",
+    overflow: "hidden",
+  },
+
+  appointmentIdPreview: {
+    width: "100%",
+    height: 190,
+    resizeMode: "cover",
+  },
+
+  appointmentIdPlaceholder: {
+    minHeight: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 18,
+    gap: 6,
+  },
+
+  appointmentIdPlaceholderTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+
+  appointmentIdPlaceholderText: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    color: "#64748B",
+    textAlign: "center",
+  },
+
+  appointmentChangeIdButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#ECFDF5",
+  },
+
+  appointmentChangeIdText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0F766E",
+  },
+
+  appointmentPrivacyCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FAFC",
+  },
+
+  appointmentPrivacyCardAccepted: {
+    borderColor: "#10B981",
+    backgroundColor: "#ECFDF5",
+  },
+
+  appointmentPrivacyCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#94A3B8",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+
+  appointmentPrivacyCheckboxChecked: {
+    backgroundColor: "#10B981",
+    borderColor: "#10B981",
+  },
+
+  appointmentPrivacyText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#334155",
+    fontWeight: "700",
+  },
+
   appointmentModalFooter: {
     flexDirection: "row",
     gap: 12,
