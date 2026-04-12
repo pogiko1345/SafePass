@@ -55,6 +55,11 @@ role: {
     cardActive: { type: Boolean, default: true },
   },
 
+  isVerified: { type: Boolean, default: false },
+  verificationTokenHash: { type: String, default: "" },
+  verificationExpiresAt: { type: Date, default: null },
+  verifiedAt: { type: Date, default: null },
+
   isActive: { type: Boolean, default: true },
   lastLogin: Date,
   createdAt: { type: Date, default: Date.now },

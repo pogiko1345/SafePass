@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const Visitor = require("./models/Visitor");
 const Notification = require("./models/Notification");
 const User = require("./models/User");
@@ -36,6 +37,8 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // ========== DATABASE CONNECTION ==========
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/sapphire_aviation";
+const FRONTEND_URL =
+  process.env.FRONTEND_URL || "https://sapphiresafepass2.vercel.app";
 
 let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
 
@@ -326,6 +329,54 @@ const sendEmail = (to, subject, body) => {
   console.log(`📧 Body: ${body}`);
   console.log(`📧 ====================================\n`);
   return { success: true };
+};
+
+const createVerificationToken = () => {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+
+  return { token, tokenHash, expiresAt };
+};
+
+const getApiBaseUrl = (req) => {
+  if (process.env.API_PUBLIC_URL) {
+    return process.env.API_PUBLIC_URL.replace(/\/$/, "");
+  }
+
+  const protocol = req.get("x-forwarded-proto") || req.protocol || "http";
+  const host = req.get("host");
+  return `${protocol}://${host}`;
+};
+
+const sendVerificationEmailSimulation = (req, user) => {
+  const { token, tokenHash, expiresAt } = createVerificationToken();
+  user.verificationTokenHash = tokenHash;
+  user.verificationExpiresAt = expiresAt;
+
+  const verificationUrl = `${getApiBaseUrl(req)}/api/auth/verify-email?token=${token}`;
+
+  sendEmail(
+    user.email,
+    "Verify your Sapphire SafePass account",
+    [
+      `Hi ${user.firstName},`,
+      "",
+      "Please verify your Sapphire SafePass account by opening this link:",
+      verificationUrl,
+      "",
+      "This verification link expires in 24 hours.",
+      "",
+      "SIMULATION MODE: copy/open the link above from your backend logs.",
+      `After verifying, return to ${FRONTEND_URL} and log in.`,
+    ].join("\n"),
+  );
+
+  console.log(`\nEMAIL VERIFICATION LINK for ${user.email}:`);
+  console.log(verificationUrl);
+  console.log("Open this link to verify the visitor account.\n");
+
+  return { verificationUrl, expiresAt };
 };
 
 // ========== ROUTES ==========
@@ -865,6 +916,17 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: "Account is deactivated" });
     }
 
+    if (user.role === "visitor" && user.isVerified === false) {
+      return res.status(403).json({
+        success: false,
+        error: "Your account is not yet verified",
+        message:
+          "Please verify your email first. In simulation mode, open the verification link printed in the backend logs.",
+        requiresEmailVerification: true,
+        email: user.email,
+      });
+    }
+
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
@@ -1031,6 +1093,113 @@ app.post("/api/check-email", async (req, res) => {
   }
 });
 
+app.get("/api/auth/verify-email", async (req, res) => {
+  try {
+    const token = String(req.query.token || "").trim();
+
+    if (!token) {
+      return res.status(400).send("Missing verification token.");
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      verificationTokenHash: tokenHash,
+      verificationExpiresAt: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).send(
+        "This verification link is invalid or expired. Please request a new verification email.",
+      );
+    }
+
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.verificationTokenHash = "";
+    user.verificationExpiresAt = null;
+    if (user.status === "pending") {
+      user.status = "active";
+    }
+    await user.save();
+
+    console.log(`Email verified for ${user.email}`);
+
+    res.send(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Email Verified</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f3f7f5; color: #0f172a; padding: 40px; }
+            .card { max-width: 520px; margin: 8vh auto; background: white; border-radius: 18px; padding: 32px; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12); }
+            h1 { color: #047857; margin-top: 0; }
+            a { display: inline-block; margin-top: 18px; background: #047857; color: white; padding: 12px 18px; border-radius: 10px; text-decoration: none; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Email verified</h1>
+            <p>Your Sapphire SafePass account has been verified. You can now return to the app and log in.</p>
+            <a href="${FRONTEND_URL}">Go to SafePass</a>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Verify email error:", error);
+    res.status(500).send("Failed to verify email.");
+  }
+});
+
+app.post("/api/auth/resend-verification", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const user = await User.findOne({ email, role: "visitor" });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor account not found.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.json({
+        success: true,
+        message: "This account is already verified.",
+      });
+    }
+
+    const verification = sendVerificationEmailSimulation(req, user);
+    await user.save();
+
+    res.json({
+      success: true,
+      message:
+        "Verification link generated. In simulation mode, check the backend logs.",
+      simulation: true,
+      verificationLink: verification.verificationUrl,
+      verificationExpiresAt: verification.expiresAt,
+    });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to resend verification link.",
+    });
+  }
+});
+
 // ============ VISITOR REGISTRATION ROUTES ============
 
 // Register a new visitor (Complete version with UNIQUE NFC ID for pending visitors)
@@ -1093,25 +1262,28 @@ app.post("/api/visitors/register", async (req, res) => {
       phone: "",
       role: "visitor",
       status: "active",
+      isVerified: false,
       isActive: true,
       visitorId: existingVisitor?._id || null,
       nfcCardId: null,
     });
 
+    const verification = sendVerificationEmailSimulation(req, user);
     await user.save();
-    console.log("Visitor account created:", normalizedEmail);
+    console.log("Visitor account created, waiting for email verification:", normalizedEmail);
 
     await createSystemActivity({
       actorUser: user,
       relatedVisitor: existingVisitor?._id ? existingVisitor : null,
       relatedUser: user,
       activityType: "visitor_account_registration",
-      status: "granted",
+      status: "pending",
       location: "Visitor Registration",
-      notes: `${normalizedFullName} created a visitor account.`,
+      notes: `${normalizedFullName} created a visitor account and must verify email before login.`,
       metadata: {
         username: user.username,
         email: user.email,
+        requiresEmailVerification: true,
       },
     });
 
@@ -1123,15 +1295,20 @@ app.post("/api/visitors/register", async (req, res) => {
       location: "Visitor Registration",
       accessType: "system",
       activityType: "visitor_account_registration",
-      status: "granted",
+      status: "pending",
       relatedUser: user._id,
       relatedVisitor: existingVisitor?._id || null,
-      notes: "Visitor account created successfully",
+      notes: "Visitor account created and waiting for email verification",
     });
 
     res.status(201).json({
       success: true,
-      message: "Visitor account created successfully.",
+      message:
+        "Visitor account created. Please verify your email before logging in. In simulation mode, open the verification link printed in the backend logs.",
+      requiresEmailVerification: true,
+      simulation: true,
+      verificationLink: verification.verificationUrl,
+      verificationExpiresAt: verification.expiresAt,
       user: {
         _id: user._id,
         fullName: normalizedFullName,
@@ -1139,6 +1316,7 @@ app.post("/api/visitors/register", async (req, res) => {
         username: user.username,
         role: user.role,
         status: user.status,
+        isVerified: user.isVerified,
       },
       credentials: {
         username: user.username,
