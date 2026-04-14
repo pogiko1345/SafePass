@@ -11,6 +11,8 @@ import {
   Modal,
   TextInput,
   Platform,
+  LayoutAnimation,
+  UIManager,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -52,6 +54,7 @@ const getStatusMeta = (status) => {
 
 const getAppointmentStatus = (appointment) => {
   if (!appointment) return "pending";
+  if (appointment.appointmentCompletedAt) return "completed";
   if (appointment.status === "checked_out") return "completed";
   return String(appointment.appointmentStatus || "pending").toLowerCase();
 };
@@ -61,6 +64,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [appointments, setAppointments] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState("pending");
+  const [expandedModule, setExpandedModule] = useState("home");
+  const [selectedSubmodule, setSelectedSubmodule] = useState("home-main");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState(null);
@@ -120,6 +125,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadData();
@@ -149,6 +160,105 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     }),
     [appointments],
   );
+
+  const appointmentRequests = useMemo(
+    () => appointments.filter((item) => getAppointmentStatus(item) === "pending"),
+    [appointments],
+  );
+
+  const profileName = useMemo(() => {
+    const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
+    return fullName || user?.fullName || user?.username || "Staff User";
+  }, [user]);
+
+  const profileInitials = useMemo(() => {
+    const nameParts = profileName.split(" ").filter(Boolean);
+    return (
+      (nameParts[0]?.[0] || user?.firstName?.[0] || "S") +
+      (nameParts[1]?.[0] || user?.lastName?.[0] || "T")
+    ).toUpperCase();
+  }, [profileName, user]);
+
+  const staffModules = useMemo(
+    () => [
+      {
+        key: "home",
+        label: "Home",
+        icon: "home-outline",
+        color: "#0A3D91",
+        submodules: [{ key: "home-main", label: "Dashboard", badge: 0 }],
+      },
+      {
+        key: "appointment",
+        label: "Appointment",
+        icon: "calendar-outline",
+        color: "#2563EB",
+        submodules: [
+          { key: "appointment-request", label: "Appointment Request", badge: stats.pending },
+          { key: "appointment-record", label: "Appointment Record", badge: appointments.length },
+        ],
+      },
+      {
+        key: "account",
+        label: "Account Management",
+        icon: "person-circle-outline",
+        color: "#7C3AED",
+        submodules: [{ key: "account-info", label: "View Account Info", badge: 0 }],
+      },
+    ],
+    [appointments.length, stats.pending],
+  );
+
+  const getSelectedSubmoduleMeta = () => {
+    switch (selectedSubmodule) {
+      case "appointment-request":
+        return {
+          title: "Appointment Request",
+          subtitle: "Review and act on new visitor appointment requests assigned to your office.",
+        };
+      case "appointment-record":
+        return {
+          title: "Appointment Record",
+          subtitle: "Browse appointment history, statuses, and visitor scheduling details.",
+        };
+      case "account-info":
+        return {
+          title: "Account Information",
+          subtitle: "View your staff profile details with limited access controls.",
+        };
+      case "home-main":
+      default:
+        return {
+          title: "Staff Home",
+          subtitle: "Track pending requests, recent updates, and your office activity in one place.",
+        };
+    }
+  };
+
+  const getParentModule = (submoduleKey) =>
+    staffModules.find((module) =>
+      module.submodules.some((submodule) => submodule.key === submoduleKey),
+    )?.key || "home";
+
+  const toggleModule = (moduleKey) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedModule((currentValue) => (currentValue === moduleKey ? null : moduleKey));
+  };
+
+  const selectSubmodule = (submoduleKey) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const parentModule = getParentModule(submoduleKey);
+    setExpandedModule(parentModule);
+    setSelectedSubmodule(submoduleKey);
+
+    if (submoduleKey === "appointment-request") {
+      setFilter("pending");
+    }
+
+    if (submoduleKey === "appointment-record") {
+      setFilter("all");
+    }
+  };
 
   const mergeAppointment = (updatedVisitor) => {
     if (!updatedVisitor?._id) return;
@@ -349,10 +459,521 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     }
   };
 
+  const handleComplete = async (appointment) => {
+    if (!appointment?._id || processingId) return;
+
+    const performComplete = async () => {
+      setProcessingId(appointment._id);
+      try {
+        const response = await ApiService.completeStaffAppointment(appointment._id);
+        if (response?.visitor) {
+          mergeAppointment(response.visitor);
+        }
+        await loadData();
+        Alert.alert(
+          "Appointment Completed",
+          "Security, admin, and the visitor have been notified for checkout follow-up.",
+        );
+      } catch (error) {
+        Alert.alert("Complete Failed", error?.message || "Could not complete appointment.");
+      } finally {
+        setProcessingId(null);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmed = globalThis?.window?.confirm?.(
+        "Mark this appointment as complete and notify security for checkout?",
+      );
+      if (confirmed) {
+        await performComplete();
+      }
+      return;
+    }
+
+    Alert.alert(
+      "Complete Appointment",
+      "Mark this appointment as complete and notify security for checkout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Complete", onPress: performComplete },
+      ],
+    );
+  };
+
   const handleLogout = async () => {
     await ApiService.logout();
     if (typeof onLogout === "function") onLogout();
     navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+  };
+
+  const renderAppointmentCard = (appointment, { allowActions = true } = {}) => {
+    const appointmentStatus = getAppointmentStatus(appointment);
+    const statusMeta = getStatusMeta(appointmentStatus);
+    const isPending = appointmentStatus === "pending";
+    const canComplete =
+      appointment.status === "checked_in" &&
+      !appointment.checkedOutAt &&
+      !appointment.appointmentCompletedAt;
+    const isProcessing = processingId === appointment._id;
+
+    return (
+      <View key={appointment._id} style={styles.appointmentCard}>
+        <View style={styles.appointmentTop}>
+          <View style={styles.appointmentInfo}>
+            <Text style={styles.appointmentName}>{appointment.fullName}</Text>
+            <Text style={styles.appointmentPurpose}>
+              {appointment.purposeOfVisit || "No visit purpose provided"}
+            </Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusMeta.background }]}>
+            <Text style={[styles.statusBadgeText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
+          </View>
+        </View>
+
+        <View style={styles.metaGrid}>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Preferred Date</Text>
+            <Text style={styles.metaValue}>{formatDate(appointment.visitDate)}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Preferred Time</Text>
+            <Text style={styles.metaValue}>{formatTime(appointment.visitTime)}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Visitor Email</Text>
+            <Text style={styles.metaValue}>{appointment.email || "N/A"}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Office To Visit</Text>
+            <Text style={styles.metaValue}>
+              {appointment.appointmentDepartment || appointment.assignedOffice || "Assigned department"}
+            </Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Assigned Staff</Text>
+            <Text style={styles.metaValue}>
+              {appointment.assignedStaffName || profileName}
+            </Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Requested At</Text>
+            <Text style={styles.metaValue}>
+              {appointment.appointmentRequestedAt
+                ? `${formatDate(appointment.appointmentRequestedAt)} ${formatTime(
+                    appointment.appointmentRequestedAt,
+                  )}`
+                : "Recently submitted"}
+            </Text>
+          </View>
+        </View>
+
+        {appointment.staffAdjustmentNote ? (
+          <View style={styles.noteBox}>
+            <Ionicons name="create-outline" size={16} color="#D97706" />
+            <Text style={styles.noteText}>{appointment.staffAdjustmentNote}</Text>
+          </View>
+        ) : null}
+
+        {appointment.staffRejectionReason ? (
+          <View style={[styles.noteBox, styles.noteBoxReject]}>
+            <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+            <Text style={[styles.noteText, styles.noteTextReject]}>
+              {appointment.staffRejectionReason}
+            </Text>
+          </View>
+        ) : null}
+
+        {appointment.appointmentCompletionNote ? (
+          <View style={[styles.noteBox, styles.noteBoxComplete]}>
+            <Ionicons name="checkmark-done-outline" size={16} color="#475569" />
+            <Text style={[styles.noteText, styles.noteTextComplete]}>
+              {appointment.appointmentCompletionNote}
+            </Text>
+          </View>
+        ) : null}
+
+        {allowActions && isPending ? (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.primaryAction, isProcessing && styles.disabledAction]}
+              onPress={() => handleApprove(appointment)}
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.primaryActionText}>Approve</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryAction}
+              onPress={() => openAdjustModal(appointment)}
+              disabled={isProcessing}
+            >
+              <Ionicons name="time-outline" size={16} color="#1D4ED8" />
+              <Text style={styles.secondaryActionText}>Adjust Time</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.rejectAction}
+              onPress={() => openRejectModal(appointment)}
+              disabled={isProcessing}
+            >
+              <Ionicons name="close-outline" size={16} color="#DC2626" />
+              <Text style={styles.rejectActionText}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {allowActions && canComplete ? (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.completeAction, isProcessing && styles.disabledAction]}
+              onPress={() => handleComplete(appointment)}
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.completeActionText}>Complete Appointment</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderHomeContent = () => (
+    <>
+      <LinearGradient colors={["#0A3D91", "#1E4A8C"]} style={styles.heroCard}>
+        <View style={styles.heroHeader}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>Staff Dashboard</Text>
+            <Text style={styles.heroTitle}>Office Appointment Flow</Text>
+            <Text style={styles.heroSubtitle}>
+              Review visitor requests, manage schedules, and stay updated with your latest office activity.
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.profileButton} onPress={() => selectSubmodule("account-info")}>
+            <Text style={styles.profileInitials}>{profileInitials}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatValue}>{stats.pending}</Text>
+            <Text style={styles.heroStatLabel}>Pending</Text>
+          </View>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatValue}>{stats.approved}</Text>
+            <Text style={styles.heroStatLabel}>Approved</Text>
+          </View>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatValue}>{stats.completed}</Text>
+            <Text style={styles.heroStatLabel}>Completed</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      <View style={styles.quickActionsGrid}>
+        <TouchableOpacity style={styles.quickActionCard} onPress={() => selectSubmodule("appointment-request")}>
+          <View style={[styles.quickActionIcon, { backgroundColor: "#DBEAFE" }]}>
+            <Ionicons name="calendar-clear-outline" size={22} color="#1D4ED8" />
+          </View>
+          <Text style={styles.quickActionTitle}>Appointment Request</Text>
+          <Text style={styles.quickActionSubtitle}>
+            Open the pending request queue and respond to new visitor schedules.
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.quickActionCard} onPress={() => selectSubmodule("appointment-record")}>
+          <View style={[styles.quickActionIcon, { backgroundColor: "#DCFCE7" }]}>
+            <Ionicons name="documents-outline" size={22} color="#059669" />
+          </View>
+          <Text style={styles.quickActionTitle}>Appointment Record</Text>
+          <Text style={styles.quickActionSubtitle}>
+            Review all appointment records and track status changes over time.
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.quickActionCard} onPress={() => selectSubmodule("account-info")}>
+          <View style={[styles.quickActionIcon, { backgroundColor: "#EDE9FE" }]}>
+            <Ionicons name="person-outline" size={22} color="#7C3AED" />
+          </View>
+          <Text style={styles.quickActionTitle}>View Account Info</Text>
+          <Text style={styles.quickActionSubtitle}>
+            Check your assigned office profile and account details with limited access.
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Notifications</Text>
+          <TouchableOpacity onPress={loadData}>
+            <Ionicons name="refresh-outline" size={20} color="#3B82F6" />
+          </TouchableOpacity>
+        </View>
+
+        {(notifications || []).length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="notifications-off-outline" size={42} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No notifications yet</Text>
+            <Text style={styles.emptySubtitle}>Updates from admin and visitor appointment activity will appear here.</Text>
+          </View>
+        ) : (
+          (notifications || []).slice(0, 5).map((notification) => (
+            <View key={notification._id} style={styles.notificationItem}>
+              <View style={styles.notificationDot} />
+              <View style={styles.notificationContent}>
+                <Text style={styles.notificationTitle}>{notification.title}</Text>
+                <Text style={styles.notificationMessage}>{notification.message}</Text>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    </>
+  );
+
+  const renderAppointmentRequestContent = () => (
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Pending Appointment Requests</Text>
+        <TouchableOpacity onPress={loadData}>
+          <Ionicons name="refresh-outline" size={20} color="#3B82F6" />
+        </TouchableOpacity>
+      </View>
+
+      {appointmentRequests.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="calendar-clear-outline" size={42} color="#94A3B8" />
+          <Text style={styles.emptyTitle}>No pending requests</Text>
+          <Text style={styles.emptySubtitle}>New visitor appointment requests will appear here for approval.</Text>
+        </View>
+      ) : (
+        appointmentRequests.map((appointment) =>
+          renderAppointmentCard(appointment, { allowActions: true }),
+        )
+      )}
+    </View>
+  );
+
+  const renderAppointmentRecordContent = () => (
+    <>
+      <View style={styles.filterRow}>
+        {[
+          { key: "all", label: `All (${appointments.length})` },
+          { key: "pending", label: `Pending (${stats.pending})` },
+          { key: "approved", label: `Approved (${stats.approved})` },
+          { key: "rejected", label: `Rejected (${stats.rejected})` },
+          { key: "completed", label: `Completed (${stats.completed})` },
+        ].map((item) => (
+          <TouchableOpacity
+            key={item.key}
+            style={[styles.filterChip, filter === item.key && styles.filterChipActive]}
+            onPress={() => setFilter(item.key)}
+          >
+            <Text style={[styles.filterChipText, filter === item.key && styles.filterChipTextActive]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Appointment Records</Text>
+          <TouchableOpacity onPress={loadData}>
+            <Ionicons name="refresh-outline" size={20} color="#3B82F6" />
+          </TouchableOpacity>
+        </View>
+
+        {filteredAppointments.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="documents-outline" size={42} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No appointment records found</Text>
+            <Text style={styles.emptySubtitle}>Try a different filter or wait for new appointment activity.</Text>
+          </View>
+        ) : (
+          filteredAppointments.map((appointment) =>
+            renderAppointmentCard(appointment, { allowActions: true }),
+          )
+        )}
+      </View>
+    </>
+  );
+
+  const renderAccountInfoContent = () => (
+    <>
+      <View style={styles.accountInfoBanner}>
+        <Ionicons name="shield-checkmark-outline" size={20} color="#7C3AED" />
+        <Text style={styles.accountInfoBannerText}>
+          This area is view-only for staff. Admin-level account controls stay in the admin dashboard.
+        </Text>
+      </View>
+
+      <View style={styles.sectionCard}>
+        <View style={styles.accountProfileHeader}>
+          <View style={styles.accountProfileAvatar}>
+            <Text style={styles.accountProfileAvatarText}>{profileInitials}</Text>
+          </View>
+          <View style={styles.accountProfileCopy}>
+            <Text style={styles.accountProfileName}>{profileName}</Text>
+            <Text style={styles.accountProfileRole}>
+              {String(user?.role || "staff").toUpperCase()} ACCESS
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.accountInfoGrid}>
+          <View style={styles.accountInfoItem}>
+            <Text style={styles.accountInfoLabel}>Email</Text>
+            <Text style={styles.accountInfoValue}>{user?.email || "N/A"}</Text>
+          </View>
+          <View style={styles.accountInfoItem}>
+            <Text style={styles.accountInfoLabel}>Username</Text>
+            <Text style={styles.accountInfoValue}>{user?.username || "N/A"}</Text>
+          </View>
+          <View style={styles.accountInfoItem}>
+            <Text style={styles.accountInfoLabel}>Staff ID</Text>
+            <Text style={styles.accountInfoValue}>
+              {user?.staffId || user?.employeeId || "Not assigned"}
+            </Text>
+          </View>
+          <View style={styles.accountInfoItem}>
+            <Text style={styles.accountInfoLabel}>Department</Text>
+            <Text style={styles.accountInfoValue}>{user?.department || "Not assigned"}</Text>
+          </View>
+          <View style={styles.accountInfoItem}>
+            <Text style={styles.accountInfoLabel}>Contact Number</Text>
+            <Text style={styles.accountInfoValue}>
+              {user?.phoneNumber || user?.contactNumber || "N/A"}
+            </Text>
+          </View>
+          <View style={styles.accountInfoItem}>
+            <Text style={styles.accountInfoLabel}>Status</Text>
+            <Text style={styles.accountInfoValue}>{user?.status || "active"}</Text>
+          </View>
+        </View>
+      </View>
+    </>
+  );
+
+  const renderSidebar = () => (
+    <View style={styles.sidebar}>
+      <View style={styles.sidebarHeader}>
+        <View style={styles.sidebarAvatar}>
+          <Text style={styles.sidebarAvatarText}>{profileInitials}</Text>
+        </View>
+        <View style={styles.sidebarUserCopy}>
+          <Text style={styles.sidebarUserName}>{profileName}</Text>
+          <Text style={styles.sidebarUserRole}>Staff Panel</Text>
+        </View>
+      </View>
+
+      <ScrollView style={styles.sidebarScroll} showsVerticalScrollIndicator={false}>
+        {staffModules.map((module) => {
+          const isExpanded = expandedModule === module.key;
+          const hasSelectedChild = module.submodules.some(
+            (submodule) => submodule.key === selectedSubmodule,
+          );
+
+          return (
+            <View key={module.key} style={styles.sidebarModuleCard}>
+              <TouchableOpacity
+                style={[
+                  styles.sidebarModuleButton,
+                  hasSelectedChild && styles.sidebarModuleButtonActive,
+                ]}
+                onPress={() => toggleModule(module.key)}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.sidebarModuleIcon, { backgroundColor: `${module.color}18` }]}>
+                  <Ionicons name={module.icon} size={20} color={module.color} />
+                </View>
+                <Text
+                  style={[
+                    styles.sidebarModuleLabel,
+                    hasSelectedChild && styles.sidebarModuleLabelActive,
+                  ]}
+                >
+                  {module.label}
+                </Text>
+                <Ionicons
+                  name={isExpanded ? "chevron-up-outline" : "chevron-down-outline"}
+                  size={18}
+                  color={hasSelectedChild ? module.color : "#64748B"}
+                />
+              </TouchableOpacity>
+
+              {isExpanded ? (
+                <View style={styles.sidebarSubmoduleList}>
+                  {module.submodules.map((submodule) => {
+                    const isActive = selectedSubmodule === submodule.key;
+                    return (
+                      <TouchableOpacity
+                        key={submodule.key}
+                        style={[
+                          styles.sidebarSubmoduleButton,
+                          isActive && styles.sidebarSubmoduleButtonActive,
+                        ]}
+                        onPress={() => selectSubmodule(submodule.key)}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={[
+                            styles.sidebarSubmoduleLabel,
+                            isActive && styles.sidebarSubmoduleLabelActive,
+                          ]}
+                        >
+                          {submodule.label}
+                        </Text>
+                        {submodule.badge ? (
+                          <View style={styles.sidebarSubmoduleBadge}>
+                            <Text style={styles.sidebarSubmoduleBadgeText}>{submodule.badge}</Text>
+                          </View>
+                        ) : null}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+        <Text style={styles.logoutButtonText}>Sign Out</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderActiveContent = () => {
+    if (selectedSubmodule === "appointment-request") {
+      return renderAppointmentRequestContent();
+    }
+
+    if (selectedSubmodule === "appointment-record") {
+      return renderAppointmentRecordContent();
+    }
+
+    if (selectedSubmodule === "account-info") {
+      return renderAccountInfoContent();
+    }
+
+    return renderHomeContent();
   };
 
   if (loading) {
@@ -364,204 +985,29 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     );
   }
 
+  const selectedSubmoduleMeta = getSelectedSubmoduleMeta();
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <LinearGradient colors={["#0A3D91", "#1E4A8C"]} style={styles.heroCard}>
-          <View style={styles.heroHeader}>
-            <View>
-              <Text style={styles.heroEyebrow}>Staff Dashboard</Text>
-              <Text style={styles.heroTitle}>Appointment Requests</Text>
-              <Text style={styles.heroSubtitle}>
-                Review visitor schedules, approve visits, and adjust time slots for your office.
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate("Profile")}>
-              <Text style={styles.profileInitials}>
-                {(user?.firstName?.[0] || "S") + (user?.lastName?.[0] || "T")}
-              </Text>
-            </TouchableOpacity>
-          </View>
+      <View style={styles.dashboardLayout}>
+        {renderSidebar()}
 
-          <View style={styles.statsRow}>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{stats.pending}</Text>
-              <Text style={styles.heroStatLabel}>Pending</Text>
+        <View style={styles.contentArea}>
+          <ScrollView
+            style={styles.contentScroll}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <View style={styles.pageHeaderCard}>
+              <Text style={styles.pageEyebrow}>Staff Module</Text>
+              <Text style={styles.pageTitle}>{selectedSubmoduleMeta.title}</Text>
+              <Text style={styles.pageSubtitle}>{selectedSubmoduleMeta.subtitle}</Text>
             </View>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{stats.approved}</Text>
-              <Text style={styles.heroStatLabel}>Approved</Text>
-            </View>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{stats.completed}</Text>
-              <Text style={styles.heroStatLabel}>Completed</Text>
-            </View>
-          </View>
-        </LinearGradient>
 
-        <View style={styles.filterRow}>
-          {[
-            { key: "all", label: `All (${appointments.length})` },
-            { key: "pending", label: `Pending (${stats.pending})` },
-            { key: "approved", label: `Approved (${stats.approved})` },
-            { key: "rejected", label: `Rejected (${stats.rejected})` },
-            { key: "completed", label: `Completed (${stats.completed})` },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.key}
-              style={[styles.filterChip, filter === item.key && styles.filterChipActive]}
-              onPress={() => setFilter(item.key)}
-            >
-              <Text style={[styles.filterChipText, filter === item.key && styles.filterChipTextActive]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+            {renderActiveContent()}
+          </ScrollView>
         </View>
-
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Appointment Queue</Text>
-            <TouchableOpacity onPress={loadData}>
-              <Ionicons name="refresh-outline" size={20} color="#3B82F6" />
-            </TouchableOpacity>
-          </View>
-
-          {filteredAppointments.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="calendar-clear-outline" size={42} color="#94A3B8" />
-              <Text style={styles.emptyTitle}>No appointments here</Text>
-              <Text style={styles.emptySubtitle}>New visitor requests will appear in this queue.</Text>
-            </View>
-          ) : (
-            filteredAppointments.map((appointment) => {
-              const appointmentStatus = getAppointmentStatus(appointment);
-              const statusMeta = getStatusMeta(appointmentStatus);
-              const isPending = appointmentStatus === "pending";
-              const isProcessing = processingId === appointment._id;
-
-              return (
-                <View key={appointment._id} style={styles.appointmentCard}>
-                  <View style={styles.appointmentTop}>
-                    <View style={styles.appointmentInfo}>
-                      <Text style={styles.appointmentName}>{appointment.fullName}</Text>
-                      <Text style={styles.appointmentPurpose}>{appointment.purposeOfVisit}</Text>
-                    </View>
-                    <View style={[styles.statusBadge, { backgroundColor: statusMeta.background }]}>
-                      <Text style={[styles.statusBadgeText, { color: statusMeta.color }]}>
-                        {statusMeta.label}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.metaGrid}>
-                    <View style={styles.metaItem}>
-                      <Text style={styles.metaLabel}>Preferred Date</Text>
-                      <Text style={styles.metaValue}>{formatDate(appointment.visitDate)}</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Text style={styles.metaLabel}>Preferred Time</Text>
-                      <Text style={styles.metaValue}>{formatTime(appointment.visitTime)}</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Text style={styles.metaLabel}>Visitor Email</Text>
-                      <Text style={styles.metaValue}>{appointment.email}</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Text style={styles.metaLabel}>Assigned Staff</Text>
-                      <Text style={styles.metaValue}>
-                        {appointment.assignedStaffName || `${user?.firstName || "Staff"} ${user?.lastName || ""}`.trim()}
-                      </Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Text style={styles.metaLabel}>Requested At</Text>
-                      <Text style={styles.metaValue}>
-                        {appointment.appointmentRequestedAt
-                          ? `${formatDate(appointment.appointmentRequestedAt)} ${formatTime(appointment.appointmentRequestedAt)}`
-                          : "Recently submitted"}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {appointment.staffAdjustmentNote ? (
-                    <View style={styles.noteBox}>
-                      <Ionicons name="create-outline" size={16} color="#D97706" />
-                      <Text style={styles.noteText}>{appointment.staffAdjustmentNote}</Text>
-                    </View>
-                  ) : null}
-
-                  {appointment.staffRejectionReason ? (
-                    <View style={[styles.noteBox, styles.noteBoxReject]}>
-                      <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
-                      <Text style={[styles.noteText, styles.noteTextReject]}>
-                        {appointment.staffRejectionReason}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {isPending ? (
-                    <View style={styles.actionRow}>
-                      <TouchableOpacity
-                        style={[styles.primaryAction, isProcessing && styles.disabledAction]}
-                        onPress={() => handleApprove(appointment)}
-                        disabled={isProcessing}
-                      >
-                        {isProcessing ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <>
-                            <Ionicons name="checkmark-outline" size={16} color="#FFFFFF" />
-                            <Text style={styles.primaryActionText}>Approve</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.secondaryAction}
-                        onPress={() => openAdjustModal(appointment)}
-                        disabled={isProcessing}
-                      >
-                        <Ionicons name="time-outline" size={16} color="#1D4ED8" />
-                        <Text style={styles.secondaryActionText}>Adjust Time</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.rejectAction}
-                        onPress={() => openRejectModal(appointment)}
-                        disabled={isProcessing}
-                      >
-                        <Ionicons name="close-outline" size={16} color="#DC2626" />
-                        <Text style={styles.rejectActionText}>Reject</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })
-          )}
-        </View>
-
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Recent Notifications</Text>
-          {(notifications || []).slice(0, 5).map((notification) => (
-            <View key={notification._id} style={styles.notificationItem}>
-              <View style={styles.notificationDot} />
-              <View style={styles.notificationContent}>
-                <Text style={styles.notificationTitle}>{notification.title}</Text>
-                <Text style={styles.notificationMessage}>{notification.message}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-          <Text style={styles.logoutButtonText}>Sign Out</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      </View>
 
       <Modal visible={showAdjustModal} transparent animationType="fade" onRequestClose={closeAdjustModal}>
         <View style={styles.modalOverlay}>

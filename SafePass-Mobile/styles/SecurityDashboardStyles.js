@@ -1021,6 +1021,38 @@ export default StyleSheet.create({
     fontWeight: "600",
   },
 
+  readonlyRecordActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: spacing.sm,
+  },
+
+  readonlyRecordActionText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.secondary,
+  },
+
+  readonlyInfoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.secondarySoft,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.secondaryLight,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+
+  readonlyInfoBannerText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    fontWeight: "600",
+    color: colors.secondaryDark,
+  },
+
   // ============ UPCOMING BANNER ============
   upcomingBanner: {
     backgroundColor: colors.secondarySoft,
@@ -1387,6 +1419,172 @@ export default StyleSheet.create({
       alignSelf: "center",
       width: "100%",
     }),
+  },
+
+  reportFormCard: {
+    backgroundColor: colors.white,
+    borderRadius: 22,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.05)" },
+    }),
+  },
+
+  reportFormTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: "700",
+    color: colors.gray[900],
+    marginBottom: spacing.xs,
+  },
+
+  reportFormSubtitle: {
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: colors.gray[500],
+    marginBottom: spacing.lg,
+  },
+
+  reportFormLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[700],
+    marginBottom: spacing.sm,
+  },
+
+  reportVisitorChipRow: {
+    marginBottom: spacing.md,
+  },
+
+  reportVisitorChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    backgroundColor: colors.gray[50],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    marginRight: spacing.sm,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    }),
+  },
+
+  reportVisitorChipActive: {
+    backgroundColor: colors.purpleLight,
+    borderColor: colors.purple,
+  },
+
+  reportVisitorChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: "600",
+    color: colors.gray[600],
+  },
+
+  reportVisitorChipTextActive: {
+    color: colors.purple,
+  },
+
+  reportCategoryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+
+  reportCategoryChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    backgroundColor: colors.gray[50],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    }),
+  },
+
+  reportCategoryChipActive: {
+    backgroundColor: colors.dangerLight,
+    borderColor: colors.danger,
+  },
+
+  reportCategoryChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[600],
+  },
+
+  reportCategoryChipTextActive: {
+    color: colors.danger,
+  },
+
+  reportFormInput: {
+    minHeight: 110,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 16,
+    backgroundColor: colors.gray[50],
+    padding: spacing.md,
+    color: colors.gray[900],
+    textAlignVertical: "top",
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+
+  reportFormActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+
+  reportFormSecondaryButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 14,
+    backgroundColor: colors.gray[100],
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    }),
+  },
+
+  reportFormSecondaryButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[700],
+  },
+
+  reportFormPrimaryButton: {
+    minWidth: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 14,
+    backgroundColor: colors.purple,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    }),
+  },
+
+  reportFormPrimaryButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.white,
   },
 
   reportStatsGrid: {
@@ -1839,6 +2037,66 @@ export default StyleSheet.create({
     width: 3,
     height: 20,
     borderRadius: 2,
+  },
+
+  sidebarModuleCard: {
+    marginBottom: spacing.xs,
+  },
+
+  sidebarSubmoduleList: {
+    marginLeft: 48,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.sm,
+    paddingLeft: spacing.sm,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.gray[200],
+    gap: spacing.xs,
+  },
+
+  sidebarSubmoduleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: colors.white,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      ":hover": { backgroundColor: colors.gray[50] },
+    }),
+  },
+
+  sidebarSubmoduleButtonActive: {
+    backgroundColor: colors.primarySoft,
+  },
+
+  sidebarSubmoduleLabel: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: "600",
+    color: colors.gray[600],
+  },
+
+  sidebarSubmoduleLabelActive: {
+    color: colors.primary,
+  },
+
+  sidebarSubmoduleBadge: {
+    minWidth: 24,
+    height: 22,
+    paddingHorizontal: spacing.xs,
+    borderRadius: 999,
+    backgroundColor: colors.gray[100],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  sidebarSubmoduleBadgeText: {
+    fontSize: fontSize.xxs,
+    fontWeight: "700",
+    color: colors.gray[600],
   },
 
   sidebarStatsSection: {

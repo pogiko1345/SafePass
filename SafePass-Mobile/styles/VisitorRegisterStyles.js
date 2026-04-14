@@ -563,6 +563,25 @@ export default StyleSheet.create({
     marginTop: 4,
   },
 
+  otherPurposeInput: {
+    minHeight: 92,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: "#D7E3EE",
+    borderRadius: 16,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: spacing.base,
+    paddingVertical: 12,
+    fontSize: fontSizes.base,
+    color: "#0F172A",
+    lineHeight: 22,
+  },
+
+  otherPurposeInputError: {
+    borderColor: "#EF4444",
+    backgroundColor: "#FEF2F2",
+  },
+
   uploadArea: {
     borderRadius: 18,
     overflow: "hidden",
@@ -717,6 +736,16 @@ export default StyleSheet.create({
     color: "#0F172A",
     flex: 1,
   },
+  dropdownButtonContent: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  dropdownButtonMeta: {
+    marginTop: 3,
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    fontWeight: "600",
+  },
   dropdownButtonPlaceholder: {
     color: "#94A3B8",
   },
@@ -766,6 +795,16 @@ export default StyleSheet.create({
   pickerModalOptionText: {
     fontSize: fontSizes.base,
     color: "#0F172A",
+  },
+  pickerModalOptionContent: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  pickerModalOptionMeta: {
+    marginTop: 3,
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    fontWeight: "600",
   },
   pickerModalOptionTextActive: {
     color: "#059669",
@@ -976,10 +1015,13 @@ export default StyleSheet.create({
     borderRadius: 28,
     width: "90%",
     maxWidth: 520,
-    maxHeight: "82%",
+    maxHeight: "88%",
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E4EDF7",
+    ...(isWeb && {
+      boxShadow: "0px 18px 40px rgba(15, 23, 42, 0.18)",
+    }),
   },
   privacyModalHeader: {
     padding: spacing.lg,
@@ -1010,10 +1052,11 @@ export default StyleSheet.create({
     fontSize: fontSizes.sm,
     color: "#64748B",
     textAlign: "center",
+    lineHeight: 22,
   },
   privacyModalContent: {
     padding: spacing.lg,
-    maxHeight: 400,
+    maxHeight: 320,
   },
   privacySection: {
     marginBottom: spacing.lg,
@@ -1038,11 +1081,22 @@ export default StyleSheet.create({
   },
   privacyCheckboxContainer: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     padding: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
     backgroundColor: "#F8FBFE",
+  },
+  privacyCheckboxRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.base,
+    paddingBottom: spacing.base,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    backgroundColor: "#F8FBFE",
+    gap: spacing.sm,
   },
   privacyCheckbox: {
     width: 22,
@@ -1052,8 +1106,8 @@ export default StyleSheet.create({
     borderColor: "#059669",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: spacing.sm,
     backgroundColor: "#FFFFFF",
+    marginTop: 1,
   },
   privacyCheckboxChecked: {
     backgroundColor: "#059669",
@@ -1062,6 +1116,7 @@ export default StyleSheet.create({
     fontSize: fontSizes.sm,
     color: "#475569",
     flex: 1,
+    lineHeight: 21,
   },
   privacyLinkText: {
     color: "#059669",
@@ -1073,6 +1128,15 @@ export default StyleSheet.create({
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+  },
+  privacyButtonRow: {
+    flexDirection: "row",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+    gap: spacing.sm,
+    backgroundColor: "#FFFFFF",
   },
   privacyDeclineButton: {
     flex: 1,
@@ -1080,16 +1144,27 @@ export default StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#F1F5F9",
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
   },
   privacyDeclineText: {
     fontSize: fontSizes.base,
     fontWeight: "700",
     color: "#64748B",
   },
+  privacyDeclineButtonText: {
+    fontSize: fontSizes.base,
+    fontWeight: "700",
+    color: "#64748B",
+  },
   privacyAcceptButton: {
-    flex: 2,
+    flex: 1,
     borderRadius: 14,
     overflow: "hidden",
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#059669",
   },
   privacyAcceptButtonDisabled: {
     opacity: 0.6,
@@ -1102,6 +1177,11 @@ export default StyleSheet.create({
     gap: spacing.xs,
   },
   privacyAcceptText: {
+    fontSize: fontSizes.base,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  privacyAcceptButtonText: {
     fontSize: fontSizes.base,
     fontWeight: "700",
     color: "#FFFFFF",

@@ -88,6 +88,15 @@ export default StyleSheet.create({
     backgroundColor: "#F9FAFB",
   },
 
+  mapZoomLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    minHeight: 500,
+  },
+
   floorPlanImage: {
     width: "100%",
     height: "100%",
@@ -190,6 +199,82 @@ export default StyleSheet.create({
     left: -6,
   },
 
+  visitorMarkerSourceBadge: {
+    position: "absolute",
+    right: -13,
+    bottom: -13,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  visitorMarkerSourceText: {
+    fontSize: 8,
+    fontWeight: "900",
+  },
+
+  mapEmptyState: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    zIndex: 12,
+  },
+
+  mapEmptyStateCard: {
+    width: "100%",
+    maxWidth: 320,
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    padding: 18,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 18,
+      },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 10px 24px rgba(15, 23, 42, 0.12)" },
+    }),
+  },
+
+  mapEmptyStateIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  mapEmptyStateTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 5,
+    textAlign: "center",
+  },
+
+  mapEmptyStateText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    textAlign: "center",
+  },
+
   officeLabel: {
     position: "absolute",
     backgroundColor: "#0A3D91",
@@ -265,6 +350,23 @@ export default StyleSheet.create({
   activeVisitorsBadgeText: {
     fontSize: 12,
     fontWeight: "600",
+    color: "#FFFFFF",
+  },
+
+  zoomLevelBadge: {
+    position: "absolute",
+    top: 56,
+    right: 16,
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    zIndex: 20,
+  },
+
+  zoomLevelText: {
+    fontSize: 11,
+    fontWeight: "800",
     color: "#FFFFFF",
   },
 

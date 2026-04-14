@@ -16,6 +16,8 @@ import {
   Animated,
   StatusBar,
   Dimensions,
+  LayoutAnimation,
+  UIManager,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
@@ -27,9 +29,16 @@ import styles from "../styles/SecurityDashboardStyles";
 
 // Import map components
 import SharedMonitoringMap from "../components/SharedMonitoringMap";
+import {
+  MONITORING_MAP_BLUEPRINTS,
+  MONITORING_MAP_FLOORS,
+  MONITORING_MAP_OFFICES,
+  MONITORING_MAP_OFFICE_POSITIONS,
+} from "../utils/monitoringMapConfig";
 
 const { width, height } = Dimensions.get("window");
 const isDesktop = width >= 1024;
+const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
 
 export default function SecurityDashboardScreen({ navigation }) {
   // ============ STATE MANAGEMENT ============
@@ -46,6 +55,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const sidebarAnim = useRef(new Animated.Value(isDesktop ? 1 : 0)).current;
+  const liveMapRefreshRef = useRef(false);
   
   // Dashboard Data
   const [dashboardStats, setDashboardStats] = useState({
@@ -83,7 +93,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   });
   
   // Map and tracking states
-  const [selectedFloor, setSelectedFloor] = useState('all');
+  const [selectedFloor, setSelectedFloor] = useState('ground');
   const [selectedOffice, setSelectedOffice] = useState('all');
   const [hoveredVisitor, setHoveredVisitor] = useState(null);
   const [visitorLocations, setVisitorLocations] = useState([]);
@@ -91,6 +101,8 @@ export default function SecurityDashboardScreen({ navigation }) {
   
   // UI State
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [expandedModule, setExpandedModule] = useState('home');
+  const [selectedSubmodule, setSelectedSubmodule] = useState('home-main');
   const [visitorFilter, setVisitorFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showVisitorModal, setShowVisitorModal] = useState(false);
@@ -132,27 +144,20 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [reports, setReports] = useState([]);
   const [reportDateRange, setReportDateRange] = useState({ start: null, end: null });
   const [reportType, setReportType] = useState('daily');
+  const [reportForm, setReportForm] = useState({
+    visitorId: '',
+    category: 'suspicious',
+    details: '',
+  });
   
   // Floors and offices data
-  const floors = [
-    { id: 'all', name: 'All Floors', icon: 'layers-outline' },
-    { id: 'ground', name: 'Ground Floor', icon: 'home-outline' },
-    { id: 'first', name: '1st Floor', icon: 'arrow-up-outline' },
-    { id: 'second', name: '2nd Floor', icon: 'arrow-up-outline' },
-    { id: 'third', name: '3rd Floor', icon: 'arrow-up-outline' },
-  ];
+  const floors = MONITORING_MAP_FLOORS;
   
-  const offices = [
-    { id: 'admin', name: 'Administration', floor: 'ground', icon: 'business-outline' },
-    { id: 'registrar', name: 'Registrar\'s Office', floor: 'ground', icon: 'document-text-outline' },
-    { id: 'accounting', name: 'Accounting Office', floor: 'ground', icon: 'calculator-outline' },
-    { id: 'admissions', name: 'Admissions Office', floor: 'first', icon: 'school-outline' },
-    { id: 'dean', name: 'Dean\'s Office', floor: 'first', icon: 'people-outline' },
-    { id: 'hr', name: 'HR Department', floor: 'second', icon: 'people-circle-outline' },
-    { id: 'it', name: 'IT Department', floor: 'second', icon: 'desktop-outline' },
-    { id: 'library', name: 'Library', floor: 'third', icon: 'book-outline' },
-    { id: 'cafeteria', name: 'Cafeteria', floor: 'third', icon: 'restaurant-outline' },
-  ];
+  const offices = MONITORING_MAP_OFFICES;
+
+  const mapBlueprints = MONITORING_MAP_BLUEPRINTS;
+
+  const officePositions = MONITORING_MAP_OFFICE_POSITIONS;
 
   // ============ LOGOUT FUNCTIONS ============
   const handleLogoutPress = () => {
@@ -190,6 +195,12 @@ export default function SecurityDashboardScreen({ navigation }) {
     }, 30000);
     
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
   }, []);
 
   const initializeScreen = async () => {
@@ -330,10 +341,14 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const deriveVisitorCollections = (all = []) => {
     const active = all.filter((visitor) => visitor.status === 'checked_in');
-    const pending = all.filter((visitor) => visitor.approvalStatus === 'pending');
+    const pending = all.filter(
+      (visitor) =>
+        visitor.appointmentStatus === 'pending' ||
+        (!visitor.appointmentStatus && visitor.approvalStatus === 'pending'),
+    );
     const approved = all.filter(
       (visitor) =>
-        visitor.approvalStatus === 'approved' &&
+        hasApprovedVisitWindow(visitor) &&
         visitor.status !== 'checked_in' &&
         visitor.status !== 'checked_out',
     );
@@ -437,26 +452,44 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const deriveVisitorLocations = (activeVisitors = []) =>
-    activeVisitors.map((visitor, index) => ({
-      id: visitor._id,
-      name: visitor.fullName,
-      phone: visitor.phoneNumber,
-      purpose: visitor.purposeOfVisit,
-      host: visitor.host,
-      checkInTime: visitor.checkedInAt,
-      status: visitor.status,
-      idPhoto: visitor.idImage,
-      location: {
-        floor: getRandomFloor(),
-        office: visitor.assignedOffice || getRandomOffice(),
-        coordinates: {
-          x: 15 + ((index * 17) % 70),
-          y: 15 + ((index * 23) % 70),
-        },
-        timestamp: new Date(),
-      },
-      movement: [],
-    }));
+    activeVisitors
+      .filter((visitor) => visitor?.status === 'checked_in')
+      .map((visitor, index) => {
+        const liveLocation = visitor.currentLocation?.isActive
+          ? visitor.currentLocation
+          : null;
+        const liveCoordinates = liveLocation?.coordinates || {};
+        const hasLiveCoordinates =
+          Number.isFinite(Number(liveCoordinates.x)) &&
+          Number.isFinite(Number(liveCoordinates.y));
+
+        return {
+          id: visitor._id,
+          name: visitor.fullName,
+          phone: visitor.phoneNumber,
+          purpose: visitor.purposeOfVisit,
+          host: visitor.host,
+          checkInTime: visitor.checkedInAt,
+          status: visitor.status,
+          idPhoto: visitor.idImage,
+          location: {
+            floor: liveLocation?.floor || 'ground',
+            office: liveLocation?.office || visitor.assignedOffice || getRandomOffice(),
+            coordinates: hasLiveCoordinates
+              ? {
+                  x: Number(liveCoordinates.x),
+                  y: Number(liveCoordinates.y),
+                }
+              : {
+                  x: 15 + ((index * 17) % 70),
+                  y: 15 + ((index * 23) % 70),
+                },
+            timestamp: liveLocation?.lastSeenAt || new Date(),
+            source: liveLocation?.source || 'system_estimate',
+          },
+          movement: visitor.locationHistory || [],
+        };
+      });
 
   const deriveAccessLogs = (all = []) =>
     all
@@ -628,6 +661,115 @@ export default function SecurityDashboardScreen({ navigation }) {
     const floorsList = ['ground', 'first', 'second', 'third'];
     return floorsList[Math.floor(Math.random() * floorsList.length)];
   };
+
+  const guardModules = [
+    {
+      key: 'home',
+      label: 'Home',
+      icon: 'home-outline',
+      color: '#DC2626',
+      submodules: [
+        { key: 'home-main', label: 'Main Landing', badge: 0 },
+      ],
+    },
+    {
+      key: 'maps',
+      label: 'Maps',
+      icon: 'map-outline',
+      color: '#0F766E',
+      submodules: [
+        { key: 'map-ground', label: 'Ground Floor', badge: 0 },
+        { key: 'map-mezzanine', label: 'Mezzanine', badge: 0 },
+        { key: 'map-second', label: 'Second Floor', badge: 0 },
+        { key: 'map-third', label: 'Third Floor', badge: 0 },
+      ],
+    },
+    {
+      key: 'appointment',
+      label: 'Appointment',
+      icon: 'calendar-outline',
+      color: '#2563EB',
+      submodules: [
+        { key: 'appointment-records', label: 'Appointment Records', badge: visitors.all.length || 0 },
+      ],
+    },
+    {
+      key: 'reports',
+      label: 'Reports',
+      icon: 'document-text-outline',
+      color: '#7C3AED',
+      submodules: [
+        { key: 'report-file', label: 'File a Report', badge: reports.length || 0 },
+      ],
+    },
+  ];
+
+  const floorSubmoduleToFloor = {
+    'map-ground': 'ground',
+    'map-mezzanine': 'mezzanine',
+    'map-second': 'second',
+    'map-third': 'third',
+  };
+
+  const getGuardParentModule = (submoduleKey) =>
+    guardModules.find((module) => module.submodules.some((submodule) => submodule.key === submoduleKey))?.key || 'home';
+
+  const getContentKeyForSubmodule = (submoduleKey) => {
+    if (submoduleKey === 'home-main') return 'dashboard';
+    if (submoduleKey.startsWith('map-')) return 'map';
+    if (submoduleKey === 'appointment-records') return 'visitors';
+    if (submoduleKey === 'report-file') return 'reports';
+    return 'dashboard';
+  };
+
+  const getSelectedSubmoduleMeta = () => {
+    switch (selectedSubmodule) {
+      case 'map-ground':
+        return { title: 'Ground Floor Map', subtitle: 'View-only monitoring of the ground floor layout and active visitor positions.' };
+      case 'map-mezzanine':
+        return { title: 'Mezzanine Map', subtitle: 'View-only monitoring of the mezzanine layout and active visitor positions.' };
+      case 'map-second':
+        return { title: 'Second Floor Map', subtitle: 'View-only monitoring of the second floor layout and active visitor positions.' };
+      case 'map-third':
+        return { title: 'Third Floor Map', subtitle: 'View-only monitoring of the third floor layout and active visitor positions.' };
+      case 'appointment-records':
+        return { title: 'Appointment Records', subtitle: 'Review appointment records in a read-only security view.' };
+      case 'report-file':
+        return { title: 'File a Report', subtitle: 'Submit a security report and review recently filed incidents.' };
+      case 'home-main':
+      default:
+        return { title: 'Security Home', subtitle: 'Main landing screen for live security activity, visitor status, and quick actions.' };
+    }
+  };
+
+  const selectGuardSubmodule = (submoduleKey) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const parentModule = getGuardParentModule(submoduleKey);
+    setExpandedModule(parentModule);
+    setSelectedSubmodule(submoduleKey);
+    setActiveTab(getContentKeyForSubmodule(submoduleKey));
+
+    if (floorSubmoduleToFloor[submoduleKey]) {
+      setSelectedFloor(floorSubmoduleToFloor[submoduleKey]);
+      setSelectedOffice('all');
+    }
+
+    if (submoduleKey === 'appointment-records') {
+      setVisitorFilter('all');
+    }
+  };
+
+  const toggleGuardModule = (moduleKey) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedModule((currentValue) => (currentValue === moduleKey ? null : moduleKey));
+  };
+
+  const normalizeFloorId = (floorId) => {
+    if (floorId === 'mezzanine') {
+      return 'first';
+    }
+    return floorId;
+  };
   
   const getRandomOffice = () => {
     const officeNames = offices.filter(o => o.id !== 'all').map(o => o.name);
@@ -636,7 +778,9 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const getFilteredVisitorLocations = () => {
     return visitorLocations.filter(visitor => {
-      if (selectedFloor !== 'all' && visitor.location.floor !== selectedFloor) {
+      if (
+        normalizeFloorId(visitor.location.floor) !== normalizeFloorId(selectedFloor)
+      ) {
         return false;
       }
       if (selectedOffice !== 'all' && visitor.location.office !== selectedOffice) {
@@ -672,6 +816,26 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
   };
 
+  const refreshLiveMapData = async () => {
+    if (liveMapRefreshRef.current) return;
+    liveMapRefreshRef.current = true;
+    try {
+      await loadOperationalData();
+    } finally {
+      liveMapRefreshRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    const isMapVisible = activeTab === 'map' || showMapModal;
+    if (!isMapVisible) return undefined;
+
+    refreshLiveMapData();
+    const interval = setInterval(refreshLiveMapData, LIVE_MAP_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [activeTab, showMapModal]);
+
   const formatDate = (date) => {
     if (!date) return 'N/A';
     const d = new Date(date);
@@ -702,17 +866,32 @@ export default function SecurityDashboardScreen({ navigation }) {
     });
   };
 
+  const hasApprovedVisitWindow = (visitor) => {
+    if (!visitor) return false;
+    const appointmentStatus = String(visitor.appointmentStatus || "").toLowerCase();
+    const approvalStatus = String(visitor.approvalStatus || "").toLowerCase();
+
+    if (visitor.requestCategory === "appointment") {
+      return approvalStatus === "approved" && ["approved", "adjusted"].includes(appointmentStatus);
+    }
+
+    return approvalStatus === "approved";
+  };
+
   const getStatusBadge = (visitor) => {
     if (visitor.status === 'checked_in') {
       return { bg: '#D1FAE5', text: '#059669', label: 'CHECKED IN' };
     } else if (visitor.status === 'checked_out') {
       return { bg: '#F3F4F6', text: '#6B7280', label: 'CHECKED OUT' };
-    } else if (visitor.approvalStatus === 'pending') {
-      return { bg: '#FEF3C7', text: '#D97706', label: 'PENDING' };
-    } else if (visitor.approvalStatus === 'approved') {
-      return { bg: '#DBEAFE', text: '#3B82F6', label: 'APPROVED' };
-    } else if (visitor.approvalStatus === 'rejected') {
+    } else if (visitor.appointmentStatus === 'rejected' || visitor.approvalStatus === 'rejected') {
       return { bg: '#FEE2E2', text: '#DC2626', label: 'REJECTED' };
+    } else if (
+      visitor.appointmentStatus === 'pending' ||
+      (!visitor.appointmentStatus && visitor.approvalStatus === 'pending')
+    ) {
+      return { bg: '#FEF3C7', text: '#D97706', label: 'PENDING' };
+    } else if (hasApprovedVisitWindow(visitor)) {
+      return { bg: '#DBEAFE', text: '#3B82F6', label: 'APPROVED' };
     }
     return { bg: '#F3F4F6', text: '#6B7280', label: 'UNKNOWN' };
   };
@@ -839,8 +1018,8 @@ export default function SecurityDashboardScreen({ navigation }) {
       return;
     }
 
-    if (visitor.approvalStatus !== 'approved') {
-      Alert.alert("Approval Required", `${visitor.fullName} is still waiting for admin approval.`);
+    if (!hasApprovedVisitWindow(visitor)) {
+      Alert.alert("Approval Required", `${visitor.fullName} does not have an approved visit window yet.`);
       return;
     }
 
@@ -932,6 +1111,41 @@ export default function SecurityDashboardScreen({ navigation }) {
       Alert.alert("Report Submitted", "Security team has been notified");
     } catch (error) {
       Alert.alert("Error", "Failed to submit report");
+    }
+  };
+
+  const submitSecurityReportForm = async () => {
+    if (!reportForm.visitorId) {
+      Alert.alert("Visitor Required", "Please choose a visitor record for this report.");
+      return;
+    }
+
+    if (!reportForm.details.trim()) {
+      Alert.alert("Report Details Required", "Please add a short report description before submitting.");
+      return;
+    }
+
+    const visitor = visitors.all.find((entry) => String(entry._id) === String(reportForm.visitorId));
+    if (!visitor?._id) {
+      Alert.alert("Visitor Not Found", "Please choose a valid visitor record.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const reason = `${reportForm.category}: ${reportForm.details.trim()}`;
+      await ApiService.reportVisitor(visitor._id, { reason, reportedBy: user._id });
+      await refreshData();
+      setReportForm({
+        visitorId: '',
+        category: 'suspicious',
+        details: '',
+      });
+      Alert.alert("Report Submitted", "The security report has been filed successfully.");
+    } catch (error) {
+      Alert.alert("Error", error?.message || "Failed to submit security report");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1148,8 +1362,8 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Text style={styles.securitySectionSubtitle}>Monitor active visitors and recent status changes without the campus map.</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => setActiveTab('visitors')}>
-              <Text style={styles.viewAll}>Open Visitors</Text>
+            <TouchableOpacity onPress={() => selectGuardSubmodule('appointment-records')}>
+              <Text style={styles.viewAll}>Open Records</Text>
             </TouchableOpacity>
           </View>
 
@@ -1216,9 +1430,9 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
                   <TouchableOpacity onPress={() => {
                     setVisitorFilter('all');
-                    setActiveTab('visitors');
+                    selectGuardSubmodule('appointment-records');
                   }}>
-                    <Text style={styles.viewAll}>Manage Visitors</Text>
+                    <Text style={styles.viewAll}>Appointment Records</Text>
                   </TouchableOpacity>
         </View>
 
@@ -1267,8 +1481,8 @@ export default function SecurityDashboardScreen({ navigation }) {
         <TouchableOpacity 
           style={styles.upcomingBanner}
           onPress={() => {
-            setActiveTab('visitors');
             setVisitorFilter('pending');
+            selectGuardSubmodule('appointment-records');
           }}
         >
           <View style={styles.upcomingBannerContent}>
@@ -1299,35 +1513,48 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
         
         <View style={styles.quickActionsGrid}>
-          <TouchableOpacity style={styles.quickActionCard} onPress={handleRegisterVisitor}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => selectGuardSubmodule('appointment-records')}>
             <LinearGradient
               colors={['#0A3D91', '#1E4A8C']}
               style={styles.quickActionGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Ionicons name="person-add-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>Register Visitor</Text>
-              <Text style={styles.quickActionSubtitle}>Add a new visitor record for manual intake</Text>
+              <Ionicons name="reader-outline" size={24} color="#FFFFFF" />
+              <Text style={styles.quickActionTitle}>Appointment Records</Text>
+              <Text style={styles.quickActionSubtitle}>Open the read-only appointment list for current and past visits</Text>
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => setActiveTab('alerts')}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => selectGuardSubmodule('report-file')}>
             <LinearGradient
               colors={['#10B981', '#059669']}
               style={styles.quickActionGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Ionicons name="warning-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>Alerts Center</Text>
-              <Text style={styles.quickActionSubtitle}>Review alerts and resolve incidents quickly</Text>
+              <Ionicons name="flag-outline" size={24} color="#FFFFFF" />
+              <Text style={styles.quickActionTitle}>File a Report</Text>
+              <Text style={styles.quickActionSubtitle}>Open the reporting workspace and submit an incident report</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => selectGuardSubmodule('map-ground')}>
+            <LinearGradient
+              colors={['#0F766E', '#0EA5A4']}
+              style={styles.quickActionGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="map-outline" size={24} color="#FFFFFF" />
+              <Text style={styles.quickActionTitle}>Monitoring Map</Text>
+              <Text style={styles.quickActionSubtitle}>Track active visitors by floor and office in real time</Text>
             </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickActionCard} onPress={() => {
             setVisitorFilter('all');
-            setActiveTab('visitors');
+            selectGuardSubmodule('appointment-records');
           }}>
             <LinearGradient
               colors={['#F59E0B', '#D97706']}
@@ -1336,8 +1563,8 @@ export default function SecurityDashboardScreen({ navigation }) {
               end={{ x: 1, y: 1 }}
             >
               <Ionicons name="list-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>Visitor Queue</Text>
-              <Text style={styles.quickActionSubtitle}>Review all visitor records and statuses</Text>
+              <Text style={styles.quickActionTitle}>View Records</Text>
+              <Text style={styles.quickActionSubtitle}>Review appointment records by status and visitor details</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -1363,8 +1590,8 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name="time-outline" size={20} color="#059669" />
             <Text style={styles.sectionTitle}>Recent Activity</Text>
           </View>
-          <TouchableOpacity onPress={() => setActiveTab('logs')}>
-            <Text style={styles.viewAllLink}>View All</Text>
+          <TouchableOpacity onPress={() => selectGuardSubmodule('appointment-records')}>
+            <Text style={styles.viewAllLink}>View Records</Text>
           </TouchableOpacity>
         </View>
 
@@ -1403,8 +1630,8 @@ export default function SecurityDashboardScreen({ navigation }) {
               <Ionicons name="warning-outline" size={20} color="#DC2626" />
               <Text style={styles.sectionTitle}>Security Alerts</Text>
             </View>
-            <TouchableOpacity onPress={() => setActiveTab('alerts')}>
-              <Text style={styles.viewAllLink}>View All</Text>
+            <TouchableOpacity onPress={() => selectGuardSubmodule('report-file')}>
+              <Text style={styles.viewAllLink}>Open Reports</Text>
             </TouchableOpacity>
           </View>
 
@@ -1461,6 +1688,12 @@ export default function SecurityDashboardScreen({ navigation }) {
           offices={offices}
           selectedFloor={selectedFloor}
           selectedOffice={selectedOffice}
+          mapBlueprints={mapBlueprints}
+          officePositions={officePositions}
+          onFloorChange={(floorId) => {
+            setSelectedFloor(floorId);
+            setSelectedOffice('all');
+          }}
           onVisitorHover={handleVisitorHover}
           onVisitorLeave={handleVisitorLeave}
           onVisitorSelect={handleVisitorSelect}
@@ -1474,6 +1707,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             { label: "Checked In", value: visitors.active.length || 0, color: "#F59E0B" },
           ]}
           statusLabel="Security monitoring"
+          showFloorNavigation={false}
         />
       </View>
     </ScrollView>
@@ -1485,18 +1719,14 @@ export default function SecurityDashboardScreen({ navigation }) {
       <View style={styles.visitorsContainer}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
-            <Ionicons name="people-outline" size={20} color="#0A3D91" />
+            <Ionicons name="calendar-outline" size={20} color="#0A3D91" />
             <View>
-              <Text style={styles.sectionTitle}>Visitor Management</Text>
+              <Text style={styles.sectionTitle}>Appointment Records</Text>
               <Text style={styles.securitySectionSubtitle}>
-                Completed visits stay here for 30 days, then roll off the history view automatically.
+                Security can review appointment records here in a read-only view.
               </Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.addButton} onPress={handleRegisterVisitor}>
-            <Ionicons name="add" size={20} color="#FFFFFF" />
-            <Text style={styles.addButtonText}>Register</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Filter Tabs */}
@@ -1539,19 +1769,26 @@ export default function SecurityDashboardScreen({ navigation }) {
           )}
         </View>
 
-        {/* Visitor Cards */}
+        <View style={styles.readonlyInfoBanner}>
+          <Ionicons name="shield-checkmark-outline" size={18} color="#2563EB" />
+          <Text style={styles.readonlyInfoBannerText}>
+            This section is view-only for guards. Open a record to inspect appointment details.
+          </Text>
+        </View>
+
+        {/* Appointment Record Cards */}
         {getFilteredVisitors().length > 0 ? (
-          getFilteredVisitors().map((visitor) => renderVisitorCard(visitor))
+          getFilteredVisitors().map((visitor) => renderAppointmentRecordCard(visitor))
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyStateTitle}>No visitors found</Text>
+            <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateTitle}>No appointment records found</Text>
             <Text style={styles.emptyStateSubtitle}>
               {searchQuery
                 ? 'Try a different search term'
                 : visitorFilter === 'completed'
-                  ? 'No completed visits are available in the last 30 days'
-                  : 'No visitors in this category'}
+                  ? 'No completed appointments are available in the last 30 days'
+                  : 'No appointment records in this category'}
             </Text>
           </View>
         )}
@@ -1682,7 +1919,10 @@ export default function SecurityDashboardScreen({ navigation }) {
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="document-text-outline" size={20} color="#7C3AED" />
-            <Text style={styles.sectionTitle}>Security Reports</Text>
+            <View>
+              <Text style={styles.sectionTitle}>File a Report</Text>
+              <Text style={styles.securitySectionSubtitle}>Submit a guard report, then review the most recent filed incidents below.</Text>
+            </View>
           </View>
           <TouchableOpacity 
             style={styles.generateButton}
@@ -1691,6 +1931,85 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
             <Text style={styles.generateButtonText}>Refresh</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.reportFormCard}>
+          <Text style={styles.reportFormTitle}>New Security Report</Text>
+          <Text style={styles.reportFormSubtitle}>
+            Select a visitor record and describe the incident for admin follow-up.
+          </Text>
+
+          <Text style={styles.reportFormLabel}>Visitor Record</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reportVisitorChipRow}>
+            {visitors.all.slice(0, 12).map((visitor) => {
+              const isActive = reportForm.visitorId === visitor._id;
+              return (
+                <TouchableOpacity
+                  key={visitor._id}
+                  style={[styles.reportVisitorChip, isActive && styles.reportVisitorChipActive]}
+                  onPress={() => setReportForm((currentValue) => ({ ...currentValue, visitorId: visitor._id }))}
+                >
+                  <Text style={[styles.reportVisitorChipText, isActive && styles.reportVisitorChipTextActive]}>
+                    {visitor.fullName}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={styles.reportFormLabel}>Category</Text>
+          <View style={styles.reportCategoryRow}>
+            {[
+              { key: 'suspicious', label: 'Suspicious' },
+              { key: 'overstayed', label: 'Overstayed' },
+              { key: 'violation', label: 'Violation' },
+              { key: 'other', label: 'Other' },
+            ].map((option) => {
+              const isActive = reportForm.category === option.key;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[styles.reportCategoryChip, isActive && styles.reportCategoryChipActive]}
+                  onPress={() => setReportForm((currentValue) => ({ ...currentValue, category: option.key }))}
+                >
+                  <Text style={[styles.reportCategoryChipText, isActive && styles.reportCategoryChipTextActive]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={styles.reportFormLabel}>Details</Text>
+          <TextInput
+            style={styles.reportFormInput}
+            placeholder="Describe what happened..."
+            placeholderTextColor="#9CA3AF"
+            multiline
+            numberOfLines={4}
+            value={reportForm.details}
+            onChangeText={(text) => setReportForm((currentValue) => ({ ...currentValue, details: text }))}
+          />
+
+          <View style={styles.reportFormActions}>
+            <TouchableOpacity
+              style={styles.reportFormSecondaryButton}
+              onPress={() => setReportForm({ visitorId: '', category: 'suspicious', details: '' })}
+            >
+              <Text style={styles.reportFormSecondaryButtonText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.reportFormPrimaryButton}
+              onPress={submitSecurityReportForm}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.reportFormPrimaryButtonText}>Submit Report</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Report Stats Cards */}
@@ -1780,33 +2099,31 @@ export default function SecurityDashboardScreen({ navigation }) {
         </ScrollView>
       </View>
       
-      {selectedFloor !== 'all' && (
-        <View style={styles.filterGroup}>
-          <Text style={styles.filterLabel}>Office:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+      <View style={styles.filterGroup}>
+        <Text style={styles.filterLabel}>Office:</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+          <TouchableOpacity
+            style={[styles.filterChip, selectedOffice === 'all' && styles.filterChipActive]}
+            onPress={() => setSelectedOffice('all')}
+          >
+            <Text style={[styles.filterChipText, selectedOffice === 'all' && styles.filterChipTextActive]}>
+              All Offices
+            </Text>
+          </TouchableOpacity>
+          {offices.filter((office) => normalizeFloorId(office.floor) === normalizeFloorId(selectedFloor)).map((office) => (
             <TouchableOpacity
-              style={[styles.filterChip, selectedOffice === 'all' && styles.filterChipActive]}
-              onPress={() => setSelectedOffice('all')}
+              key={office.id}
+              style={[styles.filterChip, selectedOffice === office.name && styles.filterChipActive]}
+              onPress={() => setSelectedOffice(office.name)}
             >
-              <Text style={[styles.filterChipText, selectedOffice === 'all' && styles.filterChipTextActive]}>
-                All Offices
+              <Ionicons name={office.icon} size={16} color={selectedOffice === office.name ? "#FFFFFF" : "#6B7280"} />
+              <Text style={[styles.filterChipText, selectedOffice === office.name && styles.filterChipTextActive]}>
+                {office.name}
               </Text>
             </TouchableOpacity>
-            {offices.filter(o => o.id !== 'all' && o.floor === selectedFloor).map((office) => (
-              <TouchableOpacity
-                key={office.id}
-                style={[styles.filterChip, selectedOffice === office.name && styles.filterChipActive]}
-                onPress={() => setSelectedOffice(office.name)}
-              >
-                <Ionicons name={office.icon} size={16} color={selectedOffice === office.name ? "#FFFFFF" : "#6B7280"} />
-                <Text style={[styles.filterChipText, selectedOffice === office.name && styles.filterChipTextActive]}>
-                  {office.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+          ))}
+        </ScrollView>
+      </View>
       
       <View style={styles.mapLegend}>
         <View style={styles.legendItem}>
@@ -1824,6 +2141,32 @@ export default function SecurityDashboardScreen({ navigation }) {
       </View>
     </View>
   );
+
+  const getTrackingSourceLabel = (source) => {
+    const normalizedSource = String(source || '').toLowerCase();
+    if (normalizedSource.includes('phone')) return 'Phone GPS';
+    if (
+      normalizedSource.includes('arduino') ||
+      normalizedSource.includes('tap') ||
+      normalizedSource.includes('nfc')
+    ) {
+      return 'Tap checkpoint';
+    }
+    if (normalizedSource.includes('manual')) return 'Manual update';
+    if (normalizedSource.includes('estimate')) return 'Estimated location';
+    return 'Tracking update';
+  };
+
+  const getFreshnessLabel = (dateValue) => {
+    const timestamp = new Date(dateValue).getTime();
+    if (!Number.isFinite(timestamp)) return 'No recent update';
+
+    const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    if (diffSeconds < 45) return 'Live now';
+    if (diffSeconds < 180) return `${Math.max(1, Math.floor(diffSeconds / 60))}m ago`;
+    if (diffSeconds < 900) return `${Math.floor(diffSeconds / 60)}m ago`;
+    return 'Stale update';
+  };
 
   // Render Hover Card
   const renderHoverCard = () => {
@@ -1852,6 +2195,18 @@ export default function SecurityDashboardScreen({ navigation }) {
           <View style={styles.hoverCardDetail}>
             <Ionicons name="location-outline" size={14} color="#6B7280" />
             <Text style={styles.hoverCardDetailText}>{hoveredVisitor.location.office}</Text>
+          </View>
+          <View style={styles.hoverCardDetail}>
+            <Ionicons name="navigate-outline" size={14} color="#6B7280" />
+            <Text style={styles.hoverCardDetailText}>
+              {getTrackingSourceLabel(hoveredVisitor.location.source)}
+            </Text>
+          </View>
+          <View style={styles.hoverCardDetail}>
+            <Ionicons name="time-outline" size={14} color="#6B7280" />
+            <Text style={styles.hoverCardDetailText}>
+              Last seen: {getFreshnessLabel(hoveredVisitor.location.timestamp)}
+            </Text>
           </View>
         </View>
         <TouchableOpacity 
@@ -1941,7 +2296,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
 
         <View style={styles.visitorCardActions}>
-          {visitor.approvalStatus === 'approved' && (
+          {hasApprovedVisitWindow(visitor) && (
             <TouchableOpacity 
               style={[
                 styles.visitorCardAction,
@@ -2032,31 +2387,76 @@ export default function SecurityDashboardScreen({ navigation }) {
 
           {/* Navigation Menu */}
           <View style={styles.sidebarNav}>
-            {menuItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.sidebarNavItem,
-                  activeTab === item.id && styles.sidebarNavItemActive
-                ]}
-                onPress={() => setActiveTab(item.id)}
-              >
-                <View style={[styles.sidebarNavIcon, activeTab === item.id && { backgroundColor: item.color + '20' }]}>
-                  <Ionicons 
-                    name={item.icon} 
-                    size={20} 
-                    color={activeTab === item.id ? item.color : '#6B7280'} 
-                  />
+            {guardModules.map((module) => {
+              const isExpanded = expandedModule === module.key;
+              const hasSelectedChild = module.submodules.some((submodule) => submodule.key === selectedSubmodule);
+
+              return (
+                <View key={module.key} style={styles.sidebarModuleCard}>
+                  <TouchableOpacity
+                    style={[
+                      styles.sidebarNavItem,
+                      hasSelectedChild && styles.sidebarNavItemActive,
+                    ]}
+                    onPress={() => toggleGuardModule(module.key)}
+                  >
+                    <View style={[styles.sidebarNavIcon, hasSelectedChild && { backgroundColor: `${module.color}20` }]}>
+                      <Ionicons
+                        name={module.icon}
+                        size={20}
+                        color={hasSelectedChild ? module.color : '#6B7280'}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.sidebarNavLabel,
+                        hasSelectedChild && styles.sidebarNavLabelActive,
+                      ]}
+                    >
+                      {module.label}
+                    </Text>
+                    <Ionicons
+                      name={isExpanded ? "chevron-up-outline" : "chevron-down-outline"}
+                      size={18}
+                      color={hasSelectedChild ? module.color : '#94A3B8'}
+                    />
+                    {hasSelectedChild && <View style={[styles.sidebarNavIndicator, { backgroundColor: module.color }]} />}
+                  </TouchableOpacity>
+
+                  {isExpanded ? (
+                    <View style={styles.sidebarSubmoduleList}>
+                      {module.submodules.map((submodule) => {
+                        const isActive = selectedSubmodule === submodule.key;
+                        return (
+                          <TouchableOpacity
+                            key={submodule.key}
+                            style={[
+                              styles.sidebarSubmoduleButton,
+                              isActive && styles.sidebarSubmoduleButtonActive,
+                            ]}
+                            onPress={() => selectGuardSubmodule(submodule.key)}
+                          >
+                            <Text
+                              style={[
+                                styles.sidebarSubmoduleLabel,
+                                isActive && styles.sidebarSubmoduleLabelActive,
+                              ]}
+                            >
+                              {submodule.label}
+                            </Text>
+                            {submodule.badge > 0 ? (
+                              <View style={styles.sidebarSubmoduleBadge}>
+                                <Text style={styles.sidebarSubmoduleBadgeText}>{submodule.badge}</Text>
+                              </View>
+                            ) : null}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : null}
                 </View>
-                <Text style={[
-                  styles.sidebarNavLabel,
-                  activeTab === item.id && styles.sidebarNavLabelActive
-                ]}>
-                  {item.label}
-                </Text>
-                {activeTab === item.id && <View style={[styles.sidebarNavIndicator, { backgroundColor: item.color }]} />}
-              </TouchableOpacity>
-            ))}
+              );
+            })}
           </View>
 
           {/* Quick Stats */}
@@ -2116,14 +2516,78 @@ export default function SecurityDashboardScreen({ navigation }) {
     );
   };
 
-  // Menu Items
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline', color: '#DC2626' },
-    { id: 'visitors', label: 'Visitors', icon: 'people-outline', color: '#0A3D91' },
-    { id: 'alerts', label: 'Alerts', icon: 'warning-outline', color: '#F59E0B' },
-    { id: 'logs', label: 'Access Logs', icon: 'time-outline', color: '#059669' },
-    { id: 'reports', label: 'Reports', icon: 'document-text-outline', color: '#7C3AED' },
-  ];
+  const renderAppointmentRecordCard = (visitor) => {
+    const statusBadge = getStatusBadge(visitor);
+
+    return (
+      <TouchableOpacity
+        key={visitor._id}
+        style={styles.visitorCard}
+        onPress={() => handleViewDetails(visitor)}
+        activeOpacity={0.75}
+      >
+        <View style={styles.visitorCardHeader}>
+          {visitor.idImage ? (
+            <Image source={{ uri: visitor.idImage }} style={styles.visitorIdImage} />
+          ) : (
+            <View style={styles.visitorIdPlaceholder}>
+              <Ionicons name="document-text-outline" size={30} color="#9CA3AF" />
+            </View>
+          )}
+          <View style={styles.visitorCardInfo}>
+            <Text style={styles.visitorCardName} numberOfLines={1}>
+              {visitor.fullName}
+            </Text>
+            <Text style={styles.visitorCardPurpose} numberOfLines={1}>
+              {visitor.purposeOfVisit || 'No appointment purpose'}
+            </Text>
+            <View style={styles.visitorCardMeta}>
+              <Ionicons name="business-outline" size={12} color="#6B7280" />
+              <Text style={styles.visitorCardMetaText}>
+                {visitor.assignedOffice || visitor.host || 'Campus access'}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusBadge.bg }]}>
+            <Text style={[styles.statusBadgeText, { color: statusBadge.text }]}>
+              {statusBadge.label}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.visitorCardFooter}>
+          <View style={styles.visitorCardFooterItem}>
+            <Ionicons name="mail-outline" size={14} color="#6B7280" />
+            <Text style={styles.visitorCardFooterText}>
+              {visitor.email || 'No email'}
+            </Text>
+          </View>
+          <View style={styles.visitorCardFooterItem}>
+            <Ionicons name="call-outline" size={14} color="#6B7280" />
+            <Text style={styles.visitorCardFooterText}>
+              {visitor.phoneNumber || 'No contact number'}
+            </Text>
+          </View>
+          <View style={styles.visitorCardFooterItem}>
+            <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+            <Text style={styles.visitorCardFooterText}>
+              {formatDate(visitor.visitDate)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.readonlyRecordActions}>
+          <TouchableOpacity
+            style={[styles.visitorCardAction, styles.visitorCardActionSecondary]}
+            onPress={() => handleViewDetails(visitor)}
+          >
+            <Ionicons name="eye-outline" size={18} color="#0A3D91" />
+            <Text style={styles.readonlyRecordActionText}>View Record</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   // ============ LOADING STATE ============
   if (isLoading) {
@@ -2138,6 +2602,8 @@ export default function SecurityDashboardScreen({ navigation }) {
   if (!user) {
     return null;
   }
+
+  const selectedSubmoduleMeta = getSelectedSubmoduleMeta();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -2164,10 +2630,10 @@ export default function SecurityDashboardScreen({ navigation }) {
                 </TouchableOpacity>
                 <View>
                   <Text style={styles.headerTitle}>
-                    {menuItems.find(item => item.id === activeTab)?.label || 'Dashboard'}
+                    {selectedSubmoduleMeta.title}
                   </Text>
                   <Text style={styles.headerSubtitle}>
-                    {formatDate(new Date())}
+                    {selectedSubmoduleMeta.subtitle}
                   </Text>
                 </View>
               </View>
@@ -2222,12 +2688,10 @@ export default function SecurityDashboardScreen({ navigation }) {
           </LinearGradient>
 
           {/* Tab Content */}
-          {activeTab === 'dashboard' && renderDashboardTab()}
-          {activeTab === 'map' && renderMapTab()}
-          {activeTab === 'visitors' && renderVisitorsTab()}
-          {activeTab === 'alerts' && renderAlertsTab()}
-          {activeTab === 'logs' && renderLogsTab()}
-          {activeTab === 'reports' && renderReportsTab()}
+          {selectedSubmodule === 'home-main' && renderDashboardTab()}
+          {selectedSubmodule.startsWith('map-') && renderMapTab()}
+          {selectedSubmodule === 'appointment-records' && renderVisitorsTab()}
+          {selectedSubmodule === 'report-file' && renderReportsTab()}
           
         </Animated.View>
       </View>
@@ -2299,6 +2763,12 @@ export default function SecurityDashboardScreen({ navigation }) {
               offices={offices}
               selectedFloor={selectedFloor}
               selectedOffice={selectedOffice}
+              mapBlueprints={mapBlueprints}
+              officePositions={officePositions}
+              onFloorChange={(floorId) => {
+                setSelectedFloor(floorId);
+                setSelectedOffice('all');
+              }}
               onVisitorHover={handleVisitorHover}
               onVisitorLeave={handleVisitorLeave}
               onVisitorSelect={handleVisitorSelect}
@@ -2316,6 +2786,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 { label: "Checked In", value: visitors.active.length || 0, color: "#FBBF24" },
               ]}
               statusLabel="Security monitoring"
+              showFloorNavigation={false}
             />
           </View>
         </View>
@@ -2581,7 +3052,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                       <View style={styles.visitorDetailAccessPill}>
                         <Ionicons name="shield-checkmark-outline" size={12} color="#0A3D91" />
                         <Text style={styles.visitorDetailAccessPillText}>
-                          {selectedVisitor.approvalStatus === 'approved' ? 'Cleared for access' : 'Awaiting clearance'}
+                          {hasApprovedVisitWindow(selectedVisitor) ? 'Cleared for access' : 'Awaiting clearance'}
                         </Text>
                       </View>
                     </View>
@@ -2678,7 +3149,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 </View>
 
                 <View style={styles.detailActions}>
-                  {selectedVisitor.approvalStatus === 'approved' && selectedVisitor.status !== 'checked_out' && (
+                  {hasApprovedVisitWindow(selectedVisitor) && selectedVisitor.status !== 'checked_out' && (
                     <TouchableOpacity 
                       style={[
                         styles.detailActionButton,

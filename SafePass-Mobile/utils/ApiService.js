@@ -19,7 +19,14 @@ const WEB_FALLBACK_API_BASE_URL = (() => {
   }
 
   const { protocol, hostname } = window.location;
-  return `${protocol}//${hostname}:5000/api`;
+  const isLocalHost =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0";
+
+  return isLocalHost
+    ? `${protocol}//${hostname}:5000/api`
+    : "https://safepass-052h.onrender.com/api";
 })();
 
 const DEFAULT_API_BASE_URL = Platform.select({
@@ -33,6 +40,11 @@ const API_BASE_URL = (
   process.env.EXPO_PUBLIC_API_BASE_URL ||
   DEFAULT_API_BASE_URL
 ).replace(/\/$/, "");
+
+const API_BASE_URL_CANDIDATES =
+  process.env.EXPO_PUBLIC_API_BASE_URL || Platform.OS !== "android"
+    ? [API_BASE_URL]
+    : ["http://10.0.2.2:5000/api", "http://localhost:5000/api"];
 
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
@@ -262,9 +274,19 @@ async register(userData) {
         status: staffData?.status || "active",
         isActive: staffData?.isActive ?? true,
       };
-      return await this.register(payload);
+      return await this.fetch("/admin/staff/create", {
+        method: "POST",
+        body: payload,
+      });
     } catch (error) {
-      const message = error?.message || "Failed to create staff account";
+      const errorMessage = String(error?.message || "").toLowerCase();
+      const message = errorMessage.includes("username already")
+        ? "Username already registered. Please use another username."
+        : errorMessage.includes("staff id already") || errorMessage.includes("employeeid")
+          ? "Staff ID already registered. Please use another staff ID."
+          : errorMessage.includes("email already")
+            ? "Email already registered. Please use another email address."
+            : error?.message || "Failed to create staff account";
       throw new Error(message);
     }
   }
@@ -284,6 +306,13 @@ async register(userData) {
     } catch (error) {
       console.error("Login API error:", error);
       
+      if (error?.data?.requiresEmailVerification || error?.status === 403) {
+        throw new Error(
+          error?.data?.message ||
+            "Your account is not yet verified. Please verify your email first."
+        );
+      }
+
       if (error.message.includes("401")) {
         throw new Error("Invalid email or password. Please check your credentials.");
       }
@@ -390,7 +419,11 @@ async verifyCredentials(email, password) {
     console.error("Verify credentials error:", error);
 
     if (!this.isDevFallbackEnabled()) {
-      throw new Error(error.message || "Invalid email or password");
+      throw new Error(
+        error?.data?.message ||
+          error.message ||
+          "Invalid email or password"
+      );
     }
 
     // Demo accounts (development fallback if backend not running)
@@ -744,6 +777,19 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async updateVisitorPhoneLocation(visitorId, locationData) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/phone-location`, {
+        method: "PUT",
+        body: locationData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Update visitor phone location error:", error);
+      throw error;
+    }
+  }
+
   async securityCheckIn(visitorId) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/checkin`, {
@@ -847,6 +893,18 @@ async verifyCredentials(email, password) {
       });
     } catch (error) {
       console.error("Reject staff appointment error:", error);
+      throw error;
+    }
+  }
+
+  async completeStaffAppointment(visitorId, note = "") {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/complete`, {
+        method: "PUT",
+        body: { note },
+      });
+    } catch (error) {
+      console.error("Complete staff appointment error:", error);
       throw error;
     }
   }
@@ -1452,7 +1510,19 @@ generateRandomPassword(length = 10) {
 
   async testConnection() {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), 5000)
+        : null;
+
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        signal: controller?.signal,
+      });
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       const data = await response.json();
       return data.status === "OK";
     } catch {
@@ -1460,5 +1530,101 @@ generateRandomPassword(length = 10) {
     }
   }
 }
+
+ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, options = {}) {
+  const token = await this.getToken();
+  console.log(
+    `[ApiService] FETCH ${url}, Method: ${options.method || "GET"}, Has Token: ${!!token}`
+  );
+
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+
+  const config = {
+    ...options,
+    headers,
+  };
+
+  if (config.body && typeof config.body !== "string") {
+    config.body = JSON.stringify(config.body);
+  }
+
+  let lastError = null;
+
+  for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
+    try {
+      console.log(`[ApiService] Sending request to: ${baseUrl}${url}`);
+      const response = await fetch(`${baseUrl}${url}`, config);
+      const contentType = response.headers.get("content-type");
+      let data;
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = text ? { message: text } : {};
+      }
+
+      if (!response.ok) {
+        const apiError = new Error(
+          data.error || data.message || `HTTP ${response.status}`
+        );
+        apiError.status = response.status;
+        apiError.data = data;
+        throw apiError;
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error;
+      console.error(`[ApiService] Fetch error for ${url} via ${baseUrl}:`, error);
+
+      if (!String(error?.message || "").includes("Network request failed")) {
+        throw error;
+      }
+    }
+  }
+
+  if (String(lastError?.message || "").includes("Network request failed")) {
+    throw new Error(
+      "Cannot connect to backend. Make sure server is running on port 5000. On a real Android device, run adb reverse for ports 8081 and 5000."
+    );
+  }
+
+  throw lastError || new Error("Cannot connect to backend.");
+};
+
+ApiService.prototype.testConnection = async function testConnectionWithAndroidFallback() {
+  for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
+    try {
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), 5000)
+        : null;
+
+      const response = await fetch(`${baseUrl}/health`, {
+        signal: controller?.signal,
+      });
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      const data = await response.json();
+      if (data.status === "OK") {
+        return true;
+      }
+    } catch (error) {
+      console.error(`[ApiService] Health check failed via ${baseUrl}:`, error);
+    }
+  }
+
+  return false;
+};
 
 export default new ApiService();

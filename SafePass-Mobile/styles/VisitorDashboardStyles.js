@@ -275,6 +275,52 @@ export default StyleSheet.create({
     color: "#0F172A",
   },
 
+  phoneTrackingCard: {
+    marginTop: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  phoneTrackingCardActive: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0",
+  },
+
+  phoneTrackingCardInactive: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+  },
+
+  phoneTrackingIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+
+  phoneTrackingCopy: {
+    flex: 1,
+  },
+
+  phoneTrackingTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+
+  phoneTrackingText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+  },
+
   commandActionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2297,6 +2343,8 @@ export default StyleSheet.create({
     marginTop: -25,
     borderRadius: 26,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -2311,6 +2359,7 @@ export default StyleSheet.create({
 
   reappointmentHeroGradient: {
     padding: 22,
+    minHeight: 228,
   },
 
   reappointmentHeroBadge: {
@@ -2347,11 +2396,14 @@ export default StyleSheet.create({
   },
 
   reappointmentMetaGrid: {
+    marginTop: 4,
     gap: 12,
   },
 
   reappointmentMetaCard: {
     backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
     borderRadius: 16,
     padding: 14,
   },
@@ -2378,7 +2430,7 @@ export default StyleSheet.create({
     padding: 20,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#DCE7F3",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -2387,11 +2439,15 @@ export default StyleSheet.create({
         shadowRadius: 10,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 3px 10px rgba(15,23,42,0.06)" },
+      web: { boxShadow: "0px 8px 22px rgba(15,23,42,0.07)" },
     }),
   },
 
   reappointmentCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
     gap: 14,
     marginBottom: 18,
   },
@@ -2415,10 +2471,20 @@ export default StyleSheet.create({
     justifyContent: "center",
     alignSelf: "flex-start",
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
     backgroundColor: "#0F766E",
     borderRadius: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F766E",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 10px 20px rgba(15,118,110,0.18)" },
+    }),
   },
 
   reappointmentPrimaryButtonText: {
@@ -2429,6 +2495,7 @@ export default StyleSheet.create({
 
   reappointmentChecklist: {
     gap: 12,
+    paddingTop: 6,
   },
 
   reappointmentChecklistRow: {
@@ -2449,6 +2516,7 @@ export default StyleSheet.create({
     borderRadius: 28,
     width: "92%",
     maxWidth: 460,
+    maxHeight: "88%",
     overflow: "hidden",
   },
 
@@ -2473,9 +2541,14 @@ export default StyleSheet.create({
     color: "rgba(255,255,255,0.88)",
   },
 
+  appointmentModalBodyScroll: {
+    flexGrow: 0,
+  },
+
   appointmentModalBody: {
     padding: 20,
     gap: 16,
+    paddingBottom: 24,
   },
 
   appointmentField: {
@@ -2617,6 +2690,128 @@ export default StyleSheet.create({
     paddingTop: 14,
   },
 
+  appointmentReadOnlyField: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#E2E8F0",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+
+  appointmentReadOnlyText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
+  },
+
+  appointmentAutoHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    fontWeight: "600",
+    marginTop: -2,
+  },
+
+  appointmentIdUploadCard: {
+    minHeight: 160,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderStyle: "dashed",
+    backgroundColor: "#F8FAFC",
+    overflow: "hidden",
+  },
+
+  appointmentIdPreview: {
+    width: "100%",
+    height: 190,
+    resizeMode: "cover",
+  },
+
+  appointmentIdPlaceholder: {
+    minHeight: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 18,
+    gap: 6,
+  },
+
+  appointmentIdPlaceholderTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+
+  appointmentIdPlaceholderText: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    color: "#64748B",
+    textAlign: "center",
+  },
+
+  appointmentChangeIdButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#ECFDF5",
+  },
+
+  appointmentChangeIdText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0F766E",
+  },
+
+  appointmentPrivacyCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FAFC",
+  },
+
+  appointmentPrivacyCardAccepted: {
+    borderColor: "#10B981",
+    backgroundColor: "#ECFDF5",
+  },
+
+  appointmentPrivacyCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#94A3B8",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+
+  appointmentPrivacyCheckboxChecked: {
+    backgroundColor: "#10B981",
+    borderColor: "#10B981",
+  },
+
+  appointmentPrivacyText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#334155",
+    fontWeight: "700",
+  },
+
   appointmentModalFooter: {
     flexDirection: "row",
     gap: 12,
@@ -2708,5 +2903,385 @@ export default StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#065F46",
+  },
+
+  visitorModuleCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginTop: 18,
+    marginBottom: 16,
+    padding: 18,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.07,
+        shadowRadius: 16,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 12px 28px rgba(15,23,42,0.07)" },
+    }),
+  },
+
+  visitorModuleHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+  },
+
+  visitorModuleEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#2563EB",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+
+  visitorModuleTitle: {
+    fontSize: 19,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  visitorModuleHeaderBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+  },
+
+  visitorModuleHeaderBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0F766E",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  visitorModuleGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  visitorModuleButton: {
+    flexGrow: 1,
+    flexBasis: width <= 540 ? "100%" : "47%",
+    minWidth: width <= 540 ? "100%" : 220,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  visitorModuleButtonActive: {
+    backgroundColor: "#1D4ED8",
+    borderColor: "#1D4ED8",
+  },
+
+  visitorModuleIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  visitorModuleIconWrapActive: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  visitorModuleCopy: {
+    flex: 1,
+    gap: 3,
+  },
+
+  visitorModuleButtonTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  visitorModuleButtonTitleActive: {
+    color: "#FFFFFF",
+  },
+
+  visitorModuleButtonText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+  },
+
+  visitorModuleButtonTextActive: {
+    color: "rgba(255,255,255,0.82)",
+  },
+
+  visitorFlowPanel: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginTop: 2,
+    marginBottom: 18,
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  visitorMapPanel: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginTop: 2,
+    marginBottom: 18,
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  visitorFlowPanelHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+  },
+
+  visitorFlowPanelIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 17,
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  visitorFlowPanelTitleWrap: {
+    flex: 1,
+  },
+
+  visitorFlowPanelEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#2563EB",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+
+  visitorFlowPanelTitle: {
+    fontSize: 21,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 5,
+  },
+
+  visitorFlowPanelSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+  },
+
+  visitorFlowChecklist: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 18,
+    padding: 15,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 16,
+  },
+
+  visitorFlowChecklistRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  visitorFlowChecklistText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#334155",
+    fontWeight: "500",
+  },
+
+  visitorFlowPrimaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: "#2563EB",
+  },
+
+  visitorFlowPrimaryButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  visitorFlowSecondaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    marginTop: 14,
+  },
+
+  visitorFlowSecondaryButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#2563EB",
+  },
+
+  appointmentStatusHero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: "#F8FAFC",
+    marginBottom: 14,
+  },
+
+  appointmentStatusIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  appointmentStatusCopy: {
+    flex: 1,
+  },
+
+  appointmentStatusLabel: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  appointmentStatusText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#475569",
+  },
+
+  appointmentStatusDetails: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    overflow: "hidden",
+  },
+
+  appointmentStatusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+    backgroundColor: "#FFFFFF",
+  },
+
+  appointmentStatusRowLabel: {
+    flex: 0.42,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  appointmentStatusRowValue: {
+    flex: 0.58,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+    textAlign: "right",
+  },
+
+  visitorFloorTabsScroll: {
+    marginBottom: 12,
+  },
+
+  visitorFloorTabs: {
+    flexDirection: "row",
+    gap: 8,
+    paddingBottom: 2,
+  },
+
+  visitorFloorTab: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  visitorFloorTabActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+
+  visitorFloorTabText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+
+  visitorFloorTabTextActive: {
+    color: "#FFFFFF",
+  },
+
+  visitorMapNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+  },
+
+  visitorMapNoteText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#047857",
+    fontWeight: "600",
   },
 });
