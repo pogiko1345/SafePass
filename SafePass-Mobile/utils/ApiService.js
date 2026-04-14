@@ -41,6 +41,11 @@ const API_BASE_URL = (
   DEFAULT_API_BASE_URL
 ).replace(/\/$/, "");
 
+const API_BASE_URL_CANDIDATES =
+  process.env.EXPO_PUBLIC_API_BASE_URL || Platform.OS !== "android"
+    ? [API_BASE_URL]
+    : ["http://10.0.2.2:5000/api", "http://localhost:5000/api"];
+
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
 
@@ -1525,5 +1530,101 @@ generateRandomPassword(length = 10) {
     }
   }
 }
+
+ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, options = {}) {
+  const token = await this.getToken();
+  console.log(
+    `[ApiService] FETCH ${url}, Method: ${options.method || "GET"}, Has Token: ${!!token}`
+  );
+
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+
+  const config = {
+    ...options,
+    headers,
+  };
+
+  if (config.body && typeof config.body !== "string") {
+    config.body = JSON.stringify(config.body);
+  }
+
+  let lastError = null;
+
+  for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
+    try {
+      console.log(`[ApiService] Sending request to: ${baseUrl}${url}`);
+      const response = await fetch(`${baseUrl}${url}`, config);
+      const contentType = response.headers.get("content-type");
+      let data;
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = text ? { message: text } : {};
+      }
+
+      if (!response.ok) {
+        const apiError = new Error(
+          data.error || data.message || `HTTP ${response.status}`
+        );
+        apiError.status = response.status;
+        apiError.data = data;
+        throw apiError;
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error;
+      console.error(`[ApiService] Fetch error for ${url} via ${baseUrl}:`, error);
+
+      if (!String(error?.message || "").includes("Network request failed")) {
+        throw error;
+      }
+    }
+  }
+
+  if (String(lastError?.message || "").includes("Network request failed")) {
+    throw new Error(
+      "Cannot connect to backend. Make sure server is running on port 5000. On a real Android device, run adb reverse for ports 8081 and 5000."
+    );
+  }
+
+  throw lastError || new Error("Cannot connect to backend.");
+};
+
+ApiService.prototype.testConnection = async function testConnectionWithAndroidFallback() {
+  for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
+    try {
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), 5000)
+        : null;
+
+      const response = await fetch(`${baseUrl}/health`, {
+        signal: controller?.signal,
+      });
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      const data = await response.json();
+      if (data.status === "OK") {
+        return true;
+      }
+    } catch (error) {
+      console.error(`[ApiService] Health check failed via ${baseUrl}:`, error);
+    }
+  }
+
+  return false;
+};
 
 export default new ApiService();
