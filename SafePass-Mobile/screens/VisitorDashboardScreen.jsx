@@ -2949,7 +2949,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </TouchableOpacity>
             </LinearGradient>
 
-            <View style={visitorDashboardStyles.appointmentModalBody}>
+            <ScrollView
+              style={visitorDashboardStyles.appointmentModalBodyScroll}
+              contentContainerStyle={visitorDashboardStyles.appointmentModalBody}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+            >
               <View style={visitorDashboardStyles.appointmentField}>
                 <Text style={visitorDashboardStyles.appointmentFieldLabel}>Preferred Date</Text>
                 <TouchableOpacity
@@ -3299,7 +3305,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   )}
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

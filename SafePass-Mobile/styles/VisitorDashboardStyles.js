@@ -2516,6 +2516,7 @@ export default StyleSheet.create({
     borderRadius: 28,
     width: "92%",
     maxWidth: 460,
+    maxHeight: "88%",
     overflow: "hidden",
   },
 
@@ -2540,9 +2541,14 @@ export default StyleSheet.create({
     color: "rgba(255,255,255,0.88)",
   },
 
+  appointmentModalBodyScroll: {
+    flexGrow: 0,
+  },
+
   appointmentModalBody: {
     padding: 20,
     gap: 16,
+    paddingBottom: 24,
   },
 
   appointmentField: {
