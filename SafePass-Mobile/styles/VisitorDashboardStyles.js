@@ -6,7 +6,7 @@ export default StyleSheet.create({
   // ============ CONTAINERS ============
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F1F5F9",
   },
 
   loadingContainer: {
@@ -24,7 +24,7 @@ export default StyleSheet.create({
   },
 
   scrollContent: {
-    paddingBottom: 30,
+    paddingBottom: 110,
   },
 
   dashboardShell: {
@@ -40,24 +40,24 @@ export default StyleSheet.create({
 
   // ============ HEADER ============
   header: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.select({ ios: 60, android: 20, web: 20 }),
-    paddingBottom: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingHorizontal: 22,
+    paddingTop: Platform.select({ ios: 60, android: 22, web: 22 }),
+    paddingBottom: 28,
+    borderBottomLeftRadius: 34,
+    borderBottomRightRadius: 34,
   },
 
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
+    alignItems: "flex-start",
+    marginBottom: 18,
   },
 
   greeting: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.8)",
-    fontWeight: "500",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.74)",
+    fontWeight: "600",
   },
 
   headerPill: {
@@ -68,7 +68,7 @@ export default StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.14)",
     marginBottom: 10,
   },
 
@@ -81,23 +81,27 @@ export default StyleSheet.create({
   },
 
   userName: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 30,
+    fontWeight: "800",
     color: "#FFFFFF",
-    letterSpacing: -0.5,
+    letterSpacing: -0.7,
   },
 
   headerSupportText: {
     fontSize: 12,
+    lineHeight: 18,
     color: "rgba(255,255,255,0.82)",
-    marginTop: 6,
+    marginTop: 8,
+    maxWidth: 240,
   },
 
   profileButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
   },
 
   profileGradient: {
@@ -118,11 +122,13 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 18,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 8,
+    paddingVertical: 13,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
   },
 
   statusRow: {
@@ -141,7 +147,7 @@ export default StyleSheet.create({
 
   statusValue: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "800",
   },
 
   timerRow: {
@@ -158,21 +164,21 @@ export default StyleSheet.create({
   commandDeckCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
-    marginTop: -22,
-    marginBottom: 18,
+    marginTop: -26,
+    marginBottom: 16,
     padding: 22,
-    borderRadius: 28,
+    borderRadius: 30,
     borderWidth: 1,
-    borderColor: "#E6ECF5",
+    borderColor: "#DCE4F0",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 14 },
-        shadowOpacity: 0.09,
-        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 18 },
+        shadowOpacity: 0.08,
+        shadowRadius: 26,
       },
-      android: { elevation: 5 },
-      web: { boxShadow: "0px 18px 38px rgba(15,23,42,0.09)" },
+      android: { elevation: 7 },
+      web: { boxShadow: "0px 20px 42px rgba(15,23,42,0.08)" },
     }),
   },
 
@@ -195,22 +201,22 @@ export default StyleSheet.create({
 
   commandDeckEyebrow: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.8,
-    color: "#6366F1",
+    color: "#2563EB",
   },
 
   commandDeckTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "800",
     color: "#0F172A",
-    lineHeight: 30,
+    lineHeight: 32,
   },
 
   commandDeckSubtitle: {
     fontSize: 13,
-    lineHeight: 20,
+    lineHeight: 21,
     color: "#64748B",
   },
 
@@ -219,8 +225,8 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
     borderRadius: 999,
   },
 
@@ -238,14 +244,14 @@ export default StyleSheet.create({
   commandMetricsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 14,
+    gap: 12,
   },
 
   commandMetricCard: {
     backgroundColor: "#F8FAFC",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 16,
   },
 
@@ -253,7 +259,7 @@ export default StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#E0E7FF",
+    backgroundColor: "#DBEAFE",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 10,
@@ -336,7 +342,7 @@ export default StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 18,
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1D4ED8",
   },
 
   commandPrimaryButtonText: {
@@ -353,15 +359,64 @@ export default StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 18,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#EFF6FF",
     borderWidth: 1,
-    borderColor: "#C7D2FE",
+    borderColor: "#BFDBFE",
   },
 
   commandSecondaryButtonText: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#4F46E5",
+    color: "#1D4ED8",
+  },
+
+  sectionIntroCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginTop: 2,
+    marginBottom: 14,
+    padding: 18,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  sectionIntroIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  sectionIntroCopy: {
+    flex: 1,
+  },
+
+  sectionIntroEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#2563EB",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+
+  sectionIntroTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  sectionIntroSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
   },
 
   // ============ NFC CARD ============
@@ -3036,22 +3091,42 @@ export default StyleSheet.create({
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
     marginTop: 2,
-    marginBottom: 18,
+    marginBottom: 16,
     padding: 20,
     borderRadius: 24,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 16,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 8px 24px rgba(15,23,42,0.04)" },
+    }),
   },
 
   visitorMapPanel: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
     marginTop: 2,
-    marginBottom: 18,
+    marginBottom: 16,
     padding: 16,
     borderRadius: 24,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 16,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 8px 24px rgba(15,23,42,0.04)" },
+    }),
   },
 
   visitorFlowPanelHeader: {
@@ -3145,16 +3220,16 @@ export default StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 16,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#D9E4F2",
     marginTop: 14,
   },
 
   visitorFlowSecondaryButtonText: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#2563EB",
+    color: "#1D4ED8",
   },
 
   appointmentStatusHero: {
@@ -3198,6 +3273,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     overflow: "hidden",
+    backgroundColor: "#FFFFFF",
   },
 
   appointmentStatusRow: {
@@ -3283,5 +3359,116 @@ export default StyleSheet.create({
     lineHeight: 20,
     color: "#047857",
     fontWeight: "600",
+  },
+
+  accountPanelCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    overflow: "hidden",
+    marginBottom: 16,
+  },
+
+  accountPanelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+
+  accountPanelLabel: {
+    flex: 0.42,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  accountPanelValue: {
+    flex: 0.58,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+    textAlign: "right",
+  },
+
+  accountLogoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    marginTop: 14,
+  },
+
+  accountLogoutButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#DC2626",
+  },
+
+  bottomNavShell: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.select({ ios: 24, android: 16, default: 16 }),
+    backgroundColor: "transparent",
+  },
+
+  bottomNavBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.12,
+        shadowRadius: 20,
+      },
+      android: { elevation: 10 },
+      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.12)" },
+    }),
+  },
+
+  bottomNavItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 16,
+  },
+
+  bottomNavItemActive: {
+    backgroundColor: "#EFF6FF",
+  },
+
+  bottomNavLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+  },
+
+  bottomNavLabelActive: {
+    color: "#2563EB",
   },
 });

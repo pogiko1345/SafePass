@@ -64,22 +64,16 @@ const VISITOR_MODULES = [
     icon: "home-outline",
   },
   {
-    id: "appointment-request",
-    label: "Appointment Request",
-    description: "Create a new visit request",
-    icon: "calendar-outline",
-  },
-  {
-    id: "appointment-status",
-    label: "Appointment Status",
-    description: "Track pending, approved, or rejected visits",
-    icon: "list-circle-outline",
-  },
-  {
     id: "map",
     label: "Campus Map",
     description: "Ground, mezzanine, second, and third floor guide",
     icon: "map-outline",
+  },
+  {
+    id: "account",
+    label: "Account",
+    description: "Profile details and account tools",
+    icon: "person-circle-outline",
   },
 ];
 
@@ -1446,6 +1440,143 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     </View>
   );
 
+  const renderAccountPanel = () => (
+    <View style={[visitorDashboardStyles.visitorFlowPanel, dashboardSectionResponsiveStyle]}>
+      <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
+        <View style={visitorDashboardStyles.visitorFlowPanelIcon}>
+          <Ionicons name="person-circle-outline" size={24} color="#2563EB" />
+        </View>
+        <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
+          <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Account Management</Text>
+          <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Your Visitor Account</Text>
+          <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
+            Review your visitor details, open your profile, or sign out securely.
+          </Text>
+        </View>
+      </View>
+
+      <View style={visitorDashboardStyles.accountPanelCard}>
+        <View style={visitorDashboardStyles.accountPanelRow}>
+          <Text style={visitorDashboardStyles.accountPanelLabel}>Full Name</Text>
+          <Text style={visitorDashboardStyles.accountPanelValue}>
+            {visitor?.fullName || displayName}
+          </Text>
+        </View>
+        <View style={visitorDashboardStyles.accountPanelRow}>
+          <Text style={visitorDashboardStyles.accountPanelLabel}>Email</Text>
+          <Text style={visitorDashboardStyles.accountPanelValue}>
+            {currentUser?.email || visitor?.email || "Not available"}
+          </Text>
+        </View>
+        <View style={visitorDashboardStyles.accountPanelRow}>
+          <Text style={visitorDashboardStyles.accountPanelLabel}>Role</Text>
+          <Text style={visitorDashboardStyles.accountPanelValue}>Visitor</Text>
+        </View>
+        <View style={visitorDashboardStyles.accountPanelRow}>
+          <Text style={visitorDashboardStyles.accountPanelLabel}>Status</Text>
+          <Text style={visitorDashboardStyles.accountPanelValue}>
+            {statusText}
+          </Text>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={visitorDashboardStyles.visitorFlowPrimaryButton}
+        onPress={() => navigation.navigate("Profile")}
+        activeOpacity={0.88}
+      >
+        <Ionicons name="create-outline" size={18} color="#FFFFFF" />
+        <Text style={visitorDashboardStyles.visitorFlowPrimaryButtonText}>
+          Open Profile
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={visitorDashboardStyles.accountLogoutButton}
+        onPress={handleLogout}
+        activeOpacity={0.88}
+      >
+        <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+        <Text style={visitorDashboardStyles.accountLogoutButtonText}>
+          Logout
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderBottomNavigation = () => (
+    <View style={visitorDashboardStyles.bottomNavShell}>
+      <View style={visitorDashboardStyles.bottomNavBar}>
+        {VISITOR_MODULES.map((module) => {
+          const isActive = selectedVisitorSection === module.id;
+
+          return (
+            <TouchableOpacity
+              key={module.id}
+              style={[
+                visitorDashboardStyles.bottomNavItem,
+                isActive && visitorDashboardStyles.bottomNavItemActive,
+              ]}
+              onPress={() => setSelectedVisitorSection(module.id)}
+              activeOpacity={0.9}
+            >
+              <Ionicons
+                name={module.icon}
+                size={20}
+                color={isActive ? "#2563EB" : "#94A3B8"}
+              />
+              <Text
+                style={[
+                  visitorDashboardStyles.bottomNavLabel,
+                  isActive && visitorDashboardStyles.bottomNavLabelActive,
+                ]}
+              >
+                {module.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  const sectionIntro = {
+    home: {
+      eyebrow: "Visitor Workspace",
+      title: "Home",
+      subtitle:
+        "Check your approval progress, prepare your next visit, and access your active pass in one place.",
+      icon: "grid-outline",
+    },
+    map: {
+      eyebrow: "Visitor Workspace",
+      title: "Campus Map",
+      subtitle:
+        "Review the floor layout before arrival so you know exactly where to go on site.",
+      icon: "map-outline",
+    },
+    account: {
+      eyebrow: "Visitor Workspace",
+      title: "Account Management",
+      subtitle:
+        "Review your visitor account details, open your profile, and manage your sign-in session securely.",
+      icon: "person-circle-outline",
+    },
+  }[selectedVisitorSection];
+
+  const renderSectionIntro = () => (
+    <View style={[visitorDashboardStyles.sectionIntroCard, dashboardSectionResponsiveStyle]}>
+      <View style={visitorDashboardStyles.sectionIntroIconWrap}>
+        <Ionicons name={sectionIntro.icon} size={20} color="#1D4ED8" />
+      </View>
+      <View style={visitorDashboardStyles.sectionIntroCopy}>
+        <Text style={visitorDashboardStyles.sectionIntroEyebrow}>{sectionIntro.eyebrow}</Text>
+        <Text style={visitorDashboardStyles.sectionIntroTitle}>{sectionIntro.title}</Text>
+        <Text style={visitorDashboardStyles.sectionIntroSubtitle}>{sectionIntro.subtitle}</Text>
+      </View>
+    </View>
+  );
+
   const renderAppointmentRequestPanel = () => (
     <View style={[visitorDashboardStyles.visitorFlowPanel, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
@@ -1694,7 +1825,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               {displayName.split(' ')[0] || 'Visitor'}!
             </Text>
             <Text style={visitorDashboardStyles.headerSupportText}>
-              Sapphire International Aviation Academy
+              Visitor access, appointments, and campus guidance
             </Text>
           </View>
           <TouchableOpacity 
@@ -1826,7 +1957,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 >
                   <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
                   <Text style={visitorDashboardStyles.commandPrimaryButtonText}>
-                    {isApprovedVisitor ? "Plan Another Visit" : "Open Re-appointment"}
+                    {isApprovedVisitor ? "Register Another Appointment" : "Register Appointment"}
                   </Text>
                 </TouchableOpacity>
 
@@ -1847,7 +1978,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             ) : null}
           </View>
 
-          {renderVisitorModuleNavigation()}
+          {renderSectionIntro()}
 
         {selectedVisitorSection === "home" ? (
           visitor ? (
@@ -2916,15 +3047,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </TouchableOpacity>
           </View>
           )
-        ) : selectedVisitorSection === "appointment-request" ? (
-          renderAppointmentRequestPanel()
-        ) : selectedVisitorSection === "appointment-status" ? (
-          renderAppointmentStatusPanel()
-        ) : (
+        ) : selectedVisitorSection === "map" ? (
           renderVisitorMapPanel()
+        ) : (
+          renderAccountPanel()
         )}
         </View>
       </ScrollView>
+
+      {renderBottomNavigation()}
 
       <Modal
         visible={showAppointmentModal}
