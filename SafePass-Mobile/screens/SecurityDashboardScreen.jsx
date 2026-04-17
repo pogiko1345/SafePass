@@ -1307,9 +1307,8 @@ export default function SecurityDashboardScreen({ navigation }) {
       </View>
 
       <View style={styles.securityWorkspaceGrid}>
-      {/* Live Operations Queue */}
-      <View style={styles.securityWorkspacePrimary}>
-        <View style={styles.securityPanelCard}>
+        {/* Live Operations Queue */}
+        <View style={[styles.securityPanelCard, styles.securityWorkspacePrimary]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <Ionicons name="pulse-outline" size={20} color="#10B981" />
@@ -1375,61 +1374,63 @@ export default function SecurityDashboardScreen({ navigation }) {
             )}
           </View>
         </View>
-      </View>
 
-      {/* Operations Overview */}
-      <View style={[styles.activitySection, styles.securityWorkspaceSecondary]}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="clipboard-outline" size={20} color="#10B981" />
-            <Text style={styles.sectionTitle}>Operations Snapshot</Text>
-          </View>
-                  <TouchableOpacity onPress={() => {
-                    setVisitorFilter('all');
-                    selectGuardSubmodule('appointment-records');
-                  }}>
-                    <Text style={styles.viewAll}>Appointment Records</Text>
-                  </TouchableOpacity>
-        </View>
-
-        <View style={styles.reportStatsGrid}>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{visitors.approved.length}</Text>
-            <Text style={styles.reportStatLabel}>Approved Visits</Text>
-          </View>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{visitors.pending.length}</Text>
-            <Text style={styles.reportStatLabel}>Pending Review</Text>
-          </View>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{visitors.completed.length}</Text>
-            <Text style={styles.reportStatLabel}>Completed Today</Text>
-          </View>
-        </View>
-
-        <View style={styles.activityList}>
-          {analytics.mostVisitedOffices.slice(0, 3).map((office, index) => (
-            <View key={office.office || index} style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: '#DBEAFE' }]}>
-                <Ionicons name="business-outline" size={16} color="#0A3D91" />
+        {/* Operations Overview */}
+        <View style={[styles.securityPanelCard, styles.securityWorkspaceSecondary]}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="clipboard-outline" size={20} color="#10B981" />
+              <View>
+                <Text style={styles.sectionTitle}>Operations Snapshot</Text>
+                <Text style={styles.securitySectionSubtitle}>A quick read of approved, pending, and completed visits.</Text>
               </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>{office.office}</Text>
-                <Text style={styles.activityLocation}>{office.count} scheduled visit{office.count === 1 ? '' : 's'}</Text>
-              </View>
-              <Text style={styles.activityTime}>{office.percentage}%</Text>
             </View>
-          ))}
+            <TouchableOpacity onPress={() => {
+              setVisitorFilter('all');
+              selectGuardSubmodule('appointment-records');
+            }}>
+              <Text style={styles.viewAll}>Appointment Records</Text>
+            </TouchableOpacity>
+          </View>
 
-          {analytics.mostVisitedOffices.length === 0 && (
-            <View style={styles.emptyState}>
-              <Ionicons name="business-outline" size={48} color="#D1D5DB" />
-              <Text style={styles.emptyStateTitle}>No Office Traffic Yet</Text>
-              <Text style={styles.emptyStateSubtitle}>Visitor assignments will appear here once registrations come in</Text>
+          <View style={styles.reportStatsGrid}>
+            <View style={styles.reportStatCard}>
+              <Text style={styles.reportStatValue}>{visitors.approved.length}</Text>
+              <Text style={styles.reportStatLabel}>Approved Visits</Text>
             </View>
-          )}
+            <View style={styles.reportStatCard}>
+              <Text style={styles.reportStatValue}>{visitors.pending.length}</Text>
+              <Text style={styles.reportStatLabel}>Pending Review</Text>
+            </View>
+            <View style={styles.reportStatCard}>
+              <Text style={styles.reportStatValue}>{visitors.completed.length}</Text>
+              <Text style={styles.reportStatLabel}>Completed Today</Text>
+            </View>
+          </View>
+
+          <View style={styles.activityList}>
+            {analytics.mostVisitedOffices.slice(0, 3).map((office, index) => (
+              <View key={office.office || index} style={styles.activityItem}>
+                <View style={[styles.activityIcon, { backgroundColor: '#DBEAFE' }]}>
+                  <Ionicons name="business-outline" size={16} color="#0A3D91" />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>{office.office}</Text>
+                  <Text style={styles.activityLocation}>{office.count} scheduled visit{office.count === 1 ? '' : 's'}</Text>
+                </View>
+                <Text style={styles.activityTime}>{office.percentage}%</Text>
+              </View>
+            ))}
+
+            {analytics.mostVisitedOffices.length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="business-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.emptyStateTitle}>No Office Traffic Yet</Text>
+                <Text style={styles.emptyStateSubtitle}>Visitor assignments will appear here once registrations come in</Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
       </View>
 
       {/* Command Actions */}

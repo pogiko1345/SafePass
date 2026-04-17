@@ -650,25 +650,31 @@ export default StyleSheet.create({
   },
 
   securityWorkspaceGrid: {
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.xl,
+    gap: spacing.md,
     ...(isWeb && isDesktop
       ? {
           flexDirection: "row",
           alignItems: "flex-start",
-          gap: spacing.md,
-          maxWidth: 1400,
+          maxWidth: 1200,
           alignSelf: "center",
           width: "100%",
         }
-      : {}),
+      : {
+          width: "100%",
+        }),
   },
 
   securityWorkspacePrimary: {
     flex: 1.35,
+    minHeight: isWeb && isDesktop ? 440 : undefined,
   },
 
   securityWorkspaceSecondary: {
     flex: 0.95,
     marginBottom: 0,
+    minHeight: isWeb && isDesktop ? 440 : undefined,
   },
 
   mapSectionFull: {
@@ -1112,6 +1118,7 @@ export default StyleSheet.create({
     borderColor: colors.gray[200],
     padding: spacing.lg,
     marginBottom: spacing.md,
+    alignSelf: "stretch",
     ...Platform.select({
       ios: {
         shadowColor: colors.black,
@@ -1589,15 +1596,18 @@ export default StyleSheet.create({
 
   reportStatsGrid: {
     flexDirection: "row",
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
 
   reportStatCard: {
     flex: 1,
+    minWidth: isSmallPhone ? "100%" : 110,
     backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: spacing.lg,
+    borderRadius: 16,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.gray[200],
@@ -1614,15 +1624,16 @@ export default StyleSheet.create({
   },
 
   reportStatValue: {
-    fontSize: fontSize.xxxl,
-    fontWeight: "700",
+    fontSize: isSmallPhone ? fontSize.xl : fontSize.xxl,
+    fontWeight: "800",
     color: colors.gray[900],
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
 
   reportStatLabel: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: colors.gray[500],
+    textAlign: "center",
   },
 
   reportSection: {
