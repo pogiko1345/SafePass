@@ -668,9 +668,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       label: 'Home',
       icon: 'home-outline',
       color: '#DC2626',
-      submodules: [
-        { key: 'home-main', label: 'Main Landing', badge: 0 },
-      ],
+      submodules: [{ key: 'home-main', label: 'Home', badge: 0 }],
     },
     {
       key: 'maps',
@@ -738,7 +736,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         return { title: 'File a Report', subtitle: 'Submit a security report and review recently filed incidents.' };
       case 'home-main':
       default:
-        return { title: 'Security Home', subtitle: 'Main landing screen for live security activity, visitor status, and quick actions.' };
+        return { title: 'Security Home', subtitle: 'Live guard operations, visitor status, and priority actions.' };
     }
   };
 
@@ -1308,48 +1306,6 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Quick Stats */}
-      <View style={styles.statsContainer}>
-        <LinearGradient
-          colors={['#DC2626', '#B91C1C']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.statCardLarge}
-        >
-          <View style={styles.statCardLargeContent}>
-            <View style={styles.statIconCircle}>
-              <Ionicons name="people" size={28} color="#DC2626" />
-            </View>
-            <Text style={styles.statCardLargeValue}>{visitorStats.activeNow}</Text>
-            <Text style={styles.statCardLargeLabel}>Visitors currently being monitored across active access points</Text>
-            <View style={styles.statBadge}>
-              <Ionicons name="shield-checkmark-outline" size={12} color="#10B981" />
-              <Text style={styles.statBadgeText}>{unreadCount} unread notifications for this shift</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statCardMedium}>
-            <View style={[styles.statIconSmall, { backgroundColor: '#FEF3C7' }]}>
-              <Ionicons name="people-circle" size={20} color="#F59E0B" />
-            </View>
-            <Text style={styles.statValueLarge}>{dashboardStats.activeUsers}</Text>
-            <Text style={styles.statLabel}>On-Site Visitors</Text>
-            <Text style={styles.statTrend}>{visitorStats.pendingApproval} waiting on admin approval</Text>
-          </View>
-
-          <View style={styles.statCardMedium}>
-            <View style={[styles.statIconSmall, { backgroundColor: '#DBEAFE' }]}>
-              <Ionicons name="calendar" size={20} color="#3B82F6" />
-            </View>
-            <Text style={styles.statValueLarge}>{visitorStats.totalToday}</Text>
-            <Text style={styles.statLabel}>Today's Visitors</Text>
-            <Text style={styles.statTrend}>{reports.length} incident report{reports.length === 1 ? '' : 's'} filed</Text>
-          </View>
-        </View>
-      </View>
-
       <View style={styles.securityWorkspaceGrid}>
       {/* Live Operations Queue */}
       <View style={styles.securityWorkspacePrimary}>
@@ -1476,149 +1432,51 @@ export default function SecurityDashboardScreen({ navigation }) {
       </View>
       </View>
 
-      {/* Pending Approval Banner */}
-      {visitorStats.pendingApproval > 0 && (
-        <TouchableOpacity 
-          style={styles.upcomingBanner}
-          onPress={() => {
-            setVisitorFilter('all');
-            selectGuardSubmodule('appointment-records');
-          }}
-        >
-          <View style={styles.upcomingBannerContent}>
-            <Ionicons name="time-outline" size={24} color="#D97706" />
-            <View style={styles.upcomingBannerText}>
-              <Text style={styles.upcomingBannerTitle}>
-                {visitorStats.pendingApproval} Visitor{visitorStats.pendingApproval > 1 ? 's' : ''} Pending Approval
-              </Text>
-              <Text style={styles.upcomingBannerSubtitle}>
-                Waiting for approval before appearing in records
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#D97706" />
-        </TouchableOpacity>
-      )}
-
-      {/* Quick Actions Row */}
+      {/* Command Actions */}
       <View style={styles.quickActionsSection}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="flash-outline" size={20} color="#F59E0B" />
             <View>
               <Text style={styles.sectionTitle}>Command Actions</Text>
-              <Text style={styles.securitySectionSubtitle}>Jump into the most common guard tasks without leaving the dashboard.</Text>
+              <Text style={styles.securitySectionSubtitle}>Fast access to the guard tools used during daily operations.</Text>
             </View>
           </View>
         </View>
         
-        <View style={styles.quickActionsGrid}>
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => selectGuardSubmodule('appointment-records')}>
-            <LinearGradient
-              colors={['#0A3D91', '#1E4A8C']}
-              style={styles.quickActionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="reader-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>Appointment Records</Text>
-              <Text style={styles.quickActionSubtitle}>Open the read-only appointment list for current and past visits</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => selectGuardSubmodule('report-file')}>
-            <LinearGradient
-              colors={['#10B981', '#059669']}
-              style={styles.quickActionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="flag-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>File a Report</Text>
-              <Text style={styles.quickActionSubtitle}>Open the reporting workspace and submit an incident report</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => selectGuardSubmodule('map-ground')}>
-            <LinearGradient
-              colors={['#0F766E', '#0EA5A4']}
-              style={styles.quickActionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="map-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>Monitoring Map</Text>
-              <Text style={styles.quickActionSubtitle}>Track active visitors by floor and office in real time</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => {
-            setVisitorFilter('all');
-            selectGuardSubmodule('appointment-records');
-          }}>
-            <LinearGradient
-              colors={['#F59E0B', '#D97706']}
-              style={styles.quickActionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="list-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>View Records</Text>
-              <Text style={styles.quickActionSubtitle}>Review appointment records by status and visitor details</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate("NFCScan")}>
-            <LinearGradient
-              colors={['#7C3AED', '#6D28D9']}
-              style={styles.quickActionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionTitle}>Quick Scan</Text>
-              <Text style={styles.quickActionSubtitle}>Launch QR and ID scanning tools</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Recent Activity Section */}
-      <View style={styles.activitySection}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="time-outline" size={20} color="#059669" />
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-          </View>
-          <TouchableOpacity onPress={() => selectGuardSubmodule('appointment-records')}>
-            <Text style={styles.viewAllLink}>View Records</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.activityList}>
-          {recentAccess.slice(0, 5).map((log, index) => (
-            <View key={index} style={styles.activityItem}>
-              <View style={[styles.activityIcon, { 
-                backgroundColor: log.status === 'granted' ? '#D1FAE5' : '#FEE2E2' 
-              }]}>
-                <Ionicons 
-                  name={log.status === 'granted' ? "checkmark" : "close"} 
-                  size={16} 
-                  color={log.status === 'granted' ? '#059669' : '#DC2626'} 
-                />
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>{log.userName || 'Unknown User'}</Text>
-                <Text style={styles.activityLocation}>
-                  <Ionicons name="location-outline" size={10} color="#9CA3AF" />
-                  {' '}{log.location}
-                </Text>
-              </View>
-              <Text style={styles.activityTime}>
-                {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
+        <View style={styles.securityCommandGrid}>
+          <TouchableOpacity style={styles.securityCommandCard} onPress={() => selectGuardSubmodule('appointment-records')}>
+            <View style={[styles.securityCommandIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Ionicons name="reader-outline" size={24} color="#0A3D91" />
             </View>
-          ))}
+            <View style={styles.securityCommandCopy}>
+              <Text style={styles.securityCommandTitle}>Appointment Records</Text>
+              <Text style={styles.securityCommandSubtitle}>Review approved appointments, check-ins, and completed visits.</Text>
+            </View>
+            <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.securityCommandCard} onPress={() => selectGuardSubmodule('report-file')}>
+            <View style={[styles.securityCommandIcon, { backgroundColor: '#D1FAE5' }]}>
+              <Ionicons name="flag-outline" size={24} color="#059669" />
+            </View>
+            <View style={styles.securityCommandCopy}>
+              <Text style={styles.securityCommandTitle}>File a Report</Text>
+              <Text style={styles.securityCommandSubtitle}>Submit incidents, overstays, or security observations.</Text>
+            </View>
+            <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.securityCommandCard} onPress={() => selectGuardSubmodule('map-ground')}>
+            <View style={[styles.securityCommandIcon, { backgroundColor: '#CCFBF1' }]}>
+              <Ionicons name="map-outline" size={24} color="#0F766E" />
+            </View>
+            <View style={styles.securityCommandCopy}>
+              <Text style={styles.securityCommandTitle}>Monitoring Map</Text>
+              <Text style={styles.securityCommandSubtitle}>Track checked-in visitors by floor and assigned office.</Text>
+            </View>
+            <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -2389,6 +2247,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             {guardModules.map((module) => {
               const isExpanded = expandedModule === module.key;
               const hasSelectedChild = module.submodules.some((submodule) => submodule.key === selectedSubmodule);
+              const isDirectHomeModule = module.key === 'home';
 
               return (
                 <View key={module.key} style={styles.sidebarModuleCard}>
@@ -2397,7 +2256,11 @@ export default function SecurityDashboardScreen({ navigation }) {
                       styles.sidebarNavItem,
                       hasSelectedChild && styles.sidebarNavItemActive,
                     ]}
-                    onPress={() => toggleGuardModule(module.key)}
+                    onPress={() =>
+                      isDirectHomeModule
+                        ? selectGuardSubmodule('home-main')
+                        : toggleGuardModule(module.key)
+                    }
                   >
                     <View style={[styles.sidebarNavIcon, hasSelectedChild && { backgroundColor: `${module.color}20` }]}>
                       <Ionicons
@@ -2414,15 +2277,17 @@ export default function SecurityDashboardScreen({ navigation }) {
                     >
                       {module.label}
                     </Text>
-                    <Ionicons
-                      name={isExpanded ? "chevron-up-outline" : "chevron-down-outline"}
-                      size={18}
-                      color={hasSelectedChild ? module.color : '#94A3B8'}
-                    />
+                    {!isDirectHomeModule ? (
+                      <Ionicons
+                        name={isExpanded ? "chevron-up-outline" : "chevron-down-outline"}
+                        size={18}
+                        color={hasSelectedChild ? module.color : '#94A3B8'}
+                      />
+                    ) : null}
                     {hasSelectedChild && <View style={[styles.sidebarNavIndicator, { backgroundColor: module.color }]} />}
                   </TouchableOpacity>
 
-                  {isExpanded ? (
+                  {isExpanded && !isDirectHomeModule ? (
                     <View style={styles.sidebarSubmoduleList}>
                       {module.submodules.map((submodule) => {
                         const isActive = selectedSubmodule === submodule.key;
@@ -2480,7 +2345,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           {/* Most Visited Offices */}
           {analytics.mostVisitedOffices.length > 0 && (
             <View style={styles.sidebarSection}>
-              <Text style={styles.sidebarSectionTitle}>Most Visited</Text>
+              <Text style={styles.sidebarSectionTitle}>Most Visited Offices</Text>
               {analytics.mostVisitedOffices.slice(0, 5).map((office, index) => (
                 <View key={index} style={styles.sidebarRankItem}>
                   <Text style={styles.sidebarRankNumber}>{index + 1}</Text>

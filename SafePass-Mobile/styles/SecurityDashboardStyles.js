@@ -2149,9 +2149,11 @@ export default StyleSheet.create({
 
   sidebarSectionTitle: {
     fontSize: fontSize.sm,
-    fontWeight: "600",
-    color: colors.gray[700],
+    fontWeight: "800",
+    color: colors.gray[900],
     marginBottom: spacing.sm,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 
   sidebarRankItem: {
