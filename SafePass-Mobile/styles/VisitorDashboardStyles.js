@@ -2731,6 +2731,11 @@ export default StyleSheet.create({
     backgroundColor: "#EEF2FF",
   },
 
+  pickerOptionItemDisabled: {
+    backgroundColor: "#FEF2F2",
+    opacity: 0.74,
+  },
+
   pickerOptionText: {
     fontSize: 14,
     fontWeight: "600",
@@ -2738,7 +2743,24 @@ export default StyleSheet.create({
   },
 
   pickerOptionTextActive: {
-    color: "#4338CA",
+    color: "#0F766E",
+  },
+
+  pickerOptionTextDisabled: {
+    color: "#991B1B",
+  },
+
+  pickerOptionMeta: {
+    marginTop: 3,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0F766E",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  pickerOptionMetaFull: {
+    color: "#DC2626",
   },
 
   purposeOptionItem: {
@@ -2762,7 +2784,7 @@ export default StyleSheet.create({
   },
 
   purposeOptionTextActive: {
-    color: "#4338CA",
+    color: "#0F766E",
   },
 
   appointmentFieldInput: {

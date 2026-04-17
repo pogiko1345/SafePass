@@ -144,6 +144,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [isVirtualTapLoading, setIsVirtualTapLoading] = useState(false);
   const [isCheckInLoading, setIsCheckInLoading] = useState(false);
   const [isCheckOutLoading, setIsCheckOutLoading] = useState(false);
+  const [appointmentAvailability, setAppointmentAvailability] = useState(null);
+  const [isLoadingAppointmentSlots, setIsLoadingAppointmentSlots] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState({
     preferredDate: null,
     preferredTime: null,
@@ -739,6 +741,57 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return `${year}-${month}-${day}`;
   };
 
+  const getAppointmentSlotInfo = (timeOption) => {
+    const optionDate = getValidDate(timeOption);
+    if (!optionDate || !appointmentAvailability?.slots?.length) return null;
+
+    return appointmentAvailability.slots.find(
+      (slot) =>
+        Number(slot.hour) === optionDate.getHours() &&
+        Number(slot.minute) === optionDate.getMinutes(),
+    );
+  };
+
+  const isAppointmentTimeSlotFull = (timeOption) =>
+    Boolean(getAppointmentSlotInfo(timeOption)?.isFull);
+
+  const getAppointmentSlotStatusText = (timeOption) => {
+    const slot = getAppointmentSlotInfo(timeOption);
+    if (!slot) {
+      return isLoadingAppointmentSlots ? "Checking..." : "3 slots";
+    }
+
+    if (slot.isFull) return "Full";
+    return `${slot.available} left`;
+  };
+
+  const loadAppointmentAvailability = async () => {
+    const date = getValidDate(appointmentForm.preferredDate);
+    const department = String(appointmentForm.department || "").trim();
+
+    if (!showAppointmentModal || !date || !department) {
+      setAppointmentAvailability(null);
+      return;
+    }
+
+    setIsLoadingAppointmentSlots(true);
+    try {
+      const response = await ApiService.getAppointmentAvailability({
+        date: date.toISOString(),
+        department,
+      });
+      if (response?.success) {
+        setAppointmentAvailability(response);
+      } else {
+        setAppointmentAvailability(null);
+      }
+    } catch (error) {
+      setAppointmentAvailability(null);
+    } finally {
+      setIsLoadingAppointmentSlots(false);
+    }
+  };
+
   const applyAppointmentDateSelection = (selectedValue) => {
     const selectedDate = getValidDate(selectedValue);
     if (!selectedDate) return;
@@ -879,6 +932,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setShowAppointmentModal(false);
   };
 
+  useEffect(() => {
+    loadAppointmentAvailability();
+  }, [
+    showAppointmentModal,
+    appointmentForm.preferredDate,
+    appointmentForm.department,
+  ]);
+
   const handleRequestAppointment = async () => {
     const preferredDate = appointmentForm.preferredDate;
     const preferredTime = appointmentForm.preferredTime;
@@ -886,9 +947,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const purposeCategory = String(appointmentForm.purposeSelection || "").trim();
     const customPurposeOfVisit = String(appointmentForm.customPurpose || "").trim();
     const purposeOfVisit = isOtherPurpose ? customPurposeOfVisit : purposeCategory;
-    const department = isOtherPurpose
-      ? String(appointmentForm.department || "").trim()
-      : getDefaultDepartmentForPurpose(purposeCategory);
+    const department = String(appointmentForm.department || "").trim();
     const idNumber = String(appointmentForm.idNumber || "").trim();
     const idImage = appointmentForm.idImage;
 
@@ -909,6 +968,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
     if (!preferredDate || !preferredTime) {
       Alert.alert("Missing Details", "Please select the preferred date and time.");
+      return;
+    }
+
+    if (isAppointmentTimeSlotFull(preferredTime)) {
+      Alert.alert(
+        "Time Slot Full",
+        `${department} already has 3 appointments for ${formatTime(preferredTime)}. Please choose another time.`,
+      );
       return;
     }
 
@@ -3170,32 +3237,49 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       showsVerticalScrollIndicator={false}
                     >
                       {appointmentTimeOptions.map((option) => {
-                        const isSelected =
+                      const isSelected =
                           appointmentForm.preferredTime &&
                           new Date(appointmentForm.preferredTime).getHours() === option.getHours() &&
                           new Date(appointmentForm.preferredTime).getMinutes() === option.getMinutes();
+                        const slotInfo = getAppointmentSlotInfo(option);
+                        const isFull = Boolean(slotInfo?.isFull);
                         return (
                           <TouchableOpacity
                             key={`${option.getHours()}-${option.getMinutes()}`}
                             style={[
                               visitorDashboardStyles.pickerOptionItem,
                               isSelected && visitorDashboardStyles.pickerOptionItemActive,
+                              isFull && visitorDashboardStyles.pickerOptionItemDisabled,
                             ]}
+                            disabled={isFull}
                             onPress={() => {
                               setAppointmentForm((prev) => ({ ...prev, preferredTime: option }));
                               setShowAppointmentTimePicker(false);
                             }}
                           >
-                            <Text
-                              style={[
-                                visitorDashboardStyles.pickerOptionText,
-                                isSelected && visitorDashboardStyles.pickerOptionTextActive,
-                              ]}
-                            >
-                              {formatTime(option)}
-                            </Text>
+                            <View>
+                              <Text
+                                style={[
+                                  visitorDashboardStyles.pickerOptionText,
+                                  isSelected && visitorDashboardStyles.pickerOptionTextActive,
+                                  isFull && visitorDashboardStyles.pickerOptionTextDisabled,
+                                ]}
+                              >
+                                {formatTime(option)}
+                              </Text>
+                              <Text
+                                style={[
+                                  visitorDashboardStyles.pickerOptionMeta,
+                                  isFull && visitorDashboardStyles.pickerOptionMetaFull,
+                                ]}
+                              >
+                                {getAppointmentSlotStatusText(option)}
+                              </Text>
+                            </View>
                             {isSelected ? (
-                              <Ionicons name="checkmark-circle" size={18} color="#4F46E5" />
+                              <Ionicons name="checkmark-circle" size={18} color="#0F766E" />
+                            ) : isFull ? (
+                              <Ionicons name="lock-closed-outline" size={18} color="#DC2626" />
                             ) : null}
                           </TouchableOpacity>
                         );
@@ -3203,91 +3287,87 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     </ScrollView>
                   </View>
                 ) : null}
+
+                <Text style={visitorDashboardStyles.appointmentAutoHint}>
+                  {isLoadingAppointmentSlots
+                    ? "Checking staff slot availability..."
+                    : appointmentAvailability?.assignedStaff
+                      ? `Slots are limited to 3 visitors per time for ${appointmentAvailability.assignedStaff.name}.`
+                      : "Choose an office first so we can check available staff slots."}
+                </Text>
               </View>
 
               <View style={visitorDashboardStyles.appointmentField}>
                 <Text style={visitorDashboardStyles.appointmentFieldLabel}>Office to Visit</Text>
-                {appointmentForm.purposeSelection === "Other" ? (
-                  <>
-                    <TouchableOpacity
-                      style={visitorDashboardStyles.appointmentPickerField}
-                      onPress={() => {
-                        setShowDepartmentDropdown((current) => !current);
-                        setShowPurposeDropdown(false);
-                        setShowAppointmentDatePicker(false);
-                        setShowAppointmentTimePicker(false);
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
-                        <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
-                          <Ionicons name="business-outline" size={18} color="#4F46E5" />
-                        </View>
-                        <View>
-                          <Text style={visitorDashboardStyles.appointmentPickerLabel}>
-                            Choose an office
-                          </Text>
-                          <Text style={visitorDashboardStyles.appointmentPickerValue}>
-                            {appointmentForm.department || "Select office to visit"}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons
-                        name={showDepartmentDropdown ? "chevron-up" : "chevron-down"}
-                        size={18}
-                        color="#94A3B8"
-                      />
-                    </TouchableOpacity>
-
-                    {showDepartmentDropdown ? (
-                      <View style={visitorDashboardStyles.purposeDropdownMenu}>
-                        {APPOINTMENT_DEPARTMENT_OPTIONS.map((option) => {
-                          const isSelected = appointmentForm.department === option;
-                          return (
-                            <TouchableOpacity
-                              key={option}
-                              style={[
-                                visitorDashboardStyles.purposeOptionItem,
-                                isSelected && visitorDashboardStyles.purposeOptionItemActive,
-                              ]}
-                              onPress={() => {
-                                setAppointmentForm((prev) => ({
-                                  ...prev,
-                                  department: option,
-                                }));
-                                setShowDepartmentDropdown(false);
-                              }}
-                              activeOpacity={0.85}
-                            >
-                              <Text
-                                style={[
-                                  visitorDashboardStyles.purposeOptionText,
-                                  isSelected && visitorDashboardStyles.purposeOptionTextActive,
-                                ]}
-                              >
-                                {option}
-                              </Text>
-                              {isSelected ? (
-                                <Ionicons name="checkmark-circle" size={18} color="#4F46E5" />
-                              ) : null}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    ) : null}
-                  </>
-                ) : (
-                  <View style={visitorDashboardStyles.appointmentReadOnlyField}>
-                    <Ionicons name="business-outline" size={18} color="#475569" />
-                    <Text style={visitorDashboardStyles.appointmentReadOnlyText}>
-                      {getDefaultDepartmentForPurpose(appointmentForm.purposeSelection) || "Assigned automatically"}
-                    </Text>
+                <TouchableOpacity
+                  style={visitorDashboardStyles.appointmentPickerField}
+                  onPress={() => {
+                    setShowDepartmentDropdown((current) => !current);
+                    setShowPurposeDropdown(false);
+                    setShowAppointmentDatePicker(false);
+                    setShowAppointmentTimePicker(false);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
+                    <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
+                      <Ionicons name="business-outline" size={18} color="#0F766E" />
+                    </View>
+                    <View>
+                      <Text style={visitorDashboardStyles.appointmentPickerLabel}>
+                        Choose an office
+                      </Text>
+                      <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                        {appointmentForm.department || "Select office to visit"}
+                      </Text>
+                    </View>
                   </View>
-                )}
+                  <Ionicons
+                    name={showDepartmentDropdown ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+
+                {showDepartmentDropdown ? (
+                  <View style={visitorDashboardStyles.purposeDropdownMenu}>
+                    {APPOINTMENT_DEPARTMENT_OPTIONS.map((option) => {
+                      const isSelected = appointmentForm.department === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[
+                            visitorDashboardStyles.purposeOptionItem,
+                            isSelected && visitorDashboardStyles.purposeOptionItemActive,
+                          ]}
+                          onPress={() => {
+                            setAppointmentForm((prev) => ({
+                              ...prev,
+                              department: option,
+                              preferredTime: null,
+                            }));
+                            setShowDepartmentDropdown(false);
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text
+                            style={[
+                              visitorDashboardStyles.purposeOptionText,
+                              isSelected && visitorDashboardStyles.purposeOptionTextActive,
+                            ]}
+                          >
+                            {option}
+                          </Text>
+                          {isSelected ? (
+                            <Ionicons name="checkmark-circle" size={18} color="#0F766E" />
+                          ) : null}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : null}
                 <Text style={visitorDashboardStyles.appointmentAutoHint}>
-                  {appointmentForm.purposeSelection === "Other"
-                    ? "Choose the office or department that should review this custom visit."
-                    : "This is automatically assigned based on the selected purpose."}
+                  We suggest an office from your purpose, but you can change it. Each staff member accepts up to 3 visitors per time slot.
                 </Text>
               </View>
 
@@ -3339,6 +3419,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                               ...prev,
                               purposeSelection: option,
                               department: nextDepartment,
+                              preferredTime: null,
                               customPurpose: option === "Other" ? prev.customPurpose : "",
                             }));
                             setShowPurposeDropdown(false);

@@ -738,6 +738,57 @@ const formatDepartmentLabel = (value = "") =>
     .replace(/\s+/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
+const APPOINTMENT_SLOT_LIMIT = 3;
+const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted"];
+
+const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
+  const visitDate = new Date(visitDateValue);
+  const visitTime = new Date(visitTimeValue);
+
+  if (Number.isNaN(visitDate.getTime()) || Number.isNaN(visitTime.getTime())) {
+    return null;
+  }
+
+  const dayStart = new Date(visitDate);
+  dayStart.setHours(0, 0, 0, 0);
+
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const slotStart = new Date(visitDate);
+  slotStart.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+
+  const slotEnd = new Date(slotStart);
+  slotEnd.setMinutes(slotEnd.getMinutes() + 1);
+
+  return { dayStart, dayEnd, slotStart, slotEnd };
+};
+
+const countStaffAppointmentsForSlot = async ({
+  assignedStaff,
+  visitDate,
+  visitTime,
+  excludeVisitorId = null,
+}) => {
+  const slot = getAppointmentSlotWindow(visitDate, visitTime);
+  if (!slot) return 0;
+
+  const query = {
+    requestCategory: "appointment",
+    approvalFlow: "staff",
+    appointmentStatus: { $in: APPOINTMENT_SLOT_STATUSES },
+    assignedStaff,
+    visitDate: { $gte: slot.dayStart, $lt: slot.dayEnd },
+    visitTime: { $gte: slot.slotStart, $lt: slot.slotEnd },
+  };
+
+  if (excludeVisitorId) {
+    query._id = { $ne: excludeVisitorId };
+  }
+
+  return Visitor.countDocuments(query);
+};
+
 const getStaffDepartmentQuery = (department = "") => {
   const normalizedDepartment = normalizeDepartmentValue(department);
   const aliasGroups = {
@@ -3240,6 +3291,87 @@ app.get("/api/visitors/:id/logs", authMiddleware, async (req, res) => {
   }
 });
 
+// Visitor appointment slot availability
+app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
+  try {
+    const { date, department } = req.query || {};
+    const requestedDepartment = String(department || "").trim();
+
+    if (!date || !requestedDepartment) {
+      return res.status(400).json({
+        success: false,
+        message: "Date and office or department are required.",
+      });
+    }
+
+    const routedStaff = await User.findOne({
+      role: "staff",
+      isActive: true,
+      status: "active",
+      department: getStaffDepartmentQuery(requestedDepartment),
+    }).sort({ lastLogin: -1, createdAt: 1 });
+
+    if (!routedStaff) {
+      return res.json({
+        success: true,
+        limit: APPOINTMENT_SLOT_LIMIT,
+        department: formatDepartmentLabel(requestedDepartment),
+        assignedStaff: null,
+        slots: [],
+        message: `No active staff account is assigned to ${requestedDepartment}.`,
+      });
+    }
+
+    const selectedDate = new Date(date);
+    if (Number.isNaN(selectedDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid appointment date.",
+      });
+    }
+
+    const slots = [];
+    for (let hour = 7; hour <= 18; hour += 1) {
+      for (const minute of [0, 30]) {
+        const slotTime = new Date(selectedDate);
+        slotTime.setHours(hour, minute, 0, 0);
+        const count = await countStaffAppointmentsForSlot({
+          assignedStaff: routedStaff._id,
+          visitDate: selectedDate,
+          visitTime: slotTime,
+        });
+
+        slots.push({
+          value: slotTime.toISOString(),
+          hour,
+          minute,
+          count,
+          limit: APPOINTMENT_SLOT_LIMIT,
+          available: Math.max(APPOINTMENT_SLOT_LIMIT - count, 0),
+          isFull: count >= APPOINTMENT_SLOT_LIMIT,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      limit: APPOINTMENT_SLOT_LIMIT,
+      department: formatDepartmentLabel(requestedDepartment),
+      assignedStaff: {
+        id: routedStaff._id,
+        name: getFullName(routedStaff),
+      },
+      slots,
+    });
+  } catch (error) {
+    console.error("Get appointment availability error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load appointment availability.",
+    });
+  }
+});
+
 // Visitor appointment request / reappointment
 app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
   try {
@@ -3363,6 +3495,22 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     }
 
     const visitorFullName = `${user.firstName} ${user.lastName}`.trim();
+    const slotCount = await countStaffAppointmentsForSlot({
+      assignedStaff: routedStaff._id,
+      visitDate: finalVisitDate,
+      visitTime: finalVisitTime,
+      excludeVisitorId: visitor?._id || null,
+    });
+
+    if (slotCount >= APPOINTMENT_SLOT_LIMIT) {
+      return res.status(409).json({
+        success: false,
+        code: "APPOINTMENT_SLOT_FULL",
+        message: `${formatDepartmentLabel(requestedDepartment)} is already full for that time. Please choose another time slot.`,
+        limit: APPOINTMENT_SLOT_LIMIT,
+        currentCount: slotCount,
+      });
+    }
 
     if (!visitor) {
       visitor = new Visitor({

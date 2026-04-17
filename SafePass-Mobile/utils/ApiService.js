@@ -866,6 +866,19 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async getAppointmentAvailability({ date, department } = {}) {
+    try {
+      const queryString = new URLSearchParams({
+        date: date || "",
+        department: department || "",
+      }).toString();
+      return await this.fetch(`/appointments/availability?${queryString}`);
+    } catch (error) {
+      console.error("Get appointment availability error:", error);
+      throw error;
+    }
+  }
+
   async getStaffAppointments(filters = {}) {
     try {
       const queryString = new URLSearchParams(filters).toString();
