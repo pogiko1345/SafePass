@@ -1280,6 +1280,9 @@ export default StyleSheet.create({
     overflow: "hidden",
     width: "100%",
   },
+  successButtonMuted: {
+    opacity: 0.9,
+  },
   successGradient: {
     flexDirection: "row",
     alignItems: "center",

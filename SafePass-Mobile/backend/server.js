@@ -1380,6 +1380,62 @@ app.get("/api/auth/verify-email", async (req, res) => {
   }
 });
 
+app.post("/api/auth/verify-email", async (req, res) => {
+  try {
+    const token = String(req.body?.token || "").trim();
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing verification token.",
+      });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      verificationTokenHash: tokenHash,
+      verificationExpiresAt: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This verification link is invalid or expired. Please request a new verification email.",
+      });
+    }
+
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.verificationTokenHash = "";
+    user.verificationExpiresAt = null;
+    if (user.status === "pending") {
+      user.status = "active";
+    }
+    await user.save();
+
+    console.log(`Email verified for ${user.email}`);
+
+    return res.json({
+      success: true,
+      message: "Email verified. You can now log in.",
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error("Verify email API error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify email.",
+    });
+  }
+});
+
 app.post("/api/auth/resend-verification", async (req, res) => {
   try {
     const email = normalizeEmailValue(req.body?.email);

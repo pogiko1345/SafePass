@@ -731,6 +731,18 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async verifyEmailToken(token) {
+    try {
+      return await this.fetch("/auth/verify-email", {
+        method: "POST",
+        body: { token },
+      });
+    } catch (error) {
+      console.error("Email verification error:", error);
+      throw error;
+    }
+  }
+
   async getVisitorProfile() {
     try {
       const response = await this.fetch("/visitor/profile");

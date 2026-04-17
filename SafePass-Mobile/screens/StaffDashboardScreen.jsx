@@ -136,34 +136,41 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     loadData();
   }, [loadData]);
 
-  const filteredAppointments = useMemo(() => {
-    if (filter === "all") return appointments;
-    if (filter === "completed") {
-      return appointments.filter((item) => item.status === "checked_out");
-    }
-    if (filter === "approved") {
-      return appointments.filter((item) =>
-        ["approved", "adjusted"].includes(getAppointmentStatus(item)),
-      );
-    }
-    return appointments.filter((item) => getAppointmentStatus(item) === filter);
-  }, [appointments, filter]);
-
-  const stats = useMemo(
-    () => ({
-      pending: appointments.filter((item) => getAppointmentStatus(item) === "pending").length,
-      approved: appointments.filter((item) =>
-        ["approved", "adjusted"].includes(getAppointmentStatus(item)),
-      ).length,
-      rejected: appointments.filter((item) => getAppointmentStatus(item) === "rejected").length,
-      completed: appointments.filter((item) => getAppointmentStatus(item) === "completed").length,
-    }),
-    [appointments],
-  );
-
   const appointmentRequests = useMemo(
     () => appointments.filter((item) => getAppointmentStatus(item) === "pending"),
     [appointments],
+  );
+
+  const appointmentRecords = useMemo(
+    () =>
+      appointments.filter((item) =>
+        ["approved", "adjusted", "completed"].includes(getAppointmentStatus(item)),
+      ),
+    [appointments],
+  );
+
+  const filteredAppointments = useMemo(() => {
+    if (filter === "all") return appointmentRecords;
+    if (filter === "completed") {
+      return appointmentRecords.filter((item) => getAppointmentStatus(item) === "completed");
+    }
+    if (filter === "approved") {
+      return appointmentRecords.filter((item) =>
+        ["approved", "adjusted"].includes(getAppointmentStatus(item)),
+      );
+    }
+    return appointmentRecords.filter((item) => getAppointmentStatus(item) === filter);
+  }, [appointmentRecords, filter]);
+
+  const stats = useMemo(
+    () => ({
+      pending: appointmentRequests.length,
+      approved: appointmentRecords.filter((item) =>
+        ["approved", "adjusted"].includes(getAppointmentStatus(item)),
+      ).length,
+      completed: appointmentRecords.filter((item) => getAppointmentStatus(item) === "completed").length,
+    }),
+    [appointmentRecords, appointmentRequests.length],
   );
 
   const profileName = useMemo(() => {
@@ -195,7 +202,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         color: "#2563EB",
         submodules: [
           { key: "appointment-request", label: "Appointment Request", badge: stats.pending },
-          { key: "appointment-record", label: "Appointment Record", badge: appointments.length },
+          { key: "appointment-record", label: "Appointment Record", badge: appointmentRecords.length },
         ],
       },
       {
@@ -206,7 +213,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         submodules: [{ key: "account-info", label: "View Account Info", badge: 0 }],
       },
     ],
-    [appointments.length, stats.pending],
+    [appointmentRecords.length, stats.pending],
   );
 
   const getSelectedSubmoduleMeta = () => {
@@ -772,10 +779,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     <>
       <View style={styles.filterRow}>
         {[
-          { key: "all", label: `All (${appointments.length})` },
-          { key: "pending", label: `Pending (${stats.pending})` },
+          { key: "all", label: `All (${appointmentRecords.length})` },
           { key: "approved", label: `Approved (${stats.approved})` },
-          { key: "rejected", label: `Rejected (${stats.rejected})` },
           { key: "completed", label: `Completed (${stats.completed})` },
         ].map((item) => (
           <TouchableOpacity
@@ -802,11 +807,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           <View style={styles.emptyState}>
             <Ionicons name="documents-outline" size={42} color="#94A3B8" />
             <Text style={styles.emptyTitle}>No appointment records found</Text>
-            <Text style={styles.emptySubtitle}>Try a different filter or wait for new appointment activity.</Text>
+            <Text style={styles.emptySubtitle}>Approved appointments will appear here after staff approval.</Text>
           </View>
         ) : (
           filteredAppointments.map((appointment) =>
-            renderAppointmentCard(appointment, { allowActions: true }),
+            renderAppointmentCard(appointment, { allowActions: false }),
           )
         )}
       </View>

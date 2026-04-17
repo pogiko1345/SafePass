@@ -357,7 +357,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         visitor.status === 'checked_out' &&
         isWithinCompletedHistoryWindow(visitor),
     );
-    const allVisible = [...active, ...pending, ...approved, ...completed].sort(
+    const allVisible = [...active, ...approved, ...completed].sort(
       (a, b) => new Date(b.updatedAt || b.createdAt || b.visitDate) - new Date(a.updatedAt || a.createdAt || a.visitDate)
     );
 
@@ -1481,7 +1481,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         <TouchableOpacity 
           style={styles.upcomingBanner}
           onPress={() => {
-            setVisitorFilter('pending');
+            setVisitorFilter('all');
             selectGuardSubmodule('appointment-records');
           }}
         >
@@ -1492,7 +1492,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 {visitorStats.pendingApproval} Visitor{visitorStats.pendingApproval > 1 ? 's' : ''} Pending Approval
               </Text>
               <Text style={styles.upcomingBannerSubtitle}>
-                Waiting for admin approval
+                Waiting for approval before appearing in records
               </Text>
             </View>
           </View>
@@ -1731,7 +1731,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
         {/* Filter Tabs */}
         <View style={styles.filterTabs}>
-          {['all', 'active', 'pending', 'approved', 'completed'].map((filter) => (
+          {['all', 'active', 'approved', 'completed'].map((filter) => (
             <TouchableOpacity
               key={filter}
               style={[styles.filterTab, visitorFilter === filter && styles.filterTabActive]}
@@ -1743,7 +1743,6 @@ export default function SecurityDashboardScreen({ navigation }) {
               <Text style={[styles.filterTabText, visitorFilter === filter && styles.filterTabTextActive]}>
                 {filter === 'completed' ? 'Completed' : filter.charAt(0).toUpperCase() + filter.slice(1)}
                 {filter === 'active' && ` (${visitors.active.length})`}
-                {filter === 'pending' && ` (${visitors.pending.length})`}
                 {filter === 'approved' && ` (${visitors.approved.length})`}
                 {filter === 'completed' && ` (${visitors.completed.length})`}
                 {filter === 'all' && ` (${visitors.all.length})`}

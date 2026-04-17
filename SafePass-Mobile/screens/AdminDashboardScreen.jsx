@@ -1098,6 +1098,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     [appointmentRequests],
   );
 
+  const appointmentRecords = useMemo(
+    () => appointmentRequests.filter((request) => getRequestStatus(request) === "approved"),
+    [appointmentRequests],
+  );
+
   const selectedMapModuleFloor = FLOOR_VIEW_TO_ID[selectedSubmodule] || "ground";
   const selectedFloorRooms = useMemo(
     () => managedRooms.filter((room) => room.floor === selectedMapModuleFloor),
@@ -1148,10 +1153,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       case "appointment-records":
         return {
           title: "Appointment Records",
-          subtitle: "See the full appointment history, current statuses, and the staff-linked request trail.",
+          subtitle: "See approved appointment history and completed staff-linked visitor visits.",
           highlights: [
-            { label: "Appointments", value: appointmentRequests.length, icon: "calendar-outline", color: "#EC4899" },
-            { label: "Pending", value: pendingAppointmentRequests.length, icon: "time-outline", color: "#F59E0B" },
+            { label: "Records", value: appointmentRecords.length, icon: "calendar-outline", color: "#EC4899" },
+            { label: "Approved", value: appointmentRecords.length, icon: "checkmark-circle-outline", color: "#10B981" },
           ],
         };
       case "appointment-management":
@@ -1193,6 +1198,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
   }, [
     accountRecordsMode,
+    appointmentRecords.length,
     appointmentRequests.length,
     approvedRequests.length,
     dataCollectionFields,
@@ -1243,7 +1249,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         icon: "calendar-outline",
         color: "#F59E0B",
         submodules: [
-          { key: "appointment-records", label: "Appointment Records", badge: appointmentRequests.length },
+          { key: "appointment-records", label: "Appointment Records", badge: appointmentRecords.length },
           { key: "appointment-management", label: "Appointment Management", badge: pendingAppointmentRequests.length },
         ],
       },
@@ -1255,7 +1261,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         submodules: [{ key: "report-records", label: "Report Records", badge: visitorHistory.length }],
       },
     ],
-    [allUsers.length, appointmentRequests.length, dataCollectionFields.length, managedRooms, pendingAppointmentRequests.length, visitorHistory.length],
+    [allUsers.length, appointmentRecords.length, dataCollectionFields.length, managedRooms, pendingAppointmentRequests.length, visitorHistory.length],
   );
 
   const getFilteredHistory = useCallback(() => {
@@ -4631,8 +4637,8 @@ const loadDashboardData = useCallback(async () => {
       <View style={styles.pageContainer}>
         <AdminSectionShell
           title="Appointment Records"
-          subtitle="Read through appointment-linked requests and their latest approval decisions."
-          badge={`${appointmentRequests.length} records`}
+          subtitle="Read through approved appointment records after staff approval."
+          badge={`${appointmentRecords.length} records`}
           isDarkMode={isDarkMode}
           theme={theme}
           actions={
@@ -4641,7 +4647,7 @@ const loadDashboardData = useCallback(async () => {
               onPress={() =>
                 handlePrintRequests(
                   "Appointment Records",
-                  appointmentRequests,
+                  appointmentRecords,
                   "Generated from the appointment records table in the admin dashboard.",
                 )
               }
@@ -4652,9 +4658,9 @@ const loadDashboardData = useCallback(async () => {
         >
           <View style={styles.modularCardGrid}>
             {[
-              { label: "Total Appointments", value: appointmentRequests.length, color: "#EC4899" },
-              { label: "Pending", value: pendingAppointmentRequests.length, color: "#F59E0B" },
-              { label: "Approved", value: appointmentRequests.filter((item) => getRequestStatus(item) === "approved").length, color: "#10B981" },
+              { label: "Total Records", value: appointmentRecords.length, color: "#EC4899" },
+              { label: "Pending Queue", value: pendingAppointmentRequests.length, color: "#F59E0B" },
+              { label: "Approved", value: appointmentRecords.length, color: "#10B981" },
             ].map((item) => (
               <View
                 key={item.label}
@@ -4673,10 +4679,10 @@ const loadDashboardData = useCallback(async () => {
           </View>
 
           {renderAdminTable({
-            rows: appointmentRequests,
+            rows: appointmentRecords,
             keyExtractor: (request) => request._id || request.id || request.email,
             emptyTitle: "No appointment records",
-            emptySubtitle: "No appointment records are available yet.",
+            emptySubtitle: "Pending appointment requests will appear here only after staff approval.",
             columns: [
               {
                 key: "visitor",

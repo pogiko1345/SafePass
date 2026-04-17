@@ -13,7 +13,6 @@ import {
   Image,
   ActivityIndicator,
   Modal,
-  Linking,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -61,7 +60,14 @@ const officeOptions = MONITORING_MAP_OFFICES.map((office) => {
 });
 
 // ================= SUCCESS MODAL COMPONENT =================
-const SuccessModal = ({ visible, credentials, onConfirm, onVerifySimulation }) => {
+const SuccessModal = ({
+  visible,
+  credentials,
+  isVerified,
+  isVerifying,
+  onConfirm,
+  onVerifySimulation,
+}) => {
   const handleCopy = (text, type) => {
     if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(text).catch(() => {});
@@ -88,7 +94,9 @@ const SuccessModal = ({ visible, credentials, onConfirm, onVerifySimulation }) =
           </View>
           <Text style={visitorRegisterStyles.successTitle}>Registration Successful</Text>
           <Text style={visitorRegisterStyles.successMessage}>
-            Please verify your account first before logging in.
+            {isVerified
+              ? "Your account is verified. You can now continue to login."
+              : "Please verify your account first before logging in."}
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
             <View style={visitorRegisterStyles.credentialsTitleRow}>
@@ -98,8 +106,8 @@ const SuccessModal = ({ visible, credentials, onConfirm, onVerifySimulation }) =
               </Text>
             </View>
             <Text style={visitorRegisterStyles.credentialsInfo}>
-              This is a simulation only. You can verify the account first, then use
-              these credentials to sign in.
+              This is a simulation only. Press Verify Account, then use these
+              credentials to sign in.
             </Text>
             {credentials && (
               <>
@@ -144,18 +152,30 @@ const SuccessModal = ({ visible, credentials, onConfirm, onVerifySimulation }) =
           </View>
           {credentials?.verificationLink ? (
             <TouchableOpacity
-              style={visitorRegisterStyles.successButton}
+              style={[
+                visitorRegisterStyles.successButton,
+                isVerified && visitorRegisterStyles.successButtonMuted,
+              ]}
               onPress={onVerifySimulation}
+              disabled={isVerified || isVerifying}
               activeOpacity={0.7}
             >
               <LinearGradient
-                colors={["#2563EB", "#1D4ED8"]}
+                colors={isVerified ? ["#10B981", "#059669"] : ["#2563EB", "#1D4ED8"]}
                 style={visitorRegisterStyles.successGradient}
               >
                 <Text style={visitorRegisterStyles.successButtonText}>
-                  Verify Account
+                  {isVerifying
+                    ? "Verifying..."
+                    : isVerified
+                      ? "Account Verified"
+                      : "Verify Account"}
                 </Text>
-                <Ionicons name="mail-open-outline" size={20} color="#FFFFFF" />
+                <Ionicons
+                  name={isVerified ? "checkmark-circle-outline" : "mail-open-outline"}
+                  size={20}
+                  color="#FFFFFF"
+                />
               </LinearGradient>
             </TouchableOpacity>
           ) : null}
@@ -369,6 +389,7 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [focusedField, setFocusedField] = useState(null);
   const [completedFields, setCompletedFields] = useState({});
   const [registeredVisitor, setRegisteredVisitor] = useState(null);
+  const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
 
   const goToVisitorLogin = (overrides = {}) => {
     navigation.reset({
@@ -523,9 +544,10 @@ export default function VisitorRegisterScreen({ navigation }) {
       if (response?.success) {
         setRegisteredVisitor({
           username: response.credentials?.username || formData.username,
-          userEmail: response.credentials?.email || formData.email,
-          userPassword: response.credentials?.password || formData.password,
+          email: response.credentials?.email || formData.email,
+          password: response.credentials?.password || formData.password,
           verificationLink: response.verificationLink || "",
+          isVerified: false,
         });
         setTimeout(() => {
           setShowSuccess(true);
@@ -591,11 +613,11 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const handleSuccessConfirm = async () => {
     const loginIdentifier =
+      registeredVisitor?.email ||
       registeredVisitor?.username ||
-      registeredVisitor?.userEmail ||
-      formData.username;
+      formData.email;
     const loginPassword =
-      registeredVisitor?.userPassword || formData.password;
+      registeredVisitor?.password || formData.password;
 
     setShowSuccess(false);
 
@@ -624,22 +646,51 @@ export default function VisitorRegisterScreen({ navigation }) {
       return;
     }
 
+    const token = (() => {
+      try {
+        const parsedUrl = new URL(verificationLink);
+        return parsedUrl.searchParams.get("token");
+      } catch {
+        const [, rawToken] = String(verificationLink).split("token=");
+        return rawToken ? decodeURIComponent(rawToken) : "";
+      }
+    })();
+
+    if (!token) {
+      Alert.alert(
+        "Simulation Link Invalid",
+        "The verification link does not contain a valid token. Please try registering again.",
+      );
+      return;
+    }
+
     try {
-      if (Platform.OS === "web") {
-        window.open(verificationLink, "_blank", "noopener,noreferrer");
-      } else {
-        await Linking.openURL(verificationLink);
+      setIsVerifyingAccount(true);
+      const response = await ApiService.verifyEmailToken(token);
+
+      if (response?.success) {
+        setRegisteredVisitor((previous) => ({
+          ...previous,
+          isVerified: true,
+        }));
+        Alert.alert(
+          "Account Verified",
+          "Your visitor account is now verified. Press Continue to Login.",
+        );
+        return;
       }
 
       Alert.alert(
-        "Verification Opened",
-        "Open the verification page, complete the simulation, then return here and log in.",
+        "Verification Failed",
+        response?.message || "Unable to verify the account. Please try again.",
       );
     } catch (error) {
       Alert.alert(
-        "Unable to Open Verification",
-        "Please copy the verification link from the backend logs and open it manually.",
+        "Unable to Verify Account",
+        error?.message || "Please try again or use the verification link from the backend logs.",
       );
+    } finally {
+      setIsVerifyingAccount(false);
     }
   };
 
@@ -742,7 +793,7 @@ export default function VisitorRegisterScreen({ navigation }) {
             <View style={[visitorRegisterStyles.headerButtons, headerButtonsResponsiveStyle]}>
               <TouchableOpacity
                 style={visitorRegisterStyles.backButton}
-                onPress={() => navigation.goBack()}
+                onPress={() => goToVisitorLogin()}
                 activeOpacity={0.7}
               >
                 <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
@@ -971,12 +1022,14 @@ export default function VisitorRegisterScreen({ navigation }) {
           registeredVisitor
             ? {
                 username: registeredVisitor.username,
-                email: registeredVisitor.userEmail,
-                password: registeredVisitor.userPassword,
+                email: registeredVisitor.email,
+                password: registeredVisitor.password,
                 verificationLink: registeredVisitor.verificationLink,
               }
             : null
         }
+        isVerified={Boolean(registeredVisitor?.isVerified)}
+        isVerifying={isVerifyingAccount}
         onConfirm={handleSuccessConfirm}
         onVerifySimulation={handleVerifySimulation}
       />
