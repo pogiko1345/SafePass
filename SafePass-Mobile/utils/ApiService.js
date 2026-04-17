@@ -733,9 +733,18 @@ async verifyCredentials(email, password) {
 
   async getVisitorProfile() {
     try {
-      const response = await this.fetch("/visitor-profile");
+      const response = await this.fetch("/visitor/profile");
       return response;
     } catch (error) {
+      if (error?.status === 404) {
+        return {
+          success: false,
+          visitor: null,
+          notFound: true,
+          message: "Visitor profile not found",
+        };
+      }
+
       console.error("Get visitor profile error:", error);
       throw error;
     }
@@ -746,6 +755,15 @@ async verifyCredentials(email, password) {
       const response = await this.fetch(`/visitors/${visitorId}/logs`);
       return response;
     } catch (error) {
+      if (error?.status === 404) {
+        return {
+          success: true,
+          logs: [],
+          notFound: true,
+          message: "Visitor access logs not found",
+        };
+      }
+
       console.error("Get visitor logs error:", error);
       throw error;
     }

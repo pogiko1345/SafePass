@@ -6,7 +6,7 @@ export default StyleSheet.create({
   // ============ CONTAINERS ============
   safeArea: {
     flex: 1,
-    backgroundColor: "#EAF2FB",
+    backgroundColor: "#F4F7FB",
   },
 
   loadingContainer: {
@@ -25,13 +25,13 @@ export default StyleSheet.create({
 
   mainScrollView: {
     flex: 1,
-    backgroundColor: "#EAF2FB",
+    backgroundColor: "#F4F7FB",
   },
 
   scrollContent: {
     flexGrow: 1,
-    paddingTop: 8,
-    paddingBottom: 184,
+    paddingTop: 10,
+    paddingBottom: 164,
   },
 
   dashboardShell: {
@@ -47,11 +47,11 @@ export default StyleSheet.create({
 
   // ============ HEADER ============
   header: {
-    paddingHorizontal: 18,
-    paddingTop: Platform.select({ ios: 42, android: 10, web: 10 }),
-    paddingBottom: 18,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
+    paddingHorizontal: width <= 390 ? 16 : 20,
+    paddingTop: Platform.select({ ios: 38, android: 10, web: 10 }),
+    paddingBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
 
   headerTop: {
@@ -64,9 +64,10 @@ export default StyleSheet.create({
   },
 
   greeting: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.74)",
-    fontWeight: "600",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.72)",
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
 
   headerPill: {
@@ -74,10 +75,12 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
     marginBottom: 5,
   },
 
@@ -90,18 +93,18 @@ export default StyleSheet.create({
   },
 
   userName: {
-    fontSize: width <= 390 ? 21 : 23,
-    fontWeight: "800",
+    fontSize: width <= 390 ? 20 : 22,
+    fontWeight: "900",
     color: "#FFFFFF",
     letterSpacing: -0.7,
   },
 
   headerSupportText: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 11.5,
+    lineHeight: 16,
     color: "rgba(255,255,255,0.82)",
     marginTop: 4,
-    maxWidth: width <= 390 ? 190 : 230,
+    maxWidth: width <= 390 ? 210 : 250,
   },
 
   headerActions: {
@@ -111,9 +114,9 @@ export default StyleSheet.create({
   },
 
   profileButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.24)",
@@ -137,10 +140,10 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.16)",
-    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 18,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     marginTop: 6,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
@@ -153,16 +156,16 @@ export default StyleSheet.create({
   },
 
   statusIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
   },
 
   statusValue: {
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 13.5,
+    fontWeight: "900",
   },
 
   timerRow: {
@@ -178,28 +181,28 @@ export default StyleSheet.create({
 
   commandDeckCard: {
     backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
-    marginTop: -18,
-    marginBottom: 18,
-    padding: 20,
-    borderRadius: 28,
+    marginHorizontal: 16,
+    marginTop: -14,
+    marginBottom: 14,
+    padding: 18,
+    borderRadius: 30,
     borderWidth: 1,
-    borderColor: "#CFE0F5",
+    borderColor: "#DDE8F6",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
         shadowOffset: { width: 0, height: 18 },
-        shadowOpacity: 0.08,
-        shadowRadius: 26,
+        shadowOpacity: 0.1,
+        shadowRadius: 28,
       },
-      android: { elevation: 7 },
-      web: { boxShadow: "0px 22px 46px rgba(15,23,42,0.1)" },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 22px 48px rgba(15,23,42,0.11)" },
     }),
   },
 
   commandDeckHeader: {
-    gap: 12,
-    marginBottom: 18,
+    gap: 10,
+    marginBottom: 16,
   },
 
   commandDeckHeaderWide: {
@@ -216,22 +219,22 @@ export default StyleSheet.create({
 
   commandDeckEyebrow: {
     fontSize: 10,
-    fontWeight: "800",
+    fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 0.8,
-    color: "#2563EB",
+    color: "#0F766E",
   },
 
   commandDeckTitle: {
-    fontSize: width <= 390 ? 22 : 25,
-    fontWeight: "800",
+    fontSize: width <= 390 ? 20 : 24,
+    fontWeight: "900",
     color: "#0F172A",
-    lineHeight: 32,
+    lineHeight: width <= 390 ? 26 : 31,
   },
 
   commandDeckSubtitle: {
-    fontSize: 13,
-    lineHeight: 21,
+    fontSize: 12.5,
+    lineHeight: 19,
     color: "#64748B",
   },
 
@@ -240,8 +243,8 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 999,
   },
 
@@ -260,15 +263,15 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 8,
+    gap: 9,
   },
 
   commandMetricCard: {
-    minHeight: 86,
-    backgroundColor: "#F8FBFF",
+    minHeight: 82,
+    backgroundColor: "#F7FAFE",
     borderWidth: 1,
-    borderColor: "#DDEBFA",
-    borderRadius: 18,
+    borderColor: "#E1EAF5",
+    borderRadius: 20,
     paddingHorizontal: 9,
     paddingVertical: 11,
     alignItems: "center",
@@ -276,10 +279,10 @@ export default StyleSheet.create({
   },
 
   commandMetricIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#DBEAFE",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#E6F4F1",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 7,
@@ -290,7 +293,7 @@ export default StyleSheet.create({
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.3,
-    color: "#94A3B8",
+    color: "#7C8EA3",
     marginBottom: 3,
     textAlign: "center",
   },
@@ -298,7 +301,7 @@ export default StyleSheet.create({
   commandMetricValue: {
     fontSize: width <= 390 ? 11 : 12,
     lineHeight: 16,
-    fontWeight: "800",
+    fontWeight: "900",
     color: "#0F172A",
     textAlign: "center",
   },
@@ -364,7 +367,17 @@ export default StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 18,
-    backgroundColor: "#1D4ED8",
+    backgroundColor: "#0F766E",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F766E",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+      },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 12px 24px rgba(15,118,110,0.18)" },
+    }),
   },
 
   commandPrimaryButtonText: {
@@ -381,7 +394,7 @@ export default StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 18,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "#F0F7FF",
     borderWidth: 1,
     borderColor: "#BFDBFE",
   },
@@ -396,21 +409,21 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    backgroundColor: "#F8FBFF",
-    marginHorizontal: 20,
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 16,
     marginTop: 0,
     marginBottom: 14,
-    padding: 16,
-    borderRadius: 22,
+    padding: 15,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#DDEBFA",
+    borderColor: "#E1EAF5",
   },
 
   sectionIntroIconWrap: {
     width: 42,
     height: 42,
     borderRadius: 15,
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#E6F4F1",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -422,7 +435,7 @@ export default StyleSheet.create({
   sectionIntroEyebrow: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#2563EB",
+    color: "#0F766E",
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -430,7 +443,7 @@ export default StyleSheet.create({
 
   sectionIntroTitle: {
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "900",
     color: "#0F172A",
     marginBottom: 4,
   },
@@ -761,26 +774,26 @@ export default StyleSheet.create({
 
   // ============ MAP CARD ============
   mapCard: {
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 8,
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
-        shadowRadius: 8,
+        shadowRadius: 14,
       },
-      android: { elevation: 4 },
-      web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.1)" },
+      android: { elevation: 5 },
+      web: { boxShadow: "0px 14px 30px rgba(15,23,42,0.1)" },
     }),
   },
 
   mapGradient: {
     padding: 20,
-    borderRadius: 20,
+    borderRadius: 24,
   },
 
   mapContent: {
@@ -796,14 +809,15 @@ export default StyleSheet.create({
 
   mapTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#D97706",
+    fontWeight: "900",
+    color: "#92400E",
     marginBottom: 4,
   },
 
   mapSubtitle: {
     fontSize: 13,
     color: "#92400E",
+    lineHeight: 19,
     marginBottom: 12,
   },
 
@@ -815,14 +829,14 @@ export default StyleSheet.create({
 
   mapButtonText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "800",
     color: "#D97706",
   },
 
   mapIconContainer: {
     width: 60,
     height: 60,
-    backgroundColor: "rgba(217, 119, 6, 0.1)",
+    backgroundColor: "rgba(217, 119, 6, 0.12)",
     borderRadius: 30,
     justifyContent: "center",
     alignItems: "center",
@@ -2416,9 +2430,9 @@ export default StyleSheet.create({
   },
 
   reappointmentHeroCard: {
-    marginHorizontal: 20,
-    marginTop: -25,
-    borderRadius: 26,
+    marginHorizontal: 16,
+    marginTop: 0,
+    borderRadius: 28,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
@@ -2435,8 +2449,8 @@ export default StyleSheet.create({
   },
 
   reappointmentHeroGradient: {
-    padding: 22,
-    minHeight: 228,
+    padding: 20,
+    minHeight: 210,
   },
 
   reappointmentHeroBadge: {
@@ -2458,15 +2472,15 @@ export default StyleSheet.create({
   },
 
   reappointmentHeroTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    lineHeight: 32,
+    fontSize: width <= 390 ? 24 : 27,
+    fontWeight: "900",
+    lineHeight: width <= 390 ? 29 : 32,
     color: "#FFFFFF",
     marginBottom: 8,
   },
 
   reappointmentHeroText: {
-    fontSize: 14,
+    fontSize: 13.5,
     lineHeight: 21,
     color: "rgba(255,255,255,0.92)",
     marginBottom: 18,
@@ -2502,12 +2516,12 @@ export default StyleSheet.create({
 
   reappointmentCard: {
     backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 18,
-    padding: 20,
-    borderRadius: 22,
+    padding: 18,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: "#DCE7F3",
+    borderColor: "#E1EAF5",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -2515,8 +2529,8 @@ export default StyleSheet.create({
         shadowOpacity: 0.06,
         shadowRadius: 10,
       },
-      android: { elevation: 2 },
-      web: { boxShadow: "0px 8px 22px rgba(15,23,42,0.07)" },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 10px 26px rgba(15,23,42,0.08)" },
     }),
   },
 
@@ -2531,7 +2545,7 @@ export default StyleSheet.create({
 
   reappointmentCardTitle: {
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "900",
     color: "#0F172A",
     marginBottom: 4,
   },
@@ -2551,7 +2565,7 @@ export default StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 13,
     backgroundColor: "#0F766E",
-    borderRadius: 14,
+    borderRadius: 16,
     ...Platform.select({
       ios: {
         shadowColor: "#0F766E",
@@ -2590,7 +2604,7 @@ export default StyleSheet.create({
 
   appointmentModalContent: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 28,
+    borderRadius: 30,
     width: "92%",
     maxWidth: 460,
     maxHeight: "88%",
@@ -2663,7 +2677,7 @@ export default StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#E6F4F1",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2687,7 +2701,7 @@ export default StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
   },
 
@@ -2695,7 +2709,7 @@ export default StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
   },
 
@@ -2752,10 +2766,10 @@ export default StyleSheet.create({
   },
 
   appointmentFieldInput: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F7FAFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 14,
+    borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 13,
     fontSize: 14,
@@ -2799,7 +2813,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#CBD5E1",
     borderStyle: "dashed",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F7FAFE",
     overflow: "hidden",
   },
 
@@ -2854,7 +2868,7 @@ export default StyleSheet.create({
     alignItems: "flex-start",
     gap: 12,
     padding: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "#CBD5E1",
     backgroundColor: "#F8FAFC",
@@ -2984,13 +2998,13 @@ export default StyleSheet.create({
 
   visitorModuleCard: {
     backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 18,
     marginBottom: 16,
-    padding: 18,
-    borderRadius: 24,
+    padding: 16,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E1EAF5",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -2998,8 +3012,8 @@ export default StyleSheet.create({
         shadowOpacity: 0.07,
         shadowRadius: 16,
       },
-      android: { elevation: 3 },
-      web: { boxShadow: "0px 12px 28px rgba(15,23,42,0.07)" },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 14px 30px rgba(15,23,42,0.08)" },
     }),
   },
 
@@ -3013,8 +3027,8 @@ export default StyleSheet.create({
 
   visitorModuleEyebrow: {
     fontSize: 11,
-    fontWeight: "800",
-    color: "#2563EB",
+    fontWeight: "900",
+    color: "#0F766E",
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -3022,7 +3036,7 @@ export default StyleSheet.create({
 
   visitorModuleTitle: {
     fontSize: 19,
-    fontWeight: "800",
+    fontWeight: "900",
     color: "#0F172A",
   },
 
@@ -3060,15 +3074,15 @@ export default StyleSheet.create({
     alignItems: "center",
     gap: 12,
     padding: 14,
-    borderRadius: 18,
-    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    backgroundColor: "#F7FAFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
 
   visitorModuleButtonActive: {
-    backgroundColor: "#1D4ED8",
-    borderColor: "#1D4ED8",
+    backgroundColor: "#0F766E",
+    borderColor: "#0F766E",
   },
 
   visitorModuleIconWrap: {
@@ -3111,11 +3125,11 @@ export default StyleSheet.create({
 
   visitorFlowPanel: {
     backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 0,
     marginBottom: 18,
     padding: 18,
-    borderRadius: 26,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: "#DDEBFA",
     ...Platform.select({
@@ -3132,11 +3146,11 @@ export default StyleSheet.create({
 
   visitorMapPanel: {
     backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 0,
     marginBottom: 18,
     padding: 16,
-    borderRadius: 26,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: "#DDEBFA",
     ...Platform.select({
@@ -3171,7 +3185,7 @@ export default StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 15,
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#E6F4F1",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -3463,8 +3477,8 @@ export default StyleSheet.create({
   },
 
   accountPanelCard: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 18,
+    backgroundColor: "#F7FAFE",
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     overflow: "hidden",
@@ -3472,7 +3486,7 @@ export default StyleSheet.create({
   },
 
   accountHeroCard: {
-    borderRadius: 24,
+    borderRadius: 28,
     padding: 18,
     marginBottom: 16,
     ...Platform.select({
@@ -3519,7 +3533,7 @@ export default StyleSheet.create({
 
   accountHeroName: {
     fontSize: 20,
-    fontWeight: "800",
+    fontWeight: "900",
     color: "#FFFFFF",
     marginBottom: 4,
   },
@@ -3603,7 +3617,7 @@ export default StyleSheet.create({
   accountPanelValue: {
     flex: 0.58,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#0F172A",
     textAlign: "right",
   },
@@ -3620,7 +3634,7 @@ export default StyleSheet.create({
     flexBasis: width <= 520 ? "100%" : "47%",
     minWidth: width <= 520 ? "100%" : 170,
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     padding: 16,
@@ -3629,8 +3643,8 @@ export default StyleSheet.create({
   accountActionIcon: {
     width: 38,
     height: 38,
-    borderRadius: 14,
-    backgroundColor: "#DBEAFE",
+    borderRadius: 18,
+    backgroundColor: "#E6F4F1",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
@@ -3638,7 +3652,7 @@ export default StyleSheet.create({
 
   accountActionTitle: {
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "900",
     color: "#0F172A",
     marginBottom: 4,
   },
@@ -3676,7 +3690,7 @@ export default StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: width <= 390 ? 12 : 18,
-    paddingBottom: Platform.select({ ios: 24, android: 18, default: 18 }),
+    paddingBottom: Platform.select({ ios: 22, android: 16, default: 16 }),
     backgroundColor: "transparent",
     pointerEvents: "box-none",
   },
@@ -3686,20 +3700,20 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 7,
-    paddingVertical: 8,
-    borderRadius: 30,
-    backgroundColor: "rgba(255,255,255,0.96)",
+    paddingVertical: 7,
+    borderRadius: 32,
+    backgroundColor: "rgba(255,255,255,0.98)",
     borderWidth: 1,
-    borderColor: "#D7E3F0",
+    borderColor: "#DCE7F3",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.12,
-        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.14,
+        shadowRadius: 24,
       },
       android: { elevation: 12 },
-      web: { boxShadow: "0px 14px 30px rgba(15,23,42,0.16)" },
+      web: { boxShadow: "0px 16px 34px rgba(15,23,42,0.17)" },
     }),
   },
 
@@ -3707,18 +3721,18 @@ export default StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 20,
+    gap: 5,
+    paddingVertical: 9,
+    borderRadius: 22,
   },
 
   bottomNavItemActive: {
-    backgroundColor: "#0F172A",
+    backgroundColor: "#061A2E",
   },
 
   bottomNavLabel: {
-    fontSize: 11,
-    fontWeight: "800",
+    fontSize: width <= 390 ? 10 : 10.5,
+    fontWeight: "900",
     color: "#64748B",
   },
 

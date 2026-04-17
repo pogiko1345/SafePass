@@ -154,7 +154,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     idImage: null,
     privacyAccepted: false,
   });
-  const [accessLogs, setAccessLogs] = useState([]);
   const [greeting, setGreeting] = useState("");
   const [isNfcSupported, setIsNfcSupported] = useState(false);
   const [isNfcEnabled, setIsNfcEnabled] = useState(false);
@@ -368,19 +367,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       const profileResponse = await ApiService.getVisitorProfile();
       if (profileResponse.success && profileResponse.visitor) {
         setVisitor(profileResponse.visitor);
-
-        const pendingVisitor =
-          profileResponse.visitor.status === "pending" ||
-          profileResponse.visitor.approvalStatus === "pending";
-
-        if (!pendingVisitor) {
-          const logsResponse = await ApiService.getVisitorAccessLogs(profileResponse.visitor._id);
-          if (logsResponse.success) {
-            setAccessLogs(logsResponse.logs);
-          }
-        } else {
-          setAccessLogs([]);
-        }
       } else {
         setVisitor(null);
       }
@@ -389,11 +375,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       const isProfileMissing =
         error?.status === 404 ||
         String(error?.message || "").includes("404") ||
-        String(error?.message || "").toLowerCase().includes("profile not found");
+        String(error?.message || "").toLowerCase().includes("profile not found") ||
+        String(error?.message || "").toLowerCase().includes("visitor not found");
 
       if (isProfileMissing) {
         setVisitor(null);
-        setAccessLogs([]);
       } else {
         Alert.alert("Error", "Failed to load visitor data");
       }
@@ -1426,7 +1412,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 <Ionicons
                   name={module.icon}
                   size={19}
-                  color={isActive ? "#FFFFFF" : "#2563EB"}
+                  color={isActive ? "#FFFFFF" : "#0F766E"}
                 />
               </View>
               <View style={visitorDashboardStyles.visitorModuleCopy}>
@@ -1458,7 +1444,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     <View style={[visitorDashboardStyles.visitorFlowPanel, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
         <View style={visitorDashboardStyles.visitorFlowPanelIcon}>
-          <Ionicons name="person-circle-outline" size={24} color="#2563EB" />
+          <Ionicons name="person-circle-outline" size={24} color="#0F766E" />
         </View>
         <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
           <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Account Management</Text>
@@ -1492,7 +1478,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 {visitor?.fullName || displayName}
               </Text>
               <Text style={visitorDashboardStyles.accountHeroSubtext}>
-                Manage your visitor profile, appointment history, and secure access session.
+                Manage your visitor profile, appointment status, and secure access session.
               </Text>
             </View>
           </View>
@@ -1656,7 +1642,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const renderSectionIntro = () => (
     <View style={[visitorDashboardStyles.sectionIntroCard, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.sectionIntroIconWrap}>
-        <Ionicons name={sectionIntro.icon} size={20} color="#1D4ED8" />
+        <Ionicons name={sectionIntro.icon} size={20} color="#0F766E" />
       </View>
       <View style={visitorDashboardStyles.sectionIntroCopy}>
         <Text style={visitorDashboardStyles.sectionIntroEyebrow}>{sectionIntro.eyebrow}</Text>
@@ -1925,11 +1911,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   return (
     <SafeAreaView style={visitorDashboardStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+      <StatusBar barStyle="light-content" backgroundColor="#061A2E" />
       
       {/* Header */}
       <LinearGradient
-        colors={["#0F172A", "#1D4ED8", "#0EA5E9"]}
+        colors={["#061A2E", "#0F3A5F", "#0F766E"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={visitorDashboardStyles.header}
@@ -2010,7 +1996,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <View style={[visitorDashboardStyles.commandDeckCard, dashboardCardResponsiveStyle]}>
             <View style={[visitorDashboardStyles.commandDeckHeader, isWideVisitorDashboard && visitorDashboardStyles.commandDeckHeaderWide]}>
               <View style={visitorDashboardStyles.commandDeckTitleWrap}>
-                <Text style={visitorDashboardStyles.commandDeckEyebrow}>Visit Command</Text>
+                <Text style={visitorDashboardStyles.commandDeckEyebrow}>Visitor Pass</Text>
                 <Text style={visitorDashboardStyles.commandDeckTitle}>{journeyTitle}</Text>
                 <Text style={visitorDashboardStyles.commandDeckSubtitle}>{journeySubtitle}</Text>
               </View>
@@ -2034,7 +2020,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   activeOpacity={0.86}
                 >
                   <View style={visitorDashboardStyles.commandMetricIcon}>
-                    <Ionicons name={item.icon} size={16} color="#4F46E5" />
+                    <Ionicons name={item.icon} size={16} color="#0F766E" />
                   </View>
                   <Text style={visitorDashboardStyles.commandMetricLabel} numberOfLines={1}>
                     {item.label}
@@ -2654,64 +2640,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </LinearGradient>
               </TouchableOpacity>
 
-              {accessLogs.length > 0 && (
-                <View style={visitorDashboardStyles.detailsCard}>
-                  <View style={visitorDashboardStyles.detailsHeader}>
-                    <Ionicons name="time-outline" size={20} color="#4F46E5" />
-                    <Text style={visitorDashboardStyles.detailsTitle}>Recent Access Activity</Text>
-                  </View>
-
-                  {accessLogs.slice(0, 3).map((log, index) => (
-                    <View key={index} style={visitorDashboardStyles.historyItem}>
-                      <View
-                        style={[
-                          visitorDashboardStyles.historyIcon,
-                          {
-                            backgroundColor:
-                              log.status === "granted" ? "#E3F2E9" : "#FEE2E2",
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name={log.status === "granted" ? "checkmark" : "close"}
-                          size={14}
-                          color={log.status === "granted" ? "#10B981" : "#EF4444"}
-                        />
-                      </View>
-                      <View style={visitorDashboardStyles.historyInfo}>
-                        <Text style={visitorDashboardStyles.historyLocation}>
-                          {log.location || "Main Gate"}
-                        </Text>
-                        <Text style={visitorDashboardStyles.historyTime}>
-                          {formatDateTime(log.timestamp)}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          visitorDashboardStyles.historyStatus,
-                          {
-                            backgroundColor:
-                              log.status === "granted" ? "#E3F2E9" : "#FEE2E2",
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            visitorDashboardStyles.historyStatusText,
-                            {
-                              color:
-                                log.status === "granted" ? "#10B981" : "#EF4444",
-                            },
-                          ]}
-                        >
-                          {log.status === "granted" ? "Granted" : "Denied"}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-
             </>
           ) : canRequestNewAppointment ? (
             <>
@@ -2822,42 +2750,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               </View>
 
-              {accessLogs.length > 0 && (
-                <View style={visitorDashboardStyles.detailsCard}>
-                  <View style={visitorDashboardStyles.detailsHeader}>
-                    <Ionicons name="time-outline" size={20} color="#4F46E5" />
-                    <Text style={visitorDashboardStyles.detailsTitle}>Recent Access Activity</Text>
-                  </View>
-
-                  {accessLogs.slice(0, 3).map((log, index) => (
-                    <View key={index} style={visitorDashboardStyles.historyItem}>
-                      <View
-                        style={[
-                          visitorDashboardStyles.historyIcon,
-                          {
-                            backgroundColor: log.status === "granted" ? "#E3F2E9" : "#FEE2E2",
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name={log.status === "granted" ? "checkmark" : "close"}
-                          size={14}
-                          color={log.status === "granted" ? "#10B981" : "#EF4444"}
-                        />
-                      </View>
-                      <View style={visitorDashboardStyles.historyInfo}>
-                        <Text style={visitorDashboardStyles.historyLocation}>
-                          {log.location || "Main Gate"}
-                        </Text>
-                        <Text style={visitorDashboardStyles.historyTime}>
-                          {formatDateTime(log.timestamp)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-
             </>
           ) : (
           <>
@@ -2889,7 +2781,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </View>
                   <View style={visitorDashboardStyles.nfcChipIcon}>
                     <Ionicons 
-                      name={isNfcReading ? "radio" : "nfc"} 
+                      name={isNfcReading ? "radio" : "card-outline"}
                       size={28} 
                       color="#FFD700" 
                     />
@@ -2924,7 +2816,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     <Text style={visitorDashboardStyles.visitorId}>ID: {visitor.idNumber}</Text>
                     <View style={visitorDashboardStyles.nfcChip}>
                       <Ionicons 
-                        name={isNfcReading ? "radio" : "nfc"} 
+                        name={isNfcReading ? "radio" : "card-outline"}
                         size={12} 
                         color="#FFD700" 
                       />
@@ -3082,45 +2974,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               </View>
             </View>
-
-            {/* Access History */}
-            {accessLogs.length > 0 && (
-              <View style={visitorDashboardStyles.detailsCard}>
-                <View style={visitorDashboardStyles.detailsHeader}>
-                  <Ionicons name="time-outline" size={20} color="#4F46E5" />
-                  <Text style={visitorDashboardStyles.detailsTitle}>Access History</Text>
-                </View>
-                
-                {accessLogs.slice(0, 5).map((log, index) => (
-                  <View key={index} style={visitorDashboardStyles.historyItem}>
-                    <View style={[visitorDashboardStyles.historyIcon, { 
-                      backgroundColor: log.status === 'granted' ? '#E3F2E9' : '#FEE2E2' 
-                    }]}>
-                      <Ionicons 
-                        name={log.status === 'granted' ? "checkmark" : "close"} 
-                        size={14} 
-                        color={log.status === 'granted' ? '#10B981' : '#EF4444'} 
-                      />
-                    </View>
-                    <View style={visitorDashboardStyles.historyInfo}>
-                      <Text style={visitorDashboardStyles.historyLocation}>{log.location || 'Main Gate'}</Text>
-                      <Text style={visitorDashboardStyles.historyTime}>
-                        {formatDateTime(log.timestamp)}
-                      </Text>
-                    </View>
-                    <View style={[visitorDashboardStyles.historyStatus, { 
-                      backgroundColor: log.status === 'granted' ? '#E3F2E9' : '#FEE2E2' 
-                    }]}>
-                      <Text style={[visitorDashboardStyles.historyStatusText, { 
-                        color: log.status === 'granted' ? '#10B981' : '#EF4444' 
-                      }]}>
-                        {log.status === 'granted' ? 'Granted' : 'Denied'}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
 
             {/* NFC Instructions */}
             {isNfcSupported && (

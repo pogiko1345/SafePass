@@ -289,7 +289,7 @@ const CampusMap = ({
     const officeLabel = selectedOffice !== "all" ? selectedOffice : floorName;
 
     return (
-      <View pointerEvents="none" style={styles.mapEmptyState}>
+      <View style={[styles.mapEmptyState, { pointerEvents: "none" }]}>
         <View style={styles.mapEmptyStateCard}>
           <View style={styles.mapEmptyStateIcon}>
             <Ionicons name="location-outline" size={22} color="#64748B" />

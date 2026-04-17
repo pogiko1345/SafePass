@@ -98,7 +98,7 @@ export default function FloorBlueprintDiagram({ floorId = "ground" }) {
 
   return (
     <View style={styles.surface}>
-      <View pointerEvents="none" style={styles.grid} />
+      <View style={[styles.grid, { pointerEvents: "none" }]} />
       <Text style={styles.title}>{layout.title}</Text>
       <View style={styles.canvas}>
         {layout.walls.map((wall, index) => (
