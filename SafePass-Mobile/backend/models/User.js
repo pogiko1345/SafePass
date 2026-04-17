@@ -22,6 +22,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true },
   phone: { type: String, default: "" },
+  emergencyContact: { type: String, default: "" },
+  profilePhoto: { type: String, default: "" },
   visitorId: { type: mongoose.Schema.Types.ObjectId, ref: "Visitor" },
   
   department: { type: String, default: "" },

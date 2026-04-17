@@ -54,6 +54,8 @@ const APPOINTMENT_DEPARTMENT_OPTIONS = [
   "Registrar",
   "Accounting",
   "Information Desk",
+  "Guidance",
+  "Administration",
 ];
 
 const VISITOR_MODULES = [
@@ -62,6 +64,12 @@ const VISITOR_MODULES = [
     label: "Home",
     description: "Overview and quick actions",
     icon: "home-outline",
+  },
+  {
+    id: "appointment",
+    label: "Appointment",
+    description: "Request and track visits",
+    icon: "calendar-outline",
   },
   {
     id: "map",
@@ -169,7 +177,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     : isTabletVisitorDashboard
       ? "48.5%"
       : "100%";
-  const compactCommandMetricCardWidth = viewportWidth <= 560 ? "100%" : commandMetricCardWidth;
+  const compactCommandMetricCardWidth = viewportWidth <= 560 ? "31%" : commandMetricCardWidth;
   const approvedFactCardWidth = isWideVisitorDashboard
     ? "31.8%"
     : isTabletVisitorDashboard
@@ -1346,16 +1354,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           label: "Visit Date",
           value: formatDate(visitor.visitDate),
           icon: "calendar-outline",
+          target: "appointment",
         },
         {
           label: "Visit Time",
           value: formatTime(visitor.visitTime),
           icon: "time-outline",
+          target: "appointment",
         },
         {
           label: "Purpose",
           value: visitor.purposeOfVisit || "Pending details",
           icon: "document-text-outline",
+          target: "appointment",
         },
       ]
     : [
@@ -1363,16 +1374,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           label: "Account",
           value: String(currentUser?.status || "Active").toUpperCase(),
           icon: "person-circle-outline",
+          target: "account",
         },
         {
           label: "Role",
           value: "Visitor",
           icon: "id-card-outline",
+          target: "account",
         },
         {
           label: "Next Step",
           value: canCreateFreshAppointment ? "Request Visit" : "Register",
           icon: "arrow-forward-circle-outline",
+          target: canCreateFreshAppointment ? "appointment" : "home",
         },
       ];
 
@@ -1455,6 +1469,53 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
       </View>
 
+      <LinearGradient
+        colors={["#0F172A", "#1E3A8A", "#2563EB"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={visitorDashboardStyles.accountHeroCard}
+      >
+        <View style={visitorDashboardStyles.accountHeroTopRow}>
+          <View style={visitorDashboardStyles.accountHeroIdentity}>
+            <View style={visitorDashboardStyles.accountHeroAvatar}>
+              <Text style={visitorDashboardStyles.accountHeroInitials}>
+                {(visitor?.fullName || displayName || "Visitor")
+                  .split(" ")
+                  .map((name) => name[0])
+                  .join("")
+                  .substring(0, 2)
+                  .toUpperCase()}
+              </Text>
+            </View>
+            <View style={visitorDashboardStyles.accountHeroCopy}>
+              <Text style={visitorDashboardStyles.accountHeroName}>
+                {visitor?.fullName || displayName}
+              </Text>
+              <Text style={visitorDashboardStyles.accountHeroSubtext}>
+                Manage your visitor profile, appointment history, and secure access session.
+              </Text>
+            </View>
+          </View>
+          <View style={visitorDashboardStyles.accountHeroBadge}>
+            <Ionicons name="shield-checkmark-outline" size={14} color="#0F172A" />
+            <Text style={visitorDashboardStyles.accountHeroBadgeText}>{statusText}</Text>
+          </View>
+        </View>
+
+        <View style={visitorDashboardStyles.accountStatGrid}>
+          <View style={visitorDashboardStyles.accountStatCard}>
+            <Text style={visitorDashboardStyles.accountStatLabel}>Role</Text>
+            <Text style={visitorDashboardStyles.accountStatValue}>Visitor</Text>
+          </View>
+          <View style={visitorDashboardStyles.accountStatCard}>
+            <Text style={visitorDashboardStyles.accountStatLabel}>Access State</Text>
+            <Text style={visitorDashboardStyles.accountStatValue}>
+              {visitor?.status === "checked_in" ? "On Site" : "Off Site"}
+            </Text>
+          </View>
+        </View>
+      </LinearGradient>
+
       <View style={visitorDashboardStyles.accountPanelCard}>
         <View style={visitorDashboardStyles.accountPanelRow}>
           <Text style={visitorDashboardStyles.accountPanelLabel}>Full Name</Text>
@@ -1476,6 +1537,27 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <Text style={visitorDashboardStyles.accountPanelLabel}>Status</Text>
           <Text style={visitorDashboardStyles.accountPanelValue}>
             {statusText}
+          </Text>
+        </View>
+      </View>
+
+      <View style={visitorDashboardStyles.accountActionGrid}>
+        <View style={visitorDashboardStyles.accountActionCard}>
+          <View style={visitorDashboardStyles.accountActionIcon}>
+            <Ionicons name="mail-outline" size={18} color="#2563EB" />
+          </View>
+          <Text style={visitorDashboardStyles.accountActionTitle}>Verification</Text>
+          <Text style={visitorDashboardStyles.accountActionText}>
+            Keep your email active so appointment updates and approval notices reach you.
+          </Text>
+        </View>
+        <View style={visitorDashboardStyles.accountActionCard}>
+          <View style={visitorDashboardStyles.accountActionIcon}>
+            <Ionicons name="document-text-outline" size={18} color="#2563EB" />
+          </View>
+          <Text style={visitorDashboardStyles.accountActionTitle}>Appointment Records</Text>
+          <Text style={visitorDashboardStyles.accountActionText}>
+            Your active visit status and assigned office appear here once requests are processed.
           </Text>
         </View>
       </View>
@@ -1523,7 +1605,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <Ionicons
                 name={module.icon}
                 size={20}
-                color={isActive ? "#2563EB" : "#94A3B8"}
+                color={isActive ? "#FFFFFF" : "#64748B"}
               />
               <Text
                 style={[
@@ -1554,6 +1636,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       subtitle:
         "Review the floor layout before arrival so you know exactly where to go on site.",
       icon: "map-outline",
+    },
+    appointment: {
+      eyebrow: "Visitor Workspace",
+      title: "Appointment",
+      subtitle:
+        "Create a visit request and track whether it is pending, approved, or rejected.",
+      icon: "calendar-outline",
     },
     account: {
       eyebrow: "Visitor Workspace",
@@ -1735,10 +1824,41 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
       </View>
 
+      <View style={visitorDashboardStyles.mapSummaryCard}>
+        <View style={visitorDashboardStyles.mapSummaryHeader}>
+          <View style={visitorDashboardStyles.mapSummaryIconWrap}>
+            <Ionicons name="compass-outline" size={18} color="#1D4ED8" />
+          </View>
+          <View style={visitorDashboardStyles.mapSummaryCopy}>
+            <Text style={visitorDashboardStyles.mapSummaryTitle}>Arrival Guide</Text>
+            <Text style={visitorDashboardStyles.mapSummaryText}>
+              Review your assigned floor before arrival so you can move directly to the correct office.
+            </Text>
+          </View>
+        </View>
+
+        <View style={visitorDashboardStyles.mapSummaryMetricRow}>
+          <View style={visitorDashboardStyles.mapSummaryMetricCard}>
+            <Text style={visitorDashboardStyles.mapSummaryMetricLabel}>Current Floor</Text>
+            <Text style={visitorDashboardStyles.mapSummaryMetricValue}>
+              {MONITORING_MAP_FLOORS.find((floor) => floor.id === selectedVisitorMapFloor)?.name || "Ground Floor"}
+            </Text>
+          </View>
+          <View style={visitorDashboardStyles.mapSummaryMetricCard}>
+            <Text style={visitorDashboardStyles.mapSummaryMetricLabel}>Assigned Office</Text>
+            <Text style={visitorDashboardStyles.mapSummaryMetricValue}>
+              {visitor?.appointmentDepartment || visitor?.assignedOffice || "Use your appointment details"}
+            </Text>
+          </View>
+        </View>
+      </View>
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={visitorDashboardStyles.visitorFloorTabsScroll}
+        contentContainerStyle={visitorDashboardStyles.visitorFloorTabsContent}
+        nestedScrollEnabled
       >
         <View style={visitorDashboardStyles.visitorFloorTabs}>
           {MONITORING_MAP_FLOORS.map((floor) => {
@@ -1809,7 +1929,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       
       {/* Header */}
       <LinearGradient
-        colors={['#4F46E5', '#7C3AED']}
+        colors={["#0F172A", "#1D4ED8", "#0EA5E9"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={visitorDashboardStyles.header}
@@ -1828,19 +1948,22 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               Visitor access, appointments, and campus guidance
             </Text>
           </View>
-          <TouchableOpacity 
-            onPress={() => navigation.navigate("Profile")}
-            style={visitorDashboardStyles.profileButton}
-          >
-            <LinearGradient
-              colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
-              style={visitorDashboardStyles.profileGradient}
+          <View style={visitorDashboardStyles.headerActions}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Profile")}
+              style={visitorDashboardStyles.profileButton}
+              activeOpacity={0.86}
             >
-              <Text style={visitorDashboardStyles.profileInitials}>
-                {visitor?.fullName?.charAt(0) || 'V'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={["rgba(255,255,255,0.24)", "rgba(255,255,255,0.1)"]}
+                style={visitorDashboardStyles.profileGradient}
+              >
+                <Text style={visitorDashboardStyles.profileInitials}>
+                  {visitor?.fullName?.charAt(0) || "V"}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Status Card */}
@@ -1865,8 +1988,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       </LinearGradient>
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        style={visitorDashboardStyles.mainScrollView}
+        showsVerticalScrollIndicator
         contentContainerStyle={visitorDashboardStyles.scrollContent}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        overScrollMode="always"
+        persistentScrollbar={Platform.OS === "android"}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#4F46E5"]} />
         }
@@ -1895,21 +2024,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
             <View style={visitorDashboardStyles.commandMetricsGrid}>
               {commandMetrics.map((item) => (
-                <View
+                <TouchableOpacity
                   key={item.label}
                   style={[
                     visitorDashboardStyles.commandMetricCard,
                     { width: compactCommandMetricCardWidth },
                   ]}
+                  onPress={() => item.target && setSelectedVisitorSection(item.target)}
+                  activeOpacity={0.86}
                 >
                   <View style={visitorDashboardStyles.commandMetricIcon}>
                     <Ionicons name={item.icon} size={16} color="#4F46E5" />
                   </View>
-                  <Text style={visitorDashboardStyles.commandMetricLabel}>{item.label}</Text>
-                  <Text style={visitorDashboardStyles.commandMetricValue} numberOfLines={2}>
+                  <Text style={visitorDashboardStyles.commandMetricLabel} numberOfLines={1}>
+                    {item.label}
+                  </Text>
+                  <Text style={visitorDashboardStyles.commandMetricValue} numberOfLines={1}>
                     {item.value}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 
@@ -1952,7 +2085,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     visitorDashboardStyles.commandPrimaryButton,
                     commandActionButtonResponsiveStyle,
                   ]}
-                  onPress={isApprovedVisitor ? openAppointmentModal : openAppointmentModal}
+                  onPress={() => setSelectedVisitorSection("appointment")}
                   activeOpacity={0.9}
                 >
                   <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
@@ -3047,6 +3180,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </TouchableOpacity>
           </View>
           )
+        ) : selectedVisitorSection === "appointment" ? (
+          <>
+            {renderAppointmentRequestPanel()}
+            {renderAppointmentStatusPanel()}
+          </>
         ) : selectedVisitorSection === "map" ? (
           renderVisitorMapPanel()
         ) : (
@@ -3217,15 +3355,74 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.appointmentField}>
                 <Text style={visitorDashboardStyles.appointmentFieldLabel}>Office to Visit</Text>
                 {appointmentForm.purposeSelection === "Other" ? (
-                  <TextInput
-                    style={visitorDashboardStyles.appointmentFieldInput}
-                    placeholder="Enter office or department"
-                    placeholderTextColor="#94A3B8"
-                    value={appointmentForm.department}
-                    onChangeText={(text) =>
-                      setAppointmentForm((prev) => ({ ...prev, department: text }))
-                    }
-                  />
+                  <>
+                    <TouchableOpacity
+                      style={visitorDashboardStyles.appointmentPickerField}
+                      onPress={() => {
+                        setShowDepartmentDropdown((current) => !current);
+                        setShowPurposeDropdown(false);
+                        setShowAppointmentDatePicker(false);
+                        setShowAppointmentTimePicker(false);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
+                        <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
+                          <Ionicons name="business-outline" size={18} color="#4F46E5" />
+                        </View>
+                        <View>
+                          <Text style={visitorDashboardStyles.appointmentPickerLabel}>
+                            Choose an office
+                          </Text>
+                          <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                            {appointmentForm.department || "Select office to visit"}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons
+                        name={showDepartmentDropdown ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color="#94A3B8"
+                      />
+                    </TouchableOpacity>
+
+                    {showDepartmentDropdown ? (
+                      <View style={visitorDashboardStyles.purposeDropdownMenu}>
+                        {APPOINTMENT_DEPARTMENT_OPTIONS.map((option) => {
+                          const isSelected = appointmentForm.department === option;
+                          return (
+                            <TouchableOpacity
+                              key={option}
+                              style={[
+                                visitorDashboardStyles.purposeOptionItem,
+                                isSelected && visitorDashboardStyles.purposeOptionItemActive,
+                              ]}
+                              onPress={() => {
+                                setAppointmentForm((prev) => ({
+                                  ...prev,
+                                  department: option,
+                                }));
+                                setShowDepartmentDropdown(false);
+                              }}
+                              activeOpacity={0.85}
+                            >
+                              <Text
+                                style={[
+                                  visitorDashboardStyles.purposeOptionText,
+                                  isSelected && visitorDashboardStyles.purposeOptionTextActive,
+                                ]}
+                              >
+                                {option}
+                              </Text>
+                              {isSelected ? (
+                                <Ionicons name="checkmark-circle" size={18} color="#4F46E5" />
+                              ) : null}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+                  </>
                 ) : (
                   <View style={visitorDashboardStyles.appointmentReadOnlyField}>
                     <Ionicons name="business-outline" size={18} color="#475569" />
@@ -3236,7 +3433,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 )}
                 <Text style={visitorDashboardStyles.appointmentAutoHint}>
                   {appointmentForm.purposeSelection === "Other"
-                    ? "You can type the office or department for custom visits."
+                    ? "Choose the office or department that should review this custom visit."
                     : "This is automatically assigned based on the selected purpose."}
                 </Text>
               </View>

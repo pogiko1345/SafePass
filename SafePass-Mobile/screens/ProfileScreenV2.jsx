@@ -32,6 +32,7 @@ const DEFAULT_PROFILE = {
   _id: "",
   firstName: "",
   lastName: "",
+  username: "",
   email: "",
   phone: "",
   role: "visitor",
@@ -67,6 +68,12 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("English");
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -126,6 +133,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   const infoRows = [
     ["First Name", "firstName", true],
     ["Last Name", "lastName", true],
+    ["Username", "username", true],
     ["Email", "email", true],
     ["Phone", "phone", true],
     ["Emergency Contact", "emergencyContact", true],
@@ -282,6 +290,11 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         emergencyContact: editedProfile.emergencyContact || "",
         profilePhoto: editedProfile.profilePhoto || null,
       };
+
+      if (editedProfile.username || profile?.username) {
+        updates.username = editedProfile.username || "";
+      }
+
       const response = await ApiService.updateProfile(updates);
       if (!response?.user)
         throw new Error("No updated profile returned from server");
@@ -301,6 +314,50 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       Alert.alert("Error", e.message || "Failed to update profile.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const updatePasswordField = (field, value) => {
+    setPasswordForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleChangePassword = async () => {
+    const currentPassword = passwordForm.currentPassword.trim();
+    const newPassword = passwordForm.newPassword.trim();
+    const confirmPassword = passwordForm.confirmPassword.trim();
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert("Missing Information", "Please complete all password fields.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert("Password Too Short", "New password must be at least 6 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Password Mismatch", "New password and confirmation do not match.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const response = await ApiService.changePassword({
+        currentPassword,
+        newPassword,
+      });
+
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      Alert.alert("Password Updated", response?.message || "Your password was changed successfully.");
+    } catch (e) {
+      Alert.alert("Unable To Change Password", e.message || "Please check your current password and try again.");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -443,7 +500,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
               onChangeText={(text) =>
                 setEditedProfile((prev) => ({ ...prev, [key]: text }))
               }
-              autoCapitalize={key === "email" ? "none" : "words"}
+              autoCapitalize={key === "email" || key === "username" ? "none" : "words"}
+              autoCorrect={false}
               keyboardType={
                 key === "phone"
                   ? "phone-pad"
@@ -487,6 +545,86 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
             <Text style={styles.fieldValue}>{value}</Text>
           </View>
         ))}
+      </View>
+    </View>
+  );
+
+  const renderSecurity = () => (
+    <View style={styles.stack}>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Change Password</Text>
+        <Text style={styles.muted}>
+          Use a strong password that you do not use on other accounts. Your current password is required before saving.
+        </Text>
+
+        <View style={styles.passwordForm}>
+          <View style={styles.field}>
+            <Text style={styles.kicker}>Current Password</Text>
+            <TextInput
+              style={styles.input}
+              value={passwordForm.currentPassword}
+              onChangeText={(text) => updatePasswordField("currentPassword", text)}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Enter current password"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.kicker}>New Password</Text>
+            <TextInput
+              style={styles.input}
+              value={passwordForm.newPassword}
+              onChangeText={(text) => updatePasswordField("newPassword", text)}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Enter new password"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.kicker}>Confirm New Password</Text>
+            <TextInput
+              style={styles.input}
+              value={passwordForm.confirmPassword}
+              onChangeText={(text) => updatePasswordField("confirmPassword", text)}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Re-enter new password"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={handleChangePassword}
+            disabled={isChangingPassword}
+          >
+            {isChangingPassword ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="key-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.primaryBtnText}>Update Password</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.securityNoteCard}>
+        <Ionicons name="shield-checkmark-outline" size={22} color="#0F766E" />
+        <View style={styles.securityNoteCopy}>
+          <Text style={styles.securityNoteTitle}>Account Safety</Text>
+          <Text style={styles.securityNoteText}>
+            If you change your email or username, use the updated value the next time you sign in.
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -668,6 +806,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     ["overview", "Overview", "grid-outline"],
                     ["account", "Account", "person-circle-outline"],
                     ["access", "Access", "shield-checkmark-outline"],
+                    ["security", "Security", "key-outline"],
                     ["preferences", "Preferences", "options-outline"],
                   ].map(([id, label, icon]) => {
                     const active = tab === id;
@@ -697,6 +836,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                 {tab === "overview" && renderOverview()}
                 {tab === "account" && renderAccount()}
                 {tab === "access" && renderAccess()}
+                {tab === "security" && renderSecurity()}
                 {tab === "preferences" && renderPreferences()}
               </View>
               <View style={[styles.side, isDesktop && styles.sideDesktop]}>
@@ -742,6 +882,14 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                       </>
                     ) : (
                       <>
+                        <TouchableOpacity
+                          style={styles.secondaryBtn}
+                          onPress={() => setTab("security")}
+                        >
+                          <Text style={styles.secondaryBtnText}>
+                            Change Password
+                          </Text>
+                        </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.secondaryBtn}
                           onPress={loadProfile}
@@ -1109,6 +1257,33 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: "#0F172A",
+  },
+  passwordForm: {
+    gap: 4,
+    marginTop: 18,
+  },
+  securityNoteCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    borderRadius: 20,
+    padding: 16,
+  },
+  securityNoteCopy: { flex: 1 },
+  securityNoteTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#065F46",
+    marginBottom: 4,
+  },
+  securityNoteText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#047857",
+    fontWeight: "600",
   },
   accessCard: { borderRadius: 24, padding: 20, ...shadow },
   accessLabel: {

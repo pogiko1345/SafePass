@@ -1106,20 +1106,101 @@ app.get("/api/profile", authMiddleware, async (req, res) => {
 // 4. UPDATE PROFILE (Protected)
 app.put("/api/profile", authMiddleware, async (req, res) => {
   try {
-    const updates = req.body;
+    const existingUser = await User.findById(req.user._id);
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-    // Don't allow password update through this route
-    delete updates.password;
-    delete updates.email; // Email cannot be changed
+    const body = req.body || {};
+    const updates = {};
+
+    if (body.firstName !== undefined) updates.firstName = String(body.firstName || "").trim();
+    if (body.lastName !== undefined) updates.lastName = String(body.lastName || "").trim();
+    if (body.phone !== undefined) updates.phone = String(body.phone || "").trim();
+    if (body.emergencyContact !== undefined) {
+      updates.emergencyContact = String(body.emergencyContact || "").trim();
+    }
+    if (body.profilePhoto !== undefined) updates.profilePhoto = body.profilePhoto || null;
+
+    if (body.email !== undefined) {
+      const normalizedEmail = normalizeEmailValue(body.email);
+      if (!normalizedEmail || !isValidEmailValue(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid email address.",
+        });
+      }
+
+      const duplicateEmail = await User.findOne({
+        _id: { $ne: existingUser._id },
+        email: normalizedEmail,
+      });
+
+      if (duplicateEmail) {
+        return res.status(409).json({
+          success: false,
+          message: "That email address is already used by another account.",
+        });
+      }
+
+      updates.email = normalizedEmail;
+    }
+
+    if (body.username !== undefined) {
+      const normalizedUsername = normalizeUsernameValue(body.username);
+      if (!normalizedUsername) {
+        return res.status(400).json({
+          success: false,
+          message: "Username cannot be empty.",
+        });
+      }
+
+      const duplicateUsername = await User.findOne({
+        _id: { $ne: existingUser._id },
+        username: normalizedUsername,
+      });
+
+      if (duplicateUsername) {
+        return res.status(409).json({
+          success: false,
+          message: "That username is already used by another account.",
+        });
+      }
+
+      updates.username = normalizedUsername;
+    }
+
+    if (updates.firstName !== undefined && !updates.firstName) {
+      return res.status(400).json({ success: false, message: "First name is required." });
+    }
+
+    if (updates.lastName !== undefined && !updates.lastName) {
+      return res.status(400).json({ success: false, message: "Last name is required." });
+    }
 
     const user = await User.findByIdAndUpdate(
-      req.user._id,
+      existingUser._id,
       { ...updates, updatedAt: new Date() },
       { new: true, runValidators: true },
     ).select("-password");
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+    if (user?.role === "visitor") {
+      const visitorUpdates = {};
+      if (updates.firstName !== undefined || updates.lastName !== undefined) {
+        visitorUpdates.fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+      }
+      if (updates.email !== undefined) visitorUpdates.email = user.email;
+      if (updates.phone !== undefined && updates.phone) visitorUpdates.phoneNumber = updates.phone;
+
+      if (Object.keys(visitorUpdates).length > 0) {
+        let visitor = null;
+        if (user.visitorId) visitor = await Visitor.findById(user.visitorId);
+        if (!visitor) visitor = await Visitor.findOne({ email: existingUser.email }).sort({ registeredAt: -1 });
+        if (visitor) {
+          Object.assign(visitor, visitorUpdates);
+          await visitor.save();
+        }
+      }
     }
 
     res.json({

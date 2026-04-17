@@ -6,7 +6,7 @@ export default StyleSheet.create({
   // ============ CONTAINERS ============
   safeArea: {
     flex: 1,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EAF2FB",
   },
 
   loadingContainer: {
@@ -23,15 +23,22 @@ export default StyleSheet.create({
     fontWeight: "500",
   },
 
+  mainScrollView: {
+    flex: 1,
+    backgroundColor: "#EAF2FB",
+  },
+
   scrollContent: {
-    paddingBottom: 110,
+    flexGrow: 1,
+    paddingTop: 8,
+    paddingBottom: 184,
   },
 
   dashboardShell: {
     width: "100%",
     maxWidth: 1120,
     alignSelf: "center",
-    paddingBottom: 16,
+    paddingBottom: 26,
   },
 
   dashboardShellWide: {
@@ -40,22 +47,24 @@ export default StyleSheet.create({
 
   // ============ HEADER ============
   header: {
-    paddingHorizontal: 22,
-    paddingTop: Platform.select({ ios: 60, android: 22, web: 22 }),
-    paddingBottom: 28,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
+    paddingHorizontal: 18,
+    paddingTop: Platform.select({ ios: 42, android: 10, web: 10 }),
+    paddingBottom: 18,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
   },
 
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 18,
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 8,
   },
 
   greeting: {
-    fontSize: 13,
+    fontSize: 12,
     color: "rgba(255,255,255,0.74)",
     fontWeight: "600",
   },
@@ -64,12 +73,12 @@ export default StyleSheet.create({
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.14)",
-    marginBottom: 10,
+    marginBottom: 5,
   },
 
   headerPillText: {
@@ -81,24 +90,30 @@ export default StyleSheet.create({
   },
 
   userName: {
-    fontSize: 30,
+    fontSize: width <= 390 ? 21 : 23,
     fontWeight: "800",
     color: "#FFFFFF",
     letterSpacing: -0.7,
   },
 
   headerSupportText: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 15,
     color: "rgba(255,255,255,0.82)",
-    marginTop: 8,
-    maxWidth: 240,
+    marginTop: 4,
+    maxWidth: width <= 390 ? 190 : 230,
+  },
+
+  headerActions: {
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    gap: 8,
   },
 
   profileButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.24)",
@@ -112,7 +127,7 @@ export default StyleSheet.create({
   },
 
   profileInitials: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "700",
     color: "#FFFFFF",
   },
@@ -122,31 +137,31 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    marginTop: 10,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 6,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.18)",
   },
 
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
 
   statusIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     justifyContent: "center",
     alignItems: "center",
   },
 
   statusValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "800",
   },
 
@@ -157,19 +172,19 @@ export default StyleSheet.create({
   },
 
   timerText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "500",
   },
 
   commandDeckCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
-    marginTop: -26,
-    marginBottom: 16,
-    padding: 22,
-    borderRadius: 30,
+    marginTop: -18,
+    marginBottom: 18,
+    padding: 20,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: "#DCE4F0",
+    borderColor: "#CFE0F5",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -178,13 +193,13 @@ export default StyleSheet.create({
         shadowRadius: 26,
       },
       android: { elevation: 7 },
-      web: { boxShadow: "0px 20px 42px rgba(15,23,42,0.08)" },
+      web: { boxShadow: "0px 22px 46px rgba(15,23,42,0.1)" },
     }),
   },
 
   commandDeckHeader: {
-    gap: 14,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 18,
   },
 
   commandDeckHeaderWide: {
@@ -200,7 +215,7 @@ export default StyleSheet.create({
   },
 
   commandDeckEyebrow: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.8,
@@ -208,7 +223,7 @@ export default StyleSheet.create({
   },
 
   commandDeckTitle: {
-    fontSize: 26,
+    fontSize: width <= 390 ? 22 : 25,
     fontWeight: "800",
     color: "#0F172A",
     lineHeight: 32,
@@ -244,41 +259,48 @@ export default StyleSheet.create({
   commandMetricsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    justifyContent: "space-between",
+    gap: 8,
   },
 
   commandMetricCard: {
-    backgroundColor: "#F8FAFC",
+    minHeight: 86,
+    backgroundColor: "#F8FBFF",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 22,
-    padding: 16,
+    borderColor: "#DDEBFA",
+    borderRadius: 18,
+    paddingHorizontal: 9,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   commandMetricIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: "#DBEAFE",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 7,
   },
 
   commandMetricLabel: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: width <= 390 ? 8.5 : 9.5,
+    fontWeight: "800",
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.3,
     color: "#94A3B8",
-    marginBottom: 4,
+    marginBottom: 3,
+    textAlign: "center",
   },
 
   commandMetricValue: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "700",
+    fontSize: width <= 390 ? 11 : 12,
+    lineHeight: 16,
+    fontWeight: "800",
     color: "#0F172A",
+    textAlign: "center",
   },
 
   phoneTrackingCard: {
@@ -373,21 +395,21 @@ export default StyleSheet.create({
   sectionIntroCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 14,
-    backgroundColor: "#FFFFFF",
+    gap: 12,
+    backgroundColor: "#F8FBFF",
     marginHorizontal: 20,
-    marginTop: 2,
+    marginTop: 0,
     marginBottom: 14,
-    padding: 18,
-    borderRadius: 24,
+    padding: 16,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#DDEBFA",
   },
 
   sectionIntroIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
     backgroundColor: "#DBEAFE",
     alignItems: "center",
     justifyContent: "center",
@@ -407,7 +429,7 @@ export default StyleSheet.create({
   },
 
   sectionIntroTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
     color: "#0F172A",
     marginBottom: 4,
@@ -3090,12 +3112,12 @@ export default StyleSheet.create({
   visitorFlowPanel: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
-    marginTop: 2,
-    marginBottom: 16,
-    padding: 20,
-    borderRadius: 24,
+    marginTop: 0,
+    marginBottom: 18,
+    padding: 18,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#DDEBFA",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -3103,20 +3125,20 @@ export default StyleSheet.create({
         shadowOpacity: 0.04,
         shadowRadius: 16,
       },
-      android: { elevation: 2 },
-      web: { boxShadow: "0px 8px 24px rgba(15,23,42,0.04)" },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 10px 28px rgba(15,23,42,0.05)" },
     }),
   },
 
   visitorMapPanel: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
-    marginTop: 2,
-    marginBottom: 16,
+    marginTop: 0,
+    marginBottom: 18,
     padding: 16,
-    borderRadius: 24,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#DDEBFA",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -3124,9 +3146,84 @@ export default StyleSheet.create({
         shadowOpacity: 0.04,
         shadowRadius: 16,
       },
-      android: { elevation: 2 },
-      web: { boxShadow: "0px 8px 24px rgba(15,23,42,0.04)" },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 10px 28px rgba(15,23,42,0.05)" },
     }),
+  },
+
+  mapSummaryCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#DCE4F0",
+    padding: 16,
+    marginBottom: 16,
+  },
+
+  mapSummaryHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  mapSummaryIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mapSummaryCopy: {
+    flex: 1,
+  },
+
+  mapSummaryTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  mapSummaryText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+  },
+
+  mapSummaryMetricRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  mapSummaryMetricCard: {
+    flexGrow: 1,
+    flexBasis: width <= 520 ? "100%" : "47%",
+    minWidth: width <= 520 ? "100%" : 180,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 14,
+  },
+
+  mapSummaryMetricLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+
+  mapSummaryMetricValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    lineHeight: 20,
   },
 
   visitorFlowPanelHeader: {
@@ -3308,6 +3405,10 @@ export default StyleSheet.create({
     marginBottom: 12,
   },
 
+  visitorFloorTabsContent: {
+    paddingRight: 6,
+  },
+
   visitorFloorTabs: {
     flexDirection: "row",
     gap: 8,
@@ -3370,6 +3471,116 @@ export default StyleSheet.create({
     marginBottom: 16,
   },
 
+  accountHeroCard: {
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#1E3A8A",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.16,
+        shadowRadius: 20,
+      },
+      android: { elevation: 5 },
+      web: { boxShadow: "0px 16px 30px rgba(30,58,138,0.16)" },
+    }),
+  },
+
+  accountHeroTopRow: {
+    gap: 14,
+    marginBottom: 16,
+  },
+
+  accountHeroIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+
+  accountHeroAvatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  accountHeroInitials: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  accountHeroCopy: {
+    flex: 1,
+  },
+
+  accountHeroName: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+
+  accountHeroSubtext: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "rgba(255,255,255,0.84)",
+  },
+
+  accountHeroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.92)",
+  },
+
+  accountHeroBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0F172A",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  accountStatGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  accountStatCard: {
+    flexGrow: 1,
+    flexBasis: width <= 520 ? "100%" : "47%",
+    minWidth: width <= 520 ? "100%" : 150,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+
+  accountStatLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.7)",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+
+  accountStatValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
   accountPanelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -3397,6 +3608,48 @@ export default StyleSheet.create({
     textAlign: "right",
   },
 
+  accountActionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 16,
+  },
+
+  accountActionCard: {
+    flexGrow: 1,
+    flexBasis: width <= 520 ? "100%" : "47%",
+    minWidth: width <= 520 ? "100%" : 170,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 16,
+  },
+
+  accountActionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+
+  accountActionTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  accountActionText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+
   accountLogoutButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -3422,21 +3675,22 @@ export default StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 18,
-    paddingBottom: Platform.select({ ios: 24, android: 16, default: 16 }),
+    paddingHorizontal: width <= 390 ? 12 : 18,
+    paddingBottom: Platform.select({ ios: 24, android: 18, default: 18 }),
     backgroundColor: "transparent",
+    pointerEvents: "box-none",
   },
 
   bottomNavBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderRadius: 26,
-    backgroundColor: "rgba(255,255,255,0.98)",
+    paddingHorizontal: 7,
+    paddingVertical: 8,
+    borderRadius: 30,
+    backgroundColor: "rgba(255,255,255,0.96)",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#D7E3F0",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -3444,8 +3698,8 @@ export default StyleSheet.create({
         shadowOpacity: 0.12,
         shadowRadius: 20,
       },
-      android: { elevation: 10 },
-      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.12)" },
+      android: { elevation: 12 },
+      web: { boxShadow: "0px 14px 30px rgba(15,23,42,0.16)" },
     }),
   },
 
@@ -3455,20 +3709,20 @@ export default StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     paddingVertical: 10,
-    borderRadius: 16,
+    borderRadius: 20,
   },
 
   bottomNavItemActive: {
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "#0F172A",
   },
 
   bottomNavLabel: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#94A3B8",
+    color: "#64748B",
   },
 
   bottomNavLabelActive: {
-    color: "#2563EB",
+    color: "#FFFFFF",
   },
 });
