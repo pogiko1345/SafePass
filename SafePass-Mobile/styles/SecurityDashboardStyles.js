@@ -1622,6 +1622,20 @@ export default StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
+  reportFormLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  reportFormHint: {
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+    color: colors.success,
+  },
+
   reportVisitorChipRow: {
     marginBottom: spacing.md,
   },
@@ -1653,6 +1667,138 @@ export default StyleSheet.create({
 
   reportVisitorChipTextActive: {
     color: colors.purple,
+  },
+
+  reportVisitorTable: {
+    minWidth: isSmallPhone ? 720 : 820,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: colors.white,
+    marginBottom: spacing.lg,
+  },
+
+  reportVisitorTableRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    minHeight: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+    backgroundColor: colors.white,
+    ...webHover({
+      cursor: "pointer",
+      transition: "background-color 0.2s ease",
+      ":hover": {
+        backgroundColor: colors.gray[50],
+      },
+    }),
+  },
+
+  reportVisitorTableRowSelected: {
+    backgroundColor: "#ECFDF5",
+  },
+
+  reportVisitorTableHeader: {
+    minHeight: 44,
+    backgroundColor: colors.gray[900],
+    borderBottomWidth: 0,
+  },
+
+  reportVisitorHeaderCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.white,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  reportVisitorCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    justifyContent: "center",
+  },
+
+  reportVisitorNameCell: {
+    width: 260,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  reportVisitorOfficeCell: {
+    width: 180,
+  },
+
+  reportVisitorCheckInCell: {
+    width: 125,
+  },
+
+  reportVisitorContactCell: {
+    width: 230,
+  },
+
+  reportVisitorSelectDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.gray[300],
+    backgroundColor: colors.white,
+  },
+
+  reportVisitorSelectDotActive: {
+    borderColor: colors.success,
+    backgroundColor: colors.success,
+  },
+
+  reportVisitorInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  reportVisitorPrimaryText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[900],
+  },
+
+  reportVisitorMutedText: {
+    marginTop: 2,
+    fontSize: fontSize.xs,
+    fontWeight: "600",
+    color: colors.gray[500],
+  },
+
+  reportVisitorEmptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.gray[50],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+
+  reportVisitorEmptyTitle: {
+    marginTop: spacing.sm,
+    fontSize: fontSize.md,
+    fontWeight: "800",
+    color: colors.gray[800],
+  },
+
+  reportVisitorEmptyText: {
+    marginTop: spacing.xs,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: colors.gray[500],
+    textAlign: "center",
   },
 
   reportCategoryRow: {
@@ -1854,6 +2000,88 @@ export default StyleSheet.create({
     fontWeight: "600",
     color: colors.gray[600],
     textAlign: "right",
+  },
+
+  securityReportsTable: {
+    minWidth: isSmallPhone ? 680 : 760,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: colors.white,
+  },
+
+  securityReportsTableRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    minHeight: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+    backgroundColor: colors.white,
+  },
+
+  securityReportsTableHeader: {
+    minHeight: 46,
+    backgroundColor: colors.gray[900],
+    borderBottomWidth: 0,
+  },
+
+  securityReportsHeaderCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.white,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  securityReportsCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    justifyContent: "center",
+  },
+
+  securityReportsIncidentCell: {
+    width: 290,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  securityReportsVisitorCell: {
+    width: 170,
+  },
+
+  securityReportsDateCell: {
+    width: 145,
+  },
+
+  securityReportsStatusCell: {
+    width: 120,
+  },
+
+  securityReportsIncidentIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEE2E2",
+  },
+
+  securityReportsPrimaryText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[900],
+  },
+
+  securityReportsMutedText: {
+    fontSize: fontSize.sm,
+    fontWeight: "600",
+    color: colors.gray[600],
   },
 
   reportCard: {

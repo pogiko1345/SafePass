@@ -796,14 +796,16 @@ export default StyleSheet.create({
 
   adminTableScroll: {
     marginTop: 14,
+    alignSelf: "stretch",
   },
 
   adminTable: {
-    minWidth: "100%",
+    alignSelf: "stretch",
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 18,
     overflow: "hidden",
+    backgroundColor: "#FFFFFF",
   },
 
   adminTableHeaderRow: {
@@ -820,22 +822,22 @@ export default StyleSheet.create({
   },
 
   adminTableCell: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 10,
     justifyContent: "center",
   },
 
   adminTableHeaderCell: {
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
 
   adminTableFlexCell: {
     flex: 1,
-    minWidth: 140,
+    minWidth: 100,
   },
 
   adminTableHeaderText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "800",
     color: "#334155",
     textTransform: "uppercase",
@@ -843,21 +845,21 @@ export default StyleSheet.create({
   },
 
   adminTableCellText: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
     color: "#0F172A",
   },
 
   adminTablePrimaryText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800",
     color: "#0F172A",
     marginBottom: 2,
   },
 
   adminTableSecondaryText: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
     color: "#64748B",
   },
 
@@ -874,18 +876,18 @@ export default StyleSheet.create({
   adminTableActionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 6,
   },
 
   adminTableActionButton: {
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    borderRadius: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
 
   adminTableActionText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
   },
 
@@ -2481,6 +2483,152 @@ export default StyleSheet.create({
 
   filterChipTextActive: {
     color: "#FFF",
+  },
+
+  recordsToolPanel: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    marginBottom: 14,
+  },
+
+  recordsFilterPanel: {
+    marginBottom: 18,
+  },
+
+  recordsToolHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  recordsToolIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  recordsToolCopy: {
+    flex: 1,
+  },
+
+  recordsResetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  recordsResetButtonText: {
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  recordsToolTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+
+  recordsToolSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+  },
+
+  recordsSearchRow: {
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "stretch" : "center",
+    gap: 10,
+  },
+
+  recordsSearchInputWrap: {
+    flex: 1,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 12,
+  },
+
+  recordsSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: "#0F172A",
+    paddingVertical: Platform.OS === "web" ? 10 : 8,
+  },
+
+  recordsSearchButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+  },
+
+  recordsSearchButtonText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  recordsFilterChips: {
+    flexDirection: "row",
+    gap: 10,
+    paddingRight: 8,
+  },
+
+  recordsFilterGroup: {
+    marginTop: 8,
+  },
+
+  recordsFilterGroupLabel: {
+    marginBottom: 8,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.45,
+  },
+
+  recordsFilterChip: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+
+  recordsFilterChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+
+  recordsFilterChipTextActive: {
+    color: "#FFFFFF",
   },
 
   // ============================================

@@ -1142,7 +1142,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const submitSecurityReportForm = async () => {
     if (!reportForm.visitorId) {
-      Alert.alert("Visitor Required", "Please choose a visitor record for this report.");
+      Alert.alert("Visitor Required", "Please choose a checked-in visitor for this report.");
       return;
     }
 
@@ -1151,9 +1151,9 @@ export default function SecurityDashboardScreen({ navigation }) {
       return;
     }
 
-    const visitor = visitors.all.find((entry) => String(entry._id) === String(reportForm.visitorId));
+    const visitor = visitors.active.find((entry) => String(entry._id) === String(reportForm.visitorId));
     if (!visitor?._id) {
-      Alert.alert("Visitor Not Found", "Please choose a valid visitor record.");
+      Alert.alert("Visitor Not Inside", "Only visitors who are currently checked in can be reported.");
       return;
     }
 
@@ -1835,26 +1835,85 @@ export default function SecurityDashboardScreen({ navigation }) {
         <View style={styles.reportFormCard}>
           <Text style={styles.reportFormTitle}>New Security Report</Text>
           <Text style={styles.reportFormSubtitle}>
-            Select a visitor record and describe the incident for admin follow-up.
+            Select a checked-in visitor and describe the incident for admin follow-up.
           </Text>
 
-          <Text style={styles.reportFormLabel}>Visitor Record</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reportVisitorChipRow}>
-            {visitors.all.slice(0, 12).map((visitor) => {
-              const isActive = reportForm.visitorId === visitor._id;
-              return (
-                <TouchableOpacity
-                  key={visitor._id}
-                  style={[styles.reportVisitorChip, isActive && styles.reportVisitorChipActive]}
-                  onPress={() => setReportForm((currentValue) => ({ ...currentValue, visitorId: visitor._id }))}
-                >
-                  <Text style={[styles.reportVisitorChipText, isActive && styles.reportVisitorChipTextActive]}>
-                    {visitor.fullName}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.reportFormLabelRow}>
+            <Text style={styles.reportFormLabel}>Checked-In Visitor</Text>
+            <Text style={styles.reportFormHint}>{visitors.active.length} inside facility</Text>
+          </View>
+
+          {visitors.active.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.reportVisitorTable}>
+                <View style={[styles.reportVisitorTableRow, styles.reportVisitorTableHeader]}>
+                  <Text style={[styles.reportVisitorHeaderCell, styles.reportVisitorNameCell]}>Visitor</Text>
+                  <Text style={[styles.reportVisitorHeaderCell, styles.reportVisitorOfficeCell]}>Office</Text>
+                  <Text style={[styles.reportVisitorHeaderCell, styles.reportVisitorCheckInCell]}>Checked In</Text>
+                  <Text style={[styles.reportVisitorHeaderCell, styles.reportVisitorContactCell]}>Contact</Text>
+                </View>
+
+                {visitors.active.map((visitor) => {
+                  const isSelected = String(reportForm.visitorId) === String(visitor._id);
+
+                  return (
+                    <TouchableOpacity
+                      key={visitor._id}
+                      style={[
+                        styles.reportVisitorTableRow,
+                        isSelected && styles.reportVisitorTableRowSelected,
+                      ]}
+                      onPress={() => setReportForm((currentValue) => ({ ...currentValue, visitorId: visitor._id }))}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.reportVisitorCell, styles.reportVisitorNameCell]}>
+                        <View style={[styles.reportVisitorSelectDot, isSelected && styles.reportVisitorSelectDotActive]}>
+                          {isSelected && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
+                        </View>
+                        <View style={styles.reportVisitorInfo}>
+                          <Text style={styles.reportVisitorPrimaryText} numberOfLines={1}>
+                            {visitor.fullName || 'Unnamed Visitor'}
+                          </Text>
+                          <Text style={styles.reportVisitorMutedText} numberOfLines={1}>
+                            ID: {visitor.idNumber || 'Not provided'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={[styles.reportVisitorCell, styles.reportVisitorOfficeCell]}>
+                        <Text style={styles.reportVisitorPrimaryText} numberOfLines={1}>
+                          {visitor.assignedOffice || visitor.appointmentDepartment || 'Campus access'}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.reportVisitorCell, styles.reportVisitorCheckInCell]}>
+                        <Text style={styles.reportVisitorMutedText} numberOfLines={1}>
+                          {formatTime(visitor.checkedInAt)}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.reportVisitorCell, styles.reportVisitorContactCell]}>
+                        <Text style={styles.reportVisitorPrimaryText} numberOfLines={1}>
+                          {visitor.phoneNumber || 'No phone'}
+                        </Text>
+                        <Text style={styles.reportVisitorMutedText} numberOfLines={1}>
+                          {visitor.email || 'No email'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          ) : (
+            <View style={styles.reportVisitorEmptyState}>
+              <Ionicons name="log-in-outline" size={28} color="#94A3B8" />
+              <Text style={styles.reportVisitorEmptyTitle}>No visitors inside</Text>
+              <Text style={styles.reportVisitorEmptyText}>
+                A visitor must be checked in before security can file a report for them.
+              </Text>
+            </View>
+          )}
 
           <Text style={styles.reportFormLabel}>Category</Text>
           <View style={styles.reportCategoryRow}>
@@ -1949,17 +2008,62 @@ export default function SecurityDashboardScreen({ navigation }) {
         {reports.length > 0 && (
           <View style={styles.reportSection}>
             <Text style={styles.reportSectionTitle}>Recent Reports</Text>
-            {reports.slice(0, 5).map((report) => (
-              <View key={report._id} style={styles.reportCard}>
-                <View style={styles.reportCardHeader}>
-                  <Ionicons name="flag-outline" size={16} color="#DC2626" />
-                  <Text style={styles.reportCardTitle}>{report.reason}</Text>
-                  <Text style={styles.reportCardDate}>{formatDate(report.createdAt)}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.securityReportsTable}>
+                <View style={[styles.securityReportsTableRow, styles.securityReportsTableHeader]}>
+                  <Text style={[styles.securityReportsHeaderCell, styles.securityReportsIncidentCell]}>Incident</Text>
+                  <Text style={[styles.securityReportsHeaderCell, styles.securityReportsVisitorCell]}>Visitor</Text>
+                  <Text style={[styles.securityReportsHeaderCell, styles.securityReportsDateCell]}>Filed Date</Text>
+                  <Text style={[styles.securityReportsHeaderCell, styles.securityReportsStatusCell]}>Status</Text>
                 </View>
-                <Text style={styles.reportCardVisitor}>Visitor: {report.visitorName}</Text>
-                <Text style={styles.reportCardStatus}>Status: {report.status}</Text>
+                {reports.slice(0, 8).map((report) => {
+                  const isResolved = String(report.status || '').toLowerCase() === 'resolved';
+
+                  return (
+                    <View key={report._id} style={styles.securityReportsTableRow}>
+                      <View style={[styles.securityReportsCell, styles.securityReportsIncidentCell]}>
+                        <View style={styles.securityReportsIncidentIcon}>
+                          <Ionicons name="flag-outline" size={16} color="#DC2626" />
+                        </View>
+                        <Text style={styles.securityReportsPrimaryText} numberOfLines={2}>
+                          {report.reason || 'Security incident'}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.securityReportsCell, styles.securityReportsVisitorCell]}>
+                        <Text style={styles.securityReportsPrimaryText} numberOfLines={1}>
+                          {report.visitorName || 'Unknown visitor'}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.securityReportsCell, styles.securityReportsDateCell]}>
+                        <Text style={styles.securityReportsMutedText} numberOfLines={1}>
+                          {formatDate(report.createdAt)}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.securityReportsCell, styles.securityReportsStatusCell]}>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            { backgroundColor: isResolved ? '#D1FAE5' : '#FEF3C7' },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              { color: isResolved ? '#047857' : '#B45309' },
+                            ]}
+                          >
+                            {report.status || 'Open'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
-            ))}
+            </ScrollView>
           </View>
         )}
 
