@@ -971,6 +971,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
+    if (isLoadingAppointmentSlots) {
+      Alert.alert("Checking Slots", "Please wait while we confirm available appointment slots.");
+      return;
+    }
+
+    if (appointmentAvailability && appointmentAvailability.assignedStaff === null) {
+      Alert.alert(
+        "No Staff Available",
+        appointmentAvailability.message ||
+          "No active staff account is assigned to this office yet. Please choose another office or contact admin.",
+      );
+      return;
+    }
+
     if (isAppointmentTimeSlotFull(preferredTime)) {
       Alert.alert(
         "Time Slot Full",
@@ -1006,6 +1020,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     combinedDateTime.setHours(preferredTime.getHours(), preferredTime.getMinutes(), 0, 0);
     if (Number.isNaN(combinedDateTime.getTime())) {
       Alert.alert("Invalid Schedule", "Please choose a valid preferred date and time.");
+      return;
+    }
+
+    if (combinedDateTime < new Date(Date.now() - 60 * 1000)) {
+      Alert.alert("Invalid Schedule", "Appointment schedule cannot be in the past.");
       return;
     }
 
@@ -3367,7 +3386,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </View>
                 ) : null}
                 <Text style={visitorDashboardStyles.appointmentAutoHint}>
-                  We suggest an office from your purpose, but you can change it. Each staff member accepts up to 3 visitors per time slot.
+                  Choose the office that should review your appointment. Each staff member accepts up to 3 visitors per time slot.
                 </Text>
               </View>
 

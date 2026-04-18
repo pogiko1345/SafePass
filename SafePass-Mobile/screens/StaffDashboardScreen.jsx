@@ -411,12 +411,22 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const submitAdjustment = async () => {
     if (!selectedAppointment) return;
-    setProcessingId(selectedAppointment._id);
     try {
       const mergedDateTime = new Date(adjustedDate);
       const timeValue = new Date(adjustedTime);
       mergedDateTime.setHours(timeValue.getHours(), timeValue.getMinutes(), 0, 0);
 
+      if (Number.isNaN(mergedDateTime.getTime())) {
+        Alert.alert("Invalid Schedule", "Please choose a valid appointment date and time.");
+        return;
+      }
+
+      if (mergedDateTime < new Date(Date.now() - 60 * 1000)) {
+        Alert.alert("Invalid Schedule", "Adjusted appointment time cannot be in the past.");
+        return;
+      }
+
+      setProcessingId(selectedAppointment._id);
       const response = await ApiService.adjustStaffAppointment(selectedAppointment._id, {
         visitDate: adjustedDate.toISOString(),
         preferredDate: adjustedDate.toISOString(),

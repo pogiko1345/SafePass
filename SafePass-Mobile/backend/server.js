@@ -740,6 +740,62 @@ const formatDepartmentLabel = (value = "") =>
 
 const APPOINTMENT_SLOT_LIMIT = 3;
 const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted"];
+const APPOINTMENT_PURPOSE_OPTIONS = [
+  "Enrollment",
+  "Payment",
+  "Inquiry",
+  "Document Request",
+  "Other",
+];
+const APPOINTMENT_DEPARTMENT_OPTIONS = [
+  "Registrar",
+  "Accounting",
+  "Information Desk",
+  "Guidance",
+  "Administration",
+];
+const ACCOUNT_ROLE_OPTIONS = ["admin", "staff", "security", "guard", "visitor"];
+const ACCOUNT_STATUS_OPTIONS = ["active", "inactive", "pending", "suspended"];
+
+const normalizeOptionValue = (value = "") =>
+  String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+const isAllowedOption = (value, options) => {
+  const normalizedValue = normalizeOptionValue(value);
+  return options.some((option) => normalizeOptionValue(option) === normalizedValue);
+};
+
+const normalizePhoneValue = (value = "") => String(value || "").trim().replace(/\s+/g, " ");
+
+const isValidPhoneValue = (value = "") =>
+  String(value || "").replace(/[^\d+]/g, "").length >= 7;
+
+const isSameObjectId = (left, right) =>
+  Boolean(left && right && String(left) === String(right));
+
+const isVisitorOwner = (user = {}, visitor = {}) => {
+  if (String(user.role || "").toLowerCase() !== "visitor") return false;
+
+  const sameVisitorId = isSameObjectId(user.visitorId, visitor._id);
+  const sameEmail =
+    String(user.email || "").trim().toLowerCase() ===
+    String(visitor.email || "").trim().toLowerCase();
+
+  return sameVisitorId || sameEmail;
+};
+
+const getCombinedAppointmentDateTime = (visitDateValue, visitTimeValue) => {
+  const visitDate = new Date(visitDateValue);
+  const visitTime = new Date(visitTimeValue);
+
+  if (Number.isNaN(visitDate.getTime()) || Number.isNaN(visitTime.getTime())) {
+    return null;
+  }
+
+  const combined = new Date(visitDate);
+  combined.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+  return Number.isNaN(combined.getTime()) ? null : combined;
+};
 
 const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
   const visitDate = new Date(visitDateValue);
@@ -1012,9 +1068,10 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
 
       return res.json({
         success: true,
-        visitor: {
+        visitor: null,
+        account: {
           _id: req.user._id,
-          fullName: `${req.user.firstName} ${req.user.lastName}`,
+          fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
           email: req.user.email,
           phoneNumber: req.user.phone,
           status: req.user.status,
@@ -2033,7 +2090,26 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       status,
     } = req.body;
 
-    if (!firstName || !lastName || !username || !email || !password || !phone || !department) {
+    const normalizedFirstName = String(firstName || "").trim();
+    const normalizedLastName = String(lastName || "").trim();
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedUsername = normalizeUsernameValue(username);
+    const normalizedPhone = normalizePhoneValue(phone);
+    const normalizedDepartment = String(department || "").trim();
+    const normalizedPosition = String(position || "Staff Member").trim();
+    const normalizedEmployeeId = employeeId ? String(employeeId).trim() : "";
+    const normalizedStatus = status === "inactive" ? "inactive" : "active";
+    const normalizedPassword = String(password || "");
+
+    if (
+      !normalizedFirstName ||
+      !normalizedLastName ||
+      !normalizedUsername ||
+      !normalizedEmail ||
+      !normalizedPassword ||
+      !normalizedPhone ||
+      !normalizedDepartment
+    ) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
@@ -2041,16 +2117,27 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       });
     }
 
-    const normalizedEmail = normalizeEmailValue(email);
-    const normalizedUsername = normalizeUsernameValue(username);
-    const normalizedEmployeeId = employeeId ? String(employeeId).trim() : "";
-    const normalizedStatus = status === "inactive" ? "inactive" : "active";
-
     if (!isValidEmailValue(normalizedEmail)) {
       return res.status(400).json({
         success: false,
         message: "Invalid email format",
         field: "email",
+      });
+    }
+
+    if (normalizedPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+        field: "password",
+      });
+    }
+
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid contact number.",
+        field: "phone",
       });
     }
 
@@ -2094,18 +2181,18 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
     const nfcCardId = `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
     const user = new User({
-      firstName: String(firstName).trim(),
-      lastName: String(lastName).trim(),
+      firstName: normalizedFirstName,
+      lastName: normalizedLastName,
       username: normalizedUsername,
       email: normalizedEmail,
-      password,
-      phone: String(phone).trim(),
+      password: normalizedPassword,
+      phone: normalizedPhone,
       role: "staff",
       status: normalizedStatus,
       isActive: normalizedStatus === "active",
       employeeId: finalEmployeeId,
-      department: String(department).trim(),
-      position: String(position || "Staff Member").trim(),
+      department: normalizedDepartment,
+      position: normalizedPosition,
       nfcCardId,
     });
 
@@ -2189,20 +2276,64 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       employeeId,
     } = req.body;
 
+    const normalizedFirstName = String(firstName || "").trim();
+    const normalizedLastName = String(lastName || "").trim();
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedPhone = normalizePhoneValue(phone);
+    const normalizedPassword = String(password || "");
+    const normalizedEmployeeId = employeeId ? String(employeeId).trim() : "";
+    const normalizedPosition = String(position || "Security Guard").trim();
+
     // Validate required fields
-    if (!firstName || !lastName || !email || !password || !phone) {
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedPassword || !normalizedPhone) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    if (!isValidEmailValue(normalizedEmail)) {
       return res.status(400).json({
         success: false,
-        message: "Email already registered",
+        message: "Invalid email format",
+        field: "email",
+      });
+    }
+
+    if (normalizedPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+        field: "password",
+      });
+    }
+
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid contact number.",
+        field: "phone",
+      });
+    }
+
+    const duplicateChecks = [{ email: normalizedEmail }];
+    if (normalizedEmployeeId) {
+      duplicateChecks.push({ employeeId: normalizedEmployeeId });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ $or: duplicateChecks });
+    if (existingUser) {
+      const duplicateField =
+        existingUser.email === normalizedEmail ? "email" : "employeeId";
+
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "employeeId"
+            ? "Security ID already registered"
+            : "Email already registered",
+        field: duplicateField,
       });
     }
 
@@ -2212,7 +2343,7 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
     const nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
 
     // Generate employee ID if not provided
-    let finalEmployeeId = employeeId;
+    let finalEmployeeId = normalizedEmployeeId;
     if (!finalEmployeeId) {
       const timeStamp = Date.now().toString().slice(-6);
       const random = Math.random().toString(36).substr(2, 3).toUpperCase();
@@ -2221,15 +2352,15 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
 
     // Create user
     const user = new User({
-      firstName,
-      lastName,
-      email: email.toLowerCase().trim(),
-      password,
-      phone,
+      firstName: normalizedFirstName,
+      lastName: normalizedLastName,
+      email: normalizedEmail,
+      password: normalizedPassword,
+      phone: normalizedPhone,
       role: "guard",
       nfcCardId,
       employeeId: finalEmployeeId,
-      position: position || "Security Guard",
+      position: normalizedPosition,
       status: "active",
       isActive: true,
     });
@@ -2270,6 +2401,19 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error("Create security guard error:", error);
+
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "employeeId"
+            ? "Security ID already registered"
+            : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Failed to create security guard",
@@ -3126,6 +3270,13 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       });
     }
 
+    if (!isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only check in using your own visitor appointment.",
+      });
+    }
+
     if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
@@ -3233,6 +3384,13 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       });
     }
 
+    if (!isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only check out using your own visitor appointment.",
+      });
+    }
+
     if (visitor.status === "checked_out") {
       return res.status(400).json({
         success: false,
@@ -3328,6 +3486,18 @@ app.get("/api/visitors/:id/logs", authMiddleware, async (req, res) => {
       });
     }
 
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const canReadLogs =
+      ["admin", "security", "guard", "staff"].includes(requesterRole) ||
+      isVisitorOwner(req.user, visitor);
+
+    if (!canReadLogs) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot view another visitor's access logs.",
+      });
+    }
+
     const logs = await AccessLog.find({
       $or: [{ userEmail: visitor.email }, { userName: visitor.fullName }],
     })
@@ -3386,6 +3556,17 @@ app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
       });
     }
 
+    const selectedDay = new Date(selectedDate);
+    selectedDay.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDay < today) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointment date cannot be in the past.",
+      });
+    }
+
     const slots = [];
     for (let hour = 7; hour <= 18; hour += 1) {
       for (const minute of [0, 30]) {
@@ -3431,8 +3612,23 @@ app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
 // Visitor appointment request / reappointment
 app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
   try {
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    if (requesterRole !== "visitor" && requesterRole !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only visitors can create appointment requests.",
+      });
+    }
+
+    if (requesterRole === "visitor" && !isSameObjectId(req.user._id, req.params.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only request appointments for your own account.",
+      });
+    }
+
     const requestedUserId =
-      req.user.role === "visitor" ? req.user._id : req.params.userId;
+      requesterRole === "visitor" ? req.user._id : req.params.userId;
     const {
       visitDate,
       preferredDate,
@@ -3470,6 +3666,13 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
+    if (!isAllowedOption(normalizedPurposeCategory, APPOINTMENT_PURPOSE_OPTIONS)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid purpose of visit.",
+      });
+    }
+
     if (normalizedPurposeCategory === "Other" && !normalizedCustomPurpose) {
       return res.status(400).json({
         success: false,
@@ -3481,6 +3684,29 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Office or department is required for this appointment.",
+      });
+    }
+
+    if (!isAllowedOption(requestedDepartment, APPOINTMENT_DEPARTMENT_OPTIONS)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid office to visit.",
+      });
+    }
+
+    const appointmentDateTime = getCombinedAppointmentDateTime(finalVisitDate, finalVisitTime);
+    if (!appointmentDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid appointment date and time.",
+      });
+    }
+
+    const minimumScheduleTime = new Date(Date.now() - 60 * 1000);
+    if (appointmentDateTime < minimumScheduleTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointment schedule cannot be in the past.",
       });
     }
 
@@ -3531,6 +3757,14 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Only visitor accounts can create appointment requests.",
+      });
+    }
+
+    if (user.isVerified === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email before requesting an appointment.",
+        requiresEmailVerification: true,
       });
     }
 
@@ -3769,6 +4003,14 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       });
     }
 
+    const appointmentDateTime = getCombinedAppointmentDateTime(visitor.visitDate, visitor.visitTime);
+    if (!appointmentDateTime || appointmentDateTime < new Date(Date.now() - 60 * 1000)) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment schedule is no longer valid. Please adjust it before approving.",
+      });
+    }
+
     visitor.approveAppointment(req.user, req.body?.note || "");
     await visitor.save();
 
@@ -3893,6 +4135,41 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       return res.status(400).json({
         success: false,
         message: "Only pending appointments can be adjusted.",
+      });
+    }
+
+    const adjustedDate = finalVisitDate || visitor.visitDate;
+    const adjustedDateTime = getCombinedAppointmentDateTime(adjustedDate, finalVisitTime);
+    if (!adjustedDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid adjusted date and time.",
+      });
+    }
+
+    const minimumScheduleTime = new Date(Date.now() - 60 * 1000);
+    if (adjustedDateTime < minimumScheduleTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Adjusted appointment time cannot be in the past.",
+      });
+    }
+
+    const slotStaffId = visitor.assignedStaff || req.user._id;
+    const adjustedSlotCount = await countStaffAppointmentsForSlot({
+      assignedStaff: slotStaffId,
+      visitDate: adjustedDate,
+      visitTime: finalVisitTime,
+      excludeVisitorId: visitor._id,
+    });
+
+    if (adjustedSlotCount >= APPOINTMENT_SLOT_LIMIT) {
+      return res.status(409).json({
+        success: false,
+        code: "APPOINTMENT_SLOT_FULL",
+        message: "That adjusted time slot is already full. Please choose another time.",
+        limit: APPOINTMENT_SLOT_LIMIT,
+        currentCount: adjustedSlotCount,
       });
     }
 
@@ -4252,7 +4529,7 @@ app.put("/api/staff/appointments/:id/complete", authMiddleware, async (req, res)
 // Check-in visitor (by security)
 app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
   try {
-    if (!["admin", "security", "guard", "staff"].includes(req.user.role)) {
+    if (!["admin", "security", "guard"].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
@@ -4334,7 +4611,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
 // Check-out visitor (by security)
 app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
   try {
-    if (!["admin", "security", "guard", "staff"].includes(req.user.role)) {
+    if (!["admin", "security", "guard"].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
@@ -4621,6 +4898,19 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
           visitor,
         });
       }
+
+      return res.json({
+        success: true,
+        visitor: null,
+        account: {
+          _id: req.user._id,
+          fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
+          email: req.user.email,
+          phoneNumber: req.user.phone,
+          status: req.user.status,
+          registeredAt: req.user.createdAt,
+        },
+      });
     }
 
     res.status(404).json({
@@ -4640,6 +4930,26 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
 app.get("/api/visitors/user/:userId", authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
+    const requesterRole = String(req.user.role || "").toLowerCase();
+
+    if (
+      requesterRole === "visitor" &&
+      !isSameObjectId(req.user._id, userId)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view your own visitor profile.",
+      });
+    }
+
+    if (
+      !["visitor", "admin", "security", "guard", "staff"].includes(requesterRole)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
 
     const user = await User.findById(userId);
     if (!user) {
@@ -4907,6 +5217,103 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
     delete updates._id;
     delete updates.__v;
 
+    const existingUser = await User.findById(req.params.id);
+    if (!existingUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    if (updates.firstName !== undefined) {
+      updates.firstName = String(updates.firstName || "").trim();
+      if (!updates.firstName) {
+        return res.status(400).json({
+          success: false,
+          message: "First name is required.",
+          field: "firstName",
+        });
+      }
+    }
+
+    if (updates.lastName !== undefined) {
+      updates.lastName = String(updates.lastName || "").trim();
+      if (!updates.lastName) {
+        return res.status(400).json({
+          success: false,
+          message: "Last name is required.",
+          field: "lastName",
+        });
+      }
+    }
+
+    if (updates.email !== undefined) {
+      const normalizedEmail = normalizeEmailValue(updates.email);
+      if (!normalizedEmail || !isValidEmailValue(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid email address.",
+          field: "email",
+        });
+      }
+
+      const emailConflict = await User.findOne({
+        email: normalizedEmail,
+        _id: { $ne: req.params.id },
+      });
+
+      if (emailConflict) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already registered",
+          field: "email",
+        });
+      }
+
+      updates.email = normalizedEmail;
+    }
+
+    if (updates.phone !== undefined) {
+      updates.phone = normalizePhoneValue(updates.phone);
+      if (updates.phone && !isValidPhoneValue(updates.phone)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid contact number.",
+          field: "phone",
+        });
+      }
+    }
+
+    if (updates.role !== undefined) {
+      updates.role = String(updates.role || "").toLowerCase().trim();
+      if (!ACCOUNT_ROLE_OPTIONS.includes(updates.role)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid role",
+          field: "role",
+        });
+      }
+    }
+
+    if (updates.status !== undefined) {
+      updates.status = String(updates.status || "").toLowerCase().trim();
+      if (!ACCOUNT_STATUS_OPTIONS.includes(updates.status)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid account status",
+          field: "status",
+        });
+      }
+      updates.isActive = updates.status === "active";
+    }
+
+    if (updates.department !== undefined) {
+      updates.department = String(updates.department || "").trim();
+    }
+
+    if (updates.position !== undefined) {
+      updates.position = String(updates.position || "").trim();
+    }
+
     if (updates.username !== undefined) {
       const normalizedUsername = normalizeUsernameValue(updates.username);
       if (!normalizedUsername) {
@@ -4951,17 +5358,22 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       }
     }
 
+    const finalRole = updates.role || existingUser.role;
+    const finalDepartment =
+      updates.department !== undefined ? updates.department : existingUser.department;
+    if (finalRole === "staff" && !String(finalDepartment || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Department is required for staff accounts.",
+        field: "department",
+      });
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { ...updates, updatedAt: new Date() },
       { new: true, runValidators: true },
     ).select("-password");
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    }
 
     // Create access log for the update
     const accessLog = new AccessLog({
@@ -4991,13 +5403,15 @@ app.put("/api/admin/users/:id/role", authMiddleware, async (req, res) => {
 
     const { role } = req.body;
 
-    if (!["student", "staff", "security", "admin", "visitor"].includes(role)) {
+    const normalizedRole = String(role || "").toLowerCase().trim();
+
+    if (!ACCOUNT_ROLE_OPTIONS.includes(normalizedRole)) {
       return res.status(400).json({ success: false, message: "Invalid role" });
     }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { role, updatedAt: new Date() },
+      { role: normalizedRole, updatedAt: new Date() },
       { new: true },
     ).select("-password");
 
@@ -5015,7 +5429,7 @@ app.put("/api/admin/users/:id/role", authMiddleware, async (req, res) => {
       location: "Admin Panel",
       accessType: "system",
       status: "granted",
-      notes: `Updated role for ${user.email} to ${role}`,
+      notes: `Updated role for ${user.email} to ${normalizedRole}`,
     });
     await accessLog.save();
 

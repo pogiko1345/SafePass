@@ -959,15 +959,28 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const submitVisitor = async () => {
+    const normalizedFullName = String(newVisitor.fullName || "").trim();
+    const normalizedPhone = String(newVisitor.phoneNumber || "").trim();
+    const normalizedEmail = String(newVisitor.email || "").trim().toLowerCase();
+    const normalizedIdNumber = String(newVisitor.idNumber || "").trim();
+    const normalizedPurpose = String(newVisitor.purposeOfVisit || "").trim();
+    const normalizedHost = String(newVisitor.host || "").trim();
+    const normalizedOffice = String(newVisitor.assignedOffice || "").trim();
+
     if (
-      !newVisitor.fullName ||
-      !newVisitor.purposeOfVisit ||
-      !newVisitor.host ||
-      !newVisitor.phoneNumber ||
-      !newVisitor.email ||
-      !newVisitor.idNumber
+      !normalizedFullName ||
+      !normalizedPurpose ||
+      !normalizedHost ||
+      !normalizedPhone ||
+      !normalizedEmail ||
+      !normalizedIdNumber
     ) {
       Alert.alert("Error", "Please fill in all required fields");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      Alert.alert("Invalid Email", "Please enter a valid visitor email address.");
       return;
     }
 
@@ -976,20 +989,35 @@ export default function SecurityDashboardScreen({ navigation }) {
       return;
     }
 
+    const visitDate = new Date(newVisitor.visitDate);
+    const visitTime = new Date(newVisitor.visitTime);
+    const visitSchedule = new Date(visitDate);
+    visitSchedule.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+
+    if (Number.isNaN(visitSchedule.getTime())) {
+      Alert.alert("Invalid Schedule", "Please choose a valid visit date and time.");
+      return;
+    }
+
+    if (visitSchedule < new Date(Date.now() - 60 * 1000)) {
+      Alert.alert("Invalid Schedule", "Visit schedule cannot be in the past.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const visitorData = {
-        fullName: newVisitor.fullName,
-        phoneNumber: newVisitor.phoneNumber,
-        email: newVisitor.email,
-        idNumber: newVisitor.idNumber,
-        purposeOfVisit: newVisitor.purposeOfVisit,
-        host: newVisitor.host,
-        assignedOffice: newVisitor.assignedOffice,
-        visitDate: newVisitor.visitDate,
-        visitTime: newVisitor.visitTime,
-        vehicleNumber: newVisitor.vehicleNumber,
+        fullName: normalizedFullName,
+        phoneNumber: normalizedPhone,
+        email: normalizedEmail,
+        idNumber: normalizedIdNumber,
+        purposeOfVisit: normalizedPurpose,
+        host: normalizedHost,
+        assignedOffice: normalizedOffice,
+        visitDate,
+        visitTime: visitSchedule,
+        vehicleNumber: String(newVisitor.vehicleNumber || "").trim(),
         idImage: newVisitor.idPhotoBase64 ? `data:image/jpeg;base64,${newVisitor.idPhotoBase64}` : null,
         registeredBy: user._id,
         registeredByName: `${user.firstName} ${user.lastName}`,

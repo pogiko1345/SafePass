@@ -2660,8 +2660,68 @@ const loadDashboardData = useCallback(async () => {
   // FIXED: Confirm Edit User
   const confirmEditUser = async () => {
     if (!ensureAdminAccess()) return;
-    if (!editUserData.firstName || !editUserData.lastName) {
-      Alert.alert("Error", "Please fill all required fields");
+    const selectedId = editUserData.id;
+    const normalizedEmail = String(editUserData.email || "").trim().toLowerCase();
+    const normalizedUsername = normalizeUsernameInput(editUserData.username);
+    const normalizedEmployeeId = String(editUserData.employeeId || "").trim().toLowerCase();
+    const isEditingSecurity = isSecurityRole(editUserData.role);
+
+    if (!String(editUserData.firstName || "").trim() || !String(editUserData.lastName || "").trim()) {
+      Alert.alert("Missing Details", "First name and last name are required.");
+      return;
+    }
+
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
+    if (!String(editUserData.phone || "").trim()) {
+      Alert.alert("Missing Contact Number", "Contact number is required.");
+      return;
+    }
+
+    if (!isEditingSecurity && !String(editUserData.department || "").trim()) {
+      Alert.alert("Missing Department", "Department is required for staff accounts.");
+      return;
+    }
+
+    const duplicateEmail = allUsers.find(
+      (userItem) =>
+        String(userItem?._id || userItem?.id) !== String(selectedId) &&
+        String(userItem?.email || "").trim().toLowerCase() === normalizedEmail,
+    );
+    if (duplicateEmail) {
+      Alert.alert("Email Already Used", "This email is already registered. Please use another email address.");
+      return;
+    }
+
+    if (normalizedUsername) {
+      const duplicateUsername = allUsers.find(
+        (userItem) =>
+          String(userItem?._id || userItem?.id) !== String(selectedId) &&
+          normalizeUsernameInput(userItem?.username) === normalizedUsername,
+      );
+      if (duplicateUsername) {
+        Alert.alert("Username Already Used", "This username is already registered. Please use another username.");
+        return;
+      }
+    }
+
+    if (normalizedEmployeeId) {
+      const duplicateEmployeeId = allUsers.find(
+        (userItem) =>
+          String(userItem?._id || userItem?.id) !== String(selectedId) &&
+          String(userItem?.employeeId || "").trim().toLowerCase() === normalizedEmployeeId,
+      );
+      if (duplicateEmployeeId) {
+        Alert.alert("Staff ID Already Used", "This staff/security ID is already registered.");
+        return;
+      }
+    }
+
+    if (!["active", "inactive", "pending", "suspended"].includes(String(editUserData.status || "").toLowerCase())) {
+      Alert.alert("Invalid Status", "Please select a valid account status.");
       return;
     }
 
@@ -2670,7 +2730,8 @@ const loadDashboardData = useCallback(async () => {
       const updatePayload = {
         firstName: editUserData.firstName,
         lastName: editUserData.lastName,
-        username: String(editUserData.username || "").trim().toLowerCase(),
+        username: normalizedUsername,
+        email: normalizedEmail,
         phone: editUserData.phone,
         role: editUserData.role,
         department: editUserData.department,
@@ -7997,7 +8058,7 @@ const loadDashboardData = useCallback(async () => {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </Modal> 
     </SafeAreaView>
   );
 }
