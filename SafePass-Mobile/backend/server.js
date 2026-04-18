@@ -474,6 +474,37 @@ const sendVerificationEmailSimulation = (req, user) => {
   return { verificationUrl, expiresAt };
 };
 
+const createRegistrationOtp = (user) => {
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
+
+  user.verificationOtpHash = otpHash;
+  user.verificationOtpExpiresAt = expiresAt;
+  user.verificationOtpAttempts = 0;
+  user.verificationTokenHash = "";
+  user.verificationExpiresAt = null;
+
+  sendEmail(
+    user.email,
+    "Your Sapphire SafePass OTP",
+    [
+      `Hi ${user.firstName},`,
+      "",
+      `Your visitor account verification OTP is: ${otpCode}`,
+      "",
+      "This code expires in 10 minutes.",
+      "",
+      "SIMULATION MODE: use the OTP shown in this message or backend logs.",
+    ].join("\n"),
+  );
+
+  console.log(`\nVISITOR REGISTRATION OTP for ${user.email}: ${otpCode}`);
+  console.log("Enter this OTP in the visitor registration screen.\n");
+
+  return { otpCode, expiresAt };
+};
+
 // ========== ROUTES ==========
 
 // 0. TEST ROUTE
@@ -1124,8 +1155,9 @@ app.post("/api/login", async (req, res) => {
         success: false,
         error: "Your account is not yet verified",
         message:
-          "Please verify your email first. In simulation mode, open the verification link printed in the backend logs.",
+          "Please verify your account using the OTP sent during registration before logging in.",
         requiresEmailVerification: true,
+        requiresOtpVerification: true,
         email: user.email,
       });
     }
@@ -1540,6 +1572,171 @@ app.post("/api/auth/resend-verification", async (req, res) => {
   }
 });
 
+app.post("/api/auth/verify-registration-otp", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+    const otpCode = String(req.body?.otpCode || "").trim();
+
+    if (!email || !otpCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP code are required.",
+      });
+    }
+
+    if (!/^\d{6}$/.test(otpCode)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter the 6-digit OTP code.",
+      });
+    }
+
+    const user = await User.findOne({ email, role: "visitor" });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor account not found.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.json({
+        success: true,
+        verified: true,
+        message: "This account is already verified.",
+      });
+    }
+
+    if (!user.verificationOtpHash || !user.verificationOtpExpiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: "No OTP verification code was found. Please request a new code.",
+      });
+    }
+
+    if (new Date(user.verificationOtpExpiresAt).getTime() < Date.now()) {
+      user.verificationOtpHash = "";
+      user.verificationOtpExpiresAt = null;
+      user.verificationOtpAttempts = 0;
+      await user.save();
+
+      return res.status(400).json({
+        success: false,
+        message: "OTP code has expired. Please request a new code.",
+      });
+    }
+
+    if ((user.verificationOtpAttempts || 0) >= 5) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many incorrect OTP attempts. Please request a new code.",
+      });
+    }
+
+    const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+    if (otpHash !== user.verificationOtpHash) {
+      user.verificationOtpAttempts = (user.verificationOtpAttempts || 0) + 1;
+      await user.save();
+
+      return res.status(400).json({
+        success: false,
+        message: `Invalid OTP code. ${Math.max(0, 5 - user.verificationOtpAttempts)} attempts remaining.`,
+      });
+    }
+
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.verificationOtpHash = "";
+    user.verificationOtpExpiresAt = null;
+    user.verificationOtpAttempts = 0;
+    user.verificationTokenHash = "";
+    user.verificationExpiresAt = null;
+    if (user.status === "pending") {
+      user.status = "active";
+    }
+    await user.save();
+
+    await createRoleNotification({
+      title: "Visitor Account Verified",
+      message: `${getFullName(user)} verified their visitor account using OTP.`,
+      targetRole: "admin",
+      relatedUser: user._id,
+      type: "visitor",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_account_otp_verified",
+        email: user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    res.json({
+      success: true,
+      verified: true,
+      message: "OTP verified. You can now log in.",
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error("Verify registration OTP error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify OTP.",
+    });
+  }
+});
+
+app.post("/api/auth/resend-registration-otp", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const user = await User.findOne({ email, role: "visitor" });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor account not found.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.json({
+        success: true,
+        verified: true,
+        message: "This account is already verified.",
+      });
+    }
+
+    const otp = createRegistrationOtp(user);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "A new OTP code was generated. In simulation mode, check the backend logs.",
+      simulation: true,
+      otpCode: otp.otpCode,
+      otpExpiresAt: otp.expiresAt,
+    });
+  } catch (error) {
+    console.error("Resend registration OTP error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to resend OTP.",
+    });
+  }
+});
+
 // ============ VISITOR REGISTRATION ROUTES ============
 
 // Register a new visitor (Complete version with UNIQUE NFC ID for pending visitors)
@@ -1621,9 +1818,9 @@ app.post("/api/visitors/register", async (req, res) => {
       visitorId: existingVisitor?._id || null,
     });
 
-    const verification = sendVerificationEmailSimulation(req, user);
+    const otp = createRegistrationOtp(user);
     await user.save();
-    console.log("Visitor account created, waiting for email verification:", normalizedEmail);
+    console.log("Visitor account created, waiting for OTP verification:", normalizedEmail);
 
     await createSystemActivity({
       actorUser: user,
@@ -1632,11 +1829,11 @@ app.post("/api/visitors/register", async (req, res) => {
       activityType: "visitor_account_registration",
       status: "pending",
       location: "Visitor Registration",
-      notes: `${normalizedFullName} created a visitor account and must verify email before login.`,
+      notes: `${normalizedFullName} created a visitor account and must verify OTP before login.`,
       metadata: {
         username: user.username,
         email: user.email,
-        requiresEmailVerification: true,
+        requiresOtpVerification: true,
       },
     });
 
@@ -1651,7 +1848,7 @@ app.post("/api/visitors/register", async (req, res) => {
       status: "pending",
       relatedUser: user._id,
       relatedVisitor: existingVisitor?._id || null,
-      notes: "Visitor account created and waiting for email verification",
+      notes: "Visitor account created and waiting for OTP verification",
     });
 
     await createRoleNotification({
@@ -1668,6 +1865,7 @@ app.post("/api/visitors/register", async (req, res) => {
         email: user.email,
         fullName: normalizedFullName,
         isVerified: false,
+        requiresOtpVerification: true,
         timestamp: new Date().toISOString(),
       },
     });
@@ -1675,11 +1873,11 @@ app.post("/api/visitors/register", async (req, res) => {
     res.status(201).json({
       success: true,
       message:
-        "Visitor account created. Please verify your email before logging in. In simulation mode, open the verification link printed in the backend logs.",
-      requiresEmailVerification: true,
+        "Visitor account created. Please enter the OTP code before logging in. In simulation mode, use the OTP shown in the backend logs.",
+      requiresOtpVerification: true,
       simulation: true,
-      verificationLink: verification.verificationUrl,
-      verificationExpiresAt: verification.expiresAt,
+      otpCode: otp.otpCode,
+      otpExpiresAt: otp.expiresAt,
       user: {
         _id: user._id,
         fullName: normalizedFullName,
@@ -3763,8 +3961,9 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     if (user.isVerified === false) {
       return res.status(403).json({
         success: false,
-        message: "Please verify your email before requesting an appointment.",
+        message: "Please verify your visitor account with OTP before requesting an appointment.",
         requiresEmailVerification: true,
+        requiresOtpVerification: true,
       });
     }
 

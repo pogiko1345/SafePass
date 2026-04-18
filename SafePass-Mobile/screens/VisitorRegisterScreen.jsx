@@ -65,8 +65,11 @@ const SuccessModal = ({
   credentials,
   isVerified,
   isVerifying,
+  otpValue,
+  onOtpChange,
   onConfirm,
   onVerifySimulation,
+  onResendOtp,
 }) => {
   const handleCopy = (text, type) => {
     if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard) {
@@ -96,7 +99,7 @@ const SuccessModal = ({
           <Text style={visitorRegisterStyles.successMessage}>
             {isVerified
               ? "Your account is verified. You can now continue to login."
-              : "Please verify your account first before logging in."}
+              : "Enter the 6-digit OTP to verify your visitor account before logging in."}
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
             <View style={visitorRegisterStyles.credentialsTitleRow}>
@@ -106,8 +109,8 @@ const SuccessModal = ({
               </Text>
             </View>
             <Text style={visitorRegisterStyles.credentialsInfo}>
-              This is a simulation only. Press Verify Account, then use these
-              credentials to sign in.
+              This is a simulation only. Use the OTP shown below or in the
+              backend logs, then sign in with these credentials.
             </Text>
             {credentials && (
               <>
@@ -147,10 +150,40 @@ const SuccessModal = ({
                     <Ionicons name="copy-outline" size={18} color="#059669" />
                   </TouchableOpacity>
                 </View>
+                {!isVerified ? (
+                  <View style={visitorRegisterStyles.credentialRow}>
+                    <Text style={visitorRegisterStyles.credentialLabel}>OTP:</Text>
+                    <Text style={visitorRegisterStyles.credentialValue}>
+                      {credentials.otpCode || "Check backend logs"}
+                    </Text>
+                    {credentials.otpCode ? (
+                      <TouchableOpacity
+                        onPress={() => handleCopy(credentials.otpCode, "OTP")}
+                        style={visitorRegisterStyles.copyButton}
+                      >
+                        <Ionicons name="copy-outline" size={18} color="#059669" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : null}
               </>
             )}
           </View>
-          {credentials?.verificationLink ? (
+          {!isVerified ? (
+            <View style={visitorRegisterStyles.otpVerifyBox}>
+              <Text style={visitorRegisterStyles.credentialLabel}>Enter OTP Code</Text>
+              <TextInput
+                style={visitorRegisterStyles.otpInput}
+                value={otpValue}
+                onChangeText={onOtpChange}
+                placeholder="6-digit OTP"
+                placeholderTextColor="#94A3B8"
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+            </View>
+          ) : null}
+          {!isVerified ? (
             <TouchableOpacity
               style={[
                 visitorRegisterStyles.successButton,
@@ -169,27 +202,42 @@ const SuccessModal = ({
                     ? "Verifying..."
                     : isVerified
                       ? "Account Verified"
-                      : "Verify Account"}
+                      : "Verify OTP"}
                 </Text>
                 <Ionicons
-                  name={isVerified ? "checkmark-circle-outline" : "mail-open-outline"}
+                  name={isVerified ? "checkmark-circle-outline" : "keypad-outline"}
                   size={20}
                   color="#FFFFFF"
                 />
               </LinearGradient>
             </TouchableOpacity>
           ) : null}
+          {!isVerified ? (
+            <TouchableOpacity
+              style={visitorRegisterStyles.resendOtpButton}
+              onPress={onResendOtp}
+              disabled={isVerifying}
+            >
+              <Text style={visitorRegisterStyles.resendOtpButtonText}>
+                Resend OTP
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
-            style={visitorRegisterStyles.successButton}
+            style={[
+              visitorRegisterStyles.successButton,
+              !isVerified && visitorRegisterStyles.successButtonMuted,
+            ]}
             onPress={onConfirm}
+            disabled={!isVerified}
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={["#059669", "#047857"]}
+              colors={isVerified ? ["#059669", "#047857"] : ["#94A3B8", "#64748B"]}
                 style={visitorRegisterStyles.successGradient}
               >
                 <Text style={visitorRegisterStyles.successButtonText}>
-                  Continue to Login
+                  {isVerified ? "Continue to Login" : "Verify OTP First"}
                 </Text>
                 <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
               </LinearGradient>
@@ -390,6 +438,7 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [completedFields, setCompletedFields] = useState({});
   const [registeredVisitor, setRegisteredVisitor] = useState(null);
   const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
+  const [registrationOtp, setRegistrationOtp] = useState("");
 
   const goToVisitorLogin = (overrides = {}) => {
     navigation.reset({
@@ -546,9 +595,11 @@ export default function VisitorRegisterScreen({ navigation }) {
           username: response.credentials?.username || formData.username,
           email: response.credentials?.email || formData.email,
           password: response.credentials?.password || formData.password,
-          verificationLink: response.verificationLink || "",
+          otpCode: response.otpCode || "",
+          otpExpiresAt: response.otpExpiresAt || "",
           isVerified: false,
         });
+        setRegistrationOtp(response.otpCode || "");
         setTimeout(() => {
           setShowSuccess(true);
         }, Platform.OS === "web" ? 120 : 80);
@@ -636,37 +687,17 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const handleVerifySimulation = async () => {
-    const verificationLink = registeredVisitor?.verificationLink;
+    const email = registeredVisitor?.email || formData.email;
+    const otpCode = String(registrationOtp || "").trim();
 
-    if (!verificationLink) {
-      Alert.alert(
-        "Simulation Link Missing",
-        "No verification link was returned. Please check the backend logs.",
-      );
-      return;
-    }
-
-    const token = (() => {
-      try {
-        const parsedUrl = new URL(verificationLink);
-        return parsedUrl.searchParams.get("token");
-      } catch {
-        const [, rawToken] = String(verificationLink).split("token=");
-        return rawToken ? decodeURIComponent(rawToken) : "";
-      }
-    })();
-
-    if (!token) {
-      Alert.alert(
-        "Simulation Link Invalid",
-        "The verification link does not contain a valid token. Please try registering again.",
-      );
+    if (!email || !otpCode) {
+      Alert.alert("OTP Required", "Please enter the 6-digit OTP code.");
       return;
     }
 
     try {
       setIsVerifyingAccount(true);
-      const response = await ApiService.verifyEmailToken(token);
+      const response = await ApiService.verifyRegistrationOtp(email, otpCode);
 
       if (response?.success) {
         setRegisteredVisitor((previous) => ({
@@ -681,14 +712,43 @@ export default function VisitorRegisterScreen({ navigation }) {
       }
 
       Alert.alert(
-        "Verification Failed",
-        response?.message || "Unable to verify the account. Please try again.",
+        "OTP Verification Failed",
+        response?.message || "Unable to verify the OTP. Please try again.",
       );
     } catch (error) {
       Alert.alert(
-        "Unable to Verify Account",
-        error?.message || "Please try again or use the verification link from the backend logs.",
+        "Unable to Verify OTP",
+        error?.message || "Please try again or request a new OTP.",
       );
+    } finally {
+      setIsVerifyingAccount(false);
+    }
+  };
+
+  const handleResendRegistrationOtp = async () => {
+    const email = registeredVisitor?.email || formData.email;
+    if (!email) {
+      Alert.alert("Email Missing", "Unable to find the visitor email for OTP resend.");
+      return;
+    }
+
+    try {
+      setIsVerifyingAccount(true);
+      const response = await ApiService.resendRegistrationOtp(email);
+      if (response?.success) {
+        setRegisteredVisitor((previous) => ({
+          ...previous,
+          otpCode: response.otpCode || previous?.otpCode || "",
+          otpExpiresAt: response.otpExpiresAt || previous?.otpExpiresAt || "",
+        }));
+        setRegistrationOtp(response.otpCode || "");
+        Alert.alert("OTP Sent", "A new OTP was generated. In simulation mode, it is shown here and in the backend logs.");
+        return;
+      }
+
+      Alert.alert("Unable to Resend OTP", response?.message || "Please try again.");
+    } catch (error) {
+      Alert.alert("Unable to Resend OTP", error?.message || "Please try again.");
     } finally {
       setIsVerifyingAccount(false);
     }
@@ -1024,14 +1084,17 @@ export default function VisitorRegisterScreen({ navigation }) {
                 username: registeredVisitor.username,
                 email: registeredVisitor.email,
                 password: registeredVisitor.password,
-                verificationLink: registeredVisitor.verificationLink,
+                otpCode: registeredVisitor.otpCode,
               }
             : null
         }
         isVerified={Boolean(registeredVisitor?.isVerified)}
         isVerifying={isVerifyingAccount}
+        otpValue={registrationOtp}
+        onOtpChange={(value) => setRegistrationOtp(String(value || "").replace(/\D/g, "").slice(0, 6))}
         onConfirm={handleSuccessConfirm}
         onVerifySimulation={handleVerifySimulation}
+        onResendOtp={handleResendRegistrationOtp}
       />
     </SafeAreaView>
   );

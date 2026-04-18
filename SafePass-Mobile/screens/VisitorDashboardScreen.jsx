@@ -435,7 +435,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (!isNfcSupported) {
       Alert.alert(
         "NFC Not Supported",
-        "Your device doesn't support NFC. Please use the QR code or manual check-in."
+        "Your device doesn't support NFC. Please use the digital access card or manual check-in."
       );
       return false;
     }
@@ -1414,7 +1414,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     : isPendingStaffReview
       ? "Staff is evaluating your preferred schedule."
       : isApprovedVisitor
-        ? "Your pass, QR access, and NFC tools are active."
+        ? "Your pass and NFC tools are active."
         : canRequestNewAppointment
           ? "Use this site to request another appointment without registering again."
           : canCreateFreshAppointment
@@ -1869,14 +1869,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={visitorDashboardStyles.visitorFlowSecondaryButton}
-          onPress={onRefresh}
-          activeOpacity={0.86}
-        >
-          <Ionicons name="refresh-outline" size={18} color="#2563EB" />
-          <Text style={visitorDashboardStyles.visitorFlowSecondaryButtonText}>Refresh Status</Text>
-        </TouchableOpacity>
       </View>
     );
   };
@@ -2166,19 +2158,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </Text>
                 </TouchableOpacity>
 
-                {isApprovedVisitor ? (
-                  <TouchableOpacity
-                    style={[
-                      visitorDashboardStyles.commandSecondaryButton,
-                      commandActionButtonResponsiveStyle,
-                    ]}
-                    onPress={() => setShowQRModal(true)}
-                    activeOpacity={0.9}
-                  >
-                    <Ionicons name="qr-code-outline" size={18} color="#4F46E5" />
-                    <Text style={visitorDashboardStyles.commandSecondaryButtonText}>Show QR</Text>
-                  </TouchableOpacity>
-                ) : null}
               </View>
             ) : null}
           </View>
@@ -2385,7 +2364,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         Your SafePass is Ready
                       </Text>
                       <Text style={visitorDashboardStyles.approvedHeroSubtitle}>
-                        Present your QR code or use NFC at the gate when you arrive on campus.
+                        Open your digital access card or use NFC at the gate when you arrive on campus.
                       </Text>
                     </View>
                   </View>
@@ -2688,7 +2667,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 {[
                   "Bring the same ID you used during registration.",
                   "Arrive a few minutes before your scheduled visit time.",
-                  "Use your QR pass or NFC tap first before asking for manual assistance.",
+                  "Use your digital access card or NFC tap first before asking for manual assistance.",
                 ].map((tip) => (
                   <View key={tip} style={visitorDashboardStyles.approvedTipRow}>
                     <View style={visitorDashboardStyles.approvedTipBullet}>
@@ -2932,19 +2911,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
             {/* Quick Actions */}
             <View style={visitorDashboardStyles.quickActions}>
-              <TouchableOpacity 
-                style={visitorDashboardStyles.quickAction}
-                onPress={() => setShowQRModal(true)}
-              >
-                <LinearGradient
-                  colors={['#10B981', '#059669']}
-                  style={visitorDashboardStyles.quickActionGradient}
-                >
-                  <Ionicons name="qr-code" size={24} color="#FFFFFF" />
-                </LinearGradient>
-                <Text style={visitorDashboardStyles.quickActionText}>Show QR</Text>
-              </TouchableOpacity>
-
               {visitor.status !== 'checked_in' && visitor.status !== 'checked_out' && visitor.status === 'approved' && (
                 <TouchableOpacity 
                   style={visitorDashboardStyles.quickAction}
@@ -2974,19 +2940,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Text style={visitorDashboardStyles.quickActionText}>Check Out</Text>
                 </TouchableOpacity>
               )}
-
-              <TouchableOpacity 
-                style={visitorDashboardStyles.quickAction}
-                onPress={onRefresh}
-              >
-                <LinearGradient
-                  colors={['#6B7280', '#4B5563']}
-                  style={visitorDashboardStyles.quickActionGradient}
-                >
-                  <Ionicons name="refresh" size={24} color="#FFFFFF" />
-                </LinearGradient>
-                <Text style={visitorDashboardStyles.quickActionText}>Refresh</Text>
-              </TouchableOpacity>
             </View>
 
             {/* Campus Map Card */}
@@ -4195,7 +4148,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.qrFooter}>
                 <Ionicons name="shield-checkmark" size={14} color="#10B981" />
                 <Text style={visitorDashboardStyles.qrNote}>
-                  Show this QR code at the security gate
+                  Show this visitor pass at the security gate
                 </Text>
               </View>
             </View>

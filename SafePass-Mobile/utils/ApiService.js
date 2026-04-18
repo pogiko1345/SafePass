@@ -309,7 +309,7 @@ async register(userData) {
       if (error?.data?.requiresEmailVerification || error?.status === 403) {
         throw new Error(
           error?.data?.message ||
-            "Your account is not yet verified. Please verify your email first."
+            "Your account is not yet verified. Please verify your account using OTP first."
         );
       }
 
@@ -739,6 +739,30 @@ async verifyCredentials(email, password) {
       });
     } catch (error) {
       console.error("Email verification error:", error);
+      throw error;
+    }
+  }
+
+  async verifyRegistrationOtp(email, otpCode) {
+    try {
+      return await this.fetch("/auth/verify-registration-otp", {
+        method: "POST",
+        body: { email, otpCode },
+      });
+    } catch (error) {
+      console.error("Registration OTP verification error:", error);
+      throw error;
+    }
+  }
+
+  async resendRegistrationOtp(email) {
+    try {
+      return await this.fetch("/auth/resend-registration-otp", {
+        method: "POST",
+        body: { email },
+      });
+    } catch (error) {
+      console.error("Registration OTP resend error:", error);
       throw error;
     }
   }
