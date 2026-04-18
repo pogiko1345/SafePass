@@ -1059,6 +1059,160 @@ export default StyleSheet.create({
     color: colors.secondaryDark,
   },
 
+  appointmentRecordsTable: {
+    minWidth: isSmallPhone ? 980 : 1080,
+    width: "100%",
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 18,
+    overflow: "hidden",
+    marginBottom: spacing.xl,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+      web: {
+        boxShadow: "0px 8px 24px rgba(15, 23, 42, 0.06)",
+      },
+    }),
+  },
+
+  appointmentRecordsTableRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    minHeight: 74,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+    backgroundColor: colors.white,
+    ...webHover({
+      cursor: "pointer",
+      transition: "background-color 0.2s ease",
+      ":hover": {
+        backgroundColor: colors.gray[50],
+      },
+    }),
+  },
+
+  appointmentRecordsTableHeader: {
+    minHeight: 48,
+    backgroundColor: colors.gray[900],
+    borderBottomWidth: 0,
+  },
+
+  appointmentRecordsHeaderCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.white,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  appointmentRecordsCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    justifyContent: "center",
+  },
+
+  appointmentRecordsVisitorCell: {
+    width: 220,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  appointmentRecordsPurposeCell: {
+    width: 150,
+  },
+
+  appointmentRecordsOfficeCell: {
+    width: 170,
+  },
+
+  appointmentRecordsScheduleCell: {
+    width: 145,
+  },
+
+  appointmentRecordsContactCell: {
+    width: 220,
+  },
+
+  appointmentRecordsStatusCell: {
+    width: 130,
+  },
+
+  appointmentRecordsActionCell: {
+    width: 105,
+    alignItems: "center",
+  },
+
+  appointmentRecordsAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    backgroundColor: colors.gray[100],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+  },
+
+  appointmentRecordsAvatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  appointmentRecordsVisitorInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  appointmentRecordsPrimaryText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[900],
+  },
+
+  appointmentRecordsMutedText: {
+    marginTop: 3,
+    fontSize: fontSize.xs,
+    fontWeight: "500",
+    color: colors.gray[500],
+  },
+
+  appointmentRecordsViewButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    backgroundColor: colors.secondarySoft,
+    borderWidth: 1,
+    borderColor: colors.secondaryLight,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      ":hover": {
+        backgroundColor: colors.secondaryLight,
+      },
+    }),
+  },
+
+  appointmentRecordsViewButtonText: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.secondary,
+  },
+
   // ============ UPCOMING BANNER ============
   upcomingBanner: {
     backgroundColor: colors.secondarySoft,

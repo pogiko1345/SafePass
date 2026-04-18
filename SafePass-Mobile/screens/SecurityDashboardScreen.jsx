@@ -1662,9 +1662,22 @@ export default function SecurityDashboardScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* Appointment Record Cards */}
+        {/* Appointment Records Table */}
         {getFilteredVisitors().length > 0 ? (
-          getFilteredVisitors().map((visitor) => renderAppointmentRecordCard(visitor))
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.appointmentRecordsTable}>
+              <View style={[styles.appointmentRecordsTableRow, styles.appointmentRecordsTableHeader]}>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsVisitorCell]}>Visitor</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsPurposeCell]}>Purpose</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsOfficeCell]}>Office / Host</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsScheduleCell]}>Schedule</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsContactCell]}>Contact</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsStatusCell]}>Status</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsActionCell]}>Action</Text>
+              </View>
+              {getFilteredVisitors().map((visitor) => renderAppointmentRecordRow(visitor))}
+            </View>
+          </ScrollView>
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
@@ -2476,6 +2489,90 @@ export default function SecurityDashboardScreen({ navigation }) {
           >
             <Ionicons name="eye-outline" size={18} color="#0A3D91" />
             <Text style={styles.readonlyRecordActionText}>View Record</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderAppointmentRecordRow = (visitor) => {
+    const statusBadge = getStatusBadge(visitor);
+    const scheduleDate = formatDate(visitor.visitDate);
+    const scheduleTime = visitor.visitTime ? formatTime(visitor.visitTime) : 'No time';
+
+    return (
+      <TouchableOpacity
+        key={visitor._id}
+        style={styles.appointmentRecordsTableRow}
+        onPress={() => handleViewDetails(visitor)}
+        activeOpacity={0.75}
+      >
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsVisitorCell]}>
+          <View style={styles.appointmentRecordsAvatar}>
+            {visitor.idImage ? (
+              <Image source={{ uri: visitor.idImage }} style={styles.appointmentRecordsAvatarImage} />
+            ) : (
+              <Ionicons name="person-outline" size={16} color="#64748B" />
+            )}
+          </View>
+          <View style={styles.appointmentRecordsVisitorInfo}>
+            <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={1}>
+              {visitor.fullName || 'Unnamed Visitor'}
+            </Text>
+            <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
+              ID: {visitor.idNumber || 'Not provided'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsPurposeCell]}>
+          <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={2}>
+            {visitor.purposeOfVisit || 'No purpose'}
+          </Text>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsOfficeCell]}>
+          <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={1}>
+            {visitor.assignedOffice || visitor.appointmentDepartment || 'Campus access'}
+          </Text>
+          <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
+            Host: {visitor.host || visitor.assignedStaffName || 'N/A'}
+          </Text>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsScheduleCell]}>
+          <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={1}>
+            {scheduleDate}
+          </Text>
+          <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
+            {scheduleTime}
+          </Text>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsContactCell]}>
+          <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={1}>
+            {visitor.phoneNumber || 'No phone'}
+          </Text>
+          <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
+            {visitor.email || 'No email'}
+          </Text>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsStatusCell]}>
+          <View style={[styles.statusBadge, { backgroundColor: statusBadge.bg }]}>
+            <Text style={[styles.statusBadgeText, { color: statusBadge.text }]}>
+              {statusBadge.label}
+            </Text>
+          </View>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsActionCell]}>
+          <TouchableOpacity
+            style={styles.appointmentRecordsViewButton}
+            onPress={() => handleViewDetails(visitor)}
+          >
+            <Ionicons name="eye-outline" size={16} color="#0A3D91" />
+            <Text style={styles.appointmentRecordsViewButtonText}>View</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
