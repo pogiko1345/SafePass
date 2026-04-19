@@ -4181,6 +4181,25 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       },
     });
 
+    await createRoleNotification({
+      title: "Appointment Request Queued",
+      message: `${visitor.fullName} requested an appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}. Security will handle gate entry after staff approval.`,
+      type: "info",
+      severity: "low",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: user._id,
+      metadata: {
+        activityType: "visitor_appointment_request",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
+        pendingStaffApproval: true,
+      },
+    });
+
     await createSystemActivity({
       actorUser: user,
       relatedVisitor: visitor,
