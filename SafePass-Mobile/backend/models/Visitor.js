@@ -827,14 +827,12 @@ visitorSchema.statics = {
 
 // ============ Middleware ============
 // Update timestamp on save
-visitorSchema.pre('save', function(next) {
+visitorSchema.pre('save', function() {
   this.updatedAt = new Date();
-  next();
 });
 
-visitorSchema.pre('save', function(next) {
+visitorSchema.pre('save', function() {
   this.syncWorkflowState();
-  next();
 });
 
 // ============ Ensure Virtuals are Included in JSON ============
