@@ -24,6 +24,11 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as LocalAuthentication from "expo-local-authentication";
 import ApiService from "../utils/ApiService";
+import {
+  PHILIPPINE_MOBILE_NUMBER_MESSAGE,
+  isValidPhilippineMobileNumber,
+  normalizePhilippineMobileNumber,
+} from "../utils/phoneValidation";
 
 const Storage =
   Platform.OS === "web" ? require("../utils/webStorage").default : AsyncStorage;
@@ -280,13 +285,18 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   };
   const handleSave = async () => {
     if (!editedProfile) return;
+    if (editedProfile.phone && !isValidPhilippineMobileNumber(editedProfile.phone)) {
+      Alert.alert("Invalid Contact Number", PHILIPPINE_MOBILE_NUMBER_MESSAGE);
+      return;
+    }
+
     setIsSaving(true);
     try {
       const updates = {
         firstName: editedProfile.firstName || "",
         lastName: editedProfile.lastName || "",
         email: editedProfile.email || "",
-        phone: editedProfile.phone || "",
+        phone: editedProfile.phone ? normalizePhilippineMobileNumber(editedProfile.phone) : "",
         emergencyContact: editedProfile.emergencyContact || "",
         profilePhoto: editedProfile.profilePhoto || null,
       };
@@ -509,8 +519,9 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     ? "email-address"
                     : "default"
               }
-              placeholder={`Enter ${label.toLowerCase()}`}
+              placeholder={key === "phone" ? "09123456789" : `Enter ${label.toLowerCase()}`}
               placeholderTextColor="#94A3B8"
+              maxLength={key === "phone" ? 16 : undefined}
             />
           ) : (
             <Text style={styles.fieldValue}>

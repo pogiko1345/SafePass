@@ -25,6 +25,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import ApiService from "../utils/ApiService";
 import { canAccessSecurityDashboard, normalizeRole } from "../utils/authFlow";
+import {
+  PHILIPPINE_MOBILE_NUMBER_MESSAGE,
+  isValidPhilippineMobileNumber,
+  normalizePhilippineMobileNumber,
+} from "../utils/phoneValidation";
 import styles from "../styles/SecurityDashboardStyles";
 
 // Import map components
@@ -984,6 +989,11 @@ export default function SecurityDashboardScreen({ navigation }) {
       return;
     }
 
+    if (!isValidPhilippineMobileNumber(normalizedPhone)) {
+      Alert.alert("Invalid Contact Number", PHILIPPINE_MOBILE_NUMBER_MESSAGE);
+      return;
+    }
+
     if (!newVisitor.idPhotoUri) {
       Alert.alert("Error", "Please upload a photo of the visitor's ID");
       return;
@@ -1009,7 +1019,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     try {
       const visitorData = {
         fullName: normalizedFullName,
-        phoneNumber: normalizedPhone,
+        phoneNumber: normalizePhilippineMobileNumber(normalizedPhone),
         email: normalizedEmail,
         idNumber: normalizedIdNumber,
         purposeOfVisit: normalizedPurpose,
@@ -2947,11 +2957,12 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Text style={styles.inputLabel}>Phone Number *</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="0912 345 6789"
+                  placeholder="09123456789"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="phone-pad"
                   value={newVisitor.phoneNumber}
                   onChangeText={(text) => setNewVisitor({...newVisitor, phoneNumber: text})}
+                  maxLength={16}
                 />
               </View>
 

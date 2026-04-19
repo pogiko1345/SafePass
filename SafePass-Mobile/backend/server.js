@@ -839,10 +839,21 @@ const isAllowedOption = (value, options) => {
   return options.some((option) => normalizeOptionValue(option) === normalizedValue);
 };
 
-const normalizePhoneValue = (value = "") => String(value || "").trim().replace(/\s+/g, " ");
+const normalizePhoneValue = (value = "") => {
+  const digits = String(value || "").replace(/\D/g, "");
+
+  if (/^09\d{9}$/.test(digits)) return digits;
+  if (/^639\d{9}$/.test(digits)) return `0${digits.slice(2)}`;
+  if (/^9\d{9}$/.test(digits)) return `0${digits}`;
+
+  return String(value || "").trim().replace(/\s+/g, " ");
+};
 
 const isValidPhoneValue = (value = "") =>
-  String(value || "").replace(/[^\d+]/g, "").length >= 7;
+  /^09\d{9}$/.test(normalizePhoneValue(value));
+
+const PHONE_VALIDATION_MESSAGE =
+  "Please enter a valid Philippine mobile number, e.g. 09123456789 or +639123456789.";
 
 const isSameObjectId = (left, right) =>
   Boolean(left && right && String(left) === String(right));
@@ -989,6 +1000,14 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
+    const normalizedPhone = normalizePhoneValue(phone);
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        error: PHONE_VALIDATION_MESSAGE,
+        field: "phone",
+      });
+    }
+
     // Check if user already exists
     const duplicateChecks = [{ email: normalizedEmail }];
     if (normalizedUsername) {
@@ -1036,7 +1055,7 @@ const userData = {
   username: normalizedUsername || undefined,
   email: normalizedEmail,
   password,
-  phone,
+  phone: normalizedPhone,
   role: role || 'visitor',
   nfcCardId,
   employeeId: employeeId || undefined,
@@ -1796,16 +1815,17 @@ app.post("/api/visitors/register", async (req, res) => {
     const normalizedFullName = String(visitorData.fullName || "").trim();
     const normalizedEmail = normalizeEmailValue(visitorData.email);
     const normalizedUsername = normalizeUsernameValue(visitorData.username);
+    const normalizedPhone = normalizePhoneValue(visitorData.phone || visitorData.phoneNumber);
     const password = String(visitorData.password || "");
     const dataPrivacyAccepted = visitorData.privacyAccepted === true;
     const dataPrivacyAcceptedAt = visitorData.privacyAcceptedAt
       ? new Date(visitorData.privacyAcceptedAt)
       : new Date();
 
-    if (!normalizedFullName || !normalizedEmail || !normalizedUsername || !password) {
+    if (!normalizedFullName || !normalizedEmail || !normalizedUsername || !normalizedPhone || !password) {
       return res.status(400).json({
         success: false,
-        message: "Full name, email, username, and password are required.",
+        message: "Full name, email, username, contact number, and password are required.",
       });
     }
 
@@ -1820,6 +1840,14 @@ app.post("/api/visitors/register", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Password must be at least 6 characters long.",
+      });
+    }
+
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: PHONE_VALIDATION_MESSAGE,
+        field: "phone",
       });
     }
 
@@ -1858,7 +1886,7 @@ app.post("/api/visitors/register", async (req, res) => {
       username: normalizedUsername,
       email: normalizedEmail,
       password,
-      phone: "",
+      phone: normalizedPhone,
       role: "visitor",
       status: "active",
       isVerified: false,
@@ -2384,7 +2412,7 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
     if (!isValidPhoneValue(normalizedPhone)) {
       return res.status(400).json({
         success: false,
-        message: "Please enter a valid contact number.",
+        message: PHONE_VALIDATION_MESSAGE,
         field: "phone",
       });
     }
@@ -2559,7 +2587,7 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
     if (!isValidPhoneValue(normalizedPhone)) {
       return res.status(400).json({
         success: false,
-        message: "Please enter a valid contact number.",
+        message: PHONE_VALIDATION_MESSAGE,
         field: "phone",
       });
     }
@@ -5543,7 +5571,7 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       if (updates.phone && !isValidPhoneValue(updates.phone)) {
         return res.status(400).json({
           success: false,
-          message: "Please enter a valid contact number.",
+          message: PHONE_VALIDATION_MESSAGE,
           field: "phone",
         });
       }

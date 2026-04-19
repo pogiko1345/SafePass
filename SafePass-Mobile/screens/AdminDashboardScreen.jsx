@@ -30,6 +30,11 @@ import {
   MONITORING_MAP_OFFICES,
   MONITORING_MAP_OFFICE_POSITIONS,
 } from "../utils/monitoringMapConfig";
+import {
+  PHILIPPINE_MOBILE_NUMBER_MESSAGE,
+  isValidPhilippineMobileNumber,
+  normalizePhilippineMobileNumber,
+} from "../utils/phoneValidation";
 import styles from "../styles/AdminDashboardStyles";
 
 const { width, height } = Dimensions.get("window");
@@ -2561,7 +2566,12 @@ const loadDashboardData = useCallback(async () => {
     if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       nextErrors.email = "Enter a valid email address.";
     }
-    if (!String(newUserData.phone || "").trim()) nextErrors.phone = "Contact number is required.";
+    const normalizedPhone = normalizePhilippineMobileNumber(newUserData.phone);
+    if (!String(newUserData.phone || "").trim()) {
+      nextErrors.phone = "Contact number is required.";
+    } else if (!isValidPhilippineMobileNumber(newUserData.phone)) {
+      nextErrors.phone = PHILIPPINE_MOBILE_NUMBER_MESSAGE;
+    }
 
     if (!isSecurityAccount) {
       if (!normalizedUsername) nextErrors.username = "Username is required.";
@@ -2632,6 +2642,7 @@ const loadDashboardData = useCallback(async () => {
       isValid: Object.keys(nextErrors).length === 0,
       normalizedEmail,
       normalizedUsername,
+      normalizedPhone,
     };
   };
 
@@ -2733,7 +2744,12 @@ const loadDashboardData = useCallback(async () => {
   // FIXED: Handle Create User
   const handleCreateUser = async () => {
     if (!ensureAdminAccess()) return;
-    const { isValid, normalizedEmail, normalizedUsername } = validateCreateUserForm();
+    const {
+      isValid,
+      normalizedEmail,
+      normalizedUsername,
+      normalizedPhone,
+    } = validateCreateUserForm();
     if (!isValid) {
       Alert.alert("Validation Error", "Please review the highlighted fields before creating the account.");
       return;
@@ -2753,7 +2769,7 @@ const loadDashboardData = useCallback(async () => {
         username: normalizedUsername || undefined,
         email: normalizedEmail,
         password: generatedPassword,
-        phone: newUserData.phone.trim(),
+        phone: normalizedPhone,
         role: newUserData.role,
         status: newUserData.status || "active",
         isActive: (newUserData.status || "active") === "active",
@@ -2918,6 +2934,11 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
 
+    if (!isValidPhilippineMobileNumber(editUserData.phone)) {
+      Alert.alert("Invalid Contact Number", PHILIPPINE_MOBILE_NUMBER_MESSAGE);
+      return;
+    }
+
     if (!isEditingSecurity && !String(editUserData.department || "").trim()) {
       Alert.alert("Missing Department", "Department is required for staff accounts.");
       return;
@@ -2969,7 +2990,7 @@ const loadDashboardData = useCallback(async () => {
         lastName: editUserData.lastName,
         username: normalizedUsername,
         email: normalizedEmail,
-        phone: editUserData.phone,
+        phone: normalizePhilippineMobileNumber(editUserData.phone),
         role: editUserData.role,
         department: editUserData.department,
         position: editUserData.position,
@@ -4522,8 +4543,9 @@ const loadDashboardData = useCallback(async () => {
                         setNewUserData((currentValue) => ({ ...currentValue, phone: text }));
                         setCreateUserErrors((currentValue) => ({ ...currentValue, phone: null }));
                       }}
-                      placeholder="Enter contact number"
+                      placeholder="09123456789"
                       keyboardType="phone-pad"
+                      maxLength={16}
                       placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                     />
                     {renderCreateUserFieldError("phone")}
@@ -7991,8 +8013,9 @@ const loadDashboardData = useCallback(async () => {
                       style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
                       value={editUserData.phone}
                       onChangeText={(text) => setEditUserData({ ...editUserData, phone: text })}
-                      placeholder="Phone"
+                      placeholder="09123456789"
                       keyboardType="phone-pad"
+                      maxLength={16}
                       placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                     />
                   </View>

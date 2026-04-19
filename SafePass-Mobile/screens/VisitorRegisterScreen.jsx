@@ -27,6 +27,11 @@ import {
   MONITORING_MAP_FLOORS,
   MONITORING_MAP_OFFICES,
 } from "../utils/monitoringMapConfig";
+import {
+  PHILIPPINE_MOBILE_NUMBER_MESSAGE,
+  isValidPhilippineMobileNumber,
+  normalizePhilippineMobileNumber,
+} from "../utils/phoneValidation";
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== "web") {
@@ -426,12 +431,14 @@ export default function VisitorRegisterScreen({ navigation }) {
     fullName: "",
     email: "",
     username: "",
+    phone: "",
     password: "",
   });
   const [errors, setErrors] = useState({
     fullName: "",
     email: "",
     username: "",
+    phone: "",
     password: "",
   });
   const [focusedField, setFocusedField] = useState(null);
@@ -481,6 +488,12 @@ export default function VisitorRegisterScreen({ navigation }) {
     return "";
   };
 
+  const validatePhone = (phone) => {
+    if (!String(phone || "").trim()) return "Contact number is required";
+    if (!isValidPhilippineMobileNumber(phone)) return PHILIPPINE_MOBILE_NUMBER_MESSAGE;
+    return "";
+  };
+
   const validatePassword = (password) => {
     if (!password) return "Password is required";
     if (password.length < 6) return "Password must be at least 6 characters";
@@ -508,6 +521,9 @@ export default function VisitorRegisterScreen({ navigation }) {
     } else if (field === "username") {
       nextValue = value.replace(/\s+/g, "").toLowerCase();
       error = validateUsername(nextValue);
+    } else if (field === "phone") {
+      nextValue = value.replace(/[^\d+\s-]/g, "");
+      error = validatePhone(nextValue);
     } else if (field === "password") {
       error = validatePassword(nextValue);
     }
@@ -525,6 +541,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       fullName: validateName(formData.fullName),
       email: validateEmail(formData.email),
       username: validateUsername(formData.username),
+      phone: validatePhone(formData.phone),
       password: validatePassword(formData.password),
     };
 
@@ -534,6 +551,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       fullName: "Full Name",
       email: "Email",
       username: "Username",
+      phone: "Contact Number",
       password: "Password",
     };
 
@@ -585,6 +603,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         fullName: formData.fullName,
         email: formData.email,
         username: formData.username,
+        phone: normalizePhilippineMobileNumber(formData.phone),
         password: formData.password,
         privacyAccepted: true,
         privacyAcceptedAt: new Date().toISOString(),
@@ -763,6 +782,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     completedFields.fullName,
     completedFields.email,
     completedFields.username,
+    completedFields.phone,
     completedFields.password,
   ].filter(Boolean).length;
 
@@ -788,6 +808,14 @@ export default function VisitorRegisterScreen({ navigation }) {
       icon: "at",
       placeholder: "Choose a username",
       keyboard: "default",
+      autoCapitalize: "none",
+      secureTextEntry: false,
+    },
+    phone: {
+      label: "Contact Number",
+      icon: "call",
+      placeholder: "09123456789",
+      keyboard: "phone-pad",
       autoCapitalize: "none",
       secureTextEntry: false,
     },
@@ -817,7 +845,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       </View>
       <View style={visitorRegisterStyles.stepInsightStats}>
         <View style={visitorRegisterStyles.stepInsightStat}>
-          <Text style={visitorRegisterStyles.stepInsightStatValue}>{completionCount}/4</Text>
+          <Text style={visitorRegisterStyles.stepInsightStatValue}>{completionCount}/5</Text>
           <Text style={visitorRegisterStyles.stepInsightStatLabel}>Complete</Text>
         </View>
         <View style={visitorRegisterStyles.stepInsightDivider} />
@@ -1022,6 +1050,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                         keyboardType={config.keyboard}
                         autoCapitalize={config.autoCapitalize}
                         secureTextEntry={config.secureTextEntry}
+                        maxLength={field === "phone" ? 16 : undefined}
                       />
                     </View>
                     {errors[field] && (
