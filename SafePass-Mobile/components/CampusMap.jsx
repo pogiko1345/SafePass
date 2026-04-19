@@ -12,7 +12,6 @@ import {
   PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import FloorBlueprintDiagram from "./FloorBlueprintDiagram";
 import styles from "../styles/CampusMapStyles";
 
 const { width, height } = Dimensions.get("window");
@@ -483,8 +482,8 @@ const CampusMap = ({
     floorPlanImage &&
     typeof floorPlanImage === "object" &&
     floorPlanImage.type === "diagram";
-  const hasBlueprint = floorPlanImage !== null && (isDiagramBlueprint || !imageError);
-  const shouldShowOfficeLabels = !hasBlueprint || isDiagramBlueprint;
+  const hasBlueprint = floorPlanImage !== null && !isDiagramBlueprint && !imageError;
+  const shouldShowOfficeLabels = !hasBlueprint;
   const visibleVisitors = getVisibleVisitors();
 
   return (
@@ -513,16 +512,12 @@ const CampusMap = ({
         >
           {/* Floor Plan Image or Placeholder */}
           {hasBlueprint ? (
-            isDiagramBlueprint ? (
-              <FloorBlueprintDiagram floorId={floorPlanImage.floorId} />
-            ) : (
-              <Image
-                source={floorPlanImage}
-                style={styles.floorPlanImage}
-                resizeMode="contain"
-                onError={() => setImageError(true)}
-              />
-            )
+            <Image
+              source={floorPlanImage}
+              style={styles.floorPlanImage}
+              resizeMode="contain"
+              onError={() => setImageError(true)}
+            />
           ) : (
             <View style={styles.floorPlanPlaceholder}>
               <View style={styles.floorPlanContent}>

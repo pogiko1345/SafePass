@@ -1,4 +1,7 @@
+const GROUND_FLOOR_BLUEPRINT = require("../assets/maps/GroundFloor.png");
 const MEZZANINE_BLUEPRINT = require("../assets/maps/Mezzanine.png");
+const SECOND_FLOOR_BLUEPRINT = require("../assets/maps/SecondFloor.png");
+const THIRD_FLOOR_BLUEPRINT = require("../assets/maps/ThridFloor.png");
 
 export const MONITORING_MAP_FLOORS = [
   { id: "ground", name: "Ground Floor", icon: "home-outline" },
@@ -23,9 +26,11 @@ export const MONITORING_MAP_OFFICES = [
 ];
 
 export const MONITORING_MAP_BLUEPRINTS = {
-  ground: { type: "diagram", floorId: "ground" },
+  ground: GROUND_FLOOR_BLUEPRINT,
   first: MEZZANINE_BLUEPRINT,
   mezzanine: MEZZANINE_BLUEPRINT,
+  second: SECOND_FLOOR_BLUEPRINT,
+  third: THIRD_FLOOR_BLUEPRINT,
 };
 
 export const MONITORING_MAP_OFFICE_POSITIONS = {
