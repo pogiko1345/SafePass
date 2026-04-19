@@ -697,6 +697,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const mainScrollViewRef = useRef(null);
   const sidebarScrollViewRef = useRef(null);
+  const dataManagementScrollViewRef = useRef(null);
   const authErrorHandledRef = useRef(false);
   const adminMapRefreshRef = useRef(false);
 
@@ -808,11 +809,15 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [userDepartmentFilter, setUserDepartmentFilter] = useState("all");
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [userDataPanelMode, setUserDataPanelMode] = useState(null);
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
+  const [dataManagementPage, setDataManagementPage] = useState(1);
+  const [dataManagementFieldPage, setDataManagementFieldPage] = useState(1);
+  const [dataManagementItemsPerPage] = useState(6);
 
   // Modal States
   const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
@@ -1276,6 +1281,122 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     ];
   }, [scopedUsers]);
 
+  const dataManagementDepartmentFilterOptions = useMemo(() => {
+    const departmentMap = new Map();
+    allUsers.forEach((userItem) => {
+      const label = userItem.department || "General";
+      const key = normalizeFilterValue(label);
+      departmentMap.set(key, {
+        key,
+        label,
+        count: (departmentMap.get(key)?.count || 0) + 1,
+        icon: "business-outline",
+      });
+    });
+    return [
+      { key: "all", label: "All Departments", count: allUsers.length, icon: "apps-outline" },
+      ...Array.from(departmentMap.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(0, 10),
+    ];
+  }, [allUsers]);
+
+  const dataManagementUsers = useMemo(() => {
+    let filtered = [...allUsers];
+
+    if (userFilter !== "all" && userFilter !== "active" && userFilter !== "inactive") {
+      if (userFilter === "security") {
+        filtered = filtered.filter((userItem) => isSecurityRole(userItem.role));
+      } else {
+        filtered = filtered.filter((userItem) => userItem.role === userFilter);
+      }
+    }
+
+    if (userFilter === "active") {
+      filtered = filtered.filter((userItem) => isUserActive(userItem));
+    }
+
+    if (userFilter === "inactive") {
+      filtered = filtered.filter((userItem) => !isUserActive(userItem));
+    }
+
+    if (userDepartmentFilter !== "all") {
+      filtered = filtered.filter(
+        (userItem) => normalizeFilterValue(userItem.department || "General") === userDepartmentFilter,
+      );
+    }
+
+    if (userSearchQuery.trim()) {
+      const query = userSearchQuery.trim().toLowerCase();
+      filtered = filtered.filter((userItem) => {
+        const fullName = `${userItem.firstName || ""} ${userItem.lastName || ""}`.trim().toLowerCase();
+        return (
+          fullName.includes(query) ||
+          String(userItem.username || "").toLowerCase().includes(query) ||
+          String(userItem.email || "").toLowerCase().includes(query) ||
+          String(userItem.phone || "").includes(query) ||
+          String(userItem.department || "").toLowerCase().includes(query) ||
+          String(userItem.employeeId || "").toLowerCase().includes(query) ||
+          String(userItem.role || "").toLowerCase().includes(query)
+        );
+      });
+    }
+
+    return filtered.sort((a, b) => {
+      const nameA = `${a?.firstName || ""} ${a?.lastName || ""}`.trim().toLowerCase();
+      const nameB = `${b?.firstName || ""} ${b?.lastName || ""}`.trim().toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }, [allUsers, userDepartmentFilter, userFilter, userSearchQuery]);
+
+  const dataManagementTotalPages = Math.max(
+    1,
+    Math.ceil(dataManagementUsers.length / dataManagementItemsPerPage),
+  );
+  const paginatedDataManagementUsers = useMemo(
+    () =>
+      dataManagementUsers.slice(
+        (dataManagementPage - 1) * dataManagementItemsPerPage,
+        dataManagementPage * dataManagementItemsPerPage,
+      ),
+    [dataManagementItemsPerPage, dataManagementPage, dataManagementUsers],
+  );
+  const dataManagementVisibleStart =
+    dataManagementUsers.length === 0
+      ? 0
+      : (dataManagementPage - 1) * dataManagementItemsPerPage + 1;
+  const dataManagementVisibleEnd = Math.min(
+    dataManagementPage * dataManagementItemsPerPage,
+    dataManagementUsers.length,
+  );
+  const fieldSetupTotalPages = Math.max(
+    1,
+    Math.ceil(dataCollectionFields.length / dataManagementItemsPerPage),
+  );
+  const paginatedDataCollectionFields = useMemo(
+    () =>
+      dataCollectionFields.slice(
+        (dataManagementFieldPage - 1) * dataManagementItemsPerPage,
+        dataManagementFieldPage * dataManagementItemsPerPage,
+      ),
+    [dataCollectionFields, dataManagementFieldPage, dataManagementItemsPerPage],
+  );
+  const fieldSetupVisibleStart =
+    dataCollectionFields.length === 0
+      ? 0
+      : (dataManagementFieldPage - 1) * dataManagementItemsPerPage + 1;
+  const fieldSetupVisibleEnd = Math.min(
+    dataManagementFieldPage * dataManagementItemsPerPage,
+    dataCollectionFields.length,
+  );
+  const dataManagementRoleFilters = [
+    { key: "all", label: "All", count: allUsers.length, icon: "apps-outline" },
+    { key: "staff", label: "Staff", count: staffUsers.length, icon: "briefcase-outline" },
+    { key: "security", label: "Security", count: guardUsers.length, icon: "shield-outline" },
+    { key: "admin", label: "Admin", count: allUsers.filter((userItem) => userItem.role === "admin").length, icon: "person-circle-outline" },
+    { key: "visitor", label: "Visitor", count: allUsers.filter((userItem) => userItem.role === "visitor").length, icon: "person-outline" },
+    { key: "active", label: "Active", count: allUsers.filter((userItem) => isUserActive(userItem)).length, icon: "checkmark-circle-outline" },
+    { key: "inactive", label: "Inactive", count: allUsers.filter((userItem) => !isUserActive(userItem)).length, icon: "pause-circle-outline" },
+  ];
+
   const dateShortcutFilters = [
     { key: "all", label: "Any Date", icon: "calendar-outline" },
     { key: "today", label: "Today", icon: "today-outline" },
@@ -1340,11 +1461,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         };
       case "data-management":
         return {
-          title: "Data Management",
-          subtitle: "Adjust the data collection fields that shape future admin and visitor workflows.",
+          title: "User Data Management",
+          subtitle: "Select an account, review its details, and edit the user data that drives role-based access.",
           highlights: [
-            { label: "Fields", value: dataCollectionFields.length, icon: "list-outline", color: "#3B82F6" },
-            { label: "Required", value: dataCollectionFields.filter((field) => field.required).length, icon: "checkmark-circle-outline", color: "#F59E0B" },
+            { label: "Users", value: allUsers.length, icon: "people-outline", color: "#3B82F6" },
+            { label: "Active", value: allUsers.filter((userItem) => isUserActive(userItem)).length, icon: "checkmark-circle-outline", color: "#10B981" },
           ],
         };
       case "map-ground":
@@ -1407,6 +1528,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
   }, [
     accountRecordsMode,
+    allUsers.length,
     appointmentRecords.length,
     appointmentRequests.length,
     approvedRequests.length,
@@ -1437,7 +1559,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         submodules: [
           { key: "account-create", label: "Creation of Account", badge: 3 },
           { key: "account-records", label: "Account Records", badge: allUsers.length },
-          { key: "data-management", label: "Data Management", badge: dataCollectionFields.length },
+          { key: "data-management", label: "User Data Management", badge: allUsers.length },
         ],
       },
       {
@@ -1860,6 +1982,18 @@ const loadDashboardData = useCallback(async () => {
   }, [getFilteredUsersCount, currentPage, itemsPerPage]);
 
   useEffect(() => {
+    if (dataManagementPage > dataManagementTotalPages) {
+      setDataManagementPage(dataManagementTotalPages);
+    }
+  }, [dataManagementPage, dataManagementTotalPages]);
+
+  useEffect(() => {
+    if (dataManagementFieldPage > fieldSetupTotalPages) {
+      setDataManagementFieldPage(fieldSetupTotalPages);
+    }
+  }, [dataManagementFieldPage, fieldSetupTotalPages]);
+
+  useEffect(() => {
     if (!createUserMessage) return;
     const timer = setTimeout(() => setCreateUserMessage(""), 5000);
     return () => clearTimeout(timer);
@@ -1870,6 +2004,16 @@ const loadDashboardData = useCallback(async () => {
     const timer = setTimeout(() => setAdminNotice(null), 5000);
     return () => clearTimeout(timer);
   }, [adminNotice]);
+
+  useEffect(() => {
+    if (selectedSubmodule !== "data-management" || !userDataPanelMode) return undefined;
+
+    const timer = setTimeout(() => {
+      dataManagementScrollViewRef.current?.scrollToEnd?.({ animated: true });
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [selectedSubmodule, userDataPanelMode, selectedUser]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -2288,6 +2432,13 @@ const loadDashboardData = useCallback(async () => {
     if (submoduleKey === "data-management") {
       setEditingFieldId(null);
       setFieldDraft(createFieldDraft());
+      setUserFilter("all");
+      setUserDepartmentFilter("all");
+      setUserSearchTerm("");
+      setUserSearchQuery("");
+      setDataManagementPage(1);
+      setDataManagementFieldPage(1);
+      setUserDataPanelMode(null);
     }
 
     if (submoduleKey === "account-create") {
@@ -2887,11 +3038,19 @@ const loadDashboardData = useCallback(async () => {
       status: userItem.status || "active",
       isActive: userItem.isActive !== false,
     });
+    if (selectedSubmodule === "data-management") {
+      setUserDataPanelMode("edit");
+      return;
+    }
     setShowEditUserModal(true);
   };
 
   const handleViewUser = (userItem) => {
     setSelectedUser(userItem);
+    if (selectedSubmodule === "data-management") {
+      setUserDataPanelMode("view");
+      return;
+    }
     setShowViewUserModal(true);
   };
 
@@ -3026,6 +3185,9 @@ const loadDashboardData = useCallback(async () => {
         );
         Alert.alert("Success", "User has been updated successfully!");
         setShowEditUserModal(false);
+        if (userDataPanelMode === "edit") {
+          setUserDataPanelMode("view");
+        }
       } else {
         Alert.alert("Error", response?.message || "Failed to update user");
       }
@@ -3363,6 +3525,7 @@ const loadDashboardData = useCallback(async () => {
     keyExtractor,
     emptyTitle = "No records found",
     emptySubtitle = "There is nothing to display in this table yet.",
+    minTableHeight,
   }) => {
     const availableTableWidth = Platform.OS === "web"
       ? Math.max(620, width - 340)
@@ -3397,8 +3560,28 @@ const loadDashboardData = useCallback(async () => {
     }
 
     return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.adminTableScroll}>
-        <View style={[styles.adminTable, { width: availableTableWidth, minWidth: availableTableWidth }]}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[
+          styles.adminTableScroll,
+          minTableHeight ? { minHeight: minTableHeight } : null,
+        ]}
+        contentContainerStyle={[
+          styles.adminTableScrollContent,
+          minTableHeight ? { minHeight: minTableHeight } : null,
+        ]}
+      >
+        <View
+          style={[
+            styles.adminTable,
+            {
+              width: availableTableWidth,
+              minWidth: availableTableWidth,
+              minHeight: minTableHeight || undefined,
+            },
+          ]}
+        >
           <View style={[styles.adminTableHeaderRow, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
             {columns.map((column) => (
               <View key={column.key} style={[styles.adminTableCell, styles.adminTableHeaderCell, getColumnStyle(column)]}>
@@ -4237,6 +4420,7 @@ const loadDashboardData = useCallback(async () => {
             setDataCollectionFields((currentFields) =>
               currentFields.filter((item) => item.id !== field.id),
             );
+            setDataManagementFieldPage(1);
             if (editingFieldId === field.id) {
               resetFieldEditor();
             }
@@ -4271,6 +4455,7 @@ const loadDashboardData = useCallback(async () => {
       return [...currentFields, nextField];
     });
 
+    setDataManagementFieldPage(1);
     resetFieldEditor();
   };
 
@@ -4762,16 +4947,571 @@ const loadDashboardData = useCallback(async () => {
     );
   };
 
+  const renderUserDataPanel = () => {
+    if (!userDataPanelMode || !selectedUser) return null;
+
+    const isEditing = userDataPanelMode === "edit";
+    const panelUser = isEditing ? editUserData : selectedUser;
+    const roleColor = getRoleColor(panelUser?.role);
+    const infoItems = [
+      { label: "Username", value: selectedUser?.username || "Not set", icon: "person-outline" },
+      { label: "Phone", value: selectedUser?.phone || "No phone number", icon: "call-outline" },
+      { label: "Employee ID", value: selectedUser?.employeeId || "Not assigned", icon: "card-outline" },
+      { label: "Department", value: selectedUser?.department || "General", icon: "business-outline" },
+      { label: "Position", value: selectedUser?.position || (isSecurityRole(selectedUser?.role) ? "Security Personnel" : "Not set"), icon: "briefcase-outline" },
+      { label: "Status", value: isUserActive(selectedUser) ? "Active" : "Inactive", icon: "checkmark-circle-outline" },
+    ];
+
+    return (
+      <View style={[styles.userDataBottomPanel, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+        <View style={styles.userDataPanelHeader}>
+          <View style={styles.userDataPanelIdentity}>
+            <View style={[styles.userProfileAvatar, styles.userDataPanelAvatar, { backgroundColor: `${roleColor}16` }]}>
+              <Text style={[styles.userProfileAvatarText, { color: roleColor }]}>
+                {getUserInitials(panelUser)}
+              </Text>
+            </View>
+            <View style={styles.userDataPanelTitleBlock}>
+              <Text style={[styles.userDataPanelTitle, isDarkMode && styles.darkText]}>
+                {isEditing ? "Edit Account" : "Account Details"}
+              </Text>
+              <Text style={[styles.userDataPanelSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                {panelUser?.firstName || "User"} {panelUser?.lastName || ""} • {panelUser?.email || "No email"}
+              </Text>
+              <View style={styles.userProfileBadgeRow}>
+                <View style={[styles.userProfileBadge, { backgroundColor: `${roleColor}14` }]}>
+                  <Text style={[styles.userProfileBadgeText, { color: roleColor }]}>
+                    {formatRoleLabel(panelUser?.role)}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.userProfileBadge,
+                    { backgroundColor: isUserActive(panelUser) ? "rgba(16,185,129,0.14)" : "rgba(239,68,68,0.14)" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.userProfileBadgeText,
+                      { color: isUserActive(panelUser) ? "#10B981" : "#EF4444" },
+                    ]}
+                  >
+                    {isUserActive(panelUser) ? "Active" : "Inactive"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+          <View style={styles.userDataPanelActions}>
+            {!isEditing ? (
+              <TouchableOpacity style={styles.dataManagementPrimaryButton} onPress={() => handleEditUser(selectedUser)}>
+                <Ionicons name="create-outline" size={15} color="#FFFFFF" />
+                <Text style={styles.dataManagementPrimaryButtonText}>Edit</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.dataManagementGhostButton, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}
+              onPress={() => setUserDataPanelMode(null)}
+            >
+              <Ionicons name="close-outline" size={16} color="#2563EB" />
+              <Text style={styles.dataManagementGhostButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {isEditing ? (
+          <View style={styles.userDataEditGrid}>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>First Name</Text>
+              <TextInput
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                value={editUserData.firstName}
+                onChangeText={(text) => setEditUserData({ ...editUserData, firstName: text })}
+                placeholder="First name"
+                placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+              />
+            </View>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Last Name</Text>
+              <TextInput
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                value={editUserData.lastName}
+                onChangeText={(text) => setEditUserData({ ...editUserData, lastName: text })}
+                placeholder="Last name"
+                placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+              />
+            </View>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Username</Text>
+              <TextInput
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                value={editUserData.username}
+                onChangeText={(text) => setEditUserData({ ...editUserData, username: normalizeUsernameInput(text) })}
+                placeholder="Username"
+                autoCapitalize="none"
+                placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+              />
+            </View>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Email</Text>
+              <TextInput
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                value={editUserData.email}
+                onChangeText={(text) => setEditUserData({ ...editUserData, email: text })}
+                placeholder="Email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+              />
+            </View>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Phone</Text>
+              <TextInput
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                value={editUserData.phone}
+                onChangeText={(text) => setEditUserData({ ...editUserData, phone: text })}
+                placeholder="09123456789"
+                keyboardType="phone-pad"
+                maxLength={16}
+                placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+              />
+            </View>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Employee ID</Text>
+              <TextInput
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                value={editUserData.employeeId}
+                onChangeText={(text) => setEditUserData({ ...editUserData, employeeId: text })}
+                placeholder="Staff / Security ID"
+                placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+              />
+            </View>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Department</Text>
+              <TextInput
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                value={editUserData.department}
+                onChangeText={(text) => setEditUserData({ ...editUserData, department: text })}
+                placeholder="Department"
+                placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+              />
+            </View>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Position</Text>
+              <TextInput
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                value={editUserData.position}
+                onChangeText={(text) => setEditUserData({ ...editUserData, position: text })}
+                placeholder="Position"
+                placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+              />
+            </View>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Role</Text>
+              <View style={styles.userDataCompactOptions}>
+                {["staff", "security", "admin", "visitor"].map((role) => (
+                  <TouchableOpacity
+                    key={role}
+                    style={[
+                      styles.userDataCompactOption,
+                      editUserData.role === role && styles.userDataCompactOptionActive,
+                    ]}
+                    onPress={() => setEditUserData({ ...editUserData, role })}
+                  >
+                    <Text style={[styles.userDataCompactOptionText, editUserData.role === role && styles.userDataCompactOptionTextActive]}>
+                      {formatRoleLabel(role)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+              <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Status</Text>
+              <View style={styles.userDataCompactOptions}>
+                {["active", "inactive"].map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.userDataCompactOption,
+                      editUserData.status === status && styles.userDataCompactOptionActive,
+                    ]}
+                    onPress={() => setEditUserData({ ...editUserData, status, isActive: status === "active" })}
+                  >
+                    <Text style={[styles.userDataCompactOptionText, editUserData.status === status && styles.userDataCompactOptionTextActive]}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={styles.userDataPanelFooter}>
+              <TouchableOpacity
+                style={[styles.dataManagementGhostButton, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}
+                onPress={() => selectedUser && handleViewUser(selectedUser)}
+              >
+                <Ionicons name="arrow-back-outline" size={15} color="#2563EB" />
+                <Text style={styles.dataManagementGhostButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dataManagementPrimaryButton}
+                onPress={confirmEditUser}
+                disabled={processingId === "edit-user"}
+              >
+                <Ionicons name="save-outline" size={15} color="#FFFFFF" />
+                <Text style={styles.dataManagementPrimaryButtonText}>
+                  {processingId === "edit-user" ? "Saving..." : "Save Changes"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.userDataInfoGrid}>
+            {infoItems.map((item) => (
+              <View key={item.label} style={[styles.userDataInfoCard, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
+                <Ionicons name={item.icon} size={16} color="#2563EB" />
+                <View style={styles.userDataInfoCopy}>
+                  <Text style={styles.userProfileInfoLabel}>{item.label}</Text>
+                  <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
+                    {item.value}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderDataManagementContent = () => (
-    <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      ref={dataManagementScrollViewRef}
+      style={styles.contentScrollView}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.pageContainer}>
         <AdminSectionShell
-          title="Data Management"
-          subtitle="Design the field list the admin team wants to collect and keep the form structure organized."
-          badge={`${dataCollectionFields.length} fields`}
+          title="User Data Management"
+          subtitle="Select a user account first, then view or edit the details connected to that account."
+          badge={`${dataManagementUsers.length} users`}
           isDarkMode={isDarkMode}
           theme={theme}
+          actions={
+            <TouchableOpacity style={styles.pageRefreshButton} onPress={loadAllUsers}>
+              <Ionicons name="refresh-outline" size={22} color="#2563EB" />
+            </TouchableOpacity>
+          }
         >
+          <View
+            style={[
+              styles.modularEditorCard,
+              {
+                backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
+                borderColor: theme.borderColor,
+                marginBottom: 18,
+              },
+            ]}
+          >
+            <Text style={[styles.modularEditorTitle, isDarkMode && styles.darkText]}>
+              Select User to Manage
+            </Text>
+            <Text style={[styles.modularListMeta, isDarkMode && styles.darkTextSecondary]}>
+              Search or filter the account list, then choose View or Edit.
+            </Text>
+
+            <View style={styles.dataManagementToolbar}>
+              <View style={[styles.dataManagementSearchBox, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
+                <Ionicons name="search-outline" size={17} color="#2563EB" />
+                <TextInput
+                  style={[styles.dataManagementSearchInput, isDarkMode && styles.darkText]}
+                  placeholder="Search name, email, username, phone, staff ID..."
+                  placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                  value={userSearchTerm}
+                  onChangeText={setUserSearchTerm}
+                  returnKeyType="search"
+                  onSubmitEditing={() => {
+                    setUserSearchQuery(userSearchTerm.trim());
+                    setDataManagementPage(1);
+                  }}
+                />
+                {userSearchTerm ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setUserSearchTerm("");
+                      setUserSearchQuery("");
+                      setDataManagementPage(1);
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <TouchableOpacity
+                style={styles.dataManagementPrimaryButton}
+                onPress={() => {
+                  setUserSearchQuery(userSearchTerm.trim());
+                  setDataManagementPage(1);
+                }}
+              >
+                <Ionicons name="search-outline" size={15} color="#FFFFFF" />
+                <Text style={styles.dataManagementPrimaryButtonText}>Search</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dataManagementGhostButton, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}
+                onPress={() => {
+                  setUserSearchTerm("");
+                  setUserSearchQuery("");
+                  setUserFilter("all");
+                  setUserDepartmentFilter("all");
+                  setDataManagementPage(1);
+                }}
+              >
+                <Ionicons name="refresh-outline" size={15} color="#2563EB" />
+                <Text style={styles.dataManagementGhostButtonText}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.dataManagementFilterBox, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+              <View style={styles.dataManagementFilterRow}>
+                <Text style={[styles.dataManagementFilterLabel, isDarkMode && styles.darkTextSecondary]}>Role</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dataManagementChipRow}>
+                  {dataManagementRoleFilters.map((filterItem) => {
+                    const isActive = userFilter === filterItem.key;
+                    return (
+                      <TouchableOpacity
+                        key={filterItem.key}
+                        style={[
+                          styles.dataManagementChip,
+                          isActive && styles.dataManagementChipActive,
+                          isDarkMode && !isActive && { backgroundColor: "#111827", borderColor: theme.borderColor },
+                        ]}
+                        onPress={() => {
+                          setUserFilter(filterItem.key);
+                          setDataManagementPage(1);
+                        }}
+                      >
+                        <Ionicons name={filterItem.icon} size={13} color={isActive ? "#FFFFFF" : "#2563EB"} />
+                        <Text style={[styles.dataManagementChipText, isActive && styles.dataManagementChipTextActive]}>
+                          {filterItem.label} ({filterItem.count})
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+              <View style={styles.dataManagementFilterRow}>
+                <Text style={[styles.dataManagementFilterLabel, isDarkMode && styles.darkTextSecondary]}>Office</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dataManagementChipRow}>
+                  {dataManagementDepartmentFilterOptions.map((filterItem) => {
+                    const isActive = userDepartmentFilter === filterItem.key;
+                    return (
+                      <TouchableOpacity
+                        key={filterItem.key}
+                        style={[
+                          styles.dataManagementChip,
+                          isActive && styles.dataManagementChipActive,
+                          isDarkMode && !isActive && { backgroundColor: "#111827", borderColor: theme.borderColor },
+                        ]}
+                        onPress={() => {
+                          setUserDepartmentFilter(filterItem.key);
+                          setDataManagementPage(1);
+                        }}
+                      >
+                        <Ionicons name={filterItem.icon} size={13} color={isActive ? "#FFFFFF" : "#2563EB"} />
+                        <Text style={[styles.dataManagementChipText, isActive && styles.dataManagementChipTextActive]}>
+                          {filterItem.label} ({filterItem.count})
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+
+            {renderAdminTable({
+              rows: paginatedDataManagementUsers,
+              keyExtractor: (userItem) => userItem._id || userItem.id || userItem.email,
+              emptyTitle: "No users found",
+              emptySubtitle: "Try clearing the search or filter to find the account you want to manage.",
+              minTableHeight: 372,
+              columns: [
+                {
+                  key: "name",
+                  label: "User",
+                  width: 220,
+                  render: (userItem) => {
+                    const roleColor = getRoleColor(userItem.role);
+                    return (
+                      <View style={styles.adminTableIdentityCell}>
+                        <View style={[styles.userAvatar, { backgroundColor: `${roleColor}18` }]}>
+                          <Text style={[styles.userAvatarInitials, { color: roleColor }]}>
+                            {getUserInitials(userItem)}
+                          </Text>
+                        </View>
+                        <View style={styles.adminTableIdentityCopy}>
+                          <Text style={[styles.adminTablePrimaryText, isDarkMode && styles.darkText]}>
+                            {userItem.firstName} {userItem.lastName}
+                          </Text>
+                          <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
+                            {userItem.email || "No email"}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  },
+                },
+                {
+                  key: "role",
+                  label: "Role",
+                  width: 105,
+                  render: (userItem) => {
+                    const roleColor = getRoleColor(userItem.role);
+                    return (
+                      <View style={[styles.roleBadge, { backgroundColor: `${roleColor}14`, alignSelf: "flex-start" }]}>
+                        <Text style={[styles.roleBadgeText, { color: roleColor }]}>
+                          {formatRoleLabel(userItem.role)}
+                        </Text>
+                      </View>
+                    );
+                  },
+                },
+                {
+                  key: "department",
+                  label: "Department",
+                  width: 140,
+                  render: (userItem) => (
+                    <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                      {userItem.department || "General"}
+                    </Text>
+                  ),
+                },
+                {
+                  key: "contact",
+                  label: "Contact",
+                  width: 160,
+                  render: (userItem) => (
+                    <View>
+                      <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                        {userItem.username || "-"}
+                      </Text>
+                      <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
+                        {userItem.phone || "No phone"}
+                      </Text>
+                    </View>
+                  ),
+                },
+                {
+                  key: "status",
+                  label: "Status",
+                  width: 100,
+                  render: (userItem) => {
+                    const userIsActive = isUserActive(userItem);
+                    return (
+                      <View
+                        style={[
+                          styles.userLiveStatusBadge,
+                          {
+                            backgroundColor: userIsActive ? "rgba(16,185,129,0.14)" : "rgba(239,68,68,0.14)",
+                            alignSelf: "flex-start",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.userLiveStatusText,
+                            { color: userIsActive ? "#10B981" : "#EF4444" },
+                          ]}
+                        >
+                          {userIsActive ? "Active" : "Inactive"}
+                        </Text>
+                      </View>
+                    );
+                  },
+                },
+                {
+                  key: "actions",
+                  label: "Manage",
+                  width: 140,
+                  render: (userItem) => (
+                    <View style={styles.adminTableActionRow}>
+                      <TouchableOpacity
+                        style={[styles.adminTableActionButton, { borderColor: "rgba(59,130,246,0.24)", backgroundColor: "rgba(59,130,246,0.12)" }]}
+                        onPress={() => handleViewUser(userItem)}
+                      >
+                        <Text style={[styles.adminTableActionText, { color: "#2563EB" }]}>View</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.adminTableActionButton, { borderColor: "rgba(16,185,129,0.24)", backgroundColor: "rgba(16,185,129,0.12)" }]}
+                        onPress={() => handleEditUser(userItem)}
+                      >
+                        <Text style={[styles.adminTableActionText, { color: "#10B981" }]}>Edit</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ),
+                },
+              ],
+            })}
+            <View style={styles.userPaginationRow}>
+              <Text style={[styles.userPaginationSummary, isDarkMode && styles.darkTextSecondary]}>
+                Showing {dataManagementVisibleStart}-{dataManagementVisibleEnd} of {dataManagementUsers.length} users
+              </Text>
+              <View style={styles.userPaginationControls}>
+                <TouchableOpacity
+                  style={[
+                    styles.userPaginationButton,
+                    dataManagementPage === 1 && styles.userPaginationButtonDisabled,
+                  ]}
+                  onPress={() => setDataManagementPage((page) => Math.max(1, page - 1))}
+                  disabled={dataManagementPage === 1}
+                >
+                  <Ionicons name="chevron-back-outline" size={16} color={dataManagementPage === 1 ? "#94A3B8" : "#334155"} />
+                  <Text style={[styles.userPaginationButtonText, dataManagementPage === 1 && styles.userPaginationButtonTextDisabled]}>
+                    Previous
+                  </Text>
+                </TouchableOpacity>
+                <Text style={[styles.userPaginationSummary, isDarkMode && styles.darkTextSecondary]}>
+                  Page {dataManagementPage} of {dataManagementTotalPages}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.userPaginationButton,
+                    dataManagementPage >= dataManagementTotalPages && styles.userPaginationButtonDisabled,
+                  ]}
+                  onPress={() => setDataManagementPage((page) => Math.min(dataManagementTotalPages, page + 1))}
+                  disabled={dataManagementPage >= dataManagementTotalPages}
+                >
+                  <Text style={[styles.userPaginationButtonText, dataManagementPage >= dataManagementTotalPages && styles.userPaginationButtonTextDisabled]}>
+                    Next
+                  </Text>
+                  <Ionicons name="chevron-forward-outline" size={16} color={dataManagementPage >= dataManagementTotalPages ? "#94A3B8" : "#334155"} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {renderUserDataPanel()}
+
+          {false ? (
+          <View
+            style={[
+              styles.modularEditorCard,
+              {
+                backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
+                borderColor: theme.borderColor,
+                marginBottom: 18,
+              },
+            ]}
+          >
+            <Text style={[styles.modularEditorTitle, isDarkMode && styles.darkText]}>
+              Form Field Setup
+            </Text>
+            <Text style={[styles.modularListMeta, isDarkMode && styles.darkTextSecondary]}>
+              Optional setup for the fields collected in future visitor/admin workflows.
+            </Text>
+          </View>
+          ) : null}
+
+          {false ? (
           <View style={styles.modularTwoColumnLayout}>
             <View
               style={[
@@ -4844,6 +5584,122 @@ const loadDashboardData = useCallback(async () => {
               <Text style={[styles.modularEditorTitle, isDarkMode && styles.darkText]}>
                 Current fields
               </Text>
+              {renderAdminTable({
+                rows: paginatedDataCollectionFields,
+                keyExtractor: (field) => field.id,
+                emptyTitle: "No fields configured",
+                emptySubtitle: "Add a field to start shaping the data collection setup.",
+                columns: [
+                  {
+                    key: "field",
+                    label: "Field",
+                    width: 190,
+                    render: (field) => (
+                      <Text style={[styles.adminTablePrimaryText, isDarkMode && styles.darkText]}>
+                        {field.label}
+                      </Text>
+                    ),
+                  },
+                  {
+                    key: "type",
+                    label: "Type",
+                    width: 120,
+                    render: (field) => (
+                      <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                        {field.type || "text"}
+                      </Text>
+                    ),
+                  },
+                  {
+                    key: "scope",
+                    label: "Scope",
+                    width: 130,
+                    render: (field) => (
+                      <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                        {field.scope || "visitor"}
+                      </Text>
+                    ),
+                  },
+                  {
+                    key: "required",
+                    label: "Required",
+                    width: 120,
+                    render: (field) => (
+                      <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                        {field.required ? "Required" : "Optional"}
+                      </Text>
+                    ),
+                  },
+                  {
+                    key: "enabled",
+                    label: "Status",
+                    width: 110,
+                    render: (field) => (
+                      <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                        {field.enabled ? "Enabled" : "Disabled"}
+                      </Text>
+                    ),
+                  },
+                  {
+                    key: "actions",
+                    label: "Actions",
+                    width: 150,
+                    render: (field) => (
+                      <View style={styles.adminTableActionRow}>
+                        <TouchableOpacity
+                          style={[styles.adminTableActionButton, { borderColor: "rgba(37,99,235,0.24)", backgroundColor: "rgba(37,99,235,0.12)" }]}
+                          onPress={() => handleEditField(field)}
+                        >
+                          <Text style={[styles.adminTableActionText, { color: "#2563EB" }]}>Edit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.adminTableActionButton, { borderColor: "rgba(239,68,68,0.22)", backgroundColor: "rgba(239,68,68,0.12)" }]}
+                          onPress={() => handleDeleteField(field)}
+                        >
+                          <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ),
+                  },
+                ],
+              })}
+              <View style={styles.userPaginationRow}>
+                <Text style={[styles.userPaginationSummary, isDarkMode && styles.darkTextSecondary]}>
+                  Showing {fieldSetupVisibleStart}-{fieldSetupVisibleEnd} of {dataCollectionFields.length} fields
+                </Text>
+                <View style={styles.userPaginationControls}>
+                  <TouchableOpacity
+                    style={[
+                      styles.userPaginationButton,
+                      dataManagementFieldPage === 1 && styles.userPaginationButtonDisabled,
+                    ]}
+                    onPress={() => setDataManagementFieldPage((page) => Math.max(1, page - 1))}
+                    disabled={dataManagementFieldPage === 1}
+                  >
+                    <Ionicons name="chevron-back-outline" size={16} color={dataManagementFieldPage === 1 ? "#94A3B8" : "#334155"} />
+                    <Text style={[styles.userPaginationButtonText, dataManagementFieldPage === 1 && styles.userPaginationButtonTextDisabled]}>
+                      Previous
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.userPaginationSummary, isDarkMode && styles.darkTextSecondary]}>
+                    Page {dataManagementFieldPage} of {fieldSetupTotalPages}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.userPaginationButton,
+                      dataManagementFieldPage >= fieldSetupTotalPages && styles.userPaginationButtonDisabled,
+                    ]}
+                    onPress={() => setDataManagementFieldPage((page) => Math.min(fieldSetupTotalPages, page + 1))}
+                    disabled={dataManagementFieldPage >= fieldSetupTotalPages}
+                  >
+                    <Text style={[styles.userPaginationButtonText, dataManagementFieldPage >= fieldSetupTotalPages && styles.userPaginationButtonTextDisabled]}>
+                      Next
+                    </Text>
+                    <Ionicons name="chevron-forward-outline" size={16} color={dataManagementFieldPage >= fieldSetupTotalPages ? "#94A3B8" : "#334155"} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {false ? (
               <View style={styles.modularListStack}>
                 {dataCollectionFields.map((field) => (
                   <View
@@ -4875,8 +5731,10 @@ const loadDashboardData = useCallback(async () => {
                   </View>
                 ))}
               </View>
+              ) : null}
             </View>
           </View>
+          ) : null}
         </AdminSectionShell>
       </View>
     </ScrollView>
@@ -6593,7 +7451,7 @@ const loadDashboardData = useCallback(async () => {
                           {module.label}
                         </Text>
                         <Text style={styles.sidebarModuleHint}>
-                          {module.submodules.length} submodule{module.submodules.length === 1 ? "" : "s"}
+                          {module.submodules.length} section{module.submodules.length === 1 ? "" : "s"}
                         </Text>
                       </View>
                       <Ionicons

@@ -232,6 +232,48 @@ export default StyleSheet.create({
     backgroundColor: "#059669",
     borderRadius: 999,
   },
+  progressMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+    flexWrap: "wrap",
+  },
+  progressMetaText: {
+    fontSize: fontSizes.xs,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  progressChecklist: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  progressChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  progressChipComplete: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#BBF7D0",
+  },
+  progressChipText: {
+    fontSize: fontSizes.xs,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  progressChipTextComplete: {
+    color: "#047857",
+  },
 
   stepIndicatorContainer: {
     backgroundColor: "#FFFFFF",

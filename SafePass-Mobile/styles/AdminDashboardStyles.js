@@ -797,6 +797,12 @@ export default StyleSheet.create({
   adminTableScroll: {
     marginTop: 14,
     alignSelf: "stretch",
+    overflow: "visible",
+  },
+
+  adminTableScrollContent: {
+    alignItems: "flex-start",
+    alignSelf: "stretch",
   },
 
   adminTable: {
@@ -817,6 +823,7 @@ export default StyleSheet.create({
 
   adminTableRow: {
     flexDirection: "row",
+    minHeight: 54,
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
   },
@@ -2701,6 +2708,255 @@ export default StyleSheet.create({
 
   recordsFilterChipTextActive: {
     color: "#FFFFFF",
+  },
+
+  dataManagementToolbar: {
+    marginTop: 14,
+    marginBottom: 10,
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "stretch" : "center",
+    gap: 8,
+  },
+
+  dataManagementSearchBox: {
+    flex: 1,
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 11,
+  },
+
+  dataManagementSearchInput: {
+    flex: 1,
+    fontSize: 12,
+    color: "#0F172A",
+    paddingVertical: Platform.OS === "web" ? 8 : 7,
+  },
+
+  dataManagementPrimaryButton: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: "#2563EB",
+  },
+
+  dataManagementPrimaryButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  dataManagementGhostButton: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 12,
+  },
+
+  dataManagementGhostButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#2563EB",
+  },
+
+  dataManagementFilterBox: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 8,
+    marginBottom: 10,
+  },
+
+  dataManagementFilterRow: {
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "stretch" : "center",
+    gap: 8,
+  },
+
+  dataManagementFilterLabel: {
+    width: width < 760 ? "auto" : 54,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.55,
+    textTransform: "uppercase",
+    color: "#64748B",
+  },
+
+  dataManagementChipRow: {
+    gap: 7,
+    paddingRight: 8,
+  },
+
+  dataManagementChip: {
+    minHeight: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+
+  dataManagementChipActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+
+  dataManagementChipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#475569",
+  },
+
+  dataManagementChipTextActive: {
+    color: "#FFFFFF",
+  },
+
+  userDataBottomPanel: {
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    marginBottom: 18,
+  },
+
+  userDataPanelHeader: {
+    flexDirection: width < 760 ? "column" : "row",
+    justifyContent: "space-between",
+    alignItems: width < 760 ? "stretch" : "flex-start",
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  userDataPanelIdentity: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  userDataPanelAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+  },
+
+  userDataPanelTitleBlock: {
+    flex: 1,
+  },
+
+  userDataPanelTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+
+  userDataPanelSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+    marginBottom: 8,
+  },
+
+  userDataPanelActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: width < 760 ? "flex-start" : "flex-end",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+
+  userDataInfoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  userDataInfoCard: {
+    flexGrow: 1,
+    flexBasis: width < 900 ? 180 : 220,
+    minWidth: 170,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+
+  userDataInfoCopy: {
+    flex: 1,
+  },
+
+  userDataEditGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  userDataCompactOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  userDataCompactOption: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 999,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  userDataCompactOptionActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+
+  userDataCompactOptionText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#475569",
+  },
+
+  userDataCompactOptionTextActive: {
+    color: "#FFFFFF",
+  },
+
+  userDataPanelFooter: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 4,
   },
 
   // ============================================

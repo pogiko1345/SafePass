@@ -872,7 +872,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           <View style={styles.accountInfoItem}>
             <Text style={styles.accountInfoLabel}>Contact Number</Text>
             <Text style={styles.accountInfoValue}>
-              {user?.phoneNumber || user?.contactNumber || "N/A"}
+              {user?.phone || user?.phoneNumber || user?.contactNumber || "N/A"}
             </Text>
           </View>
           <View style={styles.accountInfoItem}>

@@ -774,15 +774,29 @@ export default function VisitorRegisterScreen({ navigation }) {
     }
   };
 
-  const completionCount = [
-    completedFields.fullName,
-    completedFields.email,
-    completedFields.username,
-    completedFields.phone,
-    completedFields.password,
-    completedFields.confirmPassword,
-  ].filter(Boolean).length;
-  const totalRegistrationFields = 6;
+  const registrationFields = [
+    { key: "fullName", label: "Name", icon: "person-outline" },
+    { key: "email", label: "Email", icon: "mail-outline" },
+    { key: "username", label: "Username", icon: "at-outline" },
+    { key: "phone", label: "Phone", icon: "call-outline" },
+    { key: "password", label: "Password", icon: "lock-closed-outline" },
+    { key: "confirmPassword", label: "Confirm", icon: "shield-checkmark-outline" },
+  ];
+  const fieldCompletion = {
+    fullName: Boolean(formData.fullName && !validateName(formData.fullName)),
+    email: Boolean(formData.email && !validateEmail(formData.email)),
+    username: Boolean(formData.username && !validateUsername(formData.username)),
+    phone: Boolean(formData.phone && !validatePhone(formData.phone)),
+    password: Boolean(formData.password && !validatePassword(formData.password)),
+    confirmPassword: Boolean(
+      formData.confirmPassword &&
+        !validateConfirmPassword(formData.confirmPassword, formData.password),
+    ),
+  };
+  const totalRegistrationFields = registrationFields.length;
+  const completionCount = registrationFields.filter(
+    (field) => fieldCompletion[field.key],
+  ).length;
   const registrationProgressPercentage = Math.round(
     (completionCount / totalRegistrationFields) * 100,
   );
@@ -962,40 +976,43 @@ export default function VisitorRegisterScreen({ navigation }) {
                   ]}
                 />
               </View>
-            </View>
-
-            <View
-              style={[
-                visitorRegisterStyles.stepIndicatorContainer,
-                sectionCardResponsiveStyle,
-              ]}
-            >
-              <View style={visitorRegisterStyles.stepWrapper}>
-                <View
-                  style={[
-                    visitorRegisterStyles.stepCircle,
-                    visitorRegisterStyles.stepCircleActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      visitorRegisterStyles.stepCircleText,
-                      visitorRegisterStyles.stepCircleTextActive,
-                    ]}
-                  >
-                    1
-                  </Text>
-                </View>
-              </View>
-              <View style={visitorRegisterStyles.stepLabels}>
-                <Text
-                  style={[
-                    visitorRegisterStyles.stepLabel,
-                    visitorRegisterStyles.stepLabelActive,
-                  ]}
-                >
-                  Account
+              <View style={visitorRegisterStyles.progressMetaRow}>
+                <Text style={visitorRegisterStyles.progressMetaText}>
+                  {completionCount} of {totalRegistrationFields} required details complete
                 </Text>
+                <Text style={visitorRegisterStyles.progressMetaText}>
+                  {registrationProgressPercentage === 100
+                    ? "Ready to create"
+                    : "Complete all fields"}
+                </Text>
+              </View>
+              <View style={visitorRegisterStyles.progressChecklist}>
+                {registrationFields.map((field) => {
+                  const isComplete = fieldCompletion[field.key];
+                  return (
+                    <View
+                      key={field.key}
+                      style={[
+                        visitorRegisterStyles.progressChip,
+                        isComplete && visitorRegisterStyles.progressChipComplete,
+                      ]}
+                    >
+                      <Ionicons
+                        name={isComplete ? "checkmark-circle" : field.icon}
+                        size={14}
+                        color={isComplete ? "#047857" : "#94A3B8"}
+                      />
+                      <Text
+                        style={[
+                          visitorRegisterStyles.progressChipText,
+                          isComplete && visitorRegisterStyles.progressChipTextComplete,
+                        ]}
+                      >
+                        {field.label}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
 
@@ -1012,7 +1029,9 @@ export default function VisitorRegisterScreen({ navigation }) {
                 </View>
                 <View style={visitorRegisterStyles.sectionBadge}>
                   <Ionicons name="person-circle-outline" size={14} color="#047857" />
-                  <Text style={visitorRegisterStyles.sectionBadgeText}>Step 1/1</Text>
+                  <Text style={visitorRegisterStyles.sectionBadgeText}>
+                    Account Details
+                  </Text>
                 </View>
               </View>
 
