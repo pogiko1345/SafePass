@@ -3927,131 +3927,38 @@ const loadDashboardData = useCallback(async () => {
           </TouchableOpacity>
         </View>
 
-          <View
-            style={[
-              styles.dashboardHeroCard,
-              isDarkMode && { backgroundColor: "#1E293B", borderColor: "#334155" },
-            ]}
+        <View
+          style={[
+            styles.dashboardHeroCard,
+            isDarkMode && { backgroundColor: "#1E293B", borderColor: "#334155" },
+          ]}
         >
           <View style={styles.dashboardHeroLeft}>
             <Text style={[styles.dashboardHeroTitle, isDarkMode && styles.darkText]}>
               Welcome back, {user?.firstName || "Admin"}
             </Text>
             <Text style={[styles.dashboardHeroSubtitle, isDarkMode && styles.darkTextSecondary]}>
-              Live overview of visitor flow, user activity, and pending approvals.
+              Here are the essentials for today: requests, visits, and active accounts.
             </Text>
           </View>
-          <View style={[styles.dashboardHeroBadge, isDarkMode && { backgroundColor: "#334155" }]}>
-            <Ionicons name="sparkles-outline" size={16} color="#2563EB" />
+          <TouchableOpacity
+            style={[styles.dashboardHeroBadge, isDarkMode && { backgroundColor: "#334155" }]}
+            onPress={() => handleMenuAction("requests")}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="time-outline" size={16} color="#F59E0B" />
             <Text style={[styles.dashboardHeroBadgeText, isDarkMode && styles.darkTextSecondary]}>
-              {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              {stats.pendingRequests || 0} pending
             </Text>
-          </View>
-        </View>
-
-        <View style={styles.quickActionsGrid}>
-          {dashboardQuickActions.map((item) => (
-            <TouchableOpacity
-              key={item.key}
-              activeOpacity={0.86}
-              style={[
-                styles.quickActionCard,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.borderColor,
-                },
-              ]}
-              onPress={() => handleMenuAction(item.action)}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: `${item.color}18` }]}>
-                <Ionicons name={item.icon} size={24} color={item.color} />
-              </View>
-              <Text style={[styles.quickActionTitle, { color: theme.textPrimary }]}>{item.title}</Text>
-              <Text style={[styles.quickActionSubtitle, { color: theme.textSecondary }]}>{item.subtitle}</Text>
-              <View style={[styles.quickActionBadge, { backgroundColor: `${item.color}14` }]}>
-                <Text style={[styles.quickActionBadgeText, { color: item.color }]}>{item.badge}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View
-          style={[
-            styles.dashboardFlowCard,
-            {
-              backgroundColor: theme.cardBackground,
-              borderColor: theme.borderColor,
-            },
-          ]}
-        >
-          <View style={styles.dashboardSectionHeader}>
-            <View>
-              <Text style={[styles.dashboardSectionTitle, { color: theme.textPrimary }]}>Admin Workflow</Text>
-              <Text style={[styles.analyticsChartSubtitle, { color: theme.textSecondary }]}>
-                Follow the most common admin path from review to monitoring.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.dashboardFlowSteps}>
-            {[
-              {
-                key: "review",
-                title: "1. Review requests",
-                subtitle: `${stats.pendingRequests || 0} waiting for admin approval`,
-                icon: "time-outline",
-                color: "#F59E0B",
-                action: "requests",
-              },
-              {
-                key: "team",
-                title: "2. Prepare teams",
-                subtitle: `${staffUsers.length + guardUsers.length} staff and security accounts available`,
-                icon: "people-outline",
-                color: "#3B82F6",
-                action: "users",
-              },
-              {
-                key: "monitor",
-                title: "3. Watch live activity",
-                subtitle: `${monitoredMapVisitors.length || 0} live map markers on campus`,
-                icon: "map-outline",
-                color: "#10B981",
-                action: "webmap",
-              },
-            ].map((item) => (
-              <TouchableOpacity
-                key={item.key}
-                style={[
-                  styles.dashboardFlowStep,
-                  {
-                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
-                    borderColor: theme.borderColor,
-                  },
-                ]}
-                onPress={() => handleMenuAction(item.action)}
-              >
-                <View style={[styles.dashboardFlowStepIcon, { backgroundColor: `${item.color}18` }]}>
-                  <Ionicons name={item.icon} size={18} color={item.color} />
-                </View>
-                <View style={styles.dashboardFlowStepCopy}>
-                  <Text style={[styles.dashboardFlowStepTitle, { color: theme.textPrimary }]}>{item.title}</Text>
-                  <Text style={[styles.dashboardFlowStepSubtitle, { color: theme.textSecondary }]}>{item.subtitle}</Text>
-                </View>
-                <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
-              </TouchableOpacity>
-            ))}
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.dashboardStatsGrid}>
           {[
             { label: "Pending Requests", value: stats.pendingRequests, color: "#F59E0B", icon: "time-outline" },
-            { label: "Approved Today", value: stats.approvedRequests, color: "#10B981", icon: "checkmark-circle-outline" },
-            { label: "Total Users", value: stats.totalUsers, color: "#3B82F6", icon: "people-outline" },
-            { label: "Active Users", value: stats.activeUsers, color: "#8B5CF6", icon: "pulse-outline" },
             { label: "Today Visits", value: stats.todayVisits, color: "#EF4444", icon: "walk-outline" },
-            { label: "Tomorrow Visits", value: stats.tomorrowVisits, color: "#14B8A6", icon: "calendar-outline" },
+            { label: "Checked In", value: stats.checkedInVisitors, color: "#10B981", icon: "log-in-outline" },
+            { label: "Active Users", value: stats.activeUsers, color: "#3B82F6", icon: "people-outline" },
           ].map((item) => (
             <View
               key={item.label}
@@ -4075,7 +3982,33 @@ const loadDashboardData = useCallback(async () => {
           ))}
         </View>
 
-        {renderAdminMapWorkspace()}
+        <View style={styles.quickActionsGrid}>
+          {dashboardQuickActions.slice(0, 4).map((item) => (
+            <TouchableOpacity
+              key={item.key}
+              activeOpacity={0.86}
+              style={[
+                styles.quickActionCard,
+                {
+                  backgroundColor: theme.cardBackground,
+                  borderColor: theme.borderColor,
+                },
+              ]}
+              onPress={() => handleMenuAction(item.action)}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: `${item.color}18` }]}>
+                <Ionicons name={item.icon} size={20} color={item.color} />
+              </View>
+              <View style={styles.quickActionContent}>
+                <Text style={[styles.quickActionTitle, { color: theme.textPrimary }]}>{item.title}</Text>
+                <Text style={[styles.quickActionSubtitle, { color: theme.textSecondary }]}>{item.subtitle}</Text>
+              </View>
+              <View style={[styles.quickActionBadge, { backgroundColor: `${item.color}14` }]}>
+                <Text style={[styles.quickActionBadgeText, { color: item.color }]}>{item.badge}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <View style={[styles.dashboardSectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
           <View style={styles.dashboardSectionHeader}>

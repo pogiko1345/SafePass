@@ -1046,6 +1046,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+    marginBottom: 14,
   },
 
   dashboardStatCard: {
@@ -1689,52 +1690,50 @@ export default StyleSheet.create({
   // ============================================
 
   quickActionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    marginTop: 12,
-    marginBottom: 16,
+    gap: 10,
+    marginTop: 2,
+    marginBottom: 14,
   },
 
   quickActionCard: {
-    minWidth: 180,
-    flexGrow: 1,
-    flexBasis: 180,
+    width: "100%",
     backgroundColor: "#FFF",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    gap: 12,
   },
 
   quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+  },
+
+  quickActionContent: {
+    flex: 1,
   },
 
   quickActionTitle: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "800",
     color: "#1E293B",
-    marginBottom: 4,
-    textAlign: "center",
+    marginBottom: 2,
   },
 
   quickActionSubtitle: {
     fontSize: 11,
     color: "#64748B",
-    textAlign: "center",
     lineHeight: 17,
   },
 
   quickActionBadge: {
-    marginTop: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
   },
