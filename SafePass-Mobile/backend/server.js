@@ -36,16 +36,34 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/sapphire_aviation";
 
-mongoose
-  .connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log("✅ MongoDB Connected (Local)"))
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error:", err);
-    console.log("Trying to connect to:", MONGODB_URI);
-  });
+let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
+
+const connectToDatabase = () => {
+  if (!mongoConnectionPromise) {
+    mongoConnectionPromise = mongoose
+      .connect(MONGODB_URI)
+      .then(() => {
+        console.log(
+          `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
+        );
+        return mongoose.connection;
+      })
+      .catch((err) => {
+        console.error("❌ MongoDB Connection Error:", err);
+        console.log("Trying to connect to:", MONGODB_URI);
+        mongoConnectionPromise = null;
+        global.__safepassMongoConnectionPromise = null;
+        throw err;
+      });
+
+    global.__safepassMongoConnectionPromise = mongoConnectionPromise;
+  }
+
+  return mongoConnectionPromise;
+};
+
+connectToDatabase();
+
 
 // ========== HELPER FUNCTIONS ==========
 // Generate JWT Token
@@ -3083,3 +3101,4 @@ process.on("SIGINT", () => {
     });
   });
 });
+
