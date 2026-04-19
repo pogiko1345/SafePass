@@ -785,6 +785,10 @@ export default function VisitorRegisterScreen({ navigation }) {
     completedFields.phone,
     completedFields.password,
   ].filter(Boolean).length;
+  const totalRegistrationFields = 5;
+  const registrationProgressPercentage = Math.round(
+    (completionCount / totalRegistrationFields) * 100,
+  );
 
   const fieldConfig = {
     fullName: {
@@ -941,10 +945,17 @@ export default function VisitorRegisterScreen({ navigation }) {
                 <Text style={visitorRegisterStyles.progressTitle}>
                   Registration Progress
                 </Text>
-                <Text style={visitorRegisterStyles.progressPercentage}>100%</Text>
+                <Text style={visitorRegisterStyles.progressPercentage}>
+                  {registrationProgressPercentage}%
+                </Text>
               </View>
               <View style={visitorRegisterStyles.progressBarContainer}>
-                <View style={[visitorRegisterStyles.progressBar, { width: "100%" }]} />
+                <View
+                  style={[
+                    visitorRegisterStyles.progressBar,
+                    { width: `${registrationProgressPercentage}%` },
+                  ]}
+                />
               </View>
             </View>
 
