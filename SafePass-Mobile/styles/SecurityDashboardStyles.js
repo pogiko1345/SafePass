@@ -104,6 +104,10 @@ export default StyleSheet.create({
     flex: 1,
   },
 
+  dashboardShell: {
+    paddingBottom: spacing.xxxl,
+  },
+
   mainContainer: {
     flex: 1,
     flexDirection: "row",
@@ -304,6 +308,171 @@ export default StyleSheet.create({
     color: colors.warningLight,
   },
 
+  securityHeroSection: {
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.lg,
+    gap: spacing.md,
+    ...(isWeb && {
+      maxWidth: isDesktop ? 1200 : isTablet ? 900 : "100%",
+      alignSelf: "center",
+      width: "100%",
+    }),
+  },
+
+  securityHeroCard: {
+    borderRadius: 28,
+    padding: spacing.xl,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.22,
+        shadowRadius: 18,
+      },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 14px 32px rgba(127,29,29,0.22)" },
+    }),
+  },
+
+  securityHeroTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    flexWrap: "wrap",
+  },
+
+  securityHeroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+
+  securityHeroBadgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+    color: "#FEE2E2",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  securityHeroShiftBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    backgroundColor: "rgba(16,185,129,0.18)",
+  },
+
+  securityHeroShiftText: {
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+    color: "#DCFCE7",
+  },
+
+  securityHeroTitle: {
+    fontSize: isSmallPhone ? 24 : isTablet ? 32 : 28,
+    lineHeight: isSmallPhone ? 30 : 36,
+    fontWeight: "800",
+    color: colors.white,
+    letterSpacing: -0.6,
+  },
+
+  securityHeroSubtitle: {
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.86)",
+    marginTop: spacing.sm,
+  },
+
+  securityHeroStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+
+  securityHeroStatCard: {
+    minWidth: 120,
+    flexGrow: 1,
+    flexBasis: 120,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 18,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+
+  securityHeroStatValue: {
+    fontSize: isSmallPhone ? 22 : 26,
+    fontWeight: "800",
+    color: colors.white,
+  },
+
+  securityHeroStatLabel: {
+    fontSize: fontSize.xs,
+    color: "rgba(255,255,255,0.82)",
+    marginTop: 4,
+  },
+
+  securityHeroSideCards: {
+    flexDirection: "row",
+    gap: spacing.md,
+    flexWrap: "wrap",
+  },
+
+  securityHeroSideCard: {
+    flex: 1,
+    minWidth: isSmallPhone ? "100%" : 220,
+    backgroundColor: colors.white,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 4px 14px rgba(15,23,42,0.06)" },
+    }),
+  },
+
+  securityHeroSideIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+
+  securityHeroSideValue: {
+    fontSize: isSmallPhone ? 24 : 28,
+    fontWeight: "800",
+    color: colors.gray[900],
+  },
+
+  securityHeroSideLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[700],
+    marginTop: 4,
+  },
+
+  securityHeroSideMeta: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    marginTop: 6,
+    lineHeight: 16,
+  },
+
   // ============ STATS CARDS ============
   statsContainer: {
     flexDirection: "row",
@@ -397,6 +566,12 @@ export default StyleSheet.create({
     letterSpacing: -0.3,
   },
 
+  securitySectionSubtitle: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    marginTop: 2,
+  },
+
   viewAll: {
     fontSize: fontSize.sm,
     color: colors.secondary,
@@ -472,6 +647,34 @@ export default StyleSheet.create({
       alignSelf: "center",
       width: "100%",
     }),
+  },
+
+  securityWorkspaceGrid: {
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.xl,
+    gap: spacing.md,
+    ...(isWeb && isDesktop
+      ? {
+          flexDirection: "row",
+          alignItems: "flex-start",
+          maxWidth: 1200,
+          alignSelf: "center",
+          width: "100%",
+        }
+      : {
+          width: "100%",
+        }),
+  },
+
+  securityWorkspacePrimary: {
+    flex: 1.35,
+    minHeight: isWeb && isDesktop ? 440 : undefined,
+  },
+
+  securityWorkspaceSecondary: {
+    flex: 0.95,
+    marginBottom: 0,
+    minHeight: isWeb && isDesktop ? 440 : undefined,
   },
 
   mapSectionFull: {
@@ -768,9 +971,22 @@ export default StyleSheet.create({
     gap: 4,
   },
 
+  visitorHistoryCountdown: {
+    backgroundColor: colors.warningLight,
+    borderRadius: 999,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4,
+  },
+
   visitorCardFooterText: {
     fontSize: fontSize.xs,
     color: colors.gray[500],
+  },
+
+  visitorHistoryCountdownText: {
+    fontSize: fontSize.xs,
+    color: "#B45309",
+    fontWeight: "700",
   },
 
   visitorCardActions: {
@@ -809,6 +1025,192 @@ export default StyleSheet.create({
     color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: "600",
+  },
+
+  readonlyRecordActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: spacing.sm,
+  },
+
+  readonlyRecordActionText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.secondary,
+  },
+
+  readonlyInfoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.secondarySoft,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.secondaryLight,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+
+  readonlyInfoBannerText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    fontWeight: "600",
+    color: colors.secondaryDark,
+  },
+
+  appointmentRecordsTable: {
+    minWidth: isSmallPhone ? 980 : 1080,
+    width: "100%",
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 18,
+    overflow: "hidden",
+    marginBottom: spacing.xl,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+      web: {
+        boxShadow: "0px 8px 24px rgba(15, 23, 42, 0.06)",
+      },
+    }),
+  },
+
+  appointmentRecordsTableRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    minHeight: 74,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+    backgroundColor: colors.white,
+    ...webHover({
+      cursor: "pointer",
+      transition: "background-color 0.2s ease",
+      ":hover": {
+        backgroundColor: colors.gray[50],
+      },
+    }),
+  },
+
+  appointmentRecordsTableHeader: {
+    minHeight: 48,
+    backgroundColor: colors.gray[900],
+    borderBottomWidth: 0,
+  },
+
+  appointmentRecordsHeaderCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.white,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  appointmentRecordsCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    justifyContent: "center",
+  },
+
+  appointmentRecordsVisitorCell: {
+    width: 220,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  appointmentRecordsPurposeCell: {
+    width: 150,
+  },
+
+  appointmentRecordsOfficeCell: {
+    width: 170,
+  },
+
+  appointmentRecordsScheduleCell: {
+    width: 145,
+  },
+
+  appointmentRecordsContactCell: {
+    width: 220,
+  },
+
+  appointmentRecordsStatusCell: {
+    width: 130,
+  },
+
+  appointmentRecordsActionCell: {
+    width: 105,
+    alignItems: "center",
+  },
+
+  appointmentRecordsAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    backgroundColor: colors.gray[100],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+  },
+
+  appointmentRecordsAvatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  appointmentRecordsVisitorInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  appointmentRecordsPrimaryText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[900],
+  },
+
+  appointmentRecordsMutedText: {
+    marginTop: 3,
+    fontSize: fontSize.xs,
+    fontWeight: "500",
+    color: colors.gray[500],
+  },
+
+  appointmentRecordsViewButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    backgroundColor: colors.secondarySoft,
+    borderWidth: 1,
+    borderColor: colors.secondaryLight,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      ":hover": {
+        backgroundColor: colors.secondaryLight,
+      },
+    }),
+  },
+
+  appointmentRecordsViewButtonText: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.secondary,
   },
 
   // ============ UPCOMING BANNER ============
@@ -861,6 +1263,57 @@ export default StyleSheet.create({
   activitySection: {
     paddingHorizontal: spacing.md,
     marginBottom: spacing.xl,
+  },
+
+  securityPanelCard: {
+    backgroundColor: colors.white,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    alignSelf: "stretch",
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 4px 12px rgba(15,23,42,0.06)" },
+    }),
+  },
+
+  securityMiniStats: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    flexWrap: "wrap",
+    marginBottom: spacing.md,
+  },
+
+  securityMiniStatCard: {
+    flex: 1,
+    minWidth: 90,
+    borderRadius: 16,
+    backgroundColor: colors.gray[50],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    alignItems: "center",
+  },
+
+  securityMiniStatValue: {
+    fontSize: fontSize.xl,
+    fontWeight: "800",
+    color: colors.gray[900],
+  },
+
+  securityMiniStatLabel: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    marginTop: 2,
   },
 
   activityList: {
@@ -923,6 +1376,16 @@ export default StyleSheet.create({
   alertsSection: {
     paddingHorizontal: spacing.md,
     marginBottom: spacing.xl,
+  },
+
+  securityAlertEmpty: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    backgroundColor: colors.gray[50],
+    padding: spacing.xl,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   alertsContainer: {
@@ -1119,17 +1582,332 @@ export default StyleSheet.create({
     }),
   },
 
+  reportFormCard: {
+    backgroundColor: colors.white,
+    borderRadius: 22,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.05)" },
+    }),
+  },
+
+  reportFormTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: "700",
+    color: colors.gray[900],
+    marginBottom: spacing.xs,
+  },
+
+  reportFormSubtitle: {
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: colors.gray[500],
+    marginBottom: spacing.lg,
+  },
+
+  reportFormLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[700],
+    marginBottom: spacing.sm,
+  },
+
+  reportFormLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  reportFormHint: {
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+    color: colors.success,
+  },
+
+  reportVisitorChipRow: {
+    marginBottom: spacing.md,
+  },
+
+  reportVisitorChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    backgroundColor: colors.gray[50],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    marginRight: spacing.sm,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    }),
+  },
+
+  reportVisitorChipActive: {
+    backgroundColor: colors.purpleLight,
+    borderColor: colors.purple,
+  },
+
+  reportVisitorChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: "600",
+    color: colors.gray[600],
+  },
+
+  reportVisitorChipTextActive: {
+    color: colors.purple,
+  },
+
+  reportVisitorTable: {
+    minWidth: isSmallPhone ? 720 : 820,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: colors.white,
+    marginBottom: spacing.lg,
+  },
+
+  reportVisitorTableRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    minHeight: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+    backgroundColor: colors.white,
+    ...webHover({
+      cursor: "pointer",
+      transition: "background-color 0.2s ease",
+      ":hover": {
+        backgroundColor: colors.gray[50],
+      },
+    }),
+  },
+
+  reportVisitorTableRowSelected: {
+    backgroundColor: "#ECFDF5",
+  },
+
+  reportVisitorTableHeader: {
+    minHeight: 44,
+    backgroundColor: colors.gray[900],
+    borderBottomWidth: 0,
+  },
+
+  reportVisitorHeaderCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.white,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  reportVisitorCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    justifyContent: "center",
+  },
+
+  reportVisitorNameCell: {
+    width: 260,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  reportVisitorOfficeCell: {
+    width: 180,
+  },
+
+  reportVisitorCheckInCell: {
+    width: 125,
+  },
+
+  reportVisitorContactCell: {
+    width: 230,
+  },
+
+  reportVisitorSelectDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.gray[300],
+    backgroundColor: colors.white,
+  },
+
+  reportVisitorSelectDotActive: {
+    borderColor: colors.success,
+    backgroundColor: colors.success,
+  },
+
+  reportVisitorInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  reportVisitorPrimaryText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[900],
+  },
+
+  reportVisitorMutedText: {
+    marginTop: 2,
+    fontSize: fontSize.xs,
+    fontWeight: "600",
+    color: colors.gray[500],
+  },
+
+  reportVisitorEmptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.gray[50],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+
+  reportVisitorEmptyTitle: {
+    marginTop: spacing.sm,
+    fontSize: fontSize.md,
+    fontWeight: "800",
+    color: colors.gray[800],
+  },
+
+  reportVisitorEmptyText: {
+    marginTop: spacing.xs,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: colors.gray[500],
+    textAlign: "center",
+  },
+
+  reportCategoryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+
+  reportCategoryChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    backgroundColor: colors.gray[50],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    }),
+  },
+
+  reportCategoryChipActive: {
+    backgroundColor: colors.dangerLight,
+    borderColor: colors.danger,
+  },
+
+  reportCategoryChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[600],
+  },
+
+  reportCategoryChipTextActive: {
+    color: colors.danger,
+  },
+
+  reportFormInput: {
+    minHeight: 110,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 16,
+    backgroundColor: colors.gray[50],
+    padding: spacing.md,
+    color: colors.gray[900],
+    textAlignVertical: "top",
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+
+  reportFormActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+
+  reportFormSecondaryButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 14,
+    backgroundColor: colors.gray[100],
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    }),
+  },
+
+  reportFormSecondaryButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[700],
+  },
+
+  reportFormPrimaryButton: {
+    minWidth: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 14,
+    backgroundColor: colors.purple,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    }),
+  },
+
+  reportFormPrimaryButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.white,
+  },
+
   reportStatsGrid: {
     flexDirection: "row",
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
 
   reportStatCard: {
     flex: 1,
+    minWidth: isSmallPhone ? "100%" : 110,
     backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: spacing.lg,
+    borderRadius: 16,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.gray[200],
@@ -1146,15 +1924,16 @@ export default StyleSheet.create({
   },
 
   reportStatValue: {
-    fontSize: fontSize.xxxl,
-    fontWeight: "700",
+    fontSize: isSmallPhone ? fontSize.xl : fontSize.xxl,
+    fontWeight: "800",
     color: colors.gray[900],
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
 
   reportStatLabel: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: colors.gray[500],
+    textAlign: "center",
   },
 
   reportSection: {
@@ -1221,6 +2000,88 @@ export default StyleSheet.create({
     fontWeight: "600",
     color: colors.gray[600],
     textAlign: "right",
+  },
+
+  securityReportsTable: {
+    minWidth: isSmallPhone ? 680 : 760,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: colors.white,
+  },
+
+  securityReportsTableRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    minHeight: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+    backgroundColor: colors.white,
+  },
+
+  securityReportsTableHeader: {
+    minHeight: 46,
+    backgroundColor: colors.gray[900],
+    borderBottomWidth: 0,
+  },
+
+  securityReportsHeaderCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.white,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  securityReportsCell: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    justifyContent: "center",
+  },
+
+  securityReportsIncidentCell: {
+    width: 290,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  securityReportsVisitorCell: {
+    width: 170,
+  },
+
+  securityReportsDateCell: {
+    width: 145,
+  },
+
+  securityReportsStatusCell: {
+    width: 120,
+  },
+
+  securityReportsIncidentIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEE2E2",
+  },
+
+  securityReportsPrimaryText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[900],
+  },
+
+  securityReportsMutedText: {
+    fontSize: fontSize.sm,
+    fontWeight: "600",
+    color: colors.gray[600],
   },
 
   reportCard: {
@@ -1314,12 +2175,79 @@ export default StyleSheet.create({
     paddingHorizontal: spacing.md,
     marginTop: spacing.md,
     marginBottom: spacing.xl,
+    ...(isWeb && {
+      maxWidth: isDesktop ? 1200 : isTablet ? 900 : "100%",
+      alignSelf: "center",
+      width: "100%",
+    }),
   },
 
   quickActionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.md,
+  },
+
+  securityCommandGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+  },
+
+  securityCommandCard: {
+    minWidth: isSmallPhone ? "100%" : "47%",
+    flexGrow: 1,
+    flexBasis: isDesktop ? 240 : 260,
+    backgroundColor: colors.white,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+      web: {
+        boxShadow: "0px 4px 12px rgba(15,23,42,0.06)",
+        transition: "all 0.2s ease",
+        ":hover": {
+          transform: "translateY(-2px)",
+          boxShadow: "0px 8px 22px rgba(15,23,42,0.10)",
+        },
+      },
+    }),
+  },
+
+  securityCommandIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  securityCommandCopy: {
+    flex: 1,
+  },
+
+  securityCommandTitle: {
+    fontSize: fontSize.md,
+    fontWeight: "700",
+    color: colors.gray[900],
+  },
+
+  securityCommandSubtitle: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    lineHeight: 16,
+    marginTop: 4,
   },
 
   quickActionCard: {
@@ -1504,6 +2432,66 @@ export default StyleSheet.create({
     borderRadius: 2,
   },
 
+  sidebarModuleCard: {
+    marginBottom: spacing.xs,
+  },
+
+  sidebarSubmoduleList: {
+    marginLeft: 48,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.sm,
+    paddingLeft: spacing.sm,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.gray[200],
+    gap: spacing.xs,
+  },
+
+  sidebarSubmoduleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: colors.white,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      ":hover": { backgroundColor: colors.gray[50] },
+    }),
+  },
+
+  sidebarSubmoduleButtonActive: {
+    backgroundColor: colors.primarySoft,
+  },
+
+  sidebarSubmoduleLabel: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: "600",
+    color: colors.gray[600],
+  },
+
+  sidebarSubmoduleLabelActive: {
+    color: colors.primary,
+  },
+
+  sidebarSubmoduleBadge: {
+    minWidth: 24,
+    height: 22,
+    paddingHorizontal: spacing.xs,
+    borderRadius: 999,
+    backgroundColor: colors.gray[100],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  sidebarSubmoduleBadgeText: {
+    fontSize: fontSize.xxs,
+    fontWeight: "700",
+    color: colors.gray[600],
+  },
+
   sidebarStatsSection: {
     padding: spacing.md,
     borderTopWidth: 1,
@@ -1554,9 +2542,11 @@ export default StyleSheet.create({
 
   sidebarSectionTitle: {
     fontSize: fontSize.sm,
-    fontWeight: "600",
-    color: colors.gray[700],
+    fontWeight: "800",
+    color: colors.gray[900],
     marginBottom: spacing.sm,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 
   sidebarRankItem: {
@@ -1854,6 +2844,216 @@ export default StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.gray[400],
     marginTop: spacing.xs,
+  },
+
+  visitorDetailModalContent: {
+    maxWidth: 760,
+  },
+
+  visitorDetailHeader: {
+    alignItems: "flex-start",
+  },
+
+  visitorDetailHeaderSubtitle: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    marginTop: 4,
+    lineHeight: 16,
+  },
+
+  visitorDetailBody: {
+    gap: spacing.lg,
+  },
+
+  visitorHistoryNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.warningSoft,
+    borderWidth: 1,
+    borderColor: colors.warningLight,
+    borderRadius: 18,
+    padding: spacing.md,
+  },
+
+  visitorHistoryNoticeText: {
+    flex: 1,
+    fontSize: fontSize.xs,
+    lineHeight: 18,
+    color: "#92400E",
+    fontWeight: "600",
+  },
+
+  visitorDetailHero: {
+    backgroundColor: colors.gray[50],
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.lg,
+    gap: spacing.lg,
+    ...(isWeb && isDesktop ? { flexDirection: "row", alignItems: "center" } : {}),
+  },
+
+  visitorDetailHeroCopy: {
+    flex: 1,
+  },
+
+  visitorDetailBadgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  visitorDetailStatusPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+  },
+
+  visitorDetailStatusPillText: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+
+  visitorDetailAccessPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.infoSoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+  },
+
+  visitorDetailAccessPillText: {
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+    color: colors.secondary,
+  },
+
+  visitorDetailPurpose: {
+    fontSize: fontSize.base,
+    color: colors.gray[600],
+    marginTop: spacing.xs,
+    lineHeight: 20,
+  },
+
+  visitorDetailQuickInfo: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+
+  visitorDetailQuickInfoCard: {
+    minWidth: 120,
+    flexGrow: 1,
+    flexBasis: 120,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+
+  visitorDetailQuickInfoLabel: {
+    fontSize: fontSize.xxs,
+    color: colors.gray[400],
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    fontWeight: "700",
+  },
+
+  visitorDetailQuickInfoValue: {
+    fontSize: fontSize.sm,
+    color: colors.gray[800],
+    fontWeight: "700",
+    marginTop: 4,
+  },
+
+  visitorDetailSection: {
+    gap: spacing.sm,
+  },
+
+  visitorDetailSectionTitle: {
+    fontSize: fontSize.md,
+    fontWeight: "800",
+    color: colors.gray[900],
+  },
+
+  visitorDetailInfoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+
+  visitorDetailInfoCard: {
+    minWidth: 180,
+    flexGrow: 1,
+    flexBasis: 180,
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.md,
+  },
+
+  visitorDetailInfoLabel: {
+    fontSize: fontSize.xxs,
+    color: colors.gray[400],
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+
+  visitorDetailInfoValue: {
+    fontSize: fontSize.sm,
+    color: colors.gray[800],
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+
+  visitorDetailTimeline: {
+    backgroundColor: colors.gray[50],
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+
+  visitorDetailTimelineItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+
+  visitorDetailTimelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+
+  visitorDetailTimelineCopy: {
+    flex: 1,
+  },
+
+  visitorDetailTimelineTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[800],
+  },
+
+  visitorDetailTimelineText: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    marginTop: 2,
+    lineHeight: 16,
   },
 
   detailInfoSection: {
@@ -2221,6 +3421,69 @@ export default StyleSheet.create({
     fontSize: fontSize.xxs,
     color: colors.success,
     fontWeight: '500',
+  },
+
+  securityMetricGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+    ...(isWeb && {
+      maxWidth: isDesktop ? 1200 : isTablet ? 900 : "100%",
+      alignSelf: "center",
+      width: "100%",
+    }),
+  },
+
+  securityMetricCard: {
+    minWidth: isSmallPhone ? "100%" : 220,
+    flexGrow: 1,
+    flexBasis: 220,
+    backgroundColor: colors.white,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    padding: spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 4px 12px rgba(15,23,42,0.06)" },
+    }),
+  },
+
+  securityMetricIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+
+  securityMetricValue: {
+    fontSize: isSmallPhone ? 24 : 28,
+    fontWeight: "800",
+    color: colors.gray[900],
+  },
+
+  securityMetricLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[700],
+    marginTop: 4,
+  },
+
+  securityMetricHelper: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    lineHeight: 16,
+    marginTop: 6,
   },
 
   // ============ HOVER CARD ============

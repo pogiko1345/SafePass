@@ -1,4 +1,3 @@
-// RoleSelectScreen.jsx - Side-by-Side Boxes Design
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -6,7 +5,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
-  Dimensions,
   Platform,
   Animated,
   AccessibilityInfo,
@@ -14,54 +12,49 @@ import {
   ScrollView,
   Keyboard,
   Alert,
+  Image,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import roleSelectStyles from "../styles/RoleSelectStyles";
 
-const { width, height } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
-const isSmallPhone = width <= 375;
 
 export default function RoleSelectScreen({ navigation, route }) {
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  
-  // Animation values
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const card1Anim = useRef(new Animated.Value(0)).current;
   const card2Anim = useRef(new Animated.Value(0)).current;
 
-  // ============ USEFFECT - Animation & Keyboard ============
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => setKeyboardVisible(true)
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => setKeyboardVisible(false)
-    );
+    const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", () => {
+      setKeyboardVisible(true);
+    });
+    const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardVisible(false);
+    });
 
-    // Entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 600,
-        useNativeDriver: Platform.OS !== 'web',
+        useNativeDriver: Platform.OS !== "web",
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 500,
-        useNativeDriver: Platform.OS !== 'web',
+        useNativeDriver: Platform.OS !== "web",
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
         friction: 10,
         tension: 35,
-        useNativeDriver: Platform.OS !== 'web',
+        useNativeDriver: Platform.OS !== "web",
       }),
       Animated.stagger(100, [
         Animated.timing(card1Anim, {
@@ -77,37 +70,38 @@ export default function RoleSelectScreen({ navigation, route }) {
       ]),
     ]).start();
 
-    // Announce screen for screen readers
-    if (Platform.OS !== 'web') {
-      AccessibilityInfo.announceForAccessibility("Role selection screen. Choose visitor registration or login to access your account.");
+    if (Platform.OS !== "web") {
+      AccessibilityInfo.announceForAccessibility(
+        "Role selection screen. Choose visitor registration or login to access your account."
+      );
     }
 
     return () => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
     };
+  }, [card1Anim, card2Anim, fadeAnim, scaleAnim, slideAnim]);
+
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.title = "Sapphire International Aviation Academy";
+    }
   }, []);
 
-  // ============ SUCCESS MESSAGE FROM REGISTRATION ============
   useEffect(() => {
     if (route?.params?.registrationSuccess && route?.params?.message) {
       const timer = setTimeout(() => {
-        Alert.alert(
-          "Registration Submitted! 🎉",
-          route.params.message,
-          [{ text: "OK, Got it!" }]
-        );
-        navigation.setParams({ 
-          registrationSuccess: undefined, 
-          message: undefined 
+        Alert.alert("Registration Submitted!", route.params.message, [{ text: "OK, Got it!" }]);
+        navigation.setParams({
+          registrationSuccess: undefined,
+          message: undefined,
         });
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [route?.params, navigation]);
 
-  // ============ ROLE HANDLERS ============
   const handleVisitorSelect = () => {
     navigation.navigate("VisitorRegister", {
       timestamp: Date.now(),
@@ -115,7 +109,7 @@ export default function RoleSelectScreen({ navigation, route }) {
   };
 
   const handleLoginSelect = () => {
-    navigation.navigate("Login", { 
+    navigation.navigate("Login", {
       timestamp: Date.now(),
     });
   };
@@ -127,24 +121,31 @@ export default function RoleSelectScreen({ navigation, route }) {
     }
   };
 
-  // Determine if we should use row layout (side-by-side)
+  const openExternalLink = async (url) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert("Link Unavailable", "This link could not be opened on your device.");
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert("Link Error", "Unable to open the school link right now.");
+    }
+  };
+
   const isRowLayout = windowWidth >= 768 && !keyboardVisible;
 
   return (
     <SafeAreaView style={roleSelectStyles.safeArea}>
-      <StatusBar 
-        barStyle="light-content" 
-        backgroundColor="#0A3D91"
-        translucent={false}
-      />
-      
-      <ScrollView 
+      <StatusBar barStyle="light-content" backgroundColor="#041E42" translucent={false} />
+
+      <ScrollView
         contentContainerStyle={roleSelectStyles.scrollContainer}
         showsVerticalScrollIndicator={false}
         bounces={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Hero Section */}
         <Animated.View
           style={[
             roleSelectStyles.heroWrapper,
@@ -155,45 +156,68 @@ export default function RoleSelectScreen({ navigation, route }) {
           ]}
         >
           <LinearGradient
-            colors={["#0A3D91", "#1E4A8C", "#2B5A9E"]}
+            colors={["#041E42", "#0A3D91", "#1C6DD0"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={roleSelectStyles.hero}
           >
+            <View style={roleSelectStyles.heroGlowOne} />
+            <View style={roleSelectStyles.heroGlowTwo} />
+
             <View style={roleSelectStyles.heroContent}>
-              {/* Logo */}
-              <View style={roleSelectStyles.logoContainer}>
-                <LinearGradient
-                  colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.05)"]}
-                  style={roleSelectStyles.logoGradient}
-                >
-                  <Ionicons 
-                    name="airplane" 
-                    size={48} 
-                    color="#FFFFFF" 
-                  />
-                </LinearGradient>
+              <View style={roleSelectStyles.brandBadge}>
+                <Image
+                  source={require("../assets/LogoSapphire.jpg")}
+                  style={roleSelectStyles.brandBadgeLogo}
+                  resizeMode="contain"
+                />
+                <View style={roleSelectStyles.brandBadgeTextWrap}>
+                  <Text style={roleSelectStyles.brandBadgeEyebrow}>Entry Portal</Text>
+                  <Text style={roleSelectStyles.brandBadgeTitle}>SafePass Command Center</Text>
+                </View>
               </View>
-              
-              {/* Title */}
+
+              <View style={roleSelectStyles.logoContainer}>
+                <Image
+                  source={require("../assets/LogoSapphire.jpg")}
+                  style={roleSelectStyles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+
               <Text style={roleSelectStyles.heroTitle}>
-                Sapphire Aviation
+                Sapphire International Aviation Academy
               </Text>
               <Text style={roleSelectStyles.heroSubtitle}>
-                Visitor Management System
+                Secure Arrival and Access Control
               </Text>
-              
+
               <View style={roleSelectStyles.heroDivider} />
-              
+
               <Text style={roleSelectStyles.heroDescription}>
-                Smart • Secure • Seamless
+                Built for visitors, security personnel, and administrative teams in one streamlined
+                checkpoint experience.
               </Text>
+
+              <View style={roleSelectStyles.heroMetrics}>
+                <View style={roleSelectStyles.heroMetricCard}>
+                  <Text style={roleSelectStyles.heroMetricValue}>24/7</Text>
+                  <Text style={roleSelectStyles.heroMetricLabel}>Gate Visibility</Text>
+                </View>
+                <View style={roleSelectStyles.heroMetricCard}>
+                  <Text style={roleSelectStyles.heroMetricValue}>NFC</Text>
+                  <Text style={roleSelectStyles.heroMetricLabel}>Access Ready</Text>
+                </View>
+                <View style={roleSelectStyles.heroMetricCard}>
+                  <Text style={roleSelectStyles.heroMetricValue}>Live</Text>
+                  <Text style={roleSelectStyles.heroMetricLabel}>Approval Tracking</Text>
+                </View>
+              </View>
             </View>
           </LinearGradient>
         </Animated.View>
 
-        {/* Main Content */}
-        <Animated.View 
+        <Animated.View
           style={[
             roleSelectStyles.content,
             {
@@ -202,29 +226,32 @@ export default function RoleSelectScreen({ navigation, route }) {
             },
           ]}
         >
-          <Text style={roleSelectStyles.sectionTitle}>
-            Welcome to SafePass
-          </Text>
+          <Text style={roleSelectStyles.sectionTitle}>Welcome to SafePass</Text>
           <Text style={roleSelectStyles.sectionSubtitle}>
-            Enterprise visitor tracking and appointment-based access management
+            Choose how you want to enter the system and continue with visitor registration or secure
+            sign-in.
           </Text>
 
-          {/* Cards Container - Row layout for tablet/desktop, Column for mobile */}
-          <View style={[
-            roleSelectStyles.cardsContainer,
-            isRowLayout && roleSelectStyles.cardsRow
-          ]}>
-            {/* Visitor Registration Card */}
+          <View
+            style={[
+              roleSelectStyles.cardsContainer,
+              isRowLayout && roleSelectStyles.cardsRow,
+            ]}
+          >
             <Animated.View
               style={[
                 roleSelectStyles.cardWrapper,
                 isRowLayout && roleSelectStyles.cardWrapperRow,
                 {
                   opacity: card1Anim,
-                  transform: [{ translateY: card1Anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30, 0],
-                  }) }],
+                  transform: [
+                    {
+                      translateY: card1Anim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [30, 0],
+                      }),
+                    },
+                  ],
                 },
               ]}
             >
@@ -246,7 +273,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                 >
                   <View style={roleSelectStyles.cardIconWrapper}>
                     <LinearGradient
-                      colors={["#7C3AED", "#8B5CF6"]}
+                      colors={["#0F766E", "#14B8A6"]}
                       style={roleSelectStyles.cardIconGradient}
                     >
                       <Ionicons name="person-add-outline" size={28} color="#FFFFFF" />
@@ -255,41 +282,45 @@ export default function RoleSelectScreen({ navigation, route }) {
                   <View style={roleSelectStyles.cardContent}>
                     <Text style={roleSelectStyles.cardTitle}>New Visitor</Text>
                     <Text style={roleSelectStyles.cardDescription}>
-                      Register for a new visitor account to schedule your visit and receive your virtual NFC card
+                      Register for a new visitor account, plan your visit, and receive your virtual
+                      NFC access profile.
                     </Text>
                     <View style={roleSelectStyles.cardFeatures}>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="card-outline" size={12} color="#7C3AED" />
+                        <Ionicons name="card-outline" size={12} color="#0F766E" />
                         <Text style={roleSelectStyles.featurePillText}>Virtual NFC Card</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="calendar-outline" size={12} color="#7C3AED" />
+                        <Ionicons name="calendar-outline" size={12} color="#0F766E" />
                         <Text style={roleSelectStyles.featurePillText}>Schedule Visit</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="location-outline" size={12} color="#7C3AED" />
-                        <Text style={roleSelectStyles.featurePillText}>GPS Tracking</Text>
+                        <Ionicons name="document-text-outline" size={12} color="#0F766E" />
+                        <Text style={roleSelectStyles.featurePillText}>Fast Check-In</Text>
                       </View>
                     </View>
                   </View>
                   <View style={roleSelectStyles.cardArrow}>
-                    <Ionicons name="arrow-forward" size={20} color="#7C3AED" />
+                    <Ionicons name="arrow-forward" size={20} color="#0F766E" />
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Login Card */}
             <Animated.View
               style={[
                 roleSelectStyles.cardWrapper,
                 isRowLayout && roleSelectStyles.cardWrapperRow,
                 {
                   opacity: card2Anim,
-                  transform: [{ translateY: card2Anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30, 0],
-                  }) }],
+                  transform: [
+                    {
+                      translateY: card2Anim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [30, 0],
+                      }),
+                    },
+                  ],
                 },
               ]}
             >
@@ -306,12 +337,12 @@ export default function RoleSelectScreen({ navigation, route }) {
                 })}
               >
                 <LinearGradient
-                  colors={["#FFFFFF", "#F0F9FF"]}
+                  colors={["#FFFFFF", "#EFF6FF"]}
                   style={roleSelectStyles.cardGradient}
                 >
                   <View style={roleSelectStyles.cardIconWrapper}>
                     <LinearGradient
-                      colors={["#0A3D91", "#1E4A8C"]}
+                      colors={["#041E42", "#0A3D91"]}
                       style={roleSelectStyles.cardIconGradient}
                     >
                       <Ionicons name="log-in-outline" size={28} color="#FFFFFF" />
@@ -320,7 +351,8 @@ export default function RoleSelectScreen({ navigation, route }) {
                   <View style={roleSelectStyles.cardContent}>
                     <Text style={roleSelectStyles.cardTitle}>Existing User</Text>
                     <Text style={roleSelectStyles.cardDescription}>
-                      Login to your account to check approval status, access your dashboard, and manage your visits
+                      Sign in to review approvals, open your dashboard, manage appointments, and
+                      continue your access flow.
                     </Text>
                     <View style={roleSelectStyles.cardFeatures}>
                       <View style={roleSelectStyles.featurePill}>
@@ -328,8 +360,8 @@ export default function RoleSelectScreen({ navigation, route }) {
                         <Text style={roleSelectStyles.featurePillText}>Check Status</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="dashboard-outline" size={12} color="#0A3D91" />
-                        <Text style={roleSelectStyles.featurePillText}>Dashboard</Text>
+                        <Ionicons name="shield-checkmark-outline" size={12} color="#0A3D91" />
+                        <Text style={roleSelectStyles.featurePillText}>Secure Access</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
                         <Ionicons name="settings-outline" size={12} color="#0A3D91" />
@@ -345,7 +377,6 @@ export default function RoleSelectScreen({ navigation, route }) {
             </Animated.View>
           </View>
 
-          {/* Feature Highlights */}
           <View style={roleSelectStyles.infoGrid}>
             <View style={roleSelectStyles.infoCard}>
               <Ionicons name="shield-checkmark-outline" size={19} color="#10B981" />
@@ -361,8 +392,7 @@ export default function RoleSelectScreen({ navigation, route }) {
             </View>
           </View>
 
-          {/* Help Link */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={roleSelectStyles.helpLink}
             onPress={() => navigation.navigate("Help")}
             accessibilityLabel="Need help?"
@@ -373,7 +403,59 @@ export default function RoleSelectScreen({ navigation, route }) {
             <Text style={roleSelectStyles.helpText}>Need help?</Text>
           </TouchableOpacity>
 
-          {/* Version */}
+          <View style={roleSelectStyles.contactCard}>
+            <View style={roleSelectStyles.contactHeader}>
+              <View style={roleSelectStyles.contactHeaderIcon}>
+                <Ionicons name="call-outline" size={18} color="#0A3D91" />
+              </View>
+              <View style={roleSelectStyles.contactHeaderText}>
+                <Text style={roleSelectStyles.contactTitle}>School Contact Details</Text>
+                <Text style={roleSelectStyles.contactSubtitle}>
+                  Sapphire International Aviation Academy
+                </Text>
+              </View>
+            </View>
+
+            <View style={roleSelectStyles.contactList}>
+              <Text style={roleSelectStyles.contactLine}>Website: sapphireaviationacademy.edu.ph</Text>
+              <Text style={roleSelectStyles.contactLine}>Tel No: (02) 7091 - 3362</Text>
+              <Text style={roleSelectStyles.contactLine}>Mobile No: 0917 580 4858</Text>
+            </View>
+
+            <View style={roleSelectStyles.contactLinkRow}>
+              <TouchableOpacity
+                style={roleSelectStyles.contactLinkChip}
+                onPress={() => openExternalLink("https://sapphireaviationacademy.edu.ph/")}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="globe-outline" size={15} color="#0A3D91" />
+                <Text style={roleSelectStyles.contactLinkText}>Website</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={roleSelectStyles.contactLinkChip}
+                onPress={() => openExternalLink("https://www.facebook.com/sapphireaviationacademy/")}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="logo-facebook" size={15} color="#0A3D91" />
+                <Text style={roleSelectStyles.contactLinkText}>Facebook</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={roleSelectStyles.contactLinkChip}
+                onPress={() => openExternalLink("https://www.youtube.com/@sapphireaviation5105")}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="logo-youtube" size={15} color="#0A3D91" />
+                <Text style={roleSelectStyles.contactLinkText}>YouTube</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={roleSelectStyles.contactCopyright}>
+              ©2024. Sapphire International Aviation Academy
+            </Text>
+          </View>
+
           <Text style={roleSelectStyles.versionText}>SafePass v2.1.0</Text>
         </Animated.View>
       </ScrollView>

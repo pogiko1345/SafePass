@@ -2,21 +2,37 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema({
-  employeeId: { type: String, unique: true, sparse: true, default: null },
+  employeeId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    default: undefined,
+    trim: true,
+  },
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
+  username: {
+    type: String,
+    unique: true,
+    sparse: true,
+    default: undefined,
+    trim: true,
+    lowercase: true,
+  },
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true },
-  phone: { type: String, required: true },
+  phone: { type: String, default: "" },
+  emergencyContact: { type: String, default: "" },
+  profilePhoto: { type: String, default: "" },
   visitorId: { type: mongoose.Schema.Types.ObjectId, ref: "Visitor" },
   
   department: { type: String, default: "" },
   position: { type: String, default: "" },
-  shift: { type: String, default: "Morning" },
+  shift: { type: String, default: "" },
   
 role: {
   type: String,
-  enum: ["visitor", "security", "admin", "staff"],
+  enum: ["visitor", "security", "guard", "admin", "staff"],
   default: "visitor",
 },
   status: {
@@ -41,6 +57,16 @@ role: {
     cardActive: { type: Boolean, default: true },
   },
 
+  isVerified: { type: Boolean, default: false },
+  verificationTokenHash: { type: String, default: "" },
+  verificationExpiresAt: { type: Date, default: null },
+  verificationOtpHash: { type: String, default: "" },
+  verificationOtpExpiresAt: { type: Date, default: null },
+  verificationOtpAttempts: { type: Number, default: 0 },
+  verifiedAt: { type: Date, default: null },
+  dataPrivacyAccepted: { type: Boolean, default: false },
+  dataPrivacyAcceptedAt: { type: Date, default: null },
+
   isActive: { type: Boolean, default: true },
   lastLogin: Date,
   createdAt: { type: Date, default: Date.now },
@@ -49,6 +75,26 @@ role: {
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {
+  if (this.employeeId === null || this.employeeId === "") {
+    this.employeeId = undefined;
+  }
+
+  if (this.username === null || this.username === "") {
+    this.username = undefined;
+  }
+
+  if (this.nfcCardId === null || this.nfcCardId === "") {
+    this.nfcCardId = undefined;
+  }
+
+  if (this.email) {
+    this.email = String(this.email).toLowerCase().trim();
+  }
+
+  if (this.username) {
+    this.username = String(this.username).toLowerCase().trim();
+  }
+
   if (!this.isModified("password")) return next();
 
   try {

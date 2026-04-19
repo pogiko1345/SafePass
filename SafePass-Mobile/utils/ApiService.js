@@ -1,13 +1,53 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as ImageManipulator from 'expo-image-manipulator';
-import { Platform } from "react-native";
+import { Platform } from 'react-native';
+let AsyncStorage;
 
-const API_BASE_URL = Platform.select({
-  ios: "http://localhost:5000/api",           // iOS simulator
-  android: "http://10.0.2.2:5000/api",        // Android emulator
-  web: "http://localhost:5000/api",           // Web
-  default: "http://localhost:5000/api"        // Default
+if (Platform.OS === 'web') {
+  AsyncStorage = require('./webStorage').default;
+} else {
+  AsyncStorage = require('@react-native-async-storage/async-storage').default;
+}
+import * as ImageManipulator from 'expo-image-manipulator';
+
+const WEB_FALLBACK_API_BASE_URL = (() => {
+  if (
+    typeof window === "undefined" ||
+    !window.location ||
+    !window.location.protocol ||
+    !window.location.hostname
+  ) {
+    return "http://localhost:5000/api";
+  }
+
+  const { protocol, hostname } = window.location;
+  const isLocalHost =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0";
+
+  return isLocalHost
+    ? `${protocol}//${hostname}:5000/api`
+    : "https://safepass-052h.onrender.com/api";
+})();
+
+const DEFAULT_API_BASE_URL = Platform.select({
+  ios: "http://localhost:5000/api",            // iOS simulator
+  android: "http://10.0.2.2:5000/api",         // Android emulator
+  web: WEB_FALLBACK_API_BASE_URL,              // Browser on same host as backend
+  default: "http://localhost:5000/api",        // Default
 });
+
+const API_BASE_URL = (
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
+  DEFAULT_API_BASE_URL
+).replace(/\/$/, "");
+
+const API_BASE_URL_CANDIDATES =
+  process.env.EXPO_PUBLIC_API_BASE_URL || Platform.OS !== "android"
+    ? [API_BASE_URL]
+    : ["http://10.0.2.2:5000/api", "http://localhost:5000/api"];
+
+// Keep simulation/fallback OFF by default so app uses real backend/database.
+const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
 
 class ApiService {
   constructor() {
@@ -19,17 +59,59 @@ class ApiService {
   // ================= TOKEN HANDLING =================
 
   async setToken(token) {
-    this.token = token;
-    if (token) {
-      await AsyncStorage.setItem("userToken", token);
+    const normalizedToken = typeof token === "string" ? token.trim() : "";
+    const validToken =
+      normalizedToken &&
+      normalizedToken !== "undefined" &&
+      normalizedToken !== "null"
+        ? normalizedToken
+        : null;
+
+    this.token = validToken;
+    if (validToken) {
+      await AsyncStorage.setItem("userToken", validToken);
+      // Backward compatibility for older screens still reading authToken.
+      await AsyncStorage.setItem("authToken", validToken);
     } else {
       await AsyncStorage.removeItem("userToken");
+      await AsyncStorage.removeItem("authToken");
     }
   }
 
   async getToken() {
     if (!this.token) {
-      this.token = await AsyncStorage.getItem("userToken");
+      const userTokenRaw = await AsyncStorage.getItem("userToken");
+      const userToken =
+        typeof userTokenRaw === "string"
+          ? userTokenRaw.trim()
+          : "";
+
+      if (userToken) {
+        if (userToken === "undefined" || userToken === "null") {
+          await AsyncStorage.removeItem("userToken");
+          await AsyncStorage.removeItem("authToken");
+          this.token = null;
+        } else {
+          this.token = userToken;
+        }
+      } else {
+        // Backward compatibility: migrate legacy authToken to userToken.
+        const legacyTokenRaw = await AsyncStorage.getItem("authToken");
+        const legacyToken =
+          typeof legacyTokenRaw === "string"
+            ? legacyTokenRaw.trim()
+            : "";
+
+        if (legacyToken) {
+          if (legacyToken === "undefined" || legacyToken === "null") {
+            await AsyncStorage.removeItem("authToken");
+            this.token = null;
+          } else {
+            this.token = legacyToken;
+            await AsyncStorage.setItem("userToken", legacyToken);
+          }
+        }
+      }
     }
     return this.token;
   }
@@ -38,51 +120,76 @@ class ApiService {
     this.token = null;
     await AsyncStorage.multiRemove([
       "userToken",
+      "authToken",
       "currentUser",
       "trustedDevice",
       "isNewRegistration"
     ]);
   }
 
-  // Add to ApiService.js
-
-// Process NFC tap from mobile app
-static async processNfcTap(tapData) {
-  try {
-    const response = await this.api.post('/nfc/tap', tapData);
-    return response.data;
-  } catch (error) {
-    console.error('Process NFC tap error:', error);
-    throw error;
+  isDevFallbackEnabled() {
+    return DEV_FALLBACK_ENABLED;
   }
-}
 
-// Send command to Arduino gate controller
-static async sendGateCommand(gateId, command, visitorId) {
-  try {
-    const response = await this.api.post('/gate/control', {
+  // ================= NFC METHODS =================
+  async processNfcTap(tapData) {
+    try {
+      const visitorId = tapData?.visitorId;
+      if (!visitorId) {
+        return { success: false, message: "Missing visitor ID" };
+      }
+
+      const visitorRes = await this.getVisitorById(visitorId);
+      const visitor = visitorRes?.visitor;
+      if (!visitor) {
+        return { success: false, message: "Visitor record not found" };
+      }
+
+      if (visitor.status === "checked_in") {
+        const response = await this.fetch(`/visitors/${visitorId}/self-checkout`, {
+          method: "PUT",
+        });
+        return { ...response, action: "check_out" };
+      }
+
+      if (visitor.status === "checked_out") {
+        return { success: false, message: "Visit already completed" };
+      }
+
+      if (visitor.status !== "approved" && visitor.approvalStatus !== "approved") {
+        return { success: false, message: "Visit request is not approved yet" };
+      }
+
+      const response = await this.fetch(`/visitors/${visitorId}/self-checkin`, {
+        method: "PUT",
+      });
+      return { ...response, action: "check_in" };
+    } catch (error) {
+      console.error("Process NFC tap error:", error);
+      throw error;
+    }
+  }
+
+  async sendGateCommand(gateId, command, visitorId) {
+    // Gate controller endpoint is not available yet; keep API shape stable.
+    return {
+      success: true,
+      simulated: true,
       gateId,
-      command, // 'open', 'close', 'status'
+      command,
       visitorId,
-      timestamp: new Date().toISOString()
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Send gate command error:', error);
-    throw error;
+      timestamp: new Date().toISOString(),
+    };
   }
-}
 
-// Get gate status
-static async getGateStatus(gateId) {
-  try {
-    const response = await this.api.get(`/gate/status/${gateId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Get gate status error:', error);
-    throw error;
+  async getGateStatus(gateId) {
+    return {
+      success: true,
+      simulated: true,
+      gateId,
+      status: "online",
+    };
   }
-}
 
   // ================= GENERIC FETCH =================
 async fetch(url, options = {}) {
@@ -124,7 +231,10 @@ async fetch(url, options = {}) {
 
     if (!response.ok) {
       console.log(`❌ HTTP ${response.status}:`, data);
-      throw new Error(data.error || data.message || `HTTP ${response.status}`);
+      const apiError = new Error(data.error || data.message || `HTTP ${response.status}`);
+      apiError.status = response.status;
+      apiError.data = data;
+      throw apiError;
     }
 
     return data;
@@ -156,6 +266,31 @@ async register(userData) {
   }
 }
 
+  async createStaffUser(staffData) {
+    try {
+      const payload = {
+        ...staffData,
+        role: "staff",
+        status: staffData?.status || "active",
+        isActive: staffData?.isActive ?? true,
+      };
+      return await this.fetch("/admin/staff/create", {
+        method: "POST",
+        body: payload,
+      });
+    } catch (error) {
+      const errorMessage = String(error?.message || "").toLowerCase();
+      const message = errorMessage.includes("username already")
+        ? "Username already registered. Please use another username."
+        : errorMessage.includes("staff id already") || errorMessage.includes("employeeid")
+          ? "Staff ID already registered. Please use another staff ID."
+          : errorMessage.includes("email already")
+            ? "Email already registered. Please use another email address."
+            : error?.message || "Failed to create staff account";
+      throw new Error(message);
+    }
+  }
+
   async login(email, password) {
     try {
       const response = await this.fetch("/login", {
@@ -171,6 +306,13 @@ async register(userData) {
     } catch (error) {
       console.error("Login API error:", error);
       
+      if (error?.data?.requiresEmailVerification || error?.status === 403) {
+        throw new Error(
+          error?.data?.message ||
+            "Your account is not yet verified. Please verify your account using OTP first."
+        );
+      }
+
       if (error.message.includes("401")) {
         throw new Error("Invalid email or password. Please check your credentials.");
       }
@@ -275,8 +417,16 @@ async verifyCredentials(email, password) {
     
   } catch (error) {
     console.error("Verify credentials error:", error);
-    
-    // Demo accounts (fallback if backend not running)
+
+    if (!this.isDevFallbackEnabled()) {
+      throw new Error(
+        error?.data?.message ||
+          error.message ||
+          "Invalid email or password"
+      );
+    }
+
+    // Demo accounts (development fallback if backend not running)
     const demoAccounts = {
       'admin@test.com': { password: 'admin123', role: 'admin', status: 'active' },
       'security@test.com': { password: 'security123', role: 'security', status: 'active' },
@@ -314,6 +464,10 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.log("⚠️ OTP request API not ready - using simulation");
       
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
       
       this._lastOtp = {
@@ -351,6 +505,10 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.log("⚠️ OTP verify API not ready - using simulation");
       
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       const isValid = this._lastOtp && 
                      this._lastOtp.phoneNumber === phoneNumber &&
                      this._lastOtp.expiresAt > Date.now() &&
@@ -386,6 +544,10 @@ async verifyCredentials(email, password) {
       return response;
     } catch (error) {
       console.log("⚠️ Enable 2FA API not ready - using simulation");
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       return {
         success: true,
         message: "2FA enabled successfully",
@@ -401,6 +563,10 @@ async verifyCredentials(email, password) {
       return response;
     } catch (error) {
       console.log("⚠️ Disable 2FA API not ready - using simulation");
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       return {
         success: true,
         message: "2FA disabled successfully",
@@ -455,6 +621,10 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.log("⚠️ Password reset API not ready - using simulation");
       
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       const resetToken = "reset_" + Math.random().toString(36).substring(2);
       
       this._lastReset = {
@@ -490,6 +660,10 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.log("⚠️ Password reset verify API not ready - using simulation");
       
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       const isValid = this._lastReset?.email === email && 
                       this._lastReset?.token === resetToken &&
                       this._lastReset?.expiresAt > Date.now() &&
@@ -522,6 +696,10 @@ async verifyCredentials(email, password) {
       return response;
     } catch (error) {
       console.log("⚠️ Password reset API not ready - using simulation");
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
       return {
         success: true,
         message: "Password reset successfully"
@@ -553,11 +731,56 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async verifyEmailToken(token) {
+    try {
+      return await this.fetch("/auth/verify-email", {
+        method: "POST",
+        body: { token },
+      });
+    } catch (error) {
+      console.error("Email verification error:", error);
+      throw error;
+    }
+  }
+
+  async verifyRegistrationOtp(email, otpCode) {
+    try {
+      return await this.fetch("/auth/verify-registration-otp", {
+        method: "POST",
+        body: { email, otpCode },
+      });
+    } catch (error) {
+      console.error("Registration OTP verification error:", error);
+      throw error;
+    }
+  }
+
+  async resendRegistrationOtp(email) {
+    try {
+      return await this.fetch("/auth/resend-registration-otp", {
+        method: "POST",
+        body: { email },
+      });
+    } catch (error) {
+      console.error("Registration OTP resend error:", error);
+      throw error;
+    }
+  }
+
   async getVisitorProfile() {
     try {
-      const response = await this.fetch("/visitor-profile");
+      const response = await this.fetch("/visitor/profile");
       return response;
     } catch (error) {
+      if (error?.status === 404) {
+        return {
+          success: false,
+          visitor: null,
+          notFound: true,
+          message: "Visitor profile not found",
+        };
+      }
+
       console.error("Get visitor profile error:", error);
       throw error;
     }
@@ -568,15 +791,25 @@ async verifyCredentials(email, password) {
       const response = await this.fetch(`/visitors/${visitorId}/logs`);
       return response;
     } catch (error) {
+      if (error?.status === 404) {
+        return {
+          success: true,
+          logs: [],
+          notFound: true,
+          message: "Visitor access logs not found",
+        };
+      }
+
       console.error("Get visitor logs error:", error);
       throw error;
     }
   }
 
-  async visitorCheckIn(visitorId) {
+  async visitorCheckIn(visitorId, payload = {}) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/self-checkin`, {
         method: "PUT",
+        body: payload,
       });
       return response;
     } catch (error) {
@@ -585,14 +818,52 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async visitorCheckOut(visitorId) {
+  async visitorCheckOut(visitorId, payload = {}) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/self-checkout`, {
         method: "PUT",
+        body: payload,
       });
       return response;
     } catch (error) {
       console.error("Visitor check-out error:", error);
+      throw error;
+    }
+  }
+
+  async updateVisitorPhoneLocation(visitorId, locationData) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/phone-location`, {
+        method: "PUT",
+        body: locationData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Update visitor phone location error:", error);
+      throw error;
+    }
+  }
+
+  async securityCheckIn(visitorId) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/checkin`, {
+        method: "PUT",
+      });
+      return response;
+    } catch (error) {
+      console.error("Security check-in error:", error);
+      throw error;
+    }
+  }
+
+  async securityCheckOut(visitorId) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/checkout`, {
+        method: "PUT",
+      });
+      return response;
+    } catch (error) {
+      console.error("Security check-out error:", error);
       throw error;
     }
   }
@@ -614,6 +885,93 @@ async verifyCredentials(email, password) {
       return response;
     } catch (error) {
       console.error("Get visitor error:", error);
+      throw error;
+    }
+  }
+
+  async requestVisitorAppointment(userId, appointmentData) {
+    try {
+      const response = await this.fetch(`/visitors/${userId}/visit`, {
+        method: "PUT",
+        body: appointmentData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Request visitor appointment error:", error);
+      throw error;
+    }
+  }
+
+  async getAppointmentAvailability({ date, department } = {}) {
+    try {
+      const queryString = new URLSearchParams({
+        date: date || "",
+        department: department || "",
+      }).toString();
+      return await this.fetch(`/appointments/availability?${queryString}`);
+    } catch (error) {
+      console.error("Get appointment availability error:", error);
+      throw error;
+    }
+  }
+
+  async getStaffAppointments(filters = {}) {
+    try {
+      const queryString = new URLSearchParams(filters).toString();
+      const response = await this.fetch(
+        `/staff/appointments${queryString ? `?${queryString}` : ""}`,
+      );
+      return response;
+    } catch (error) {
+      console.error("Get staff appointments error:", error);
+      throw error;
+    }
+  }
+
+  async approveStaffAppointment(visitorId, note = "") {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/approve`, {
+        method: "PUT",
+        body: { note },
+      });
+    } catch (error) {
+      console.error("Approve staff appointment error:", error);
+      throw error;
+    }
+  }
+
+  async adjustStaffAppointment(visitorId, adjustmentData) {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/adjust`, {
+        method: "PUT",
+        body: adjustmentData,
+      });
+    } catch (error) {
+      console.error("Adjust staff appointment error:", error);
+      throw error;
+    }
+  }
+
+  async rejectStaffAppointment(visitorId, reason) {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/reject`, {
+        method: "PUT",
+        body: { reason },
+      });
+    } catch (error) {
+      console.error("Reject staff appointment error:", error);
+      throw error;
+    }
+  }
+
+  async completeStaffAppointment(visitorId, note = "") {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/complete`, {
+        method: "PUT",
+        body: { note },
+      });
+    } catch (error) {
+      console.error("Complete staff appointment error:", error);
       throw error;
     }
   }
@@ -670,19 +1028,6 @@ async rejectVisitor(visitorId, reason) {
     throw error;
   }
 }
-
-  async rejectVisitor(visitorId, reason) {
-    try {
-      const response = await this.fetch(`/admin/visitors/${visitorId}/reject`, {
-        method: "PUT",
-        body: { reason }
-      });
-      return response;
-    } catch (error) {
-      console.error("Reject visitor error:", error);
-      throw error;
-    }
-  }
 
   async sendAdminNotification(notificationData) {
     try {
@@ -759,7 +1104,7 @@ async rejectVisitor(visitorId, reason) {
 
   async getVisitorStats() {
     try {
-      const response = await this.fetch("/admin/visitors/stats");
+      const response = await this.fetch("/visitors/stats");
       return response;
     } catch (error) {
       console.error("Get visitor stats error:", error);
@@ -956,7 +1301,13 @@ async createSecurityGuard(guardData) {
     return response;
   } catch (error) {
     console.error("❌ Create security guard error:", error);
-    throw error;
+    const isDuplicateEmail =
+      error?.status === 409 ||
+      String(error?.message || "").toLowerCase().includes("email already");
+    const message = isDuplicateEmail
+      ? "Email already registered. Please use another email address."
+      : (error?.message || "Failed to create security account");
+    throw new Error(message);
   }
 }
 
@@ -1137,9 +1488,108 @@ generateRandomPassword(length = 10) {
     }
   }
 
+  // ================= COMPATIBILITY METHODS =================
+  async changePassword(payload) {
+    try {
+      return await this.fetch("/auth/change-password", {
+        method: "PUT",
+        body: payload,
+      });
+    } catch (error) {
+      console.error("Change password error:", error);
+      throw error;
+    }
+  }
+
+  async getActiveUserCount() {
+    try {
+      const response = await this.getAllUsers({ status: "active", limit: 1 });
+      return response?.total ?? response?.users?.length ?? 0;
+    } catch (error) {
+      console.error("Get active user count error:", error);
+      return 0;
+    }
+  }
+
+  async getSecurityReports() {
+    try {
+      const response = await this.getSecurityLogs({ limit: 100 });
+      const reports = (response?.logs || [])
+        .filter((log) => log?.notes || log?.status === "denied")
+        .map((log) => ({
+          ...log,
+          resolved: false,
+          reason: log.notes || "Security incident",
+        }));
+      return { success: true, reports };
+    } catch (error) {
+      console.error("Get security reports error:", error);
+      return { success: false, reports: [] };
+    }
+  }
+
+  async resolveAlert(alertId) {
+    try {
+      const result = await this.markNotificationAsRead(alertId);
+      return { success: !!result?.success };
+    } catch (error) {
+      console.error("Resolve alert error:", error);
+      return { success: false };
+    }
+  }
+
+  async reportVisitor(visitorId, reportData) {
+    try {
+      return await this.fetch(`/visitors/${visitorId}/report`, {
+        method: "POST",
+        body: reportData,
+      });
+    } catch (error) {
+      console.error("Report visitor error:", error);
+      throw error;
+    }
+  }
+
+  async updateVisitor(visitorId, data) {
+    try {
+      return await this.fetch(`/visitors/${visitorId}`, {
+        method: "PUT",
+        body: data,
+      });
+    } catch (error) {
+      // Let VisitorManagementScreen fall back to local demo-mode update path.
+      console.error("Update visitor error:", error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  async deleteVisitor(visitorId) {
+    try {
+      return await this.fetch(`/visitors/${visitorId}`, {
+        method: "DELETE",
+      });
+    } catch (error) {
+      // Let VisitorManagementScreen fall back to local demo-mode delete path.
+      console.error("Delete visitor error:", error);
+      return { success: false, message: error.message };
+    }
+  }
+
   async testConnection() {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), 5000)
+        : null;
+
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        signal: controller?.signal,
+      });
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       const data = await response.json();
       return data.status === "OK";
     } catch {
@@ -1147,5 +1597,101 @@ generateRandomPassword(length = 10) {
     }
   }
 }
+
+ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, options = {}) {
+  const token = await this.getToken();
+  console.log(
+    `[ApiService] FETCH ${url}, Method: ${options.method || "GET"}, Has Token: ${!!token}`
+  );
+
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+
+  const config = {
+    ...options,
+    headers,
+  };
+
+  if (config.body && typeof config.body !== "string") {
+    config.body = JSON.stringify(config.body);
+  }
+
+  let lastError = null;
+
+  for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
+    try {
+      console.log(`[ApiService] Sending request to: ${baseUrl}${url}`);
+      const response = await fetch(`${baseUrl}${url}`, config);
+      const contentType = response.headers.get("content-type");
+      let data;
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = text ? { message: text } : {};
+      }
+
+      if (!response.ok) {
+        const apiError = new Error(
+          data.error || data.message || `HTTP ${response.status}`
+        );
+        apiError.status = response.status;
+        apiError.data = data;
+        throw apiError;
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error;
+      console.error(`[ApiService] Fetch error for ${url} via ${baseUrl}:`, error);
+
+      if (!String(error?.message || "").includes("Network request failed")) {
+        throw error;
+      }
+    }
+  }
+
+  if (String(lastError?.message || "").includes("Network request failed")) {
+    throw new Error(
+      "Cannot connect to backend. Make sure server is running on port 5000. On a real Android device, run adb reverse for ports 8081 and 5000."
+    );
+  }
+
+  throw lastError || new Error("Cannot connect to backend.");
+};
+
+ApiService.prototype.testConnection = async function testConnectionWithAndroidFallback() {
+  for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
+    try {
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), 5000)
+        : null;
+
+      const response = await fetch(`${baseUrl}/health`, {
+        signal: controller?.signal,
+      });
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      const data = await response.json();
+      if (data.status === "OK") {
+        return true;
+      }
+    } catch (error) {
+      console.error(`[ApiService] Health check failed via ${baseUrl}:`, error);
+    }
+  }
+
+  return false;
+};
 
 export default new ApiService();

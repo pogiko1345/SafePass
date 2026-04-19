@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 16.0.0"
+  },
+  "build": {
+    "full-apk": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleFullRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "full"
+      }
+    },
+    "visitor-apk": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleVisitorRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "visitor"
+      }
+    },
+    "visitor-debug-apk": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleVisitorDebug"
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "visitor"
+      }
+    }
+  }
+}

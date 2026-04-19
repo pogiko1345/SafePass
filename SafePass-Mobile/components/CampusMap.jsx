@@ -9,18 +9,25 @@ import {
   Platform,
   Animated,
   Image,
-  ActivityIndicator,
+  PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import styles from "../styles/CampusMapStyles";
 
 const { width, height } = Dimensions.get("window");
 
+const TRACKING_FRESHNESS = {
+  LIVE: "live",
+  RECENT: "recent",
+  AGING: "aging",
+  STALE: "stale",
+};
+
 const CampusMap = ({
   visitors = [],
   floors = [],
   offices = [],
-  selectedFloor = "all",
+  selectedFloor = "ground",
   selectedOffice = "all",
   onVisitorHover,
   onVisitorLeave,
@@ -30,28 +37,146 @@ const CampusMap = ({
   fullscreen = false,
   mapBlueprints = null,
   officePositions = {}, 
+  onFloorChange,
+  showFloorNavigation = true,
 }) => {
+  const defaultFloorId = floors[0]?.id || "ground";
   const [mapScale, setMapScale] = useState(1);
   const [mapPan, setMapPan] = useState({ x: 0, y: 0 });
-  const [activeFloor, setActiveFloor] = useState(selectedFloor);
-  const [imageLoading, setImageLoading] = useState(true);
+  const [activeFloor, setActiveFloor] = useState(selectedFloor || defaultFloorId);
   const [imageError, setImageError] = useState(false);
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const panAnim = useRef(new Animated.ValueXY()).current;
+  const mapScaleRef = useRef(1);
+  const mapPanRef = useRef({ x: 0, y: 0 });
+  const mapSizeRef = useRef({ width: 0, height: 500 });
+
+  useEffect(() => {
+    mapScaleRef.current = mapScale;
+  }, [mapScale]);
+
+  const clampPan = (pan, scale = mapScaleRef.current) => {
+    const mapWidth = mapSizeRef.current.width || width || 320;
+    const mapHeight = mapSizeRef.current.height || 500;
+    const limitX = Math.max(0, (mapWidth * (scale - 1)) / 2);
+    const limitY = Math.max(0, (mapHeight * (scale - 1)) / 2);
+
+    return {
+      x: Math.max(-limitX, Math.min(limitX, pan.x)),
+      y: Math.max(-limitY, Math.min(limitY, pan.y)),
+    };
+  };
+
+  const setPanPosition = (nextPan, animated = true) => {
+    const clampedPan = clampPan(nextPan);
+    mapPanRef.current = clampedPan;
+    setMapPan(clampedPan);
+
+    if (animated) {
+      Animated.spring(panAnim, {
+        toValue: clampedPan,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    panAnim.setValue(clampedPan);
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4,
+      onPanResponderGrant: () => {
+        panAnim.stopAnimation();
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const nextPan = clampPan({
+          x: mapPanRef.current.x + gestureState.dx,
+          y: mapPanRef.current.y + gestureState.dy,
+        });
+        panAnim.setValue(nextPan);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        setPanPosition({
+          x: mapPanRef.current.x + gestureState.dx,
+          y: mapPanRef.current.y + gestureState.dy,
+        });
+      },
+      onPanResponderTerminate: (_, gestureState) => {
+        setPanPosition({
+          x: mapPanRef.current.x + gestureState.dx,
+          y: mapPanRef.current.y + gestureState.dy,
+        });
+      },
+    }),
+  ).current;
+
+  const normalizeFloorId = (floorId) => {
+    if (floorId === "mezzanine") {
+      return "first";
+    }
+    return floorId;
+  };
+
+  const getDisplayFloorName = (floorId) => {
+    const normalizedFloorId = normalizeFloorId(floorId);
+    const matchingFloor = floors.find((floor) => normalizeFloorId(floor.id) === normalizedFloorId);
+
+    if (matchingFloor?.name) {
+      return matchingFloor.name;
+    }
+
+    return `${normalizedFloorId.charAt(0).toUpperCase()}${normalizedFloorId.slice(1)} Floor`;
+  };
 
   // Update active floor when selected floor changes
   useEffect(() => {
-    setActiveFloor(selectedFloor);
-    setImageLoading(true);
+    setActiveFloor(selectedFloor || defaultFloorId);
     setImageError(false);
-  }, [selectedFloor]);
+    resetMapView();
+  }, [defaultFloorId, selectedFloor]);
+
+  const resetMapView = () => {
+    mapScaleRef.current = 1;
+    mapPanRef.current = { x: 0, y: 0 };
+    setMapScale(1);
+    setMapPan({ x: 0, y: 0 });
+    scaleAnim.setValue(1);
+    panAnim.setValue({ x: 0, y: 0 });
+  };
+
+  const handleFloorSelect = (floorId) => {
+    if (!floorId || floorId === activeFloor) return;
+    setActiveFloor(floorId);
+    setImageError(false);
+    resetMapView();
+    onFloorChange?.(floorId);
+  };
 
   // Get floor plan image based on selected floor from blueprints
   const getFloorPlanImage = () => {
-    if (mapBlueprints && mapBlueprints[activeFloor]) {
+    if (!mapBlueprints) {
+      return null;
+    }
+
+    if (mapBlueprints[activeFloor]) {
       return mapBlueprints[activeFloor];
     }
+
+    const normalizedFloorId = normalizeFloorId(activeFloor);
+    const aliasFloorId = normalizedFloorId === "first" ? "mezzanine" : normalizedFloorId;
+
+    if (mapBlueprints[normalizedFloorId]) {
+      return mapBlueprints[normalizedFloorId];
+    }
+
+    if (mapBlueprints[aliasFloorId]) {
+      return mapBlueprints[aliasFloorId];
+    }
+
     return null;
   };
 
@@ -102,6 +227,81 @@ const CampusMap = ({
     }
   };
 
+  const getVisitorLastSeenAt = (visitor) =>
+    visitor?.lastUpdate ||
+    visitor?.location?.timestamp ||
+    visitor?.location?.lastSeenAt ||
+    visitor?.sourceVisitor?.currentLocation?.lastSeenAt ||
+    visitor?.sourceVisitor?.updatedAt;
+
+  const formatFreshnessLabel = (dateValue) => {
+    const timestamp = new Date(dateValue).getTime();
+    if (!Number.isFinite(timestamp)) {
+      return { label: "No recent update", state: TRACKING_FRESHNESS.STALE, color: "#64748B" };
+    }
+
+    const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    if (diffSeconds < 45) {
+      return { label: "Live now", state: TRACKING_FRESHNESS.LIVE, color: "#10B981" };
+    }
+    if (diffSeconds < 180) {
+      return { label: `${Math.max(1, Math.floor(diffSeconds / 60))}m ago`, state: TRACKING_FRESHNESS.RECENT, color: "#2563EB" };
+    }
+    if (diffSeconds < 900) {
+      return { label: `${Math.floor(diffSeconds / 60)}m ago`, state: TRACKING_FRESHNESS.AGING, color: "#F59E0B" };
+    }
+
+    return { label: "Stale", state: TRACKING_FRESHNESS.STALE, color: "#64748B" };
+  };
+
+  const getVisitorFreshness = (visitor) => formatFreshnessLabel(getVisitorLastSeenAt(visitor));
+
+  const getTrackingSourceLabel = (visitor) => {
+    const source = String(
+      visitor?.trackingSource ||
+        visitor?.location?.source ||
+        visitor?.sourceVisitor?.currentLocation?.source ||
+        "",
+    ).toLowerCase();
+
+    if (source.includes("phone")) return "Phone GPS";
+    if (source.includes("arduino") || source.includes("tap") || source.includes("nfc")) return "Tap checkpoint";
+    if (source.includes("manual")) return "Manual";
+    if (source.includes("estimate")) return "Estimated";
+    return "Tracking";
+  };
+
+  const getVisibleVisitors = () => {
+    if (!visitors || visitors.length === 0) return [];
+
+    const normalizedActiveFloor = normalizeFloorId(activeFloor);
+    return visitors.filter((visitor) => {
+      const visitorFloor = normalizeFloorId(visitor?.location?.floor);
+      return !visitorFloor || visitorFloor === normalizedActiveFloor;
+    });
+  };
+
+  const renderMapEmptyState = (visibleVisitors) => {
+    if (visibleVisitors.length > 0) return null;
+
+    const floorName = getDisplayFloorName(activeFloor);
+    const officeLabel = selectedOffice !== "all" ? selectedOffice : floorName;
+
+    return (
+      <View style={[styles.mapEmptyState, { pointerEvents: "none" }]}>
+        <View style={styles.mapEmptyStateCard}>
+          <View style={styles.mapEmptyStateIcon}>
+            <Ionicons name="location-outline" size={22} color="#64748B" />
+          </View>
+          <Text style={styles.mapEmptyStateTitle}>No active markers here</Text>
+          <Text style={styles.mapEmptyStateText}>
+            No checked-in visitors are currently showing for {officeLabel}. Try another floor or office.
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   // Render floor navigation
   const renderFloorNavigation = () => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.floorNavigationScroll}>
@@ -113,7 +313,7 @@ const CampusMap = ({
               styles.floorButton,
               activeFloor === floor.id && styles.floorButtonActive,
             ]}
-            onPress={() => setActiveFloor(floor.id)}
+            onPress={() => handleFloorSelect(floor.id)}
           >
             <Ionicons 
               name={floor.icon} 
@@ -143,10 +343,10 @@ const CampusMap = ({
     
     let displayOffices = offices.filter(o => o.id !== "all");
     
-    // Filter by selected floor
-    if (activeFloor !== "all") {
-      displayOffices = displayOffices.filter(o => o.floor === activeFloor);
-    }
+    const normalizedActiveFloor = normalizeFloorId(activeFloor);
+    displayOffices = displayOffices.filter(
+      (office) => normalizeFloorId(office.floor) === normalizedActiveFloor
+    );
     
     // Filter by selected office
     if (selectedOffice !== "all") {
@@ -176,11 +376,15 @@ const CampusMap = ({
   };
 
   // Render visitor markers
-  const renderVisitorMarkers = () => {
-    if (!visitors || visitors.length === 0) return null;
-    
-    return visitors.map((visitor) => {
-      const statusColor = getVisitorStatusColor(visitor.status);
+  const renderVisitorMarkers = (visibleVisitors) => {
+    if (visibleVisitors.length === 0) return null;
+
+    return visibleVisitors.map((visitor) => {
+      const freshness = getVisitorFreshness(visitor);
+      const statusColor =
+        visitor.status === "checked_in" || visitor.status === "active"
+          ? freshness.color
+          : getVisitorStatusColor(visitor.status);
       const positionStyle = getVisitorPositionStyle(visitor);
       const isHovered = hoveredVisitor?.id === visitor.id;
       
@@ -199,8 +403,28 @@ const CampusMap = ({
             onMouseLeave={() => onVisitorLeave?.()}
           >
             <View style={[styles.visitorMarkerPulse, { backgroundColor: statusColor + "40" }]} />
+            <View style={[styles.visitorMarkerSourceBadge, { borderColor: statusColor }]}>
+              <Text style={[styles.visitorMarkerSourceText, { color: statusColor }]}>
+                {getTrackingSourceLabel(visitor).charAt(0)}
+              </Text>
+            </View>
           </TouchableOpacity>
-          {isHovered && renderHoverCard?.()}
+          {isHovered && (renderHoverCard?.() || (
+            <View style={styles.hoverCard}>
+              <Text style={styles.hoverCardName}>{visitor.name}</Text>
+              <Text style={styles.hoverCardPurpose}>{visitor.purpose || "On-site visitor"}</Text>
+              <View style={styles.hoverCardDetails}>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="time-outline" size={14} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText}>{freshness.label}</Text>
+                </View>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="navigate-outline" size={14} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText}>{getTrackingSourceLabel(visitor)}</Text>
+                </View>
+              </View>
+            </View>
+          ))}
         </Animated.View>
       );
     });
@@ -209,6 +433,7 @@ const CampusMap = ({
   // Handle zoom
   const handleZoomIn = () => {
     const newScale = Math.min(mapScale + 0.2, 3);
+    mapScaleRef.current = newScale;
     setMapScale(newScale);
     Animated.spring(scaleAnim, {
       toValue: newScale,
@@ -218,14 +443,26 @@ const CampusMap = ({
 
   const handleZoomOut = () => {
     const newScale = Math.max(mapScale - 0.2, 0.5);
+    mapScaleRef.current = newScale;
     setMapScale(newScale);
-    Animated.spring(scaleAnim, {
-      toValue: newScale,
-      useNativeDriver: true,
-    }).start();
+    const nextPan = clampPan(mapPanRef.current, newScale);
+    mapPanRef.current = nextPan;
+    setMapPan(nextPan);
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: newScale,
+        useNativeDriver: true,
+      }),
+      Animated.spring(panAnim, {
+        toValue: nextPan,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   const handleReset = () => {
+    mapScaleRef.current = 1;
+    mapPanRef.current = { x: 0, y: 0 };
     setMapScale(1);
     setMapPan({ x: 0, y: 0 });
     Animated.parallel([
@@ -241,61 +478,89 @@ const CampusMap = ({
   };
 
   const floorPlanImage = getFloorPlanImage();
-  const hasBlueprint = floorPlanImage !== null && !imageError;
+  const isDiagramBlueprint =
+    floorPlanImage &&
+    typeof floorPlanImage === "object" &&
+    floorPlanImage.type === "diagram";
+  const hasBlueprint = floorPlanImage !== null && !isDiagramBlueprint && !imageError;
+  const shouldShowOfficeLabels = !hasBlueprint;
+  const visibleVisitors = getVisibleVisitors();
 
   return (
     <View style={[styles.mapContainer, fullscreen && styles.mapContainerFullscreen]}>
-      {renderFloorNavigation()}
+      {showFloorNavigation ? renderFloorNavigation() : null}
       
-      <View style={styles.mapCanvas}>
-        {/* Floor Plan Image or Placeholder */}
-        {hasBlueprint ? (
-          <Image
-            source={floorPlanImage}
-            style={styles.floorPlanImage}
-            resizeMode="contain"
-            onLoadStart={() => setImageLoading(true)}
-            onLoadEnd={() => setImageLoading(false)}
-            onError={() => setImageError(true)}
-          />
-        ) : (
-          <View style={styles.floorPlanPlaceholder}>
-            <View style={styles.floorPlanContent}>
-              <Ionicons 
-                name="map-outline" 
-                size={64} 
-                color="#9CA3AF" 
-              />
-              <Text style={styles.floorPlanTitle}>
-                {activeFloor === "all" ? "Campus Map" : `${activeFloor.charAt(0).toUpperCase() + activeFloor.slice(1)} Floor`}
-              </Text>
-              <Text style={styles.floorPlanSubtitle}>
-                {!mapBlueprints ? "Upload map blueprints to start tracking" : "Loading map blueprint..."}
-              </Text>
-              <View style={styles.floorPlanFeatures}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="people-outline" size={14} color="#6B7280" />
-                  <Text style={styles.featureText}>
-                    {visitors.length} Active Visitors
-                  </Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="layers-outline" size={14} color="#6B7280" />
-                  <Text style={styles.featureText}>
-                    {floors.filter(f => f.id !== "all").length} Floors
-                  </Text>
+      <View
+        style={styles.mapCanvas}
+        onLayout={(event) => {
+          mapSizeRef.current = event.nativeEvent.layout;
+          setPanPosition(mapPanRef.current, false);
+        }}
+      >
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={[
+            styles.mapZoomLayer,
+            {
+              transform: [
+                { translateX: panAnim.x },
+                { translateY: panAnim.y },
+                { scale: scaleAnim },
+              ],
+            },
+          ]}
+        >
+          {/* Floor Plan Image or Placeholder */}
+          {hasBlueprint ? (
+            <Image
+              source={floorPlanImage}
+              style={styles.floorPlanImage}
+              resizeMode="contain"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <View style={styles.floorPlanPlaceholder}>
+              <View style={styles.floorPlanContent}>
+                <Ionicons 
+                  name="map-outline" 
+                  size={64} 
+                  color="#9CA3AF" 
+                />
+                <Text style={styles.floorPlanTitle}>
+                  {getDisplayFloorName(activeFloor)}
+                </Text>
+                <Text style={styles.floorPlanSubtitle}>
+                  {!mapBlueprints
+                    ? "Upload map blueprints to start tracking"
+                    : "Floor blueprint not uploaded yet."}
+                </Text>
+                <View style={styles.floorPlanFeatures}>
+                  <View style={styles.featureItem}>
+                    <Ionicons name="people-outline" size={14} color="#6B7280" />
+                    <Text style={styles.featureText}>
+                      {visitors.length} Active Visitors
+                    </Text>
+                  </View>
+                  <View style={styles.featureItem}>
+                    <Ionicons name="layers-outline" size={14} color="#6B7280" />
+                    <Text style={styles.featureText}>
+                      {floors.length} Floors
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
-        )}
-        
-        {/* Office Labels - Only show if we have office positions */}
-        {renderOfficeLabels()}
-        
-        {/* Visitor Markers */}
-        {renderVisitorMarkers()}
-        
+          )}
+          
+          {/* Office labels are suppressed on real blueprint images to avoid duplicating printed room names. */}
+          {shouldShowOfficeLabels ? renderOfficeLabels() : null}
+          
+          {/* Visitor Markers */}
+          {renderVisitorMarkers(visibleVisitors)}
+        </Animated.View>
+
+        {renderMapEmptyState(visibleVisitors)}
+
         {/* Map Controls */}
         <View style={styles.mapControls}>
           <TouchableOpacity
@@ -322,8 +587,12 @@ const CampusMap = ({
         <View style={styles.activeVisitorsBadge}>
           <Ionicons name="people" size={16} color="#FFFFFF" />
           <Text style={styles.activeVisitorsBadgeText}>
-            {visitors.length} Active
+            {visibleVisitors.length} Active
           </Text>
+        </View>
+
+        <View style={styles.zoomLevelBadge}>
+          <Text style={styles.zoomLevelText}>{Math.round(mapScale * 100)}%</Text>
         </View>
       </View>
       
@@ -331,13 +600,13 @@ const CampusMap = ({
       <View style={styles.floorLegend}>
         <Text style={styles.floorLegendTitle}>Floor Legend</Text>
         <View style={styles.floorLegendItems}>
-          {floors.filter(f => f.id !== "all").map((floor) => (
+          {floors.map((floor) => (
             <View key={floor.id} style={styles.floorLegendItem}>
               <View style={[
                 styles.floorLegendColor, 
                 { backgroundColor: 
                   floor.id === "ground" ? "#EFF6FF" :
-                  floor.id === "first" ? "#ECFDF5" :
+                  floor.id === "first" || floor.id === "mezzanine" ? "#ECFDF5" :
                   floor.id === "second" ? "#FEF3C7" : "#EDE9FE"
                 }
               ]} />

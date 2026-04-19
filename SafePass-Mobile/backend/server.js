@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const Visitor = require("./models/Visitor");
 const Notification = require("./models/Notification");
 const User = require("./models/User");
@@ -14,6 +15,7 @@ const otpStore = new Map();
 require("dotenv").config();
 
 const app = express();
+const isVercelRuntime = Boolean(process.env.VERCEL);
 
 // ========== ENHANCED CORS CONFIGURATION ==========
 app.use(
@@ -21,12 +23,12 @@ app.use(
     origin: true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "x-device-key"],
   }),
 );
 
-// Handle preflight requests
-app.options("*", cors());
+// Handle preflight requests. Express 5 rejects bare "*" paths.
+app.options(/.*/, cors());
 
 // Body parser middleware
 app.use(express.json({ limit: "50mb" }));
@@ -35,13 +37,22 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // ========== DATABASE CONNECTION ==========
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/sapphire_aviation";
+const FRONTEND_URL =
+  process.env.FRONTEND_URL || "https://sapphiresafepass2.vercel.app";
 
 let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
 
 const connectToDatabase = () => {
   if (!mongoConnectionPromise) {
     mongoConnectionPromise = mongoose
+
       .connect(MONGODB_URI)
+
+      .connect(MONGODB_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      })
+
       .then(() => {
         console.log(
           `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
@@ -63,7 +74,10 @@ const connectToDatabase = () => {
 };
 
 connectToDatabase();
+<<<<<<< HEAD
 
+=======
+>>>>>>> f9f336654ad9bd32e9e9c7214513a8135ab32c16
 
 // ========== HELPER FUNCTIONS ==========
 // Generate JWT Token
@@ -104,6 +118,312 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
+const getNotificationTargetRoles = (role) => {
+  const normalizedRole = String(role || "").toLowerCase();
+  if (normalizedRole === "guard" || normalizedRole === "security") {
+    return ["all", "security", "guard"];
+  }
+  return ["all", normalizedRole];
+};
+
+const getFullName = (user = {}) =>
+  `${user.firstName || ""} ${user.lastName || ""}`.trim();
+
+const createSystemActivity = async ({
+  actorUser = null,
+  relatedVisitor = null,
+  relatedUser = null,
+  activityType = "",
+  status = "granted",
+  location = "System",
+  notes = "",
+  metadata = {},
+}) => {
+  try {
+    await AccessLog.create({
+      userId: actorUser?._id || relatedUser?._id || null,
+      userEmail: actorUser?.email || relatedVisitor?.email || relatedUser?.email || "",
+      userName:
+        getFullName(actorUser) ||
+        relatedVisitor?.fullName ||
+        getFullName(relatedUser) ||
+        "System",
+      actorRole: actorUser?.role || relatedUser?.role || "system",
+      location,
+      accessType: "system",
+      activityType,
+      status,
+      nfcCardId: actorUser?.nfcCardId || relatedUser?.nfcCardId || null,
+      relatedVisitor: relatedVisitor?._id || null,
+      relatedUser: relatedUser?._id || null,
+      metadata,
+      notes,
+    });
+  } catch (error) {
+    console.error("Create system activity error:", error);
+  }
+};
+
+const createRoleNotification = async ({
+  title,
+  message,
+  targetRole = "all",
+  targetUser = null,
+  relatedVisitor = null,
+  relatedUser = null,
+  type = "info",
+  severity = "low",
+  metadata = {},
+  expiresInDays = 7,
+}) => {
+  try {
+    await Notification.create({
+      title,
+      message,
+      targetRole,
+      targetUser,
+      relatedVisitor,
+      relatedUser,
+      type,
+      severity,
+      metadata,
+      expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
+    });
+  } catch (error) {
+    console.error("Create notification error:", error);
+  }
+};
+
+const formatVisitSchedule = (visitDate, visitTime) => {
+  const resolvedDate = visitDate ? new Date(visitDate) : null;
+  const resolvedTime = visitTime ? new Date(visitTime) : null;
+  const dateLabel = resolvedDate
+    ? resolvedDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "an upcoming date";
+  const timeLabel = resolvedTime
+    ? resolvedTime.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "the scheduled time";
+
+  return `${dateLabel} at ${timeLabel}`;
+};
+
+const ensureOverstayAlerts = async () => {
+  try {
+    const graceMinutes = Math.max(
+      5,
+      parseInt(process.env.VISITOR_OVERSTAY_GRACE_MINUTES || "15", 10),
+    );
+    const threshold = new Date(Date.now() - graceMinutes * 60 * 1000);
+
+    const overstayedVisitors = await Visitor.find({
+      requestCategory: "appointment",
+      status: "checked_in",
+      appointmentCompletedAt: { $ne: null, $lte: threshold },
+      checkedOutAt: null,
+      overstayAlertedAt: null,
+    }).limit(50);
+
+    for (const visitor of overstayedVisitors) {
+      const visitorUser = await User.findOne({ email: visitor.email });
+      const scheduleLabel = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+
+      await createRoleNotification({
+        title: "Visitor Overstay Alert",
+        message: `${visitor.fullName} has not checked out ${graceMinutes} minutes after appointment completion. Scheduled visit was ${scheduleLabel}.`,
+        type: "alert",
+        severity: "high",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_overstay_alert",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes,
+        },
+      });
+
+      await createRoleNotification({
+        title: "Visitor Overstay Alert",
+        message: `${visitor.fullName} has not checked out after the appointment was marked complete.`,
+        type: "alert",
+        severity: "high",
+        targetRole: "admin",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_overstay_alert",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes,
+        },
+      });
+
+      await createSystemActivity({
+        actorUser: null,
+        relatedVisitor: visitor,
+        relatedUser: visitorUser,
+        activityType: "visitor_overstay_alert",
+        status: "flagged",
+        location: visitor.assignedOffice || visitor.host || "Campus",
+        notes: `${visitor.fullName} remained checked in after appointment completion.`,
+        metadata: {
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes,
+        },
+      });
+
+      visitor.overstayAlertedAt = new Date();
+      await visitor.save();
+    }
+  } catch (error) {
+    console.error("Ensure overstay alerts error:", error);
+  }
+};
+
+const CHECKPOINT_LOCATIONS = {
+  main_gate: {
+    floor: "ground",
+    office: "Main Gate",
+    coordinates: { x: 18, y: 78 },
+  },
+  administration: {
+    floor: "ground",
+    office: "Administration",
+    coordinates: { x: 18, y: 36 },
+  },
+  registrar: {
+    floor: "ground",
+    office: "Registrar's Office",
+    coordinates: { x: 45, y: 44 },
+  },
+  accounting: {
+    floor: "ground",
+    office: "Accounting Office",
+    coordinates: { x: 66, y: 42 },
+  },
+  conference_room: {
+    floor: "first",
+    office: "Conference Room",
+    coordinates: { x: 10, y: 36 },
+  },
+  chairman: {
+    floor: "first",
+    office: "Chairman",
+    coordinates: { x: 21, y: 40 },
+  },
+  flight_operations: {
+    floor: "first",
+    office: "Flight Operations",
+    coordinates: { x: 33, y: 43 },
+  },
+  head_of_training_room: {
+    floor: "first",
+    office: "Head Of Training Room",
+    coordinates: { x: 45, y: 42 },
+  },
+  it_room: {
+    floor: "first",
+    office: "I.T Room",
+    coordinates: { x: 57, y: 42 },
+  },
+  faculty_room: {
+    floor: "first",
+    office: "Faculty Room",
+    coordinates: { x: 69, y: 36 },
+  },
+  academy_director: {
+    floor: "first",
+    office: "Academy Director",
+    coordinates: { x: 82, y: 37 },
+  },
+  cr: {
+    floor: "first",
+    office: "CR",
+    coordinates: { x: 94, y: 25 },
+  },
+  sto: {
+    floor: "first",
+    office: "STO",
+    coordinates: { x: 94, y: 44 },
+  },
+};
+
+const normalizeCheckpointId = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const clampMapCoordinate = (value, min = 5, max = 95) =>
+  Math.max(min, Math.min(max, value));
+
+const mapGpsToCampusCoordinates = (latitude, longitude) => {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { x: null, y: null };
+  }
+
+  const latMin = Number(process.env.CAMPUS_LAT_MIN || 14.5976);
+  const latMax = Number(process.env.CAMPUS_LAT_MAX || 14.6007);
+  const lngMin = Number(process.env.CAMPUS_LNG_MIN || 120.9823);
+  const lngMax = Number(process.env.CAMPUS_LNG_MAX || 120.9857);
+
+  const x = ((lng - lngMin) / (lngMax - lngMin)) * 100;
+  const y = (1 - (lat - latMin) / (latMax - latMin)) * 100;
+
+  return {
+    x: Number(clampMapCoordinate(x).toFixed(2)),
+    y: Number(clampMapCoordinate(y).toFixed(2)),
+  };
+};
+
+const getTapLocationFromRequest = (body = {}) => {
+  const checkpointId = normalizeCheckpointId(body.checkpointId || body.checkpoint || body.office);
+  const knownCheckpoint = CHECKPOINT_LOCATIONS[checkpointId] || null;
+  const coordinates = body.coordinates || {};
+
+  return {
+    checkpointId,
+    floor: String(body.floor || knownCheckpoint?.floor || "").trim(),
+    office: String(body.office || knownCheckpoint?.office || checkpointId || "Unknown Checkpoint").trim(),
+    coordinates: {
+      x: Number.isFinite(Number(coordinates.x ?? knownCheckpoint?.coordinates?.x))
+        ? Number(coordinates.x ?? knownCheckpoint?.coordinates?.x)
+        : null,
+      y: Number.isFinite(Number(coordinates.y ?? knownCheckpoint?.coordinates?.y))
+        ? Number(coordinates.y ?? knownCheckpoint?.coordinates?.y)
+        : null,
+    },
+    source: String(body.source || "arduino_tap").trim(),
+  };
+};
+
+const validateDeviceKey = (req, res, next) => {
+  const expectedKey = process.env.ARDUINO_DEVICE_KEY || "safepass-device-key";
+  const providedKey = req.header("x-device-key") || req.body?.deviceKey;
+
+  if (!providedKey || providedKey !== expectedKey) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid device key",
+    });
+  }
+
+  next();
+};
+
 // ========== EMAIL SIMULATION (for demo) ==========
 const sendEmail = (to, subject, body) => {
   console.log(`\n📧 ========== EMAIL SIMULATION ==========`);
@@ -112,6 +432,103 @@ const sendEmail = (to, subject, body) => {
   console.log(`📧 Body: ${body}`);
   console.log(`📧 ====================================\n`);
   return { success: true };
+};
+
+const createVerificationToken = () => {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+
+  return { token, tokenHash, expiresAt };
+};
+
+const getApiBaseUrl = (req) => {
+  if (process.env.API_PUBLIC_URL) {
+    return process.env.API_PUBLIC_URL.replace(/\/$/, "");
+  }
+
+  const protocol = req.get("x-forwarded-proto") || req.protocol || "http";
+  const host = req.get("host");
+  return `${protocol}://${host}`;
+};
+
+const sendVerificationEmailSimulation = (req, user) => {
+  const { token, tokenHash, expiresAt } = createVerificationToken();
+  user.verificationTokenHash = tokenHash;
+  user.verificationExpiresAt = expiresAt;
+
+  const verificationUrl = `${getApiBaseUrl(req)}/api/auth/verify-email?token=${token}`;
+
+  sendEmail(
+    user.email,
+    "Verify your Sapphire SafePass account",
+    [
+      `Hi ${user.firstName},`,
+      "",
+      "Please verify your Sapphire SafePass account by opening this link:",
+      verificationUrl,
+      "",
+      "This verification link expires in 24 hours.",
+      "",
+      "SIMULATION MODE: copy/open the link above from your backend logs.",
+      `After verifying, return to ${FRONTEND_URL} and log in.`,
+    ].join("\n"),
+  );
+
+  console.log(`\nEMAIL VERIFICATION LINK for ${user.email}:`);
+  console.log(verificationUrl);
+  console.log("Open this link to verify the visitor account.\n");
+
+  return { verificationUrl, expiresAt };
+};
+
+const createRegistrationOtp = (user) => {
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
+
+  user.verificationOtpHash = otpHash;
+  user.verificationOtpExpiresAt = expiresAt;
+  user.verificationOtpAttempts = 0;
+  user.verificationTokenHash = "";
+  user.verificationExpiresAt = null;
+
+  sendEmail(
+    user.email,
+    "Your Sapphire SafePass OTP",
+    [
+      `Hi ${user.firstName},`,
+      "",
+      `Your visitor account verification OTP is: ${otpCode}`,
+      "",
+      "This code expires in 10 minutes.",
+      "",
+      "SIMULATION MODE: use the OTP shown in this message or backend logs.",
+    ].join("\n"),
+  );
+
+  console.log(`\nVISITOR REGISTRATION OTP for ${user.email}: ${otpCode}`);
+  console.log("Enter this OTP in the visitor registration screen.\n");
+
+  return { otpCode, expiresAt };
+};
+
+const normalizeOtpCode = (value) => String(value || "").replace(/\D/g, "").slice(0, 6);
+
+const normalizePhoneForOtp = (value) => {
+  let cleanPhone = String(value || "").replace(/[^\d]/g, "");
+
+  if (cleanPhone.startsWith("63")) {
+    cleanPhone = `0${cleanPhone.slice(2)}`;
+  } else if (cleanPhone.startsWith("9") && cleanPhone.length === 10) {
+    cleanPhone = `0${cleanPhone}`;
+  }
+
+  if (!cleanPhone.startsWith("09") && cleanPhone.length >= 9) {
+    cleanPhone = `09${cleanPhone.slice(-9)}`;
+  }
+
+  return cleanPhone;
 };
 
 // ========== ROUTES ==========
@@ -126,7 +543,437 @@ app.get("/api/test", (req, res) => {
   });
 });
 
+app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
+  try {
+    const cardId = String(
+      req.body?.nfcCardId ||
+        req.body?.cardId ||
+        req.body?.uid ||
+        req.body?.tagId ||
+        "",
+    ).trim();
+    const deviceId = String(req.body?.deviceId || "arduino-reader").trim();
+    const tapLocation = getTapLocationFromRequest(req.body || {});
+
+    if (!cardId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing NFC card ID",
+      });
+    }
+
+    if (!tapLocation.floor || !tapLocation.office) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing checkpoint floor or office",
+      });
+    }
+
+    const visitorUser = await User.findOne({
+      nfcCardId: cardId,
+      role: "visitor",
+    }).select("_id email firstName lastName nfcCardId role");
+
+    if (!visitorUser) {
+      await AccessLog.create({
+        userEmail: "",
+        userName: "Unknown NFC Card",
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "arduino_location_tap",
+        status: "denied",
+        nfcCardId: cardId,
+        metadata: {
+          deviceId,
+          tapLocation,
+        },
+        notes: `Unknown NFC card tapped at ${tapLocation.office}`,
+      });
+
+      return res.status(404).json({
+        success: false,
+        message: "NFC card is not assigned to a visitor",
+      });
+    }
+
+    const visitor = await Visitor.findOne({
+      email: visitorUser.email,
+      status: "checked_in",
+    }).sort({ checkedInAt: -1 });
+
+    if (!visitor) {
+      await AccessLog.create({
+        userId: visitorUser._id,
+        userEmail: visitorUser.email,
+        userName: `${visitorUser.firstName || ""} ${visitorUser.lastName || ""}`.trim(),
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "arduino_location_tap",
+        status: "denied",
+        nfcCardId: cardId,
+        relatedUser: visitorUser._id,
+        metadata: {
+          deviceId,
+          tapLocation,
+        },
+        notes: `Card tapped at ${tapLocation.office}, but visitor is not checked in`,
+      });
+
+      return res.status(409).json({
+        success: false,
+        message: "Visitor must be checked in before tracking can start",
+      });
+    }
+
+    visitor.updateCurrentLocation(tapLocation, { deviceId });
+    await visitor.save();
+
+    await AccessLog.create({
+      userId: visitorUser._id,
+      userEmail: visitor.email,
+      userName: visitor.fullName,
+      actorRole: "device",
+      location: tapLocation.office,
+      accessType: "system",
+      activityType: "arduino_location_tap",
+      status: "granted",
+      nfcCardId: cardId,
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser._id,
+      metadata: {
+        deviceId,
+        currentLocation: visitor.currentLocation,
+      },
+      notes: `${visitor.fullName} tapped at ${tapLocation.office}`,
+    });
+
+    res.json({
+      success: true,
+      message: "Visitor location updated",
+      visitorId: visitor._id,
+      currentLocation: visitor.currentLocation,
+      visitor: {
+        _id: visitor._id,
+        fullName: visitor.fullName,
+        email: visitor.email,
+        status: visitor.status,
+        currentLocation: visitor.currentLocation,
+      },
+    });
+  } catch (error) {
+    console.error("Arduino location tap error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update visitor location",
+    });
+  }
+});
+
+app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+
+    if (!visitor) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor not found",
+      });
+    }
+
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const isOwnVisitorRecord =
+      requesterRole === "visitor" &&
+      String(visitor.email || "").toLowerCase() === String(req.user.email || "").toLowerCase();
+    const canUpdateTrackedLocation =
+      isOwnVisitorRecord || ["admin", "security", "guard"].includes(requesterRole);
+
+    if (!canUpdateTrackedLocation) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot update this visitor location",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(409).json({
+        success: false,
+        message: "Visitor must be checked in before phone GPS tracking can start",
+      });
+    }
+
+    const latitude = Number(req.body?.latitude);
+    const longitude = Number(req.body?.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid latitude and longitude are required",
+      });
+    }
+
+    const coordinates = mapGpsToCampusCoordinates(latitude, longitude);
+    visitor.updateCurrentLocation(
+      {
+        floor: req.body?.floor || visitor.currentLocation?.floor || "ground",
+        office: req.body?.office || visitor.currentLocation?.office || "Phone GPS",
+        checkpointId: "phone_gps",
+        coordinates,
+        gps: {
+          latitude,
+          longitude,
+          accuracy: req.body?.accuracy,
+          altitude: req.body?.altitude,
+          heading: req.body?.heading,
+          speed: req.body?.speed,
+        },
+        source: "phone_gps",
+      },
+      {
+        deviceId: req.body?.deviceId || `phone-${req.user._id}`,
+      },
+    );
+
+    await visitor.save();
+
+    res.json({
+      success: true,
+      message: "Phone GPS location updated",
+      visitorId: visitor._id,
+      currentLocation: visitor.currentLocation,
+    });
+  } catch (error) {
+    console.error("Phone GPS location update error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update phone GPS location",
+    });
+  }
+});
+
 // 1. REGISTER
+const normalizeEmailValue = (value = "") => String(value || "").toLowerCase().trim();
+const normalizeUsernameValue = (value = "") => String(value || "").toLowerCase().trim();
+const isValidEmailValue = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+const normalizeDepartmentValue = (value = "") => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/&/g, "and")
+    .replace(/\s+/g, " ");
+
+  const aliases = {
+    "registrars office": "registrar",
+    registrar: "registrar",
+    "finance office": "accounting",
+    finance: "accounting",
+    accounting: "accounting",
+    cashier: "accounting",
+    guidance: "guidance",
+    "guidance office": "guidance",
+    "student services": "guidance",
+    administration: "administration",
+    "administration office": "administration",
+    admissions: "admissions",
+    "admissions office": "admissions",
+    "flight operations": "flight operations",
+    training: "training",
+    "head of training room": "training",
+    "i.t room": "i.t room",
+    "it room": "i.t room",
+    "faculty room": "faculty room",
+    "information desk": "information desk",
+    lobby: "information desk",
+    "front desk": "information desk",
+    "ground offices": "administration",
+    "file room": "registrar",
+    laboratory: "laboratory",
+    tesda: "tesda",
+    workshop: "workshop",
+    "tools room": "workshop",
+    library: "library",
+    "students lounge": "student services",
+    "student lounge": "student services",
+    "student services": "student services",
+    sto: "sto",
+  };
+
+  return aliases[normalized] || normalized;
+};
+
+const formatDepartmentLabel = (value = "") =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const APPOINTMENT_SLOT_LIMIT = 3;
+const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted"];
+const APPOINTMENT_PURPOSE_OPTIONS = [
+  "Enrollment",
+  "Payment",
+  "Inquiry",
+  "Document Request",
+  "Other",
+];
+const APPOINTMENT_DEPARTMENT_OPTIONS = [
+  "Registrar",
+  "Accounting",
+  "Information Desk",
+  "Guidance",
+  "Administration",
+  "Cashier",
+  "Flight Operations",
+  "Training",
+  "I.T Room",
+  "Faculty Room",
+  "Laboratory",
+  "TESDA",
+  "Workshop",
+  "Library",
+  "Student Services",
+  "STO",
+];
+const ACCOUNT_ROLE_OPTIONS = ["admin", "staff", "security", "guard", "visitor"];
+const ACCOUNT_STATUS_OPTIONS = ["active", "inactive", "pending", "suspended"];
+
+const normalizeOptionValue = (value = "") =>
+  String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+const isAllowedOption = (value, options) => {
+  const normalizedValue = normalizeOptionValue(value);
+  return options.some((option) => normalizeOptionValue(option) === normalizedValue);
+};
+
+const normalizePhoneValue = (value = "") => {
+  const digits = String(value || "").replace(/\D/g, "");
+
+  if (/^09\d{9}$/.test(digits)) return digits;
+  if (/^639\d{9}$/.test(digits)) return `0${digits.slice(2)}`;
+  if (/^9\d{9}$/.test(digits)) return `0${digits}`;
+
+  return String(value || "").trim().replace(/\s+/g, " ");
+};
+
+const isValidPhoneValue = (value = "") =>
+  /^09\d{9}$/.test(normalizePhoneValue(value));
+
+const PHONE_VALIDATION_MESSAGE =
+  "Please enter a valid Philippine mobile number, e.g. 09123456789 or +639123456789.";
+
+const isSameObjectId = (left, right) =>
+  Boolean(left && right && String(left) === String(right));
+
+const isVisitorOwner = (user = {}, visitor = {}) => {
+  if (String(user.role || "").toLowerCase() !== "visitor") return false;
+
+  const sameVisitorId = isSameObjectId(user.visitorId, visitor._id);
+  const sameEmail =
+    String(user.email || "").trim().toLowerCase() ===
+    String(visitor.email || "").trim().toLowerCase();
+
+  return sameVisitorId || sameEmail;
+};
+
+const getCombinedAppointmentDateTime = (visitDateValue, visitTimeValue) => {
+  const visitDate = new Date(visitDateValue);
+  const visitTime = new Date(visitTimeValue);
+
+  if (Number.isNaN(visitDate.getTime()) || Number.isNaN(visitTime.getTime())) {
+    return null;
+  }
+
+  const combined = new Date(visitDate);
+  combined.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+  return Number.isNaN(combined.getTime()) ? null : combined;
+};
+
+const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
+  const visitDate = new Date(visitDateValue);
+  const visitTime = new Date(visitTimeValue);
+
+  if (Number.isNaN(visitDate.getTime()) || Number.isNaN(visitTime.getTime())) {
+    return null;
+  }
+
+  const dayStart = new Date(visitDate);
+  dayStart.setHours(0, 0, 0, 0);
+
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const slotStart = new Date(visitDate);
+  slotStart.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+
+  const slotEnd = new Date(slotStart);
+  slotEnd.setMinutes(slotEnd.getMinutes() + 1);
+
+  return { dayStart, dayEnd, slotStart, slotEnd };
+};
+
+const countStaffAppointmentsForSlot = async ({
+  assignedStaff,
+  visitDate,
+  visitTime,
+  excludeVisitorId = null,
+}) => {
+  const slot = getAppointmentSlotWindow(visitDate, visitTime);
+  if (!slot) return 0;
+
+  const query = {
+    requestCategory: "appointment",
+    approvalFlow: "staff",
+    appointmentStatus: { $in: APPOINTMENT_SLOT_STATUSES },
+    assignedStaff,
+    visitDate: { $gte: slot.dayStart, $lt: slot.dayEnd },
+    visitTime: { $gte: slot.slotStart, $lt: slot.slotEnd },
+  };
+
+  if (excludeVisitorId) {
+    query._id = { $ne: excludeVisitorId };
+  }
+
+  return Visitor.countDocuments(query);
+};
+
+const getStaffDepartmentQuery = (department = "") => {
+  const normalizedDepartment = normalizeDepartmentValue(department);
+  const aliasGroups = {
+    registrar: ["Registrar", "Registrar's Office"],
+    accounting: ["Accounting", "Finance", "Finance Office", "Cashier"],
+    guidance: ["Guidance", "Guidance Office", "Student Services"],
+    administration: ["Administration", "Administration Office"],
+    admissions: ["Admissions", "Admissions Office"],
+    "information desk": ["Information Desk", "Lobby", "Front Desk"],
+    "flight operations": ["Flight Operations"],
+    training: ["Training", "Head of Training Room"],
+    "i.t room": ["I.T Room", "IT Room"],
+    "faculty room": ["Faculty Room"],
+    laboratory: ["Laboratory"],
+    tesda: ["TESDA"],
+    workshop: ["Workshop", "Tools Room"],
+    library: ["Library"],
+    "student services": ["Student Services", "Students Lounge"],
+    sto: ["STO"],
+  };
+
+  const labels = aliasGroups[normalizedDepartment] || [department];
+  return { $in: labels.map((label) => new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")) };
+};
+
+const isStaffAllowedForAppointment = (staffUser = {}, visitor = {}) => {
+  if (String(staffUser.role).toLowerCase() === "admin") return true;
+
+  const staffDepartment = normalizeDepartmentValue(staffUser.department);
+  const appointmentDepartment = normalizeDepartmentValue(
+    visitor.appointmentDepartment || visitor.assignedOffice || visitor.host,
+  );
+
+  return Boolean(staffDepartment && appointmentDepartment && staffDepartment === appointmentDepartment);
+};
+
 app.post("/api/register", async (req, res) => {
   console.log("📝 Registration attempt:", req.body);
 
@@ -134,6 +981,7 @@ app.post("/api/register", async (req, res) => {
     const {
       firstName,
       lastName,
+      username,
       email,
       password,
       phone,
@@ -150,10 +998,43 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedUsername = normalizeUsernameValue(username);
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        error: "Invalid email format",
+        field: "email",
+      });
+    }
+
+    const normalizedPhone = normalizePhoneValue(phone);
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        error: PHONE_VALIDATION_MESSAGE,
+        field: "phone",
+      });
+    }
+
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const duplicateChecks = [{ email: normalizedEmail }];
+    if (normalizedUsername) {
+      duplicateChecks.push({ username: normalizedUsername });
+    }
+
+    const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
+      const duplicateField =
+        existingUser.email === normalizedEmail
+          ? "email"
+          : existingUser.username === normalizedUsername
+            ? "username"
+            : "email";
+
+      return res.status(400).json({
+        error: duplicateField === "username" ? "Username already registered" : "Email already registered",
+        field: duplicateField,
+      });
     }
 
     let nfcCardId = null;
@@ -166,7 +1047,9 @@ app.post("/api/register", async (req, res) => {
       nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
     }
 
-    let employeeId = req.body.employeeId;
+    let employeeId = req.body.employeeId
+      ? String(req.body.employeeId).trim()
+      : undefined;
     if (!employeeId && (role === "staff" || role === "guard")) {
       const prefix = role === "staff" ? "STF" : "GRD";
       const timestamp = Date.now().toString().slice(-6);
@@ -177,15 +1060,15 @@ app.post("/api/register", async (req, res) => {
 const userData = {
   firstName,
   lastName,
-  email: email.toLowerCase().trim(),
+  username: normalizedUsername || undefined,
+  email: normalizedEmail,
   password,
-  phone,
+  phone: normalizedPhone,
   role: role || 'visitor',
   nfcCardId,
-  employeeId: employeeId || null,
+  employeeId: employeeId || undefined,
   department: req.body.department || '',
   position: req.body.position || '',     
-  shift: req.body.shift || 'Morning',     
   status: status || (role === 'visitor' ? 'pending' : 'active'),
   visitorId: visitorId || null,
 };
@@ -293,9 +1176,10 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
 
       return res.json({
         success: true,
-        visitor: {
+        visitor: null,
+        account: {
           _id: req.user._id,
-          fullName: `${req.user.firstName} ${req.user.lastName}`,
+          fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
           email: req.user.email,
           phoneNumber: req.user.phone,
           status: req.user.status,
@@ -323,24 +1207,19 @@ app.post("/api/login", async (req, res) => {
 
   try {
     const { email, password } = req.body;
+    const loginIdentifier = String(email || "").toLowerCase().trim();
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ error: "Username/email and password are required" });
     }
 
-    // Find user
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    // Visitors can sign in using either their username or email address.
+    const user = await User.findOne({
+      $or: [{ email: loginIdentifier }, { username: loginIdentifier }],
+    });
     if (!user) {
-      console.log("User not found:", email);
+      console.log("User not found:", loginIdentifier);
       return res.status(401).json({ error: "Invalid email or password" });
-    }
-
-    // Check if user is pending
-    if (user.status === "pending") {
-      console.log("User account pending:", email);
-      return res.status(401).json({
-        error: "Account is pending approval. Please wait for admin approval.",
-      });
     }
 
     // Check if user is inactive
@@ -348,10 +1227,22 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: "Account is deactivated" });
     }
 
+    if (user.role === "visitor" && user.isVerified === false) {
+      return res.status(403).json({
+        success: false,
+        error: "Your account is not yet verified",
+        message:
+          "Please verify your account using the OTP sent during registration before logging in.",
+        requiresEmailVerification: true,
+        requiresOtpVerification: true,
+        email: user.email,
+      });
+    }
+
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      console.log("Invalid password for:", email);
+      console.log("Invalid password for:", loginIdentifier);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
@@ -369,9 +1260,12 @@ app.post("/api/login", async (req, res) => {
       userName: `${user.firstName} ${user.lastName}`,
       location: "Mobile App",
       accessType: "system",
-      status: "granted",
+      status: user.status === "pending" ? "pending" : "granted",
       nfcCardId: user.nfcCardId,
-      notes: "User logged in via mobile app",
+      notes:
+        user.status === "pending"
+          ? "Pending visitor logged in and is waiting for admin approval"
+          : "User logged in via mobile app",
     });
     await accessLog.save();
 
@@ -381,9 +1275,25 @@ app.post("/api/login", async (req, res) => {
 
     console.log("Login successful:", user.email, "Role:", user.role);
 
+    await createSystemActivity({
+      actorUser: user,
+      relatedUser: user,
+      activityType: "user_login",
+      status: user.status === "pending" ? "pending" : "granted",
+      location: "Mobile App",
+      notes: `${user.firstName} ${user.lastName} logged in as ${user.role}.`,
+      metadata: {
+        role: user.role,
+        email: user.email,
+      },
+    });
+
     res.json({
       success: true,
-      message: "Login successful",
+      message:
+        user.status === "pending"
+          ? "Login successful. Account is waiting for admin approval."
+          : "Login successful",
       user: userResponse,
       token,
     });
@@ -413,20 +1323,101 @@ app.get("/api/profile", authMiddleware, async (req, res) => {
 // 4. UPDATE PROFILE (Protected)
 app.put("/api/profile", authMiddleware, async (req, res) => {
   try {
-    const updates = req.body;
+    const existingUser = await User.findById(req.user._id);
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-    // Don't allow password update through this route
-    delete updates.password;
-    delete updates.email; // Email cannot be changed
+    const body = req.body || {};
+    const updates = {};
+
+    if (body.firstName !== undefined) updates.firstName = String(body.firstName || "").trim();
+    if (body.lastName !== undefined) updates.lastName = String(body.lastName || "").trim();
+    if (body.phone !== undefined) updates.phone = String(body.phone || "").trim();
+    if (body.emergencyContact !== undefined) {
+      updates.emergencyContact = String(body.emergencyContact || "").trim();
+    }
+    if (body.profilePhoto !== undefined) updates.profilePhoto = body.profilePhoto || null;
+
+    if (body.email !== undefined) {
+      const normalizedEmail = normalizeEmailValue(body.email);
+      if (!normalizedEmail || !isValidEmailValue(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid email address.",
+        });
+      }
+
+      const duplicateEmail = await User.findOne({
+        _id: { $ne: existingUser._id },
+        email: normalizedEmail,
+      });
+
+      if (duplicateEmail) {
+        return res.status(409).json({
+          success: false,
+          message: "That email address is already used by another account.",
+        });
+      }
+
+      updates.email = normalizedEmail;
+    }
+
+    if (body.username !== undefined) {
+      const normalizedUsername = normalizeUsernameValue(body.username);
+      if (!normalizedUsername) {
+        return res.status(400).json({
+          success: false,
+          message: "Username cannot be empty.",
+        });
+      }
+
+      const duplicateUsername = await User.findOne({
+        _id: { $ne: existingUser._id },
+        username: normalizedUsername,
+      });
+
+      if (duplicateUsername) {
+        return res.status(409).json({
+          success: false,
+          message: "That username is already used by another account.",
+        });
+      }
+
+      updates.username = normalizedUsername;
+    }
+
+    if (updates.firstName !== undefined && !updates.firstName) {
+      return res.status(400).json({ success: false, message: "First name is required." });
+    }
+
+    if (updates.lastName !== undefined && !updates.lastName) {
+      return res.status(400).json({ success: false, message: "Last name is required." });
+    }
 
     const user = await User.findByIdAndUpdate(
-      req.user._id,
+      existingUser._id,
       { ...updates, updatedAt: new Date() },
       { new: true, runValidators: true },
     ).select("-password");
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+    if (user?.role === "visitor") {
+      const visitorUpdates = {};
+      if (updates.firstName !== undefined || updates.lastName !== undefined) {
+        visitorUpdates.fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+      }
+      if (updates.email !== undefined) visitorUpdates.email = user.email;
+      if (updates.phone !== undefined && updates.phone) visitorUpdates.phoneNumber = updates.phone;
+
+      if (Object.keys(visitorUpdates).length > 0) {
+        let visitor = null;
+        if (user.visitorId) visitor = await Visitor.findById(user.visitorId);
+        if (!visitor) visitor = await Visitor.findOne({ email: existingUser.email }).sort({ registeredAt: -1 });
+        if (visitor) {
+          Object.assign(visitor, visitorUpdates);
+          await visitor.save();
+        }
+      }
     }
 
     res.json({
@@ -437,6 +1428,46 @@ app.put("/api/profile", authMiddleware, async (req, res) => {
   } catch (error) {
     console.error("❌ Update profile error:", error);
     res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// 4b. CHANGE PASSWORD (Protected)
+app.put("/api/auth/change-password", authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Current and new passwords are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ success: false, message: "New password must be at least 6 characters" });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const isPasswordValid = await user.comparePassword(currentPassword);
+    if (!isPasswordValid) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Current password is incorrect" });
+    }
+
+    user.password = newPassword;
+    user.updatedAt = new Date();
+    await user.save();
+
+    res.json({ success: true, message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ success: false, message: "Failed to change password" });
   }
 });
 
@@ -455,154 +1486,517 @@ app.post("/api/check-email", async (req, res) => {
   }
 });
 
+app.get("/api/auth/verify-email", async (req, res) => {
+  try {
+    const token = String(req.query.token || "").trim();
+
+    if (!token) {
+      return res.status(400).send("Missing verification token.");
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      verificationTokenHash: tokenHash,
+      verificationExpiresAt: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).send(
+        "This verification link is invalid or expired. Please request a new verification email.",
+      );
+    }
+
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.verificationTokenHash = "";
+    user.verificationExpiresAt = null;
+    if (user.status === "pending") {
+      user.status = "active";
+    }
+    await user.save();
+
+    console.log(`Email verified for ${user.email}`);
+
+    res.send(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Email Verified</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f3f7f5; color: #0f172a; padding: 40px; }
+            .card { max-width: 520px; margin: 8vh auto; background: white; border-radius: 18px; padding: 32px; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12); }
+            h1 { color: #047857; margin-top: 0; }
+            a { display: inline-block; margin-top: 18px; background: #047857; color: white; padding: 12px 18px; border-radius: 10px; text-decoration: none; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Email verified</h1>
+            <p>Your Sapphire SafePass account has been verified. You can now return to the app and log in.</p>
+            <a href="${FRONTEND_URL}">Go to SafePass</a>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Verify email error:", error);
+    res.status(500).send("Failed to verify email.");
+  }
+});
+
+app.post("/api/auth/verify-email", async (req, res) => {
+  try {
+    const token = String(req.body?.token || "").trim();
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing verification token.",
+      });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      verificationTokenHash: tokenHash,
+      verificationExpiresAt: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This verification link is invalid or expired. Please request a new verification email.",
+      });
+    }
+
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.verificationTokenHash = "";
+    user.verificationExpiresAt = null;
+    if (user.status === "pending") {
+      user.status = "active";
+    }
+    await user.save();
+
+    console.log(`Email verified for ${user.email}`);
+
+    return res.json({
+      success: true,
+      message: "Email verified. You can now log in.",
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error("Verify email API error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify email.",
+    });
+  }
+});
+
+app.post("/api/auth/resend-verification", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const user = await User.findOne({ email, role: "visitor" });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor account not found.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.json({
+        success: true,
+        message: "This account is already verified.",
+      });
+    }
+
+    const verification = sendVerificationEmailSimulation(req, user);
+    await user.save();
+
+    res.json({
+      success: true,
+      message:
+        "Verification link generated. In simulation mode, check the backend logs.",
+      simulation: true,
+      verificationLink: verification.verificationUrl,
+      verificationExpiresAt: verification.expiresAt,
+    });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to resend verification link.",
+    });
+  }
+});
+
+app.post("/api/auth/verify-registration-otp", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+    const otpCode = normalizeOtpCode(req.body?.otpCode);
+
+    if (!email || !otpCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP code are required.",
+      });
+    }
+
+    if (!/^\d{6}$/.test(otpCode)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter the 6-digit OTP code.",
+      });
+    }
+
+    const user = await User.findOne({ email, role: "visitor" });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor account not found.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.json({
+        success: true,
+        verified: true,
+        message: "This account is already verified.",
+      });
+    }
+
+    if (!user.verificationOtpHash || !user.verificationOtpExpiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: "No OTP verification code was found. Please request a new code.",
+      });
+    }
+
+    if (new Date(user.verificationOtpExpiresAt).getTime() < Date.now()) {
+      user.verificationOtpHash = "";
+      user.verificationOtpExpiresAt = null;
+      user.verificationOtpAttempts = 0;
+      await user.save();
+
+      return res.status(400).json({
+        success: false,
+        message: "OTP code has expired. Please request a new code.",
+      });
+    }
+
+    if ((user.verificationOtpAttempts || 0) >= 5) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many incorrect OTP attempts. Please request a new code.",
+      });
+    }
+
+    const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+    if (otpHash !== user.verificationOtpHash) {
+      user.verificationOtpAttempts = (user.verificationOtpAttempts || 0) + 1;
+      await user.save();
+
+      return res.status(400).json({
+        success: false,
+        message: `Invalid OTP code. ${Math.max(0, 5 - user.verificationOtpAttempts)} attempts remaining.`,
+      });
+    }
+
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.verificationOtpHash = "";
+    user.verificationOtpExpiresAt = null;
+    user.verificationOtpAttempts = 0;
+    user.verificationTokenHash = "";
+    user.verificationExpiresAt = null;
+    if (user.status === "pending") {
+      user.status = "active";
+    }
+    await user.save();
+
+    await createRoleNotification({
+      title: "Visitor Account Verified",
+      message: `${getFullName(user)} verified their visitor account using OTP.`,
+      targetRole: "admin",
+      relatedUser: user._id,
+      type: "visitor",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_account_otp_verified",
+        email: user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    res.json({
+      success: true,
+      verified: true,
+      message: "OTP verified. You can now log in.",
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error("Verify registration OTP error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify OTP.",
+    });
+  }
+});
+
+app.post("/api/auth/resend-registration-otp", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const user = await User.findOne({ email, role: "visitor" });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor account not found.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.json({
+        success: true,
+        verified: true,
+        message: "This account is already verified.",
+      });
+    }
+
+    const otp = createRegistrationOtp(user);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "A new OTP code was generated. In simulation mode, check the backend logs.",
+      simulation: true,
+      otpCode: otp.otpCode,
+      otpExpiresAt: otp.expiresAt,
+    });
+  } catch (error) {
+    console.error("Resend registration OTP error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to resend OTP.",
+    });
+  }
+});
+
 // ============ VISITOR REGISTRATION ROUTES ============
 
 // Register a new visitor (Complete version with UNIQUE NFC ID for pending visitors)
 app.post("/api/visitors/register", async (req, res) => {
   try {
-    const visitorData = req.body;
+    const visitorData = req.body || {};
+    const normalizedFullName = String(visitorData.fullName || "").trim();
+    const normalizedEmail = normalizeEmailValue(visitorData.email);
+    const normalizedUsername = normalizeUsernameValue(visitorData.username);
+    const normalizedPhone = normalizePhoneValue(visitorData.phone || visitorData.phoneNumber);
+    const password = String(visitorData.password || "");
+    const dataPrivacyAccepted = visitorData.privacyAccepted === true;
+    const dataPrivacyAcceptedAt = visitorData.privacyAcceptedAt
+      ? new Date(visitorData.privacyAcceptedAt)
+      : new Date();
 
-    // 1. Check if user already exists
+    if (!normalizedFullName || !normalizedEmail || !normalizedUsername || !normalizedPhone || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Full name, email, username, contact number, and password are required.",
+      });
+    }
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long.",
+      });
+    }
+
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: PHONE_VALIDATION_MESSAGE,
+        field: "phone",
+      });
+    }
+
+    if (!dataPrivacyAccepted) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "By registering, you must agree that your personal data will be collected and used for visitor monitoring and security purposes.",
+      });
+    }
+
     const existingUser = await User.findOne({
-      email: visitorData.email.toLowerCase(),
+      $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
     });
+
     if (existingUser) {
       return res.status(400).json({
         success: false,
         message:
-          "An account with this email already exists. Please login instead.",
+          existingUser.email === normalizedEmail
+            ? "An account with this email already exists. Please log in instead."
+            : "That username is already taken. Please choose another username.",
       });
     }
 
-    // 2. Check if visitor already exists
-    const existingVisitor = await Visitor.findOne({
-      email: visitorData.email.toLowerCase(),
+    const existingVisitor = await Visitor.findOne({ email: normalizedEmail }).sort({
+      registeredAt: -1,
     });
-    if (existingVisitor) {
-      if (existingVisitor.approvalStatus === "pending") {
-        return res.status(400).json({
-          success: false,
-          message:
-            "You already have a pending registration. Please wait for admin approval.",
-        });
-      } else if (existingVisitor.approvalStatus === "approved") {
-        return res.status(400).json({
-          success: false,
-          message:
-            "You already have an approved visitor account. Please login instead.",
-        });
-      }
-      return res.status(400).json({
-        success: false,
-        message: "A visitor with this email already exists.",
-      });
-    }
+    const nameParts = normalizedFullName.split(/\s+/).filter(Boolean);
+    const firstName = nameParts.shift() || "Visitor";
+    const lastName = nameParts.join(" ") || "User";
 
-    // 3. Create new visitor
-    const visitor = new Visitor({
-      fullName: visitorData.fullName,
-      email: visitorData.email.toLowerCase(),
-      phoneNumber: visitorData.phoneNumber,
-      idNumber: visitorData.idNumber,
-      idImage: visitorData.idImage,
-      purposeOfVisit: visitorData.purposeOfVisit,
-      vehicleNumber: visitorData.vehicleNumber || "",
-      visitDate: new Date(visitorData.visitDate),
-      visitTime: new Date(visitorData.visitTime),
-      registeredAt: new Date(),
-      status: "pending",
-      approvalStatus: "pending",
-    });
-
-    await visitor.save();
-    console.log("✅ Visitor registered:", visitorData.email);
-
-    // 4. Generate temporary password
-    const tempPassword = `VIS${Math.random().toString(36).slice(-8).toUpperCase()}`;
-
-    // 5. Generate UNIQUE temporary NFC card ID (KEY FIX!)
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substr(2, 10).toUpperCase();
-    const tempNfcCardId = `PENDING-${timestamp}-${randomString}`;
-
-    // 6. Create user account with UNIQUE NFC card ID (NOT NULL!)
     const user = new User({
-      firstName: visitorData.fullName.split(" ")[0] || "Visitor",
-      lastName: visitorData.fullName.split(" ").slice(1).join(" ") || "User",
-      email: visitorData.email.toLowerCase(),
-      password: tempPassword,
-      phone: visitorData.phoneNumber,
+      firstName,
+      lastName,
+      username: normalizedUsername,
+      email: normalizedEmail,
+      password,
+      phone: normalizedPhone,
       role: "visitor",
-      status: "pending",
-      isActive: false,
-      visitorId: visitor._id,
-      nfcCardId: tempNfcCardId,
+      status: "active",
+      isVerified: false,
+      dataPrivacyAccepted: true,
+      dataPrivacyAcceptedAt,
+      isActive: true,
+      visitorId: existingVisitor?._id || null,
     });
 
+    const otp = createRegistrationOtp(user);
     await user.save();
-    console.log("✅ User account created with NFC ID:", tempNfcCardId);
+    console.log("Visitor account created, waiting for OTP verification:", normalizedEmail);
 
-    // 7. Create notifications for ALL admins
-    const admins = await User.find({ role: "admin", isActive: true });
+    await createSystemActivity({
+      actorUser: user,
+      relatedVisitor: existingVisitor?._id ? existingVisitor : null,
+      relatedUser: user,
+      activityType: "visitor_account_registration",
+      status: "pending",
+      location: "Visitor Registration",
+      notes: `${normalizedFullName} created a visitor account and must verify OTP before login.`,
+      metadata: {
+        username: user.username,
+        email: user.email,
+        requiresOtpVerification: true,
+      },
+    });
 
-    for (const admin of admins) {
-      const notification = new Notification({
-        title: "New Visitor Registration",
-        message:
-          `${visitorData.fullName} (${visitorData.email}) has registered for a visit.\n\n` +
-          `Purpose: ${visitorData.purposeOfVisit}\n` +
-          `Date: ${new Date(visitorData.visitDate).toLocaleDateString()}\n` +
-          `Time: ${new Date(visitorData.visitTime).toLocaleTimeString()}\n` +
-          `Phone: ${visitorData.phoneNumber}`,
-        type: "visitor",
-        severity: "medium",
-        targetRole: "admin",
-        targetUser: admin._id,
-        relatedVisitor: visitor._id,
-        metadata: {
-          visitorName: visitorData.fullName,
-          visitorEmail: visitorData.email,
-          purpose: visitorData.purposeOfVisit,
-          visitDate: visitorData.visitDate,
-          visitTime: visitorData.visitTime,
-          phoneNumber: visitorData.phoneNumber,
-        },
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
+    await AccessLog.create({
+      userId: user._id,
+      userEmail: user.email,
+      userName: normalizedFullName,
+      actorRole: "visitor",
+      location: "Visitor Registration",
+      accessType: "system",
+      activityType: "visitor_account_registration",
+      status: "pending",
+      relatedUser: user._id,
+      relatedVisitor: existingVisitor?._id || null,
+      notes: "Visitor account created and waiting for OTP verification",
+    });
 
-      await notification.save();
-    }
+    await createRoleNotification({
+      title: "New Visitor Account Registered",
+      message: `New visitor account registered: ${normalizedFullName}`,
+      targetRole: "admin",
+      relatedVisitor: existingVisitor?._id || null,
+      relatedUser: user._id,
+      type: "visitor",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_account_registration",
+        userId: user._id,
+        email: user.email,
+        fullName: normalizedFullName,
+        isVerified: false,
+        requiresOtpVerification: true,
+        timestamp: new Date().toISOString(),
+      },
+    });
 
-    console.log(
-      `📢 Created ${admins.length} admin notifications for new visitor`,
-    );
-
-    // 8. Return response with credentials
     res.status(201).json({
       success: true,
       message:
-        "Visitor registration submitted successfully. Pending admin approval.",
-      visitor: {
-        _id: visitor._id,
-        fullName: visitor.fullName,
-        email: visitor.email,
-        status: "pending",
-        approvalStatus: "pending",
+        "Visitor account created. Please enter the OTP code before logging in. In simulation mode, use the OTP shown in the backend logs.",
+      requiresOtpVerification: true,
+      simulation: true,
+      otpCode: otp.otpCode,
+      otpExpiresAt: otp.expiresAt,
+      user: {
+        _id: user._id,
+        fullName: normalizedFullName,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        status: user.status,
+        isVerified: user.isVerified,
       },
       credentials: {
+        username: user.username,
         email: user.email,
-        password: tempPassword,
+        password,
       },
     });
   } catch (error) {
     console.error("Visitor registration error:", error);
 
-    // Handle duplicate key error specifically
     if (error.code === 11000) {
+      const duplicateField =
+        Object.keys(error.keyPattern || {})[0] ||
+        Object.keys(error.keyValue || {})[0] ||
+        "";
+
       return res.status(400).json({
         success: false,
         message:
-          "A duplicate entry was found. Please try again with different details.",
+          duplicateField === "email"
+            ? "An account with this email already exists. Please log in instead."
+            : duplicateField === "username"
+              ? "That username is already taken. Please choose another username."
+              : "A duplicate entry was found. Please try again with different details.",
+        duplicateField,
       });
     }
 
@@ -623,9 +2017,10 @@ app.get("/api/admin/visitors/pending", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    // Get ALL visitors with status 'pending' OR approvalStatus 'pending'
     const visitors = await Visitor.find({
-      $or: [{ status: "pending" }, { approvalStatus: "pending" }],
+      requestCategory: "registration",
+      approvalFlow: "admin",
+      approvalStatus: "pending",
     }).sort({ registeredAt: -1 });
 
     console.log(`\n📋 Found ${visitors.length} pending visitors:`);
@@ -661,13 +2056,28 @@ app.get("/api/admin/visitors", authMiddleware, async (req, res) => {
       query.status = status;
     }
 
-    // Also search by approvalStatus if status is pending/approved/rejected
     if (status === "pending") {
-      query.$or = [{ status: "pending" }, { approvalStatus: "pending" }];
+      delete query.status;
+      query.$or = [
+        { requestCategory: "registration", approvalStatus: "pending" },
+        { requestCategory: "appointment", appointmentStatus: "pending" },
+      ];
     } else if (status === "approved") {
-      query.$or = [{ status: "approved" }, { approvalStatus: "approved" }];
+      delete query.status;
+      query.approvalStatus = "approved";
+      query.$or = [
+        { requestCategory: "registration" },
+        {
+          requestCategory: "appointment",
+          appointmentStatus: { $in: ["approved", "adjusted"] },
+        },
+      ];
     } else if (status === "rejected") {
-      query.$or = [{ status: "rejected" }, { approvalStatus: "rejected" }];
+      delete query.status;
+      query.$or = [
+        { requestCategory: "registration", approvalStatus: "rejected" },
+        { requestCategory: "appointment", appointmentStatus: "rejected" },
+      ];
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -746,11 +2156,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
 
     // Update visitor status - THIS IS THE KEY PART
     console.log("\n📝 UPDATING VISITOR...");
-    visitor.approvalStatus = "approved";
-    visitor.status = "approved";
-    visitor.approvedAt = new Date();
-    visitor.approvedBy = req.user._id;
-    visitor.adminNotes = adminNotes || "";
+    visitor.approveRegistration(req.user._id, adminNotes || "");
     visitor.temporaryPassword = tempPassword;
 
     await visitor.save();
@@ -790,7 +2196,14 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       console.log(`   NFC Card: ${user.nfcCardId}`);
     } else {
       console.log("📝 Updating existing user account...");
-      // Update existing user - REPLACE temporary NFC with REAL one
+      // Keep the approved account credentials and visitor link in sync.
+      user.firstName = visitor.fullName.split(" ")[0] || user.firstName;
+      user.lastName =
+        visitor.fullName.split(" ").slice(1).join(" ") || user.lastName;
+      user.phone = visitor.phoneNumber || user.phone;
+      user.role = "visitor";
+      user.visitorId = visitor._id;
+      user.password = tempPassword;
       user.status = "active";
       user.isActive = true;
       user.nfcCardId = realNfcCardId;
@@ -812,19 +2225,41 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     console.log("📧 Approval email sent to:", visitor.email);
 
     // Create notification for security
-    const notification = new Notification({
+    await createRoleNotification({
       title: "New Visitor Approved",
-      message: `${visitor.fullName} has been approved to visit on ${new Date(visitor.visitDate).toLocaleDateString()}`,
+      message: `${visitor.fullName} has been approved to visit on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}`,
       type: "visitor",
       severity: "medium",
       targetRole: "security",
       relatedVisitor: visitor._id,
+      relatedUser: user._id,
+      metadata: {
+        activityType: "admin_approved_registration",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+      },
     });
-    await notification.save();
     console.log("🔔 Security notification created");
 
     console.log("\n✅ VISITOR APPROVED SUCCESSFULLY!");
     console.log("=".repeat(60) + "\n");
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: user,
+      activityType: "admin_approved_registration",
+      status: "granted",
+      location: visitor.assignedOffice || visitor.host || "Admin Approval Desk",
+      notes: `${req.user.firstName} ${req.user.lastName} approved ${visitor.fullName}'s registration.`,
+      metadata: {
+        adminNotes: visitor.adminNotes,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+      },
+    });
 
     res.json({
       success: true,
@@ -865,11 +2300,7 @@ app.put("/api/admin/visitors/:id/reject", authMiddleware, async (req, res) => {
         .json({ success: false, message: "Visitor not found" });
     }
 
-    // Update visitor status
-    visitor.status = "rejected";
-    visitor.rejectedAt = new Date();
-    visitor.rejectedBy = req.user._id;
-    visitor.rejectionReason = reason || "No reason provided";
+    visitor.rejectRegistration(req.user._id, reason || "No reason provided");
     await visitor.save();
 
     // Send rejection email (simulated)
@@ -880,17 +2311,34 @@ app.put("/api/admin/visitors/:id/reject", authMiddleware, async (req, res) => {
     );
 
     // Create notification for security
-    const notification = new Notification({
+    await createRoleNotification({
       title: "Visitor Rejected",
       message: `${visitor.fullName}'s registration was rejected. Reason: ${reason || "N/A"}`,
       type: "alert",
       severity: "medium",
       targetRole: "security",
       relatedVisitor: visitor._id,
+      metadata: {
+        activityType: "admin_rejected_registration",
+        reason: reason || "No reason provided",
+      },
     });
-    await notification.save();
 
     console.log("❌ Visitor rejected:", visitor.email);
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      activityType: "admin_rejected_registration",
+      status: "denied",
+      location: visitor.assignedOffice || visitor.host || "Admin Approval Desk",
+      notes: `${req.user.firstName} ${req.user.lastName} rejected ${visitor.fullName}'s registration.`,
+      metadata: {
+        reason: reason || "No reason provided",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     res.json({
       success: true,
@@ -905,6 +2353,194 @@ app.put("/api/admin/visitors/:id/reject", authMiddleware, async (req, res) => {
 });
 
 // ============ SECURITY GUARD MANAGEMENT ROUTES ============
+
+// Create staff account (admin only)
+app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const {
+      firstName,
+      lastName,
+      username,
+      email,
+      password,
+      phone,
+      department,
+      position,
+      employeeId,
+      status,
+    } = req.body;
+
+    const normalizedFirstName = String(firstName || "").trim();
+    const normalizedLastName = String(lastName || "").trim();
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedUsername = normalizeUsernameValue(username);
+    const normalizedPhone = normalizePhoneValue(phone);
+    const normalizedDepartment = String(department || "").trim();
+    const normalizedPosition = String(position || "Staff Member").trim();
+    const normalizedEmployeeId = employeeId ? String(employeeId).trim() : "";
+    const normalizedStatus = status === "inactive" ? "inactive" : "active";
+    const normalizedPassword = String(password || "");
+
+    if (
+      !normalizedFirstName ||
+      !normalizedLastName ||
+      !normalizedUsername ||
+      !normalizedEmail ||
+      !normalizedPassword ||
+      !normalizedPhone ||
+      !normalizedDepartment
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+        required: ["firstName", "lastName", "username", "email", "password", "phone", "department"],
+      });
+    }
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format",
+        field: "email",
+      });
+    }
+
+    if (normalizedPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+        field: "password",
+      });
+    }
+
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: PHONE_VALIDATION_MESSAGE,
+        field: "phone",
+      });
+    }
+
+    const duplicateChecks = [
+      { email: normalizedEmail },
+      { username: normalizedUsername },
+    ];
+
+    if (normalizedEmployeeId) {
+      duplicateChecks.push({ employeeId: normalizedEmployeeId });
+    }
+
+    const existingUser = await User.findOne({ $or: duplicateChecks });
+    if (existingUser) {
+      const duplicateField =
+        existingUser.email === normalizedEmail
+          ? "email"
+          : existingUser.username === normalizedUsername
+            ? "username"
+            : "employeeId";
+
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "username"
+            ? "Username already registered"
+            : duplicateField === "employeeId"
+              ? "Staff ID already registered"
+              : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
+    let finalEmployeeId = normalizedEmployeeId;
+    if (!finalEmployeeId) {
+      const timestamp = Date.now().toString().slice(-6);
+      const random = Math.random().toString(36).substr(2, 3).toUpperCase();
+      finalEmployeeId = `STF-${timestamp}-${random}`;
+    }
+
+    const nfcCardId = `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+    const user = new User({
+      firstName: normalizedFirstName,
+      lastName: normalizedLastName,
+      username: normalizedUsername,
+      email: normalizedEmail,
+      password: normalizedPassword,
+      phone: normalizedPhone,
+      role: "staff",
+      status: normalizedStatus,
+      isActive: normalizedStatus === "active",
+      employeeId: finalEmployeeId,
+      department: normalizedDepartment,
+      position: normalizedPosition,
+      nfcCardId,
+    });
+
+    await user.save();
+
+    const accessLog = new AccessLog({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      userName: `${req.user.firstName} ${req.user.lastName}`,
+      location: "Admin Panel",
+      accessType: "system",
+      status: "granted",
+      notes: `Created staff account: ${user.email}`,
+    });
+    await accessLog.save();
+
+    sendEmail(
+      user.email,
+      `Welcome to Sapphire Aviation - Staff Account`,
+      `Dear ${user.firstName} ${user.lastName},\n\n` +
+        `Your staff account has been created by the administrator.\n\n` +
+        `Username: ${user.username}\n` +
+        `Email: ${user.email}\n` +
+        `Password: ${password}\n` +
+        `Staff ID: ${user.employeeId}\n` +
+        `Department: ${user.department}\n` +
+        `Status: ${user.status.toUpperCase()}\n\n` +
+        `Please sign in and change your password as soon as possible.\n\n` +
+        `Thank you,\n` +
+        `Sapphire Aviation Security Team`,
+    );
+
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({
+      success: true,
+      message: "Staff account created successfully",
+      user: userResponse,
+    });
+  } catch (error) {
+    console.error("Create staff account error:", error);
+
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "username"
+            ? "Username already registered"
+            : duplicateField === "employeeId"
+              ? "Staff ID already registered"
+              : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to create staff account",
+      error: error.message,
+    });
+  }
+});
 
 // Create security guard (admin only)
 app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
@@ -924,20 +2560,64 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       employeeId,
     } = req.body;
 
+    const normalizedFirstName = String(firstName || "").trim();
+    const normalizedLastName = String(lastName || "").trim();
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedPhone = normalizePhoneValue(phone);
+    const normalizedPassword = String(password || "");
+    const normalizedEmployeeId = employeeId ? String(employeeId).trim() : "";
+    const normalizedPosition = String(position || "Security Guard").trim();
+
     // Validate required fields
-    if (!firstName || !lastName || !email || !password || !phone) {
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedPassword || !normalizedPhone) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    if (!isValidEmailValue(normalizedEmail)) {
       return res.status(400).json({
         success: false,
-        message: "Email already registered",
+        message: "Invalid email format",
+        field: "email",
+      });
+    }
+
+    if (normalizedPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+        field: "password",
+      });
+    }
+
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: PHONE_VALIDATION_MESSAGE,
+        field: "phone",
+      });
+    }
+
+    const duplicateChecks = [{ email: normalizedEmail }];
+    if (normalizedEmployeeId) {
+      duplicateChecks.push({ employeeId: normalizedEmployeeId });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ $or: duplicateChecks });
+    if (existingUser) {
+      const duplicateField =
+        existingUser.email === normalizedEmail ? "email" : "employeeId";
+
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "employeeId"
+            ? "Security ID already registered"
+            : "Email already registered",
+        field: duplicateField,
       });
     }
 
@@ -947,7 +2627,7 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
     const nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
 
     // Generate employee ID if not provided
-    let finalEmployeeId = employeeId;
+    let finalEmployeeId = normalizedEmployeeId;
     if (!finalEmployeeId) {
       const timeStamp = Date.now().toString().slice(-6);
       const random = Math.random().toString(36).substr(2, 3).toUpperCase();
@@ -956,16 +2636,15 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
 
     // Create user
     const user = new User({
-      firstName,
-      lastName,
-      email: email.toLowerCase().trim(),
-      password,
-      phone,
+      firstName: normalizedFirstName,
+      lastName: normalizedLastName,
+      email: normalizedEmail,
+      password: normalizedPassword,
+      phone: normalizedPhone,
       role: "guard",
       nfcCardId,
       employeeId: finalEmployeeId,
-      shift: shift || "Morning",
-      position: position || "Security Guard",
+      position: normalizedPosition,
       status: "active",
       isActive: true,
     });
@@ -989,7 +2668,6 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
         `👤 Name: ${user.firstName} ${user.lastName}\n` +
         `🎭 Role: SECURITY GUARD\n` +
         `🆔 Employee ID: ${user.employeeId}\n` +
-        `⏰ Shift: ${shift || "Morning"}\n` +
         `📱 Phone: ${user.phone}\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
         `Please login to the app and change your password for security.\n\n` +
@@ -1007,6 +2685,19 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error("Create security guard error:", error);
+
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "employeeId"
+            ? "Security ID already registered"
+            : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Failed to create security guard",
@@ -1022,7 +2713,7 @@ app.get("/api/admin/security", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const guards = await User.find({ role: "guard" })
+    const guards = await User.find({ role: { $in: ["guard", "security"] } })
       .select("-password")
       .sort({ createdAt: -1 });
 
@@ -1035,6 +2726,38 @@ app.get("/api/admin/security", authMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get security guards",
+    });
+  }
+});
+
+// Get security guard by ID
+app.get("/api/admin/security/:id", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const guard = await User.findOne({
+      _id: req.params.id,
+      role: { $in: ["guard", "security"] },
+    }).select("-password");
+
+    if (!guard) {
+      return res.status(404).json({
+        success: false,
+        message: "Security guard not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      guard,
+    });
+  } catch (error) {
+    console.error("Get security guard by ID error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get security guard",
     });
   }
 });
@@ -1147,6 +2870,52 @@ app.put("/api/admin/security/:id/shift", authMiddleware, async (req, res) => {
   }
 });
 
+// Get guard attendance logs (derived from access logs)
+app.get("/api/admin/security/:id/attendance", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const { startDate, endDate, limit = 100 } = req.query;
+
+    const guard = await User.findById(req.params.id).select("email firstName lastName");
+    if (!guard) {
+      return res.status(404).json({
+        success: false,
+        message: "Security guard not found",
+      });
+    }
+
+    const query = { userEmail: guard.email };
+    if (startDate || endDate) {
+      query.timestamp = {};
+      if (startDate) query.timestamp.$gte = new Date(startDate);
+      if (endDate) query.timestamp.$lte = new Date(endDate);
+    }
+
+    const attendance = await AccessLog.find(query)
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit));
+
+    res.json({
+      success: true,
+      attendance,
+      guard: {
+        id: guard._id,
+        name: `${guard.firstName || ""} ${guard.lastName || ""}`.trim(),
+        email: guard.email,
+      },
+    });
+  } catch (error) {
+    console.error("Get guard attendance error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get guard attendance",
+    });
+  }
+});
+
 // ============ ADMIN NOTIFICATION ROUTES ============
 
 // Send admin notification
@@ -1209,12 +2978,20 @@ app.post("/api/auth/request-otp", async (req, res) => {
 
   try {
     const { phoneNumber, method } = req.body;
+    const cleanPhone = normalizePhoneForOtp(phoneNumber);
+
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid Philippine mobile number.",
+      });
+    }
 
     // Generate a random 6-digit OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Store OTP with expiration (5 minutes)
-    otpStore.set(phoneNumber, {
+    otpStore.set(cleanPhone, {
       code: otpCode,
       expiresAt: Date.now() + 5 * 60 * 1000,
       attempts: 0,
@@ -1227,13 +3004,13 @@ app.post("/api/auth/request-otp", async (req, res) => {
     // Log OTP to console (for development)
     console.log("\n" + "=".repeat(50));
     console.log(`🔐 OTP VERIFICATION CODE`);
-    console.log(`📱 Phone: ${phoneNumber}`);
+    console.log(`📱 Phone: ${cleanPhone}`);
     console.log(`🔢 Code: ${otpCode}`);
     console.log(`⏱️  Expires in: 5 minutes`);
     console.log("=".repeat(50) + "\n");
 
     // Also show an alert in the terminal for easy visibility
-    console.log(`\x1b[32m%s\x1b[0m`, `✅ OTP for ${phoneNumber}: ${otpCode}`);
+    console.log(`\x1b[32m%s\x1b[0m`, `✅ OTP for ${cleanPhone}: ${otpCode}`);
 
     // In a real app, you would send an SMS here
     // For development, we'll just log it
@@ -1243,6 +3020,7 @@ app.post("/api/auth/request-otp", async (req, res) => {
       tempToken: tempToken,
       expiresIn: 300,
       method: method || "sms",
+      phoneNumber: cleanPhone,
     });
   } catch (error) {
     console.error("OTP request error:", error);
@@ -1258,16 +3036,23 @@ app.post("/api/auth/verify-otp", async (req, res) => {
 
   try {
     const { phoneNumber, otpCode, tempToken } = req.body;
+    const cleanPhone = normalizePhoneForOtp(phoneNumber);
+    const cleanOtpCode = normalizeOtpCode(otpCode);
 
-    // Clean phone number
-    let cleanPhone = phoneNumber.replace(/[\s\.\-]/g, "");
-    if (cleanPhone.startsWith("63")) {
-      cleanPhone = "0" + cleanPhone.slice(2);
-    } else if (cleanPhone.startsWith("9") && cleanPhone.length === 10) {
-      cleanPhone = "0" + cleanPhone;
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: "Please enter a valid Philippine mobile number.",
+      });
     }
-    if (!cleanPhone.startsWith("09")) {
-      cleanPhone = "09" + cleanPhone.slice(-9);
+
+    if (!/^\d{6}$/.test(cleanOtpCode)) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: "Please enter the 6-digit OTP code.",
+      });
     }
 
     const storedData = otpStore.get(cleanPhone);
@@ -1301,7 +3086,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       });
     }
 
-    if (storedData.code === otpCode) {
+    if (storedData.code === cleanOtpCode) {
       console.log("✅ OTP verified successfully for:", cleanPhone);
       otpStore.delete(cleanPhone);
       return res.json({
@@ -1374,16 +3159,17 @@ app.get("/api/admin/debug-visitors", authMiddleware, async (req, res) => {
 
 app.get("/api/auth/debug-otp/:phone", async (req, res) => {
   const { phone } = req.params;
-  const storedData = otpStore.get(phone);
+  const cleanPhone = normalizePhoneForOtp(phone);
+  const storedData = otpStore.get(cleanPhone);
   if (storedData) {
     res.json({
-      phone,
+      phone: cleanPhone,
       otp: storedData.code,
       expiresAt: new Date(storedData.expiresAt),
       attempts: storedData.attempts,
     });
   } else {
-    res.json({ phone, otp: null, message: "No OTP found for this number" });
+    res.json({ phone: cleanPhone, otp: null, message: "No OTP found for this number" });
   }
 });
 
@@ -1714,10 +3500,69 @@ app.get("/api/visitors/:id", authMiddleware, async (req, res) => {
   }
 });
 
+// Update visitor (admin/security)
+app.put("/api/visitors/:id", authMiddleware, async (req, res) => {
+  try {
+    if (!["admin", "security", "guard"].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const updates = { ...req.body };
+    delete updates._id;
+    delete updates.__v;
+    delete updates.registeredAt;
+
+    const visitor = await Visitor.findByIdAndUpdate(
+      req.params.id,
+      { ...updates, updatedAt: new Date() },
+      { new: true, runValidators: true },
+    );
+
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Visitor not found" });
+    }
+
+    res.json({ success: true, message: "Visitor updated successfully", visitor });
+  } catch (error) {
+    console.error("Update visitor error:", error);
+    res.status(500).json({ success: false, message: "Failed to update visitor" });
+  }
+});
+
+// Delete visitor (admin only)
+app.delete("/api/visitors/:id", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Visitor not found" });
+    }
+
+    await Visitor.findByIdAndDelete(req.params.id);
+
+    if (visitor.email) {
+      await User.deleteOne({ email: visitor.email.toLowerCase().trim(), role: "visitor" });
+    }
+
+    res.json({ success: true, message: "Visitor deleted successfully" });
+  } catch (error) {
+    console.error("Delete visitor error:", error);
+    res.status(500).json({ success: false, message: "Failed to delete visitor" });
+  }
+});
+
 // Visitor self check-in
 app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
+    const checkInSource = String(req.body?.source || "mobile_app")
+      .trim()
+      .toLowerCase();
+    const sourceLabel =
+      checkInSource === "virtual_nfc_card" ? "virtual NFC card" : "mobile app";
 
     if (!visitor) {
       return res.status(404).json({
@@ -1726,20 +3571,88 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    visitor.status = "checked_in";
-    visitor.checkedInAt = new Date();
+    if (!isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only check in using your own visitor appointment.",
+      });
+    }
+
+    if (!visitor.hasApprovedVisitWindow()) {
+      return res.status(400).json({
+        success: false,
+        message: "Your visit is still waiting for approval.",
+      });
+    }
+
+    if (visitor.status === "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "You are already checked in for this visit.",
+      });
+    }
+
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been completed.",
+      });
+    }
+
+    visitor.markCheckedIn(req.user._id);
     await visitor.save();
 
     // Create access log
     const accessLog = new AccessLog({
       userEmail: visitor.email,
       userName: visitor.fullName,
-      location: "Mobile App",
+      location: checkInSource === "virtual_nfc_card" ? "Virtual NFC Card" : "Mobile App",
       accessType: "entry",
+      activityType: "visitor_self_checkin",
       status: "granted",
-      notes: "Visitor self check-in via mobile app",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      actorRole: req.user.role,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        source: checkInSource,
+      },
+      notes: `Visitor self check-in via ${sourceLabel}`,
     });
     await accessLog.save();
+
+    await createRoleNotification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} checked in using the ${sourceLabel}.`,
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkin",
+        source: checkInSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} checked in using the ${sourceLabel}.`,
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkin",
+        source: checkInSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     res.json({
       success: true,
@@ -1759,6 +3672,11 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
 app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
+    const checkOutSource = String(req.body?.source || "mobile_app")
+      .trim()
+      .toLowerCase();
+    const sourceLabel =
+      checkOutSource === "visitor_dashboard" ? "visitor dashboard" : "mobile app";
 
     if (!visitor) {
       return res.status(404).json({
@@ -1767,20 +3685,81 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       });
     }
 
-    visitor.status = "checked_out";
-    visitor.checkedOutAt = new Date();
+    if (!isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only check out using your own visitor appointment.",
+      });
+    }
+
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been checked out.",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "You must be checked in before you can check out.",
+      });
+    }
+
+    visitor.markCheckedOut(req.user._id);
     await visitor.save();
 
     // Create access log
     const accessLog = new AccessLog({
       userEmail: visitor.email,
       userName: visitor.fullName,
-      location: "Mobile App",
+      location: checkOutSource === "visitor_dashboard" ? "Visitor Dashboard" : "Mobile App",
       accessType: "exit",
+      activityType: "visitor_self_checkout",
       status: "granted",
-      notes: "Visitor self check-out via mobile app",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      actorRole: req.user.role,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        source: checkOutSource,
+      },
+      notes: `Visitor self check-out via ${sourceLabel}`,
     });
     await accessLog.save();
+
+    await createRoleNotification({
+      title: "Visitor Checked Out",
+      message: `${visitor.fullName} checked out using the ${sourceLabel}.`,
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkout",
+        source: checkOutSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Visitor Checked Out",
+      message: `${visitor.fullName} checked out using the ${sourceLabel}.`,
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      type: "info",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_self_checkout",
+        source: checkOutSource,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     res.json({
       success: true,
@@ -1808,6 +3787,18 @@ app.get("/api/visitors/:id/logs", authMiddleware, async (req, res) => {
       });
     }
 
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const canReadLogs =
+      ["admin", "security", "guard", "staff"].includes(requesterRole) ||
+      isVisitorOwner(req.user, visitor);
+
+    if (!canReadLogs) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot view another visitor's access logs.",
+      });
+    }
+
     const logs = await AccessLog.find({
       $or: [{ userEmail: visitor.email }, { userName: visitor.fullName }],
     })
@@ -1827,68 +3818,418 @@ app.get("/api/visitors/:id/logs", authMiddleware, async (req, res) => {
   }
 });
 
-// visitor visit details (for scheduling/rescheduling)
-app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
+// Visitor appointment slot availability
+app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
   try {
-    const { userId } = req.params;
-    const { visitDate, visitTime, purposeOfVisit } = req.body;
+    const { date, department } = req.query || {};
+    const requestedDepartment = String(department || "").trim();
 
-    // Find the user
-    const user = await User.findById(userId);
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+    if (!date || !requestedDepartment) {
+      return res.status(400).json({
+        success: false,
+        message: "Date and office or department are required.",
+      });
     }
 
-    // Find visitor record
-    let visitor = await Visitor.findOne({ email: user.email });
+    const routedStaff = await User.findOne({
+      role: "staff",
+      isActive: true,
+      status: "active",
+      department: getStaffDepartmentQuery(requestedDepartment),
+    }).sort({ lastLogin: -1, createdAt: 1 });
 
-    if (!visitor && user.visitorId) {
+    if (!routedStaff) {
+      return res.json({
+        success: true,
+        limit: APPOINTMENT_SLOT_LIMIT,
+        department: formatDepartmentLabel(requestedDepartment),
+        assignedStaff: null,
+        slots: [],
+        message: `No active staff account is assigned to ${requestedDepartment}.`,
+      });
+    }
+
+    const selectedDate = new Date(date);
+    if (Number.isNaN(selectedDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid appointment date.",
+      });
+    }
+
+    const selectedDay = new Date(selectedDate);
+    selectedDay.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDay < today) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointment date cannot be in the past.",
+      });
+    }
+
+    const slots = [];
+    for (let hour = 7; hour <= 18; hour += 1) {
+      for (const minute of [0, 30]) {
+        const slotTime = new Date(selectedDate);
+        slotTime.setHours(hour, minute, 0, 0);
+        const count = await countStaffAppointmentsForSlot({
+          assignedStaff: routedStaff._id,
+          visitDate: selectedDate,
+          visitTime: slotTime,
+        });
+
+        slots.push({
+          value: slotTime.toISOString(),
+          hour,
+          minute,
+          count,
+          limit: APPOINTMENT_SLOT_LIMIT,
+          available: Math.max(APPOINTMENT_SLOT_LIMIT - count, 0),
+          isFull: count >= APPOINTMENT_SLOT_LIMIT,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      limit: APPOINTMENT_SLOT_LIMIT,
+      department: formatDepartmentLabel(requestedDepartment),
+      assignedStaff: {
+        id: routedStaff._id,
+        name: getFullName(routedStaff),
+      },
+      slots,
+    });
+  } catch (error) {
+    console.error("Get appointment availability error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load appointment availability.",
+    });
+  }
+});
+
+// Visitor appointment request / reappointment
+app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
+  try {
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    if (requesterRole !== "visitor" && requesterRole !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only visitors can create appointment requests.",
+      });
+    }
+
+    if (requesterRole === "visitor" && !isSameObjectId(req.user._id, req.params.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only request appointments for your own account.",
+      });
+    }
+
+    const requestedUserId =
+      requesterRole === "visitor" ? req.user._id : req.params.userId;
+    const {
+      visitDate,
+      preferredDate,
+      visitTime,
+      preferredTime,
+      purposeOfVisit,
+      purposeCategory,
+      customPurposeOfVisit,
+      department,
+      officeToVisit,
+      assignedOffice,
+      appointmentDepartment,
+      idNumber,
+      idImage,
+      dataPrivacyAccepted,
+      dataPrivacyAcceptedAt,
+    } = req.body || {};
+
+    const finalVisitDate = visitDate || preferredDate;
+    const finalVisitTime = visitTime || preferredTime;
+    const normalizedPurposeCategory = String(purposeCategory || "").trim();
+    const normalizedCustomPurpose = String(customPurposeOfVisit || "").trim();
+    const requestedDepartment = String(
+      appointmentDepartment || department || officeToVisit || assignedOffice || "",
+    ).trim();
+    const resolvedPurpose =
+      normalizedPurposeCategory === "Other" && normalizedCustomPurpose
+        ? normalizedCustomPurpose
+        : String(purposeOfVisit || normalizedPurposeCategory || "").trim();
+
+    if (!finalVisitDate || !finalVisitTime || !resolvedPurpose) {
+      return res.status(400).json({
+        success: false,
+        message: "Preferred date, preferred time, and purpose of visit are required.",
+      });
+    }
+
+    if (!isAllowedOption(normalizedPurposeCategory, APPOINTMENT_PURPOSE_OPTIONS)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid purpose of visit.",
+      });
+    }
+
+    if (normalizedPurposeCategory === "Other" && !normalizedCustomPurpose) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter your custom purpose of visit.",
+      });
+    }
+
+    if (!requestedDepartment) {
+      return res.status(400).json({
+        success: false,
+        message: "Office or department is required for this appointment.",
+      });
+    }
+
+    if (!isAllowedOption(requestedDepartment, APPOINTMENT_DEPARTMENT_OPTIONS)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid office to visit.",
+      });
+    }
+
+    const appointmentDateTime = getCombinedAppointmentDateTime(finalVisitDate, finalVisitTime);
+    if (!appointmentDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid appointment date and time.",
+      });
+    }
+
+    const minimumScheduleTime = new Date(Date.now() - 60 * 1000);
+    if (appointmentDateTime < minimumScheduleTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointment schedule cannot be in the past.",
+      });
+    }
+
+    const normalizedIdNumber = String(idNumber || "").trim();
+    const normalizedIdImage = String(idImage || "").trim();
+
+    if (!normalizedIdNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid ID number is required for appointment verification.",
+      });
+    }
+
+    if (!normalizedIdImage) {
+      return res.status(400).json({
+        success: false,
+        message: "A clear valid ID picture is required for appointment verification.",
+      });
+    }
+
+    if (dataPrivacyAccepted !== true) {
+      return res.status(400).json({
+        success: false,
+        message: "Please confirm the data privacy agreement before submitting.",
+      });
+    }
+
+    const routedStaff = await User.findOne({
+      role: "staff",
+      isActive: true,
+      status: "active",
+      department: getStaffDepartmentQuery(requestedDepartment),
+    }).sort({ lastLogin: -1, createdAt: 1 });
+
+    if (!routedStaff) {
+      return res.status(400).json({
+        success: false,
+        message: `No active staff account is assigned to ${requestedDepartment}. Please choose another office or contact admin.`,
+      });
+    }
+
+    const user = await User.findById(requestedUserId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (String(user.role).toLowerCase() !== "visitor") {
+      return res.status(400).json({
+        success: false,
+        message: "Only visitor accounts can create appointment requests.",
+      });
+    }
+
+    if (user.isVerified === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your visitor account with OTP before requesting an appointment.",
+        requiresEmailVerification: true,
+        requiresOtpVerification: true,
+      });
+    }
+
+    if (String(user.status).toLowerCase() !== "active") {
+      return res.status(400).json({
+        success: false,
+        message: "Your visitor account must be active before requesting another appointment.",
+      });
+    }
+
+    let visitor = null;
+    if (user.visitorId) {
       visitor = await Visitor.findById(user.visitorId);
     }
 
     if (!visitor) {
-      // Create new visitor record if doesn't exist
+      visitor = await Visitor.findOne({ email: user.email }).sort({ registeredAt: -1 });
+    }
+
+    const visitorFullName = `${user.firstName} ${user.lastName}`.trim();
+    const slotCount = await countStaffAppointmentsForSlot({
+      assignedStaff: routedStaff._id,
+      visitDate: finalVisitDate,
+      visitTime: finalVisitTime,
+      excludeVisitorId: visitor?._id || null,
+    });
+
+    if (slotCount >= APPOINTMENT_SLOT_LIMIT) {
+      return res.status(409).json({
+        success: false,
+        code: "APPOINTMENT_SLOT_FULL",
+        message: `${formatDepartmentLabel(requestedDepartment)} is already full for that time. Please choose another time slot.`,
+        limit: APPOINTMENT_SLOT_LIMIT,
+        currentCount: slotCount,
+      });
+    }
+
+    if (!visitor) {
       visitor = new Visitor({
-        fullName: `${user.firstName} ${user.lastName}`,
+        fullName: visitorFullName,
         email: user.email,
-        phoneNumber: user.phone,
-        purposeOfVisit: purposeOfVisit || "",
-        visitDate: new Date(visitDate),
-        visitTime: new Date(visitTime),
-        status: "pending",
-        approvalStatus: "pending",
+        phoneNumber: user.phone || "Not provided",
+        idNumber: normalizedIdNumber,
+        idImage: normalizedIdImage,
+        dataPrivacyAccepted: true,
+        dataPrivacyAcceptedAt: dataPrivacyAcceptedAt
+          ? new Date(dataPrivacyAcceptedAt)
+          : new Date(),
+      });
+      visitor.queueAppointmentRequest({
+        purposeOfVisit: resolvedPurpose,
+        purposeCategory: normalizedPurposeCategory || undefined,
+        customPurposeOfVisit: normalizedCustomPurpose || undefined,
+        visitDate: new Date(finalVisitDate),
+        visitTime: new Date(finalVisitTime),
+        department: formatDepartmentLabel(requestedDepartment),
+        assignedStaff: routedStaff._id,
+        assignedStaffName: getFullName(routedStaff),
       });
       await visitor.save();
-
-      // Link visitor to user
       user.visitorId = visitor._id;
       await user.save();
     } else {
-      // Update existing visitor
-      visitor.purposeOfVisit = purposeOfVisit || visitor.purposeOfVisit;
-      visitor.visitDate = new Date(visitDate);
-      visitor.visitTime = new Date(visitTime);
-      visitor.status = "pending";
-      visitor.approvalStatus = "pending";
+      visitor.fullName = visitor.fullName || visitorFullName;
+      visitor.phoneNumber = user.phone || visitor.phoneNumber;
+      visitor.idNumber = normalizedIdNumber;
+      visitor.idImage = normalizedIdImage;
+      visitor.dataPrivacyAccepted = true;
+      visitor.dataPrivacyAcceptedAt = dataPrivacyAcceptedAt
+        ? new Date(dataPrivacyAcceptedAt)
+        : new Date();
+      visitor.queueAppointmentRequest({
+        purposeOfVisit: resolvedPurpose,
+        purposeCategory: normalizedPurposeCategory || undefined,
+        customPurposeOfVisit: normalizedCustomPurpose || undefined,
+        visitDate: new Date(finalVisitDate),
+        visitTime: new Date(finalVisitTime),
+        department: formatDepartmentLabel(requestedDepartment),
+        assignedStaff: routedStaff._id,
+        assignedStaffName: getFullName(routedStaff),
+      });
       await visitor.save();
     }
 
-    // Create notification for admin
-    const notification = new Notification({
-      title: "Visit Rescheduled",
-      message: `${visitor.fullName} has scheduled/rescheduled a visit for ${new Date(visitDate).toLocaleDateString()} at ${new Date(visitTime).toLocaleTimeString()}`,
+    await createRoleNotification({
+      title: "New Department Appointment Request",
+      message: `${visitor.fullName} requested ${visitor.appointmentDepartment || visitor.assignedOffice} on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}. Purpose: ${visitor.purposeOfVisit}`,
       type: "visitor",
+      severity: "medium",
+      targetRole: "staff",
+      targetUser: routedStaff._id,
+      relatedVisitor: visitor._id,
+      relatedUser: user._id,
+      metadata: {
+        activityType: "visitor_appointment_request",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        purposeCategory: visitor.purposeCategory,
+        customPurposeOfVisit: visitor.customPurposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Visitor Appointment Requested",
+      message: `${visitor.fullName} submitted a new appointment request for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
+      type: "info",
       severity: "medium",
       targetRole: "admin",
       relatedVisitor: visitor._id,
+      relatedUser: user._id,
+      metadata: {
+        activityType: "visitor_appointment_request",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
+      },
     });
-    await notification.save();
+
+    await createRoleNotification({
+      title: "Appointment Request Queued",
+      message: `${visitor.fullName} requested an appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}. Security will handle gate entry after staff approval.`,
+      type: "info",
+      severity: "low",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: user._id,
+      metadata: {
+        activityType: "visitor_appointment_request",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
+        pendingStaffApproval: true,
+      },
+    });
+
+    await createSystemActivity({
+      actorUser: user,
+      relatedVisitor: visitor,
+      relatedUser: user,
+      activityType: "visitor_appointment_request",
+      status: "pending",
+      location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment Request",
+      notes: `${visitor.fullName} requested a new appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
+      metadata: {
+        requestCategory: "appointment",
+        approvalFlow: "staff",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
+      },
+    });
 
     res.json({
       success: true,
-      message: "Visit scheduled successfully",
+      message: "Appointment request submitted successfully",
       visitor,
     });
   } catch (error) {
@@ -1900,9 +4241,622 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
   }
 });
 
-// Check-out visitor (by security)
-app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
+app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
   try {
+    const normalizedRole = String(req.user.role).toLowerCase();
+    if (!["staff", "admin"].includes(normalizedRole)) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const { status = "all", limit = 100 } = req.query;
+    const query = {
+      requestCategory: "appointment",
+      approvalFlow: "staff",
+    };
+
+    if (normalizedRole === "staff") {
+      const staffDepartmentQuery = getStaffDepartmentQuery(req.user.department);
+      query.$or = [
+        { assignedStaff: req.user._id },
+        { appointmentDepartment: staffDepartmentQuery },
+        { assignedOffice: staffDepartmentQuery },
+      ];
+    }
+
+    if (status === "pending") {
+      query.appointmentStatus = "pending";
+    } else if (status === "approved") {
+      query.appointmentStatus = { $in: ["approved", "adjusted"] };
+    } else if (status === "rejected") {
+      query.appointmentStatus = "rejected";
+    } else if (status === "completed") {
+      query.status = "checked_out";
+    }
+
+    const appointments = await Visitor.find(query)
+      .sort({ appointmentRequestedAt: -1, visitDate: 1 })
+      .limit(parseInt(limit, 10))
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
+
+    res.json({
+      success: true,
+      appointments,
+    });
+  } catch (error) {
+    console.error("Get staff appointments error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch staff appointments",
+    });
+  }
+});
+
+app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) => {
+  try {
+    if (!["staff", "admin"].includes(String(req.user.role).toLowerCase())) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be approved here.",
+      });
+    }
+
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only approve appointments assigned to your department.",
+      });
+    }
+
+    if ((visitor.appointmentStatus || "pending") !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending appointments can be approved.",
+      });
+    }
+
+    const appointmentDateTime = getCombinedAppointmentDateTime(visitor.visitDate, visitor.visitTime);
+    if (!appointmentDateTime || appointmentDateTime < new Date(Date.now() - 60 * 1000)) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment schedule is no longer valid. Please adjust it before approving.",
+      });
+    }
+
+    visitor.approveAppointment(req.user, req.body?.note || "");
+    await visitor.save();
+
+    const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
+
+    await createRoleNotification({
+      title: "Appointment Approved",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was approved by ${getFullName(req.user)}.`,
+      type: "success",
+      severity: "low",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_approved_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    if (visitorUser) {
+      await createRoleNotification({
+        title: "Your Appointment Is Approved",
+        message: `Your visit on ${visitSchedule} has been approved. Please provide internet before going to the site.`,
+        type: "success",
+        severity: "low",
+        targetRole: "visitor",
+        targetUser: visitorUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser._id,
+        metadata: {
+          activityType: "staff_approved_appointment",
+        },
+      });
+    }
+
+    await createRoleNotification({
+      title: "Appointment Approved",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} has been approved and recorded.`,
+      type: "success",
+      severity: "low",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_approved_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "staff_approved_appointment",
+      status: "granted",
+      location: visitor.assignedOffice || visitor.host || req.user.department || "Staff Office",
+      notes: `${getFullName(req.user)} approved ${visitor.fullName}'s appointment.`,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Appointment approved successfully",
+      visitor: updatedVisitor,
+    });
+  } catch (error) {
+    console.error("Staff approve appointment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to approve appointment",
+    });
+  }
+});
+
+app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) => {
+  try {
+    if (!["staff", "admin"].includes(String(req.user.role).toLowerCase())) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const { visitDate, preferredDate, visitTime, preferredTime, note } = req.body || {};
+    const finalVisitDate = visitDate || preferredDate;
+    const finalVisitTime = visitTime || preferredTime;
+
+    if (!finalVisitTime) {
+      return res.status(400).json({
+        success: false,
+        message: "An adjusted preferred time is required.",
+      });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be adjusted here.",
+      });
+    }
+
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only adjust appointments assigned to your department.",
+      });
+    }
+
+    if ((visitor.appointmentStatus || "pending") !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending appointments can be adjusted.",
+      });
+    }
+
+    const adjustedDate = finalVisitDate || visitor.visitDate;
+    const adjustedDateTime = getCombinedAppointmentDateTime(adjustedDate, finalVisitTime);
+    if (!adjustedDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid adjusted date and time.",
+      });
+    }
+
+    const minimumScheduleTime = new Date(Date.now() - 60 * 1000);
+    if (adjustedDateTime < minimumScheduleTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Adjusted appointment time cannot be in the past.",
+      });
+    }
+
+    const slotStaffId = visitor.assignedStaff || req.user._id;
+    const adjustedSlotCount = await countStaffAppointmentsForSlot({
+      assignedStaff: slotStaffId,
+      visitDate: adjustedDate,
+      visitTime: finalVisitTime,
+      excludeVisitorId: visitor._id,
+    });
+
+    if (adjustedSlotCount >= APPOINTMENT_SLOT_LIMIT) {
+      return res.status(409).json({
+        success: false,
+        code: "APPOINTMENT_SLOT_FULL",
+        message: "That adjusted time slot is already full. Please choose another time.",
+        limit: APPOINTMENT_SLOT_LIMIT,
+        currentCount: adjustedSlotCount,
+      });
+    }
+
+    visitor.adjustAppointment(req.user, {
+      visitDate: finalVisitDate ? new Date(finalVisitDate) : null,
+      visitTime: new Date(finalVisitTime),
+      note,
+    });
+    await visitor.save();
+
+    const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
+
+    await createRoleNotification({
+      title: "Appointment Time Adjusted",
+      message: `${getFullName(req.user)} adjusted ${visitor.fullName}'s appointment to ${visitSchedule}.`,
+      type: "warning",
+      severity: "medium",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_adjusted_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: visitor.staffAdjustmentNote,
+      },
+    });
+
+    if (visitorUser) {
+      await createRoleNotification({
+        title: "Appointment Time Updated",
+        message: `Your appointment was adjusted to ${visitSchedule}. Please provide internet before going to the site.`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "visitor",
+        targetUser: visitorUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser._id,
+        metadata: {
+          activityType: "staff_adjusted_appointment",
+          note: visitor.staffAdjustmentNote,
+        },
+      });
+    }
+
+    await createRoleNotification({
+      title: "Appointment Time Adjusted",
+      message: `${visitor.fullName}'s appointment has been updated to ${visitSchedule}.`,
+      type: "warning",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_adjusted_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: visitor.staffAdjustmentNote,
+      },
+    });
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "staff_adjusted_appointment",
+      status: "granted",
+      location: visitor.assignedOffice || visitor.host || req.user.department || "Staff Office",
+      notes: `${getFullName(req.user)} adjusted ${visitor.fullName}'s appointment.`,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        note: visitor.staffAdjustmentNote,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Appointment adjusted successfully",
+      visitor: updatedVisitor,
+    });
+  } catch (error) {
+    console.error("Staff adjust appointment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to adjust appointment",
+    });
+  }
+});
+
+app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) => {
+  try {
+    if (!["staff", "admin"].includes(String(req.user.role).toLowerCase())) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be rejected here.",
+      });
+    }
+
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only reject appointments assigned to your department.",
+      });
+    }
+
+    if ((visitor.appointmentStatus || "pending") !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending appointments can be rejected.",
+      });
+    }
+
+    const rejectionReason = String(
+      req.body?.reason || "Appointment request declined by staff.",
+    ).trim();
+
+    visitor.rejectAppointment(req.user, rejectionReason);
+    await visitor.save();
+
+    const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
+
+    if (visitorUser) {
+      await createRoleNotification({
+        title: "Appointment Request Declined",
+        message: `Your appointment request was declined. Reason: ${rejectionReason}`,
+        type: "alert",
+        severity: "medium",
+        targetRole: "visitor",
+        targetUser: visitorUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser._id,
+        metadata: {
+          activityType: "staff_rejected_appointment",
+          reason: rejectionReason,
+        },
+      });
+    }
+
+    await createRoleNotification({
+      title: "Appointment Request Declined",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was declined. Reason: ${rejectionReason}`,
+      type: "alert",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_rejected_appointment",
+        reason: rejectionReason,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Appointment Request Declined",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was declined by ${getFullName(req.user)}.`,
+      type: "alert",
+      severity: "medium",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_rejected_appointment",
+        reason: rejectionReason,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "staff_rejected_appointment",
+      status: "denied",
+      location: visitor.assignedOffice || visitor.host || req.user.department || "Staff Office",
+      notes: `${getFullName(req.user)} rejected ${visitor.fullName}'s appointment.`,
+      metadata: {
+        reason: rejectionReason,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Appointment rejected successfully",
+      visitor: updatedVisitor,
+    });
+  } catch (error) {
+    console.error("Staff reject appointment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reject appointment",
+    });
+  }
+});
+
+app.put("/api/staff/appointments/:id/complete", authMiddleware, async (req, res) => {
+  try {
+    if (!["staff", "admin"].includes(String(req.user.role).toLowerCase())) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be completed here.",
+      });
+    }
+
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only complete appointments assigned to your department.",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "The visitor must be checked in before the appointment can be completed.",
+      });
+    }
+
+    if (visitor.checkedOutAt) {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been checked out.",
+      });
+    }
+
+    if (visitor.appointmentCompletedAt) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment has already been marked complete.",
+      });
+    }
+
+    const completionNote = String(
+      req.body?.note || "Appointment completed. Visitor can proceed to check-out.",
+    ).trim();
+
+    visitor.completeAppointment(req.user, completionNote);
+    await visitor.save();
+
+    const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department")
+      .populate("appointmentCompletedBy", "firstName lastName email department");
+
+    await createRoleNotification({
+      title: "Appointment Completed",
+      message: `${getFullName(req.user)} marked ${visitor.fullName}'s appointment complete. Please prepare for check-out.`,
+      type: "info",
+      severity: "medium",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_completed_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: completionNote,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Appointment Completed",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was marked complete by ${getFullName(req.user)}.`,
+      type: "info",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_completed_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: completionNote,
+      },
+    });
+
+    if (visitorUser) {
+      await createRoleNotification({
+        title: "Appointment Completed",
+        message: "Your appointment is complete. Please proceed to check-out with security before leaving the site.",
+        type: "info",
+        severity: "medium",
+        targetRole: "visitor",
+        targetUser: visitorUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser._id,
+        metadata: {
+          activityType: "staff_completed_appointment",
+          note: completionNote,
+        },
+      });
+    }
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "staff_completed_appointment",
+      status: "granted",
+      location: visitor.assignedOffice || visitor.host || req.user.department || "Staff Office",
+      notes: `${getFullName(req.user)} completed ${visitor.fullName}'s appointment.`,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: completionNote,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Appointment marked complete successfully",
+      visitor: updatedVisitor,
+    });
+  } catch (error) {
+    console.error("Staff complete appointment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to complete appointment",
+    });
+  }
+});
+
+// Check-in visitor (by security)
+app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
+  try {
+    if (!["admin", "security", "guard"].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
     const visitor = await Visitor.findById(req.params.id);
 
     if (!visitor) {
@@ -1912,10 +4866,119 @@ app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
       });
     }
 
-    visitor.status = "checked_out";
-    visitor.checkedOutAt = new Date();
-    visitor.checkedOutBy = req.user._id;
+    if (!visitor.hasApprovedVisitWindow()) {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor does not have an approved visit window yet",
+      });
+    }
+
+    if (visitor.status === "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor is already checked in",
+      });
+    }
+
+    if (visitor.status === "checked_out") {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor has already checked out",
+      });
+    }
+
+    visitor.markCheckedIn(req.user._id);
     await visitor.save();
+
+    const accessLog = new AccessLog({
+      userId: req.user._id,
+      userEmail: visitor.email,
+      userName: visitor.fullName,
+      actorRole: req.user.role,
+      location: visitor.assignedOffice || visitor.host || "Campus Entry",
+      accessType: "entry",
+      activityType: "security_checkin",
+      status: "granted",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      notes: `Checked in by ${req.user.firstName} ${req.user.lastName}`,
+    });
+    await accessLog.save();
+
+    const notification = new Notification({
+      title: "Visitor Checked In",
+      message: `${visitor.fullName} has checked in`,
+      type: "info",
+      severity: "low",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+    });
+    await notification.save();
+
+    res.json({
+      success: true,
+      message: "Visitor checked in successfully",
+      visitor,
+    });
+  } catch (error) {
+    console.error("Check-in error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to check in visitor",
+    });
+  }
+});
+
+// Check-out visitor (by security)
+app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
+  try {
+    if (!["admin", "security", "guard"].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+
+    if (!visitor) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor not found",
+      });
+    }
+
+    if (!visitor.hasApprovedVisitWindow()) {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor does not have an approved visit window yet",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor must be checked in before checkout",
+      });
+    }
+
+    visitor.markCheckedOut(req.user._id);
+    await visitor.save();
+
+    const accessLog = new AccessLog({
+      userId: req.user._id,
+      userEmail: visitor.email,
+      userName: visitor.fullName,
+      actorRole: req.user.role,
+      location: visitor.assignedOffice || visitor.host || "Campus Exit",
+      accessType: "exit",
+      activityType: "security_checkout",
+      status: "granted",
+      relatedVisitor: visitor._id,
+      relatedUser: req.user._id,
+      notes: `Checked out by ${req.user.firstName} ${req.user.lastName}`,
+    });
+    await accessLog.save();
 
     const notification = new Notification({
       title: "Visitor Checked Out",
@@ -1989,10 +5052,14 @@ app.post("/api/visitors/:id/report", authMiddleware, async (req, res) => {
 // Get notifications (for security dashboard)
 app.get("/api/notifications", authMiddleware, async (req, res) => {
   try {
+    await ensureOverstayAlerts();
+
     const { read, limit = 50 } = req.query;
+    const targetRoles = getNotificationTargetRoles(req.user.role);
 
     let query = {
-      $or: [{ targetRole: "all" }, { targetRole: req.user.role }],
+      targetRole: { $in: targetRoles },
+      $or: [{ targetUser: null }, { targetUser: req.user._id }],
     };
 
     if (read === "false") {
@@ -2061,9 +5128,11 @@ app.put("/api/notifications/:id/read", authMiddleware, async (req, res) => {
 // Mark all notifications as read
 app.put("/api/notifications/read-all", authMiddleware, async (req, res) => {
   try {
+    const targetRoles = getNotificationTargetRoles(req.user.role);
     await Notification.updateMany(
       {
-        $or: [{ targetRole: "all" }, { targetRole: req.user.role }],
+        targetRole: { $in: targetRoles },
+        $or: [{ targetUser: null }, { targetUser: req.user._id }],
         "readBy.user": { $ne: req.user._id },
       },
       {
@@ -2150,6 +5219,19 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
           visitor,
         });
       }
+
+      return res.json({
+        success: true,
+        visitor: null,
+        account: {
+          _id: req.user._id,
+          fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
+          email: req.user.email,
+          phoneNumber: req.user.phone,
+          status: req.user.status,
+          registeredAt: req.user.createdAt,
+        },
+      });
     }
 
     res.status(404).json({
@@ -2169,6 +5251,26 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
 app.get("/api/visitors/user/:userId", authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
+    const requesterRole = String(req.user.role || "").toLowerCase();
+
+    if (
+      requesterRole === "visitor" &&
+      !isSameObjectId(req.user._id, userId)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view your own visitor profile.",
+      });
+    }
+
+    if (
+      !["visitor", "admin", "security", "guard", "staff"].includes(requesterRole)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
 
     const user = await User.findById(userId);
     if (!user) {
@@ -2202,12 +5304,85 @@ app.get("/api/visitors/user/:userId", authMiddleware, async (req, res) => {
 
 // ============ ADMIN ROUTES (Existing) ============
 
+app.get("/api/admin/activities", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit || "60", 10), 200);
+    const activities = await AccessLog.find({
+      $or: [
+        { accessType: "system" },
+        { accessType: "entry" },
+        { accessType: "exit" },
+      ],
+    })
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .populate("relatedVisitor", "fullName email visitDate visitTime purposeOfVisit assignedOffice host status appointmentStatus approvalStatus")
+      .populate("relatedUser", "firstName lastName email role department");
+
+    const summary = {
+      registrationRequests: activities.filter((item) => item.activityType === "visitor_registration_request").length,
+      appointmentRequests: activities.filter((item) => item.activityType === "visitor_appointment_request").length,
+      staffActions: activities.filter((item) =>
+        [
+          "staff_approved_appointment",
+          "staff_adjusted_appointment",
+          "staff_rejected_appointment",
+          "staff_completed_appointment",
+        ].includes(item.activityType),
+      ).length,
+      completedVisits: activities.filter((item) =>
+        item.activityType === "security_checkout" || item.activityType === "visitor_self_checkout",
+      ).length,
+      approvals: activities.filter((item) =>
+        item.activityType === "admin_approved_registration" || item.activityType === "staff_approved_appointment",
+      ).length,
+    };
+
+    res.json({
+      success: true,
+      activities,
+      summary,
+    });
+  } catch (error) {
+    console.error("Get admin activities error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch admin activities",
+    });
+  }
+});
+
 // Get admin statistics
 app.get("/api/admin/stats", authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
+
+    const pendingRegistrationRequestsQuery = {
+      requestCategory: "registration",
+      approvalFlow: "admin",
+      approvalStatus: "pending",
+    };
+    const pendingAppointmentRequestsQuery = {
+      requestCategory: "appointment",
+      approvalFlow: "staff",
+      appointmentStatus: "pending",
+    };
+    const approvedVisitWindowsQuery = {
+      approvalStatus: "approved",
+      $or: [
+        { requestCategory: "registration" },
+        {
+          requestCategory: "appointment",
+          appointmentStatus: { $in: ["approved", "adjusted"] },
+        },
+      ],
+    };
 
     const totalUsers = await User.countDocuments();
     const activeUsers = await User.countDocuments({ status: "active" });
@@ -2218,16 +5393,23 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
       timestamp: { $gte: today },
     });
 
-    const totalStudents = await User.countDocuments({ role: "student" });
+    const totalAdmins = await User.countDocuments({ role: "admin" });
     const totalStaff = await User.countDocuments({ role: "staff" });
-    // Fix: Count both "guard" and "security" roles for total security
     const totalSecurity = await User.countDocuments({ 
       role: { $in: ["guard", "security"] } 
     });
     const totalVisitors = await Visitor.countDocuments();
-    const pendingApprovals = await Visitor.countDocuments({
-      status: "pending",
-    });
+    const pendingRegistrationRequests = await Visitor.countDocuments(
+      pendingRegistrationRequestsQuery,
+    );
+    const pendingAppointmentRequests = await Visitor.countDocuments(
+      pendingAppointmentRequestsQuery,
+    );
+    const pendingApprovals =
+      pendingRegistrationRequests + pendingAppointmentRequests;
+    const approvedVisits = await Visitor.countDocuments(approvedVisitWindowsQuery);
+    const checkedInVisitors = await Visitor.countDocuments({ status: "checked_in" });
+    const completedVisits = await Visitor.countDocuments({ status: "checked_out" });
 
     const totalAccess = await AccessLog.countDocuments();
     const grantedAccess = await AccessLog.countDocuments({ status: "granted" });
@@ -2237,7 +5419,7 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
         : "0%";
 
     const pendingIssues =
-      (await Visitor.countDocuments({ status: "pending" })) +
+      pendingApprovals +
       (await AccessLog.countDocuments({
         status: "denied",
         timestamp: { $gte: today },
@@ -2252,12 +5434,17 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
         activeUsers,
         todayAccess,
         pendingIssues,
-        totalStudents,
+        totalAdmins,
         totalStaff,
         totalSecurity,
         totalVisitors,
         successRate,
         pendingApprovals,
+        pendingRegistrationRequests,
+        pendingAppointmentRequests,
+        approvedVisits,
+        checkedInVisitors,
+        completedVisits,
       },
     });
   } catch (error) {
@@ -2346,22 +5533,168 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const updates = req.body;
+    const updates = { ...req.body };
     delete updates.password; // Don't allow password update through this route
     delete updates._id;
     delete updates.__v;
+
+    const existingUser = await User.findById(req.params.id);
+    if (!existingUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    if (updates.firstName !== undefined) {
+      updates.firstName = String(updates.firstName || "").trim();
+      if (!updates.firstName) {
+        return res.status(400).json({
+          success: false,
+          message: "First name is required.",
+          field: "firstName",
+        });
+      }
+    }
+
+    if (updates.lastName !== undefined) {
+      updates.lastName = String(updates.lastName || "").trim();
+      if (!updates.lastName) {
+        return res.status(400).json({
+          success: false,
+          message: "Last name is required.",
+          field: "lastName",
+        });
+      }
+    }
+
+    if (updates.email !== undefined) {
+      const normalizedEmail = normalizeEmailValue(updates.email);
+      if (!normalizedEmail || !isValidEmailValue(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid email address.",
+          field: "email",
+        });
+      }
+
+      const emailConflict = await User.findOne({
+        email: normalizedEmail,
+        _id: { $ne: req.params.id },
+      });
+
+      if (emailConflict) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already registered",
+          field: "email",
+        });
+      }
+
+      updates.email = normalizedEmail;
+    }
+
+    if (updates.phone !== undefined) {
+      updates.phone = normalizePhoneValue(updates.phone);
+      if (updates.phone && !isValidPhoneValue(updates.phone)) {
+        return res.status(400).json({
+          success: false,
+          message: PHONE_VALIDATION_MESSAGE,
+          field: "phone",
+        });
+      }
+    }
+
+    if (updates.role !== undefined) {
+      updates.role = String(updates.role || "").toLowerCase().trim();
+      if (!ACCOUNT_ROLE_OPTIONS.includes(updates.role)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid role",
+          field: "role",
+        });
+      }
+    }
+
+    if (updates.status !== undefined) {
+      updates.status = String(updates.status || "").toLowerCase().trim();
+      if (!ACCOUNT_STATUS_OPTIONS.includes(updates.status)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid account status",
+          field: "status",
+        });
+      }
+      updates.isActive = updates.status === "active";
+    }
+
+    if (updates.department !== undefined) {
+      updates.department = String(updates.department || "").trim();
+    }
+
+    if (updates.position !== undefined) {
+      updates.position = String(updates.position || "").trim();
+    }
+
+    if (updates.username !== undefined) {
+      const normalizedUsername = normalizeUsernameValue(updates.username);
+      if (!normalizedUsername) {
+        delete updates.username;
+      } else {
+        const usernameConflict = await User.findOne({
+          username: normalizedUsername,
+          _id: { $ne: req.params.id },
+        });
+
+        if (usernameConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Username already registered",
+            field: "username",
+          });
+        }
+
+        updates.username = normalizedUsername;
+      }
+    }
+
+    if (updates.employeeId !== undefined) {
+      const normalizedEmployeeId = String(updates.employeeId || "").trim();
+      if (!normalizedEmployeeId) {
+        delete updates.employeeId;
+      } else {
+        const employeeIdConflict = await User.findOne({
+          employeeId: normalizedEmployeeId,
+          _id: { $ne: req.params.id },
+        });
+
+        if (employeeIdConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Staff ID already registered",
+            field: "employeeId",
+          });
+        }
+
+        updates.employeeId = normalizedEmployeeId;
+      }
+    }
+
+    const finalRole = updates.role || existingUser.role;
+    const finalDepartment =
+      updates.department !== undefined ? updates.department : existingUser.department;
+    if (finalRole === "staff" && !String(finalDepartment || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Department is required for staff accounts.",
+        field: "department",
+      });
+    }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { ...updates, updatedAt: new Date() },
       { new: true, runValidators: true },
     ).select("-password");
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    }
 
     // Create access log for the update
     const accessLog = new AccessLog({
@@ -2391,13 +5724,15 @@ app.put("/api/admin/users/:id/role", authMiddleware, async (req, res) => {
 
     const { role } = req.body;
 
-    if (!["student", "staff", "security", "admin", "visitor"].includes(role)) {
+    const normalizedRole = String(role || "").toLowerCase().trim();
+
+    if (!ACCOUNT_ROLE_OPTIONS.includes(normalizedRole)) {
       return res.status(400).json({ success: false, message: "Invalid role" });
     }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { role, updatedAt: new Date() },
+      { role: normalizedRole, updatedAt: new Date() },
       { new: true },
     ).select("-password");
 
@@ -2415,7 +5750,7 @@ app.put("/api/admin/users/:id/role", authMiddleware, async (req, res) => {
       location: "Admin Panel",
       accessType: "system",
       status: "granted",
-      notes: `Updated role for ${user.email} to ${role}`,
+      notes: `Updated role for ${user.email} to ${normalizedRole}`,
     });
     await accessLog.save();
 
@@ -2810,82 +6145,6 @@ app.get("/api/admin/security-logs", authMiddleware, async (req, res) => {
   }
 });
 
-// Get recent activities
-app.get("/api/admin/activities", authMiddleware, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
-    const { limit = 10 } = req.query;
-
-    // Get recent access logs
-    const accessLogs = await AccessLog.find()
-      .sort({ timestamp: -1 })
-      .limit(parseInt(limit))
-      .populate("userId", "firstName lastName email role");
-
-    const activities = accessLogs.map((log, index) => {
-      let activity = "";
-      let type = "system";
-      let severity = "info";
-
-      if (log.status === "denied") {
-        severity = "warning";
-      } else if (log.status === "granted") {
-        severity = "success";
-      }
-
-      if (log.userId) {
-        const userName =
-          `${log.userId.firstName || ""} ${log.userId.lastName || ""}`.trim() ||
-          "Unknown";
-        activity = `${userName} ${log.status} access at ${log.location || "unknown location"}`;
-        type = log.userId.role || "user";
-      } else {
-        activity = `${log.status} access attempt at ${log.location || "unknown location"}`;
-      }
-
-      const timeDiff = Date.now() - new Date(log.timestamp).getTime();
-      let timeAgo = "";
-
-      if (timeDiff < 60000) {
-        timeAgo = "Just now";
-      } else if (timeDiff < 3600000) {
-        const mins = Math.floor(timeDiff / 60000);
-        timeAgo = `${mins} min${mins > 1 ? "s" : ""} ago`;
-      } else if (timeDiff < 86400000) {
-        const hours = Math.floor(timeDiff / 3600000);
-        timeAgo = `${hours} hour${hours > 1 ? "s" : ""} ago`;
-      } else {
-        const days = Math.floor(timeDiff / 86400000);
-        timeAgo = `${days} day${days > 1 ? "s" : ""} ago`;
-      }
-
-      return {
-        id: index + 1,
-        text: activity,
-        time: timeAgo,
-        type,
-        severity,
-        userId: log.userId?._id,
-        location: log.location,
-        timestamp: log.timestamp,
-      };
-    });
-
-    res.json({
-      success: true,
-      activities,
-    });
-  } catch (error) {
-    console.error("Get recent activities error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to get activities" });
-  }
-});
-
 // Get system health
 app.get("/api/admin/health", authMiddleware, async (req, res) => {
   try {
@@ -3068,37 +6327,42 @@ app.use((err, req, res, next) => {
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 5000;
 
-// Check if port is available
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📁 Database: ${MONGODB_URI}`);
-  console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
-  console.log(`✅ Test endpoint: http://localhost:${PORT}/api/health`);
-  console.log(`✅ Test endpoint: http://localhost:${PORT}/api/test`);
-  console.log(`👑 Admin routes available at /api/admin/*`);
-  console.log(`📝 Visitor approval routes available at /api/admin/visitors/*`);
-});
+if (!isVercelRuntime && require.main === module) {
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📁 Database: ${MONGODB_URI}`);
+    console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
+    console.log(`✅ Test endpoint: http://localhost:${PORT}/api/health`);
+    console.log(`✅ Test endpoint: http://localhost:${PORT}/api/test`);
+    console.log(`👑 Admin routes available at /api/admin/*`);
+    console.log(`📝 Visitor approval routes available at /api/admin/visitors/*`);
+  });
 
-// Handle server errors
-server.on("error", (error) => {
-  if (error.code === "EADDRINUSE") {
-    console.error(`❌ Port ${PORT} is already in use. Try a different port:`);
-    console.log(`   Try: PORT=5001 npm run dev`);
-    process.exit(1);
-  } else {
-    console.error("❌ Server error:", error);
-  }
-});
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(`❌ Port ${PORT} is already in use. Try a different port:`);
+      console.log(`   Try: PORT=5001 npm run dev`);
+      process.exit(1);
+    } else {
+      console.error("❌ Server error:", error);
+    }
+  });
 
-// Handle graceful shutdown
-process.on("SIGINT", () => {
-  console.log("\n🛑 Shutting down server...");
-  server.close(() => {
-    console.log("✅ Server closed");
-    mongoose.connection.close(false, () => {
-      console.log("✅ MongoDB connection closed");
-      process.exit(0);
+  process.on("SIGINT", () => {
+    console.log("\n🛑 Shutting down server...");
+    server.close(() => {
+      console.log("✅ Server closed");
+      mongoose.connection.close(false, () => {
+        console.log("✅ MongoDB connection closed");
+        process.exit(0);
+      });
     });
   });
+<<<<<<< HEAD
 });
+=======
+}
+
+module.exports = app;
+>>>>>>> f9f336654ad9bd32e9e9c7214513a8135ab32c16
 
