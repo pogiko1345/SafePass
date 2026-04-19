@@ -45,13 +45,7 @@ let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
 const connectToDatabase = () => {
   if (!mongoConnectionPromise) {
     mongoConnectionPromise = mongoose
-
       .connect(MONGODB_URI)
-
-      .connect(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      })
 
       .then(() => {
         console.log(
@@ -74,10 +68,6 @@ const connectToDatabase = () => {
 };
 
 connectToDatabase();
-<<<<<<< HEAD
-
-=======
->>>>>>> f9f336654ad9bd32e9e9c7214513a8135ab32c16
 
 // ========== HELPER FUNCTIONS ==========
 // Generate JWT Token
@@ -6358,11 +6348,8 @@ if (!isVercelRuntime && require.main === module) {
       });
     });
   });
-<<<<<<< HEAD
-});
-=======
 }
 
 module.exports = app;
->>>>>>> f9f336654ad9bd32e9e9c7214513a8135ab32c16
+
 
