@@ -636,6 +636,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [approvedRequests, setApprovedRequests] = useState([]);
   const [rejectedRequests, setRejectedRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showPendingRequestsModal, setShowPendingRequestsModal] = useState(false);
   const [requestFilter, setRequestFilter] = useState("pending");
   const [requestDateFilter, setRequestDateFilter] = useState("all");
   const [requestOfficeFilter, setRequestOfficeFilter] = useState("all");
@@ -3943,43 +3944,14 @@ const loadDashboardData = useCallback(async () => {
           </View>
           <TouchableOpacity
             style={[styles.dashboardHeroBadge, isDarkMode && { backgroundColor: "#334155" }]}
-            onPress={() => handleMenuAction("requests")}
+            onPress={() => setShowPendingRequestsModal(true)}
             activeOpacity={0.85}
           >
             <Ionicons name="time-outline" size={16} color="#F59E0B" />
             <Text style={[styles.dashboardHeroBadgeText, isDarkMode && styles.darkTextSecondary]}>
-              {stats.pendingRequests || 0} pending
+              {pendingRequests.length || stats.pendingRequests || 0} request alerts
             </Text>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.dashboardStatsGrid}>
-          {[
-            { label: "Pending Requests", value: stats.pendingRequests, color: "#F59E0B", icon: "time-outline" },
-            { label: "Today Visits", value: stats.todayVisits, color: "#EF4444", icon: "walk-outline" },
-            { label: "Checked In", value: stats.checkedInVisitors, color: "#10B981", icon: "log-in-outline" },
-            { label: "Active Users", value: stats.activeUsers, color: "#3B82F6", icon: "people-outline" },
-          ].map((item) => (
-            <View
-              key={item.label}
-              style={[
-                styles.dashboardStatCard,
-                {
-                  width: width > 1200 ? "32%" : width > 900 ? "48%" : "100%",
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.borderColor,
-                },
-              ]}
-            >
-              <View style={styles.dashboardStatHeader}>
-                <Text style={[styles.dashboardStatLabel, { color: theme.textSecondary }]}>{item.label}</Text>
-                <View style={[styles.dashboardStatIcon, { backgroundColor: `${item.color}18` }]}>
-                  <Ionicons name={item.icon} size={16} color={item.color} />
-                </View>
-              </View>
-              <Text style={[styles.dashboardStatValue, { color: item.color }]}>{item.value || 0}</Text>
-            </View>
-          ))}
         </View>
 
         <View style={styles.quickActionsGrid}>
@@ -3990,6 +3962,7 @@ const loadDashboardData = useCallback(async () => {
               style={[
                 styles.quickActionCard,
                 {
+                  width: width > 1100 ? "24%" : width > 760 ? "48%" : "100%",
                   backgroundColor: theme.cardBackground,
                   borderColor: theme.borderColor,
                 },
@@ -4010,17 +3983,35 @@ const loadDashboardData = useCallback(async () => {
           ))}
         </View>
 
-        <View style={[styles.dashboardSectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
-          <View style={styles.dashboardSectionHeader}>
-            <Text style={[styles.dashboardSectionTitle, { color: theme.textPrimary }]}>Recent Pending Requests</Text>
-            <TouchableOpacity onPress={() => handleMenuAction("requests")}>
-              <Text style={styles.dashboardSectionLink}>View all</Text>
-            </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={[
+            styles.dashboardNotificationCard,
+            { backgroundColor: theme.cardBackground, borderColor: theme.borderColor },
+          ]}
+          onPress={() => setShowPendingRequestsModal(true)}
+        >
+          <View style={styles.dashboardNotificationLeft}>
+            <View style={styles.dashboardNotificationIcon}>
+              <Ionicons name="notifications-outline" size={22} color="#F59E0B" />
+            </View>
+            <View style={styles.dashboardNotificationTextWrap}>
+              <Text style={[styles.dashboardNotificationTitle, { color: theme.textPrimary }]}>
+                Pending request notifications
+              </Text>
+              <Text style={[styles.dashboardNotificationText, { color: theme.textSecondary }]}>
+                {pendingRequests.length
+                  ? `${pendingRequests.length} visitor request${pendingRequests.length > 1 ? "s" : ""} need review.`
+                  : "No pending request alerts right now."}
+              </Text>
+            </View>
           </View>
-          {pendingRequests.length ? pendingRequests.slice(0, 5).map((request) => renderRequestCard(request)) : (
-            <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>No pending requests right now.</Text>
-          )}
-        </View>
+          <View style={styles.dashboardNotificationBadge}>
+            <Text style={styles.dashboardNotificationBadgeText}>Open</Text>
+          </View>
+        </TouchableOpacity>
+
+        {renderAdminMapWorkspace()}
       </View>
     </ScrollView>
   );
@@ -8089,6 +8080,75 @@ const loadDashboardData = useCallback(async () => {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.confirmButton, { backgroundColor: "#EF4444" }]} onPress={handleDeleteUser}>
                 <Text style={styles.confirmButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showPendingRequestsModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPendingRequestsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.pendingRequestsModal,
+              isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor },
+            ]}
+          >
+            <View style={[styles.modalHeader, isDarkMode && { borderBottomColor: theme.borderColor }]}>
+              <View>
+                <Text style={[styles.modalTitle, isDarkMode && styles.darkText]}>Pending Requests</Text>
+                <Text style={[styles.pendingRequestsModalSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                  Review visitor requests without crowding the dashboard.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowPendingRequestsModal(false)}
+              >
+                <Ionicons name="close" size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.pendingRequestsModalList}
+              contentContainerStyle={styles.pendingRequestsModalListContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {pendingRequests.length ? (
+                pendingRequests.slice(0, 10).map((request) => renderRequestCard(request))
+              ) : (
+                <View style={styles.pendingRequestsModalEmpty}>
+                  <Ionicons name="checkmark-circle-outline" size={42} color="#10B981" />
+                  <Text style={[styles.pendingRequestsModalEmptyTitle, isDarkMode && styles.darkText]}>
+                    No pending requests
+                  </Text>
+                  <Text style={[styles.pendingRequestsModalEmptyText, isDarkMode && styles.darkTextSecondary]}>
+                    New visitor requests will appear here as notifications.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={[styles.modalFooter, isDarkMode && { borderTopColor: theme.borderColor }]}>
+              <TouchableOpacity
+                style={[styles.cancelButton, isDarkMode && { backgroundColor: "#334155" }]}
+                onPress={() => setShowPendingRequestsModal(false)}
+              >
+                <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={() => {
+                  setShowPendingRequestsModal(false);
+                  handleMenuAction("requests");
+                }}
+              >
+                <Text style={styles.submitButtonText}>Open Requests</Text>
               </TouchableOpacity>
             </View>
           </View>

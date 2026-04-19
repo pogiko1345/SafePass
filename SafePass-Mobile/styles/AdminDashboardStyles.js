@@ -1085,6 +1085,71 @@ export default StyleSheet.create({
     marginTop: 10,
   },
 
+  dashboardNotificationCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 14,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 14,
+    elevation: 2,
+  },
+
+  dashboardNotificationLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  dashboardNotificationIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "#FEF3C7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  dashboardNotificationTextWrap: {
+    flex: 1,
+  },
+
+  dashboardNotificationTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 3,
+  },
+
+  dashboardNotificationText: {
+    fontSize: 12,
+    color: "#64748B",
+    lineHeight: 18,
+  },
+
+  dashboardNotificationBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#FFF7ED",
+  },
+
+  dashboardNotificationBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#F59E0B",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+
   dashboardSectionCard: {
     marginTop: 14,
     borderRadius: 14,
@@ -1690,21 +1755,27 @@ export default StyleSheet.create({
   // ============================================
 
   quickActionsGrid: {
-    gap: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
     marginTop: 2,
     marginBottom: 14,
   },
 
   quickActionCard: {
-    width: "100%",
+    minWidth: 220,
     backgroundColor: "#FFF",
-    borderRadius: 14,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
+    borderRadius: 18,
+    padding: 16,
+    minHeight: 132,
+    justifyContent: "space-between",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    gap: 12,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 14,
+    elevation: 2,
   },
 
   quickActionIcon: {
@@ -1716,7 +1787,8 @@ export default StyleSheet.create({
   },
 
   quickActionContent: {
-    flex: 1,
+    marginTop: 12,
+    marginBottom: 12,
   },
 
   quickActionTitle: {
@@ -1733,6 +1805,7 @@ export default StyleSheet.create({
   },
 
   quickActionBadge: {
+    alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
@@ -2679,6 +2752,15 @@ export default StyleSheet.create({
     color: "#1E293B",
   },
 
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+  },
+
   modalBody: {
     padding: 20,
   },
@@ -2689,6 +2771,54 @@ export default StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
     gap: 12,
+  },
+
+  pendingRequestsModal: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    width: "100%",
+    maxWidth: 760,
+    maxHeight: "86%",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  pendingRequestsModalSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  pendingRequestsModalList: {
+    maxHeight: 520,
+  },
+
+  pendingRequestsModalListContent: {
+    padding: 16,
+    gap: 12,
+  },
+
+  pendingRequestsModalEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 42,
+    paddingHorizontal: 20,
+  },
+
+  pendingRequestsModalEmptyTitle: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  pendingRequestsModalEmptyText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 18,
   },
 
   userProfileModal: {
