@@ -505,6 +505,24 @@ const createRegistrationOtp = (user) => {
   return { otpCode, expiresAt };
 };
 
+const normalizeOtpCode = (value) => String(value || "").replace(/\D/g, "").slice(0, 6);
+
+const normalizePhoneForOtp = (value) => {
+  let cleanPhone = String(value || "").replace(/[^\d]/g, "");
+
+  if (cleanPhone.startsWith("63")) {
+    cleanPhone = `0${cleanPhone.slice(2)}`;
+  } else if (cleanPhone.startsWith("9") && cleanPhone.length === 10) {
+    cleanPhone = `0${cleanPhone}`;
+  }
+
+  if (!cleanPhone.startsWith("09") && cleanPhone.length >= 9) {
+    cleanPhone = `09${cleanPhone.slice(-9)}`;
+  }
+
+  return cleanPhone;
+};
+
 // ========== ROUTES ==========
 
 // 0. TEST ROUTE
@@ -1575,7 +1593,7 @@ app.post("/api/auth/resend-verification", async (req, res) => {
 app.post("/api/auth/verify-registration-otp", async (req, res) => {
   try {
     const email = normalizeEmailValue(req.body?.email);
-    const otpCode = String(req.body?.otpCode || "").trim();
+    const otpCode = normalizeOtpCode(req.body?.otpCode);
 
     if (!email || !otpCode) {
       return res.status(400).json({
@@ -2892,12 +2910,20 @@ app.post("/api/auth/request-otp", async (req, res) => {
 
   try {
     const { phoneNumber, method } = req.body;
+    const cleanPhone = normalizePhoneForOtp(phoneNumber);
+
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid Philippine mobile number.",
+      });
+    }
 
     // Generate a random 6-digit OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Store OTP with expiration (5 minutes)
-    otpStore.set(phoneNumber, {
+    otpStore.set(cleanPhone, {
       code: otpCode,
       expiresAt: Date.now() + 5 * 60 * 1000,
       attempts: 0,
@@ -2910,13 +2936,13 @@ app.post("/api/auth/request-otp", async (req, res) => {
     // Log OTP to console (for development)
     console.log("\n" + "=".repeat(50));
     console.log(`🔐 OTP VERIFICATION CODE`);
-    console.log(`📱 Phone: ${phoneNumber}`);
+    console.log(`📱 Phone: ${cleanPhone}`);
     console.log(`🔢 Code: ${otpCode}`);
     console.log(`⏱️  Expires in: 5 minutes`);
     console.log("=".repeat(50) + "\n");
 
     // Also show an alert in the terminal for easy visibility
-    console.log(`\x1b[32m%s\x1b[0m`, `✅ OTP for ${phoneNumber}: ${otpCode}`);
+    console.log(`\x1b[32m%s\x1b[0m`, `✅ OTP for ${cleanPhone}: ${otpCode}`);
 
     // In a real app, you would send an SMS here
     // For development, we'll just log it
@@ -2926,6 +2952,7 @@ app.post("/api/auth/request-otp", async (req, res) => {
       tempToken: tempToken,
       expiresIn: 300,
       method: method || "sms",
+      phoneNumber: cleanPhone,
     });
   } catch (error) {
     console.error("OTP request error:", error);
@@ -2941,16 +2968,23 @@ app.post("/api/auth/verify-otp", async (req, res) => {
 
   try {
     const { phoneNumber, otpCode, tempToken } = req.body;
+    const cleanPhone = normalizePhoneForOtp(phoneNumber);
+    const cleanOtpCode = normalizeOtpCode(otpCode);
 
-    // Clean phone number
-    let cleanPhone = phoneNumber.replace(/[\s\.\-]/g, "");
-    if (cleanPhone.startsWith("63")) {
-      cleanPhone = "0" + cleanPhone.slice(2);
-    } else if (cleanPhone.startsWith("9") && cleanPhone.length === 10) {
-      cleanPhone = "0" + cleanPhone;
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: "Please enter a valid Philippine mobile number.",
+      });
     }
-    if (!cleanPhone.startsWith("09")) {
-      cleanPhone = "09" + cleanPhone.slice(-9);
+
+    if (!/^\d{6}$/.test(cleanOtpCode)) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: "Please enter the 6-digit OTP code.",
+      });
     }
 
     const storedData = otpStore.get(cleanPhone);
@@ -2984,7 +3018,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       });
     }
 
-    if (storedData.code === otpCode) {
+    if (storedData.code === cleanOtpCode) {
       console.log("✅ OTP verified successfully for:", cleanPhone);
       otpStore.delete(cleanPhone);
       return res.json({
@@ -3057,16 +3091,17 @@ app.get("/api/admin/debug-visitors", authMiddleware, async (req, res) => {
 
 app.get("/api/auth/debug-otp/:phone", async (req, res) => {
   const { phone } = req.params;
-  const storedData = otpStore.get(phone);
+  const cleanPhone = normalizePhoneForOtp(phone);
+  const storedData = otpStore.get(cleanPhone);
   if (storedData) {
     res.json({
-      phone,
+      phone: cleanPhone,
       otp: storedData.code,
       expiresAt: new Date(storedData.expiresAt),
       attempts: storedData.attempts,
     });
   } else {
-    res.json({ phone, otp: null, message: "No OTP found for this number" });
+    res.json({ phone: cleanPhone, otp: null, message: "No OTP found for this number" });
   }
 });
 

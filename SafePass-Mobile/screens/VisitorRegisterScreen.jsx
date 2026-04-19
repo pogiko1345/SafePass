@@ -688,10 +688,15 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const handleVerifySimulation = async () => {
     const email = registeredVisitor?.email || formData.email;
-    const otpCode = String(registrationOtp || "").trim();
+    const otpCode = String(registrationOtp || "").replace(/\D/g, "").slice(0, 6);
 
     if (!email || !otpCode) {
       Alert.alert("OTP Required", "Please enter the 6-digit OTP code.");
+      return;
+    }
+
+    if (otpCode.length !== 6) {
+      Alert.alert("Invalid OTP", "The OTP must be exactly 6 digits.");
       return;
     }
 
