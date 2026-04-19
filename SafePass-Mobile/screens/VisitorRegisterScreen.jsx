@@ -67,7 +67,7 @@ const officeOptions = MONITORING_MAP_OFFICES.map((office) => {
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({
   visible,
-  credentials,
+  account,
   isVerified,
   isVerifying,
   otpValue,
@@ -103,74 +103,46 @@ const SuccessModal = ({
           <Text style={visitorRegisterStyles.successTitle}>Registration Successful</Text>
           <Text style={visitorRegisterStyles.successMessage}>
             {isVerified
-              ? "Your account is verified. You can now continue to login."
-              : "Enter the 6-digit OTP to verify your visitor account before logging in."}
+              ? "Your account is verified. Continue to sign in to your visitor account."
+              : "Enter the 6-digit OTP sent to your email to verify your visitor account before signing in."}
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
             <View style={visitorRegisterStyles.credentialsTitleRow}>
               <Ionicons name="person-circle-outline" size={16} color="#059669" />
               <Text style={visitorRegisterStyles.credentialsTitle}>
-                Login Credentials
+                Account Details
               </Text>
             </View>
             <Text style={visitorRegisterStyles.credentialsInfo}>
-              This is a simulation only. Use the OTP shown below or in the
-              backend logs, then sign in with these credentials.
+              Use your account credentials after OTP verification. For local testing,
+              the OTP may also appear in backend logs if email delivery is not configured.
             </Text>
-            {credentials && (
+            {account && (
               <>
                 <View style={visitorRegisterStyles.credentialRow}>
-                  <Text style={visitorRegisterStyles.credentialLabel}>Username:</Text>
+                  <Text style={visitorRegisterStyles.credentialLabel}>Username</Text>
                   <Text style={visitorRegisterStyles.credentialValue}>
-                    {credentials.username}
+                    {account.username}
                   </Text>
                   <TouchableOpacity
-                    onPress={() => handleCopy(credentials.username, "Username")}
+                    onPress={() => handleCopy(account.username, "Username")}
                     style={visitorRegisterStyles.copyButton}
                   >
                     <Ionicons name="copy-outline" size={18} color="#059669" />
                   </TouchableOpacity>
                 </View>
                 <View style={visitorRegisterStyles.credentialRow}>
-                  <Text style={visitorRegisterStyles.credentialLabel}>Email:</Text>
+                  <Text style={visitorRegisterStyles.credentialLabel}>Email</Text>
                   <Text style={visitorRegisterStyles.credentialValue}>
-                    {credentials.email}
+                    {account.email}
                   </Text>
                   <TouchableOpacity
-                    onPress={() => handleCopy(credentials.email, "Email")}
+                    onPress={() => handleCopy(account.email, "Email")}
                     style={visitorRegisterStyles.copyButton}
                   >
                     <Ionicons name="copy-outline" size={18} color="#059669" />
                   </TouchableOpacity>
                 </View>
-                <View style={visitorRegisterStyles.credentialRow}>
-                  <Text style={visitorRegisterStyles.credentialLabel}>Password:</Text>
-                  <Text style={visitorRegisterStyles.credentialValue}>
-                    {credentials.password}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => handleCopy(credentials.password, "Password")}
-                    style={visitorRegisterStyles.copyButton}
-                  >
-                    <Ionicons name="copy-outline" size={18} color="#059669" />
-                  </TouchableOpacity>
-                </View>
-                {!isVerified ? (
-                  <View style={visitorRegisterStyles.credentialRow}>
-                    <Text style={visitorRegisterStyles.credentialLabel}>OTP:</Text>
-                    <Text style={visitorRegisterStyles.credentialValue}>
-                      {credentials.otpCode || "Check backend logs"}
-                    </Text>
-                    {credentials.otpCode ? (
-                      <TouchableOpacity
-                        onPress={() => handleCopy(credentials.otpCode, "OTP")}
-                        style={visitorRegisterStyles.copyButton}
-                      >
-                        <Ionicons name="copy-outline" size={18} color="#059669" />
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                ) : null}
               </>
             )}
           </View>
@@ -242,7 +214,7 @@ const SuccessModal = ({
                 style={visitorRegisterStyles.successGradient}
               >
                 <Text style={visitorRegisterStyles.successButtonText}>
-                  {isVerified ? "Continue to Login" : "Verify OTP First"}
+                  {isVerified ? "Continue to Sign In" : "Verify OTP First"}
                 </Text>
                 <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
               </LinearGradient>
@@ -433,6 +405,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     username: "",
     phone: "",
     password: "",
+    confirmPassword: "",
   });
   const [errors, setErrors] = useState({
     fullName: "",
@@ -440,6 +413,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     username: "",
     phone: "",
     password: "",
+    confirmPassword: "",
   });
   const [focusedField, setFocusedField] = useState(null);
   const [completedFields, setCompletedFields] = useState({});
@@ -500,6 +474,12 @@ export default function VisitorRegisterScreen({ navigation }) {
     return "";
   };
 
+  const validateConfirmPassword = (confirmPassword, password) => {
+    if (!confirmPassword) return "Please confirm your password";
+    if (confirmPassword !== password) return "Passwords do not match";
+    return "";
+  };
+
   const showValidationAlert = (errorsList) => {
     Alert.alert(
       "Missing Information",
@@ -526,6 +506,19 @@ export default function VisitorRegisterScreen({ navigation }) {
       error = validatePhone(nextValue);
     } else if (field === "password") {
       error = validatePassword(nextValue);
+      setErrors((previous) => ({
+        ...previous,
+        confirmPassword: validateConfirmPassword(formData.confirmPassword, nextValue),
+      }));
+      setCompletedFields((previous) => ({
+        ...previous,
+        confirmPassword: Boolean(
+          formData.confirmPassword &&
+            !validateConfirmPassword(formData.confirmPassword, nextValue),
+        ),
+      }));
+    } else if (field === "confirmPassword") {
+      error = validateConfirmPassword(nextValue, formData.password);
     }
 
     setFormData((previous) => ({ ...previous, [field]: nextValue }));
@@ -543,6 +536,10 @@ export default function VisitorRegisterScreen({ navigation }) {
       username: validateUsername(formData.username),
       phone: validatePhone(formData.phone),
       password: validatePassword(formData.password),
+      confirmPassword: validateConfirmPassword(
+        formData.confirmPassword,
+        formData.password,
+      ),
     };
 
     setErrors(nextErrors);
@@ -553,6 +550,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       username: "Username",
       phone: "Contact Number",
       password: "Password",
+      confirmPassword: "Confirm Password",
     };
 
     const errorMessages = Object.entries(nextErrors)
@@ -613,12 +611,9 @@ export default function VisitorRegisterScreen({ navigation }) {
         setRegisteredVisitor({
           username: response.credentials?.username || formData.username,
           email: response.credentials?.email || formData.email,
-          password: response.credentials?.password || formData.password,
-          otpCode: response.otpCode || "",
-          otpExpiresAt: response.otpExpiresAt || "",
           isVerified: false,
         });
-        setRegistrationOtp(response.otpCode || "");
+        setRegistrationOtp("");
         setTimeout(() => {
           setShowSuccess(true);
         }, Platform.OS === "web" ? 120 : 80);
@@ -762,11 +757,12 @@ export default function VisitorRegisterScreen({ navigation }) {
       if (response?.success) {
         setRegisteredVisitor((previous) => ({
           ...previous,
-          otpCode: response.otpCode || previous?.otpCode || "",
-          otpExpiresAt: response.otpExpiresAt || previous?.otpExpiresAt || "",
         }));
-        setRegistrationOtp(response.otpCode || "");
-        Alert.alert("OTP Sent", "A new OTP was generated. In simulation mode, it is shown here and in the backend logs.");
+        setRegistrationOtp("");
+        Alert.alert(
+          "OTP Sent",
+          "A new OTP has been sent. If local email delivery is unavailable, check your backend logs.",
+        );
         return;
       }
 
@@ -784,8 +780,9 @@ export default function VisitorRegisterScreen({ navigation }) {
     completedFields.username,
     completedFields.phone,
     completedFields.password,
+    completedFields.confirmPassword,
   ].filter(Boolean).length;
-  const totalRegistrationFields = 5;
+  const totalRegistrationFields = 6;
   const registrationProgressPercentage = Math.round(
     (completionCount / totalRegistrationFields) * 100,
   );
@@ -831,6 +828,14 @@ export default function VisitorRegisterScreen({ navigation }) {
       autoCapitalize: "none",
       secureTextEntry: true,
     },
+    confirmPassword: {
+      label: "Confirm Password",
+      icon: "shield-checkmark",
+      placeholder: "Re-enter your password",
+      keyboard: "default",
+      autoCapitalize: "none",
+      secureTextEntry: true,
+    },
   };
 
   const renderStepInsights = () => (
@@ -849,7 +854,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       </View>
       <View style={visitorRegisterStyles.stepInsightStats}>
         <View style={visitorRegisterStyles.stepInsightStat}>
-          <Text style={visitorRegisterStyles.stepInsightStatValue}>{completionCount}/5</Text>
+          <Text style={visitorRegisterStyles.stepInsightStatValue}>{completionCount}/6</Text>
           <Text style={visitorRegisterStyles.stepInsightStatLabel}>Complete</Text>
         </View>
         <View style={visitorRegisterStyles.stepInsightDivider} />
@@ -1123,13 +1128,11 @@ export default function VisitorRegisterScreen({ navigation }) {
       />
       <SuccessModal
         visible={showSuccess}
-        credentials={
+        account={
           registeredVisitor
             ? {
                 username: registeredVisitor.username,
                 email: registeredVisitor.email,
-                password: registeredVisitor.password,
-                otpCode: registeredVisitor.otpCode,
               }
             : null
         }

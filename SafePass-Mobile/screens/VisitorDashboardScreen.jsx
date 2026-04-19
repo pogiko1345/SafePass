@@ -167,6 +167,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     idImage: null,
     privacyAccepted: false,
   });
+  const [hasAppointmentDraft, setHasAppointmentDraft] = useState(false);
   const [greeting, setGreeting] = useState("");
   const [isNfcSupported, setIsNfcSupported] = useState(false);
   const [isNfcEnabled, setIsNfcEnabled] = useState(false);
@@ -808,6 +809,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (!selectedDate) return;
 
     selectedDate.setHours(12, 0, 0, 0);
+    setHasAppointmentDraft(true);
     setAppointmentForm((prev) => ({
       ...prev,
       preferredDate: selectedDate,
@@ -854,9 +856,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     applyAppointmentDateSelection(new Date(year, month - 1, day));
   };
 
-  const populateAppointmentForm = () => {
-    const existingCategory = String(visitor?.purposeCategory || "").trim();
-    const existingPurpose = String(visitor?.purposeOfVisit || "").trim();
+  const buildAppointmentForm = (visitorRecord = visitor) => {
+    const existingCategory = String(visitorRecord?.purposeCategory || "").trim();
+    const existingPurpose = String(visitorRecord?.purposeOfVisit || "").trim();
     const matchedPurpose = APPOINTMENT_PURPOSE_OPTIONS.includes(existingCategory)
       ? existingCategory
       : APPOINTMENT_PURPOSE_OPTIONS.includes(existingPurpose)
@@ -865,28 +867,33 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           ? "Other"
           : "Enrollment";
     const existingDepartment = String(
-      visitor?.appointmentDepartment || visitor?.assignedOffice || visitor?.host || "",
+      visitorRecord?.appointmentDepartment || visitorRecord?.assignedOffice || visitorRecord?.host || "",
     ).trim();
     const mappedDepartment =
       matchedPurpose === "Other"
         ? existingDepartment
         : getDefaultDepartmentForPurpose(matchedPurpose) || existingDepartment;
 
-    setAppointmentForm({
+    return {
       preferredDate: getDefaultAppointmentDate(),
       preferredTime: getDefaultAppointmentTime(),
       department: mappedDepartment,
       purposeSelection: matchedPurpose,
       customPurpose:
         matchedPurpose === "Other"
-          ? String(visitor?.customPurposeOfVisit || existingPurpose || "").trim()
+          ? String(visitorRecord?.customPurposeOfVisit || existingPurpose || "").trim()
           : "",
-      idNumber: String(visitor?.idNumber || "").startsWith("VIS-")
+      idNumber: String(visitorRecord?.idNumber || "").startsWith("VIS-")
         ? ""
-        : String(visitor?.idNumber || "").trim(),
-      idImage: visitor?.idImage || null,
+        : String(visitorRecord?.idNumber || "").trim(),
+      idImage: visitorRecord?.idImage || null,
       privacyAccepted: false,
-    });
+    };
+  };
+
+  const populateAppointmentForm = (visitorRecord = visitor) => {
+    setAppointmentForm(buildAppointmentForm(visitorRecord));
+    setHasAppointmentDraft(false);
   };
 
   const handlePickAppointmentIdImage = async () => {
@@ -916,6 +923,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         ? `data:${asset.mimeType || "image/jpeg"};base64,${asset.base64}`
         : asset.uri;
 
+      setHasAppointmentDraft(true);
       setAppointmentForm((prev) => ({
         ...prev,
         idImage: imageValue,
@@ -927,7 +935,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const openAppointmentModal = () => {
-    populateAppointmentForm();
+    if (!hasAppointmentDraft) {
+      populateAppointmentForm();
+    }
     setShowAppointmentDatePicker(false);
     setShowAppointmentTimePicker(false);
     setShowPurposeDropdown(false);
@@ -1059,6 +1069,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
       if (response?.success) {
         setShowAppointmentModal(false);
+        setHasAppointmentDraft(false);
+        setAppointmentForm(buildAppointmentForm({
+          ...visitor,
+          visitDate: preferredDate,
+          visitTime: combinedDateTime,
+          purposeOfVisit,
+          purposeCategory,
+          customPurposeOfVisit: isOtherPurpose ? customPurposeOfVisit : "",
+          appointmentDepartment: department,
+          assignedOffice: department,
+          host: department,
+          idNumber,
+          idImage,
+        }));
         setAppointmentFeedback({
           title: "Appointment Submitted Successfully",
           message:
@@ -3236,6 +3260,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             ]}
                             disabled={isFull}
                             onPress={() => {
+                              setHasAppointmentDraft(true);
                               setAppointmentForm((prev) => ({ ...prev, preferredTime: option }));
                               setShowAppointmentTimePicker(false);
                             }}
@@ -3324,6 +3349,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             isSelected && visitorDashboardStyles.purposeOptionItemActive,
                           ]}
                           onPress={() => {
+                            setHasAppointmentDraft(true);
                             setAppointmentForm((prev) => ({
                               ...prev,
                               department: option,
@@ -3398,6 +3424,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                               option === "Other"
                                 ? ""
                                 : getDefaultDepartmentForPurpose(option);
+                            setHasAppointmentDraft(true);
                             setAppointmentForm((prev) => ({
                               ...prev,
                               purposeSelection: option,
@@ -3431,9 +3458,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     placeholder="Type your purpose of visit"
                     placeholderTextColor="#94A3B8"
                     value={appointmentForm.customPurpose}
-                    onChangeText={(text) =>
-                      setAppointmentForm((prev) => ({ ...prev, customPurpose: text }))
-                    }
+                    onChangeText={(text) => {
+                      setHasAppointmentDraft(true);
+                      setAppointmentForm((prev) => ({ ...prev, customPurpose: text }));
+                    }}
                     multiline
                     textAlignVertical="top"
                   />
@@ -3447,9 +3475,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   placeholder="Enter the ID number shown on your valid ID"
                   placeholderTextColor="#94A3B8"
                   value={appointmentForm.idNumber}
-                  onChangeText={(text) =>
-                    setAppointmentForm((prev) => ({ ...prev, idNumber: text }))
-                  }
+                  onChangeText={(text) => {
+                    setHasAppointmentDraft(true);
+                    setAppointmentForm((prev) => ({ ...prev, idNumber: text }));
+                  }}
                   autoCapitalize="characters"
                 />
                 <Text style={visitorDashboardStyles.appointmentAutoHint}>
@@ -3501,12 +3530,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   appointmentForm.privacyAccepted &&
                     visitorDashboardStyles.appointmentPrivacyCardAccepted,
                 ]}
-                onPress={() =>
+                onPress={() => {
+                  setHasAppointmentDraft(true);
                   setAppointmentForm((prev) => ({
                     ...prev,
                     privacyAccepted: !prev.privacyAccepted,
-                  }))
-                }
+                  }));
+                }}
                 activeOpacity={0.85}
               >
                 <View
