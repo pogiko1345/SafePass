@@ -776,6 +776,20 @@ const normalizeDepartmentValue = (value = "") => {
     "i.t room": "i.t room",
     "it room": "i.t room",
     "faculty room": "faculty room",
+    "information desk": "information desk",
+    lobby: "information desk",
+    "front desk": "information desk",
+    "ground offices": "administration",
+    "file room": "registrar",
+    laboratory: "laboratory",
+    tesda: "tesda",
+    workshop: "workshop",
+    "tools room": "workshop",
+    library: "library",
+    "students lounge": "student services",
+    "student lounge": "student services",
+    "student services": "student services",
+    sto: "sto",
   };
 
   return aliases[normalized] || normalized;
@@ -802,6 +816,17 @@ const APPOINTMENT_DEPARTMENT_OPTIONS = [
   "Information Desk",
   "Guidance",
   "Administration",
+  "Cashier",
+  "Flight Operations",
+  "Training",
+  "I.T Room",
+  "Faculty Room",
+  "Laboratory",
+  "TESDA",
+  "Workshop",
+  "Library",
+  "Student Services",
+  "STO",
 ];
 const ACCOUNT_ROLE_OPTIONS = ["admin", "staff", "security", "guard", "visitor"];
 const ACCOUNT_STATUS_OPTIONS = ["active", "inactive", "pending", "suspended"];
@@ -902,10 +927,17 @@ const getStaffDepartmentQuery = (department = "") => {
     guidance: ["Guidance", "Guidance Office", "Student Services"],
     administration: ["Administration", "Administration Office"],
     admissions: ["Admissions", "Admissions Office"],
+    "information desk": ["Information Desk", "Lobby", "Front Desk"],
     "flight operations": ["Flight Operations"],
     training: ["Training", "Head of Training Room"],
     "i.t room": ["I.T Room", "IT Room"],
     "faculty room": ["Faculty Room"],
+    laboratory: ["Laboratory"],
+    tesda: ["TESDA"],
+    workshop: ["Workshop", "Tools Room"],
+    library: ["Library"],
+    "student services": ["Student Services", "Students Lounge"],
+    sto: ["STO"],
   };
 
   const labels = aliasGroups[normalizedDepartment] || [department];

@@ -7,9 +7,9 @@
     "icon": "./assets/LogoSapphireAppIcon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/LogoSapphire.jpg",
+      "image": "./assets/splash-screen.png",
       "resizeMode": "contain",
-      "backgroundColor": "#041E42"
+      "backgroundColor": "#052044"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -25,7 +25,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/LogoSapphireAppIcon.png",
-        "backgroundColor": "#041E42"
+        "backgroundColor": "#052044"
       },
       "permissions": [
         "android.permission.CAMERA",

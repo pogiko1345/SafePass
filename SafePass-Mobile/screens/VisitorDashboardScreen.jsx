@@ -56,6 +56,17 @@ const APPOINTMENT_DEPARTMENT_OPTIONS = [
   "Information Desk",
   "Guidance",
   "Administration",
+  "Cashier",
+  "Flight Operations",
+  "Training",
+  "I.T Room",
+  "Faculty Room",
+  "Laboratory",
+  "TESDA",
+  "Workshop",
+  "Library",
+  "Student Services",
+  "STO",
 ];
 
 const VISITOR_MODULES = [

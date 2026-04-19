@@ -39,20 +39,43 @@ const Storage = Platform.OS === "web"
 
 const STAFF_DEPARTMENT_OPTIONS = [
   { value: "Admissions", label: "Admissions", area: "Ground Floor" },
+  { value: "Lobby", label: "Lobby / Front Desk", area: "Ground Floor" },
+  { value: "Cashier", label: "Cashier", area: "Ground Floor" },
   { value: "Registrar", label: "Registrar", area: "Ground Floor" },
   { value: "Accounting", label: "Accounting", area: "Ground Floor" },
+  { value: "File Room", label: "File Room", area: "Ground Floor" },
+  { value: "Ground Offices", label: "Offices", area: "Ground Floor" },
+  { value: "Kitchen", label: "Kitchen", area: "Ground Floor" },
   { value: "Guidance", label: "Guidance", area: "Ground Floor" },
+  { value: "Conference Room", label: "Conference Room", area: "Mezzanine" },
+  { value: "Chairman", label: "Chairman", area: "Mezzanine" },
   { value: "Flight Operations", label: "Flight Operations", area: "Mezzanine" },
   { value: "Training", label: "Head of Training Room", area: "Mezzanine" },
   { value: "I.T Room", label: "I.T Room", area: "Mezzanine" },
   { value: "Faculty Room", label: "Faculty Room", area: "Mezzanine" },
   { value: "Administration", label: "Administration", area: "Mezzanine" },
+  { value: "STO", label: "STO", area: "Mezzanine" },
+  { value: "Mock Up", label: "Mock Up", area: "Second Floor" },
+  { value: "Laboratory", label: "Laboratory", area: "Second Floor" },
+  { value: "TESDA", label: "TESDA", area: "Second Floor" },
+  { value: "Workshop", label: "Workshop", area: "Third Floor" },
+  { value: "Tools Room", label: "Tools Room", area: "Third Floor" },
+  { value: "Library", label: "Library", area: "Third Floor" },
+  { value: "Student Services", label: "Students Lounge", area: "Third Floor" },
 ];
 
 const STAFF_OFFICER_OPTIONS_BY_DEPARTMENT = {
   Admissions: [
     { value: "Admissions Officer", label: "Admissions Officer" },
     { value: "Front Desk Officer", label: "Front Desk Officer" },
+  ],
+  Lobby: [
+    { value: "Front Desk Officer", label: "Front Desk Officer" },
+    { value: "Visitor Assistance Officer", label: "Visitor Assistance Officer" },
+  ],
+  Cashier: [
+    { value: "Cashier", label: "Cashier" },
+    { value: "Payment Officer", label: "Payment Officer" },
   ],
   Registrar: [
     { value: "Registrar Officer", label: "Registrar Officer" },
@@ -65,6 +88,26 @@ const STAFF_OFFICER_OPTIONS_BY_DEPARTMENT = {
   Guidance: [
     { value: "Guidance Officer", label: "Guidance Officer" },
     { value: "Student Services Officer", label: "Student Services Officer" },
+  ],
+  "File Room": [
+    { value: "Records Officer", label: "Records Officer" },
+    { value: "Document Custodian", label: "Document Custodian" },
+  ],
+  "Ground Offices": [
+    { value: "Administrative Officer", label: "Administrative Officer" },
+    { value: "Office Coordinator", label: "Office Coordinator" },
+  ],
+  Kitchen: [
+    { value: "Kitchen Staff", label: "Kitchen Staff" },
+    { value: "Facilities Support", label: "Facilities Support" },
+  ],
+  "Conference Room": [
+    { value: "Meeting Coordinator", label: "Meeting Coordinator" },
+    { value: "Administrative Assistant", label: "Administrative Assistant" },
+  ],
+  Chairman: [
+    { value: "Chairman", label: "Chairman" },
+    { value: "Executive Assistant", label: "Executive Assistant" },
   ],
   "Flight Operations": [
     { value: "Flight Operations Officer", label: "Flight Operations Officer" },
@@ -85,6 +128,38 @@ const STAFF_OFFICER_OPTIONS_BY_DEPARTMENT = {
   Administration: [
     { value: "Administrative Officer", label: "Administrative Officer" },
     { value: "Academy Director", label: "Academy Director" },
+  ],
+  STO: [
+    { value: "STO Officer", label: "STO Officer" },
+    { value: "Safety Training Officer", label: "Safety Training Officer" },
+  ],
+  "Mock Up": [
+    { value: "Mock Up Instructor", label: "Mock Up Instructor" },
+    { value: "Training Assistant", label: "Training Assistant" },
+  ],
+  Laboratory: [
+    { value: "Laboratory Instructor", label: "Laboratory Instructor" },
+    { value: "Laboratory Custodian", label: "Laboratory Custodian" },
+  ],
+  TESDA: [
+    { value: "TESDA Coordinator", label: "TESDA Coordinator" },
+    { value: "Assessment Officer", label: "Assessment Officer" },
+  ],
+  Workshop: [
+    { value: "Workshop Instructor", label: "Workshop Instructor" },
+    { value: "Workshop Supervisor", label: "Workshop Supervisor" },
+  ],
+  "Tools Room": [
+    { value: "Tools Custodian", label: "Tools Custodian" },
+    { value: "Maintenance Staff", label: "Maintenance Staff" },
+  ],
+  Library: [
+    { value: "Librarian", label: "Librarian" },
+    { value: "Library Assistant", label: "Library Assistant" },
+  ],
+  "Student Services": [
+    { value: "Student Services Officer", label: "Student Services Officer" },
+    { value: "Lounge Coordinator", label: "Lounge Coordinator" },
   ],
 };
 
@@ -867,14 +942,19 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         if (storedRooms) {
           const parsedRooms = JSON.parse(storedRooms);
           if (Array.isArray(parsedRooms) && parsedRooms.length > 0) {
-            setManagedRooms(parsedRooms);
+            const savedRoomIds = new Set(parsedRooms.map((room) => room.id));
+            const newDefaultRooms = MONITORING_MAP_OFFICES.filter((room) => !savedRoomIds.has(room.id));
+            setManagedRooms([...parsedRooms, ...newDefaultRooms]);
           }
         }
 
         if (storedRoomPositions) {
           const parsedPositions = JSON.parse(storedRoomPositions);
           if (parsedPositions && typeof parsedPositions === "object") {
-            setManagedRoomPositions(parsedPositions);
+            setManagedRoomPositions({
+              ...MONITORING_MAP_OFFICE_POSITIONS,
+              ...parsedPositions,
+            });
           }
         }
 
