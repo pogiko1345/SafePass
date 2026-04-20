@@ -209,10 +209,6 @@ export default function VerificationScreen({ navigation, route }) {
     setOtpError("");
     const numericValue = text.replace(/[^0-9]/g, '');
     setOtpCode(numericValue);
-    
-    if (numericValue.length === 6 && !isLoading) {
-      setTimeout(() => verifyOtp(), 100);
-    }
   };
 
   const verifyOtp = async () => {
@@ -732,10 +728,10 @@ export default function VerificationScreen({ navigation, route }) {
                         <TouchableOpacity
                           style={[
                             verificationStyles.verifyButton,
-                            (isLoading || otpCode.length !== 6) && verificationStyles.buttonDisabled
+                            isLoading && verificationStyles.buttonDisabled
                           ]}
                           onPress={verifyOtp}
-                          disabled={isLoading || otpCode.length !== 6}
+                          disabled={isLoading}
                           activeOpacity={0.8}
                         >
                           <LinearGradient
