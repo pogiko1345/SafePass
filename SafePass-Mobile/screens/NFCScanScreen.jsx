@@ -486,7 +486,7 @@ export default function NFCScanScreen({ navigation }) {
                   <Ionicons 
                     name={scan.status === "granted" ? "checkmark" : "close"} 
                     size={16} 
-                    color={scan.status === "granted" ? "#059669" : "#DC2626"} 
+                    color={scan.status === "granted" ? "#0A3D91" : "#DC2626"} 
                   />
                 </View>
                 <View style={nfcStyles.historyInfo}>
@@ -506,7 +506,7 @@ export default function NFCScanScreen({ navigation }) {
                 ]}>
                   <Text style={[
                     nfcStyles.historyBadgeText,
-                    { color: scan.status === "granted" ? "#059669" : "#DC2626" }
+                    { color: scan.status === "granted" ? "#0A3D91" : "#DC2626" }
                   ]}>
                     {scan.status?.toUpperCase() || "UNKNOWN"}
                   </Text>

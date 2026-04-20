@@ -5,13 +5,13 @@ const { width } = Dimensions.get("window");
 export default StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   dashboardLayout: {
     flex: 1,
     flexDirection: width > 960 ? "row" : "column",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   sidebar: {
@@ -95,7 +95,7 @@ export default StyleSheet.create({
 
   sidebarModuleButtonActive: {
     backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
+    borderColor: "#B7D5F6",
   },
 
   sidebarModuleIcon: {
@@ -138,7 +138,7 @@ export default StyleSheet.create({
   },
 
   sidebarSubmoduleButtonActive: {
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#EEF5FF",
   },
 
   sidebarSubmoduleLabel: {
@@ -149,7 +149,7 @@ export default StyleSheet.create({
   },
 
   sidebarSubmoduleLabelActive: {
-    color: "#1D4ED8",
+    color: "#041E42",
   },
 
   sidebarSubmoduleBadge: {
@@ -180,7 +180,7 @@ export default StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   loadingText: {
@@ -450,7 +450,7 @@ export default StyleSheet.create({
     borderColor: "#E2E8F0",
     padding: 16,
     marginBottom: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   appointmentTop: {
@@ -563,7 +563,7 @@ export default StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
   },
 
   primaryActionText: {
@@ -581,13 +581,13 @@ export default StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#EEF5FF",
   },
 
   secondaryActionText: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#1D4ED8",
+    color: "#041E42",
   },
 
   rejectAction: {
@@ -643,7 +643,7 @@ export default StyleSheet.create({
     height: 10,
     borderRadius: 5,
     marginTop: 5,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
   },
 
   notificationContent: {
@@ -734,7 +734,7 @@ export default StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     padding: 14,
   },
 
@@ -804,7 +804,7 @@ export default StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#DBE3F0",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 14,
     paddingVertical: 14,
     marginTop: 14,
@@ -820,7 +820,7 @@ export default StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -895,7 +895,7 @@ export default StyleSheet.create({
     flex: 1,
     borderRadius: 14,
     paddingVertical: 14,
-    backgroundColor: "#1D4ED8",
+    backgroundColor: "#041E42",
     alignItems: "center",
   },
 

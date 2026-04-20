@@ -94,7 +94,7 @@ const SuccessModal = ({
         <View style={visitorRegisterStyles.successModalContainer}>
           <View style={visitorRegisterStyles.successIconContainer}>
             <LinearGradient
-              colors={["#10B981", "#059669"]}
+              colors={["#10B981", "#0A3D91"]}
               style={visitorRegisterStyles.successIconGradient}
             >
               <Ionicons name="checkmark-done" size={48} color="#FFFFFF" />
@@ -108,7 +108,7 @@ const SuccessModal = ({
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
             <View style={visitorRegisterStyles.credentialsTitleRow}>
-              <Ionicons name="person-circle-outline" size={16} color="#059669" />
+              <Ionicons name="person-circle-outline" size={16} color="#0A3D91" />
               <Text style={visitorRegisterStyles.credentialsTitle}>
                 Account Details
               </Text>
@@ -128,7 +128,7 @@ const SuccessModal = ({
                     onPress={() => handleCopy(account.username, "Username")}
                     style={visitorRegisterStyles.copyButton}
                   >
-                    <Ionicons name="copy-outline" size={18} color="#059669" />
+                    <Ionicons name="copy-outline" size={18} color="#0A3D91" />
                   </TouchableOpacity>
                 </View>
                 <View style={visitorRegisterStyles.credentialRow}>
@@ -140,7 +140,7 @@ const SuccessModal = ({
                     onPress={() => handleCopy(account.email, "Email")}
                     style={visitorRegisterStyles.copyButton}
                   >
-                    <Ionicons name="copy-outline" size={18} color="#059669" />
+                    <Ionicons name="copy-outline" size={18} color="#0A3D91" />
                   </TouchableOpacity>
                 </View>
               </>
@@ -171,7 +171,7 @@ const SuccessModal = ({
               activeOpacity={0.7}
             >
               <LinearGradient
-                colors={isVerified ? ["#10B981", "#059669"] : ["#2563EB", "#1D4ED8"]}
+                colors={isVerified ? ["#10B981", "#0A3D91"] : ["#0A3D91", "#041E42"]}
                 style={visitorRegisterStyles.successGradient}
               >
                 <Text style={visitorRegisterStyles.successButtonText}>
@@ -210,7 +210,7 @@ const SuccessModal = ({
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={isVerified ? ["#059669", "#047857"] : ["#94A3B8", "#64748B"]}
+              colors={isVerified ? ["#0A3D91", "#0A3D91"] : ["#94A3B8", "#64748B"]}
                 style={visitorRegisterStyles.successGradient}
               >
                 <Text style={visitorRegisterStyles.successButtonText}>
@@ -246,7 +246,7 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
           <View style={visitorRegisterStyles.privacyModalHeader}>
             <View style={visitorRegisterStyles.privacyIconContainer}>
               <LinearGradient
-                colors={["#059669", "#047857"]}
+                colors={["#0A3D91", "#0A3D91"]}
                 style={visitorRegisterStyles.privacyIconGradient}
               >
                 <Ionicons name="shield-checkmark" size={28} color="#FFFFFF" />
@@ -265,7 +265,7 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
           >
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="information-circle" size={20} color="#059669" />
+                <Ionicons name="information-circle" size={20} color="#0A3D91" />
                 <Text style={visitorRegisterStyles.privacySectionTitle}>
                   Information We Collect
                 </Text>
@@ -276,7 +276,7 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="shield" size={20} color="#059669" />
+                <Ionicons name="shield" size={20} color="#0A3D91" />
                 <Text style={visitorRegisterStyles.privacySectionTitle}>
                   How We Use Your Data
                 </Text>
@@ -290,7 +290,7 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="lock-closed" size={20} color="#059669" />
+                <Ionicons name="lock-closed" size={20} color="#0A3D91" />
                 <Text style={visitorRegisterStyles.privacySectionTitle}>
                   Data Protection
                 </Text>
@@ -856,7 +856,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     <View style={visitorRegisterStyles.stepInsightCard}>
       <View style={visitorRegisterStyles.stepInsightHeader}>
         <View style={visitorRegisterStyles.stepInsightIcon}>
-          <Ionicons name="shield-checkmark-outline" size={18} color="#047857" />
+          <Ionicons name="shield-checkmark-outline" size={18} color="#0A3D91" />
         </View>
         <View style={visitorRegisterStyles.stepInsightTextWrap}>
           <Text style={visitorRegisterStyles.stepInsightTitle}>Account Setup</Text>
@@ -887,7 +887,7 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   return (
     <SafeAreaView style={visitorRegisterStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#059669" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 12}
@@ -901,7 +901,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           contentContainerStyle={visitorRegisterStyles.scrollContainer}
         >
           <LinearGradient
-            colors={["#063B34", "#047857", "#059669"]}
+            colors={["#041E42", "#0A3D91", "#0A3D91"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[visitorRegisterStyles.header, headerResponsiveStyle]}
@@ -1000,7 +1000,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                       <Ionicons
                         name={isComplete ? "checkmark-circle" : field.icon}
                         size={14}
-                        color={isComplete ? "#047857" : "#94A3B8"}
+                        color={isComplete ? "#0A3D91" : "#94A3B8"}
                       />
                       <Text
                         style={[
@@ -1028,7 +1028,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                   </Text>
                 </View>
                 <View style={visitorRegisterStyles.sectionBadge}>
-                  <Ionicons name="person-circle-outline" size={14} color="#047857" />
+                  <Ionicons name="person-circle-outline" size={14} color="#0A3D91" />
                   <Text style={visitorRegisterStyles.sectionBadgeText}>
                     Account Details
                   </Text>
@@ -1051,10 +1051,10 @@ export default function VisitorRegisterScreen({ navigation }) {
                       <View
                         style={[
                           visitorRegisterStyles.cardIcon,
-                          { backgroundColor: "#ECFDF5" },
+                          { backgroundColor: "#EEF5FF" },
                         ]}
                       >
-                        <Ionicons name={config.icon} size={20} color="#059669" />
+                        <Ionicons name={config.icon} size={20} color="#0A3D91" />
                       </View>
                       <Text style={visitorRegisterStyles.cardLabel}>{config.label}</Text>
                       <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
@@ -1120,7 +1120,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                   disabled={isSubmitting}
                 >
                   <LinearGradient
-                    colors={["#059669", "#047857"]}
+                    colors={["#0A3D91", "#0A3D91"]}
                     style={visitorRegisterStyles.gradientButton}
                   >
                     {isSubmitting ? (

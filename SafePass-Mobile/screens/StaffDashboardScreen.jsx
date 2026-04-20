@@ -40,7 +40,7 @@ const formatTime = (value) =>
 const getStatusMeta = (status) => {
   switch (status) {
     case "approved":
-      return { color: "#059669", background: "#D1FAE5", label: "Approved" };
+      return { color: "#0A3D91", background: "#EEF5FF", label: "Approved" };
     case "adjusted":
       return { color: "#D97706", background: "#FEF3C7", label: "Adjusted" };
     case "rejected":
@@ -48,7 +48,7 @@ const getStatusMeta = (status) => {
     case "completed":
       return { color: "#475569", background: "#E2E8F0", label: "Completed" };
     default:
-      return { color: "#2563EB", background: "#DBEAFE", label: "Pending" };
+      return { color: "#0A3D91", background: "#EEF5FF", label: "Pending" };
   }
 };
 
@@ -199,7 +199,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         key: "appointment",
         label: "Appointment",
         icon: "calendar-outline",
-        color: "#2563EB",
+        color: "#0A3D91",
         submodules: [
           { key: "appointment-request", label: "Appointment Request", badge: stats.pending },
           { key: "appointment-record", label: "Appointment Record", badge: appointmentRecords.length },
@@ -209,7 +209,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         key: "account",
         label: "Account Management",
         icon: "person-circle-outline",
-        color: "#7C3AED",
+        color: "#1C6DD0",
         submodules: [{ key: "account-info", label: "View Account Info", badge: 0 }],
       },
     ],
@@ -632,7 +632,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               onPress={() => openAdjustModal(appointment)}
               disabled={isProcessing}
             >
-              <Ionicons name="time-outline" size={16} color="#1D4ED8" />
+              <Ionicons name="time-outline" size={16} color="#041E42" />
               <Text style={styles.secondaryActionText}>Adjust Time</Text>
             </TouchableOpacity>
 
@@ -703,8 +703,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
       <View style={styles.quickActionsGrid}>
         <TouchableOpacity style={styles.quickActionCard} onPress={() => selectSubmodule("appointment-request")}>
-          <View style={[styles.quickActionIcon, { backgroundColor: "#DBEAFE" }]}>
-            <Ionicons name="calendar-clear-outline" size={22} color="#1D4ED8" />
+          <View style={[styles.quickActionIcon, { backgroundColor: "#EEF5FF" }]}>
+            <Ionicons name="calendar-clear-outline" size={22} color="#041E42" />
           </View>
           <Text style={styles.quickActionTitle}>Appointment Request</Text>
           <Text style={styles.quickActionSubtitle}>
@@ -714,7 +714,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
         <TouchableOpacity style={styles.quickActionCard} onPress={() => selectSubmodule("appointment-record")}>
           <View style={[styles.quickActionIcon, { backgroundColor: "#DCFCE7" }]}>
-            <Ionicons name="documents-outline" size={22} color="#059669" />
+            <Ionicons name="documents-outline" size={22} color="#0A3D91" />
           </View>
           <Text style={styles.quickActionTitle}>Appointment Record</Text>
           <Text style={styles.quickActionSubtitle}>
@@ -724,7 +724,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
         <TouchableOpacity style={styles.quickActionCard} onPress={() => selectSubmodule("account-info")}>
           <View style={[styles.quickActionIcon, { backgroundColor: "#EDE9FE" }]}>
-            <Ionicons name="person-outline" size={22} color="#7C3AED" />
+            <Ionicons name="person-outline" size={22} color="#1C6DD0" />
           </View>
           <Text style={styles.quickActionTitle}>View Account Info</Text>
           <Text style={styles.quickActionSubtitle}>
@@ -737,7 +737,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Notifications</Text>
           <TouchableOpacity onPress={loadData}>
-            <Ionicons name="refresh-outline" size={20} color="#3B82F6" />
+            <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
           </TouchableOpacity>
         </View>
 
@@ -767,7 +767,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Pending Appointment Requests</Text>
         <TouchableOpacity onPress={loadData}>
-          <Ionicons name="refresh-outline" size={20} color="#3B82F6" />
+          <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
         </TouchableOpacity>
       </View>
 
@@ -809,7 +809,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Appointment Records</Text>
           <TouchableOpacity onPress={loadData}>
-            <Ionicons name="refresh-outline" size={20} color="#3B82F6" />
+            <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
           </TouchableOpacity>
         </View>
 
@@ -831,7 +831,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const renderAccountInfoContent = () => (
     <>
       <View style={styles.accountInfoBanner}>
-        <Ionicons name="shield-checkmark-outline" size={20} color="#7C3AED" />
+        <Ionicons name="shield-checkmark-outline" size={20} color="#1C6DD0" />
         <Text style={styles.accountInfoBannerText}>
           This area is view-only for staff. Admin-level account controls stay in the admin dashboard.
         </Text>
@@ -1035,7 +1035,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <TouchableOpacity style={styles.modalField} onPress={handleAdjustDatePress}>
               <View style={styles.modalFieldTop}>
                 <View style={styles.modalFieldIcon}>
-                  <Ionicons name="calendar-outline" size={18} color="#1D4ED8" />
+                  <Ionicons name="calendar-outline" size={18} color="#041E42" />
                 </View>
                 <View style={styles.modalFieldBody}>
                   <Text style={styles.modalFieldLabel}>Preferred Date</Text>

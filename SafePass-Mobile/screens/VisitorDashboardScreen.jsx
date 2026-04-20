@@ -1324,16 +1324,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getStatusColor = () => {
     if (visitor?.approvalStatus === "pending") return "#F59E0B";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "#F59E0B";
-    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "#2563EB";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "#0A3D91";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "#DC2626";
     switch(visitor?.status) {
       case 'checked_in': return '#10B981';
-      case 'approved': return '#4F46E5';
+      case 'approved': return '#0A3D91';
       case 'pending': return '#F59E0B';
       case 'checked_out': return '#6B7280';
       case 'expired': return '#EF4444';
       case 'rejected': return '#DC2626';
-      default: return '#4F46E5';
+      default: return '#0A3D91';
     }
   };
 
@@ -1395,8 +1395,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   if (isLoading) {
     return (
       <SafeAreaView style={visitorDashboardStyles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
-        <ActivityIndicator size="large" color="#4F46E5" />
+        <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
+        <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={visitorDashboardStyles.loadingText}>Loading your pass...</Text>
       </SafeAreaView>
     );
@@ -1505,7 +1505,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <Text style={visitorDashboardStyles.visitorModuleTitle}>Choose What You Need</Text>
         </View>
         <View style={visitorDashboardStyles.visitorModuleHeaderBadge}>
-          <Ionicons name="phone-portrait-outline" size={14} color="#0F766E" />
+          <Ionicons name="phone-portrait-outline" size={14} color="#0A3D91" />
           <Text style={visitorDashboardStyles.visitorModuleHeaderBadgeText}>Mobile Flow</Text>
         </View>
       </View>
@@ -1533,7 +1533,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 <Ionicons
                   name={module.icon}
                   size={19}
-                  color={isActive ? "#FFFFFF" : "#0F766E"}
+                  color={isActive ? "#FFFFFF" : "#0A3D91"}
                 />
               </View>
               <View style={visitorDashboardStyles.visitorModuleCopy}>
@@ -1565,7 +1565,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     <View style={[visitorDashboardStyles.visitorFlowPanel, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
         <View style={visitorDashboardStyles.visitorFlowPanelIcon}>
-          <Ionicons name="person-circle-outline" size={24} color="#0F766E" />
+          <Ionicons name="person-circle-outline" size={24} color="#0A3D91" />
         </View>
         <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
           <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Account Management</Text>
@@ -1577,7 +1577,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       </View>
 
       <LinearGradient
-        colors={["#0F172A", "#1E3A8A", "#2563EB"]}
+        colors={["#0F172A", "#1E3A8A", "#0A3D91"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={visitorDashboardStyles.accountHeroCard}
@@ -1651,7 +1651,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       <View style={visitorDashboardStyles.accountActionGrid}>
         <View style={visitorDashboardStyles.accountActionCard}>
           <View style={visitorDashboardStyles.accountActionIcon}>
-            <Ionicons name="mail-outline" size={18} color="#2563EB" />
+            <Ionicons name="mail-outline" size={18} color="#0A3D91" />
           </View>
           <Text style={visitorDashboardStyles.accountActionTitle}>Verification</Text>
           <Text style={visitorDashboardStyles.accountActionText}>
@@ -1660,7 +1660,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
         <View style={visitorDashboardStyles.accountActionCard}>
           <View style={visitorDashboardStyles.accountActionIcon}>
-            <Ionicons name="document-text-outline" size={18} color="#2563EB" />
+            <Ionicons name="document-text-outline" size={18} color="#0A3D91" />
           </View>
           <Text style={visitorDashboardStyles.accountActionTitle}>Appointment Records</Text>
           <Text style={visitorDashboardStyles.accountActionText}>
@@ -1763,7 +1763,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const renderSectionIntro = () => (
     <View style={[visitorDashboardStyles.sectionIntroCard, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.sectionIntroIconWrap}>
-        <Ionicons name={sectionIntro.icon} size={20} color="#0F766E" />
+        <Ionicons name={sectionIntro.icon} size={20} color="#0A3D91" />
       </View>
       <View style={visitorDashboardStyles.sectionIntroCopy}>
         <Text style={visitorDashboardStyles.sectionIntroEyebrow}>{sectionIntro.eyebrow}</Text>
@@ -1777,7 +1777,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     <View style={[visitorDashboardStyles.visitorFlowPanel, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
         <View style={visitorDashboardStyles.visitorFlowPanelIcon}>
-          <Ionicons name="calendar-outline" size={22} color="#2563EB" />
+          <Ionicons name="calendar-outline" size={22} color="#0A3D91" />
         </View>
         <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
           <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Appointment Module</Text>
@@ -1792,7 +1792,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={visitorDashboardStyles.appointmentSuccessCard}>
           <View style={visitorDashboardStyles.appointmentSuccessHeader}>
             <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
-              <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
+              <Ionicons name="checkmark-circle" size={22} color="#0A3D91" />
             </View>
             <View style={visitorDashboardStyles.appointmentSuccessTextWrap}>
               <Text style={visitorDashboardStyles.appointmentSuccessTitle}>
@@ -1813,7 +1813,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           "Pick your preferred date and time before sending the request.",
         ].map((item) => (
           <View key={item} style={visitorDashboardStyles.visitorFlowChecklistRow}>
-            <Ionicons name="checkmark-circle-outline" size={18} color="#0F766E" />
+            <Ionicons name="checkmark-circle-outline" size={18} color="#0A3D91" />
             <Text style={visitorDashboardStyles.visitorFlowChecklistText}>{item}</Text>
           </View>
         ))}
@@ -1912,7 +1912,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     <View style={[visitorDashboardStyles.visitorMapPanel, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
         <View style={visitorDashboardStyles.visitorFlowPanelIcon}>
-          <Ionicons name="map-outline" size={22} color="#2563EB" />
+          <Ionicons name="map-outline" size={22} color="#0A3D91" />
         </View>
         <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
           <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Map Module</Text>
@@ -1926,7 +1926,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       <View style={visitorDashboardStyles.mapSummaryCard}>
         <View style={visitorDashboardStyles.mapSummaryHeader}>
           <View style={visitorDashboardStyles.mapSummaryIconWrap}>
-            <Ionicons name="compass-outline" size={18} color="#1D4ED8" />
+            <Ionicons name="compass-outline" size={18} color="#041E42" />
           </View>
           <View style={visitorDashboardStyles.mapSummaryCopy}>
             <Text style={visitorDashboardStyles.mapSummaryTitle}>Arrival Guide</Text>
@@ -2004,7 +2004,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       />
 
       <View style={visitorDashboardStyles.visitorMapNote}>
-        <Ionicons name="information-circle-outline" size={18} color="#0F766E" />
+        <Ionicons name="information-circle-outline" size={18} color="#0A3D91" />
         <Text style={visitorDashboardStyles.visitorMapNoteText}>
           Use pinch/zoom controls and drag the map to inspect the floor. For external directions,
           open the full campus map.
@@ -2016,7 +2016,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         onPress={() => navigation.navigate("WebMapScreen")}
         activeOpacity={0.86}
       >
-        <Ionicons name="navigate-outline" size={18} color="#2563EB" />
+        <Ionicons name="navigate-outline" size={18} color="#0A3D91" />
         <Text style={visitorDashboardStyles.visitorFlowSecondaryButtonText}>Open Full Directions</Text>
       </TouchableOpacity>
     </View>
@@ -2028,7 +2028,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       
       {/* Header */}
       <LinearGradient
-        colors={["#061A2E", "#0F3A5F", "#0F766E"]}
+        colors={["#061A2E", "#0F3A5F", "#0A3D91"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={visitorDashboardStyles.header}
@@ -2096,7 +2096,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         overScrollMode="always"
         persistentScrollbar={Platform.OS === "android"}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#4F46E5"]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#0A3D91"]} />
         }
       >
         <View
@@ -2133,7 +2133,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   activeOpacity={0.86}
                 >
                   <View style={visitorDashboardStyles.commandMetricIcon}>
-                    <Ionicons name={item.icon} size={16} color="#0F766E" />
+                    <Ionicons name={item.icon} size={16} color="#0A3D91" />
                   </View>
                   <Text style={visitorDashboardStyles.commandMetricLabel} numberOfLines={1}>
                     {item.label}
@@ -2158,7 +2158,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Ionicons
                     name={phoneTrackingStatus.active ? "location" : "location-outline"}
                     size={18}
-                    color={phoneTrackingStatus.active ? "#047857" : "#B45309"}
+                    color={phoneTrackingStatus.active ? "#0A3D91" : "#B45309"}
                   />
                 </View>
                 <View style={visitorDashboardStyles.phoneTrackingCopy}>
@@ -2277,7 +2277,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 >
                   <View style={visitorDashboardStyles.appointmentSuccessHeader}>
                     <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
-                      <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
+                      <Ionicons name="checkmark-circle" size={22} color="#0A3D91" />
                     </View>
                     <View style={visitorDashboardStyles.appointmentSuccessTextWrap}>
                       <Text style={visitorDashboardStyles.appointmentSuccessTitle}>
@@ -2310,7 +2310,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ]}
               >
                 <LinearGradient
-                  colors={["#2563EB", "#1D4ED8"]}
+                  colors={["#0A3D91", "#041E42"]}
                   style={visitorDashboardStyles.pendingApprovalGradient}
                 >
                   <View style={visitorDashboardStyles.pendingApprovalIconWrap}>
@@ -2355,7 +2355,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   "Once approved, your SafePass tools will appear again for check-in and gate access.",
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.pendingStepItem}>
-                    <Ionicons name="checkmark-circle-outline" size={18} color="#3B82F6" />
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#1C6DD0" />
                     <Text style={visitorDashboardStyles.pendingStepText}>{item}</Text>
                   </View>
                 ))}
@@ -2371,13 +2371,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ]}
               >
                 <LinearGradient
-                  colors={["#0F766E", "#0EA5A4", "#2563EB"]}
+                  colors={["#0A3D91", "#1C6DD0", "#0A3D91"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={visitorDashboardStyles.approvedHeroGradient}
                 >
                   <View style={visitorDashboardStyles.approvedHeroBadge}>
-                    <Ionicons name="shield-checkmark" size={16} color="#0F766E" />
+                    <Ionicons name="shield-checkmark" size={16} color="#0A3D91" />
                     <Text style={visitorDashboardStyles.approvedHeroBadgeText}>
                       Approved Access
                     </Text>
@@ -2461,7 +2461,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     disabled={isVirtualTapLoading}
                   >
                     <LinearGradient
-                      colors={["#0F172A", "#1D4ED8", "#2563EB"]}
+                      colors={["#0F172A", "#041E42", "#0A3D91"]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={visitorDashboardStyles.approvedVirtualNfcCardGradient}
@@ -2469,7 +2469,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       <View style={visitorDashboardStyles.approvedVirtualNfcHeader}>
                         <View>
                           <View style={visitorDashboardStyles.approvedVirtualNfcBadge}>
-                            <Ionicons name="radio" size={14} color="#DBEAFE" />
+                            <Ionicons name="radio" size={14} color="#EEF5FF" />
                             <Text style={visitorDashboardStyles.approvedVirtualNfcBadgeText}>
                               Virtual NFC Card
                             </Text>
@@ -2501,13 +2501,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
                       <View style={visitorDashboardStyles.approvedVirtualNfcFooter}>
                         <View style={visitorDashboardStyles.approvedVirtualNfcFooterItem}>
-                          <Ionicons name="shield-checkmark-outline" size={15} color="#DBEAFE" />
+                          <Ionicons name="shield-checkmark-outline" size={15} color="#EEF5FF" />
                           <Text style={visitorDashboardStyles.approvedVirtualNfcFooterText}>
                             Security notified
                           </Text>
                         </View>
                         <View style={visitorDashboardStyles.approvedVirtualNfcFooterItem}>
-                          <Ionicons name="desktop-outline" size={15} color="#DBEAFE" />
+                          <Ionicons name="desktop-outline" size={15} color="#EEF5FF" />
                           <Text style={visitorDashboardStyles.approvedVirtualNfcFooterText}>
                             Admin monitored
                           </Text>
@@ -2525,7 +2525,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     activeOpacity={0.9}
                   >
                     <LinearGradient
-                      colors={isNfcReading ? ["#2563EB", "#1D4ED8"] : ["#4F46E5", "#7C3AED"]}
+                      colors={isNfcReading ? ["#0A3D91", "#041E42"] : ["#0A3D91", "#1C6DD0"]}
                       style={visitorDashboardStyles.approvedActionIconWrap}
                     >
                       <Ionicons name={approvedActionIcon} size={22} color="#FFFFFF" />
@@ -2576,7 +2576,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             : "sync-circle"
                       }
                       size={18}
-                      color="#4F46E5"
+                      color="#0A3D91"
                     />
                     <Text style={visitorDashboardStyles.approvedStatusBannerText}>
                       {nfcStatus.message}
@@ -2586,7 +2586,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
                 {isAdjustedAppointment && (
                   <View style={[visitorDashboardStyles.approvedStatusBanner, visitorDashboardStyles.adjustedStatusBanner]}>
-                    <Ionicons name="swap-horizontal-outline" size={18} color="#1D4ED8" />
+                    <Ionicons name="swap-horizontal-outline" size={18} color="#041E42" />
                     <Text style={visitorDashboardStyles.adjustedStatusText}>
                       {visitor.staffAdjustmentNote
                         ? `Staff updated your schedule: ${visitor.staffAdjustmentNote}`
@@ -2682,7 +2682,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     "Submitting a new request will replace the current visit schedule on your account.",
                   ].map((item) => (
                     <View key={item} style={visitorDashboardStyles.reappointmentChecklistRow}>
-                      <Ionicons name="arrow-forward-circle-outline" size={18} color="#0F766E" />
+                      <Ionicons name="arrow-forward-circle-outline" size={18} color="#0A3D91" />
                       <Text style={visitorDashboardStyles.reappointmentChecklistText}>{item}</Text>
                     </View>
                   ))}
@@ -2706,7 +2706,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ].map((tip) => (
                   <View key={tip} style={visitorDashboardStyles.approvedTipRow}>
                     <View style={visitorDashboardStyles.approvedTipBullet}>
-                      <Ionicons name="checkmark" size={14} color="#0F766E" />
+                      <Ionicons name="checkmark" size={14} color="#0A3D91" />
                     </View>
                     <Text style={visitorDashboardStyles.approvedTipText}>{tip}</Text>
                   </View>
@@ -2747,7 +2747,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 <View style={visitorDashboardStyles.appointmentSuccessCard}>
                   <View style={visitorDashboardStyles.appointmentSuccessHeader}>
                     <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
-                      <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
+                      <Ionicons name="checkmark-circle" size={22} color="#0A3D91" />
                     </View>
                     <View style={visitorDashboardStyles.appointmentSuccessTextWrap}>
                       <Text style={visitorDashboardStyles.appointmentSuccessTitle}>
@@ -2775,14 +2775,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
               <View style={visitorDashboardStyles.reappointmentHeroCard}>
                 <LinearGradient
-                  colors={visitor?.appointmentStatus === "rejected" ? ["#DC2626", "#B91C1C"] : ["#0F766E", "#2563EB"]}
+                  colors={visitor?.appointmentStatus === "rejected" ? ["#DC2626", "#B91C1C"] : ["#0A3D91", "#0A3D91"]}
                   style={visitorDashboardStyles.reappointmentHeroGradient}
                 >
                   <View style={visitorDashboardStyles.reappointmentHeroBadge}>
                     <Ionicons
                       name={visitor?.appointmentStatus === "rejected" ? "alert-circle-outline" : "calendar-outline"}
                       size={16}
-                      color={visitor?.appointmentStatus === "rejected" ? "#991B1B" : "#0F766E"}
+                      color={visitor?.appointmentStatus === "rejected" ? "#991B1B" : "#0A3D91"}
                     />
                     <Text style={visitorDashboardStyles.reappointmentHeroBadgeText}>
                       {visitor?.appointmentStatus === "rejected" ? "Appointment Declined" : "Ready to Register an Appointment"}
@@ -2843,7 +2843,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     "Staff will approve, adjust, or reject the request from their dashboard.",
                   ].map((item) => (
                     <View key={item} style={visitorDashboardStyles.reappointmentChecklistRow}>
-                      <Ionicons name="checkmark-circle" size={18} color="#0F766E" />
+                      <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
                       <Text style={visitorDashboardStyles.reappointmentChecklistText}>{item}</Text>
                     </View>
                   ))}
@@ -2861,7 +2861,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               disabled={!isNfcSupported}
             >
               <LinearGradient
-                colors={isNfcReading ? ['#10B981', '#059669'] : ['#4F46E5', '#7C3AED']}
+                colors={isNfcReading ? ['#10B981', '#0A3D91'] : ['#0A3D91', '#1C6DD0']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={visitorDashboardStyles.nfcCardGradient}
@@ -2952,7 +2952,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   onPress={handleCheckInAction}
                 >
                   <LinearGradient
-                    colors={['#4F46E5', '#7C3AED']}
+                    colors={['#0A3D91', '#1C6DD0']}
                     style={visitorDashboardStyles.quickActionGradient}
                   >
                     <Ionicons name="log-in" size={24} color="#FFFFFF" />
@@ -3008,7 +3008,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             {/* Visit Details Card */}
             <View style={visitorDashboardStyles.detailsCard}>
               <View style={visitorDashboardStyles.detailsHeader}>
-                <Ionicons name="calendar" size={20} color="#4F46E5" />
+                <Ionicons name="calendar" size={20} color="#0A3D91" />
                 <Text style={visitorDashboardStyles.detailsTitle}>Visit Details</Text>
               </View>
               
@@ -3052,7 +3052,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             {/* NFC Instructions */}
             {isNfcSupported && (
               <View style={visitorDashboardStyles.nfcInstructionsCard}>
-                <Ionicons name="information-circle" size={20} color="#4F46E5" />
+                <Ionicons name="information-circle" size={20} color="#0A3D91" />
                 <Text style={visitorDashboardStyles.nfcInstructionsText}>
                   Tap your phone to any NFC reader at the gate to automatically check in/out
                 </Text>
@@ -3070,7 +3070,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.appointmentSuccessCard}>
                 <View style={visitorDashboardStyles.appointmentSuccessHeader}>
                   <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
-                    <Ionicons name="checkmark-circle" size={22} color="#0F766E" />
+                    <Ionicons name="checkmark-circle" size={22} color="#0A3D91" />
                   </View>
                   <View style={visitorDashboardStyles.appointmentSuccessTextWrap}>
                     <Text style={visitorDashboardStyles.appointmentSuccessTitle}>
@@ -3096,7 +3096,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               onPress={canCreateFreshAppointment ? openAppointmentModal : () => navigation.navigate("VisitorRegister")}
             >
               <LinearGradient
-                colors={['#4F46E5', '#7C3AED']}
+                colors={['#0A3D91', '#1C6DD0']}
                 style={visitorDashboardStyles.registerGradient}
               >
                 <Ionicons name={canCreateFreshAppointment ? "calendar-outline" : "person-add"} size={20} color="#FFFFFF" />
@@ -3131,7 +3131,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={visitorDashboardStyles.modalOverlay}>
           <View style={visitorDashboardStyles.appointmentModalContent}>
             <LinearGradient
-              colors={["#0F766E", "#2563EB"]}
+              colors={["#0A3D91", "#0A3D91"]}
               style={visitorDashboardStyles.appointmentModalHeader}
             >
               <View>
@@ -3161,7 +3161,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 >
                   <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
                     <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
-                      <Ionicons name="calendar-outline" size={18} color="#4F46E5" />
+                      <Ionicons name="calendar-outline" size={18} color="#0A3D91" />
                     </View>
                     <View>
                       <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a date</Text>
@@ -3220,7 +3220,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 >
                   <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
                     <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
-                      <Ionicons name="time-outline" size={18} color="#4F46E5" />
+                      <Ionicons name="time-outline" size={18} color="#0A3D91" />
                     </View>
                     <View>
                       <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a time</Text>
@@ -3285,7 +3285,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                               </Text>
                             </View>
                             {isSelected ? (
-                              <Ionicons name="checkmark-circle" size={18} color="#0F766E" />
+                              <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
                             ) : isFull ? (
                               <Ionicons name="lock-closed-outline" size={18} color="#DC2626" />
                             ) : null}
@@ -3319,7 +3319,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 >
                   <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
                     <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
-                      <Ionicons name="business-outline" size={18} color="#0F766E" />
+                      <Ionicons name="business-outline" size={18} color="#0A3D91" />
                     </View>
                     <View>
                       <Text style={visitorDashboardStyles.appointmentPickerLabel}>
@@ -3368,7 +3368,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             {option}
                           </Text>
                           {isSelected ? (
-                            <Ionicons name="checkmark-circle" size={18} color="#0F766E" />
+                            <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
                           ) : null}
                         </TouchableOpacity>
                       );
@@ -3392,7 +3392,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 >
                   <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
                     <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
-                      <Ionicons name="list-outline" size={18} color="#4F46E5" />
+                      <Ionicons name="list-outline" size={18} color="#0A3D91" />
                     </View>
                     <View>
                       <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a purpose</Text>
@@ -3444,7 +3444,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             {option}
                           </Text>
                           {isSelected ? (
-                            <Ionicons name="checkmark-circle" size={18} color="#4F46E5" />
+                            <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
                           ) : null}
                         </TouchableOpacity>
                       );
@@ -3516,7 +3516,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     onPress={handlePickAppointmentIdImage}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="refresh-outline" size={16} color="#0F766E" />
+                    <Ionicons name="refresh-outline" size={16} color="#0A3D91" />
                     <Text style={visitorDashboardStyles.appointmentChangeIdText}>
                       Change ID picture
                     </Text>
@@ -3599,7 +3599,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             ]}
           >
             <LinearGradient
-              colors={["#0F172A", "#1D4ED8", "#2563EB"]}
+              colors={["#0F172A", "#041E42", "#0A3D91"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={[
@@ -3640,7 +3640,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   ]}
                 >
                   <LinearGradient
-                    colors={["#0F172A", "#1D4ED8", "#2563EB"]}
+                    colors={["#0F172A", "#041E42", "#0A3D91"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={visitorDashboardStyles.virtualNfcCardGradient}
@@ -3656,9 +3656,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       </View>
                       <View style={visitorDashboardStyles.virtualNfcPreviewChip}>
                         {isVirtualTapLoading ? (
-                          <ActivityIndicator size="small" color="#DBEAFE" />
+                          <ActivityIndicator size="small" color="#EEF5FF" />
                         ) : (
-                          <Ionicons name="radio" size={16} color="#DBEAFE" />
+                          <Ionicons name="radio" size={16} color="#EEF5FF" />
                         )}
                       </View>
                     </View>
@@ -3739,7 +3739,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   "Admin monitoring will also record this check-in event.",
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.virtualNfcInfoRow}>
-                    <Ionicons name="checkmark-circle-outline" size={18} color="#2563EB" />
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#0A3D91" />
                     <Text style={visitorDashboardStyles.virtualNfcInfoText}>{item}</Text>
                   </View>
                 ))}
@@ -3790,14 +3790,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={visitorDashboardStyles.modalOverlay}>
           <View style={visitorDashboardStyles.accessFlowModalContent}>
             <LinearGradient
-              colors={["#0F766E", "#0EA5A4", "#2563EB"]}
+              colors={["#0A3D91", "#1C6DD0", "#0A3D91"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={visitorDashboardStyles.accessFlowHero}
             >
               <View style={visitorDashboardStyles.accessFlowHeroTop}>
                 <View style={visitorDashboardStyles.accessFlowHeroBadge}>
-                  <Ionicons name="log-in-outline" size={15} color="#0F766E" />
+                  <Ionicons name="log-in-outline" size={15} color="#0A3D91" />
                   <Text style={visitorDashboardStyles.accessFlowHeroBadgeText}>Arrival Flow</Text>
                 </View>
                 <TouchableOpacity onPress={() => setShowCheckInModal(false)}>
@@ -3834,7 +3834,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     </View>
                   </View>
                   <View style={visitorDashboardStyles.checkInArrivalStatusPill}>
-                    <Ionicons name="shield-checkmark-outline" size={14} color="#0F766E" />
+                    <Ionicons name="shield-checkmark-outline" size={14} color="#0A3D91" />
                     <Text style={visitorDashboardStyles.checkInArrivalStatusText}>Approved</Text>
                   </View>
                 </View>
@@ -3866,7 +3866,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.checkInArrivalGuideRow}>
                     <View style={visitorDashboardStyles.checkInArrivalGuideIcon}>
-                      <Ionicons name="checkmark" size={12} color="#0F766E" />
+                      <Ionicons name="checkmark" size={12} color="#0A3D91" />
                     </View>
                     <Text style={visitorDashboardStyles.checkInArrivalGuideText}>{item}</Text>
                   </View>
@@ -3910,7 +3910,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={visitorDashboardStyles.modalOverlay}>
           <View style={visitorDashboardStyles.accessFlowSuccessContent}>
             <View style={visitorDashboardStyles.accessFlowSuccessIconWrap}>
-              <Ionicons name="checkmark-circle" size={54} color="#0F766E" />
+              <Ionicons name="checkmark-circle" size={54} color="#0A3D91" />
             </View>
             <Text style={visitorDashboardStyles.accessFlowSuccessTitle}>Checked In Successfully</Text>
             <Text style={visitorDashboardStyles.accessFlowSuccessText}>
@@ -3956,7 +3956,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={visitorDashboardStyles.modalOverlay}>
           <View style={visitorDashboardStyles.accessFlowSuccessContent}>
             <View style={visitorDashboardStyles.accessFlowSuccessIconWrap}>
-              <Ionicons name="checkmark-circle" size={54} color="#0F766E" />
+              <Ionicons name="checkmark-circle" size={54} color="#0A3D91" />
             </View>
             <Text style={visitorDashboardStyles.accessFlowSuccessTitle}>Arrival Confirmed</Text>
             <Text style={visitorDashboardStyles.accessFlowSuccessText}>
@@ -4153,7 +4153,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={visitorDashboardStyles.modalOverlay}>
           <View style={visitorDashboardStyles.qrModalContent}>
             <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
+              colors={['#0A3D91', '#1C6DD0']}
               style={visitorDashboardStyles.qrModalHeader}
             >
               <Text style={visitorDashboardStyles.qrModalTitle}>Your Visitor Pass</Text>
@@ -4164,7 +4164,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
             <View style={visitorDashboardStyles.qrContainer}>
               <View style={visitorDashboardStyles.qrPlaceholder}>
-                <Ionicons name="qr-code" size={180} color="#4F46E5" />
+                <Ionicons name="qr-code" size={180} color="#0A3D91" />
               </View>
               <Text style={visitorDashboardStyles.qrVisitorName}>{visitor?.fullName}</Text>
               <Text style={visitorDashboardStyles.qrVisitorId}>ID: {visitor?.idNumber}</Text>

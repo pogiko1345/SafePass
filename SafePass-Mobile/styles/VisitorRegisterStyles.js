@@ -58,7 +58,7 @@ export default StyleSheet.create({
     overflow: "hidden",
     ...Platform.select({
       ios: {
-        shadowColor: "#063B34",
+        shadowColor: "#041E42",
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.16,
         shadowRadius: 18,
@@ -219,7 +219,7 @@ export default StyleSheet.create({
   progressPercentage: {
     fontSize: fontSizes.sm,
     fontWeight: "700",
-    color: "#047857",
+    color: "#0A3D91",
   },
   progressBarContainer: {
     height: 6,
@@ -229,7 +229,7 @@ export default StyleSheet.create({
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
     borderRadius: 999,
   },
   progressMetaRow: {
@@ -258,13 +258,13 @@ export default StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
   progressChipComplete: {
-    backgroundColor: "#ECFDF5",
-    borderColor: "#BBF7D0",
+    backgroundColor: "#EEF5FF",
+    borderColor: "#B7D5F6",
   },
   progressChipText: {
     fontSize: fontSizes.xs,
@@ -272,7 +272,7 @@ export default StyleSheet.create({
     color: "#64748B",
   },
   progressChipTextComplete: {
-    color: "#047857",
+    color: "#0A3D91",
   },
 
   stepIndicatorContainer: {
@@ -299,7 +299,7 @@ export default StyleSheet.create({
     alignItems: "center",
   },
   stepCircleActive: {
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
   },
   stepCircleText: {
     fontSize: 14,
@@ -317,7 +317,7 @@ export default StyleSheet.create({
     borderRadius: 999,
   },
   stepConnectorActive: {
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
   },
   stepLabels: {
     flexDirection: "row",
@@ -330,7 +330,7 @@ export default StyleSheet.create({
     color: "#94A3B8",
   },
   stepLabelActive: {
-    color: "#047857",
+    color: "#0A3D91",
   },
 
   content: {
@@ -363,18 +363,18 @@ export default StyleSheet.create({
   sectionBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 999,
     gap: 4,
     borderWidth: 1,
-    borderColor: "#CFF4E5",
+    borderColor: "#B7D5F6",
   },
   sectionBadgeText: {
     fontSize: fontSizes.xs,
     fontWeight: "700",
-    color: "#047857",
+    color: "#0A3D91",
   },
   formGrid: {
     gap: spacing.base,
@@ -382,7 +382,7 @@ export default StyleSheet.create({
   },
 
   stepInsightCard: {
-    backgroundColor: "#F7FFFA",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#CDEEDF",
     borderRadius: 22,
@@ -390,7 +390,7 @@ export default StyleSheet.create({
     marginBottom: spacing.base,
     ...Platform.select({
       ios: {
-        shadowColor: "#047857",
+        shadowColor: "#0A3D91",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
         shadowRadius: 10,
@@ -408,7 +408,7 @@ export default StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: "#DDF8EA",
+    backgroundColor: "#D8E8FF",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -418,7 +418,7 @@ export default StyleSheet.create({
   stepInsightTitle: {
     fontSize: fontSizes.base,
     fontWeight: "800",
-    color: "#065F46",
+    color: "#041E42",
     marginBottom: 4,
   },
   stepInsightSubtitle: {
@@ -515,7 +515,7 @@ export default StyleSheet.create({
     }),
   },
   formCardFocused: {
-    borderColor: "#059669",
+    borderColor: "#0A3D91",
     borderWidth: 2,
   },
   formCardError: {
@@ -578,7 +578,7 @@ export default StyleSheet.create({
     gap: spacing.xs,
   },
   inputContainerFocused: {
-    borderColor: "#059669",
+    borderColor: "#0A3D91",
     borderWidth: 2,
     backgroundColor: "#FFFFFF",
   },
@@ -636,8 +636,8 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "border-color 0.2s ease, background-color 0.2s ease",
       ":hover": {
-        borderColor: "#059669",
-        backgroundColor: "#ECFDF5",
+        borderColor: "#0A3D91",
+        backgroundColor: "#EEF5FF",
       },
     }),
   },
@@ -654,7 +654,7 @@ export default StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: spacing.sm,
@@ -737,7 +737,7 @@ export default StyleSheet.create({
   },
   scanningText: {
     fontSize: fontSizes.sm,
-    color: "#047857",
+    color: "#0A3D91",
     fontWeight: "600",
   },
   scanProgressContainer: {
@@ -749,7 +749,7 @@ export default StyleSheet.create({
   },
   scanProgressBar: {
     height: "100%",
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
     borderRadius: 999,
   },
 
@@ -768,8 +768,8 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "border-color 0.2s ease, background-color 0.2s ease",
       ":hover": {
-        borderColor: "#059669",
-        backgroundColor: "#ECFDF5",
+        borderColor: "#0A3D91",
+        backgroundColor: "#EEF5FF",
       },
     }),
   },
@@ -832,7 +832,7 @@ export default StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   pickerModalOptionActive: {
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
   },
   pickerModalOptionText: {
     fontSize: fontSizes.base,
@@ -849,7 +849,7 @@ export default StyleSheet.create({
     fontWeight: "600",
   },
   pickerModalOptionTextActive: {
-    color: "#059669",
+    color: "#0A3D91",
     fontWeight: "700",
   },
 
@@ -878,8 +878,8 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "border-color 0.2s ease, background-color 0.2s ease",
       ":hover": {
-        borderColor: "#059669",
-        backgroundColor: "#ECFDF5",
+        borderColor: "#0A3D91",
+        backgroundColor: "#EEF5FF",
       },
     }),
   },
@@ -964,7 +964,7 @@ export default StyleSheet.create({
   editButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 999,
@@ -973,7 +973,7 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "background-color 0.2s ease, transform 0.2s ease",
       ":hover": {
-        backgroundColor: "#D1FAE5",
+        backgroundColor: "#EEF5FF",
         transform: "translateY(-1px)",
       },
     }),
@@ -981,7 +981,7 @@ export default StyleSheet.create({
   editButtonText: {
     fontSize: fontSizes.xs,
     fontWeight: "700",
-    color: "#059669",
+    color: "#0A3D91",
   },
 
   continueButton: {
@@ -1033,7 +1033,7 @@ export default StyleSheet.create({
         cursor: "pointer",
         transition: "transform 0.2s ease, background-color 0.2s ease",
         ":hover": {
-          backgroundColor: "#F8FAFC",
+          backgroundColor: "#F8FBFE",
           transform: "translateY(-1px)",
         },
       },
@@ -1145,14 +1145,14 @@ export default StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#059669",
+    borderColor: "#0A3D91",
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     marginTop: 1,
   },
   privacyCheckboxChecked: {
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
   },
   privacyCheckboxText: {
     fontSize: fontSizes.sm,
@@ -1161,7 +1161,7 @@ export default StyleSheet.create({
     lineHeight: 21,
   },
   privacyLinkText: {
-    color: "#059669",
+    color: "#0A3D91",
     fontWeight: "700",
   },
   privacyModalActions: {
@@ -1206,7 +1206,7 @@ export default StyleSheet.create({
     minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
   },
   privacyAcceptButtonDisabled: {
     opacity: 0.6,
@@ -1277,7 +1277,7 @@ export default StyleSheet.create({
   credentialsTitle: {
     fontSize: fontSizes.base,
     fontWeight: "700",
-    color: "#059669",
+    color: "#0A3D91",
   },
   credentialsTitleRow: {
     flexDirection: "row",
@@ -1315,11 +1315,11 @@ export default StyleSheet.create({
   copyButton: {
     padding: spacing.xs,
     borderRadius: 10,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
   },
   otpVerifyBox: {
     width: "100%",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#DCE7F3",
     borderRadius: 16,
@@ -1347,7 +1347,7 @@ export default StyleSheet.create({
   },
   resendOtpButtonText: {
     textAlign: "center",
-    color: "#2563EB",
+    color: "#0A3D91",
     fontSize: fontSizes.sm,
     fontWeight: "800",
   },

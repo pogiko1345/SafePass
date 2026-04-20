@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Image,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +26,7 @@ import {
   isRoleAllowedInCurrentVariant,
 } from "../utils/appVariant";
 import verificationStyles from "../styles/VerificationStyles";
+import Logo from "../assets/LogoSapphire.jpg";
 
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
@@ -375,7 +377,7 @@ export default function VerificationScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={verificationStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
       
       <KeyboardAvoidingView
         style={verificationStyles.container}
@@ -405,7 +407,7 @@ export default function VerificationScreen({ navigation, route }) {
               ]}
             >
               <LinearGradient
-                colors={['#1D4ED8', '#4F46E5', '#7C3AED']}
+                colors={['#041E42', '#0A3D91', '#1C6DD0']}
                 style={[
                   verificationStyles.heroPanel,
                   !isDesktopLayout && {
@@ -429,7 +431,7 @@ export default function VerificationScreen({ navigation, route }) {
                 </TouchableOpacity>
 
                 <View style={verificationStyles.heroBadge}>
-                  <Ionicons name="shield-checkmark-outline" size={14} color="#DBEAFE" />
+                  <Ionicons name="shield-checkmark-outline" size={14} color="#EEF5FF" />
                   <Text style={verificationStyles.heroBadgeText}>Two-Step Verification</Text>
                 </View>
 
@@ -445,7 +447,11 @@ export default function VerificationScreen({ navigation, route }) {
                       colors={['rgba(255,255,255,0.32)', 'rgba(255,255,255,0.08)']}
                       style={verificationStyles.iconGradient}
                     >
-                      <Ionicons name="shield-checkmark" size={44} color="#FFFFFF" />
+                      <Image
+                        source={Logo}
+                        style={verificationStyles.logoImage}
+                        resizeMode="contain"
+                      />
                     </LinearGradient>
                   </View>
                   <Text
@@ -546,10 +552,10 @@ export default function VerificationScreen({ navigation, route }) {
                     <View style={verificationStyles.userInfoCard}>
                       <View style={verificationStyles.avatarContainer}>
                         <LinearGradient
-                          colors={['#EEF2FF', '#E0E7FF']}
+                          colors={['#EEF5FF', '#D8E8FF']}
                           style={verificationStyles.avatarGradient}
                         >
-                          <Ionicons name="person" size={28} color="#4F46E5" />
+                          <Ionicons name="person" size={28} color="#0A3D91" />
                         </LinearGradient>
                       </View>
                       <View style={verificationStyles.userInfoCopy}>
@@ -673,10 +679,10 @@ export default function VerificationScreen({ navigation, route }) {
                       <View style={verificationStyles.otpCard}>
                         <View style={verificationStyles.otpHeader}>
                           <LinearGradient
-                            colors={['#EEF2FF', '#E0E7FF']}
+                            colors={['#EEF5FF', '#D8E8FF']}
                             style={verificationStyles.otpIconContainer}
                           >
-                            <Ionicons name="key-outline" size={30} color="#4F46E5" />
+                            <Ionicons name="key-outline" size={30} color="#0A3D91" />
                           </LinearGradient>
                           <Text style={verificationStyles.otpTitle}>Enter Verification Code</Text>
                           <Text style={verificationStyles.otpSubtitle}>
@@ -733,7 +739,7 @@ export default function VerificationScreen({ navigation, route }) {
                           activeOpacity={0.8}
                         >
                           <LinearGradient
-                            colors={['#1D4ED8', '#4F46E5', '#7C3AED']}
+                            colors={['#041E42', '#0A3D91', '#1C6DD0']}
                             style={verificationStyles.verifyGradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
@@ -755,7 +761,7 @@ export default function VerificationScreen({ navigation, route }) {
                           disabled={!canResend || isLoading}
                           activeOpacity={0.7}
                         >
-                          <Ionicons name="refresh-outline" size={18} color={canResend ? "#4F46E5" : "#9CA3AF"} />
+                          <Ionicons name="refresh-outline" size={18} color={canResend ? "#0A3D91" : "#9CA3AF"} />
                           <Text style={[
                             verificationStyles.resendButtonText,
                             canResend && verificationStyles.resendButtonTextActive

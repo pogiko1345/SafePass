@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#2563EB",
+    color: "#0A3D91",
   },
   summaryRow: {
     flexDirection: "row",

@@ -54,7 +54,7 @@ export default StyleSheet.create({
   heroBadgeText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#ECFDF5",
+    color: "#EEF5FF",
   },
 
   heroBody: {
@@ -159,7 +159,7 @@ export default StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1,
     textTransform: "uppercase",
-    color: "#0F766E",
+    color: "#0A3D91",
     marginBottom: 8,
   },
 
@@ -245,7 +245,7 @@ export default StyleSheet.create({
     flex: 1,
     padding: 18,
     borderRadius: 22,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
@@ -277,7 +277,7 @@ export default StyleSheet.create({
   },
 
   faqItem: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#E2E8F0",
@@ -371,7 +371,7 @@ export default StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: "#0F766E",
+    backgroundColor: "#0A3D91",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",

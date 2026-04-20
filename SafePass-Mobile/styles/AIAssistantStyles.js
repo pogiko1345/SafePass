@@ -85,7 +85,7 @@ export default StyleSheet.create({
   quickActionText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#4F46E5',
+    color: '#0A3D91',
   },
 
   // ============ CONVERSATION ============
@@ -108,7 +108,7 @@ export default StyleSheet.create({
 
   userBubble: {
     alignSelf: 'flex-end',
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#0A3D91',
     borderRadius: 20,
     padding: 12,
   },
@@ -117,7 +117,7 @@ export default StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF5FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -161,7 +161,7 @@ export default StyleSheet.create({
 
   input: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F8FBFE',
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -180,7 +180,7 @@ export default StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#0A3D91',
     justifyContent: 'center',
     alignItems: 'center',
   },

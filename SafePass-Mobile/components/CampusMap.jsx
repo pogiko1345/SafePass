@@ -245,7 +245,7 @@ const CampusMap = ({
       return { label: "Live now", state: TRACKING_FRESHNESS.LIVE, color: "#10B981" };
     }
     if (diffSeconds < 180) {
-      return { label: `${Math.max(1, Math.floor(diffSeconds / 60))}m ago`, state: TRACKING_FRESHNESS.RECENT, color: "#2563EB" };
+      return { label: `${Math.max(1, Math.floor(diffSeconds / 60))}m ago`, state: TRACKING_FRESHNESS.RECENT, color: "#0A3D91" };
     }
     if (diffSeconds < 900) {
       return { label: `${Math.floor(diffSeconds / 60)}m ago`, state: TRACKING_FRESHNESS.AGING, color: "#F59E0B" };
@@ -606,7 +606,7 @@ const CampusMap = ({
                 styles.floorLegendColor, 
                 { backgroundColor: 
                   floor.id === "ground" ? "#EFF6FF" :
-                  floor.id === "first" || floor.id === "mezzanine" ? "#ECFDF5" :
+                  floor.id === "first" || floor.id === "mezzanine" ? "#EEF5FF" :
                   floor.id === "second" ? "#FEF3C7" : "#EDE9FE"
                 }
               ]} />

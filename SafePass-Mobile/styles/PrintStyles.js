@@ -45,13 +45,13 @@ export const getPrintTableHTML = (
           gap: 14px;
           margin-bottom: 20px;
           padding-bottom: 10px;
-          border-bottom: 2px solid #3B82F6;
+          border-bottom: 2px solid #1C6DD0;
         }
         .print-header-brand {
           width: 56px;
           height: 56px;
           border-radius: 28px;
-          border: 1px solid #DBEAFE;
+          border: 1px solid #EEF5FF;
           object-fit: cover;
           flex-shrink: 0;
         }

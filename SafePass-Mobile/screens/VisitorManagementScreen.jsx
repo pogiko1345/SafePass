@@ -19,11 +19,11 @@ import visitorManagementStyles from "../styles/VisitorManagementStyles";
 // Helper functions
 const getRoleColor = (role) => {
   switch(role?.toLowerCase()) {
-    case 'visitor': return '#7C3AED';
+    case 'visitor': return '#1C6DD0';
     case 'student': return '#0A3D91';
     case 'staff': return '#D97706';
     case 'security': return '#DC2626';
-    case 'admin': return '#7C3AED';
+    case 'admin': return '#1C6DD0';
     default: return '#6B7280';
   }
 };
@@ -474,7 +474,7 @@ export default function VisitorManagementScreen({ navigation, route }) {
   if (isLoading && !visitors.length) {
     return (
       <SafeAreaView style={visitorManagementStyles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7C3AED" />
+        <ActivityIndicator size="large" color="#1C6DD0" />
         <Text style={visitorManagementStyles.loadingText}>Loading visitors...</Text>
       </SafeAreaView>
     );

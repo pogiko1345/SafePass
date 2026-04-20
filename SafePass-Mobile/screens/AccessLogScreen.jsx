@@ -244,7 +244,7 @@ export default function AccessLogScreen({ navigation }) {
           
           <View style={accessLogStyles.statItem}>
             <View style={[accessLogStyles.statIcon, { backgroundColor: "#F3E8FF" }]}>
-              <Ionicons name="trending-up" size={20} color="#7C3AED" />
+              <Ionicons name="trending-up" size={20} color="#1C6DD0" />
             </View>
             <Text style={accessLogStyles.statValue}>{stats.successRate}%</Text>
             <Text style={accessLogStyles.statLabel}>Success</Text>

@@ -1,33 +1,34 @@
 // contexts/ThemeContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { brandColors, sapphireGradient } from '../styles/brandColors';
 
 const ThemeContext = createContext();
 
 export const themes = {
   light: {
-    background: '#F9FAFB',
-    surface: '#FFFFFF',
-    card: '#FFFFFF',
+    background: brandColors.background,
+    surface: brandColors.surface,
+    card: brandColors.surface,
     text: '#111827',
     textSecondary: '#6B7280',
     textTertiary: '#9CA3AF',
     border: '#E5E7EB',
     borderLight: '#F3F4F6',
-    primary: '#2563EB',
-    primaryLight: '#3B82F6',
-    primaryDark: '#1D4ED8',
-    secondary: '#7C3AED',
-    success: '#10B981',
-    warning: '#F59E0B',
-    danger: '#EF4444',
+    primary: brandColors.blue,
+    primaryLight: brandColors.sky,
+    primaryDark: brandColors.navy,
+    secondary: brandColors.gold,
+    success: brandColors.success,
+    warning: brandColors.warning,
+    danger: brandColors.danger,
     info: '#06B6D4',
     header: {
-      gradient: ['#2563EB', '#3B82F6', '#60A5FA'],
+      gradient: sapphireGradient,
     },
     nfcCard: {
-      gradient: ['#1F2937', '#111827'],
-      text: '#FFFFFF',
+      gradient: [brandColors.navy, '#0F172A'],
+      text: brandColors.surface,
     },
     statCard: {
       gradient: ['#F3F4F6', '#FFFFFF'],
@@ -42,10 +43,10 @@ export const themes = {
     textTertiary: '#6B7280',
     border: '#374151',
     borderLight: '#1F2937',
-    primary: '#60A5FA',
-    primaryLight: '#3B82F6',
-    primaryDark: '#2563EB',
-    secondary: '#A78BFA',
+    primary: '#8EC5FF',
+    primaryLight: brandColors.sky,
+    primaryDark: brandColors.blue,
+    secondary: brandColors.gold,
     success: '#34D399',
     warning: '#FBBF24',
     danger: '#F87171',

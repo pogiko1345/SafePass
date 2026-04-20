@@ -21,7 +21,7 @@ const CONTACT_OPTIONS = [
     value: "support@sapphireaviation.edu",
     helper: "Best for login, approval, and account recovery concerns",
     icon: "mail-outline",
-    accent: "#0F766E",
+    accent: "#0A3D91",
     tint: "#CCFBF1",
     url: "mailto:support@sapphireaviation.edu",
   },
@@ -41,8 +41,8 @@ const CONTACT_OPTIONS = [
     value: "sapphireaviation.edu",
     helper: "Visit the academy site for announcements and contact details",
     icon: "globe-outline",
-    accent: "#1D4ED8",
-    tint: "#DBEAFE",
+    accent: "#041E42",
+    tint: "#EEF5FF",
     url: "https://sapphireaviation.edu",
   },
 ];
@@ -54,7 +54,7 @@ const QUICK_GUIDES = [
     description:
       "Register, wait for admin approval, then sign in to view your visitor pass and status.",
     icon: "person-outline",
-    accent: "#0F766E",
+    accent: "#0A3D91",
   },
   {
     id: "admin",
@@ -62,7 +62,7 @@ const QUICK_GUIDES = [
     description:
       "Approve visit requests from the dashboard so visitor accounts become active and security is notified.",
     icon: "shield-checkmark-outline",
-    accent: "#1D4ED8",
+    accent: "#041E42",
   },
   {
     id: "security",
@@ -153,7 +153,7 @@ export default function HelpScreen({ navigation }) {
         contentContainerStyle={helpStyles.scrollContainer}
       >
         <LinearGradient
-          colors={["#0F172A", "#123B63", "#0F766E"]}
+          colors={["#0F172A", "#123B63", "#0A3D91"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={helpStyles.hero}
@@ -173,7 +173,7 @@ export default function HelpScreen({ navigation }) {
           </TouchableOpacity>
 
           <View style={helpStyles.heroBadge}>
-            <Ionicons name="headset-outline" size={16} color="#D1FAE5" />
+            <Ionicons name="headset-outline" size={16} color="#EEF5FF" />
             <Text style={helpStyles.heroBadgeText}>SafePass Support Center</Text>
           </View>
 
@@ -302,7 +302,7 @@ export default function HelpScreen({ navigation }) {
                   >
                     <View style={helpStyles.faqQuestionRow}>
                       <View style={helpStyles.faqQuestionTextWrap}>
-                        <Ionicons name="help-circle-outline" size={18} color="#0F766E" />
+                        <Ionicons name="help-circle-outline" size={18} color="#0A3D91" />
                         <Text style={helpStyles.faqQuestion}>{faq.question}</Text>
                       </View>
                       <Ionicons
@@ -321,7 +321,7 @@ export default function HelpScreen({ navigation }) {
           </View>
 
           <LinearGradient
-            colors={["#FFF7ED", "#ECFDF5"]}
+            colors={["#FFF7ED", "#EEF5FF"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={helpStyles.ctaCard}

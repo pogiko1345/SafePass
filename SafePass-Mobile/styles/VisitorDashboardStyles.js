@@ -13,7 +13,7 @@ export default StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   loadingText: {
@@ -222,7 +222,7 @@ export default StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 0.8,
-    color: "#0F766E",
+    color: "#0A3D91",
   },
 
   commandDeckTitle: {
@@ -317,7 +317,7 @@ export default StyleSheet.create({
   },
 
   phoneTrackingCardActive: {
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     borderColor: "#A7F3D0",
   },
 
@@ -367,10 +367,10 @@ export default StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 18,
-    backgroundColor: "#0F766E",
+    backgroundColor: "#0A3D91",
     ...Platform.select({
       ios: {
-        shadowColor: "#0F766E",
+        shadowColor: "#0A3D91",
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.18,
         shadowRadius: 14,
@@ -396,13 +396,13 @@ export default StyleSheet.create({
     borderRadius: 18,
     backgroundColor: "#F0F7FF",
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#B7D5F6",
   },
 
   commandSecondaryButtonText: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#1D4ED8",
+    color: "#041E42",
   },
 
   sectionIntroCard: {
@@ -435,7 +435,7 @@ export default StyleSheet.create({
   sectionIntroEyebrow: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#0F766E",
+    color: "#0A3D91",
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -767,7 +767,7 @@ export default StyleSheet.create({
   nfcInstructionsText: {
     flex: 1,
     fontSize: 12,
-    color: "#4F46E5",
+    color: "#0A3D91",
     lineHeight: 18,
     fontWeight: "500",
   },
@@ -1000,7 +1000,7 @@ export default StyleSheet.create({
   approvedHeroBadgeText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#0F766E",
+    color: "#0A3D91",
   },
 
   approvedHeroHeader: {
@@ -1184,7 +1184,7 @@ export default StyleSheet.create({
   approvedVirtualNfcBadgeText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#DBEAFE",
+    color: "#EEF5FF",
     letterSpacing: 0.5,
     textTransform: "uppercase",
   },
@@ -1253,7 +1253,7 @@ export default StyleSheet.create({
   approvedVirtualNfcFooterText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#DBEAFE",
+    color: "#EEF5FF",
   },
 
   approvedStatusBanner: {
@@ -1261,7 +1261,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#EEF5FF",
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -1271,7 +1271,7 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: "600",
-    color: "#4338CA",
+    color: "#0A3D91",
   },
 
   approvedInfoCard: {
@@ -1329,7 +1329,7 @@ export default StyleSheet.create({
   },
 
   approvedTipsCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     marginHorizontal: 20,
     marginTop: 18,
     padding: 20,
@@ -1476,7 +1476,7 @@ export default StyleSheet.create({
   qrPlaceholder: {
     width: 220,
     height: 220,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
@@ -1740,7 +1740,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
@@ -1806,7 +1806,7 @@ export default StyleSheet.create({
   },
 
   virtualNfcInfoCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 18,
     padding: 16,
     gap: 12,
@@ -1862,7 +1862,7 @@ export default StyleSheet.create({
   virtualNfcPrimaryButton: {
     flex: 1,
     borderRadius: 16,
-    backgroundColor: "#1D4ED8",
+    backgroundColor: "#041E42",
     paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
@@ -1924,7 +1924,7 @@ export default StyleSheet.create({
   accessFlowHeroBadgeText: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#0F766E",
+    color: "#0A3D91",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -1951,7 +1951,7 @@ export default StyleSheet.create({
   },
 
   checkInArrivalCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 22,
     padding: 18,
     gap: 16,
@@ -1985,7 +1985,7 @@ export default StyleSheet.create({
   checkInArrivalInitials: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#0F766E",
+    color: "#0A3D91",
   },
 
   checkInArrivalCopy: {
@@ -2012,7 +2012,7 @@ export default StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
     borderColor: "#A7F3D0",
   },
@@ -2020,7 +2020,7 @@ export default StyleSheet.create({
   checkInArrivalStatusText: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#0F766E",
+    color: "#0A3D91",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -2106,7 +2106,7 @@ export default StyleSheet.create({
   },
 
   accessFlowSummaryCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 20,
     padding: 16,
     gap: 12,
@@ -2156,7 +2156,7 @@ export default StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#14B8A6",
+    backgroundColor: "#1C6DD0",
     marginTop: 5,
   },
 
@@ -2197,7 +2197,7 @@ export default StyleSheet.create({
   accessFlowPrimaryButton: {
     flex: 1,
     borderRadius: 16,
-    backgroundColor: "#1D4ED8",
+    backgroundColor: "#041E42",
     paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
@@ -2235,7 +2235,7 @@ export default StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 18,
@@ -2263,7 +2263,7 @@ export default StyleSheet.create({
 
   checkInSuccessStamp: {
     width: "100%",
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     borderRadius: 20,
     padding: 16,
     gap: 8,
@@ -2282,7 +2282,7 @@ export default StyleSheet.create({
   checkInSuccessStampLabel: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#0F766E",
+    color: "#0A3D91",
     textTransform: "uppercase",
     letterSpacing: 0.7,
   },
@@ -2290,11 +2290,11 @@ export default StyleSheet.create({
   checkInSuccessStampStatus: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#0F766E",
+    color: "#0A3D91",
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: "#D1FAE5",
+    backgroundColor: "#EEF5FF",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -2313,7 +2313,7 @@ export default StyleSheet.create({
 
   accessFlowSuccessMetaCard: {
     width: "100%",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 18,
     padding: 16,
     gap: 12,
@@ -2358,7 +2358,7 @@ export default StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 18,
@@ -2386,7 +2386,7 @@ export default StyleSheet.create({
 
   virtualNfcSuccessMetaCard: {
     width: "100%",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 18,
     padding: 16,
     gap: 12,
@@ -2419,14 +2419,14 @@ export default StyleSheet.create({
   },
 
   adjustedStatusBanner: {
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#EEF5FF",
   },
 
   adjustedStatusText: {
     flex: 1,
     fontSize: 13,
     fontWeight: "600",
-    color: "#1D4ED8",
+    color: "#041E42",
   },
 
   reappointmentHeroCard: {
@@ -2468,7 +2468,7 @@ export default StyleSheet.create({
   reappointmentHeroBadgeText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#0F766E",
+    color: "#0A3D91",
   },
 
   reappointmentHeroTitle: {
@@ -2564,11 +2564,11 @@ export default StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 13,
-    backgroundColor: "#0F766E",
+    backgroundColor: "#0A3D91",
     borderRadius: 16,
     ...Platform.select({
       ios: {
-        shadowColor: "#0F766E",
+        shadowColor: "#0A3D91",
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.18,
         shadowRadius: 10,
@@ -2658,7 +2658,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 16,
@@ -2728,7 +2728,7 @@ export default StyleSheet.create({
   },
 
   pickerOptionItemActive: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#EEF5FF",
   },
 
   pickerOptionItemDisabled: {
@@ -2743,7 +2743,7 @@ export default StyleSheet.create({
   },
 
   pickerOptionTextActive: {
-    color: "#0F766E",
+    color: "#0A3D91",
   },
 
   pickerOptionTextDisabled: {
@@ -2754,7 +2754,7 @@ export default StyleSheet.create({
     marginTop: 3,
     fontSize: 11,
     fontWeight: "800",
-    color: "#0F766E",
+    color: "#0A3D91",
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
@@ -2774,7 +2774,7 @@ export default StyleSheet.create({
   },
 
   purposeOptionItemActive: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#EEF5FF",
   },
 
   purposeOptionText: {
@@ -2784,7 +2784,7 @@ export default StyleSheet.create({
   },
 
   purposeOptionTextActive: {
-    color: "#0F766E",
+    color: "#0A3D91",
   },
 
   appointmentFieldInput: {
@@ -2876,13 +2876,13 @@ export default StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
   },
 
   appointmentChangeIdText: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#0F766E",
+    color: "#0A3D91",
   },
 
   appointmentPrivacyCard: {
@@ -2893,12 +2893,12 @@ export default StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#CBD5E1",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   appointmentPrivacyCardAccepted: {
     borderColor: "#10B981",
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
   },
 
   appointmentPrivacyCheckbox: {
@@ -2937,7 +2937,7 @@ export default StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
@@ -2956,7 +2956,7 @@ export default StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#0A3D91",
   },
 
   appointmentPrimaryButtonText: {
@@ -2966,7 +2966,7 @@ export default StyleSheet.create({
   },
 
   appointmentSuccessCard: {
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     marginHorizontal: 20,
     marginTop: 18,
     padding: 18,
@@ -2985,7 +2985,7 @@ export default StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#D1FAE5",
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2997,14 +2997,14 @@ export default StyleSheet.create({
   appointmentSuccessTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#065F46",
+    color: "#041E42",
     marginBottom: 4,
   },
 
   appointmentSuccessText: {
     fontSize: 13,
     lineHeight: 20,
-    color: "#047857",
+    color: "#0A3D91",
   },
 
   appointmentSuccessMetaRow: {
@@ -3015,7 +3015,7 @@ export default StyleSheet.create({
   appointmentSuccessMeta: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#065F46",
+    color: "#041E42",
   },
 
   visitorModuleCard: {
@@ -3050,7 +3050,7 @@ export default StyleSheet.create({
   visitorModuleEyebrow: {
     fontSize: 11,
     fontWeight: "900",
-    color: "#0F766E",
+    color: "#0A3D91",
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -3069,7 +3069,7 @@ export default StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
     borderColor: "#A7F3D0",
   },
@@ -3077,7 +3077,7 @@ export default StyleSheet.create({
   visitorModuleHeaderBadgeText: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#0F766E",
+    color: "#0A3D91",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -3103,15 +3103,15 @@ export default StyleSheet.create({
   },
 
   visitorModuleButtonActive: {
-    backgroundColor: "#0F766E",
-    borderColor: "#0F766E",
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
   },
 
   visitorModuleIconWrap: {
     width: 42,
     height: 42,
     borderRadius: 15,
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#EEF5FF",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -3188,7 +3188,7 @@ export default StyleSheet.create({
   },
 
   mapSummaryCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#DCE4F0",
@@ -3273,7 +3273,7 @@ export default StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 17,
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#EEF5FF",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -3285,7 +3285,7 @@ export default StyleSheet.create({
   visitorFlowPanelEyebrow: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#2563EB",
+    color: "#0A3D91",
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -3305,7 +3305,7 @@ export default StyleSheet.create({
   },
 
   visitorFlowChecklist: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 18,
     padding: 15,
     gap: 12,
@@ -3336,7 +3336,7 @@ export default StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 18,
     borderRadius: 16,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#0A3D91",
   },
 
   visitorFlowPrimaryButtonText: {
@@ -3353,7 +3353,7 @@ export default StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 16,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#D9E4F2",
     marginTop: 14,
@@ -3362,7 +3362,7 @@ export default StyleSheet.create({
   visitorFlowSecondaryButtonText: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#1D4ED8",
+    color: "#041E42",
   },
 
   appointmentStatusHero: {
@@ -3372,7 +3372,7 @@ export default StyleSheet.create({
     padding: 16,
     borderRadius: 20,
     borderWidth: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     marginBottom: 14,
   },
 
@@ -3458,14 +3458,14 @@ export default StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
 
   visitorFloorTabActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
   },
 
   visitorFloorTabText: {
@@ -3485,7 +3485,7 @@ export default StyleSheet.create({
     marginTop: 14,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
     borderColor: "#A7F3D0",
   },
@@ -3494,7 +3494,7 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 20,
-    color: "#047857",
+    color: "#0A3D91",
     fontWeight: "600",
   },
 

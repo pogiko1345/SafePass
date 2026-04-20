@@ -108,7 +108,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       admin: {
         label: "Administrator",
         icon: "settings-outline",
-        gradients: ["#7C3AED", "#4F46E5"],
+        gradients: ["#1C6DD0", "#0A3D91"],
       },
       security: {
         label: "Security Team",
@@ -123,12 +123,12 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       staff: {
         label: "Staff Member",
         icon: "briefcase-outline",
-        gradients: ["#0F766E", "#14B8A6"],
+        gradients: ["#0A3D91", "#1C6DD0"],
       },
       visitor: {
         label: "Visitor Account",
         icon: "person-outline",
-        gradients: ["#1D4ED8", "#0EA5E9"],
+        gradients: ["#041E42", "#1C6DD0"],
       },
     };
     return map[role] || map.visitor;
@@ -442,8 +442,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   if (isLoading && !profile) {
     return (
       <SafeAreaView style={styles.center}>
-        <StatusBar barStyle="light-content" backgroundColor="#1D4ED8" />
-        <ActivityIndicator size="large" color="#1D4ED8" />
+        <StatusBar barStyle="light-content" backgroundColor="#041E42" />
+        <ActivityIndicator size="large" color="#041E42" />
         <Text style={styles.loadingText}>Loading your profile...</Text>
       </SafeAreaView>
     );
@@ -452,7 +452,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   if (error && !profile) {
     return (
       <SafeAreaView style={styles.center}>
-        <StatusBar barStyle="light-content" backgroundColor="#1D4ED8" />
+        <StatusBar barStyle="light-content" backgroundColor="#041E42" />
         <Ionicons name="alert-circle-outline" size={56} color="#DC2626" />
         <Text style={styles.errorTitle}>Unable to load profile</Text>
         <Text style={styles.errorText}>{error}</Text>
@@ -629,7 +629,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       </View>
 
       <View style={styles.securityNoteCard}>
-        <Ionicons name="shield-checkmark-outline" size={22} color="#0F766E" />
+        <Ionicons name="shield-checkmark-outline" size={22} color="#0A3D91" />
         <View style={styles.securityNoteCopy}>
           <Text style={styles.securityNoteTitle}>Account Safety</Text>
           <Text style={styles.securityNoteText}>
@@ -652,7 +652,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         <Switch
           value={notificationsEnabled}
           onValueChange={setNotificationsEnabled}
-          trackColor={{ false: "#CBD5E1", true: "#2563EB" }}
+          trackColor={{ false: "#CBD5E1", true: "#0A3D91" }}
           thumbColor="#FFFFFF"
         />
       </View>
@@ -666,7 +666,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         <Switch
           value={biometricEnabled}
           onValueChange={toggleBiometric}
-          trackColor={{ false: "#CBD5E1", true: "#2563EB" }}
+          trackColor={{ false: "#CBD5E1", true: "#0A3D91" }}
           thumbColor="#FFFFFF"
         />
       </View>
@@ -680,7 +680,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         <Switch
           value={darkModeEnabled}
           onValueChange={setDarkModeEnabled}
-          trackColor={{ false: "#CBD5E1", true: "#2563EB" }}
+          trackColor={{ false: "#CBD5E1", true: "#0A3D91" }}
           thumbColor="#FFFFFF"
         />
       </View>
@@ -699,7 +699,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   return (
     <>
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor="#1D4ED8" />
+        <StatusBar barStyle="light-content" backgroundColor="#041E42" />
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -937,7 +937,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     <Ionicons
                       name="checkmark-circle-outline"
                       size={18}
-                      color="#2563EB"
+                      color="#0A3D91"
                     />
                     <Text style={styles.noteText}>
                       Keep your contact details updated for smoother account
@@ -948,7 +948,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     <Ionicons
                       name="checkmark-circle-outline"
                       size={18}
-                      color="#2563EB"
+                      color="#0A3D91"
                     />
                     <Text style={styles.noteText}>
                       Your mobile and web layouts now use the same responsive
@@ -1011,14 +1011,14 @@ const shadow = Platform.select({
   web: { boxShadow: "0px 10px 28px rgba(15,23,42,0.08)" },
 });
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F8FAFC" },
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  safeArea: { flex: 1, backgroundColor: "#F8FBFE" },
+  container: { flex: 1, backgroundColor: "#F8FBFE" },
   scrollContent: { paddingBottom: 36 },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 28,
   },
   loadingText: {
@@ -1042,7 +1042,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#0A3D91",
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 14,
@@ -1055,7 +1055,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
@@ -1079,7 +1079,7 @@ const styles = StyleSheet.create({
     color: "#92400E",
     fontWeight: "600",
   },
-  cacheAction: { fontSize: 12, fontWeight: "800", color: "#1D4ED8" },
+  cacheAction: { fontSize: 12, fontWeight: "800", color: "#041E42" },
   hero: {
     marginHorizontal: 20,
     marginTop: 18,
@@ -1208,7 +1208,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
   },
-  tabBtnActive: { backgroundColor: "#1D4ED8", borderColor: "#1D4ED8" },
+  tabBtnActive: { backgroundColor: "#041E42", borderColor: "#041E42" },
   tabText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
   tabTextActive: { color: "#FFFFFF" },
   stack: { gap: 18 },
@@ -1263,7 +1263,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#CBD5E1",
     borderRadius: 16,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
@@ -1277,7 +1277,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
     borderColor: "#A7F3D0",
     borderRadius: 20,
@@ -1287,13 +1287,13 @@ const styles = StyleSheet.create({
   securityNoteTitle: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#065F46",
+    color: "#041E42",
     marginBottom: 4,
   },
   securityNoteText: {
     fontSize: 13,
     lineHeight: 19,
-    color: "#047857",
+    color: "#0A3D91",
     fontWeight: "600",
   },
   accessCard: { borderRadius: 24, padding: 20, ...shadow },
@@ -1334,7 +1334,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#1D4ED8",
+    backgroundColor: "#041E42",
     borderRadius: 16,
     paddingVertical: 14,
   },
@@ -1344,7 +1344,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 16,
     paddingVertical: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#CBD5E1",
   },
@@ -1412,7 +1412,7 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: "row", gap: 12 },
   modalSecondary: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#CBD5E1",
     borderRadius: 14,

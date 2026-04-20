@@ -36,16 +36,16 @@ const fontSize = {
 
 // Enhanced color palette with semantic naming
 const colors = {
-  primary: "#DC2626",
-  primaryDark: "#B91C1C",
-  primaryLight: "#EF4444",
-  primarySoft: "#FEE2E2",
+  primary: "#0A3D91",
+  primaryDark: "#041E42",
+  primaryLight: "#1C6DD0",
+  primarySoft: "#EEF5FF",
   secondary: "#0A3D91",
   secondaryDark: "#1E4A8C",
-  secondaryLight: "#3B82F6",
-  secondarySoft: "#DBEAFE",
+  secondaryLight: "#1C6DD0",
+  secondarySoft: "#EEF5FF",
   success: "#10B981",
-  successLight: "#D1FAE5",
+  successLight: "#EEF5FF",
   successSoft: "#E3F2E9",
   warning: "#F59E0B",
   warningLight: "#FEF3C7",
@@ -53,11 +53,11 @@ const colors = {
   danger: "#DC2626",
   dangerLight: "#FEE2E2",
   dangerSoft: "#FFE5E5",
-  info: "#3B82F6",
-  infoLight: "#DBEAFE",
+  info: "#1C6DD0",
+  infoLight: "#EEF5FF",
   infoSoft: "#E6F0FF",
-  purple: "#7C3AED",
-  purpleLight: "#EDE9FE",
+  purple: "#1C6DD0",
+  purpleLight: "#EEF5FF",
   gray: {
     50: "#F9FAFB",
     100: "#F3F4F6",
@@ -157,15 +157,17 @@ export default StyleSheet.create({
   burgerButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
     ...webHover({
       cursor: "pointer",
       transition: "all 0.2s ease",
       ":hover": {
-        backgroundColor: "rgba(255,255,255,0.25)",
+        backgroundColor: "rgba(255,255,255,0.26)",
       },
     }),
   },
@@ -330,7 +332,7 @@ export default StyleSheet.create({
         shadowRadius: 18,
       },
       android: { elevation: 8 },
-      web: { boxShadow: "0px 14px 32px rgba(127,29,29,0.22)" },
+      web: { boxShadow: "0px 14px 32px rgba(4,30,66,0.22)" },
     }),
   },
 
@@ -356,7 +358,7 @@ export default StyleSheet.create({
   securityHeroBadgeText: {
     fontSize: fontSize.xs,
     fontWeight: "700",
-    color: "#FEE2E2",
+    color: "#D8E8FF",
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
@@ -1697,7 +1699,7 @@ export default StyleSheet.create({
   },
 
   reportVisitorTableRowSelected: {
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
   },
 
   reportVisitorTableHeader: {
@@ -2294,9 +2296,9 @@ export default StyleSheet.create({
 
   // ============ SIDEBAR STYLES ============
   sidebar: {
-    backgroundColor: colors.white,
+    backgroundColor: "#F8FBFE",
     borderRightWidth: 1,
-    borderRightColor: colors.gray[200],
+    borderRightColor: "#D8E8FF",
     overflow: "hidden",
     zIndex: 10,
     ...Platform.select({
@@ -2307,7 +2309,7 @@ export default StyleSheet.create({
         shadowRadius: 8,
       },
       android: { elevation: 4 },
-      web: { boxShadow: "2px 0 12px rgba(0,0,0,0.05)" },
+      web: { boxShadow: "2px 0 18px rgba(4,30,66,0.08)" },
     }),
   },
 
@@ -2317,27 +2319,54 @@ export default StyleSheet.create({
     alignItems: "center",
     padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
+    borderBottomColor: "rgba(255,255,255,0.16)",
   },
 
   sidebarLogo: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    flex: 1,
+  },
+
+  sidebarLogoImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
   },
 
   sidebarLogoText: {
     fontSize: fontSize.lg,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.white,
   },
 
+  sidebarLogoSubtext: {
+    marginTop: 2,
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.76)",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
   sidebarClose: {
-    padding: spacing.xs,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
   },
 
   sidebarContent: {
     flex: 1,
+    backgroundColor: "#F8FBFE",
   },
 
   sidebarUser: {
@@ -2345,8 +2374,9 @@ export default StyleSheet.create({
     alignItems: "center",
     padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomColor: "#E6EDF7",
     gap: spacing.md,
+    backgroundColor: colors.white,
   },
 
   sidebarAvatar: {
@@ -2389,24 +2419,26 @@ export default StyleSheet.create({
     alignItems: "center",
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
-    borderRadius: 12,
+    borderRadius: 8,
     marginBottom: spacing.xs,
     position: "relative",
     ...webHover({
       cursor: "pointer",
       transition: "all 0.2s ease",
-      ":hover": { backgroundColor: colors.gray[50] },
+      ":hover": { backgroundColor: "#EEF5FF" },
     }),
   },
 
   sidebarNavItemActive: {
-    backgroundColor: colors.gray[50],
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#B7D5F6",
   },
 
   sidebarNavIcon: {
     width: 32,
     height: 32,
-    borderRadius: 10,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
     marginRight: spacing.md,
@@ -2452,12 +2484,12 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
-    borderRadius: 10,
+    borderRadius: 8,
     backgroundColor: colors.white,
     ...webHover({
       cursor: "pointer",
       transition: "all 0.2s ease",
-      ":hover": { backgroundColor: colors.gray[50] },
+      ":hover": { backgroundColor: "#EEF5FF" },
     }),
   },
 
@@ -2496,8 +2528,9 @@ export default StyleSheet.create({
     padding: spacing.md,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: colors.gray[100],
+    borderColor: "#E6EDF7",
     marginVertical: spacing.sm,
+    backgroundColor: colors.white,
   },
 
   sidebarStatsTitle: {
@@ -2516,12 +2549,12 @@ export default StyleSheet.create({
 
   sidebarStatItem: {
     flex: 1,
-    backgroundColor: colors.gray[50],
-    borderRadius: 12,
+    backgroundColor: "#F8FBFE",
+    borderRadius: 8,
     padding: spacing.sm,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: colors.gray[100],
+    borderColor: "#E6EDF7",
   },
 
   sidebarStatValue: {

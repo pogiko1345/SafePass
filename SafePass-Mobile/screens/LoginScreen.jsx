@@ -69,7 +69,7 @@ export default function LoginScreen({ navigation, route }) {
     ? { padding: 12, alignItems: "flex-start" }
     : null;
   const roleIconResponsiveStyle = isCompactLogin
-    ? { width: 42, height: 42, borderRadius: 14, marginRight: 10 }
+    ? { width: 42, height: 42, borderRadius: 8, marginRight: 10 }
     : null;
   const welcomeTitleResponsiveStyle = {
     fontSize: isCompactLogin ? 24 : isTabletLogin ? 30 : 28,
@@ -102,7 +102,7 @@ export default function LoginScreen({ navigation, route }) {
   const [isLoading, setIsLoading] = useState(false);
   const [apiConnected, setApiConnected] = useState(true);
   const [errors, setErrors] = useState({});
-  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [loginError, setLoginError] = useState("");
 
   // Animation values
@@ -164,6 +164,7 @@ export default function LoginScreen({ navigation, route }) {
   useEffect(() => {
     if (initialEmail) {
       setEmail(initialEmail);
+      setRememberMe(true);
     }
     if (initialPassword) {
       setPassword(initialPassword);
@@ -192,11 +193,18 @@ export default function LoginScreen({ navigation, route }) {
     try {
       const connected = await ApiService.testConnection();
       setApiConnected(connected);
+
+      if (!initialEmail) {
+        const rememberedEmail = await Storage.getItem("rememberedEmail");
+        if (rememberedEmail) {
+          setEmail(rememberedEmail);
+          setRememberMe(true);
+        }
+      }
       
       const isNewRegistration = await Storage.getItem('isNewRegistration');
       
       if (isNewRegistration === 'true') {
-        console.log("📝 New registration detected - clearing token");
         await Storage.multiRemove(['authToken', 'userToken', 'currentUser', 'isNewRegistration']);
         setIsCheckingAuth(false);
         return;
@@ -206,9 +214,14 @@ export default function LoginScreen({ navigation, route }) {
       const userJson = await Storage.getItem('currentUser');
       
       if (token && userJson) {
-        const user = JSON.parse(userJson);
-        console.log("🔑 Auto-login detected for:", user.email);
-        
+        let user;
+        try {
+          user = JSON.parse(userJson);
+        } catch {
+          await ApiService.clearAuth();
+          setLoginError("Your saved session was invalid. Please sign in again.");
+          return;
+        }
         const normalizedRole = normalizeRole(user.role);
         if (!isRoleAllowedInCurrentVariant(normalizedRole)) {
           await ApiService.clearAuth();
@@ -220,6 +233,8 @@ export default function LoginScreen({ navigation, route }) {
           index: 0,
           routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : route }],
         });
+      } else if (token || userJson) {
+        await ApiService.clearAuth();
       }
     } catch (error) {
       console.error("Auth check error:", error);
@@ -430,7 +445,7 @@ export default function LoginScreen({ navigation, route }) {
         setResetTimer(60);
         setCanResendReset(false);
         Alert.alert(
-          "✅ Reset Code Sent",
+          "Reset Code Sent",
           `A 6-digit verification code has been sent to ${resetEmail}.`,
           [{ text: "OK" }]
         );
@@ -454,7 +469,7 @@ export default function LoginScreen({ navigation, route }) {
       
       if (response.success) {
         setResetStep(3);
-        Alert.alert("✅ Code Verified", "Please enter your new password.");
+        Alert.alert("Code Verified", "Please enter your new password.");
       } else {
         setResetOtpError("Invalid verification code");
         Alert.alert("Error", response.message || "Invalid verification code. Please try again.");
@@ -492,7 +507,7 @@ export default function LoginScreen({ navigation, route }) {
       
       if (response.success) {
         Alert.alert(
-          "✅ Password Reset Successful",
+          "Password Reset Successful",
           "Your password has been changed successfully. Please login with your new password.",
           [
             {
@@ -519,7 +534,7 @@ export default function LoginScreen({ navigation, route }) {
 
   // ============ PASSWORD STRENGTH UI ============
   const getPasswordStrengthColor = () => {
-    const colors = ['#E5E7EB', '#EF4444', '#F59E0B', '#10B981', '#059669', '#0A3D91'];
+    const colors = ['#E5E7EB', '#EF4444', '#F59E0B', '#10B981', '#0A3D91', '#0A3D91'];
     return colors[passwordStrength] || colors[0];
   };
 
@@ -544,9 +559,7 @@ export default function LoginScreen({ navigation, route }) {
     setLoginError("");
     
     try {
-      console.log('🔑 Attempting login for:', email);
       const verifyResponse = await ApiService.verifyCredentials(email, password);
-      console.log('📥 Verify response:', verifyResponse);
       
       if (verifyResponse.success) {
         const normalizedUser = {
@@ -557,6 +570,12 @@ export default function LoginScreen({ navigation, route }) {
         if (!isRoleAllowedInCurrentVariant(normalizedUser.role)) {
           await ApiService.clearAuth();
           setLoginError(getVariantBlockedRoleMessage(normalizedUser.role));
+          return;
+        }
+
+        if (normalizedUser.status === "pending" || verifyResponse.status === "pending") {
+          await ApiService.clearAuth();
+          setLoginError("Your account is pending approval. Please wait for admin approval.");
           return;
         }
 
@@ -584,18 +603,19 @@ export default function LoginScreen({ navigation, route }) {
       }
     } catch (error) {
       console.error("Login error:", error);
+      const errorMessage = String(error?.message || "");
       
       if (
-        error.message.includes("not yet verified") ||
-        error.message.includes("verify your email") ||
-        error.message.toLowerCase().includes("otp")
+        errorMessage.includes("not yet verified") ||
+        errorMessage.includes("verify your email") ||
+        errorMessage.toLowerCase().includes("otp")
       ) {
         setLoginError("Your account is not yet verified. Please verify your account using OTP first.");
-      } else if (error.message.includes("pending")) {
+      } else if (errorMessage.includes("pending")) {
         setLoginError("Your account is pending approval. Please wait for admin approval.");
-      } else if (error.message.includes("Invalid email") || error.message.includes("password")) {
+      } else if (errorMessage.includes("Invalid email") || errorMessage.includes("password")) {
         setLoginError("Incorrect email or password. Please try again.");
-      } else if (error.message.includes("Network request failed")) {
+      } else if (errorMessage.includes("Network request failed")) {
         setLoginError("Cannot connect to server. Please check your connection.");
       } else {
         setLoginError("Login failed. Please try again.");
@@ -613,7 +633,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Continue Your Visit Journey",
           subtitle: "Track approvals, manage appointments, and keep your Sapphire visit details in one secure place.",
           icon: "person-outline",
-          accent: "#0F766E",
+          accent: "#0A3D91",
           panel: "Visitor Coordination",
         };
       case "security":
@@ -632,7 +652,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Appointment Desk Sign-In",
           subtitle: "Review visitor appointments, adjust schedules, and respond to requests from the staff dashboard.",
           icon: "briefcase-outline",
-          accent: "#0F766E",
+          accent: "#0A3D91",
           panel: "Staff Coordination",
         };
       case "admin":
@@ -641,7 +661,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Command and Oversight Login",
           subtitle: "Open the administrative control center for user review, access supervision, and reporting.",
           icon: "settings-outline",
-          accent: "#7C3AED",
+          accent: "#1C6DD0",
           panel: "Admin Control",
         };
       default:
@@ -918,7 +938,7 @@ export default function LoginScreen({ navigation, route }) {
                     <View
                       style={{
                         marginBottom: 16,
-                        borderRadius: 16,
+                        borderRadius: 8,
                         borderWidth: 1,
                         borderColor: "#DDE7F3",
                         backgroundColor: "#F8FBFE",
@@ -951,9 +971,9 @@ export default function LoginScreen({ navigation, route }) {
                       <TouchableOpacity
                         style={{
                           borderWidth: 1,
-                          borderColor: "#C7D2FE",
-                          backgroundColor: "#EEF2FF",
-                          borderRadius: 14,
+                          borderColor: "#B7D5F6",
+                          backgroundColor: "#EEF5FF",
+                          borderRadius: 8,
                           paddingVertical: 13,
                           paddingHorizontal: 16,
                           flexDirection: "row",
@@ -964,12 +984,12 @@ export default function LoginScreen({ navigation, route }) {
                         onPress={() => navigation.navigate("VisitorRegister")}
                         activeOpacity={0.85}
                       >
-                        <Ionicons name="person-add-outline" size={18} color="#4F46E5" />
+                        <Ionicons name="person-add-outline" size={18} color="#0A3D91" />
                         <Text
                           style={{
                             fontSize: 14,
                             fontWeight: "800",
-                            color: "#4338CA",
+                            color: "#0A3D91",
                           }}
                         >
                           Create Account
@@ -1029,7 +1049,7 @@ export default function LoginScreen({ navigation, route }) {
                     </TouchableOpacity>
                   </View>
                   <Text style={loginStyles.footerCopyright}>
-                    ©2024. Sapphire International Aviation Academy
+                    Copyright 2024. Sapphire International Aviation Academy
                   </Text>
                 </View>
               </View>

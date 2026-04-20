@@ -139,7 +139,7 @@ export default StyleSheet.create({
     textAlign: "center",
     lineHeight: isSmallPhone ? 28 : 32,
     marginBottom: 10,
-    letterSpacing: -0.4,
+    letterSpacing: 0,
   },
 
   headerTagline: {
@@ -181,7 +181,7 @@ export default StyleSheet.create({
     marginTop: -42,
     marginHorizontal: isSmallPhone ? 16 : 20,
     padding: isSmallPhone ? 20 : 24,
-    borderRadius: 28,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E6EDF7",
     ...Platform.select({
@@ -209,7 +209,7 @@ export default StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 14,
     backgroundColor: "#F3F7FB",
-    borderRadius: 999,
+    borderRadius: 8,
     gap: 6,
     borderWidth: 1,
     borderColor: "#E4EBF5",
@@ -226,7 +226,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F7FAFD",
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 14,
     borderWidth: 1,
     borderColor: "#E6EDF7",
@@ -236,7 +236,7 @@ export default StyleSheet.create({
   roleIconWrap: {
     width: 46,
     height: 46,
-    borderRadius: 16,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -267,7 +267,7 @@ export default StyleSheet.create({
     color: "#0F172A",
     textAlign: "center",
     marginBottom: 6,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
 
   welcomeSubtitle: {
@@ -295,7 +295,7 @@ export default StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: "#DCE5F0",
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: Platform.select({
       ios: 14,
@@ -383,7 +383,7 @@ export default StyleSheet.create({
   loginButton: {
     backgroundColor: "#0A3D91",
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 8,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
@@ -415,7 +415,7 @@ export default StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 12,
     backgroundColor: "#EEF5FF",
-    borderRadius: 14,
+    borderRadius: 8,
     gap: 8,
     marginBottom: 16,
     borderWidth: 1,
@@ -439,7 +439,7 @@ export default StyleSheet.create({
     color: "#111827",
     marginTop: 12,
     marginBottom: 6,
-    letterSpacing: -0.3,
+    letterSpacing: 0,
   },
 
   verificationSubtitle: {
@@ -473,7 +473,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: "#F3F4F6",
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -501,7 +501,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 8,
     gap: 8,
     marginBottom: 16,
   },
@@ -528,7 +528,7 @@ export default StyleSheet.create({
 
   infoBox: {
     marginTop: 16,
-    borderRadius: 14,
+    borderRadius: 8,
     padding: 14,
     backgroundColor: "#FEF2F2",
     flexDirection: "row",
@@ -563,7 +563,7 @@ export default StyleSheet.create({
     width: "100%",
     maxWidth: 520,
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    borderRadius: 8,
     padding: 16,
     borderWidth: 1,
     borderColor: "#E6EDF7",
@@ -610,7 +610,7 @@ export default StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 999,
+    borderRadius: 8,
     backgroundColor: "#F4F7FB",
     borderWidth: 1,
     borderColor: "#E5EDF6",
@@ -641,7 +641,7 @@ export default StyleSheet.create({
 
   modalContent: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 28,
+    borderRadius: 8,
     padding: isSmallPhone ? 20 : 24,
     width: "100%",
     maxWidth: 420,
@@ -701,7 +701,7 @@ export default StyleSheet.create({
     height: isSmallPhone ? 56 : 64,
     borderWidth: 2,
     borderColor: "#E5E7EB",
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: isSmallPhone ? 24 : 28,
     fontWeight: "600",
@@ -730,7 +730,7 @@ export default StyleSheet.create({
   otpVerifyButton: {
     backgroundColor: "#0A3D91",
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 8,
     alignItems: "center",
     marginBottom: 12,
   },
@@ -743,7 +743,7 @@ export default StyleSheet.create({
 
   otpResendButton: {
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 8,
     alignItems: "center",
     backgroundColor: "#F3F7FB",
     borderWidth: 1,
@@ -759,7 +759,7 @@ export default StyleSheet.create({
   passwordRequirements: {
     backgroundColor: "#F8FBFE",
     padding: isSmallPhone ? 16 : 18,
-    borderRadius: 16,
+    borderRadius: 8,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: "#E5EAF3",
@@ -838,7 +838,7 @@ export default StyleSheet.create({
     backgroundColor: "#FEF2F2",
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     marginBottom: 4,
     borderWidth: 1,
     borderColor: "#FECACA",
@@ -847,7 +847,7 @@ export default StyleSheet.create({
   demoHelper: {
     backgroundColor: "#F0F9FF",
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#BAE6FD",

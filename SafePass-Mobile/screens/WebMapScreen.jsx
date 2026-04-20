@@ -196,7 +196,7 @@ export default function WebMapScreen({ navigation }) {
     return (
       <SafeAreaView style={MapStyles.loadingContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
-        <ActivityIndicator size="large" color="#1D4ED8" />
+        <ActivityIndicator size="large" color="#041E42" />
         <Text style={MapStyles.loadingText}>Opening Directions...</Text>
       </SafeAreaView>
     );
@@ -207,7 +207,7 @@ export default function WebMapScreen({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
 
       <LinearGradient
-        colors={["#0F172A", "#1E3A8A", "#0F766E"]}
+        colors={["#0F172A", "#1E3A8A", "#0A3D91"]}
         style={MapStyles.header}
       >
         <TouchableOpacity
@@ -237,12 +237,12 @@ export default function WebMapScreen({ navigation }) {
         contentContainerStyle={MapStyles.scrollContent}
       >
         <LinearGradient
-          colors={["#E0F2FE", "#ECFEFF", "#F8FAFC"]}
+          colors={["#E0F2FE", "#ECFEFF", "#F8FBFE"]}
           style={MapStyles.heroCard}
         >
           <View style={MapStyles.heroTopRow}>
             <View style={MapStyles.heroBadge}>
-              <Ionicons name="compass-outline" size={16} color="#0F766E" />
+              <Ionicons name="compass-outline" size={16} color="#0A3D91" />
               <Text style={MapStyles.heroBadgeText}>Wayfinding Assistant</Text>
             </View>
             <Text style={MapStyles.heroSupportText}>
@@ -317,7 +317,7 @@ export default function WebMapScreen({ navigation }) {
                 <Text style={MapStyles.sectionTitle}>Campus Guide Map</Text>
               </View>
               <View style={MapStyles.sectionChip}>
-                <Ionicons name="pin-outline" size={14} color="#0F766E" />
+                <Ionicons name="pin-outline" size={14} color="#0A3D91" />
                 <Text style={MapStyles.sectionChipText}>
                   {selectedLocation.name}
                 </Text>
@@ -370,7 +370,7 @@ export default function WebMapScreen({ navigation }) {
             </Text>
 
             <View style={MapStyles.routeNoticeCard}>
-              <Ionicons name="information-circle-outline" size={18} color="#0F766E" />
+              <Ionicons name="information-circle-outline" size={18} color="#0A3D91" />
               <Text style={MapStyles.routeNoticeText}>
                 {selectedLocation.arrivalNote}
               </Text>
@@ -434,7 +434,7 @@ export default function WebMapScreen({ navigation }) {
                   <Ionicons
                     name={location.icon}
                     size={22}
-                    color={isSelected ? "#FFFFFF" : "#1D4ED8"}
+                    color={isSelected ? "#FFFFFF" : "#041E42"}
                   />
                 </View>
 

@@ -307,11 +307,11 @@ const getStatusColor = (status) => {
     case "pending":
       return { bg: "#FEF3C7", text: "#D97706", label: "PENDING" };
     case "approved":
-      return { bg: "#D1FAE5", text: "#059669", label: "APPROVED" };
+      return { bg: "#EEF5FF", text: "#0A3D91", label: "APPROVED" };
     case "rejected":
       return { bg: "#FEE2E2", text: "#DC2626", label: "REJECTED" };
     case "checked_in":
-      return { bg: "#DBEAFE", text: "#2563EB", label: "CHECKED IN" };
+      return { bg: "#EEF5FF", text: "#0A3D91", label: "CHECKED IN" };
     case "checked_out":
       return { bg: "#E5E7EB", text: "#6B7280", label: "CHECKED OUT" };
     default:
@@ -328,7 +328,7 @@ const getRoleColor = (role) => {
     case "guard":
       return "#E67E22";
     case "security":
-      return "#8B5CF6";
+      return "#1C6DD0";
     case "visitor":
       return "#2ECC71";
     default:
@@ -428,7 +428,7 @@ const AdminSectionShell = ({
               <Text
                 style={[
                   styles.adminSectionShellBadgeText,
-                  { color: isDarkMode ? "#BFDBFE" : "#1D4ED8" },
+                  { color: isDarkMode ? "#B7D5F6" : "#041E42" },
                 ]}
               >
                 {badge}
@@ -453,10 +453,10 @@ const AdminFeedbackBanner = ({ notice, isDarkMode, theme, onDismiss }) => {
 
   const palette =
     notice.type === "success"
-      ? { background: isDarkMode ? "#052E16" : "#ECFDF5", border: "#86EFAC", icon: "#16A34A" }
+      ? { background: isDarkMode ? "#052E16" : "#EEF5FF", border: "#86EFAC", icon: "#16A34A" }
       : notice.type === "error"
         ? { background: isDarkMode ? "#450A0A" : "#FEF2F2", border: "#FECACA", icon: "#DC2626" }
-        : { background: isDarkMode ? "#082F49" : "#EFF6FF", border: "#BFDBFE", icon: "#2563EB" };
+        : { background: isDarkMode ? "#082F49" : "#EFF6FF", border: "#B7D5F6", icon: "#0A3D91" };
 
   return (
     <View
@@ -1168,7 +1168,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         eyebrow: "Operations Access",
         description: "Manage guards and security personnel who verify arrivals, monitor visits, and handle gate operations.",
         icon: "shield-checkmark-outline",
-        accent: "#8B5CF6",
+        accent: "#1C6DD0",
         primaryActionLabel: "Create Security",
         searchPlaceholder: "Search security personnel by name, email, or phone...",
         stats: [
@@ -1190,7 +1190,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       eyebrow: "Account Control Center",
       description: "Monitor every account in one place, move between roles quickly, and keep only the right users active in the system.",
       icon: "people-circle-outline",
-      accent: "#3B82F6",
+      accent: "#1C6DD0",
       primaryActionLabel: null,
       searchPlaceholder: "Search all users by name, email, phone, or department...",
       stats: [
@@ -1447,7 +1447,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           subtitle: "Create staff, security, and admin accounts from a cleaner modular control center.",
           highlights: [
             { label: "Staff", value: staffUsers.length, icon: "briefcase-outline", color: "#10B981" },
-            { label: "Security", value: guardUsers.length, icon: "shield-checkmark-outline", color: "#8B5CF6" },
+            { label: "Security", value: guardUsers.length, icon: "shield-checkmark-outline", color: "#1C6DD0" },
           ],
         };
       case "account-records":
@@ -1455,7 +1455,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Account Records",
           subtitle: "Browse accounts by role, review status, and keep your directory organized from one workspace.",
           highlights: [
-            { label: "Mode", value: accountRecordsMode === "all" ? "All Users" : formatRoleLabel(accountRecordsMode), icon: "funnel-outline", color: "#2563EB" },
+            { label: "Mode", value: accountRecordsMode === "all" ? "All Users" : formatRoleLabel(accountRecordsMode), icon: "funnel-outline", color: "#0A3D91" },
             { label: "Visible", value: totalFilteredUsers, icon: "people-outline", color: "#10B981" },
           ],
         };
@@ -1464,7 +1464,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "User Data Management",
           subtitle: "Select an account, review its details, and edit the user data that drives role-based access.",
           highlights: [
-            { label: "Users", value: allUsers.length, icon: "people-outline", color: "#3B82F6" },
+            { label: "Users", value: allUsers.length, icon: "people-outline", color: "#1C6DD0" },
             { label: "Active", value: allUsers.filter((userItem) => isUserActive(userItem)).length, icon: "checkmark-circle-outline", color: "#10B981" },
           ],
         };
@@ -1477,7 +1477,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           subtitle: "Review the active map layer for this floor and manage the room registry directly beside it.",
           highlights: [
             { label: "Rooms", value: selectedFloorRooms.length, icon: "business-outline", color: "#10B981" },
-            { label: "Active", value: stats.activeVisitors || stats.checkedInVisitors || 0, icon: "locate-outline", color: "#2563EB" },
+            { label: "Active", value: stats.activeVisitors || stats.checkedInVisitors || 0, icon: "locate-outline", color: "#0A3D91" },
           ],
         };
       case "appointment-records":
@@ -1503,7 +1503,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Report Records",
           subtitle: "Review generated report-ready activity summaries, visitor history, and approval outcomes.",
           highlights: [
-            { label: "History", value: visitorHistory.length, icon: "document-text-outline", color: "#2563EB" },
+            { label: "History", value: visitorHistory.length, icon: "document-text-outline", color: "#0A3D91" },
             { label: "Completed", value: stats.completedVisits, icon: "checkmark-done-outline", color: "#10B981" },
           ],
         };
@@ -1513,7 +1513,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           subtitle: "Control dashboard preferences and communication settings for the admin experience.",
           highlights: [
             { label: "Dark Mode", value: settings.darkMode ? "On" : "Off", icon: "moon-outline", color: "#6B7280" },
-            { label: "Email", value: settings.emailNotifications ? "On" : "Off", icon: "mail-outline", color: "#2563EB" },
+            { label: "Email", value: settings.emailNotifications ? "On" : "Off", icon: "mail-outline", color: "#0A3D91" },
           ],
         };
       default:
@@ -1555,7 +1555,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         key: "account-management",
         label: "Account Management",
         icon: "people-circle-outline",
-        color: "#2563EB",
+        color: "#0A3D91",
         submodules: [
           { key: "account-create", label: "Creation of Account", badge: 3 },
           { key: "account-records", label: "Account Records", badge: allUsers.length },
@@ -1588,7 +1588,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         key: "reports",
         label: "Reports",
         icon: "document-text-outline",
-        color: "#8B5CF6",
+        color: "#1C6DD0",
         submodules: [{ key: "report-records", label: "Report Records", badge: visitorHistory.length }],
       },
     ],
@@ -2067,15 +2067,15 @@ const loadDashboardData = useCallback(async () => {
       };
     }
     return {
-      backgroundColor: "#F8FAFC",
+      backgroundColor: "#F8FBFE",
       cardBackground: "#FFFFFF",
       textPrimary: "#1E293B",
       textSecondary: "#64748B",
       borderColor: "#E2E8F0",
       headerBackground: "#FFFFFF",
       sidebarBackground: "#1E3A5F",
-      inputBackground: "#F8FAFC",
-      successBg: "#D1FAE5",
+      inputBackground: "#F8FBFE",
+      successBg: "#EEF5FF",
       warningBg: "#FEF3C7",
       errorBg: "#FEE2E2",
       infoBg: "#EFF6FF",
@@ -2190,22 +2190,22 @@ const loadDashboardData = useCallback(async () => {
           subtitle: "Manage staff accounts, assignments, and who can respond to incoming appointments.",
           highlights: [
             { label: "Staff", value: staffUsers.length, icon: "briefcase-outline", color: "#10B981" },
-            { label: "Departments", value: new Set(staffUsers.map((item) => item.department).filter(Boolean)).size, icon: "business-outline", color: "#0EA5E9" },
+            { label: "Departments", value: new Set(staffUsers.map((item) => item.department).filter(Boolean)).size, icon: "business-outline", color: "#1C6DD0" },
           ],
         };
       case "security":
         return {
           subtitle: "Keep your gate team ready, track active personnel, and support visitor check-ins in real time.",
           highlights: [
-            { label: "Security", value: guardUsers.length, icon: "shield-outline", color: "#8B5CF6" },
-            { label: "Active", value: guardUsers.filter((item) => isUserActive(item)).length, icon: "pulse-outline", color: "#2563EB" },
+            { label: "Security", value: guardUsers.length, icon: "shield-outline", color: "#1C6DD0" },
+            { label: "Active", value: guardUsers.filter((item) => isUserActive(item)).length, icon: "pulse-outline", color: "#0A3D91" },
           ],
         };
       case "users":
         return {
           subtitle: "Monitor the full account directory and move between roles without losing control of the admin workflow.",
           highlights: [
-            { label: "Users", value: allUsers.length, icon: "people-outline", color: "#3B82F6" },
+            { label: "Users", value: allUsers.length, icon: "people-outline", color: "#1C6DD0" },
             { label: "Active", value: activeUsersList.length, icon: "checkmark-done-outline", color: "#10B981" },
           ],
         };
@@ -2214,7 +2214,7 @@ const loadDashboardData = useCallback(async () => {
           subtitle: "Track daily trends, visitor outcomes, and operational patterns across the system.",
           highlights: [
             { label: "Today", value: stats.todayVisits, icon: "calendar-outline", color: "#EF4444" },
-            { label: "Tomorrow", value: stats.tomorrowVisits, icon: "calendar-clear-outline", color: "#14B8A6" },
+            { label: "Tomorrow", value: stats.tomorrowVisits, icon: "calendar-clear-outline", color: "#1C6DD0" },
           ],
         };
       case "settings":
@@ -2222,7 +2222,7 @@ const loadDashboardData = useCallback(async () => {
           subtitle: "Control dashboard preferences and communication settings for the admin experience.",
           highlights: [
             { label: "Dark Mode", value: settings.darkMode ? "On" : "Off", icon: "moon-outline", color: "#6B7280" },
-            { label: "Email", value: settings.emailNotifications ? "On" : "Off", icon: "mail-outline", color: "#2563EB" },
+            { label: "Email", value: settings.emailNotifications ? "On" : "Off", icon: "mail-outline", color: "#0A3D91" },
           ],
         };
       default:
@@ -2273,7 +2273,7 @@ const loadDashboardData = useCallback(async () => {
       title: "Security Team",
       subtitle: "Check the operational team covering arrivals.",
       icon: "shield-checkmark-outline",
-      color: "#8B5CF6",
+      color: "#1C6DD0",
       badge: `${guardUsers.length || 0} security`,
       action: "security",
     },
@@ -2282,7 +2282,7 @@ const loadDashboardData = useCallback(async () => {
       title: "All Users",
       subtitle: "Audit account access across every role.",
       icon: "people-circle-outline",
-      color: "#3B82F6",
+      color: "#1C6DD0",
       badge: `${allUsers.length || 0} total`,
       action: "users",
     },
@@ -2300,7 +2300,7 @@ const loadDashboardData = useCallback(async () => {
       title: "Campus Map",
       subtitle: "Open live monitoring on the campus map view.",
       icon: "map-outline",
-      color: "#14B8A6",
+      color: "#1C6DD0",
       badge: `${monitoredMapVisitors.length || 0} live`,
       action: "webmap",
     },
@@ -2339,7 +2339,7 @@ const loadDashboardData = useCallback(async () => {
 
   const adminMapSummaryItems = useMemo(() => ([
     { label: "Tracked", value: visibleAdminMapVisitors.length || 0, color: "#10B981" },
-    { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: "#2563EB" },
+    { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: "#0A3D91" },
     { label: "Issues", value: adminMapFilters.find((item) => item.key === "issues")?.count || 0, color: "#DC2626" },
   ]), [adminMapFilters, visibleAdminMapVisitors.length]);
 
@@ -3596,7 +3596,7 @@ const loadDashboardData = useCallback(async () => {
               style={[
                 styles.adminTableRow,
                 {
-                  backgroundColor: isDarkMode ? (index % 2 === 0 ? "#111827" : "#0F172A") : index % 2 === 0 ? "#FFFFFF" : "#F8FAFC",
+                  backgroundColor: isDarkMode ? (index % 2 === 0 ? "#111827" : "#0F172A") : index % 2 === 0 ? "#FFFFFF" : "#F8FBFE",
                   borderColor: theme.borderColor,
                 },
               ]}
@@ -3627,7 +3627,7 @@ const loadDashboardData = useCallback(async () => {
     onApply,
     onClear,
     placeholder,
-    accent = "#3B82F6",
+    accent = "#1C6DD0",
   }) => (
     <View style={[styles.recordsToolPanel, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
       <View style={styles.recordsToolHeader}>
@@ -3673,7 +3673,7 @@ const loadDashboardData = useCallback(async () => {
     groups = null,
     activeValue,
     onSelect,
-    accent = "#3B82F6",
+    accent = "#1C6DD0",
     onReset,
   }) => (
     <View style={[styles.recordsToolPanel, styles.recordsFilterPanel, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
@@ -3731,7 +3731,7 @@ const loadDashboardData = useCallback(async () => {
 
   const renderBarChart = (labels, data) => {
     const max = Math.max(...(data || [0]), 1);
-    const chartColors = ["#3B82F6", "#8B5CF6", "#0EA5E9", "#14B8A6", "#F59E0B", "#EF4444"];
+    const chartColors = ["#1C6DD0", "#1C6DD0", "#1C6DD0", "#1C6DD0", "#F59E0B", "#EF4444"];
     return (
       <View style={styles.analyticsBarChart}>
         {(labels || []).map((label, index) => {
@@ -3817,7 +3817,7 @@ const loadDashboardData = useCallback(async () => {
       style={[
         styles.adminMapFilters,
         {
-          backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+          backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
           borderColor: theme.borderColor,
         },
       ]}
@@ -3893,7 +3893,7 @@ const loadDashboardData = useCallback(async () => {
           { label: "Approvals", color: "#10B981" },
           { label: "Requests", color: "#F59E0B" },
           { label: "Issues", color: "#DC2626" },
-          { label: "Movement", color: "#2563EB" },
+          { label: "Movement", color: "#0A3D91" },
         ].map((item) => (
           <View key={item.label} style={styles.adminMapLegendItem}>
             <View style={[styles.adminMapLegendDot, { backgroundColor: item.color }]} />
@@ -3982,7 +3982,7 @@ const loadDashboardData = useCallback(async () => {
           }}
           onVisitorSelect={(item) => setSelectedMapActivity(item)}
           hoveredVisitor={activeMapActivity}
-          backgroundColor={isDarkMode ? "#0F172A" : "#F8FAFC"}
+          backgroundColor={isDarkMode ? "#0F172A" : "#F8FBFE"}
           borderColor={theme.borderColor}
           mapBackgroundColor={isDarkMode ? "#111827" : "#FFFFFF"}
           textPrimary={theme.textPrimary}
@@ -3992,10 +3992,10 @@ const loadDashboardData = useCallback(async () => {
           showFloorNavigation={false}
         />
 
-        <View style={[styles.adminMapSideCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+        <View style={[styles.adminMapSideCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
-              <Ionicons name="flash-outline" size={18} color="#3B82F6" />
+              <Ionicons name="flash-outline" size={18} color="#1C6DD0" />
               <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>Focus Activity</Text>
             </View>
           </View>
@@ -4013,7 +4013,7 @@ const loadDashboardData = useCallback(async () => {
               <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: "800", marginBottom: 4 }}>
                 {activeMapActivity.name}
               </Text>
-              <Text style={{ color: "#3B82F6", fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
+              <Text style={{ color: "#1C6DD0", fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
                 {activeMapActivity.eventLabel}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
@@ -4102,7 +4102,7 @@ const loadDashboardData = useCallback(async () => {
         <View style={[styles.adminMapSideCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
-              <Ionicons name="radio-outline" size={20} color="#3B82F6" />
+              <Ionicons name="radio-outline" size={20} color="#1C6DD0" />
               <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Activity Monitor</Text>
             </View>
             <TouchableOpacity onPress={loadRecentActivities}>
@@ -4116,7 +4116,7 @@ const loadDashboardData = useCallback(async () => {
             {[
               { label: "Requests", value: adminMapFilters.find((item) => item.key === "requests")?.count || 0, color: "#F59E0B" },
               { label: "Approvals", value: adminMapFilters.find((item) => item.key === "approvals")?.count || 0, color: "#10B981" },
-              { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: "#2563EB" },
+              { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: "#0A3D91" },
               { label: "Issues", value: adminMapFilters.find((item) => item.key === "issues")?.count || 0, color: "#DC2626" },
             ].map((item) => (
               <View
@@ -4124,7 +4124,7 @@ const loadDashboardData = useCallback(async () => {
                 style={[
                   styles.adminMapSummaryCard,
                   {
-                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                     borderColor: theme.borderColor,
                   },
                 ]}
@@ -4140,7 +4140,7 @@ const loadDashboardData = useCallback(async () => {
               style={[
                 styles.adminMapFocusCard,
                 {
-                  backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                  backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                   borderColor: theme.borderColor,
                 },
               ]}
@@ -4148,7 +4148,7 @@ const loadDashboardData = useCallback(async () => {
               <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: "800", marginBottom: 4 }}>
                 {activeMapActivity.name}
               </Text>
-              <Text style={{ color: "#3B82F6", fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
+              <Text style={{ color: "#1C6DD0", fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
                 {activeMapActivity.eventLabel}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
@@ -4208,7 +4208,7 @@ const loadDashboardData = useCallback(async () => {
           <View style={styles.pageHeader}>
             <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Dashboard Overview</Text>
             <TouchableOpacity style={styles.pageRefreshButton} onPress={loadDashboardData}>
-              <Ionicons name="refresh-outline" size={22} color="#3B82F6" />
+              <Ionicons name="refresh-outline" size={22} color="#1C6DD0" />
           </TouchableOpacity>
         </View>
 
@@ -4461,7 +4461,7 @@ const loadDashboardData = useCallback(async () => {
 
   const renderAccountCreationContent = () => {
     const isCreatingSecurity = isSecurityRole(newUserData.role);
-    const creationRoleColor = isCreatingSecurity ? "#8B5CF6" : "#10B981";
+    const creationRoleColor = isCreatingSecurity ? "#1C6DD0" : "#10B981";
     const creationRoleIcon = isCreatingSecurity ? "shield-checkmark-outline" : "briefcase-outline";
     const creationRoleLabel = isCreatingSecurity ? "Security" : "Staff";
     const creationRoleInitials = isCreatingSecurity ? "SE" : "ST";
@@ -4480,7 +4480,7 @@ const loadDashboardData = useCallback(async () => {
             style={[
               styles.modularInfoPanel,
               {
-                backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                 borderColor: theme.borderColor,
                 marginBottom: 16,
               },
@@ -4523,16 +4523,16 @@ const loadDashboardData = useCallback(async () => {
                   styles.managementQuickStatCard,
                   {
                     backgroundColor: isDarkMode ? "#111827" : "#FFFFFF",
-                    borderColor: isCreatingSecurity ? "#8B5CF6" : theme.borderColor,
+                    borderColor: isCreatingSecurity ? "#1C6DD0" : theme.borderColor,
                     flex: 1,
                   },
                 ]}
                 onPress={() => resetCreateUserForm("security")}
               >
                 <View style={[styles.managementQuickStatIcon, { backgroundColor: "rgba(139,92,246,0.14)" }]}>
-                  <Ionicons name="shield-checkmark-outline" size={18} color="#8B5CF6" />
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#1C6DD0" />
                 </View>
-                <Text style={[styles.managementQuickStatValue, { color: "#8B5CF6" }]}>Create Security</Text>
+                <Text style={[styles.managementQuickStatValue, { color: "#1C6DD0" }]}>Create Security</Text>
                 <Text style={[styles.managementQuickStatLabel, isDarkMode && styles.darkTextSecondary]}>
                   Security Account
                 </Text>
@@ -4861,7 +4861,7 @@ const loadDashboardData = useCallback(async () => {
                 style={[
                   styles.modularInfoPanel,
                   {
-                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                     borderColor: theme.borderColor,
                   },
                 ]}
@@ -4893,7 +4893,7 @@ const loadDashboardData = useCallback(async () => {
                 style={[
                   styles.modularInfoPanel,
                   {
-                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                     borderColor: theme.borderColor,
                   },
                 ]}
@@ -4903,12 +4903,12 @@ const loadDashboardData = useCallback(async () => {
                 </Text>
                 <View style={styles.modularInfoStats}>
                   {(isCreatingSecurity ? [
-                    { label: "Security", value: guardUsers.length, color: "#8B5CF6" },
-                    { label: "Active", value: guardUsers.filter((item) => isUserActive(item)).length, color: "#2563EB" },
+                    { label: "Security", value: guardUsers.length, color: "#1C6DD0" },
+                    { label: "Active", value: guardUsers.filter((item) => isUserActive(item)).length, color: "#0A3D91" },
                     { label: "Inactive", value: guardUsers.filter((item) => !isUserActive(item)).length, color: "#EF4444" },
                   ] : [
                     { label: "Staff", value: staffUsers.length, color: "#10B981" },
-                    { label: "Active", value: staffUsers.filter((item) => isUserActive(item)).length, color: "#2563EB" },
+                    { label: "Active", value: staffUsers.filter((item) => isUserActive(item)).length, color: "#0A3D91" },
                     { label: "Inactive", value: staffUsers.filter((item) => !isUserActive(item)).length, color: "#EF4444" },
                   ]).map((item) => (
                     <View
@@ -5013,7 +5013,7 @@ const loadDashboardData = useCallback(async () => {
               style={[styles.dataManagementGhostButton, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}
               onPress={() => setUserDataPanelMode(null)}
             >
-              <Ionicons name="close-outline" size={16} color="#2563EB" />
+              <Ionicons name="close-outline" size={16} color="#0A3D91" />
               <Text style={styles.dataManagementGhostButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -5024,7 +5024,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>First Name</Text>
               <TextInput
-                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
                 value={editUserData.firstName}
                 onChangeText={(text) => setEditUserData({ ...editUserData, firstName: text })}
                 placeholder="First name"
@@ -5034,7 +5034,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Last Name</Text>
               <TextInput
-                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
                 value={editUserData.lastName}
                 onChangeText={(text) => setEditUserData({ ...editUserData, lastName: text })}
                 placeholder="Last name"
@@ -5044,7 +5044,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Username</Text>
               <TextInput
-                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
                 value={editUserData.username}
                 onChangeText={(text) => setEditUserData({ ...editUserData, username: normalizeUsernameInput(text) })}
                 placeholder="Username"
@@ -5055,7 +5055,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Email</Text>
               <TextInput
-                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
                 value={editUserData.email}
                 onChangeText={(text) => setEditUserData({ ...editUserData, email: text })}
                 placeholder="Email"
@@ -5067,7 +5067,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Phone</Text>
               <TextInput
-                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
                 value={editUserData.phone}
                 onChangeText={(text) => setEditUserData({ ...editUserData, phone: text })}
                 placeholder="09123456789"
@@ -5079,7 +5079,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Employee ID</Text>
               <TextInput
-                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
                 value={editUserData.employeeId}
                 onChangeText={(text) => setEditUserData({ ...editUserData, employeeId: text })}
                 placeholder="Staff / Security ID"
@@ -5089,7 +5089,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Department</Text>
               <TextInput
-                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
                 value={editUserData.department}
                 onChangeText={(text) => setEditUserData({ ...editUserData, department: text })}
                 placeholder="Department"
@@ -5099,7 +5099,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Position</Text>
               <TextInput
-                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FAFC" }]}
+                style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
                 value={editUserData.position}
                 onChangeText={(text) => setEditUserData({ ...editUserData, position: text })}
                 placeholder="Position"
@@ -5149,7 +5149,7 @@ const loadDashboardData = useCallback(async () => {
                 style={[styles.dataManagementGhostButton, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}
                 onPress={() => selectedUser && handleViewUser(selectedUser)}
               >
-                <Ionicons name="arrow-back-outline" size={15} color="#2563EB" />
+                <Ionicons name="arrow-back-outline" size={15} color="#0A3D91" />
                 <Text style={styles.dataManagementGhostButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -5168,7 +5168,7 @@ const loadDashboardData = useCallback(async () => {
           <View style={styles.userDataInfoGrid}>
             {infoItems.map((item) => (
               <View key={item.label} style={[styles.userDataInfoCard, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
-                <Ionicons name={item.icon} size={16} color="#2563EB" />
+                <Ionicons name={item.icon} size={16} color="#0A3D91" />
                 <View style={styles.userDataInfoCopy}>
                   <Text style={styles.userProfileInfoLabel}>{item.label}</Text>
                   <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
@@ -5198,7 +5198,7 @@ const loadDashboardData = useCallback(async () => {
           theme={theme}
           actions={
             <TouchableOpacity style={styles.pageRefreshButton} onPress={loadAllUsers}>
-              <Ionicons name="refresh-outline" size={22} color="#2563EB" />
+              <Ionicons name="refresh-outline" size={22} color="#0A3D91" />
             </TouchableOpacity>
           }
         >
@@ -5221,7 +5221,7 @@ const loadDashboardData = useCallback(async () => {
 
             <View style={styles.dataManagementToolbar}>
               <View style={[styles.dataManagementSearchBox, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
-                <Ionicons name="search-outline" size={17} color="#2563EB" />
+                <Ionicons name="search-outline" size={17} color="#0A3D91" />
                 <TextInput
                   style={[styles.dataManagementSearchInput, isDarkMode && styles.darkText]}
                   placeholder="Search name, email, username, phone, staff ID..."
@@ -5266,7 +5266,7 @@ const loadDashboardData = useCallback(async () => {
                   setDataManagementPage(1);
                 }}
               >
-                <Ionicons name="refresh-outline" size={15} color="#2563EB" />
+                <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
                 <Text style={styles.dataManagementGhostButtonText}>Reset</Text>
               </TouchableOpacity>
             </View>
@@ -5290,7 +5290,7 @@ const loadDashboardData = useCallback(async () => {
                           setDataManagementPage(1);
                         }}
                       >
-                        <Ionicons name={filterItem.icon} size={13} color={isActive ? "#FFFFFF" : "#2563EB"} />
+                        <Ionicons name={filterItem.icon} size={13} color={isActive ? "#FFFFFF" : "#0A3D91"} />
                         <Text style={[styles.dataManagementChipText, isActive && styles.dataManagementChipTextActive]}>
                           {filterItem.label} ({filterItem.count})
                         </Text>
@@ -5317,7 +5317,7 @@ const loadDashboardData = useCallback(async () => {
                           setDataManagementPage(1);
                         }}
                       >
-                        <Ionicons name={filterItem.icon} size={13} color={isActive ? "#FFFFFF" : "#2563EB"} />
+                        <Ionicons name={filterItem.icon} size={13} color={isActive ? "#FFFFFF" : "#0A3D91"} />
                         <Text style={[styles.dataManagementChipText, isActive && styles.dataManagementChipTextActive]}>
                           {filterItem.label} ({filterItem.count})
                         </Text>
@@ -5438,7 +5438,7 @@ const loadDashboardData = useCallback(async () => {
                         style={[styles.adminTableActionButton, { borderColor: "rgba(59,130,246,0.24)", backgroundColor: "rgba(59,130,246,0.12)" }]}
                         onPress={() => handleViewUser(userItem)}
                       >
-                        <Text style={[styles.adminTableActionText, { color: "#2563EB" }]}>View</Text>
+                        <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>View</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.adminTableActionButton, { borderColor: "rgba(16,185,129,0.24)", backgroundColor: "rgba(16,185,129,0.12)" }]}
@@ -5650,7 +5650,7 @@ const loadDashboardData = useCallback(async () => {
                           style={[styles.adminTableActionButton, { borderColor: "rgba(37,99,235,0.24)", backgroundColor: "rgba(37,99,235,0.12)" }]}
                           onPress={() => handleEditField(field)}
                         >
-                          <Text style={[styles.adminTableActionText, { color: "#2563EB" }]}>Edit</Text>
+                          <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>Edit</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[styles.adminTableActionButton, { borderColor: "rgba(239,68,68,0.22)", backgroundColor: "rgba(239,68,68,0.12)" }]}
@@ -5707,7 +5707,7 @@ const loadDashboardData = useCallback(async () => {
                     style={[
                       styles.modularListCard,
                       {
-                        backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                        backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                         borderColor: theme.borderColor,
                       },
                     ]}
@@ -5721,7 +5721,7 @@ const loadDashboardData = useCallback(async () => {
                       </View>
                       <View style={styles.modularInlineActions}>
                         <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleEditField(field)}>
-                          <Ionicons name="create-outline" size={16} color="#2563EB" />
+                          <Ionicons name="create-outline" size={16} color="#0A3D91" />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleDeleteField(field)}>
                           <Ionicons name="trash-outline" size={16} color="#EF4444" />
@@ -5859,7 +5859,7 @@ const loadDashboardData = useCallback(async () => {
                       style={[
                         styles.modularListCard,
                         {
-                          backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                          backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                           borderColor: theme.borderColor,
                         },
                       ]}
@@ -5873,7 +5873,7 @@ const loadDashboardData = useCallback(async () => {
                         </View>
                         <View style={styles.modularInlineActions}>
                           <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleEditRoom(room)}>
-                            <Ionicons name="create-outline" size={16} color="#2563EB" />
+                            <Ionicons name="create-outline" size={16} color="#0A3D91" />
                           </TouchableOpacity>
                           <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleDeleteRoom(room)}>
                             <Ionicons name="trash-outline" size={16} color="#EF4444" />
@@ -5887,7 +5887,7 @@ const loadDashboardData = useCallback(async () => {
                     style={[
                       styles.modularEmptyState,
                       {
-                        backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC",
+                        backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                         borderColor: theme.borderColor,
                       },
                     ]}
@@ -6182,7 +6182,7 @@ const loadDashboardData = useCallback(async () => {
                         setShowRequestDetailsModal(true);
                       }}
                     >
-                      <Text style={[styles.adminTableActionText, { color: "#2563EB" }]}>View</Text>
+                      <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>View</Text>
                     </TouchableOpacity>
                     {getRequestStatus(request) === "pending" ? (
                       <>
@@ -6232,17 +6232,17 @@ const loadDashboardData = useCallback(async () => {
           actions={
             <View style={styles.adminSectionShellActions}>
               <TouchableOpacity style={styles.pageRefreshButton} onPress={loadVisitorHistory}>
-                <Ionicons name="refresh-outline" size={22} color="#8B5CF6" />
+                <Ionicons name="refresh-outline" size={22} color="#1C6DD0" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.pageRefreshButton} onPress={handlePrintReports}>
-                <Ionicons name="print-outline" size={20} color="#8B5CF6" />
+                <Ionicons name="print-outline" size={20} color="#1C6DD0" />
               </TouchableOpacity>
             </View>
           }
         >
             <View style={styles.modularCardGrid}>
               {[
-                { label: "Total History", value: historyStats.totalVisits, color: "#2563EB" },
+                { label: "Total History", value: historyStats.totalVisits, color: "#0A3D91" },
                 { label: "Completed", value: historyStats.completedVisits, color: "#10B981" },
                 { label: "Pending", value: historyStats.pendingVisits, color: "#F59E0B" },
                 { label: "Rejected", value: historyStats.rejectedVisits, color: "#EF4444" },
@@ -6379,7 +6379,7 @@ const loadDashboardData = useCallback(async () => {
         icon: "layers-outline",
         label: "Total Requests",
         value: totalRequests,
-        accent: "#3B82F6",
+        accent: "#1C6DD0",
         helper: "All recorded visitor requests",
       },
       {
@@ -6403,7 +6403,7 @@ const loadDashboardData = useCallback(async () => {
         icon: "time-outline",
         label: "Upcoming",
         value: stats.upcomingVisits || 0,
-        accent: "#8B5CF6",
+        accent: "#1C6DD0",
         helper: "Approved future visits",
       },
     ];
@@ -6436,7 +6436,7 @@ const loadDashboardData = useCallback(async () => {
               onPress={onRefresh}
               activeOpacity={0.8}
             >
-              <Ionicons name="refresh-outline" size={16} color="#3B82F6" />
+              <Ionicons name="refresh-outline" size={16} color="#1C6DD0" />
               <Text style={styles.analyticsActionButtonText}>Refresh</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -6444,7 +6444,7 @@ const loadDashboardData = useCallback(async () => {
               onPress={() => setShowDatePicker(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="calendar-outline" size={16} color="#8B5CF6" />
+              <Ionicons name="calendar-outline" size={16} color="#1C6DD0" />
               <Text style={styles.analyticsActionButtonText}>Pick Date</Text>
             </TouchableOpacity>
           </View>
@@ -6458,7 +6458,7 @@ const loadDashboardData = useCallback(async () => {
           ]}
         >
           <View style={styles.analyticsHeroContent}>
-            <View style={[styles.analyticsHeroBadge, { backgroundColor: isDarkMode ? "#312E81" : "#EEF2FF" }]}>
+            <View style={[styles.analyticsHeroBadge, { backgroundColor: isDarkMode ? "#041E42" : "#EEF5FF" }]}>
               <Ionicons name="pulse-outline" size={14} color="#6366F1" />
               <Text style={styles.analyticsHeroBadgeText}>Operational Snapshot</Text>
             </View>
@@ -6472,26 +6472,26 @@ const loadDashboardData = useCallback(async () => {
               {stats.upcomingVisits === 1 ? "" : "s"} still upcoming.
             </Text>
             <View style={styles.analyticsHeroInsightRow}>
-              <View style={[styles.analyticsHeroInsightCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+              <View style={[styles.analyticsHeroInsightCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                 <Text style={[styles.analyticsHeroInsightLabel, { color: theme.textSecondary }]}>Selected Date</Text>
                 <Text style={[styles.analyticsHeroInsightValue, { color: theme.textPrimary }]}>{selectedDateLabel}</Text>
               </View>
-              <View style={[styles.analyticsHeroInsightCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+              <View style={[styles.analyticsHeroInsightCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                 <Text style={[styles.analyticsHeroInsightLabel, { color: theme.textSecondary }]}>Busiest Window</Text>
                 <Text style={[styles.analyticsHeroInsightValue, { color: theme.textPrimary }]}>{chartPeakLabel || "N/A"}</Text>
               </View>
-              <View style={[styles.analyticsHeroInsightCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+              <View style={[styles.analyticsHeroInsightCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                 <Text style={[styles.analyticsHeroInsightLabel, { color: theme.textSecondary }]}>Active Visits</Text>
                 <Text style={[styles.analyticsHeroInsightValue, { color: theme.textPrimary }]}>{historyStats.checkedIn}</Text>
               </View>
             </View>
           </View>
           <View style={[styles.analyticsHeroStats, width < 960 && { width: "100%", flexDirection: "row" }]}>
-            <View style={[styles.analyticsHeroStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+            <View style={[styles.analyticsHeroStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
               <Text style={[styles.analyticsHeroStatValue, { color: theme.textPrimary }]}>{historyStats.uniqueEmails}</Text>
               <Text style={[styles.analyticsHeroStatLabel, { color: theme.textSecondary }]}>Unique Visitors</Text>
             </View>
-            <View style={[styles.analyticsHeroStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+            <View style={[styles.analyticsHeroStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
               <Text style={[styles.analyticsHeroStatValue, { color: theme.textPrimary }]}>{stats.weeklyGrowth || 0}%</Text>
               <Text style={[styles.analyticsHeroStatLabel, { color: theme.textSecondary }]}>7d Activity</Text>
             </View>
@@ -6550,12 +6550,12 @@ const loadDashboardData = useCallback(async () => {
                 </View>
               </View>
 
-              <View style={[styles.analyticsChartCallout, { backgroundColor: isDarkMode ? "#172554" : "#EFF6FF", borderColor: isDarkMode ? "#1D4ED8" : "#BFDBFE" }]}>
+              <View style={[styles.analyticsChartCallout, { backgroundColor: isDarkMode ? "#172554" : "#EFF6FF", borderColor: isDarkMode ? "#041E42" : "#B7D5F6" }]}>
                 <View style={styles.analyticsChartCalloutCopy}>
-                  <Text style={[styles.analyticsChartCalloutTitle, { color: isDarkMode ? "#DBEAFE" : "#1D4ED8" }]}>
+                  <Text style={[styles.analyticsChartCalloutTitle, { color: isDarkMode ? "#EEF5FF" : "#041E42" }]}>
                     {activeDatasetLabel} trend insight
                   </Text>
-                  <Text style={[styles.analyticsChartCalloutText, { color: isDarkMode ? "#BFDBFE" : "#1E40AF" }]}>
+                  <Text style={[styles.analyticsChartCalloutText, { color: isDarkMode ? "#B7D5F6" : "#1E40AF" }]}>
                     {chartInsightText}
                   </Text>
                 </View>
@@ -6563,7 +6563,7 @@ const loadDashboardData = useCallback(async () => {
                   {distributionItems.map((item) => (
                     <View key={item.key} style={styles.analyticsMiniLegendItem}>
                       <View style={[styles.analyticsMiniLegendDot, { backgroundColor: item.color }]} />
-                      <Text style={[styles.analyticsMiniLegendText, { color: isDarkMode ? "#DBEAFE" : "#1E3A8A" }]}>
+                      <Text style={[styles.analyticsMiniLegendText, { color: isDarkMode ? "#EEF5FF" : "#1E3A8A" }]}>
                         {item.label}
                       </Text>
                     </View>
@@ -6572,21 +6572,21 @@ const loadDashboardData = useCallback(async () => {
               </View>
 
               <View style={styles.analyticsQuickStatsRow}>
-                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                   <Text style={[styles.analyticsQuickStatValue, { color: theme.textPrimary }]}>{chartTotal}</Text>
                   <Text style={[styles.analyticsQuickStatLabel, { color: theme.textSecondary }]}>Total Volume</Text>
                 </View>
-                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                   <Text style={[styles.analyticsQuickStatValue, { color: theme.textPrimary }]}>{chartPeakLabel || "N/A"}</Text>
                   <Text style={[styles.analyticsQuickStatLabel, { color: theme.textSecondary }]}>Busiest Period</Text>
                 </View>
-                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                <View style={[styles.analyticsQuickStat, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                   <Text style={[styles.analyticsQuickStatValue, { color: theme.textPrimary }]}>{chartAverage}</Text>
                   <Text style={[styles.analyticsQuickStatLabel, { color: theme.textSecondary }]}>Average</Text>
                 </View>
               </View>
 
-              <View style={[styles.analyticsChartSurface, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+              <View style={[styles.analyticsChartSurface, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                 {renderBarChart(chart.labels, chart.data)}
               </View>
             </View>
@@ -6600,23 +6600,23 @@ const loadDashboardData = useCallback(async () => {
                   </Text>
                 </View>
                 <TouchableOpacity
-                  style={[styles.historyRefreshButton, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC" }]}
+                  style={[styles.historyRefreshButton, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE" }]}
                   onPress={onRefresh}
                 >
-                  <Ionicons name="refresh-outline" size={16} color="#3B82F6" />
+                  <Ionicons name="refresh-outline" size={16} color="#1C6DD0" />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.historyOverviewRow}>
-                <View style={[styles.historyOverviewCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                <View style={[styles.historyOverviewCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                   <Text style={[styles.historyOverviewValue, { color: theme.textPrimary }]}>{filteredHistory.length}</Text>
                   <Text style={[styles.historyOverviewLabel, { color: theme.textSecondary }]}>Visible Records</Text>
                 </View>
-                <View style={[styles.historyOverviewCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                <View style={[styles.historyOverviewCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                   <Text style={[styles.historyOverviewValue, { color: theme.textPrimary }]}>{filteredTodayCount}</Text>
                   <Text style={[styles.historyOverviewLabel, { color: theme.textSecondary }]}>Scheduled Today</Text>
                 </View>
-                <View style={[styles.historyOverviewCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                <View style={[styles.historyOverviewCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                   <Text style={[styles.historyOverviewValue, { color: theme.textPrimary }]}>{historyStats.checkedOut}</Text>
                   <Text style={[styles.historyOverviewLabel, { color: theme.textSecondary }]}>Completed Visits</Text>
                 </View>
@@ -6634,13 +6634,13 @@ const loadDashboardData = useCallback(async () => {
                     setHistorySearchQuery("");
                   },
                   placeholder: "Example: April 18, 2026 or Document Request",
-                  accent: "#8B5CF6",
+                  accent: "#1C6DD0",
                 })}
 
                 {renderRecordsFilterPanel({
                   title: "Filter Visitor History",
                   subtitle: "Quick status, date range, and office shortcuts for narrowing records without typing.",
-                  accent: "#8B5CF6",
+                  accent: "#1C6DD0",
                   onReset: () => {
                     setHistoryFilter("all");
                     setHistoryDateFilter("all");
@@ -6704,7 +6704,7 @@ const loadDashboardData = useCallback(async () => {
                   return (
                     <View
                       key={visitor._id || visitor.id || `${visitor.email}-${visitor.visitDate}`}
-                      style={[styles.historyItem, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}
+                      style={[styles.historyItem, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}
                     >
                       <View style={styles.historyItemHeader}>
                         <View style={[styles.historyItemAvatar, { backgroundColor: isDarkMode ? "#1E293B" : "#EFF6FF" }]}>
@@ -6773,22 +6773,22 @@ const loadDashboardData = useCallback(async () => {
                   </Text>
                 </View>
                 <View style={[styles.analyticsPanelPill, { backgroundColor: isDarkMode ? "#172554" : "#EFF6FF" }]}>
-                  <Text style={[styles.analyticsPanelPillText, { color: "#3B82F6" }]}>{selectedDateApprovalRate}% approved</Text>
+                  <Text style={[styles.analyticsPanelPillText, { color: "#1C6DD0" }]}>{selectedDateApprovalRate}% approved</Text>
                 </View>
               </View>
               <View style={styles.analyticsDateSummaryRow}>
-                <View style={[styles.analyticsDateSummaryCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                <View style={[styles.analyticsDateSummaryCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                   <Text style={[styles.analyticsDateSummaryValue, { color: theme.textPrimary }]}>{dateAnalytics.total}</Text>
                   <Text style={[styles.analyticsDateSummaryLabel, { color: theme.textSecondary }]}>Total Visits</Text>
                 </View>
-                <View style={[styles.analyticsDateSummaryCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+                <View style={[styles.analyticsDateSummaryCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                   <Text style={[styles.analyticsDateSummaryValue, { color: theme.textPrimary }]}>{dateAnalytics.approved}</Text>
                   <Text style={[styles.analyticsDateSummaryLabel, { color: theme.textSecondary }]}>Approved</Text>
                 </View>
               </View>
 
-              <View style={[styles.analyticsDateCallout, { backgroundColor: isDarkMode ? "#172554" : "#EFF6FF", borderColor: isDarkMode ? "#1D4ED8" : "#BFDBFE" }]}>
-                <Ionicons name="calendar-clear-outline" size={18} color="#3B82F6" />
+              <View style={[styles.analyticsDateCallout, { backgroundColor: isDarkMode ? "#172554" : "#EFF6FF", borderColor: isDarkMode ? "#041E42" : "#B7D5F6" }]}>
+                <Ionicons name="calendar-clear-outline" size={18} color="#1C6DD0" />
                 <View style={styles.analyticsDateCalloutTextWrap}>
                   <Text style={[styles.analyticsDateCalloutTitle, { color: theme.textPrimary }]}>{selectedDateLabel}</Text>
                   <Text style={[styles.analyticsDateCalloutSubtitle, { color: theme.textSecondary }]}>
@@ -6812,7 +6812,7 @@ const loadDashboardData = useCallback(async () => {
                     return (
                       <View
                         key={visitor._id || visitor.id || `${visitor.email}-${visitor.visitDate}`}
-                        style={[styles.analyticsDateVisitorItem, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}
+                        style={[styles.analyticsDateVisitorItem, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}
                       >
                         <View style={styles.analyticsDateVisitorInfo}>
                           <Text style={[styles.analyticsDateVisitorName, { color: theme.textPrimary }]}>{visitor.fullName}</Text>
@@ -6863,8 +6863,8 @@ const loadDashboardData = useCallback(async () => {
                 })}
               </View>
 
-              <View style={[styles.analyticsDistributionCallout, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
-                <Ionicons name="analytics-outline" size={18} color={topDistributionItem?.color || "#3B82F6"} />
+              <View style={[styles.analyticsDistributionCallout, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
+                <Ionicons name="analytics-outline" size={18} color={topDistributionItem?.color || "#1C6DD0"} />
                 <Text style={[styles.analyticsDistributionCalloutText, { color: theme.textPrimary }]}>
                   {topDistributionItem?.label || "No status data"} currently leads with {topDistributionItem?.value || 0} request
                   {(topDistributionItem?.value || 0) === 1 ? "" : "s"}.
@@ -7385,7 +7385,7 @@ const loadDashboardData = useCallback(async () => {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color="#1C6DD0" />
         <Text style={styles.loadingText}>Loading Dashboard...</Text>
       </SafeAreaView>
     );
@@ -7401,7 +7401,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.sidebarHeader, isDarkMode && { borderBottomColor: "#334155" }]}>
               <Image source={require("../assets/LogoSapphire.jpg")} style={styles.sidebarLogoImage} />
               <Text style={[styles.sidebarBrand, isDarkMode && styles.darkText]}>Sapphire International Aviation Academy</Text>
-              <View style={[styles.sidebarRoleBadge, isDarkMode && { backgroundColor: "#8B5CF6" }]}><Text style={styles.sidebarRoleText}>ADMIN</Text></View>
+              <View style={[styles.sidebarRoleBadge, isDarkMode && { backgroundColor: "#1C6DD0" }]}><Text style={styles.sidebarRoleText}>ADMIN</Text></View>
               <View style={[styles.sidebarStats, isDarkMode && { backgroundColor: "rgba(255,255,255,0.05)" }]}>
                 <View style={styles.sidebarStat}><Text style={[styles.sidebarStatNumber, isDarkMode && styles.darkText]}>{stats.pendingRequests}</Text><Text style={[styles.sidebarStatLabel, isDarkMode && { color: "rgba(255,255,255,0.6)" }]}>Pending</Text></View>
                 <View style={[styles.sidebarStatDivider, isDarkMode && { backgroundColor: "rgba(255,255,255,0.1)" }]} />
@@ -7420,7 +7420,7 @@ const loadDashboardData = useCallback(async () => {
               activeOpacity={0.85}
             >
               <View style={[styles.sidebarMenuIcon, { backgroundColor: "rgba(37,99,235,0.16)" }]}>
-                <Ionicons name="grid-outline" size={20} color="#60A5FA" />
+                <Ionicons name="grid-outline" size={20} color="#8EC5FF" />
               </View>
               <Text style={[styles.sidebarMenuLabel, selectedSubmodule === "dashboard" && styles.sidebarMenuLabelActive, isDarkMode && styles.darkText]}>
                 Dashboard Overview
@@ -7517,7 +7517,7 @@ const loadDashboardData = useCallback(async () => {
 
             <View style={[styles.sidebarUserSection, isDarkMode && { borderTopColor: "#334155" }]}>
               <View style={styles.sidebarUserInfo}>
-                <View style={[styles.sidebarUserAvatar, isDarkMode && { backgroundColor: "#334155" }]}><Text style={[styles.sidebarUserAvatarText, isDarkMode && { color: "#8B5CF6" }]}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View>
+                <View style={[styles.sidebarUserAvatar, isDarkMode && { backgroundColor: "#334155" }]}><Text style={[styles.sidebarUserAvatarText, isDarkMode && { color: "#1C6DD0" }]}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View>
                 <View><Text style={[styles.sidebarUserName, isDarkMode && styles.darkText]}>{user?.firstName} {user?.lastName}</Text><Text style={[styles.sidebarUserEmail, isDarkMode && { color: "rgba(255,255,255,0.5)" }]}>{user?.email}</Text></View>
               </View>
               <TouchableOpacity style={[styles.sidebarLogoutButton, isDarkMode && { backgroundColor: "rgba(239,68,68,0.2)" }]} onPress={handleLogout}>
@@ -7546,7 +7546,7 @@ const loadDashboardData = useCallback(async () => {
               </Text>
               <View style={styles.headerMetaRow}>
                 <View style={[styles.headerMetaBadge, isDarkMode && { backgroundColor: "#0F172A", borderColor: "#334155" }]}>
-                  <Ionicons name="calendar-outline" size={14} color="#2563EB" />
+                  <Ionicons name="calendar-outline" size={14} color="#0A3D91" />
                   <Text style={[styles.headerMetaText, isDarkMode && styles.darkTextSecondary]}>
                     {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </Text>
@@ -7564,7 +7564,7 @@ const loadDashboardData = useCallback(async () => {
                 ))}
               </View>
             </View>
-              <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.profileButton}><View style={[styles.profileIcon, isDarkMode && { backgroundColor: "#8B5CF6" }]}><Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View></TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.profileButton}><View style={[styles.profileIcon, isDarkMode && { backgroundColor: "#1C6DD0" }]}><Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View></TouchableOpacity>
             </View>
           </Animated.View>
 
@@ -7893,7 +7893,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && {
                         backgroundColor: "#111827",
                         borderColor: theme.borderColor,
-                        color: "#F8FAFC",
+                        color: "#F8FBFE",
                       },
                     ]}
                     placeholder="Enter first name"
@@ -7917,7 +7917,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && {
                         backgroundColor: "#111827",
                         borderColor: theme.borderColor,
-                        color: "#F8FAFC",
+                        color: "#F8FBFE",
                       },
                     ]}
                     placeholder="Enter last name"
@@ -7943,7 +7943,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && {
                         backgroundColor: "#111827",
                         borderColor: theme.borderColor,
-                        color: "#F8FAFC",
+                        color: "#F8FBFE",
                       },
                     ]}
                     placeholder="Enter email address"
@@ -7969,7 +7969,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && {
                         backgroundColor: "#111827",
                         borderColor: theme.borderColor,
-                        color: "#F8FAFC",
+                        color: "#F8FBFE",
                       },
                     ]}
                     placeholder="Enter phone number"
@@ -8073,7 +8073,7 @@ const loadDashboardData = useCallback(async () => {
                           isDarkMode && {
                             backgroundColor: "#111827",
                             borderColor: theme.borderColor,
-                            color: "#F8FAFC",
+                            color: "#F8FBFE",
                           },
                         ]}
                         placeholder="Auto-generate if blank"
@@ -8100,7 +8100,7 @@ const loadDashboardData = useCallback(async () => {
                           isDarkMode && {
                             backgroundColor: "#111827",
                             borderColor: theme.borderColor,
-                            color: "#F8FAFC",
+                            color: "#F8FBFE",
                           },
                         ]}
                         placeholder="e.g. 8:00 AM - 5:00 PM"
@@ -8128,7 +8128,7 @@ const loadDashboardData = useCallback(async () => {
                           isDarkMode && {
                             backgroundColor: "#111827",
                             borderColor: theme.borderColor,
-                            color: "#F8FAFC",
+                            color: "#F8FBFE",
                           },
                         ]}
                         placeholder="Security Department"
@@ -8155,7 +8155,7 @@ const loadDashboardData = useCallback(async () => {
                           isDarkMode && {
                             backgroundColor: "#111827",
                             borderColor: theme.borderColor,
-                            color: "#F8FAFC",
+                            color: "#F8FBFE",
                           },
                         ]}
                         placeholder="Security Personnel"
@@ -8184,7 +8184,7 @@ const loadDashboardData = useCallback(async () => {
                           isDarkMode && {
                             backgroundColor: "#111827",
                             borderColor: theme.borderColor,
-                            color: "#F8FAFC",
+                            color: "#F8FBFE",
                           },
                         ]}
                         placeholder="Auto-generate if blank"
@@ -8211,7 +8211,7 @@ const loadDashboardData = useCallback(async () => {
                           isDarkMode && {
                             backgroundColor: "#111827",
                             borderColor: theme.borderColor,
-                            color: "#F8FAFC",
+                            color: "#F8FBFE",
                           },
                         ]}
                         placeholder="e.g. Day Shift / Night Shift"
@@ -8275,7 +8275,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && {
                         backgroundColor: "#111827",
                         borderColor: theme.borderColor,
-                        color: "#F8FAFC",
+                        color: "#F8FBFE",
                       },
                     ]}
                     placeholder="Enter username"
@@ -8339,7 +8339,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && {
                         backgroundColor: "#111827",
                         borderColor: theme.borderColor,
-                        color: "#F8FAFC",
+                        color: "#F8FBFE",
                       },
                     ]}
                     placeholder="Enter password or leave blank"
@@ -8364,7 +8364,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && {
                         backgroundColor: "#111827",
                         borderColor: theme.borderColor,
-                        color: "#F8FAFC",
+                        color: "#F8FBFE",
                       },
                     ]}
                     placeholder="Confirm password"
@@ -8568,7 +8568,7 @@ const loadDashboardData = useCallback(async () => {
                   },
                 ]}
               >
-                <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                <Ionicons name="information-circle-outline" size={16} color="#1C6DD0" />
                 <Text
                   style={[
                     styles.createAccountPreviewNoteText,
@@ -8633,7 +8633,7 @@ const loadDashboardData = useCallback(async () => {
             <View
               style={[
                 styles.userProfileHero,
-                { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderBottomColor: theme.borderColor },
+                { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderBottomColor: theme.borderColor },
               ]}
             >
               <View style={styles.userProfileHeroTopRow}>
@@ -8643,7 +8643,7 @@ const loadDashboardData = useCallback(async () => {
                     { backgroundColor: `${getRoleColor(selectedUser?.role)}16` || "rgba(59,130,246,0.14)" },
                   ]}
                 >
-                  <Text style={[styles.userProfileAvatarText, { color: getRoleColor(selectedUser?.role) || "#3B82F6" }]}>
+                  <Text style={[styles.userProfileAvatarText, { color: getRoleColor(selectedUser?.role) || "#1C6DD0" }]}>
                     {getUserInitials(selectedUser)}
                   </Text>
                 </View>
@@ -8661,7 +8661,7 @@ const loadDashboardData = useCallback(async () => {
 
               <View style={styles.userProfileBadgeRow}>
                 <View style={[styles.userProfileBadge, { backgroundColor: `${getRoleColor(selectedUser?.role)}14` || "rgba(59,130,246,0.12)" }]}>
-                  <Text style={[styles.userProfileBadgeText, { color: getRoleColor(selectedUser?.role) || "#3B82F6" }]}>
+                  <Text style={[styles.userProfileBadgeText, { color: getRoleColor(selectedUser?.role) || "#1C6DD0" }]}>
                     {formatRoleLabel(selectedUser?.role)}
                   </Text>
                 </View>
@@ -8725,11 +8725,11 @@ const loadDashboardData = useCallback(async () => {
               <View
                 style={[
                   styles.userProfileCallout,
-                  isDarkMode && { backgroundColor: "#172554", borderColor: "#1D4ED8" },
+                  isDarkMode && { backgroundColor: "#172554", borderColor: "#041E42" },
                 ]}
               >
-                <Ionicons name="information-circle-outline" size={18} color="#3B82F6" />
-                <Text style={[styles.userProfileCalloutText, isDarkMode && { color: "#DBEAFE" }]}>
+                <Ionicons name="information-circle-outline" size={18} color="#1C6DD0" />
+                <Text style={[styles.userProfileCalloutText, isDarkMode && { color: "#EEF5FF" }]}>
                   Review the account details here before editing access, role, or status.
                 </Text>
               </View>
@@ -9009,9 +9009,9 @@ const loadDashboardData = useCallback(async () => {
                 </View>
               )}
 
-              <View style={[styles.userProfileCallout, isDarkMode && { backgroundColor: "#172554", borderColor: "#1D4ED8" }]}>
-                <Ionicons name="shield-checkmark-outline" size={18} color="#3B82F6" />
-                <Text style={[styles.userProfileCalloutText, isDarkMode && { color: "#DBEAFE" }]}>
+              <View style={[styles.userProfileCallout, isDarkMode && { backgroundColor: "#172554", borderColor: "#041E42" }]}>
+                <Ionicons name="shield-checkmark-outline" size={18} color="#1C6DD0" />
+                <Text style={[styles.userProfileCalloutText, isDarkMode && { color: "#EEF5FF" }]}>
                   Email and employee ID stay visible here for reference while you update role-based access settings.
                 </Text>
               </View>
@@ -9192,9 +9192,9 @@ const loadDashboardData = useCallback(async () => {
               </View>
             </View>
 
-            <View style={[styles.createSuccessNote, isDarkMode && { backgroundColor: "#172554", borderColor: "#1D4ED8" }]}>
-              <Ionicons name="mail-outline" size={16} color="#3B82F6" />
-              <Text style={[styles.createSuccessNoteText, isDarkMode && { color: "#BFDBFE" }]}>
+            <View style={[styles.createSuccessNote, isDarkMode && { backgroundColor: "#172554", borderColor: "#041E42" }]}>
+              <Ionicons name="mail-outline" size={16} color="#1C6DD0" />
+              <Text style={[styles.createSuccessNoteText, isDarkMode && { color: "#B7D5F6" }]}>
                 {createdUserSummary?.deliveryNote || "The account details are ready to review."}
               </Text>
             </View>
@@ -9223,7 +9223,7 @@ const loadDashboardData = useCallback(async () => {
               {createUserMessage ? (
                 <View
                   style={{
-                    backgroundColor: isDarkMode ? "#064E3B" : "#D1FAE5",
+                    backgroundColor: isDarkMode ? "#064E3B" : "#EEF5FF",
                     borderColor: isDarkMode ? "#10B981" : "#86EFAC",
                     borderWidth: 1,
                     borderRadius: 10,
@@ -9232,7 +9232,7 @@ const loadDashboardData = useCallback(async () => {
                     marginBottom: 10,
                   }}
                 >
-                  <Text style={{ color: isDarkMode ? "#A7F3D0" : "#065F46", fontWeight: "600" }}>
+                  <Text style={{ color: isDarkMode ? "#A7F3D0" : "#041E42", fontWeight: "600" }}>
                     {createUserMessage}
                   </Text>
                 </View>
@@ -9346,7 +9346,7 @@ const loadDashboardData = useCallback(async () => {
                 mapWrapperStyle={styles.adminMapModalMapWrap}
               />
 
-              <View style={[styles.adminMapSideCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FAFC", borderColor: theme.borderColor }]}>
+              <View style={[styles.adminMapSideCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionTitleContainer}>
                     <Ionicons name="pulse-outline" size={20} color="#10B981" />

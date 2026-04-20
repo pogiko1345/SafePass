@@ -31,6 +31,7 @@ import {
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
 import styles from "../styles/SecurityDashboardStyles";
+import Logo from "../assets/LogoSapphire.jpg";
 
 // Import map components
 import SharedMonitoringMap from "../components/SharedMonitoringMap";
@@ -672,14 +673,14 @@ export default function SecurityDashboardScreen({ navigation }) {
       key: 'home',
       label: 'Home',
       icon: 'home-outline',
-      color: '#DC2626',
+      color: '#0A3D91',
       submodules: [{ key: 'home-main', label: 'Home', badge: 0 }],
     },
     {
       key: 'maps',
       label: 'Maps',
       icon: 'map-outline',
-      color: '#0F766E',
+      color: '#0A3D91',
       submodules: [
         { key: 'map-ground', label: 'Ground Floor', badge: 0 },
         { key: 'map-mezzanine', label: 'Mezzanine', badge: 0 },
@@ -691,7 +692,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       key: 'appointment',
       label: 'Appointment',
       icon: 'calendar-outline',
-      color: '#2563EB',
+      color: '#0A3D91',
       submodules: [
         { key: 'appointment-records', label: 'Appointment Records', badge: visitors.all.length || 0 },
       ],
@@ -700,7 +701,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       key: 'reports',
       label: 'Reports',
       icon: 'document-text-outline',
-      color: '#7C3AED',
+      color: '#1C6DD0',
       submodules: [
         { key: 'report-file', label: 'File a Report', badge: reports.length || 0 },
       ],
@@ -883,7 +884,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const getStatusBadge = (visitor) => {
     if (visitor.status === 'checked_in') {
-      return { bg: '#D1FAE5', text: '#059669', label: 'CHECKED IN' };
+      return { bg: '#EEF5FF', text: '#0A3D91', label: 'CHECKED IN' };
     } else if (visitor.status === 'checked_out') {
       return { bg: '#F3F4F6', text: '#6B7280', label: 'CHECKED OUT' };
     } else if (visitor.appointmentStatus === 'rejected' || visitor.approvalStatus === 'rejected') {
@@ -894,7 +895,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     ) {
       return { bg: '#FEF3C7', text: '#D97706', label: 'PENDING' };
     } else if (hasApprovedVisitWindow(visitor)) {
-      return { bg: '#DBEAFE', text: '#3B82F6', label: 'APPROVED' };
+      return { bg: '#EEF5FF', text: '#1C6DD0', label: 'APPROVED' };
     }
     return { bg: '#F3F4F6', text: '#6B7280', label: 'UNKNOWN' };
   };
@@ -1287,14 +1288,14 @@ export default function SecurityDashboardScreen({ navigation }) {
       <View style={styles.dashboardShell}>
       <View style={styles.securityHeroSection}>
         <LinearGradient
-          colors={['#7F1D1D', '#DC2626', '#B91C1C']}
+          colors={['#041E42', '#0A3D91', '#1C6DD0']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.securityHeroCard}
         >
           <View style={styles.securityHeroTop}>
             <View style={styles.securityHeroBadge}>
-              <Ionicons name="shield-checkmark-outline" size={14} color="#FECACA" />
+              <Ionicons name="shield-checkmark-outline" size={14} color="#D8E8FF" />
               <Text style={styles.securityHeroBadgeText}>Security Operations Center</Text>
             </View>
             <View style={styles.securityHeroShiftBadge}>
@@ -1325,8 +1326,8 @@ export default function SecurityDashboardScreen({ navigation }) {
 
         <View style={styles.securityHeroSideCards}>
           <View style={styles.securityHeroSideCard}>
-            <View style={[styles.securityHeroSideIcon, { backgroundColor: '#FEF3C7' }]}>
-              <Ionicons name="people-circle-outline" size={18} color="#D97706" />
+            <View style={[styles.securityHeroSideIcon, { backgroundColor: '#EEF5FF' }]}>
+              <Ionicons name="people-circle-outline" size={18} color="#0A3D91" />
             </View>
             <Text style={styles.securityHeroSideValue}>{dashboardStats.activeUsers}</Text>
             <Text style={styles.securityHeroSideLabel}>On-Site Now</Text>
@@ -1334,8 +1335,8 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
 
           <View style={styles.securityHeroSideCard}>
-            <View style={[styles.securityHeroSideIcon, { backgroundColor: '#EDE9FE' }]}>
-              <Ionicons name="document-text-outline" size={18} color="#7C3AED" />
+            <View style={[styles.securityHeroSideIcon, { backgroundColor: '#EEF5FF' }]}>
+              <Ionicons name="document-text-outline" size={18} color="#1C6DD0" />
             </View>
             <Text style={styles.securityHeroSideValue}>{reports.length}</Text>
             <Text style={styles.securityHeroSideLabel}>Reports Logged</Text>
@@ -1383,12 +1384,12 @@ export default function SecurityDashboardScreen({ navigation }) {
                 onPress={() => handleViewDetails(visitor)}
               >
                 <View style={[styles.activityIcon, {
-                  backgroundColor: visitor.status === 'checked_in' ? '#D1FAE5' : '#DBEAFE',
+                  backgroundColor: visitor.status === 'checked_in' ? '#EEF5FF' : '#EEF5FF',
                 }]}>
                   <Ionicons
                     name={visitor.status === 'checked_in' ? 'log-in-outline' : 'checkmark-circle-outline'}
                     size={16}
-                    color={visitor.status === 'checked_in' ? '#059669' : '#2563EB'}
+                    color={visitor.status === 'checked_in' ? '#0A3D91' : '#0A3D91'}
                   />
                 </View>
                 <View style={styles.activityContent}>
@@ -1449,7 +1450,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           <View style={styles.activityList}>
             {analytics.mostVisitedOffices.slice(0, 3).map((office, index) => (
               <View key={office.office || index} style={styles.activityItem}>
-                <View style={[styles.activityIcon, { backgroundColor: '#DBEAFE' }]}>
+                <View style={[styles.activityIcon, { backgroundColor: '#EEF5FF' }]}>
                   <Ionicons name="business-outline" size={16} color="#0A3D91" />
                 </View>
                 <View style={styles.activityContent}>
@@ -1485,7 +1486,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         
         <View style={styles.securityCommandGrid}>
           <TouchableOpacity style={styles.securityCommandCard} onPress={() => selectGuardSubmodule('appointment-records')}>
-            <View style={[styles.securityCommandIcon, { backgroundColor: '#DBEAFE' }]}>
+            <View style={[styles.securityCommandIcon, { backgroundColor: '#EEF5FF' }]}>
               <Ionicons name="reader-outline" size={24} color="#0A3D91" />
             </View>
             <View style={styles.securityCommandCopy}>
@@ -1496,8 +1497,8 @@ export default function SecurityDashboardScreen({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.securityCommandCard} onPress={() => selectGuardSubmodule('report-file')}>
-            <View style={[styles.securityCommandIcon, { backgroundColor: '#D1FAE5' }]}>
-              <Ionicons name="flag-outline" size={24} color="#059669" />
+            <View style={[styles.securityCommandIcon, { backgroundColor: '#EEF5FF' }]}>
+              <Ionicons name="flag-outline" size={24} color="#0A3D91" />
             </View>
             <View style={styles.securityCommandCopy}>
               <Text style={styles.securityCommandTitle}>File a Report</Text>
@@ -1508,7 +1509,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
           <TouchableOpacity style={styles.securityCommandCard} onPress={() => selectGuardSubmodule('map-ground')}>
             <View style={[styles.securityCommandIcon, { backgroundColor: '#CCFBF1' }]}>
-              <Ionicons name="map-outline" size={24} color="#0F766E" />
+              <Ionicons name="map-outline" size={24} color="#0A3D91" />
             </View>
             <View style={styles.securityCommandCopy}>
               <Text style={styles.securityCommandTitle}>Monitoring Map</Text>
@@ -1552,7 +1553,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               </View>
               <View style={[styles.alertSeverity, { 
                 backgroundColor: alert.severity === 'high' ? '#FEE2E2' : 
-                               alert.severity === 'medium' ? '#FEF3C7' : '#D1FAE5' 
+                               alert.severity === 'medium' ? '#FEF3C7' : '#EEF5FF' 
               }]}>
                 <Text style={[styles.alertSeverityText, { 
                   color: alert.severity === 'high' ? '#DC2626' : 
@@ -1600,7 +1601,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           borderColor="#E5E7EB"
           summaryItems={[
             { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
-            { label: "Approved", value: visitors.approved.length || 0, color: "#2563EB" },
+            { label: "Approved", value: visitors.approved.length || 0, color: "#0A3D91" },
             { label: "Checked In", value: visitors.active.length || 0, color: "#F59E0B" },
           ]}
           statusLabel="Security monitoring"
@@ -1666,7 +1667,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
 
         <View style={styles.readonlyInfoBanner}>
-          <Ionicons name="shield-checkmark-outline" size={18} color="#2563EB" />
+          <Ionicons name="shield-checkmark-outline" size={18} color="#0A3D91" />
           <Text style={styles.readonlyInfoBannerText}>
             This section is view-only for guards. Open a record to inspect appointment details.
           </Text>
@@ -1774,11 +1775,11 @@ export default function SecurityDashboardScreen({ navigation }) {
       <View style={styles.logsContainer}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
-            <Ionicons name="time-outline" size={20} color="#059669" />
+            <Ionicons name="time-outline" size={20} color="#0A3D91" />
             <Text style={styles.sectionTitle}>Access Logs</Text>
           </View>
           <TouchableOpacity onPress={() => { setLogsPage(1); loadAccessLogs(); }}>
-            <Ionicons name="refresh-outline" size={20} color="#059669" />
+            <Ionicons name="refresh-outline" size={20} color="#0A3D91" />
           </TouchableOpacity>
         </View>
 
@@ -1786,12 +1787,12 @@ export default function SecurityDashboardScreen({ navigation }) {
           {accessLogs.map((log) => (
             <View key={log._id} style={styles.logItem}>
               <View style={[styles.logIcon, { 
-                backgroundColor: log.status === 'granted' ? '#D1FAE5' : '#FEE2E2' 
+                backgroundColor: log.status === 'granted' ? '#EEF5FF' : '#FEE2E2' 
               }]}>
                 <Ionicons 
                   name={log.status === 'granted' ? "checkmark" : "close"} 
                   size={16} 
-                  color={log.status === 'granted' ? '#059669' : '#DC2626'} 
+                  color={log.status === 'granted' ? '#0A3D91' : '#DC2626'} 
                 />
               </View>
               <View style={styles.logContent}>
@@ -1827,7 +1828,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       <View style={styles.reportsContainer}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
-            <Ionicons name="document-text-outline" size={20} color="#7C3AED" />
+            <Ionicons name="document-text-outline" size={20} color="#1C6DD0" />
             <View>
               <Text style={styles.sectionTitle}>File a Report</Text>
               <Text style={styles.securitySectionSubtitle}>Submit a guard report, then review the most recent filed incidents below.</Text>
@@ -2056,13 +2057,13 @@ export default function SecurityDashboardScreen({ navigation }) {
                         <View
                           style={[
                             styles.statusBadge,
-                            { backgroundColor: isResolved ? '#D1FAE5' : '#FEF3C7' },
+                            { backgroundColor: isResolved ? '#EEF5FF' : '#FEF3C7' },
                           ]}
                         >
                           <Text
                             style={[
                               styles.statusBadgeText,
-                              { color: isResolved ? '#047857' : '#B45309' },
+                              { color: isResolved ? '#0A3D91' : '#B45309' },
                             ]}
                           >
                             {report.status || 'Open'}
@@ -2364,12 +2365,15 @@ export default function SecurityDashboardScreen({ navigation }) {
     return (
       <Animated.View style={[styles.sidebar, { width: sidebarWidth }]}>
         <LinearGradient
-          colors={['#DC2626', '#B91C1C']}
+          colors={['#041E42', '#0A3D91', '#1C6DD0']}
           style={styles.sidebarHeader}
         >
           <View style={styles.sidebarLogo}>
-            <MaterialCommunityIcons name="shield-check" size={28} color="#FFFFFF" />
-            <Text style={styles.sidebarLogoText}>SecuriTrack</Text>
+            <Image source={Logo} style={styles.sidebarLogoImage} resizeMode="contain" />
+            <View>
+              <Text style={styles.sidebarLogoText}>Sapphire Security</Text>
+              <Text style={styles.sidebarLogoSubtext}>Campus operations</Text>
+            </View>
           </View>
           {!isDesktop && (
             <TouchableOpacity onPress={toggleSidebar} style={styles.sidebarClose}>
@@ -2392,7 +2396,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                   {user.firstName} {user.lastName}
                 </Text>
                 <Text style={styles.sidebarUserRole}>
-                  {user.role?.toUpperCase()} • {user.badgeNumber || 'SEC-0000'}
+                  {user.role?.toUpperCase()} - {user.badgeNumber || 'SEC-0000'}
                 </Text>
               </View>
             </View>
@@ -2697,7 +2701,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#DC2626" />
+        <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={styles.loadingText}>Loading security dashboard...</Text>
       </SafeAreaView>
     );
@@ -2711,7 +2715,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#DC2626" />
+      <StatusBar barStyle="light-content" backgroundColor="#041E42" />
       
       <View style={styles.mainContainer}>
         {/* Sidebar */}
@@ -2721,7 +2725,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         <Animated.View style={[styles.mainContent, { opacity: fadeAnim }]}>
           {/* Header with Burger Menu */}
           <LinearGradient
-            colors={['#DC2626', '#B91C1C']}
+            colors={['#041E42', '#0A3D91', '#1C6DD0']}
             style={styles.header}
           >
             <View style={styles.headerTop}>
@@ -2886,7 +2890,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               textSecondary="#CBD5E1"
               summaryItems={[
                 { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
-                { label: "Approved", value: visitors.approved.length || 0, color: "#60A5FA" },
+                { label: "Approved", value: visitors.approved.length || 0, color: "#8EC5FF" },
                 { label: "Checked In", value: visitors.active.length || 0, color: "#FBBF24" },
               ]}
               statusLabel="Security monitoring"
@@ -3222,7 +3226,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                   <Text style={styles.visitorDetailSectionTitle}>Access Timeline</Text>
                   <View style={styles.visitorDetailTimeline}>
                     <View style={styles.visitorDetailTimelineItem}>
-                      <View style={[styles.visitorDetailTimelineDot, { backgroundColor: '#3B82F6' }]} />
+                      <View style={[styles.visitorDetailTimelineDot, { backgroundColor: '#1C6DD0' }]} />
                       <View style={styles.visitorDetailTimelineCopy}>
                         <Text style={styles.visitorDetailTimelineTitle}>Scheduled Arrival</Text>
                         <Text style={styles.visitorDetailTimelineText}>
@@ -3347,8 +3351,8 @@ export default function SecurityDashboardScreen({ navigation }) {
                       { 
                         backgroundColor: 
                           notification.type === 'alert' ? '#FEE2E2' :
-                          notification.type === 'visitor' ? '#DBEAFE' :
-                          '#D1FAE5'
+                          notification.type === 'visitor' ? '#EEF5FF' :
+                          '#EEF5FF'
                       }
                     ]}>
                       <Ionicons 
@@ -3361,7 +3365,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                         color={
                           notification.type === 'alert' ? "#DC2626" :
                           notification.type === 'visitor' ? "#0A3D91" :
-                          "#059669"
+                          "#0A3D91"
                         }
                       />
                     </View>

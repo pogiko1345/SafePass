@@ -11,12 +11,12 @@ export default StyleSheet.create({
   // ============ CONTAINERS ============
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   scrollView: {
@@ -83,7 +83,7 @@ export default StyleSheet.create({
     ...(isDesktop ? { width: 420 } : {}),
     ...Platform.select({
       ios: {
-        shadowColor: "#312E81",
+        shadowColor: "#041E42",
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.18,
         shadowRadius: 20,
@@ -120,7 +120,7 @@ export default StyleSheet.create({
   heroBadgeText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#E0E7FF",
+    color: "#D8E8FF",
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
@@ -139,6 +139,17 @@ export default StyleSheet.create({
     borderRadius: 45,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+  },
+
+  logoImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.42)",
   },
 
   headerTitle: {
@@ -238,7 +249,7 @@ export default StyleSheet.create({
   },
 
   progressDotActive: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#0A3D91",
   },
 
   progressLabel: {
@@ -248,7 +259,7 @@ export default StyleSheet.create({
   },
 
   progressLabelActive: {
-    color: "#312E81",
+    color: "#041E42",
   },
 
   progressLine: {
@@ -259,12 +270,12 @@ export default StyleSheet.create({
   },
 
   progressLineActive: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#0A3D91",
   },
 
   // ============ USER INFO CARD ============
   userInfoCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 22,
     padding: 16,
     flexDirection: "row",
@@ -371,7 +382,7 @@ export default StyleSheet.create({
   countryCode: {
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRightWidth: 1,
     borderRightColor: "#E2E8F0",
   },
@@ -433,7 +444,7 @@ export default StyleSheet.create({
   },
 
   methodButtonActive: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#0A3D91",
   },
 
   methodButtonText: {
@@ -448,7 +459,7 @@ export default StyleSheet.create({
 
   // ============ BUTTONS ============
   sendButton: {
-    backgroundColor: "#1D4ED8",
+    backgroundColor: "#041E42",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -518,7 +529,7 @@ export default StyleSheet.create({
   phoneNumberDisplay: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#4F46E5",
+    color: "#0A3D91",
     marginTop: 4,
   },
 
@@ -545,7 +556,7 @@ export default StyleSheet.create({
         transition: "border-color 0.2s ease",
         outline: "none",
         ":focus": {
-          borderColor: "#4F46E5",
+          borderColor: "#0A3D91",
         },
       },
     }),
@@ -607,7 +618,7 @@ export default StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     gap: 8,
     marginBottom: 16,
   },
@@ -619,7 +630,7 @@ export default StyleSheet.create({
   },
 
   resendButtonTextActive: {
-    color: "#4F46E5",
+    color: "#0A3D91",
   },
 
   changeMethodButton: {

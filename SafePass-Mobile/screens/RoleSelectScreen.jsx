@@ -268,12 +268,12 @@ export default function RoleSelectScreen({ navigation, route }) {
                 })}
               >
                 <LinearGradient
-                  colors={["#FFFFFF", "#F8FAFC"]}
+                  colors={["#FFFFFF", "#F8FBFE"]}
                   style={roleSelectStyles.cardGradient}
                 >
                   <View style={roleSelectStyles.cardIconWrapper}>
                     <LinearGradient
-                      colors={["#0F766E", "#14B8A6"]}
+                      colors={["#0A3D91", "#1C6DD0"]}
                       style={roleSelectStyles.cardIconGradient}
                     >
                       <Ionicons name="person-add-outline" size={28} color="#FFFFFF" />
@@ -287,21 +287,21 @@ export default function RoleSelectScreen({ navigation, route }) {
                     </Text>
                     <View style={roleSelectStyles.cardFeatures}>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="card-outline" size={12} color="#0F766E" />
+                        <Ionicons name="card-outline" size={12} color="#0A3D91" />
                         <Text style={roleSelectStyles.featurePillText}>Virtual NFC Card</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="calendar-outline" size={12} color="#0F766E" />
+                        <Ionicons name="calendar-outline" size={12} color="#0A3D91" />
                         <Text style={roleSelectStyles.featurePillText}>Schedule Visit</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="document-text-outline" size={12} color="#0F766E" />
+                        <Ionicons name="document-text-outline" size={12} color="#0A3D91" />
                         <Text style={roleSelectStyles.featurePillText}>Fast Check-In</Text>
                       </View>
                     </View>
                   </View>
                   <View style={roleSelectStyles.cardArrow}>
-                    <Ionicons name="arrow-forward" size={20} color="#0F766E" />
+                    <Ionicons name="arrow-forward" size={20} color="#0A3D91" />
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
@@ -387,7 +387,7 @@ export default function RoleSelectScreen({ navigation, route }) {
               <Text style={roleSelectStyles.infoCardText}>GPS Tracking</Text>
             </View>
             <View style={roleSelectStyles.infoCard}>
-              <Ionicons name="notifications-outline" size={19} color="#3B82F6" />
+              <Ionicons name="notifications-outline" size={19} color="#1C6DD0" />
               <Text style={roleSelectStyles.infoCardText}>Real-time Alerts</Text>
             </View>
           </View>
@@ -452,7 +452,7 @@ export default function RoleSelectScreen({ navigation, route }) {
             </View>
 
             <Text style={roleSelectStyles.contactCopyright}>
-              ©2024. Sapphire International Aviation Academy
+              Copyright 2024. Sapphire International Aviation Academy
             </Text>
           </View>
 

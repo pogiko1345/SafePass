@@ -9,27 +9,27 @@ export default StyleSheet.create({
   
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: "#3B82F6",
+    color: "#1C6DD0",
     fontWeight: "500",
   },
 
   mainContainer: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   // ============================================
@@ -87,7 +87,7 @@ export default StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 20,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
     marginBottom: 16,
   },
 
@@ -430,7 +430,7 @@ export default StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   adminMonitoringDockBody: {
@@ -684,7 +684,7 @@ export default StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: "#0F172A",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     marginBottom: 10,
   },
 
@@ -816,7 +816,7 @@ export default StyleSheet.create({
 
   adminTableHeaderRow: {
     flexDirection: "row",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
   },
@@ -963,7 +963,7 @@ export default StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "#EFF6FF",
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#EEF5FF",
   },
 
   headerMetaText: {
@@ -980,14 +980,14 @@ export default StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#0EA5E9",
+    borderColor: "#1C6DD0",
   },
 
   profileIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#0EA5E9",
+    backgroundColor: "#1C6DD0",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1000,14 +1000,14 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#B7D5F6",
   },
 
   dashboardHeroCard: {
     marginBottom: 14,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#EEF5FF",
     backgroundColor: "#F0F9FF",
     padding: 16,
     flexDirection: "row",
@@ -1185,7 +1185,7 @@ export default StyleSheet.create({
   dashboardSectionLink: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#2563EB",
+    color: "#0A3D91",
   },
 
   sectionTitleContainer: {
@@ -1197,7 +1197,7 @@ export default StyleSheet.create({
   viewAll: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#2563EB",
+    color: "#0A3D91",
   },
 
   adminMapSection: {
@@ -1457,7 +1457,7 @@ export default StyleSheet.create({
   // ============================================
 
   welcomeBanner: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
     margin: 20,
     marginTop: 16,
     padding: 20,
@@ -1467,7 +1467,7 @@ export default StyleSheet.create({
     alignItems: "center",
     ...Platform.select({
       ios: {
-        shadowColor: "#3B82F6",
+        shadowColor: "#1C6DD0",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 12,
@@ -1599,7 +1599,7 @@ export default StyleSheet.create({
 
   sectionLink: {
     fontSize: 13,
-    color: "#3B82F6",
+    color: "#1C6DD0",
     fontWeight: "600",
   },
 
@@ -1622,7 +1622,7 @@ export default StyleSheet.create({
   },
 
   chartTypeButtonActive: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
   },
 
   chartTypeText: {
@@ -1729,7 +1729,7 @@ export default StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -1917,7 +1917,7 @@ export default StyleSheet.create({
   overviewBadgeText: {
     fontSize: 10,
     fontWeight: "600",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   // ============================================
@@ -1944,11 +1944,11 @@ export default StyleSheet.create({
   },
 
   tabActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
     ...Platform.select({
       ios: {
-        shadowColor: "#3B82F6",
+        shadowColor: "#1C6DD0",
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.18,
         shadowRadius: 14,
@@ -2144,7 +2144,7 @@ export default StyleSheet.create({
   roleBadgeText: {
     fontSize: 9,
     fontWeight: "700",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   deptBadge: {
@@ -2257,14 +2257,14 @@ export default StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#EEF5FF",
     backgroundColor: "#EFF6FF",
   },
 
   managementSecondaryButtonText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   managementStatsGrid: {
@@ -2340,7 +2340,7 @@ export default StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#EEF5FF",
     backgroundColor: "#EFF6FF",
   },
 
@@ -2489,7 +2489,7 @@ export default StyleSheet.create({
   },
 
   userPaginationButtonDisabled: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderColor: "#E2E8F0",
   },
 
@@ -2507,7 +2507,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 22,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 20,
   },
 
@@ -2550,8 +2550,8 @@ export default StyleSheet.create({
   },
 
   filterChipActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   filterChipText: {
@@ -2603,7 +2603,7 @@ export default StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
@@ -2641,7 +2641,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 12,
   },
 
@@ -2695,7 +2695,7 @@ export default StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
@@ -2727,7 +2727,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 11,
   },
 
@@ -2746,7 +2746,7 @@ export default StyleSheet.create({
     gap: 6,
     borderRadius: 12,
     paddingHorizontal: 14,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#0A3D91",
   },
 
   dataManagementPrimaryButtonText: {
@@ -2763,7 +2763,7 @@ export default StyleSheet.create({
     gap: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#EEF5FF",
     backgroundColor: "#EFF6FF",
     paddingHorizontal: 12,
   },
@@ -2771,14 +2771,14 @@ export default StyleSheet.create({
   dataManagementGhostButtonText: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#2563EB",
+    color: "#0A3D91",
   },
 
   dataManagementFilterBox: {
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingVertical: 10,
     paddingHorizontal: 10,
     gap: 8,
@@ -2819,8 +2819,8 @@ export default StyleSheet.create({
   },
 
   dataManagementChipActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
   },
 
   dataManagementChipText: {
@@ -2835,7 +2835,7 @@ export default StyleSheet.create({
 
   userDataBottomPanel: {
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#EEF5FF",
     borderRadius: 20,
     backgroundColor: "#FFFFFF",
     padding: 16,
@@ -2905,7 +2905,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
@@ -2930,14 +2930,14 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 999,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
 
   userDataCompactOptionActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
   },
 
   userDataCompactOptionText: {
@@ -3014,7 +3014,7 @@ export default StyleSheet.create({
     borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   modalBody: {
@@ -3214,7 +3214,7 @@ export default StyleSheet.create({
     gap: 10,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#B7D5F6",
     backgroundColor: "#EFF6FF",
     paddingHorizontal: 14,
     paddingVertical: 13,
@@ -3224,7 +3224,7 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 19,
-    color: "#1D4ED8",
+    color: "#041E42",
   },
 
   userEditorModal: {
@@ -3307,7 +3307,7 @@ export default StyleSheet.create({
     borderRadius: 30,
     paddingHorizontal: 16,
     paddingVertical: 13,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     marginBottom: 12,
   },
 
@@ -3329,7 +3329,7 @@ export default StyleSheet.create({
     borderRadius: 30,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   staffDropdownValueWrap: {
@@ -3465,7 +3465,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 22,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     padding: 16,
     gap: 14,
   },
@@ -3495,7 +3495,7 @@ export default StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: "#1E293B",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     marginBottom: 12,
   },
 
@@ -3518,7 +3518,7 @@ export default StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 30,
     alignItems: "center",
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
   },
 
   submitButtonText: {
@@ -3589,7 +3589,7 @@ export default StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 6,
@@ -3600,7 +3600,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 18,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     padding: 16,
     gap: 12,
     marginBottom: 14,
@@ -3636,7 +3636,7 @@ export default StyleSheet.create({
     gap: 8,
     backgroundColor: "#EFF6FF",
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#B7D5F6",
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -3647,7 +3647,7 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
-    color: "#1D4ED8",
+    color: "#041E42",
     fontWeight: "600",
   },
 
@@ -3670,7 +3670,7 @@ export default StyleSheet.create({
     textAlignVertical: "top",
     minHeight: 90,
     marginVertical: 20,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     color: "#1E293B",
   },
 
@@ -3786,7 +3786,7 @@ export default StyleSheet.create({
   requestAvatarText: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   requestInfo: {
@@ -3813,7 +3813,7 @@ export default StyleSheet.create({
   },
 
   requestDetails: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -3899,8 +3899,8 @@ export default StyleSheet.create({
   },
 
   roleOptionActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   roleText: {
@@ -4011,7 +4011,7 @@ export default StyleSheet.create({
   analyticsHeroBadgeText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#4F46E5",
+    color: "#0A3D91",
   },
 
   analyticsHeroTitle: {
@@ -4099,7 +4099,7 @@ export default StyleSheet.create({
   refreshButtonText: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   keyMetricsRow: {
@@ -4211,7 +4211,7 @@ export default StyleSheet.create({
   },
 
   analyticsDatasetButtonActive: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
   },
 
   analyticsDatasetButtonText: {
@@ -4396,7 +4396,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#D1FAE5",
+    backgroundColor: "#EEF5FF",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 20,
@@ -4423,7 +4423,7 @@ export default StyleSheet.create({
   todayStatValue: {
     fontSize: 32,
     fontWeight: "800",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   todayStatLabel: {
@@ -4802,8 +4802,8 @@ export default StyleSheet.create({
   },
 
   historyFilterChipActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   historyFilterChipText: {
@@ -4819,7 +4819,7 @@ export default StyleSheet.create({
   historySearchBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 12,
@@ -4836,7 +4836,7 @@ export default StyleSheet.create({
   },
 
   historyItem: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
@@ -4863,7 +4863,7 @@ export default StyleSheet.create({
   historyItemAvatarText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   historyItemInfo: {
@@ -5059,7 +5059,7 @@ export default StyleSheet.create({
     gap: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
     borderRadius: 12,
   },
 
@@ -5109,7 +5109,7 @@ export default StyleSheet.create({
   },
 
   settingsTabTextActive: {
-    color: "#3B82F6",
+    color: "#1C6DD0",
     fontWeight: "600",
   },
 
@@ -5146,7 +5146,7 @@ export default StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -5175,7 +5175,7 @@ export default StyleSheet.create({
 
   profileRole: {
     fontSize: 12,
-    color: "#3B82F6",
+    color: "#1C6DD0",
     fontWeight: "600",
     marginTop: 2,
   },
@@ -5190,7 +5190,7 @@ export default StyleSheet.create({
   editProfileButtonText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   divider: {
@@ -5275,8 +5275,8 @@ export default StyleSheet.create({
   },
 
   selectOptionActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   selectOptionText: {
@@ -5316,7 +5316,7 @@ export default StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#1E293B",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   dangerButton: {
