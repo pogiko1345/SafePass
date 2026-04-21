@@ -444,6 +444,16 @@ try {
 const getMailFromAddress = () =>
   String(process.env.MAIL_FROM || process.env.MAIL_USER || "no-reply@safepass.local").trim();
 
+const getEmailGreetingName = (user = {}) =>
+  String(user.firstName || user.fullName || "User").trim();
+
+const getSupportEmailSignature = () =>
+  [
+    "Thank you,",
+    "Sapphire SafePass",
+    "Sapphire International Aviation Academy",
+  ].join("\n");
+
 const sendEmail = (to, subject, body) => {
   if (mailTransporter) {
     mailTransporter
@@ -512,15 +522,19 @@ const sendVerificationEmailSimulation = (req, user) => {
     user.email,
     "Verify your Sapphire SafePass account",
     [
-      `Hi ${user.firstName},`,
+      `Good day, ${getEmailGreetingName(user)}.`,
       "",
-      "Please verify your Sapphire SafePass account by opening this link:",
+      "Welcome to Sapphire SafePass.",
+      "Please verify your visitor account by opening the secure link below:",
       verificationUrl,
       "",
-      "This verification link expires in 24 hours.",
+      "This verification link will expire in 24 hours.",
       "",
-      "SIMULATION MODE: copy/open the link above from your backend logs.",
-      `After verifying, return to ${FRONTEND_URL} and log in.`,
+      `After verifying, return to ${FRONTEND_URL} and sign in to continue your visitor access request.`,
+      "",
+      "If you did not create this account, you may safely ignore this email.",
+      "",
+      getSupportEmailSignature(),
     ].join("\n"),
   );
 
@@ -544,15 +558,20 @@ const createRegistrationOtp = (user) => {
 
   sendEmail(
     user.email,
-    "Your Sapphire SafePass OTP",
+    "Sapphire SafePass Visitor Verification Code",
     [
-      `Hi ${user.firstName},`,
+      `Good day, ${getEmailGreetingName(user)}.`,
       "",
-      `Your visitor account verification OTP is: ${otpCode}`,
+      "Use the verification code below to confirm your visitor account:",
       "",
-      "This code expires in 10 minutes.",
+      `Verification code: ${otpCode}`,
       "",
-      "SIMULATION MODE: use the OTP shown in this message or backend logs.",
+      "This code will expire in 10 minutes.",
+      "For your security, please do not share this code with anyone.",
+      "",
+      "If you did not request this code, you may safely ignore this email.",
+      "",
+      getSupportEmailSignature(),
     ].join("\n"),
   );
 
@@ -578,15 +597,19 @@ const createPasswordResetOtp = (req, user) => {
 
   sendEmail(
     user.email,
-    "Your Sapphire SafePass Password Reset Code",
+    "Sapphire SafePass Password Reset Code",
     [
-      `Hi ${user.firstName},`,
+      `Good day, ${getEmailGreetingName(user)}.`,
       "",
-      `Your password reset OTP is: ${otpCode}`,
+      "We received a request to reset the password for your Sapphire SafePass account.",
+      "Use the code below to continue:",
       "",
-      "This code expires in 10 minutes.",
+      `Password reset code: ${otpCode}`,
       "",
-      "SIMULATION MODE: use the OTP shown in this message or backend logs.",
+      "This code will expire in 10 minutes.",
+      "If you did not request a password reset, you may ignore this email and keep your current password.",
+      "",
+      getSupportEmailSignature(),
     ].join("\n"),
   );
 
