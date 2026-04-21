@@ -192,26 +192,13 @@ export default function RoleSelectScreen({ navigation, route }) {
                 Secure Arrival and Access Control
               </Text>
 
-              <View style={roleSelectStyles.heroDivider} />
-
               <Text style={roleSelectStyles.heroDescription}>
-                Built for visitors, security personnel, and administrative teams in one streamlined
-                checkpoint experience.
+                Visitor access and checkpoint sign-in in one secure entry flow.
               </Text>
-
-              <View style={roleSelectStyles.heroMetrics}>
-                <View style={roleSelectStyles.heroMetricCard}>
-                  <Text style={roleSelectStyles.heroMetricValue}>24/7</Text>
-                  <Text style={roleSelectStyles.heroMetricLabel}>Gate Visibility</Text>
-                </View>
-                <View style={roleSelectStyles.heroMetricCard}>
-                  <Text style={roleSelectStyles.heroMetricValue}>NFC</Text>
-                  <Text style={roleSelectStyles.heroMetricLabel}>Access Ready</Text>
-                </View>
-                <View style={roleSelectStyles.heroMetricCard}>
-                  <Text style={roleSelectStyles.heroMetricValue}>Live</Text>
-                  <Text style={roleSelectStyles.heroMetricLabel}>Approval Tracking</Text>
-                </View>
+              <View style={roleSelectStyles.flightAccent}>
+                <View style={roleSelectStyles.flightAccentLine} />
+                <Ionicons name="airplane" size={13} color="rgba(255,255,255,0.92)" />
+                <View style={roleSelectStyles.flightAccentDot} />
               </View>
             </View>
           </LinearGradient>

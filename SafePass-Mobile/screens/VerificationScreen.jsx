@@ -391,6 +391,8 @@ export default function VerificationScreen({ navigation, route }) {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
+                <View style={verificationStyles.heroGlowOne} />
+                <View style={verificationStyles.heroGlowTwo} />
                 <TouchableOpacity
                   style={verificationStyles.backButton}
                   onPress={handleBack}
@@ -440,35 +442,19 @@ export default function VerificationScreen({ navigation, route }) {
                   >
                     Secure access to your SafePass account with a one-time verification code.
                   </Text>
+                  <View
+                    style={[
+                      verificationStyles.flightAccent,
+                      !isDesktopLayout && { alignSelf: "center" },
+                      isDesktopLayout && { alignSelf: "flex-start" },
+                    ]}
+                  >
+                    <View style={verificationStyles.flightAccentLine} />
+                    <Ionicons name="airplane" size={13} color="rgba(255,255,255,0.92)" />
+                    <View style={verificationStyles.flightAccentDot} />
+                  </View>
                 </View>
 
-                <View
-                  style={[
-                    verificationStyles.heroMetaRow,
-                    isCompactWidth && { flexDirection: "column", flexWrap: "nowrap" },
-                  ]}
-                >
-                  <View
-                    style={[
-                      verificationStyles.heroMetaCard,
-                      isCompactWidth && { width: "100%" },
-                    ]}
-                  >
-                    <Text style={verificationStyles.heroMetaLabel}>Account</Text>
-                    <Text style={verificationStyles.heroMetaValue}>{email || "User"}</Text>
-                  </View>
-                  <View
-                    style={[
-                      verificationStyles.heroMetaCard,
-                      isCompactWidth && { width: "100%" },
-                    ]}
-                  >
-                    <Text style={verificationStyles.heroMetaLabel}>Method</Text>
-                    <Text style={verificationStyles.heroMetaValue}>
-                      {otpSent ? (otpMethod === "sms" ? "SMS Code" : "Voice Call") : "Phone Setup"}
-                    </Text>
-                  </View>
-                </View>
               </LinearGradient>
 
               <Animated.View
@@ -512,6 +498,34 @@ export default function VerificationScreen({ navigation, route }) {
                     </View>
                     <Text style={[verificationStyles.progressLabel, otpVerified && verificationStyles.progressLabelActive]}>
                       Access
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    verificationStyles.panelMetaRow,
+                    isCompactWidth && { flexDirection: "column", flexWrap: "nowrap" },
+                  ]}
+                >
+                  <View
+                    style={[
+                      verificationStyles.panelMetaCard,
+                      isCompactWidth && { width: "100%" },
+                    ]}
+                  >
+                    <Text style={verificationStyles.panelMetaLabel}>Account</Text>
+                    <Text style={verificationStyles.panelMetaValue}>{email || "User"}</Text>
+                  </View>
+                  <View
+                    style={[
+                      verificationStyles.panelMetaCard,
+                      isCompactWidth && { width: "100%" },
+                    ]}
+                  >
+                    <Text style={verificationStyles.panelMetaLabel}>Method</Text>
+                    <Text style={verificationStyles.panelMetaValue}>
+                      {otpSent ? (otpMethod === "sms" ? "SMS Code" : "Voice Call") : "Phone Setup"}
                     </Text>
                   </View>
                 </View>

@@ -48,20 +48,20 @@ export default function LoginScreen({ navigation, route }) {
   );
   const headerResponsiveStyle = {
     paddingHorizontal: isCompactLogin ? 18 : isTabletLogin ? 28 : 24,
-    paddingBottom: isCompactLogin ? 72 : 88,
+    paddingBottom: isCompactLogin ? 56 : isTabletLogin ? 68 : 62,
   };
   const logoResponsiveStyle = {
-    width: isCompactLogin ? 88 : isTabletLogin ? 116 : 108,
-    height: isCompactLogin ? 88 : isTabletLogin ? 116 : 108,
-    borderRadius: isCompactLogin ? 44 : isTabletLogin ? 58 : 54,
+    width: isCompactLogin ? 74 : isTabletLogin ? 100 : 92,
+    height: isCompactLogin ? 74 : isTabletLogin ? 100 : 92,
+    borderRadius: isCompactLogin ? 37 : isTabletLogin ? 50 : 46,
   };
   const appNameResponsiveStyle = {
-    fontSize: isCompactLogin ? 20 : isTabletLogin ? 26 : 24,
-    lineHeight: isCompactLogin ? 27 : isTabletLogin ? 34 : 32,
+    fontSize: isCompactLogin ? 18 : isTabletLogin ? 24 : 22,
+    lineHeight: isCompactLogin ? 24 : isTabletLogin ? 30 : 28,
   };
   const cardResponsiveStyle = {
     marginHorizontal: loginHorizontalPadding,
-    marginTop: isCompactLogin ? -34 : -42,
+    marginTop: isCompactLogin ? -26 : -32,
     padding: isCompactLogin ? 18 : 24,
     ...(isWeb ? { maxWidth: loginMaxContentWidth } : null),
   };
@@ -793,6 +793,8 @@ export default function LoginScreen({ navigation, route }) {
             {/* Header with Logo */}
             <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
               <View style={[loginStyles.header, headerResponsiveStyle]}>
+                <View style={loginStyles.headerGlowOne} />
+                <View style={loginStyles.headerGlowTwo} />
                 <View style={loginStyles.headerContent}>
                   <View style={loginStyles.brandBadge}>
                     <Image
@@ -815,8 +817,13 @@ export default function LoginScreen({ navigation, route }) {
                     Sapphire International{"\n"}Aviation Academy
                   </Text>
                   <Text style={loginStyles.headerTagline}>
-                    Campus arrival, access, and visitor authentication in one secure checkpoint flow
+                    Secure campus access and visitor sign-in
                   </Text>
+                  <View style={loginStyles.flightAccent}>
+                    <View style={loginStyles.flightAccentLine} />
+                    <Ionicons name="airplane" size={13} color="rgba(255,255,255,0.92)" />
+                    <View style={loginStyles.flightAccentDot} />
+                  </View>
                   
                   {/* API Status Badge */}
                   <View style={[

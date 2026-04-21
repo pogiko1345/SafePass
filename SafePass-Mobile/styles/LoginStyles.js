@@ -40,13 +40,13 @@ export default StyleSheet.create({
     backgroundColor: "#041E42",
     paddingHorizontal: 24,
     paddingTop: Platform.select({
-      ios: 60,
-      android: 50,
-      web: 54,
+      ios: 52,
+      android: 44,
+      web: 46,
     }),
-    paddingBottom: 88,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
+    paddingBottom: 62,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
     overflow: "hidden",
     ...Platform.select({
       ios: {
@@ -78,20 +78,40 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
     borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: 18,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    marginBottom: 14,
     ...Platform.select({
       web: { backdropFilter: "blur(10px)" },
     }),
   },
 
   brandBadgeLogo: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    marginRight: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
     backgroundColor: "#FFFFFF",
+  },
+
+  headerGlowOne: {
+    position: "absolute",
+    top: -26,
+    right: -14,
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+    backgroundColor: "rgba(255,255,255,0.09)",
+  },
+
+  headerGlowTwo: {
+    position: "absolute",
+    bottom: -52,
+    left: -28,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: "rgba(56,189,248,0.12)",
   },
 
   brandBadgeTextWrap: {
@@ -100,23 +120,23 @@ export default StyleSheet.create({
 
   brandBadgeEyebrow: {
     color: "rgba(255,255,255,0.78)",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
   },
 
   brandBadgeTitle: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
   },
 
   logoImage: {
-    width: isSmallPhone ? 92 : 108,
-    height: isSmallPhone ? 92 : 108,
-    borderRadius: isSmallPhone ? 46 : 54,
-    marginBottom: 16,
+    width: isSmallPhone ? 78 : 92,
+    height: isSmallPhone ? 78 : 92,
+    borderRadius: isSmallPhone ? 39 : 46,
+    marginBottom: 12,
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.28)",
     backgroundColor: "#FFFFFF",
@@ -134,22 +154,44 @@ export default StyleSheet.create({
 
   appName: {
     color: "#FFFFFF",
-    fontSize: isSmallPhone ? 21 : isTablet ? 26 : 24,
+    fontSize: isSmallPhone ? 18 : isTablet ? 24 : 22,
     fontWeight: "800",
     textAlign: "center",
-    lineHeight: isSmallPhone ? 28 : 32,
-    marginBottom: 10,
+    lineHeight: isSmallPhone ? 24 : 28,
+    marginBottom: 8,
     letterSpacing: 0,
   },
 
   headerTagline: {
     color: "rgba(255,255,255,0.86)",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
     textAlign: "center",
-    lineHeight: 21,
-    maxWidth: 460,
-    marginBottom: 18,
+    lineHeight: 19,
+    maxWidth: 380,
+    marginBottom: 14,
+  },
+
+  flightAccent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  flightAccentLine: {
+    width: 34,
+    height: 1.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.34)",
+  },
+
+  flightAccentDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "rgba(255,255,255,0.78)",
   },
 
   statusBadge: {
@@ -171,14 +213,14 @@ export default StyleSheet.create({
 
   statusText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
 
   card: {
     backgroundColor: "#FFFFFF",
-    marginTop: -42,
+    marginTop: -32,
     marginHorizontal: isSmallPhone ? 16 : 20,
     padding: isSmallPhone ? 20 : 24,
     borderRadius: 8,

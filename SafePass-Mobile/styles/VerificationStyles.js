@@ -74,12 +74,12 @@ export default StyleSheet.create({
   // ============ HEADER ============
   heroPanel: {
     width: "100%",
-    paddingTop: Platform.select({ ios: 52, android: 32, web: 28 }),
-    paddingBottom: isSmallPhone ? 22 : 28,
-    paddingHorizontal: isSmallPhone ? 18 : 24,
-    borderRadius: 34,
+    paddingTop: Platform.select({ ios: 52, android: 44, web: 46 }),
+    paddingBottom: 62,
+    paddingHorizontal: 24,
+    borderRadius: 26,
     overflow: "hidden",
-    minHeight: isDesktop ? 640 : undefined,
+    minHeight: isDesktop ? 420 : undefined,
     ...(isDesktop ? { width: 420 } : {}),
     ...Platform.select({
       ios: {
@@ -89,7 +89,7 @@ export default StyleSheet.create({
         shadowRadius: 20,
       },
       android: { elevation: 8 },
-      web: { boxShadow: "0px 16px 40px rgba(79,70,229,0.20)" },
+      web: { boxShadow: "0px 18px 40px rgba(4, 30, 66, 0.22)" },
     }),
   },
 
@@ -100,7 +100,7 @@ export default StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
   },
@@ -110,19 +110,19 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.14)",
-    marginBottom: 18,
+    marginBottom: 14,
   },
 
   heroBadgeText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "700",
-    color: "#D8E8FF",
+    color: "rgba(255,255,255,0.78)",
     textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.8,
   },
 
   headerContent: {
@@ -130,17 +130,37 @@ export default StyleSheet.create({
   },
 
   iconContainer: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
 
   iconGradient: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: isSmallPhone ? 78 : 92,
+    height: isSmallPhone ? 78 : 92,
+    borderRadius: isSmallPhone ? 39 : 46,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.24)",
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+
+  heroGlowOne: {
+    position: "absolute",
+    top: -26,
+    right: -14,
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+    backgroundColor: "rgba(255,255,255,0.09)",
+  },
+
+  heroGlowTwo: {
+    position: "absolute",
+    bottom: -52,
+    left: -28,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: "rgba(56,189,248,0.12)",
   },
 
   logoImage: {
@@ -148,58 +168,83 @@ export default StyleSheet.create({
     height: 72,
     borderRadius: 36,
     backgroundColor: "#FFFFFF",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.42)",
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.28)",
   },
 
   headerTitle: {
-    fontSize: isSmallPhone ? 26 : 28,
-    fontWeight: "700",
+    fontSize: isSmallPhone ? 18 : isTablet ? 24 : 22,
+    fontWeight: "800",
     color: "#FFFFFF",
     textAlign: "center",
     marginBottom: 8,
-    letterSpacing: -0.3,
+    lineHeight: isSmallPhone ? 24 : 28,
+    letterSpacing: 0,
   },
 
   headerSubtitle: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.9)",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.86)",
     textAlign: isDesktop ? "left" : "center",
-    lineHeight: 20,
-    paddingHorizontal: isDesktop ? 0 : 20,
+    lineHeight: 19,
+    paddingHorizontal: 0,
+    maxWidth: 380,
   },
 
-  heroMetaRow: {
+  flightAccent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 0,
+  },
+
+  flightAccentLine: {
+    width: 34,
+    height: 1.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.34)",
+  },
+
+  flightAccentDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "rgba(255,255,255,0.78)",
+  },
+
+  panelMetaRow: {
     flexDirection: isSmallPhone ? "column" : "row",
     flexWrap: isSmallPhone ? "nowrap" : "wrap",
     gap: 12,
-    marginTop: 24,
+    marginBottom: 20,
   },
 
-  heroMetaCard: {
+  panelMetaCard: {
     width: isSmallPhone ? "100%" : undefined,
     minWidth: 120,
     flexGrow: 1,
     flexBasis: 120,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderRadius: 18,
+    backgroundColor: "#F7FAFD",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E6EDF7",
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
 
-  heroMetaLabel: {
+  panelMetaLabel: {
     fontSize: 11,
-    color: "rgba(255,255,255,0.72)",
+    color: "#64748B",
     textTransform: "uppercase",
     letterSpacing: 0.4,
     fontWeight: "700",
     marginBottom: 4,
   },
 
-  heroMetaValue: {
+  panelMetaValue: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: "#0F172A",
   },
 
   // ============ CONTENT ============
