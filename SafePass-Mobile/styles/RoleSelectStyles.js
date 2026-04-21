@@ -481,14 +481,33 @@ export default StyleSheet.create({
   },
 
   contactList: {
-    gap: 6,
+    gap: 8,
     marginBottom: spacing.sm,
   },
 
-  contactLine: {
+  contactRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF3F8",
+  },
+
+  contactLabel: {
+    fontSize: fontSizes.sm,
+    color: "#64748B",
+    fontWeight: "600",
+    minWidth: isSmallPhone ? 78 : 92,
+  },
+
+  contactValue: {
+    flex: 1,
     fontSize: fontSizes.sm,
     color: "#334155",
-    fontWeight: "600",
+    fontWeight: "700",
+    textAlign: "right",
   },
 
   contactLinkRow: {
@@ -496,6 +515,7 @@ export default StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.xs,
     marginTop: spacing.xs,
+    justifyContent: "flex-start",
   },
 
   contactLinkChip: {
@@ -522,6 +542,7 @@ export default StyleSheet.create({
     fontSize: fontSizes.xs,
     color: "#94A3B8",
     fontWeight: "600",
+    textAlign: "left",
   },
 
   versionText: {

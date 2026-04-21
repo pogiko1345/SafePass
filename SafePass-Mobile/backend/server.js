@@ -414,14 +414,73 @@ const validateDeviceKey = (req, res, next) => {
   next();
 };
 
-// ========== EMAIL SIMULATION (for demo) ==========
+// ========== EMAIL DELIVERY ==========
+let mailTransporter = null;
+let nodemailerLoadError = null;
+
+try {
+  const nodemailer = require("nodemailer");
+  const mailHost = String(process.env.MAIL_HOST || "").trim();
+  const mailUser = String(process.env.MAIL_USER || "").trim();
+  const mailPass = String(process.env.MAIL_PASS || "").trim();
+  const mailPort = Number(process.env.MAIL_PORT || 587);
+  const mailSecure = String(process.env.MAIL_SECURE || "false").trim() === "true";
+
+  if (mailHost && mailUser && mailPass) {
+    mailTransporter = nodemailer.createTransport({
+      host: mailHost,
+      port: mailPort,
+      secure: mailSecure,
+      auth: {
+        user: mailUser,
+        pass: mailPass,
+      },
+    });
+  }
+} catch (error) {
+  nodemailerLoadError = error;
+}
+
+const getMailFromAddress = () =>
+  String(process.env.MAIL_FROM || process.env.MAIL_USER || "no-reply@safepass.local").trim();
+
 const sendEmail = (to, subject, body) => {
-  console.log(`\n📧 ========== EMAIL SIMULATION ==========`);
-  console.log(`📧 To: ${to}`);
-  console.log(`📧 Subject: ${subject}`);
-  console.log(`📧 Body: ${body}`);
-  console.log(`📧 ====================================\n`);
-  return { success: true };
+  if (mailTransporter) {
+    mailTransporter
+      .sendMail({
+        from: getMailFromAddress(),
+        to,
+        subject,
+        text: body,
+      })
+      .then((info) => {
+        console.log(`\nEMAIL SENT TO ${to}`);
+        console.log(`SUBJECT: ${subject}`);
+        console.log(`MESSAGE ID: ${info.messageId}\n`);
+      })
+      .catch((error) => {
+        console.error(`\nFailed to send email to ${to}:`, error.message);
+      });
+
+    return { success: true, simulated: false };
+  }
+
+  if (nodemailerLoadError) {
+    console.warn(
+      "\nNodemailer is not installed yet. Run npm install in the backend folder to enable real email sending.",
+    );
+  } else if (!process.env.MAIL_HOST || !process.env.MAIL_USER || !process.env.MAIL_PASS) {
+    console.warn(
+      "\nMAIL_HOST / MAIL_USER / MAIL_PASS are not configured. Falling back to email simulation.",
+    );
+  }
+
+  console.log(`\nEMAIL SIMULATION`);
+  console.log(`To: ${to}`);
+  console.log(`Subject: ${subject}`);
+  console.log(`Body: ${body}`);
+  console.log(`END EMAIL SIMULATION\n`);
+  return { success: true, simulated: true };
 };
 
 const createVerificationToken = () => {
@@ -504,6 +563,47 @@ const createRegistrationOtp = (user) => {
 };
 
 const normalizeOtpCode = (value) => String(value || "").replace(/\D/g, "").slice(0, 6);
+const createPasswordResetOtp = (req, user) => {
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+  const resetToken = crypto.randomBytes(24).toString("hex");
+  const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
+
+  user.passwordResetTokenHash = resetTokenHash;
+  user.passwordResetOtpHash = otpHash;
+  user.passwordResetExpiresAt = expiresAt;
+  user.passwordResetAttempts = 0;
+  user.passwordResetVerifiedAt = null;
+
+  sendEmail(
+    user.email,
+    "Your Sapphire SafePass Password Reset Code",
+    [
+      `Hi ${user.firstName},`,
+      "",
+      `Your password reset OTP is: ${otpCode}`,
+      "",
+      "This code expires in 10 minutes.",
+      "",
+      "SIMULATION MODE: use the OTP shown in this message or backend logs.",
+    ].join("\n"),
+  );
+
+  console.log(`\nPASSWORD RESET OTP for ${user.email}: ${otpCode}`);
+  console.log(`PASSWORD RESET TOKEN for ${user.email}: ${resetToken}`);
+  console.log("Enter this OTP in the forgot password screen.\n");
+
+  return { otpCode, resetToken, expiresAt };
+};
+
+const clearPasswordResetState = (user) => {
+  user.passwordResetTokenHash = "";
+  user.passwordResetOtpHash = "";
+  user.passwordResetExpiresAt = null;
+  user.passwordResetAttempts = 0;
+  user.passwordResetVerifiedAt = null;
+};
 
 const normalizePhoneForOtp = (value) => {
   let cleanPhone = String(value || "").replace(/[^\d]/g, "");
@@ -1473,6 +1573,233 @@ app.post("/api/check-email", async (req, res) => {
   } catch (error) {
     console.error("❌ Check email error:", error);
     res.status(500).json({ error: "Failed to check email" });
+  }
+});
+
+app.post("/api/auth/request-password-reset", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+
+    if (!email || !isValidEmailValue(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email address.",
+      });
+    }
+
+    const otp = createPasswordResetOtp(req, user);
+    user.updatedAt = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "A password reset code has been sent to your email address.",
+      resetToken: otp.resetToken,
+      expiresIn: 600,
+      simulation: true,
+      otpCode: otp.otpCode,
+      otpExpiresAt: otp.expiresAt,
+    });
+  } catch (error) {
+    console.error("Request password reset error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to send password reset code.",
+    });
+  }
+});
+
+app.post("/api/auth/verify-password-reset", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+    const otpCode = normalizeOtpCode(req.body?.otpCode);
+    const resetToken = String(req.body?.resetToken || "").trim();
+
+    if (!email || !otpCode || !resetToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, reset token, and OTP code are required.",
+      });
+    }
+
+    if (!/^\d{6}$/.test(otpCode)) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP code must be exactly 6 digits.",
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    if (
+      !user.passwordResetTokenHash ||
+      !user.passwordResetOtpHash ||
+      !user.passwordResetExpiresAt
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "No active password reset request was found.",
+      });
+    }
+
+    if (user.passwordResetExpiresAt <= new Date()) {
+      clearPasswordResetState(user);
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: "Reset code has expired. Please request a new one.",
+      });
+    }
+
+    const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+    if (resetTokenHash !== user.passwordResetTokenHash) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid password reset session. Please request a new code.",
+      });
+    }
+
+    if ((user.passwordResetAttempts || 0) >= 5) {
+      clearPasswordResetState(user);
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: "Too many invalid attempts. Please request a new reset code.",
+      });
+    }
+
+    const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+    if (otpHash !== user.passwordResetOtpHash) {
+      user.passwordResetAttempts = (user.passwordResetAttempts || 0) + 1;
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: `Invalid verification code. ${Math.max(
+          0,
+          5 - user.passwordResetAttempts,
+        )} attempts remaining.`,
+      });
+    }
+
+    user.passwordResetAttempts = 0;
+    user.passwordResetVerifiedAt = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      verified: true,
+      message: "Password reset code verified successfully.",
+    });
+  } catch (error) {
+    console.error("Verify password reset error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify password reset code.",
+    });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+    const newPassword = String(req.body?.newPassword || "");
+    const resetToken = String(req.body?.resetToken || "").trim();
+
+    if (!email || !newPassword || !resetToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, new password, and reset token are required.",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters long.",
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    if (
+      !user.passwordResetTokenHash ||
+      !user.passwordResetOtpHash ||
+      !user.passwordResetExpiresAt
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "No verified password reset request was found.",
+      });
+    }
+
+    if (user.passwordResetExpiresAt <= new Date()) {
+      clearPasswordResetState(user);
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: "Reset session expired. Please request a new code.",
+      });
+    }
+
+    const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+    if (resetTokenHash !== user.passwordResetTokenHash) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid password reset session. Please request a new code.",
+      });
+    }
+
+    if (!user.passwordResetVerifiedAt) {
+      return res.status(400).json({
+        success: false,
+        message: "Please verify the reset code before changing your password.",
+      });
+    }
+
+    user.password = newPassword;
+    clearPasswordResetState(user);
+    user.updatedAt = new Date();
+    await user.save();
+
+    await createSystemActivity({
+      actorUser: user,
+      relatedUser: user,
+      activityType: "password_reset",
+      status: "completed",
+      location: "Login Screen",
+      notes: `${user.email} completed a password reset via forgot password.`,
+    });
+
+    res.json({
+      success: true,
+      message: "Password reset successfully.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset password.",
+    });
   }
 });
 
@@ -6351,5 +6678,6 @@ if (!isVercelRuntime && require.main === module) {
 }
 
 module.exports = app;
+
 
 

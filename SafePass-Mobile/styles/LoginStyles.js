@@ -516,7 +516,8 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
     gap: 6,
   },
 
@@ -636,59 +637,199 @@ export default StyleSheet.create({
     backgroundColor: "rgba(4, 30, 66, 0.42)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
   },
 
   modalContent: {
     backgroundColor: "#FFFFFF",
     borderRadius: 8,
-    padding: isSmallPhone ? 20 : 24,
     width: "100%",
-    maxWidth: 420,
-    alignItems: "center",
+    maxWidth: 520,
+    maxHeight: "92%",
     borderWidth: 1,
     borderColor: "#E6EDF7",
+    overflow: "hidden",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 6 },
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.12,
-        shadowRadius: 16,
+        shadowRadius: 24,
       },
       android: { elevation: 8 },
       web: { boxShadow: "0px 16px 36px rgba(15, 23, 42, 0.14)" },
     }),
   },
 
-  modalHeader: {
+  modalHero: {
+    backgroundColor: "#041E42",
+    paddingHorizontal: isSmallPhone ? 18 : 24,
+    paddingTop: isSmallPhone ? 18 : 22,
+    paddingBottom: isSmallPhone ? 18 : 22,
+  },
+
+  modalHeroTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    width: "100%",
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 18,
+  },
+
+  modalBrandBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+
+  modalBrandBadgeLogo: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
+    backgroundColor: "#FFFFFF",
+  },
+
+  modalBrandBadgeTextWrap: {
+    justifyContent: "center",
+    flex: 1,
+  },
+
+  modalBrandBadgeEyebrow: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+
+  modalBrandBadgeTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalHeroContent: {
+    alignItems: "center",
+  },
+
+  modalHeroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
   },
 
   modalTitle: {
     fontSize: isSmallPhone ? 20 : 22,
     fontWeight: "800",
-    color: "#0F172A",
-    flex: 1,
-    marginLeft: 12,
+    color: "#FFFFFF",
+    textAlign: "center",
   },
 
   modalSubtitle: {
     fontSize: isSmallPhone ? 13 : 14,
-    color: "#64748B",
-    marginBottom: 4,
+    color: "rgba(255,255,255,0.82)",
+    marginTop: 6,
     textAlign: "center",
     lineHeight: 20,
+  },
+
+  modalStepRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+    width: "100%",
+  },
+
+  modalStepChip: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalStepChipActive: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#FFFFFF",
+  },
+
+  modalStepChipComplete: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+
+  modalStepChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.76)",
+  },
+
+  modalStepChipTextActive: {
+    color: "#041E42",
+  },
+
+  modalBody: {
+    flex: 1,
+    width: "100%",
+  },
+
+  modalBodyContent: {
+    padding: isSmallPhone ? 18 : 24,
+  },
+
+  modalInfoCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    backgroundColor: "#F8FBFE",
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 18,
+  },
+
+  modalInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#475569",
+    fontWeight: "600",
   },
 
   modalPhone: {
     fontSize: isSmallPhone ? 16 : 18,
     fontWeight: "800",
     color: "#0A3D91",
-    marginBottom: 24,
+    marginBottom: 20,
+    textAlign: "center",
   },
 
   otpInputContainer: {
@@ -714,7 +855,8 @@ export default StyleSheet.create({
   timerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    justifyContent: "center",
+    marginBottom: 20,
     gap: 8,
   },
 

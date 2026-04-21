@@ -52,23 +52,6 @@ const storeData = async (key, value) => {
   }
 };
 
-const getData = async (key) => {
-  try {
-    if (!Storage || typeof Storage.getItem !== 'function') {
-      console.error("Storage is not available");
-      // Fallback for web - use localStorage
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
-      }
-      return null;
-    }
-    return await Storage.getItem(key);
-  } catch (error) {
-    console.error(`Error getting ${key}:`, error);
-    return null;
-  }
-};
-
 export default function VerificationScreen({ navigation, route }) {
   // Properly extract params with defaults
   const { email, password, rememberMe, tempToken, user: userData } = route.params || {};
@@ -77,8 +60,6 @@ export default function VerificationScreen({ navigation, route }) {
   const isTabletLayout = viewportWidth >= 768;
   const isCompactWidth = viewportWidth <= 520;
   const isPhoneWidth = viewportWidth <= 420;
-  
-  console.log("📱 VerificationScreen mounted with:", { email, hasTempToken: !!tempToken, userRole: userData?.role });
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -190,7 +171,7 @@ export default function VerificationScreen({ navigation, route }) {
         setCanResend(false);
         
         Alert.alert(
-          "📱 Verification Code Sent",
+          "Verification Code Sent",
           `A 6-digit code has been sent to ${cleanPhone}\n\nCheck your terminal/console for the OTP code.`,
           [{ text: "OK" }]
         );
@@ -271,8 +252,6 @@ export default function VerificationScreen({ navigation, route }) {
         return;
       }
       
-      console.log("💾 Storing user data:", finalUser.email, "Role:", finalUser.role);
-      
       // Reuse the token returned during credential verification to avoid a second login request.
       let sessionToken = verificationResponse?.token || tempToken || null;
       if (!sessionToken && email && password) {
@@ -284,10 +263,8 @@ export default function VerificationScreen({ navigation, route }) {
       }
       if (sessionToken) {
         await ApiService.setToken(sessionToken);
-        console.log("✅ Auth token stored");
       } else if (tempToken) {
         await ApiService.setToken(tempToken);
-        console.log("⚠️ Using temporary token fallback");
       }
       
       const userRole = normalizeRole(finalUser.role) || "visitor";
@@ -310,13 +287,11 @@ export default function VerificationScreen({ navigation, route }) {
 
       // Store user data
       await storeData("currentUser", JSON.stringify({ ...finalUser, role: userRole }));
-      console.log("✅ User data stored");
       
       // Treat remember-me as a trusted device so future logins can follow the faster path.
       if (rememberMe && email) {
         await storeData("rememberedEmail", email);
         await ApiService.trustDevice();
-        console.log("✅ Remembered email stored");
       } else if (email) {
         await Storage.removeItem("rememberedEmail");
       }
@@ -325,8 +300,6 @@ export default function VerificationScreen({ navigation, route }) {
       await Storage.removeItem("isNewRegistration");
       
       const dashboardRoute = IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(userRole);
-      
-      console.log('✅ Verification complete - Navigating to:', dashboardRoute, 'Role:', userRole);
       
       // Small delay to ensure storage is complete
       setTimeout(() => {

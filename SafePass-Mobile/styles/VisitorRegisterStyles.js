@@ -51,10 +51,10 @@ export default StyleSheet.create({
 
   header: {
     width: "100%",
-    paddingTop: Platform.select({ ios: 54, android: 42, web: 46 }),
-    paddingBottom: 42,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
+    paddingTop: Platform.select({ ios: 50, android: 36, web: 40 }),
+    paddingBottom: 28,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
     overflow: "hidden",
     ...Platform.select({
       ios: {
@@ -65,7 +65,7 @@ export default StyleSheet.create({
       },
       android: { elevation: 7 },
       web: {
-        boxShadow: "0px 18px 40px rgba(6, 59, 52, 0.18)",
+        boxShadow: "0px 18px 40px rgba(4, 30, 66, 0.18)",
       },
     }),
   },
@@ -121,17 +121,17 @@ export default StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
     ...Platform.select({
       web: { backdropFilter: "blur(10px)" },
     }),
   },
   headerBadgeLogo: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: "#FFFFFF",
-    marginRight: 10,
+    marginRight: 8,
   },
   headerBadgeTextWrap: {
     justifyContent: "center",
@@ -149,14 +149,14 @@ export default StyleSheet.create({
     color: "#FFFFFF",
   },
   headerIconContainer: {
-    marginBottom: spacing.sm,
-    borderRadius: 36,
+    marginBottom: spacing.xs,
+    borderRadius: 28,
     overflow: "hidden",
   },
   headerIconGradient: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -166,23 +166,65 @@ export default StyleSheet.create({
     fontSize: fontSizes.xxl,
     fontWeight: "800",
     color: "#FFFFFF",
-    marginBottom: 6,
+    marginBottom: 4,
     textAlign: "center",
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
   headerSubtitle: {
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.base,
     color: "rgba(255,255,255,0.94)",
     fontWeight: "700",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   headerDescription: {
     fontSize: fontSizes.sm,
     color: "rgba(255,255,255,0.84)",
     textAlign: "center",
-    lineHeight: 22,
-    maxWidth: 540,
+    lineHeight: 20,
+    maxWidth: 500,
+  },
+  aviationStrip: {
+    width: "100%",
+    maxWidth: 420,
+    marginTop: spacing.base,
+    gap: spacing.sm,
+    alignItems: "center",
+  },
+  aviationChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  aviationChipText: {
+    color: "#FFFFFF",
+    fontSize: fontSizes.xs,
+    fontWeight: "700",
+  },
+  aviationRoute: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  aviationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+  },
+  aviationTrail: {
+    flex: 1,
+    maxWidth: 180,
+    height: 1,
+    backgroundColor: "rgba(214,231,255,0.5)",
   },
 
   progressContainer: {
@@ -191,7 +233,7 @@ export default StyleSheet.create({
     marginTop: -22,
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.base,
-    borderRadius: 20,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E4EDF7",
     ...Platform.select({
@@ -281,7 +323,7 @@ export default StyleSheet.create({
     marginTop: spacing.base,
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.base,
-    borderRadius: 20,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E4EDF7",
   },
@@ -351,7 +393,7 @@ export default StyleSheet.create({
     fontSize: fontSizes.xl,
     fontWeight: "800",
     color: "#0F172A",
-    letterSpacing: -0.4,
+    letterSpacing: 0,
     marginBottom: 4,
   },
   sectionDescription: {
@@ -384,8 +426,8 @@ export default StyleSheet.create({
   stepInsightCard: {
     backgroundColor: "#F8FBFE",
     borderWidth: 1,
-    borderColor: "#CDEEDF",
-    borderRadius: 22,
+    borderColor: "#D8E8FF",
+    borderRadius: 8,
     padding: spacing.base,
     marginBottom: spacing.base,
     ...Platform.select({
@@ -396,7 +438,7 @@ export default StyleSheet.create({
         shadowRadius: 10,
       },
       android: { elevation: 1 },
-      web: { boxShadow: "0px 10px 22px rgba(5, 150, 105, 0.06)" },
+      web: { boxShadow: "0px 10px 22px rgba(10, 61, 145, 0.08)" },
     }),
   },
   stepInsightHeader: {
@@ -499,7 +541,7 @@ export default StyleSheet.create({
 
   formCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
+    borderRadius: 8,
     padding: spacing.base,
     borderWidth: 1,
     borderColor: "#E4EDF7",
@@ -572,7 +614,7 @@ export default StyleSheet.create({
     backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2EAF2",
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: spacing.base,
     minHeight: 52,
     gap: spacing.xs,
@@ -610,7 +652,7 @@ export default StyleSheet.create({
     marginTop: spacing.sm,
     borderWidth: 1,
     borderColor: "#D7E3EE",
-    borderRadius: 16,
+    borderRadius: 8,
     backgroundColor: "#F8FBFE",
     paddingHorizontal: spacing.base,
     paddingVertical: 12,
@@ -625,11 +667,11 @@ export default StyleSheet.create({
   },
 
   uploadArea: {
-    borderRadius: 18,
+    borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#F8FBFE",
     borderWidth: 2,
-    borderColor: "#DCE8E2",
+    borderColor: "#D8E8FF",
     borderStyle: "dashed",
     minHeight: 176,
     ...(isWeb && {
@@ -703,7 +745,7 @@ export default StyleSheet.create({
   },
 
   scanButton: {
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: "hidden",
     marginTop: spacing.sm,
     ...(isWeb && {
@@ -727,13 +769,13 @@ export default StyleSheet.create({
   },
   scanningContainer: {
     backgroundColor: "#F8FBFE",
-    borderRadius: 16,
+    borderRadius: 8,
     padding: spacing.base,
     marginTop: spacing.sm,
     alignItems: "center",
     gap: spacing.xs,
     borderWidth: 1,
-    borderColor: "#DCE8E2",
+    borderColor: "#D8E8FF",
   },
   scanningText: {
     fontSize: fontSizes.sm,
@@ -760,7 +802,7 @@ export default StyleSheet.create({
     backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2EAF2",
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: spacing.base,
     paddingVertical: 15,
     minHeight: 52,
@@ -914,7 +956,7 @@ export default StyleSheet.create({
 
   reviewCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
+    borderRadius: 8,
     padding: spacing.base,
     marginBottom: spacing.base,
     borderWidth: 1,
@@ -986,7 +1028,7 @@ export default StyleSheet.create({
 
   continueButton: {
     flex: 1.35,
-    borderRadius: 18,
+    borderRadius: 8,
     overflow: "hidden",
     marginBottom: spacing.base,
     ...(isWeb && {
@@ -994,7 +1036,7 @@ export default StyleSheet.create({
       transition: "transform 0.2s ease, box-shadow 0.2s ease",
       ":hover": {
         transform: "translateY(-2px)",
-        boxShadow: "0px 10px 24px rgba(5, 150, 105, 0.28)",
+        boxShadow: "0px 10px 24px rgba(10, 61, 145, 0.24)",
       },
     }),
   },
@@ -1021,7 +1063,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xs,
-    borderRadius: 18,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#D6E0EA",
     backgroundColor: "#FFFFFF",
@@ -1322,7 +1364,7 @@ export default StyleSheet.create({
     backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#DCE7F3",
-    borderRadius: 16,
+    borderRadius: 8,
     padding: spacing.base,
     marginBottom: spacing.base,
   },
@@ -1330,16 +1372,32 @@ export default StyleSheet.create({
     marginTop: spacing.xs,
     borderWidth: 1,
     borderColor: "#CBD5E1",
-    borderRadius: 14,
+    borderRadius: 8,
     paddingHorizontal: spacing.base,
     paddingVertical: Platform.select({ ios: 14, android: 12, web: 12 }),
     fontSize: fontSizes.lg,
     fontWeight: "800",
-    letterSpacing: 5,
+    letterSpacing: 4,
     color: "#0F172A",
     textAlign: "center",
     backgroundColor: "#FFFFFF",
     ...(Platform.OS === "web" ? { outlineStyle: "none" } : {}),
+  },
+  otpInputError: {
+    borderColor: "#DC2626",
+    backgroundColor: "#FEF2F2",
+  },
+  otpHintText: {
+    marginTop: spacing.xs,
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    lineHeight: 18,
+  },
+  otpErrorText: {
+    marginTop: spacing.xs,
+    fontSize: fontSizes.xs,
+    color: "#DC2626",
+    fontWeight: "600",
   },
   resendOtpButton: {
     paddingVertical: spacing.sm,
@@ -1352,7 +1410,7 @@ export default StyleSheet.create({
     fontWeight: "800",
   },
   successButton: {
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: "hidden",
     width: "100%",
   },

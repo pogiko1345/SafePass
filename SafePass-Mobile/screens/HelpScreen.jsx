@@ -18,32 +18,32 @@ const CONTACT_OPTIONS = [
   {
     id: "email",
     label: "Email Support",
-    value: "support@sapphireaviation.edu",
-    helper: "Best for login, approval, and account recovery concerns",
+    value: "info@sapphireaviationacademy.edu.ph",
+    helper: "Best for login, OTP verification, approval, and account recovery concerns",
     icon: "mail-outline",
     accent: "#0A3D91",
-    tint: "#CCFBF1",
-    url: "mailto:support@sapphireaviation.edu",
+    tint: "#EEF5FF",
+    url: "mailto:info@sapphireaviationacademy.edu.ph",
   },
   {
     id: "call",
     label: "Security Desk",
-    value: "+1 (234) 567-890",
+    value: "0917 580 4858",
     helper: "Call for gate access concerns and urgent visitor coordination",
     icon: "call-outline",
-    accent: "#B45309",
-    tint: "#FEF3C7",
-    url: "tel:+1234567890",
+    accent: "#0A3D91",
+    tint: "#E8F1FF",
+    url: "tel:09175804858",
   },
   {
     id: "site",
     label: "Campus Website",
-    value: "sapphireaviation.edu",
+    value: "sapphireaviationacademy.edu.ph",
     helper: "Visit the academy site for announcements and contact details",
     icon: "globe-outline",
     accent: "#041E42",
     tint: "#EEF5FF",
-    url: "https://sapphireaviation.edu",
+    url: "https://sapphireaviationacademy.edu.ph/",
   },
 ];
 
@@ -70,7 +70,7 @@ const QUICK_GUIDES = [
     description:
       "Track approved visitors, monitor notifications, and handle check-in or check-out at arrival time.",
     icon: "scan-outline",
-    accent: "#B45309",
+    accent: "#1C6DD0",
   },
 ];
 
@@ -79,19 +79,19 @@ const FAQS = [
     id: "login",
     question: "How do I sign in to SafePass?",
     answer:
-      "Use the Login screen and enter the credentials tied to your role. Visitors can sign in after registration, even while approval is still pending.",
+      "Use the Login screen and enter the credentials tied to your role. Visitors can sign in after completing registration and OTP verification.",
   },
   {
     id: "visitor",
     question: "What happens after visitor registration?",
     answer:
-      "Your registration is sent to admin for approval. Once approved, your visitor account becomes active and security receives a visit notification with the scheduled date and time.",
+      "After registration, verify your account using the OTP code sent to your email. Once verified, you can sign in and submit your visit request from the visitor dashboard.",
   },
   {
     id: "pending",
     question: "Why does my visitor dashboard say waiting for approval?",
     answer:
-      "That means your visitor account exists, but admin has not approved the visit yet. You can still sign in and monitor the status from your dashboard.",
+      "That means your account is active, but your current visit request is still waiting for review. You can monitor the request status from your visitor dashboard.",
   },
   {
     id: "security",
@@ -103,7 +103,7 @@ const FAQS = [
     id: "password",
     question: "What if I forgot my password?",
     answer:
-      "Return to Login and use the password recovery flow if available, or contact support so your account can be reset safely.",
+      "Return to Login and use the password recovery flow. If you still cannot sign in, contact support so your account can be reset safely.",
   },
   {
     id: "privacy",
@@ -158,48 +158,50 @@ export default function HelpScreen({ navigation }) {
           end={{ x: 1, y: 1 }}
           style={helpStyles.hero}
         >
-          <TouchableOpacity
-            style={helpStyles.backButton}
-            onPress={handleBack}
-            activeOpacity={0.8}
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-            {...(isWeb && {
-              onKeyPress: (e) => handleKeyPress(e, handleBack),
-              tabIndex: 0,
-            })}
-          >
-            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={helpStyles.heroInner}>
+            <TouchableOpacity
+              style={helpStyles.backButton}
+              onPress={handleBack}
+              activeOpacity={0.8}
+              accessibilityLabel="Go back"
+              accessibilityRole="button"
+              {...(isWeb && {
+                onKeyPress: (e) => handleKeyPress(e, handleBack),
+                tabIndex: 0,
+              })}
+            >
+              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
 
-          <View style={helpStyles.heroBadge}>
-            <Ionicons name="headset-outline" size={16} color="#EEF5FF" />
-            <Text style={helpStyles.heroBadgeText}>SafePass Support Center</Text>
-          </View>
+            <View style={helpStyles.heroBadge}>
+              <Ionicons name="headset-outline" size={16} color="#EEF5FF" />
+              <Text style={helpStyles.heroBadgeText}>SafePass Support Center</Text>
+            </View>
 
-          <View style={helpStyles.heroBody}>
-            <View style={helpStyles.heroIconShell}>
-              <Ionicons name="help-buoy-outline" size={38} color="#FFFFFF" />
+            <View style={helpStyles.heroBody}>
+              <View style={helpStyles.heroIconShell}>
+                <Ionicons name="help-buoy-outline" size={38} color="#FFFFFF" />
+              </View>
+              <Text style={helpStyles.heroTitle}>Help That Matches Your Flow</Text>
+              <Text style={helpStyles.heroSubtitle}>
+                Get support for visitor registration, admin approval, security
+                tracking, and account access from one place.
+              </Text>
             </View>
-            <Text style={helpStyles.heroTitle}>Help That Matches Your Flow</Text>
-            <Text style={helpStyles.heroSubtitle}>
-              Get support for visitor registration, admin approval, security
-              tracking, and account access from one place.
-            </Text>
-          </View>
 
-          <View style={helpStyles.heroStats}>
-            <View style={helpStyles.heroStatCard}>
-              <Text style={helpStyles.heroStatValue}>24/7</Text>
-              <Text style={helpStyles.heroStatLabel}>Support window</Text>
-            </View>
-            <View style={helpStyles.heroStatCard}>
-              <Text style={helpStyles.heroStatValue}>3</Text>
-              <Text style={helpStyles.heroStatLabel}>Core workflows</Text>
-            </View>
-            <View style={helpStyles.heroStatCard}>
-              <Text style={helpStyles.heroStatValue}>Fast</Text>
-              <Text style={helpStyles.heroStatLabel}>Issue guidance</Text>
+            <View style={helpStyles.heroStats}>
+              <View style={helpStyles.heroStatCard}>
+                <Text style={helpStyles.heroStatValue}>24/7</Text>
+                <Text style={helpStyles.heroStatLabel}>Support window</Text>
+              </View>
+              <View style={helpStyles.heroStatCard}>
+                <Text style={helpStyles.heroStatValue}>3</Text>
+                <Text style={helpStyles.heroStatLabel}>Core workflows</Text>
+              </View>
+              <View style={helpStyles.heroStatCard}>
+                <Text style={helpStyles.heroStatValue}>Fast</Text>
+                <Text style={helpStyles.heroStatLabel}>Issue guidance</Text>
+              </View>
             </View>
           </View>
         </LinearGradient>
@@ -237,12 +239,14 @@ export default function HelpScreen({ navigation }) {
                     tabIndex: 0,
                   })}
                 >
-                  <View style={[helpStyles.contactIconWrap, { backgroundColor: item.tint }]}>
-                    <Ionicons name={item.icon} size={22} color={item.accent} />
+                  <View style={helpStyles.contactCardContent}>
+                    <View style={[helpStyles.contactIconWrap, { backgroundColor: item.tint }]}>
+                      <Ionicons name={item.icon} size={22} color={item.accent} />
+                    </View>
+                    <Text style={helpStyles.contactLabel}>{item.label}</Text>
+                    <Text style={helpStyles.contactValue}>{item.value}</Text>
+                    <Text style={helpStyles.contactHelper}>{item.helper}</Text>
                   </View>
-                  <Text style={helpStyles.contactLabel}>{item.label}</Text>
-                  <Text style={helpStyles.contactValue}>{item.value}</Text>
-                  <Text style={helpStyles.contactHelper}>{item.helper}</Text>
                   <View style={helpStyles.contactLinkRow}>
                     <Text style={[helpStyles.contactLinkText, { color: item.accent }]}>
                       Open
@@ -321,7 +325,7 @@ export default function HelpScreen({ navigation }) {
           </View>
 
           <LinearGradient
-            colors={["#FFF7ED", "#EEF5FF"]}
+            colors={["#F8FBFE", "#EEF5FF"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={helpStyles.ctaCard}

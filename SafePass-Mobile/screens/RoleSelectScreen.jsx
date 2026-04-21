@@ -329,7 +329,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                 onPress={handleLoginSelect}
                 activeOpacity={0.7}
                 accessibilityLabel="Login"
-                accessibilityHint="Login to your existing account"
+                accessibilityHint="Go to the login screen for your account"
                 accessibilityRole="button"
                 {...(isWeb && {
                   onKeyPress: (e) => handleKeyPress(e, handleLoginSelect),
@@ -349,7 +349,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                     </LinearGradient>
                   </View>
                   <View style={roleSelectStyles.cardContent}>
-                    <Text style={roleSelectStyles.cardTitle}>Existing User</Text>
+                    <Text style={roleSelectStyles.cardTitle}>Login</Text>
                     <Text style={roleSelectStyles.cardDescription}>
                       Sign in to review approvals, open your dashboard, manage appointments, and
                       continue your access flow.
@@ -417,9 +417,18 @@ export default function RoleSelectScreen({ navigation, route }) {
             </View>
 
             <View style={roleSelectStyles.contactList}>
-              <Text style={roleSelectStyles.contactLine}>Website: sapphireaviationacademy.edu.ph</Text>
-              <Text style={roleSelectStyles.contactLine}>Tel No: (02) 7091 - 3362</Text>
-              <Text style={roleSelectStyles.contactLine}>Mobile No: 0917 580 4858</Text>
+              <View style={roleSelectStyles.contactRow}>
+                <Text style={roleSelectStyles.contactLabel}>Website</Text>
+                <Text style={roleSelectStyles.contactValue}>sapphireaviationacademy.edu.ph</Text>
+              </View>
+              <View style={roleSelectStyles.contactRow}>
+                <Text style={roleSelectStyles.contactLabel}>Tel No.</Text>
+                <Text style={roleSelectStyles.contactValue}>(02) 7091 - 3362</Text>
+              </View>
+              <View style={roleSelectStyles.contactRow}>
+                <Text style={roleSelectStyles.contactLabel}>Mobile No.</Text>
+                <Text style={roleSelectStyles.contactValue}>0917 580 4858</Text>
+              </View>
             </View>
 
             <View style={roleSelectStyles.contactLinkRow}>

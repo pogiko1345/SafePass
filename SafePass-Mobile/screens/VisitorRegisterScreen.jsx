@@ -71,6 +71,7 @@ const SuccessModal = ({
   isVerified,
   isVerifying,
   otpValue,
+  otpError,
   onOtpChange,
   onConfirm,
   onVerifySimulation,
@@ -94,7 +95,7 @@ const SuccessModal = ({
         <View style={visitorRegisterStyles.successModalContainer}>
           <View style={visitorRegisterStyles.successIconContainer}>
             <LinearGradient
-              colors={["#10B981", "#0A3D91"]}
+              colors={["#0A3D91", "#041E42"]}
               style={visitorRegisterStyles.successIconGradient}
             >
               <Ionicons name="checkmark-done" size={48} color="#FFFFFF" />
@@ -150,7 +151,10 @@ const SuccessModal = ({
             <View style={visitorRegisterStyles.otpVerifyBox}>
               <Text style={visitorRegisterStyles.credentialLabel}>Enter OTP Code</Text>
               <TextInput
-                style={visitorRegisterStyles.otpInput}
+                style={[
+                  visitorRegisterStyles.otpInput,
+                  otpError && visitorRegisterStyles.otpInputError,
+                ]}
                 value={otpValue}
                 onChangeText={onOtpChange}
                 placeholder="6-digit OTP"
@@ -158,6 +162,13 @@ const SuccessModal = ({
                 keyboardType="number-pad"
                 maxLength={6}
               />
+              {otpError ? (
+                <Text style={visitorRegisterStyles.otpErrorText}>{otpError}</Text>
+              ) : (
+                <Text style={visitorRegisterStyles.otpHintText}>
+                  We will check the code after you press Verify OTP.
+                </Text>
+              )}
             </View>
           ) : null}
           {!isVerified ? (
@@ -171,7 +182,7 @@ const SuccessModal = ({
               activeOpacity={0.7}
             >
               <LinearGradient
-                colors={isVerified ? ["#10B981", "#0A3D91"] : ["#0A3D91", "#041E42"]}
+                colors={["#0A3D91", "#041E42"]}
                 style={visitorRegisterStyles.successGradient}
               >
                 <Text style={visitorRegisterStyles.successButtonText}>
@@ -211,13 +222,13 @@ const SuccessModal = ({
           >
             <LinearGradient
               colors={isVerified ? ["#0A3D91", "#0A3D91"] : ["#94A3B8", "#64748B"]}
-                style={visitorRegisterStyles.successGradient}
-              >
-                <Text style={visitorRegisterStyles.successButtonText}>
-                  {isVerified ? "Continue to Sign In" : "Verify OTP First"}
-                </Text>
-                <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
-              </LinearGradient>
+              style={visitorRegisterStyles.successGradient}
+            >
+              <Text style={visitorRegisterStyles.successButtonText}>
+                {isVerified ? "Continue to Sign In" : "Verify OTP First"}
+              </Text>
+              <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -271,7 +282,7 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • Full name, email address, username, and your password for account access.
+                - Full name, email address, username, and your password for account access.
               </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
@@ -282,10 +293,10 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • To create your visitor account and securely link future appointments to you.
+                - To create your visitor account and securely link future appointments to you.
               </Text>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • To let you log in, request appointments, and track approval status.
+                - To let you log in, request appointments, and track approval status.
               </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
@@ -296,10 +307,10 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • Your account details are stored securely and used only inside the SafePass system.
+                - Your account details are stored securely and used only inside the SafePass system.
               </Text>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • Only authorized personnel can view appointment-related records when needed.
+                - Only authorized personnel can view appointment-related records when needed.
               </Text>
             </View>
           </ScrollView>
@@ -355,7 +366,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     Math.max(viewportWidth - registerHorizontalMargin * 2, 300),
   );
   const headerResponsiveStyle = {
-    paddingBottom: isCompactRegister ? 34 : 42,
+    paddingBottom: isCompactRegister ? 22 : 28,
   };
   const headerButtonsResponsiveStyle = {
     left: registerHorizontalMargin,
@@ -366,9 +377,9 @@ export default function VisitorRegisterScreen({ navigation }) {
     maxWidth: isTabletRegister ? 720 : 640,
   };
   const headerIconGradientResponsiveStyle = {
-    width: isCompactRegister ? 64 : 72,
-    height: isCompactRegister ? 64 : 72,
-    borderRadius: isCompactRegister ? 32 : 36,
+    width: isCompactRegister ? 48 : 56,
+    height: isCompactRegister ? 48 : 56,
+    borderRadius: isCompactRegister ? 24 : 28,
   };
   const headerTitleResponsiveStyle = {
     fontSize: isCompactRegister ? 24 : undefined,
@@ -416,10 +427,12 @@ export default function VisitorRegisterScreen({ navigation }) {
     confirmPassword: "",
   });
   const [focusedField, setFocusedField] = useState(null);
+  const [touchedFields, setTouchedFields] = useState({});
   const [completedFields, setCompletedFields] = useState({});
   const [registeredVisitor, setRegisteredVisitor] = useState(null);
   const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
   const [registrationOtp, setRegistrationOtp] = useState("");
+  const [registrationOtpError, setRegistrationOtpError] = useState("");
 
   const goToVisitorLogin = (overrides = {}) => {
     navigation.reset({
@@ -443,9 +456,27 @@ export default function VisitorRegisterScreen({ navigation }) {
     }
   }, []);
 
+  const normalizeFullName = (name) => name.replace(/\s{2,}/g, " ").trim();
+
+  const normalizeUsername = (username) => username.trim().toLowerCase();
+
   const validateName = (name) => {
-    if (!name.trim()) return "Full name is required";
-    if (name.trim().length < 2) return "Name must be at least 2 characters";
+    const normalizedName = normalizeFullName(String(name || ""));
+
+    if (!normalizedName) return "Full name is required";
+    if (normalizedName.length < 5) return "Please enter your full name";
+
+    const nameParts = normalizedName.split(" ").filter(Boolean);
+    if (nameParts.length < 2) return "Please enter at least first and last name";
+
+    if (!/^[A-Za-z][A-Za-z\s\-']*[A-Za-z]$/.test(normalizedName)) {
+      return "Name must start and end with a letter";
+    }
+
+    if (/[-']{2,}/.test(normalizedName)) {
+      return "Name contains invalid punctuation";
+    }
+
     return "";
   };
 
@@ -457,8 +488,15 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const validateUsername = (username) => {
-    if (!username.trim()) return "Username is required";
-    if (username.trim().length < 4) return "Username must be at least 4 characters";
+    const normalizedUsername = normalizeUsername(String(username || ""));
+
+    if (!normalizedUsername) return "Username is required";
+    if (normalizedUsername.length < 4) return "Username must be at least 4 characters";
+    if (normalizedUsername.length > 20) return "Username must be 20 characters or less";
+    if (!/^[a-z][a-z0-9._]*$/.test(normalizedUsername)) {
+      return "Use lowercase letters, numbers, dots, or underscores only";
+    }
+
     return "";
   };
 
@@ -470,7 +508,10 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const validatePassword = (password) => {
     if (!password) return "Password is required";
-    if (password.length < 6) return "Password must be at least 6 characters";
+    if (password.length < 8) return "Password must be at least 8 characters";
+    if (!/[A-Z]/.test(password)) return "Password must include at least one uppercase letter";
+    if (!/[a-z]/.test(password)) return "Password must include at least one lowercase letter";
+    if (!/\d/.test(password)) return "Password must include at least one number";
     return "";
   };
 
@@ -488,44 +529,92 @@ export default function VisitorRegisterScreen({ navigation }) {
     );
   };
 
+  const getFieldError = (field, value, nextFormData = formData) => {
+    if (field === "fullName") return validateName(value);
+    if (field === "email") return validateEmail(value);
+    if (field === "username") return validateUsername(value);
+    if (field === "phone") return validatePhone(value);
+    if (field === "password") return validatePassword(value);
+    if (field === "confirmPassword") {
+      return validateConfirmPassword(value, nextFormData.password);
+    }
+    return "";
+  };
+
   const handleInputChange = (field, value) => {
     let nextValue = value;
-    let error = "";
 
     if (field === "fullName") {
-      nextValue = value.replace(/[^A-Za-z\s\-']/g, "");
-      error = validateName(nextValue);
+      nextValue = value.replace(/[^A-Za-z\s\-']/g, "").replace(/\s{2,}/g, " ");
     } else if (field === "email") {
       nextValue = value.trim().toLowerCase();
-      error = validateEmail(nextValue);
     } else if (field === "username") {
-      nextValue = value.replace(/\s+/g, "").toLowerCase();
-      error = validateUsername(nextValue);
+      nextValue = value.replace(/[^A-Za-z0-9._]/g, "").toLowerCase();
     } else if (field === "phone") {
       nextValue = value.replace(/[^\d+\s-]/g, "");
-      error = validatePhone(nextValue);
-    } else if (field === "password") {
-      error = validatePassword(nextValue);
-      setErrors((previous) => ({
-        ...previous,
-        confirmPassword: validateConfirmPassword(formData.confirmPassword, nextValue),
-      }));
-      setCompletedFields((previous) => ({
-        ...previous,
-        confirmPassword: Boolean(
-          formData.confirmPassword &&
-            !validateConfirmPassword(formData.confirmPassword, nextValue),
-        ),
-      }));
-    } else if (field === "confirmPassword") {
-      error = validateConfirmPassword(nextValue, formData.password);
     }
 
-    setFormData((previous) => ({ ...previous, [field]: nextValue }));
-    setErrors((previous) => ({ ...previous, [field]: error }));
+    const nextFormData = { ...formData, [field]: nextValue };
+    const nextFieldError = getFieldError(field, nextValue, nextFormData);
+    const nextConfirmPasswordError = getFieldError(
+      "confirmPassword",
+      nextFormData.confirmPassword,
+      nextFormData,
+    );
+
+    setFormData(nextFormData);
+    setErrors((previous) => ({
+      ...previous,
+      [field]: touchedFields[field] ? nextFieldError : "",
+      confirmPassword:
+        field === "password"
+          ? touchedFields.confirmPassword
+            ? nextConfirmPasswordError
+            : ""
+          : previous.confirmPassword,
+    }));
     setCompletedFields((previous) => ({
       ...previous,
-      [field]: Boolean(nextValue && !error),
+      [field]: Boolean(nextValue && !nextFieldError),
+      confirmPassword:
+        field === "password"
+          ? Boolean(nextFormData.confirmPassword && !nextConfirmPasswordError)
+          : previous.confirmPassword,
+    }));
+  };
+
+  const handleFieldBlur = (field) => {
+    setFocusedField(null);
+    if (field === "fullName") {
+      setFormData((previous) => ({
+        ...previous,
+        fullName: normalizeFullName(previous.fullName),
+      }));
+    } else if (field === "username") {
+      setFormData((previous) => ({
+        ...previous,
+        username: normalizeUsername(previous.username),
+      }));
+    }
+    setTouchedFields((previous) => ({ ...previous, [field]: true }));
+    setErrors((previous) => ({
+      ...previous,
+      [field]: getFieldError(
+        field,
+        field === "fullName"
+          ? normalizeFullName(formData[field])
+          : field === "username"
+            ? normalizeUsername(formData[field])
+            : formData[field],
+        {
+          ...formData,
+          ...(field === "fullName"
+            ? { fullName: normalizeFullName(formData.fullName) }
+            : field === "username"
+              ? { username: normalizeUsername(formData.username) }
+              : {}),
+        },
+      ),
     }));
   };
 
@@ -555,9 +644,17 @@ export default function VisitorRegisterScreen({ navigation }) {
 
     const errorMessages = Object.entries(nextErrors)
       .filter(([, message]) => Boolean(message))
-      .map(([field, message]) => `• ${labels[field]}: ${message}`);
+      .map(([field, message]) => `- ${labels[field]}: ${message}`);
 
     if (errorMessages.length > 0) {
+      setTouchedFields({
+        fullName: true,
+        email: true,
+        username: true,
+        phone: true,
+        password: true,
+        confirmPassword: true,
+      });
       showValidationAlert(errorMessages);
       return false;
     }
@@ -598,9 +695,9 @@ export default function VisitorRegisterScreen({ navigation }) {
       }
 
       const response = await ApiService.registerVisitor({
-        fullName: formData.fullName,
+        fullName: normalizeFullName(formData.fullName),
         email: formData.email,
-        username: formData.username,
+        username: normalizeUsername(formData.username),
         phone: normalizePhilippineMobileNumber(formData.phone),
         password: formData.password,
         privacyAccepted: true,
@@ -614,6 +711,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           isVerified: false,
         });
         setRegistrationOtp("");
+        setRegistrationOtpError("");
         setTimeout(() => {
           setShowSuccess(true);
         }, Platform.OS === "web" ? 120 : 80);
@@ -705,16 +803,17 @@ export default function VisitorRegisterScreen({ navigation }) {
     const otpCode = String(registrationOtp || "").replace(/\D/g, "").slice(0, 6);
 
     if (!email || !otpCode) {
-      Alert.alert("OTP Required", "Please enter the 6-digit OTP code.");
+      setRegistrationOtpError("Please enter the 6-digit OTP code.");
       return;
     }
 
     if (otpCode.length !== 6) {
-      Alert.alert("Invalid OTP", "The OTP must be exactly 6 digits.");
+      setRegistrationOtpError("The OTP must be exactly 6 digits.");
       return;
     }
 
     try {
+      setRegistrationOtpError("");
       setIsVerifyingAccount(true);
       const response = await ApiService.verifyRegistrationOtp(email, otpCode);
 
@@ -735,6 +834,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         response?.message || "Unable to verify the OTP. Please try again.",
       );
     } catch (error) {
+      setRegistrationOtpError(error?.message || "Please try again or request a new OTP.");
       Alert.alert(
         "Unable to Verify OTP",
         error?.message || "Please try again or request a new OTP.",
@@ -759,8 +859,9 @@ export default function VisitorRegisterScreen({ navigation }) {
           ...previous,
         }));
         setRegistrationOtp("");
+        setRegistrationOtpError("");
         Alert.alert(
-          "OTP Sent",
+          "Verification Code Sent",
           "A new OTP has been sent. If local email delivery is unavailable, check your backend logs.",
         );
         return;
@@ -955,6 +1056,19 @@ export default function VisitorRegisterScreen({ navigation }) {
                 Register first, then log in to request appointments and view the
                 campus map from your visitor dashboard.
               </Text>
+              <View style={visitorRegisterStyles.aviationStrip}>
+                <View style={visitorRegisterStyles.aviationChip}>
+                  <Ionicons name="airplane-outline" size={16} color="#FFFFFF" />
+                  <Text style={visitorRegisterStyles.aviationChipText}>
+                    Sapphire Aviation
+                  </Text>
+                </View>
+                <View style={visitorRegisterStyles.aviationRoute}>
+                  <View style={visitorRegisterStyles.aviationDot} />
+                  <View style={visitorRegisterStyles.aviationTrail} />
+                  <Ionicons name="airplane" size={16} color="#D6E7FF" />
+                </View>
+              </View>
             </View>
           </LinearGradient>
 
@@ -1078,10 +1192,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                         value={formData[field]}
                         onChangeText={(text) => handleInputChange(field, text)}
                         onFocus={() => setFocusedField(field)}
-                        onBlur={() => {
-                          setFocusedField(null);
-                          handleInputChange(field, formData[field]);
-                        }}
+                        onBlur={() => handleFieldBlur(field)}
                         keyboardType={config.keyboard}
                         autoCapitalize={config.autoCapitalize}
                         secureTextEntry={config.secureTextEntry}
@@ -1158,7 +1269,13 @@ export default function VisitorRegisterScreen({ navigation }) {
         isVerified={Boolean(registeredVisitor?.isVerified)}
         isVerifying={isVerifyingAccount}
         otpValue={registrationOtp}
-        onOtpChange={(value) => setRegistrationOtp(String(value || "").replace(/\D/g, "").slice(0, 6))}
+        otpError={registrationOtpError}
+        onOtpChange={(value) => {
+          setRegistrationOtp(String(value || "").replace(/\D/g, "").slice(0, 6));
+          if (registrationOtpError) {
+            setRegistrationOtpError("");
+          }
+        }}
         onConfirm={handleSuccessConfirm}
         onVerifySimulation={handleVerifySimulation}
         onResendOtp={handleResendRegistrationOtp}
@@ -1166,4 +1283,5 @@ export default function VisitorRegisterScreen({ navigation }) {
     </SafeAreaView>
   );
 }
+
 
