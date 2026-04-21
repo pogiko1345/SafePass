@@ -1284,14 +1284,10 @@ async createSecurityGuard(guardData) {
   try {
     console.log('👮 Creating security guard:', guardData);
     
-    // Generate a random password if not provided
-    const password = guardData.password || this.generateRandomPassword();
-    
     const response = await this.fetch("/admin/security/create", {
       method: "POST",
       body: {
         ...guardData,
-        password,
         role: 'guard',
         status: 'active'
       }
@@ -1695,3 +1691,4 @@ ApiService.prototype.testConnection = async function testConnectionWithAndroidFa
 };
 
 export default new ApiService();
+

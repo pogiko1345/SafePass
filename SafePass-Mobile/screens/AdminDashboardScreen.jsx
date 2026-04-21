@@ -302,6 +302,19 @@ const formatDate = (date) => {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
+const formatFilterDateLabel = (date) => {
+  if (!date) return "Pick Date";
+  const resolvedDate = new Date(date);
+  if (Number.isNaN(resolvedDate.getTime())) return "Pick Date";
+  return resolvedDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const getGeneratedEmployeeIdPreview = () => `${new Date().getFullYear()}-******`;
+
 const getStatusColor = (status) => {
   switch (status) {
     case "pending":
@@ -720,7 +733,12 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [showPendingRequestsModal, setShowPendingRequestsModal] = useState(false);
   const [requestFilter, setRequestFilter] = useState("pending");
   const [requestDateFilter, setRequestDateFilter] = useState("all");
+  const [requestDateRange, setRequestDateRange] = useState({
+    startDate: null,
+    endDate: null,
+  });
   const [requestOfficeFilter, setRequestOfficeFilter] = useState("all");
+  const [requestSortOrder, setRequestSortOrder] = useState("newest");
   const [processingId, setProcessingId] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -740,12 +758,15 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [historyFilter, setHistoryFilter] = useState("all");
   const [historyDateFilter, setHistoryDateFilter] = useState("all");
   const [historyOfficeFilter, setHistoryOfficeFilter] = useState("all");
+  const [historySortOrder, setHistorySortOrder] = useState("newest");
   const [historySearchQuery, setHistorySearchQuery] = useState("");
   const [historySearchTerm, setHistorySearchTerm] = useState("");
   const [historyDateRange, setHistoryDateRange] = useState({
     startDate: null,
     endDate: null,
   });
+  const [activeFilterDateField, setActiveFilterDateField] = useState(null);
+  const [expandedFilterSections, setExpandedFilterSections] = useState({});
 
   // Settings States
   const [settings, setSettings] = useState({
@@ -880,12 +901,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     lastName: "",
     username: "",
     email: "",
-    password: "",
-    confirmPassword: "",
     phone: "",
     role,
     department: role === "security" ? "Security Department" : "Admissions",
-    employeeId: "",
     position: role === "security" ? "Security Personnel" : "Admissions Officer",
     shift: "",
     status: "active",
@@ -1015,6 +1033,21 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         normalizeFilterValue(r.assignedOffice || r.appointmentDepartment || r.host) === requestOfficeFilter,
       );
     }
+    if (requestDateRange.startDate) {
+      filtered = filtered.filter((r) => {
+        const requestDate = new Date(r.visitDate || r.scheduledVisitStart || r.createdAt);
+        return !Number.isNaN(requestDate.getTime()) && requestDate >= requestDateRange.startDate;
+      });
+    }
+    if (requestDateRange.endDate) {
+      filtered = filtered.filter((r) => {
+        const requestDate = new Date(r.visitDate || r.scheduledVisitStart || r.createdAt);
+        if (Number.isNaN(requestDate.getTime())) return false;
+        const inclusiveEndDate = new Date(requestDateRange.endDate);
+        inclusiveEndDate.setHours(23, 59, 59, 999);
+        return requestDate <= inclusiveEndDate;
+      });
+    }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -1036,11 +1069,14 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       );
     }
     return filtered.sort((a, b) => {
-      if (a.status === "pending" && b.status !== "pending") return -1;
-      if (a.status !== "pending" && b.status === "pending") return 1;
-      return new Date(b.createdAt) - new Date(a.createdAt);
+      if (requestSortOrder === "status") {
+        if (a.status === "pending" && b.status !== "pending") return -1;
+        if (a.status !== "pending" && b.status === "pending") return 1;
+      }
+      const timeDifference = new Date(b.createdAt || b.visitDate || 0) - new Date(a.createdAt || a.visitDate || 0);
+      return requestSortOrder === "oldest" ? -timeDifference : timeDifference;
     });
-  }, [visitRequests, requestFilter, requestDateFilter, requestOfficeFilter, searchQuery]);
+  }, [visitRequests, requestFilter, requestDateFilter, requestOfficeFilter, requestDateRange, searchQuery, requestSortOrder]);
 
   const getFilteredRequestsCount = useCallback(() => {
     return getFilteredRequests().length;
@@ -1626,14 +1662,22 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
     
     if (historyDateRange.startDate) {
-      filtered = filtered.filter(v => new Date(v.visitDate) >= historyDateRange.startDate);
+      filtered = filtered.filter(v => new Date(v.visitDate || v.createdAt) >= historyDateRange.startDate);
     }
     if (historyDateRange.endDate) {
-      filtered = filtered.filter(v => new Date(v.visitDate) <= historyDateRange.endDate);
+      filtered = filtered.filter(v => {
+        const visitDate = new Date(v.visitDate || v.createdAt);
+        const inclusiveEndDate = new Date(historyDateRange.endDate);
+        inclusiveEndDate.setHours(23, 59, 59, 999);
+        return visitDate <= inclusiveEndDate;
+      });
     }
-    
-    return filtered;
-  }, [visitorHistory, historyDateFilter, historyFilter, historyOfficeFilter, historySearchQuery, historyDateRange]);
+
+    return filtered.sort((a, b) => {
+      const timeDifference = new Date(b.visitDate || b.createdAt || 0) - new Date(a.visitDate || a.createdAt || 0);
+      return historySortOrder === "oldest" ? -timeDifference : timeDifference;
+    });
+  }, [visitorHistory, historyDateFilter, historyFilter, historyOfficeFilter, historySearchQuery, historyDateRange, historySortOrder]);
 
   const getHistoryStats = useCallback(() => {
     const total = visitorHistory.length;
@@ -2709,7 +2753,6 @@ const loadDashboardData = useCallback(async () => {
     const nextErrors = {};
     const normalizedEmail = String(newUserData.email || "").trim().toLowerCase();
     const normalizedUsername = normalizeUsernameInput(newUserData.username);
-    const isSecurityAccount = isSecurityRole(newUserData.role);
 
     if (!String(newUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(newUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
@@ -2724,42 +2767,9 @@ const loadDashboardData = useCallback(async () => {
       nextErrors.phone = PHILIPPINE_MOBILE_NUMBER_MESSAGE;
     }
 
-    if (!isSecurityAccount) {
+    if (!isSecurityRole(newUserData.role)) {
       if (!normalizedUsername) nextErrors.username = "Username is required.";
-      if (!String(newUserData.password || "").trim()) nextErrors.password = "Password is required.";
-      if (!String(newUserData.confirmPassword || "").trim()) {
-        nextErrors.confirmPassword = "Confirm the password.";
-      }
-      if (
-        String(newUserData.password || "").trim() &&
-        String(newUserData.confirmPassword || "").trim() &&
-        newUserData.password !== newUserData.confirmPassword
-      ) {
-        nextErrors.confirmPassword = "Passwords do not match.";
-      }
-      if (String(newUserData.password || "").trim() && String(newUserData.password || "").length < 6) {
-        nextErrors.password = "Password must be at least 6 characters.";
-      }
       if (!String(newUserData.department || "").trim()) nextErrors.department = "Department is required.";
-    } else {
-      const hasManualPassword = !!String(newUserData.password || "").trim() || !!String(newUserData.confirmPassword || "").trim();
-      if (hasManualPassword && !String(newUserData.password || "").trim()) {
-        nextErrors.password = "Password is required when confirming manually.";
-      }
-      if (hasManualPassword && !String(newUserData.confirmPassword || "").trim()) {
-        nextErrors.confirmPassword = "Confirm the password or leave both password fields blank.";
-      }
-      if (
-        hasManualPassword &&
-        String(newUserData.password || "").trim() &&
-        String(newUserData.confirmPassword || "").trim() &&
-        newUserData.password !== newUserData.confirmPassword
-      ) {
-        nextErrors.confirmPassword = "Passwords do not match.";
-      }
-      if (hasManualPassword && String(newUserData.password || "").length < 6) {
-        nextErrors.password = "Password must be at least 6 characters.";
-      }
     }
 
     const existingEmail = allUsers.find(
@@ -2775,16 +2785,6 @@ const loadDashboardData = useCallback(async () => {
       );
       if (existingUsername) {
         nextErrors.username = "This username is already in use.";
-      }
-    }
-
-    if (String(newUserData.employeeId || "").trim()) {
-      const normalizedEmployeeId = String(newUserData.employeeId).trim().toLowerCase();
-      const existingEmployeeId = allUsers.find(
-        (userItem) => String(userItem?.employeeId || "").trim().toLowerCase() === normalizedEmployeeId,
-      );
-      if (existingEmployeeId) {
-        nextErrors.employeeId = "This staff ID is already registered.";
       }
     }
 
@@ -2910,16 +2910,12 @@ const loadDashboardData = useCallback(async () => {
 
     try {
       const isSecurityAccount = isSecurityRole(newUserData.role);
-      const generatedPassword = isSecurityAccount
-        ? newUserData.password || ApiService.generateRandomPassword()
-        : newUserData.password.trim();
       
       const userPayload = {
         firstName: newUserData.firstName.trim(),
         lastName: newUserData.lastName.trim(),
         username: normalizedUsername || undefined,
         email: normalizedEmail,
-        password: generatedPassword,
         phone: normalizedPhone,
         role: newUserData.role,
         status: newUserData.status || "active",
@@ -2929,11 +2925,10 @@ const loadDashboardData = useCallback(async () => {
       if (newUserData.role === "staff") {
         userPayload.department = newUserData.department || "General";
         userPayload.position = newUserData.position || "Staff Member";
-        userPayload.employeeId = newUserData.employeeId || `STF-${Date.now().toString().slice(-6)}`;
       } else if (newUserData.role === "security" || newUserData.role === "guard") {
         userPayload.position = newUserData.position || "Security Personnel";
-        userPayload.employeeId = newUserData.employeeId || `SEC-${Date.now().toString().slice(-6)}`;
         userPayload.department = "Security Department";
+        userPayload.shift = newUserData.shift || "";
       }
 
       const response = isSecurityAccount
@@ -2941,10 +2936,9 @@ const loadDashboardData = useCallback(async () => {
             firstName: userPayload.firstName,
             lastName: userPayload.lastName,
             email: userPayload.email,
-            password: userPayload.password,
             phone: userPayload.phone,
             position: userPayload.position,
-            employeeId: userPayload.employeeId,
+            shift: userPayload.shift,
           })
         : await ApiService.createStaffUser(userPayload);
 
@@ -2961,6 +2955,7 @@ const loadDashboardData = useCallback(async () => {
           isActive: response.user?.isActive ?? userPayload.isActive,
           _id: response.user?._id || response.user?.id || Date.now().toString(),
           createdAt: new Date().toISOString(),
+          employeeId: response.user?.employeeId || "Pending assignment",
         };
         
         setAllUsers(prev => [...prev, newUser]);
@@ -2984,11 +2979,10 @@ const loadDashboardData = useCallback(async () => {
           name: createdName,
           email: newUserData.email,
           username: newUser.username || "N/A",
-          password: generatedPassword,
           role: roleDisplay,
-          employeeId: userPayload.employeeId,
+          employeeId: response.user?.employeeId || "Generated automatically",
           status: userPayload.status,
-          deliveryNote: `Login credentials have been sent to ${newUserData.email}.`,
+          deliveryNote: `A temporary password and login details have been sent to ${newUserData.email}.`,
         });
         setShowCreateSuccessModal(true);
         setCreateUserErrors({});
@@ -3010,9 +3004,6 @@ const loadDashboardData = useCallback(async () => {
       } else if (message.toLowerCase().includes("username already")) {
         setCreateUserErrors((currentValue) => ({ ...currentValue, username: "This username is already in use." }));
         Alert.alert("Username Already Used", "This username is already registered. Please use another username.");
-      } else if (message.toLowerCase().includes("staff id already")) {
-        setCreateUserErrors((currentValue) => ({ ...currentValue, employeeId: "This staff ID is already registered." }));
-        Alert.alert("Staff ID Already Used", "This staff ID is already registered. Please use another staff ID.");
       } else {
         Alert.alert("Error", message || "Failed to create account");
       }
@@ -3434,7 +3425,15 @@ const loadDashboardData = useCallback(async () => {
     };
 
     try {
-      await printUserList(users, getTitle(), accountRecordsMode);
+      const generatedAt = new Date();
+      const printedBy =
+        `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
+        user?.email ||
+        "Admin User";
+      await printUserList(users, getTitle(), accountRecordsMode, {
+        printedBy,
+        generatedAt,
+      });
     } catch (error) {
       console.error("Print error:", error);
       Alert.alert("Error", "Failed to generate print view. Please try again.");
@@ -3469,11 +3468,18 @@ const loadDashboardData = useCallback(async () => {
     }
 
     try {
+      const generatedAt = new Date();
+      const printedBy =
+        `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
+        user?.email ||
+        "Admin User";
       await printRecordsTable({
         title,
         subtitle,
         totalLabel: "requests",
         dialogTitle: title,
+        printedBy,
+        generatedAt,
         columns: [
           { key: "visitor", label: "Visitor" },
           { key: "email", label: "Email" },
@@ -3498,11 +3504,18 @@ const loadDashboardData = useCallback(async () => {
     }
 
     try {
+      const generatedAt = new Date();
+      const printedBy =
+        `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
+        user?.email ||
+        "Admin User";
       await printRecordsTable({
         title: "Visitor Report Records",
         subtitle: "Generated from the report records table in the admin dashboard.",
         totalLabel: "report rows",
         dialogTitle: "Print Report Records",
+        printedBy,
+        generatedAt,
         columns: [
           { key: "visitor", label: "Visitor" },
           { key: "email", label: "Email" },
@@ -3675,6 +3688,8 @@ const loadDashboardData = useCallback(async () => {
     onSelect,
     accent = "#1C6DD0",
     onReset,
+    footerContent = null,
+    panelKey = "default",
   }) => (
     <View style={[styles.recordsToolPanel, styles.recordsFilterPanel, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
       <View style={styles.recordsToolHeader}>
@@ -3693,39 +3708,145 @@ const loadDashboardData = useCallback(async () => {
         ) : null}
       </View>
 
-      {(groups || [{ key: "default", label: null, filters, activeValue, onSelect }]).map((group) => (
-        <View key={group.key} style={styles.recordsFilterGroup}>
-          {group.label ? (
-            <Text style={[styles.recordsFilterGroupLabel, isDarkMode && styles.darkTextSecondary]}>
-              {group.label}
+      {(groups || [{ key: "default", label: null, filters, activeValue, onSelect }]).map((group) => {
+        const sectionKey = `${panelKey}-${group.key}`;
+        const isExpanded = !!expandedFilterSections[sectionKey];
+        return (
+          <View
+            key={group.key}
+            style={[
+              styles.recordsFilterAccordion,
+              isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.recordsFilterAccordionHeader}
+              onPress={() =>
+                setExpandedFilterSections((current) => ({
+                  ...current,
+                  [sectionKey]: !current[sectionKey],
+                }))
+              }
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.recordsFilterGroupLabel, styles.recordsFilterAccordionLabel, isDarkMode && styles.darkTextSecondary]}>
+                {group.label || "Filters"}
+              </Text>
+              <Ionicons
+                name={isExpanded ? "chevron-up-outline" : "chevron-down-outline"}
+                size={16}
+                color={group.accent || accent}
+              />
+            </TouchableOpacity>
+            {isExpanded ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recordsFilterChips}>
+                {group.filters.map((filterItem) => {
+                  const isActive = group.activeValue === filterItem.key;
+                  return (
+                    <TouchableOpacity
+                      key={filterItem.key}
+                      style={[
+                        styles.recordsFilterChip,
+                        isActive && { backgroundColor: group.accent || accent, borderColor: group.accent || accent },
+                        isDarkMode && !isActive && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+                      ]}
+                      onPress={() => group.onSelect(filterItem.key)}
+                      activeOpacity={0.85}
+                    >
+                      {filterItem.icon ? (
+                        <Ionicons name={filterItem.icon} size={14} color={isActive ? "#FFFFFF" : group.accent || accent} />
+                      ) : null}
+                      <Text style={[styles.recordsFilterChipText, isActive && styles.recordsFilterChipTextActive, isDarkMode && !isActive && styles.darkTextSecondary]}>
+                        {filterItem.label}{typeof filterItem.count === "number" ? ` (${filterItem.count})` : ""}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
+          </View>
+        );
+      })}
+
+      {footerContent ? (
+        <View
+          style={[
+            styles.recordsFilterAccordion,
+            styles.recordsFilterFooter,
+            isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.recordsFilterAccordionHeader}
+            onPress={() =>
+              setExpandedFilterSections((current) => ({
+                ...current,
+                [`${panelKey}-date-range`]: !current[`${panelKey}-date-range`],
+              }))
+            }
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.recordsFilterGroupLabel, styles.recordsFilterAccordionLabel, isDarkMode && styles.darkTextSecondary]}>
+              Exact Date Range
             </Text>
-          ) : null}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recordsFilterChips}>
-            {group.filters.map((filterItem) => {
-              const isActive = group.activeValue === filterItem.key;
-              return (
-                <TouchableOpacity
-                  key={filterItem.key}
-                  style={[
-                    styles.recordsFilterChip,
-                    isActive && { backgroundColor: group.accent || accent, borderColor: group.accent || accent },
-                    isDarkMode && !isActive && { backgroundColor: "#111827", borderColor: theme.borderColor },
-                  ]}
-                  onPress={() => group.onSelect(filterItem.key)}
-                  activeOpacity={0.85}
-                >
-                  {filterItem.icon ? (
-                    <Ionicons name={filterItem.icon} size={14} color={isActive ? "#FFFFFF" : group.accent || accent} />
-                  ) : null}
-                  <Text style={[styles.recordsFilterChipText, isActive && styles.recordsFilterChipTextActive, isDarkMode && !isActive && styles.darkTextSecondary]}>
-                    {filterItem.label}{typeof filterItem.count === "number" ? ` (${filterItem.count})` : ""}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+            <Ionicons
+              name={expandedFilterSections[`${panelKey}-date-range`] ? "chevron-up-outline" : "chevron-down-outline"}
+              size={16}
+              color={accent}
+            />
+          </TouchableOpacity>
+          {expandedFilterSections[`${panelKey}-date-range`] ? footerContent : null}
         </View>
-      ))}
+      ) : null}
+    </View>
+  );
+
+  const renderDateRangeControls = ({
+    accent = "#1C6DD0",
+    startDate,
+    endDate,
+    onPickStart,
+    onPickEnd,
+    onClear,
+  }) => (
+    <View style={styles.recordsDateRangeWrap}>
+      <Text style={[styles.recordsFilterGroupLabel, isDarkMode && styles.darkTextSecondary]}>
+        Exact Date Range
+      </Text>
+      <View style={styles.recordsDateRangeRow}>
+        <TouchableOpacity
+          style={[
+            styles.recordsDateButton,
+            isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+          ]}
+          onPress={onPickStart}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="calendar-outline" size={14} color={accent} />
+          <Text style={[styles.recordsDateButtonText, isDarkMode && styles.darkText]}>
+            {startDate ? formatFilterDateLabel(startDate) : "Start Date"}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.recordsDateButton,
+            isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+          ]}
+          onPress={onPickEnd}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="calendar-clear-outline" size={14} color={accent} />
+          <Text style={[styles.recordsDateButtonText, isDarkMode && styles.darkText]}>
+            {endDate ? formatFilterDateLabel(endDate) : "End Date"}
+          </Text>
+        </TouchableOpacity>
+        {(startDate || endDate) ? (
+          <TouchableOpacity style={styles.recordsDateClearButton} onPress={onClear} activeOpacity={0.85}>
+            <Ionicons name="close-circle-outline" size={14} color={accent} />
+            <Text style={[styles.recordsDateClearText, { color: accent }]}>Clear</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -3761,6 +3882,38 @@ const loadDashboardData = useCallback(async () => {
         })}
       </View>
     );
+  };
+
+  const handleFilterDateSelection = (event, date) => {
+    if (Platform.OS !== "ios") {
+      setActiveFilterDateField(null);
+    }
+
+    if (!date || !activeFilterDateField) {
+      return;
+    }
+
+    if (activeFilterDateField === "request-start") {
+      setRequestDateRange((currentRange) => ({
+        ...currentRange,
+        startDate: date,
+      }));
+    } else if (activeFilterDateField === "request-end") {
+      setRequestDateRange((currentRange) => ({
+        ...currentRange,
+        endDate: date,
+      }));
+    } else if (activeFilterDateField === "history-start") {
+      setHistoryDateRange((currentRange) => ({
+        ...currentRange,
+        startDate: date,
+      }));
+    } else if (activeFilterDateField === "history-end") {
+      setHistoryDateRange((currentRange) => ({
+        ...currentRange,
+        endDate: date,
+      }));
+    }
   };
 
   const renderRequestCard = (request) => {
@@ -4652,45 +4805,11 @@ const loadDashboardData = useCallback(async () => {
                   </View>
                 </View>
 
-                <View style={styles.userEditorGrid}>
-                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Password *</Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        createUserErrors.password && styles.inputErrorState,
-                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
-                      ]}
-                      value={newUserData.password}
-                      onChangeText={(text) => {
-                        setNewUserData((currentValue) => ({ ...currentValue, password: text }));
-                        setCreateUserErrors((currentValue) => ({ ...currentValue, password: null }));
-                      }}
-                      placeholder={isCreatingSecurity ? "Optional: auto-generates if blank" : "Enter password"}
-                      secureTextEntry
-                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                    />
-                    {renderCreateUserFieldError("password")}
-                  </View>
-                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Confirm Password *</Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        createUserErrors.confirmPassword && styles.inputErrorState,
-                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
-                      ]}
-                      value={newUserData.confirmPassword}
-                      onChangeText={(text) => {
-                        setNewUserData((currentValue) => ({ ...currentValue, confirmPassword: text }));
-                        setCreateUserErrors((currentValue) => ({ ...currentValue, confirmPassword: null }));
-                      }}
-                      placeholder={isCreatingSecurity ? "Optional if password is blank" : "Re-enter password"}
-                      secureTextEntry
-                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                    />
-                    {renderCreateUserFieldError("confirmPassword")}
-                  </View>
+                <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                  <Ionicons name="mail-outline" size={16} color="#0A3D91" />
+                  <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                    A temporary password will be sent to the user's Gmail after account creation.
+                  </Text>
                 </View>
               </View>
 
@@ -4698,22 +4817,13 @@ const loadDashboardData = useCallback(async () => {
                 <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Work Profile</Text>
                 <View style={styles.userEditorGrid}>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>{isCreatingSecurity ? "Security ID" : "Staff ID"}</Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        createUserErrors.employeeId && styles.inputErrorState,
-                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
-                      ]}
-                      value={newUserData.employeeId}
-                      onChangeText={(text) => {
-                        setNewUserData((currentValue) => ({ ...currentValue, employeeId: text }));
-                        setCreateUserErrors((currentValue) => ({ ...currentValue, employeeId: null }));
-                      }}
-                      placeholder={isCreatingSecurity ? "Optional custom security ID" : "Optional custom staff ID"}
-                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                    />
-                    {renderCreateUserFieldError("employeeId")}
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>{isCreatingSecurity ? "Generated Security ID" : "Generated Staff ID"}</Text>
+                    <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                      <Ionicons name="card-outline" size={16} color="#0A3D91" />
+                      <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                        {getGeneratedEmployeeIdPreview()}
+                      </Text>
+                    </View>
                   </View>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Contact Number *</Text>
@@ -6070,12 +6180,15 @@ const loadDashboardData = useCallback(async () => {
 
           {renderRecordsFilterPanel({
             title: "Filter Appointment Records",
-            subtitle: "Quick shortcuts for status, date range, and office. These filters work together.",
+            subtitle: "Quick shortcuts for status, month, exact date range, office, and time order.",
+            panelKey: "appointment-records",
             accent: "#F59E0B",
             onReset: () => {
               setRequestFilter("all");
               setRequestDateFilter("all");
               setRequestOfficeFilter("all");
+              setRequestDateRange({ startDate: null, endDate: null });
+              setRequestSortOrder("newest");
             },
             groups: [
               {
@@ -6104,7 +6217,26 @@ const loadDashboardData = useCallback(async () => {
                 onSelect: setRequestOfficeFilter,
                 filters: requestOfficeFilterOptions,
               },
+              {
+                key: "order",
+                label: "Time Order",
+                activeValue: requestSortOrder,
+                onSelect: setRequestSortOrder,
+                filters: [
+                  { key: "newest", label: "Newest First", icon: "arrow-down-outline" },
+                  { key: "oldest", label: "Oldest First", icon: "arrow-up-outline" },
+                  { key: "status", label: "Pending First", icon: "time-outline" },
+                ],
+              },
             ],
+            footerContent: renderDateRangeControls({
+              accent: "#F59E0B",
+              startDate: requestDateRange.startDate,
+              endDate: requestDateRange.endDate,
+              onPickStart: () => setActiveFilterDateField("request-start"),
+              onPickEnd: () => setActiveFilterDateField("request-end"),
+              onClear: () => setRequestDateRange({ startDate: null, endDate: null }),
+            }),
           })}
 
           {renderAdminTable({
@@ -6639,13 +6771,15 @@ const loadDashboardData = useCallback(async () => {
 
                 {renderRecordsFilterPanel({
                   title: "Filter Visitor History",
-                  subtitle: "Quick status, date range, and office shortcuts for narrowing records without typing.",
+                  subtitle: "Quick status, month, exact date range, office, and time order filters for narrowing records.",
+                  panelKey: "visitor-history",
                   accent: "#1C6DD0",
                   onReset: () => {
                     setHistoryFilter("all");
                     setHistoryDateFilter("all");
                     setHistoryOfficeFilter("all");
                     setHistoryDateRange({ startDate: null, endDate: null });
+                    setHistorySortOrder("newest");
                   },
                   groups: [
                     {
@@ -6682,7 +6816,25 @@ const loadDashboardData = useCallback(async () => {
                       onSelect: setHistoryOfficeFilter,
                       filters: historyOfficeFilterOptions,
                     },
+                    {
+                      key: "order",
+                      label: "Time Order",
+                      activeValue: historySortOrder,
+                      onSelect: setHistorySortOrder,
+                      filters: [
+                        { key: "newest", label: "Newest First", icon: "arrow-down-outline" },
+                        { key: "oldest", label: "Oldest First", icon: "arrow-up-outline" },
+                      ],
+                    },
                   ],
+                  footerContent: renderDateRangeControls({
+                    accent: "#1C6DD0",
+                    startDate: historyDateRange.startDate,
+                    endDate: historyDateRange.endDate,
+                    onPickStart: () => setActiveFilterDateField("history-start"),
+                    onPickEnd: () => setActiveFilterDateField("history-end"),
+                    onClear: () => setHistoryDateRange({ startDate: null, endDate: null }),
+                  }),
                 })}
               </View>
 
@@ -6899,6 +7051,22 @@ const loadDashboardData = useCallback(async () => {
             }}
           />
         )}
+        {activeFilterDateField && (
+          <DateTimePicker
+            value={
+              activeFilterDateField === "request-start"
+                ? requestDateRange.startDate || new Date()
+                : activeFilterDateField === "request-end"
+                  ? requestDateRange.endDate || requestDateRange.startDate || new Date()
+                  : activeFilterDateField === "history-start"
+                    ? historyDateRange.startDate || new Date()
+                    : historyDateRange.endDate || historyDateRange.startDate || new Date()
+            }
+            mode="date"
+            display={Platform.OS === "ios" ? "spinner" : "default"}
+            onChange={handleFilterDateSelection}
+          />
+        )}
       </ScrollView>
     );
   };
@@ -7076,6 +7244,7 @@ const loadDashboardData = useCallback(async () => {
           {renderRecordsFilterPanel({
             title: "Filter Account Records",
             subtitle: "Quick role, status, and department shortcuts. These filters work together.",
+            panelKey: "account-records",
             accent: userManagementConfig.accent,
             onReset: () => {
               setUserFilter("all");
@@ -8065,33 +8234,6 @@ const loadDashboardData = useCallback(async () => {
                       <Text
                         style={[styles.inputLabel, isDarkMode && styles.darkText]}
                       >
-                        Employee ID
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          isDarkMode && {
-                            backgroundColor: "#111827",
-                            borderColor: theme.borderColor,
-                            color: "#F8FBFE",
-                          },
-                        ]}
-                        placeholder="Auto-generate if blank"
-                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                        value={newUserData.employeeId}
-                        onChangeText={(text) =>
-                          setNewUserData((prev) => ({
-                            ...prev,
-                            employeeId: text,
-                          }))
-                        }
-                      />
-                    </View>
-
-                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text
-                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
-                      >
                         Shift
                       </Text>
                       <TextInput
@@ -8110,6 +8252,27 @@ const loadDashboardData = useCallback(async () => {
                           setNewUserData((prev) => ({ ...prev, shift: text }))
                         }
                       />
+                    </View>
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text
+                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
+                      >
+                        Generated Staff ID
+                      </Text>
+                      <View
+                        style={[
+                          styles.createAccountStatusBadge,
+                          {
+                            backgroundColor: "rgba(28,109,208,0.12)",
+                            borderColor: "rgba(28,109,208,0.22)",
+                            justifyContent: "flex-start",
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.createAccountStatusText, { color: "#0A3D91" }]}>
+                          {getGeneratedEmployeeIdPreview()}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </>
@@ -8176,33 +8339,6 @@ const loadDashboardData = useCallback(async () => {
                       <Text
                         style={[styles.inputLabel, isDarkMode && styles.darkText]}
                       >
-                        Employee ID
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          isDarkMode && {
-                            backgroundColor: "#111827",
-                            borderColor: theme.borderColor,
-                            color: "#F8FBFE",
-                          },
-                        ]}
-                        placeholder="Auto-generate if blank"
-                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                        value={newUserData.employeeId}
-                        onChangeText={(text) =>
-                          setNewUserData((prev) => ({
-                            ...prev,
-                            employeeId: text,
-                          }))
-                        }
-                      />
-                    </View>
-
-                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text
-                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
-                      >
                         Shift
                       </Text>
                       <TextInput
@@ -8221,6 +8357,27 @@ const loadDashboardData = useCallback(async () => {
                           setNewUserData((prev) => ({ ...prev, shift: text }))
                         }
                       />
+                    </View>
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text
+                        style={[styles.inputLabel, isDarkMode && styles.darkText]}
+                      >
+                        Generated Staff ID
+                      </Text>
+                      <View
+                        style={[
+                          styles.createAccountStatusBadge,
+                          {
+                            backgroundColor: "rgba(28,109,208,0.12)",
+                            borderColor: "rgba(28,109,208,0.22)",
+                            justifyContent: "flex-start",
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.createAccountStatusText, { color: "#0A3D91" }]}>
+                          {getGeneratedEmployeeIdPreview()}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </>
@@ -8257,8 +8414,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && styles.darkTextSecondary,
                     ]}
                   >
-                    Set the account credentials. Leave password blank if your
-                    logic auto-generates one.
+                    A temporary password will be emailed automatically after the account is created.
                   </Text>
                 </View>
               </View>
@@ -8327,59 +8483,19 @@ const loadDashboardData = useCallback(async () => {
                 </View>
               </View>
 
-              <View style={styles.userEditorRow}>
-                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
-                    Password
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      createUserErrors.password && styles.inputError,
-                      isDarkMode && {
-                        backgroundColor: "#111827",
-                        borderColor: theme.borderColor,
-                        color: "#F8FBFE",
-                      },
-                    ]}
-                    placeholder="Enter password or leave blank"
-                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                    secureTextEntry
-                    value={newUserData.password}
-                    onChangeText={(text) =>
-                      setNewUserData((prev) => ({ ...prev, password: text }))
-                    }
-                  />
-                  {renderCreateUserFieldError("password")}
-                </View>
-
-                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
-                    Confirm Password
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      createUserErrors.confirmPassword && styles.inputError,
-                      isDarkMode && {
-                        backgroundColor: "#111827",
-                        borderColor: theme.borderColor,
-                        color: "#F8FBFE",
-                      },
-                    ]}
-                    placeholder="Confirm password"
-                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                    secureTextEntry
-                    value={newUserData.confirmPassword}
-                    onChangeText={(text) =>
-                      setNewUserData((prev) => ({
-                        ...prev,
-                        confirmPassword: text,
-                      }))
-                    }
-                  />
-                  {renderCreateUserFieldError("confirmPassword")}
-                </View>
+              <View
+                style={[
+                  styles.createAccountStatusBadge,
+                  {
+                    backgroundColor: "rgba(28,109,208,0.12)",
+                    borderColor: "rgba(28,109,208,0.22)",
+                    justifyContent: "flex-start",
+                  },
+                ]}
+              >
+                <Text style={[styles.createAccountStatusText, { color: "#0A3D91" }]}>
+                  Temporary password delivery: sent to the user's Gmail after account creation.
+                </Text>
               </View>
             </View>
           </View>
@@ -8535,7 +8651,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && styles.darkText,
                     ]}
                   >
-                    {newUserData.employeeId || "Will auto-generate"}
+                    {getGeneratedEmployeeIdPreview()}
                   </Text>
                 </View>
 
@@ -9173,10 +9289,6 @@ const loadDashboardData = useCallback(async () => {
               <View style={styles.createSuccessRow}>
                 <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Username</Text>
                 <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.username || "N/A"}</Text>
-              </View>
-              <View style={styles.createSuccessRow}>
-                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Password</Text>
-                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.password || "N/A"}</Text>
               </View>
               <View style={styles.createSuccessRow}>
                 <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Role</Text>

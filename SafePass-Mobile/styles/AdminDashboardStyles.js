@@ -2674,6 +2674,31 @@ export default StyleSheet.create({
     paddingRight: 8,
   },
 
+  recordsFilterFooter: {
+    marginTop: 10,
+  },
+
+  recordsFilterAccordion: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+
+  recordsFilterAccordionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  recordsFilterAccordionLabel: {
+    marginBottom: 0,
+  },
+
   recordsFilterGroup: {
     marginTop: 8,
   },
@@ -2698,6 +2723,54 @@ export default StyleSheet.create({
     backgroundColor: "#F8FBFE",
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+
+  recordsDateRangeWrap: {
+    marginTop: 2,
+  },
+
+  recordsDateRangeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  recordsDateButton: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  recordsDateButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#334155",
+  },
+
+  recordsDateClearButton: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  recordsDateClearText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
 
   recordsFilterChipText: {

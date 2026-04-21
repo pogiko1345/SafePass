@@ -454,6 +454,30 @@ const getSupportEmailSignature = () =>
     "Sapphire International Aviation Academy",
   ].join("\n");
 
+const generateTemporaryPassword = (length = 10) => {
+  const characters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  let password = "";
+  for (let index = 0; index < length; index += 1) {
+    const randomIndex = crypto.randomInt(0, characters.length);
+    password += characters[randomIndex];
+  }
+  return password;
+};
+
+const generateYearEmployeeIdCandidate = () => {
+  const currentYear = new Date().getFullYear();
+  const numericPart = crypto.randomInt(0, 1000000).toString().padStart(6, "0");
+  return `${currentYear}-${numericPart}`;
+};
+
+const generateUniqueEmployeeId = async () => {
+  let candidate = generateYearEmployeeIdCandidate();
+  while (await User.exists({ employeeId: candidate })) {
+    candidate = generateYearEmployeeIdCandidate();
+  }
+  return candidate;
+};
+
 const sendEmail = (to, subject, body) => {
   if (mailTransporter) {
     mailTransporter
@@ -2706,11 +2730,9 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       lastName,
       username,
       email,
-      password,
       phone,
       department,
       position,
-      employeeId,
       status,
     } = req.body;
 
@@ -2721,23 +2743,20 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
     const normalizedPhone = normalizePhoneValue(phone);
     const normalizedDepartment = String(department || "").trim();
     const normalizedPosition = String(position || "Staff Member").trim();
-    const normalizedEmployeeId = employeeId ? String(employeeId).trim() : "";
     const normalizedStatus = status === "inactive" ? "inactive" : "active";
-    const normalizedPassword = String(password || "");
 
     if (
       !normalizedFirstName ||
       !normalizedLastName ||
       !normalizedUsername ||
       !normalizedEmail ||
-      !normalizedPassword ||
       !normalizedPhone ||
       !normalizedDepartment
     ) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
-        required: ["firstName", "lastName", "username", "email", "password", "phone", "department"],
+        required: ["firstName", "lastName", "username", "email", "phone", "department"],
       });
     }
 
@@ -2746,14 +2765,6 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
         success: false,
         message: "Invalid email format",
         field: "email",
-      });
-    }
-
-    if (normalizedPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must be at least 6 characters.",
-        field: "password",
       });
     }
 
@@ -2770,10 +2781,6 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       { username: normalizedUsername },
     ];
 
-    if (normalizedEmployeeId) {
-      duplicateChecks.push({ employeeId: normalizedEmployeeId });
-    }
-
     const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
       const duplicateField =
@@ -2781,26 +2788,20 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
           ? "email"
           : existingUser.username === normalizedUsername
             ? "username"
-            : "employeeId";
+            : "email";
 
       return res.status(400).json({
         success: false,
         message:
           duplicateField === "username"
             ? "Username already registered"
-            : duplicateField === "employeeId"
-              ? "Staff ID already registered"
-              : "Email already registered",
+            : "Email already registered",
         field: duplicateField,
       });
     }
 
-    let finalEmployeeId = normalizedEmployeeId;
-    if (!finalEmployeeId) {
-      const timestamp = Date.now().toString().slice(-6);
-      const random = Math.random().toString(36).substr(2, 3).toUpperCase();
-      finalEmployeeId = `STF-${timestamp}-${random}`;
-    }
+    const finalEmployeeId = await generateUniqueEmployeeId();
+    const temporaryPassword = generateTemporaryPassword();
 
     const nfcCardId = `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
@@ -2809,7 +2810,7 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       lastName: normalizedLastName,
       username: normalizedUsername,
       email: normalizedEmail,
-      password: normalizedPassword,
+      password: temporaryPassword,
       phone: normalizedPhone,
       role: "staff",
       status: normalizedStatus,
@@ -2840,11 +2841,11 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
         `Your staff account has been created by the administrator.\n\n` +
         `Username: ${user.username}\n` +
         `Email: ${user.email}\n` +
-        `Password: ${password}\n` +
+        `Temporary Password: ${temporaryPassword}\n` +
         `Staff ID: ${user.employeeId}\n` +
         `Department: ${user.department}\n` +
         `Status: ${user.status.toUpperCase()}\n\n` +
-        `Please sign in and change your password as soon as possible.\n\n` +
+        `Please sign in and change your password when convenient.\n\n` +
         `Thank you,\n` +
         `Sapphire Aviation Security Team`,
     );
@@ -2867,9 +2868,7 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
         message:
           duplicateField === "username"
             ? "Username already registered"
-            : duplicateField === "employeeId"
-              ? "Staff ID already registered"
-              : "Email already registered",
+            : "Email already registered",
         field: duplicateField,
       });
     }
@@ -2889,128 +2888,66 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      phone,
-      shift,
-      position,
-      employeeId,
-    } = req.body;
+    const { firstName, lastName, email, phone, shift, position } = req.body;
 
     const normalizedFirstName = String(firstName || "").trim();
     const normalizedLastName = String(lastName || "").trim();
     const normalizedEmail = normalizeEmailValue(email);
     const normalizedPhone = normalizePhoneValue(phone);
-    const normalizedPassword = String(password || "");
-    const normalizedEmployeeId = employeeId ? String(employeeId).trim() : "";
     const normalizedPosition = String(position || "Security Guard").trim();
 
-    // Validate required fields
-    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedPassword || !normalizedPhone) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields",
-      });
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedPhone) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
     if (!isValidEmailValue(normalizedEmail)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email format",
-        field: "email",
-      });
-    }
-
-    if (normalizedPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must be at least 6 characters.",
-        field: "password",
-      });
+      return res.status(400).json({ success: false, message: "Invalid email format", field: "email" });
     }
 
     if (!isValidPhoneValue(normalizedPhone)) {
-      return res.status(400).json({
-        success: false,
-        message: PHONE_VALIDATION_MESSAGE,
-        field: "phone",
-      });
+      return res.status(400).json({ success: false, message: PHONE_VALIDATION_MESSAGE, field: "phone" });
     }
 
-    const duplicateChecks = [{ email: normalizedEmail }];
-    if (normalizedEmployeeId) {
-      duplicateChecks.push({ employeeId: normalizedEmployeeId });
-    }
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ $or: duplicateChecks });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
-      const duplicateField =
-        existingUser.email === normalizedEmail ? "email" : "employeeId";
-
-      return res.status(400).json({
-        success: false,
-        message:
-          duplicateField === "employeeId"
-            ? "Security ID already registered"
-            : "Email already registered",
-        field: duplicateField,
-      });
+      return res.status(400).json({ success: false, message: "Email already registered", field: "email" });
     }
 
-    // Generate NFC Card ID
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substr(2, 6).toUpperCase();
     const nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
+    const finalEmployeeId = await generateUniqueEmployeeId();
+    const temporaryPassword = generateTemporaryPassword();
 
-    // Generate employee ID if not provided
-    let finalEmployeeId = normalizedEmployeeId;
-    if (!finalEmployeeId) {
-      const timeStamp = Date.now().toString().slice(-6);
-      const random = Math.random().toString(36).substr(2, 3).toUpperCase();
-      finalEmployeeId = `GRD-${timeStamp}-${random}`;
-    }
-
-    // Create user
     const user = new User({
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
       email: normalizedEmail,
-      password: normalizedPassword,
+      password: temporaryPassword,
       phone: normalizedPhone,
       role: "guard",
       nfcCardId,
       employeeId: finalEmployeeId,
       position: normalizedPosition,
+      shift: String(shift || "").trim(),
       status: "active",
       isActive: true,
     });
 
     await user.save();
 
-    // Send welcome email
     sendEmail(
       user.email,
-      `Welcome to Sapphire Aviation - Security Guard Account`,
+      "Welcome to Sapphire Aviation - Security Guard Account",
       `Dear ${user.firstName} ${user.lastName},\n\n` +
-        `Your Security Guard account has been created!\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `🔐 LOGIN CREDENTIALS\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `📧 Email: ${user.email}\n` +
-        `🔑 Password: ${password}\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `📋 ACCOUNT DETAILS\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `👤 Name: ${user.firstName} ${user.lastName}\n` +
-        `🎭 Role: SECURITY GUARD\n` +
-        `🆔 Employee ID: ${user.employeeId}\n` +
-        `📱 Phone: ${user.phone}\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `Please login to the app and change your password for security.\n\n` +
+        `Your security account has been created by the administrator.\n\n` +
+        `Email: ${user.email}\n` +
+        `Temporary Password: ${temporaryPassword}\n` +
+        `Employee ID: ${user.employeeId}\n` +
+        `Phone: ${user.phone}\n` +
+        `Position: ${user.position}\n` +
+        `Shift: ${user.shift || "To be assigned"}\n\n` +
+        `Please sign in and change your password when convenient.\n\n` +
         `Thank you,\n` +
         `Sapphire Aviation Security Team`,
     );
@@ -3018,34 +2955,18 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
     const userResponse = user.toObject();
     delete userResponse.password;
 
-    res.status(201).json({
-      success: true,
-      message: "Security guard created successfully",
-      user: userResponse,
-    });
+    res.status(201).json({ success: true, message: "Security guard created successfully", user: userResponse });
   } catch (error) {
     console.error("Create security guard error:", error);
 
     if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
-      return res.status(400).json({
-        success: false,
-        message:
-          duplicateField === "employeeId"
-            ? "Security ID already registered"
-            : "Email already registered",
-        field: duplicateField,
-      });
+      return res.status(400).json({ success: false, message: "Email already registered", field: duplicateField });
     }
 
-    res.status(500).json({
-      success: false,
-      message: "Failed to create security guard",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: "Failed to create security guard", error: error.message });
   }
 });
-
 // Get all security guards
 app.get("/api/admin/security", authMiddleware, async (req, res) => {
   try {
@@ -6701,6 +6622,8 @@ if (!isVercelRuntime && require.main === module) {
 }
 
 module.exports = app;
+
+
 
 
 

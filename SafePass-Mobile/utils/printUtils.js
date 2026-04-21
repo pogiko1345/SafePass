@@ -59,17 +59,17 @@ const convertAssetToDataUrl = async (assetUri) => {
   }
 };
 
-export const printUserList = async (users, title, activeMenu) => {
+export const printUserList = async (users, title, activeMenu, metadata = {}) => {
   if (!users || users.length === 0) {
     throw new Error("No users to print");
   }
 
   const schoolLogoSource = await convertAssetToDataUrl(getSchoolLogoSource());
-  const htmlContent = getPrintHTML(users, title, activeMenu, schoolLogoSource);
+  const htmlContent = getPrintHTML(users, title, activeMenu, schoolLogoSource, metadata);
 
   try {
     if (Platform.OS === "web") {
-      await printUserListWeb(users, title, activeMenu);
+      await printUserListWeb(users, title, activeMenu, metadata);
     } else {
       const { uri } = await Print.printToFileAsync({
         html: htmlContent,
@@ -96,6 +96,8 @@ export const printRecordsTable = async ({
   rows = [],
   totalLabel = "records",
   dialogTitle,
+  printedBy = "System",
+  generatedAt = new Date(),
 }) => {
   if (!rows || rows.length === 0) {
     throw new Error("No records to print");
@@ -109,6 +111,8 @@ export const printRecordsTable = async ({
       columns,
       rows,
       totalLabel,
+      printedBy,
+      generatedAt,
     },
     schoolLogoSource,
   );
@@ -184,7 +188,7 @@ export const printRecordsTable = async ({
 };
 
 // Web-only fallback print function
-export const printUserListWeb = async (users, title, activeMenu) => {
+export const printUserListWeb = async (users, title, activeMenu, metadata = {}) => {
   if (!users || users.length === 0) {
     throw new Error("No users to print");
   }
@@ -195,7 +199,7 @@ export const printUserListWeb = async (users, title, activeMenu) => {
 
   const startPrintPreview = async () => {
     const schoolLogoSource = await convertAssetToDataUrl(getSchoolLogoSource());
-    const htmlContent = getPrintHTML(users, title, activeMenu, schoolLogoSource);
+    const htmlContent = getPrintHTML(users, title, activeMenu, schoolLogoSource, metadata);
 
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";

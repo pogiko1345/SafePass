@@ -14,11 +14,15 @@ export const getPrintTableHTML = (
     columns = [],
     rows = [],
     totalLabel = "records",
+    printedBy = "System",
+    generatedAt = new Date(),
   },
   logoSrc = "",
 ) => {
   const safeColumns = Array.isArray(columns) ? columns : [];
   const safeRows = Array.isArray(rows) ? rows : [];
+  const generatedLabel = new Date(generatedAt).toLocaleString();
+  const printedByLabel = String(printedBy || "System").trim() || "System";
 
   return `
     <!DOCTYPE html>
@@ -27,6 +31,10 @@ export const getPrintTableHTML = (
       <meta charset="UTF-8">
       <title>${escapeHTML(title)} - Sapphire International Aviation Academy</title>
       <style>
+        @page {
+          size: auto;
+          margin: 12mm;
+        }
         * {
           margin: 0;
           padding: 0;
@@ -78,6 +86,7 @@ export const getPrintTableHTML = (
           width: 100%;
           border-collapse: collapse;
           font-size: 12px;
+          border: 1px solid #CBD5E1;
         }
         th {
           background: #F1F5F9;
@@ -85,11 +94,11 @@ export const getPrintTableHTML = (
           padding: 10px 8px;
           text-align: left;
           font-weight: 700;
-          border-bottom: 2px solid #E2E8F0;
+          border: 1px solid #CBD5E1;
         }
         td {
           padding: 9px 8px;
-          border-bottom: 1px solid #E2E8F0;
+          border: 1px solid #CBD5E1;
           vertical-align: top;
         }
         tr:nth-child(even) td {
@@ -106,6 +115,19 @@ export const getPrintTableHTML = (
         @media print {
           body { padding: 10px; }
           .no-print { display: none; }
+          table {
+            page-break-inside: auto;
+          }
+          tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+          }
+          thead {
+            display: table-header-group;
+          }
+          tfoot {
+            display: table-footer-group;
+          }
         }
       </style>
     </head>
@@ -114,7 +136,8 @@ export const getPrintTableHTML = (
         ${logoSrc ? `<img src="${logoSrc}" alt="Sapphire International Aviation Academy Logo" class="print-header-brand" />` : ""}
         <div class="print-header-copy">
           <h2>Sapphire International Aviation Academy</h2>
-          <p>${escapeHTML(title)} | Generated: ${escapeHTML(new Date().toLocaleString())}</p>
+          <p>${escapeHTML(title)}</p>
+          <p>Generated: ${escapeHTML(generatedLabel)} | Printed by: ${escapeHTML(printedByLabel)}</p>
         </div>
       </div>
 
@@ -150,14 +173,14 @@ export const getPrintTableHTML = (
       </table>
 
       <div class="print-footer">
-        <p>Total: ${safeRows.length} ${escapeHTML(totalLabel)} | Printed on ${escapeHTML(new Date().toLocaleString())}</p>
+        <p>Total: ${safeRows.length} ${escapeHTML(totalLabel)} | Printed on ${escapeHTML(generatedLabel)} | Printed by ${escapeHTML(printedByLabel)}</p>
       </div>
     </body>
     </html>
   `;
 };
 
-export const getPrintHTML = (users, title, activeMenu, logoSrc = "") => {
+export const getPrintHTML = (users, title, activeMenu, logoSrc = "", metadata = {}) => {
   const resolvedTitle =
     activeMenu === "staff"
       ? "Staff Members List"
@@ -170,6 +193,8 @@ export const getPrintHTML = (users, title, activeMenu, logoSrc = "") => {
       title: resolvedTitle,
       subtitle: "Generated from the SafePass admin records table.",
       totalLabel: "users",
+      printedBy: metadata.printedBy,
+      generatedAt: metadata.generatedAt,
       columns: [
         { key: "name", label: "Name" },
         { key: "email", label: "Email" },

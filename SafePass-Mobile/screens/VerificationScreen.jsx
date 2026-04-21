@@ -72,7 +72,6 @@ export default function VerificationScreen({ navigation, route }) {
   const [otpTimer, setOtpTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [otpMethod, setOtpMethod] = useState('sms');
   const [showPhoneInput, setShowPhoneInput] = useState(true);
   const [otpVerified, setOtpVerified] = useState(false);
   const [phoneError, setPhoneError] = useState("");
@@ -162,7 +161,7 @@ export default function VerificationScreen({ navigation, route }) {
         cleanPhone = '09' + cleanPhone.slice(-9);
       }
       
-      const response = await ApiService.requestOtp(cleanPhone, otpMethod);
+      const response = await ApiService.requestOtp(cleanPhone, "sms");
       
       if (response.success) {
         setOtpSent(true);
@@ -525,7 +524,7 @@ export default function VerificationScreen({ navigation, route }) {
                   >
                     <Text style={verificationStyles.panelMetaLabel}>Method</Text>
                     <Text style={verificationStyles.panelMetaValue}>
-                      {otpSent ? (otpMethod === "sms" ? "SMS Code" : "Voice Call") : "Phone Setup"}
+                      {otpSent ? "Text Message" : "Phone Setup"}
                     </Text>
                   </View>
                 </View>
@@ -554,7 +553,7 @@ export default function VerificationScreen({ navigation, route }) {
                         <View style={verificationStyles.panelHeader}>
                           <Text style={verificationStyles.sectionTitle}>Verify with Phone</Text>
                           <Text style={verificationStyles.sectionSubtitle}>
-                            Choose how you want to receive your one-time access code.
+                            Enter your mobile number and we will send your one-time access code by text.
                           </Text>
                         </View>
 
@@ -589,54 +588,6 @@ export default function VerificationScreen({ navigation, route }) {
                               Enter your 10-digit mobile number to receive a secure OTP code.
                             </Text>
                           )}
-                        </View>
-
-                        <View style={verificationStyles.methodContainer}>
-                          <Text style={verificationStyles.methodLabel}>Receive code via</Text>
-                          <View
-                            style={[
-                              verificationStyles.methodButtons,
-                              isCompactWidth && { flexDirection: "column" },
-                            ]}
-                          >
-                            <TouchableOpacity
-                              style={[
-                                verificationStyles.methodButton,
-                                otpMethod === 'sms' && verificationStyles.methodButtonActive
-                              ]}
-                              onPress={() => setOtpMethod('sms')}
-                              activeOpacity={0.7}
-                            >
-                              <Ionicons 
-                                name="chatbubble-outline" 
-                                size={20} 
-                                color={otpMethod === 'sms' ? '#FFFFFF' : '#6B7280'} 
-                              />
-                              <Text style={[
-                                verificationStyles.methodButtonText,
-                                otpMethod === 'sms' && verificationStyles.methodButtonTextActive
-                              ]}>SMS</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity
-                              style={[
-                                verificationStyles.methodButton,
-                                otpMethod === 'call' && verificationStyles.methodButtonActive
-                              ]}
-                              onPress={() => setOtpMethod('call')}
-                              activeOpacity={0.7}
-                            >
-                              <Ionicons 
-                                name="call-outline" 
-                                size={20} 
-                                color={otpMethod === 'call' ? '#FFFFFF' : '#6B7280'} 
-                              />
-                              <Text style={[
-                                verificationStyles.methodButtonText,
-                                otpMethod === 'call' && verificationStyles.methodButtonTextActive
-                              ]}>Voice Call</Text>
-                            </TouchableOpacity>
-                          </View>
                         </View>
 
                         <TouchableOpacity
