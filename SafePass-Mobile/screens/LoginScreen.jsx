@@ -122,7 +122,6 @@ export default function LoginScreen({ navigation, route }) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const [resetStep, setResetStep] = useState(1);
-  const [resetToken, setResetToken] = useState(null);
   const [resetTimer, setResetTimer] = useState(60);
   const [canResendReset, setCanResendReset] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -215,7 +214,7 @@ export default function LoginScreen({ navigation, route }) {
       const isNewRegistration = await Storage.getItem('isNewRegistration');
       
       if (isNewRegistration === 'true') {
-        await Storage.multiRemove(['authToken', 'userToken', 'currentUser', 'isNewRegistration']);
+        await ApiService.clearAuth();
         setIsCheckingAuth(false);
         return;
       }
@@ -427,7 +426,6 @@ export default function LoginScreen({ navigation, route }) {
     setConfirmNewPasswordError("");
     setResetTimer(60);
     setCanResendReset(false);
-    setResetToken(null);
     setShowNewPassword(false);
     setShowConfirmNewPassword(false);
     setPasswordStrength(0);
@@ -451,7 +449,6 @@ export default function LoginScreen({ navigation, route }) {
     setNewPasswordError("");
     setConfirmNewPassword("");
     setConfirmNewPasswordError("");
-    setResetToken(null);
     setShowNewPassword(false);
     setShowConfirmNewPassword(false);
   };
@@ -480,7 +477,6 @@ export default function LoginScreen({ navigation, route }) {
       
       if (response.success) {
         setResetStep(2);
-        setResetToken(response.resetToken);
         setResetTimer(60);
         setCanResendReset(false);
         Alert.alert(
@@ -511,7 +507,6 @@ export default function LoginScreen({ navigation, route }) {
       const response = await ApiService.verifyPasswordResetOtp(
         normalizedResetEmail,
         normalizedResetOtp,
-        resetToken,
       );
       
       if (response.success) {
@@ -552,7 +547,6 @@ export default function LoginScreen({ navigation, route }) {
       const response = await ApiService.resetPassword(
         normalizeResetEmailValue(resetEmail),
         newPassword,
-        resetToken,
       );
       
       if (response.success) {
@@ -1534,7 +1528,6 @@ export default function LoginScreen({ navigation, route }) {
                       if (resetStep === 2) {
                         setResetOtp("");
                         setResetOtpError("");
-                        setResetToken(null);
                       }
                       if (resetStep === 3) {
                         setNewPassword("");

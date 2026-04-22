@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 let AsyncStorage;
 
 if (Platform.OS === 'web') {
@@ -48,12 +49,77 @@ const API_BASE_URL_CANDIDATES =
 
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
+const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+const SENSITIVE_STORAGE_KEYS = ["userToken", "authToken", "trustedDevice", "trustedUntil"];
+
+const setSensitiveItem = async (key, value) => {
+  const normalizedValue = value == null ? null : String(value);
+
+  if (Platform.OS === "web") {
+    if (normalizedValue == null) {
+      await AsyncStorage.removeItem(key);
+      return;
+    }
+    await AsyncStorage.setItem(key, normalizedValue);
+    return;
+  }
+
+  if (normalizedValue == null) {
+    await SecureStore.deleteItemAsync(key);
+    return;
+  }
+
+  await SecureStore.setItemAsync(key, normalizedValue);
+};
+
+const getSensitiveItem = async (key) => {
+  if (Platform.OS === "web") {
+    return AsyncStorage.getItem(key);
+  }
+
+  return SecureStore.getItemAsync(key);
+};
+
+const removeSensitiveItems = async (keys) => {
+  if (Platform.OS === "web") {
+    await AsyncStorage.multiRemove(keys);
+    return;
+  }
+
+  await Promise.all(keys.map((key) => SecureStore.deleteItemAsync(key)));
+};
 
 class ApiService {
   constructor() {
     this.token = null;
     this._lastOtp = null;
     this._lastReset = null;
+  }
+
+  async clearTrustedDevice() {
+    await removeSensitiveItems(["trustedDevice", "trustedUntil"]);
+  }
+
+  async isTrustedDeviceActive() {
+    const [trustedDevice, trustedUntilRaw] = await Promise.all([
+      getSensitiveItem("trustedDevice"),
+      getSensitiveItem("trustedUntil"),
+    ]);
+
+    if (trustedDevice !== "true") {
+      if (trustedUntilRaw) {
+        await this.clearTrustedDevice();
+      }
+      return false;
+    }
+
+    const trustedUntil = Number(trustedUntilRaw);
+    if (!Number.isFinite(trustedUntil) || trustedUntil <= Date.now()) {
+      await this.clearTrustedDevice();
+      return false;
+    }
+
+    return true;
   }
 
   // ================= TOKEN HANDLING =================
@@ -69,18 +135,17 @@ class ApiService {
 
     this.token = validToken;
     if (validToken) {
-      await AsyncStorage.setItem("userToken", validToken);
+      await setSensitiveItem("userToken", validToken);
       // Backward compatibility for older screens still reading authToken.
-      await AsyncStorage.setItem("authToken", validToken);
+      await setSensitiveItem("authToken", validToken);
     } else {
-      await AsyncStorage.removeItem("userToken");
-      await AsyncStorage.removeItem("authToken");
+      await removeSensitiveItems(["userToken", "authToken"]);
     }
   }
 
   async getToken() {
     if (!this.token) {
-      const userTokenRaw = await AsyncStorage.getItem("userToken");
+      const userTokenRaw = await getSensitiveItem("userToken");
       const userToken =
         typeof userTokenRaw === "string"
           ? userTokenRaw.trim()
@@ -88,8 +153,7 @@ class ApiService {
 
       if (userToken) {
         if (userToken === "undefined" || userToken === "null") {
-          await AsyncStorage.removeItem("userToken");
-          await AsyncStorage.removeItem("authToken");
+          await removeSensitiveItems(["userToken", "authToken"]);
           this.token = null;
         } else {
           this.token = userToken;
@@ -108,7 +172,9 @@ class ApiService {
             this.token = null;
           } else {
             this.token = legacyToken;
-            await AsyncStorage.setItem("userToken", legacyToken);
+            await setSensitiveItem("userToken", legacyToken);
+            await setSensitiveItem("authToken", legacyToken);
+            await AsyncStorage.removeItem("authToken");
           }
         }
       }
@@ -118,11 +184,9 @@ class ApiService {
 
   async clearAuth() {
     this.token = null;
+    await removeSensitiveItems(SENSITIVE_STORAGE_KEYS);
     await AsyncStorage.multiRemove([
-      "userToken",
-      "authToken",
       "currentUser",
-      "trustedDevice",
       "isNewRegistration"
     ]);
   }
@@ -395,7 +459,7 @@ async verifyCredentials(email, password) {
       body: { email, password },
     });
     
-    const trustedDevice = await AsyncStorage.getItem('trustedDevice');
+    const trustedDevice = await this.isTrustedDeviceActive();
     
     // Check if user is pending
     if (loginResponse.user?.status === 'pending') {
@@ -408,12 +472,12 @@ async verifyCredentials(email, password) {
       };
     }
     
-    return {
-      success: true,
-      requires2FA: !trustedDevice,
-      user: loginResponse.user,
-      tempToken: loginResponse.token,
-    };
+      return {
+        success: true,
+        requires2FA: !trustedDevice,
+        user: loginResponse.user,
+        tempToken: loginResponse.token,
+      };
     
   } catch (error) {
     console.error("Verify credentials error:", error);
@@ -576,8 +640,8 @@ async verifyCredentials(email, password) {
 
   async trustDevice() {
     try {
-      await AsyncStorage.setItem('trustedDevice', 'true');
-      await AsyncStorage.setItem('trustedUntil', Date.now() + 2592000000);
+      await setSensitiveItem('trustedDevice', 'true');
+      await setSensitiveItem('trustedUntil', String(Date.now() + TRUST_DEVICE_DURATION_MS));
       return { success: true };
     } catch (error) {
       console.error("Trust device error:", error);
@@ -625,11 +689,8 @@ async verifyCredentials(email, password) {
         throw error;
       }
 
-      const resetToken = "reset_" + Math.random().toString(36).substring(2);
-      
       this._lastReset = {
         email,
-        token: resetToken,
         otp: "123456",
         expiresAt: Date.now() + 600000
       };
@@ -644,17 +705,16 @@ async verifyCredentials(email, password) {
       
       return {
         success: true,
-        resetToken,
         expiresIn: 600
       };
     }
   }
 
-  async verifyPasswordResetOtp(email, otpCode, resetToken) {
+  async verifyPasswordResetOtp(email, otpCode) {
     try {
       const response = await this.fetch("/auth/verify-password-reset", {
         method: "POST",
-        body: { email, otpCode, resetToken },
+        body: { email, otpCode },
       });
       return response;
     } catch (error) {
@@ -664,8 +724,7 @@ async verifyCredentials(email, password) {
         throw error;
       }
 
-      const isValid = this._lastReset?.email === email && 
-                      this._lastReset?.token === resetToken &&
+      const isValid = this._lastReset?.email === email &&
                       this._lastReset?.expiresAt > Date.now() &&
                       (otpCode === this._lastReset?.otp || otpCode === "123456");
       
@@ -687,11 +746,11 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async resetPassword(email, newPassword, resetToken) {
+  async resetPassword(email, newPassword) {
     try {
       const response = await this.fetch("/auth/reset-password", {
         method: "POST",
-        body: { email, newPassword, resetToken },
+        body: { email, newPassword },
       });
       return response;
     } catch (error) {
