@@ -1,5 +1,5 @@
 // SecurityDashboardScreen.jsx (Complete with Working Tab Navigation)
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -111,6 +111,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [selectedSubmodule, setSelectedSubmodule] = useState('home-main');
   const [visitorFilter, setVisitorFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [appointmentRecordsPage, setAppointmentRecordsPage] = useState(1);
   const [showVisitorModal, setShowVisitorModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
@@ -150,6 +151,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [reports, setReports] = useState([]);
   const [reportDateRange, setReportDateRange] = useState({ start: null, end: null });
   const [reportType, setReportType] = useState('daily');
+  const [reportsPage, setReportsPage] = useState(1);
   const [reportForm, setReportForm] = useState({
     visitorId: '',
     category: 'suspicious',
@@ -1244,7 +1246,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   // ============ RENDER FUNCTIONS FOR EACH TAB ============
 
   // Filter visitors based on search and filter
-  const getFilteredVisitors = () => {
+  const filteredVisitors = useMemo(() => {
     let list = [];
     
     switch(visitorFilter) {
@@ -1266,7 +1268,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
     
     if (!searchQuery) return list;
-    
+
     return list.filter(v => 
       v.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       v.phoneNumber?.includes(searchQuery) ||
@@ -1274,7 +1276,157 @@ export default function SecurityDashboardScreen({ navigation }) {
       v.purposeOfVisit?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       v.host?.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  };
+  }, [visitorFilter, visitors, searchQuery]);
+
+  const appointmentRecordsItemsPerPage = 6;
+  const appointmentRecordsPageCount = Math.max(
+    1,
+    Math.ceil(filteredVisitors.length / appointmentRecordsItemsPerPage),
+  );
+  const paginatedAppointmentRecords = useMemo(() => {
+    const startIndex = (appointmentRecordsPage - 1) * appointmentRecordsItemsPerPage;
+    return filteredVisitors.slice(startIndex, startIndex + appointmentRecordsItemsPerPage);
+  }, [filteredVisitors, appointmentRecordsPage]);
+
+  const reportsItemsPerPage = 6;
+  const reportsPageCount = Math.max(1, Math.ceil(reports.length / reportsItemsPerPage));
+  const paginatedReports = useMemo(() => {
+    const startIndex = (reportsPage - 1) * reportsItemsPerPage;
+    return reports.slice(startIndex, startIndex + reportsItemsPerPage);
+  }, [reports, reportsPage]);
+
+  useEffect(() => {
+    setAppointmentRecordsPage(1);
+  }, [visitorFilter, searchQuery]);
+
+  useEffect(() => {
+    setAppointmentRecordsPage((currentPageValue) => Math.min(currentPageValue, appointmentRecordsPageCount));
+  }, [appointmentRecordsPageCount]);
+
+  useEffect(() => {
+    setReportsPage((currentPageValue) => Math.min(currentPageValue, reportsPageCount));
+  }, [reportsPageCount]);
+
+  const renderAppointmentPagination = () => (
+    <View style={styles.appointmentRecordsPaginationRow}>
+      <Text style={styles.appointmentRecordsPaginationInfo}>
+        Page {appointmentRecordsPage} of {appointmentRecordsPageCount} • {filteredVisitors.length} records
+      </Text>
+      <View style={styles.appointmentRecordsPaginationActions}>
+        <TouchableOpacity
+          style={[
+            styles.appointmentRecordsPaginationButton,
+            appointmentRecordsPage === 1 && styles.appointmentRecordsPaginationButtonDisabled,
+          ]}
+          onPress={() => setAppointmentRecordsPage((currentValue) => Math.max(1, currentValue - 1))}
+          disabled={appointmentRecordsPage === 1}
+        >
+          <Ionicons
+            name="chevron-back-outline"
+            size={14}
+            color={appointmentRecordsPage === 1 ? "#94A3B8" : "#334155"}
+          />
+          <Text
+            style={[
+              styles.appointmentRecordsPaginationButtonText,
+              appointmentRecordsPage === 1 && styles.appointmentRecordsPaginationButtonTextDisabled,
+            ]}
+          >
+            Previous
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.appointmentRecordsPaginationButton,
+            appointmentRecordsPage === appointmentRecordsPageCount &&
+              styles.appointmentRecordsPaginationButtonDisabled,
+          ]}
+          onPress={() =>
+            setAppointmentRecordsPage((currentValue) =>
+              Math.min(appointmentRecordsPageCount, currentValue + 1),
+            )
+          }
+          disabled={appointmentRecordsPage === appointmentRecordsPageCount}
+        >
+          <Text
+            style={[
+              styles.appointmentRecordsPaginationButtonText,
+              appointmentRecordsPage === appointmentRecordsPageCount &&
+                styles.appointmentRecordsPaginationButtonTextDisabled,
+            ]}
+          >
+            Next
+          </Text>
+          <Ionicons
+            name="chevron-forward-outline"
+            size={14}
+            color={appointmentRecordsPage === appointmentRecordsPageCount ? "#94A3B8" : "#334155"}
+          />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderSecurityTablePagination = ({
+    currentPage,
+    totalPages,
+    totalItems,
+    itemLabel,
+    onPrevious,
+    onNext,
+  }) => (
+    <View style={styles.appointmentRecordsPaginationRow}>
+      <Text style={styles.appointmentRecordsPaginationInfo}>
+        Page {currentPage} of {totalPages} • {totalItems} {itemLabel}
+      </Text>
+      <View style={styles.appointmentRecordsPaginationActions}>
+        <TouchableOpacity
+          style={[
+            styles.appointmentRecordsPaginationButton,
+            currentPage === 1 && styles.appointmentRecordsPaginationButtonDisabled,
+          ]}
+          onPress={onPrevious}
+          disabled={currentPage === 1}
+        >
+          <Ionicons
+            name="chevron-back-outline"
+            size={14}
+            color={currentPage === 1 ? "#94A3B8" : "#334155"}
+          />
+          <Text
+            style={[
+              styles.appointmentRecordsPaginationButtonText,
+              currentPage === 1 && styles.appointmentRecordsPaginationButtonTextDisabled,
+            ]}
+          >
+            Previous
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.appointmentRecordsPaginationButton,
+            currentPage === totalPages && styles.appointmentRecordsPaginationButtonDisabled,
+          ]}
+          onPress={onNext}
+          disabled={currentPage === totalPages}
+        >
+          <Text
+            style={[
+              styles.appointmentRecordsPaginationButtonText,
+              currentPage === totalPages && styles.appointmentRecordsPaginationButtonTextDisabled,
+            ]}
+          >
+            Next
+          </Text>
+          <Ionicons
+            name="chevron-forward-outline"
+            size={14}
+            color={currentPage === totalPages ? "#94A3B8" : "#334155"}
+          />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   // Render Dashboard Tab
   const renderDashboardTab = () => (
@@ -1674,7 +1826,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
 
         {/* Appointment Records Table */}
-        {getFilteredVisitors().length > 0 ? (
+        {filteredVisitors.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.appointmentRecordsTable}>
               <View style={[styles.appointmentRecordsTableRow, styles.appointmentRecordsTableHeader]}>
@@ -1686,7 +1838,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsStatusCell]}>Status</Text>
                 <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsActionCell]}>Action</Text>
               </View>
-              {getFilteredVisitors().map((visitor) => renderAppointmentRecordRow(visitor))}
+              {paginatedAppointmentRecords.map((visitor) => renderAppointmentRecordRow(visitor))}
             </View>
           </ScrollView>
         ) : (
@@ -1702,6 +1854,8 @@ export default function SecurityDashboardScreen({ navigation }) {
             </Text>
           </View>
         )}
+
+        {filteredVisitors.length > 0 ? renderAppointmentPagination() : null}
       </View>
     </ScrollView>
   );
@@ -2027,7 +2181,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                   <Text style={[styles.securityReportsHeaderCell, styles.securityReportsDateCell]}>Filed Date</Text>
                   <Text style={[styles.securityReportsHeaderCell, styles.securityReportsStatusCell]}>Status</Text>
                 </View>
-                {reports.slice(0, 8).map((report) => {
+                {paginatedReports.map((report) => {
                   const isResolved = String(report.status || '').toLowerCase() === 'resolved';
 
                   return (
@@ -2075,6 +2229,14 @@ export default function SecurityDashboardScreen({ navigation }) {
                 })}
               </View>
             </ScrollView>
+            {renderSecurityTablePagination({
+              currentPage: reportsPage,
+              totalPages: reportsPageCount,
+              totalItems: reports.length,
+              itemLabel: "reports",
+              onPrevious: () => setReportsPage((currentValue) => Math.max(1, currentValue - 1)),
+              onNext: () => setReportsPage((currentValue) => Math.min(reportsPageCount, currentValue + 1)),
+            })}
           </View>
         )}
 

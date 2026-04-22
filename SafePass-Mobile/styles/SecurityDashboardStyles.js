@@ -1215,6 +1215,64 @@ export default StyleSheet.create({
     color: colors.secondary,
   },
 
+  appointmentRecordsPaginationRow: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: spacing.md,
+    flexWrap: "wrap",
+  },
+
+  appointmentRecordsPaginationInfo: {
+    fontSize: fontSize.sm,
+    color: colors.gray[500],
+    fontWeight: "600",
+  },
+
+  appointmentRecordsPaginationActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  appointmentRecordsPaginationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    minWidth: 112,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    backgroundColor: colors.white,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      ":hover": {
+        backgroundColor: colors.gray[50],
+      },
+    }),
+  },
+
+  appointmentRecordsPaginationButtonDisabled: {
+    backgroundColor: colors.gray[50],
+    borderColor: colors.gray[200],
+  },
+
+  appointmentRecordsPaginationButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.gray[800],
+  },
+
+  appointmentRecordsPaginationButtonTextDisabled: {
+    color: colors.gray[400],
+  },
+
   // ============ UPCOMING BANNER ============
   upcomingBanner: {
     backgroundColor: colors.secondarySoft,

@@ -116,6 +116,16 @@ const getNotificationTargetRoles = (role) => {
   return ["all", normalizedRole];
 };
 
+const notificationIsAccessibleToUser = (notification, user) => {
+  if (!notification || !user) return false;
+  const allowedRoles = getNotificationTargetRoles(user.role);
+  const targetRole = String(notification.targetRole || "all").toLowerCase();
+  const roleAllowed = allowedRoles.includes(targetRole);
+  const userAllowed =
+    !notification.targetUser || String(notification.targetUser) === String(user._id);
+  return roleAllowed && userAllowed;
+};
+
 const getFullName = (user = {}) =>
   `${user.firstName || ""} ${user.lastName || ""}`.trim();
 
@@ -5330,7 +5340,7 @@ app.get("/api/notifications", authMiddleware, async (req, res) => {
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
-      .populate("relatedVisitor", "fullName")
+      .populate("relatedVisitor", "fullName visitDate visitTime appointmentStatus appointmentDepartment assignedOffice")
       .populate("relatedUser", "firstName lastName");
 
     const unreadCount = await Notification.countDocuments({
@@ -5361,6 +5371,13 @@ app.put("/api/notifications/:id/read", authMiddleware, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Notification not found",
+      });
+    }
+
+    if (!notificationIsAccessibleToUser(notification, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to access this notification",
       });
     }
 

@@ -839,6 +839,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [dataManagementPage, setDataManagementPage] = useState(1);
   const [dataManagementFieldPage, setDataManagementFieldPage] = useState(1);
   const [dataManagementItemsPerPage] = useState(6);
+  const [appointmentRecordsPage, setAppointmentRecordsPage] = useState(1);
 
   // Modal States
   const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
@@ -1468,6 +1469,20 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     () => appointmentRequests.filter((request) => getRequestStatus(request) === "approved"),
     [appointmentRequests],
   );
+
+  const appointmentRecordsItemsPerPage = 6;
+  const appointmentRecordsPageCount = Math.max(
+    1,
+    Math.ceil(appointmentRecords.length / appointmentRecordsItemsPerPage),
+  );
+  const paginatedAppointmentRecords = useMemo(() => {
+    const startIndex = (appointmentRecordsPage - 1) * appointmentRecordsItemsPerPage;
+    return appointmentRecords.slice(startIndex, startIndex + appointmentRecordsItemsPerPage);
+  }, [appointmentRecords, appointmentRecordsPage]);
+
+  useEffect(() => {
+    setAppointmentRecordsPage((currentPageValue) => Math.min(currentPageValue, appointmentRecordsPageCount));
+  }, [appointmentRecordsPageCount]);
 
   const selectedMapModuleFloor = FLOOR_VIEW_TO_ID[selectedSubmodule] || "ground";
   const selectedFloorRooms = useMemo(
@@ -3801,6 +3816,61 @@ const loadDashboardData = useCallback(async () => {
     </View>
   );
 
+  const renderCompactPagination = ({
+    currentPage,
+    totalPages,
+    itemCount,
+    itemLabel,
+    onPrevious,
+    onNext,
+  }) => (
+    <View style={styles.userPaginationRow}>
+      <Text style={[styles.userPaginationSummary, isDarkMode && styles.darkTextSecondary]}>
+        Page {currentPage} of {totalPages} • {itemCount} {itemLabel}
+      </Text>
+      <View style={styles.userPaginationControls}>
+        <TouchableOpacity
+          style={[styles.userPaginationButton, currentPage === 1 && styles.userPaginationButtonDisabled]}
+          onPress={onPrevious}
+          disabled={currentPage === 1}
+        >
+          <Ionicons
+            name="chevron-back-outline"
+            size={14}
+            color={currentPage === 1 ? "#94A3B8" : "#334155"}
+          />
+          <Text
+            style={[
+              styles.userPaginationButtonText,
+              currentPage === 1 && styles.userPaginationButtonTextDisabled,
+            ]}
+          >
+            Previous
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.userPaginationButton, currentPage === totalPages && styles.userPaginationButtonDisabled]}
+          onPress={onNext}
+          disabled={currentPage === totalPages}
+        >
+          <Text
+            style={[
+              styles.userPaginationButtonText,
+              currentPage === totalPages && styles.userPaginationButtonTextDisabled,
+            ]}
+          >
+            Next
+          </Text>
+          <Ionicons
+            name="chevron-forward-outline"
+            size={14}
+            color={currentPage === totalPages ? "#94A3B8" : "#334155"}
+          />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   const renderDateRangeControls = ({
     accent = "#1C6DD0",
     startDate,
@@ -6063,7 +6133,7 @@ const loadDashboardData = useCallback(async () => {
           </View>
 
           {renderAdminTable({
-            rows: appointmentRecords,
+            rows: paginatedAppointmentRecords,
             keyExtractor: (request) => request._id || request.id || request.email,
             emptyTitle: "No appointment records",
             emptySubtitle: "Pending appointment requests will appear here only after staff approval.",
@@ -6130,6 +6200,20 @@ const loadDashboardData = useCallback(async () => {
               },
             ],
           })}
+
+          {appointmentRecords.length ? (
+            renderCompactPagination({
+              currentPage: appointmentRecordsPage,
+              totalPages: appointmentRecordsPageCount,
+              itemCount: appointmentRecords.length,
+              itemLabel: "records",
+              onPrevious: () => setAppointmentRecordsPage((currentValue) => Math.max(1, currentValue - 1)),
+              onNext: () =>
+                setAppointmentRecordsPage((currentValue) =>
+                  Math.min(appointmentRecordsPageCount, currentValue + 1),
+                ),
+            })
+          ) : null}
         </AdminSectionShell>
       </View>
     </ScrollView>
@@ -7458,33 +7542,14 @@ const loadDashboardData = useCallback(async () => {
                   },
                 ],
               })}
-              <View style={styles.userPaginationRow}>
-                <Text style={[styles.userPaginationSummary, isDarkMode && styles.darkTextSecondary]}>
-                  Page {currentPage} of {totalPages}
-                </Text>
-                <View style={styles.userPaginationControls}>
-                  <TouchableOpacity
-                    style={[styles.userPaginationButton, currentPage === 1 && styles.userPaginationButtonDisabled]}
-                    onPress={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <Ionicons name="chevron-back-outline" size={16} color={currentPage === 1 ? "#94A3B8" : "#334155"} />
-                    <Text style={[styles.userPaginationButtonText, currentPage === 1 && styles.userPaginationButtonTextDisabled]}>
-                      Previous
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.userPaginationButton, currentPage >= totalPages && styles.userPaginationButtonDisabled]}
-                    onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage >= totalPages}
-                  >
-                    <Text style={[styles.userPaginationButtonText, currentPage >= totalPages && styles.userPaginationButtonTextDisabled]}>
-                      Next
-                    </Text>
-                    <Ionicons name="chevron-forward-outline" size={16} color={currentPage >= totalPages ? "#94A3B8" : "#334155"} />
-                  </TouchableOpacity>
-                </View>
-              </View>
+              {renderCompactPagination({
+                currentPage,
+                totalPages,
+                itemCount: totalFilteredUsers,
+                itemLabel: "accounts",
+                onPrevious: () => setCurrentPage((prev) => Math.max(1, prev - 1)),
+                onNext: () => setCurrentPage((prev) => Math.min(totalPages, prev + 1)),
+              })}
             </>
           ) : (
             <View style={[styles.emptyState, styles.userEmptyState, isDarkMode && { backgroundColor: "#0F172A" }]}>
