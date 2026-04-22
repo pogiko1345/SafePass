@@ -2564,11 +2564,8 @@ const loadDashboardData = useCallback(async () => {
 
       await ApiService.clearAuth();
       await storageMultiRemove([
-        "userToken",
-        "authToken",
         "userData",
         "currentUser",
-        "trustedDevice",
         "isNewRegistration",
       ]);
 

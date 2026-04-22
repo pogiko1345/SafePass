@@ -17,6 +17,14 @@ require("dotenv").config();
 const app = express();
 const isVercelRuntime = Boolean(process.env.VERCEL);
 
+const getRequiredEnvValue = (name) => {
+  const value = String(process.env[name] || "").trim();
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+};
+
 // ========== ENHANCED CORS CONFIGURATION ==========
 app.use(
   cors({
@@ -74,7 +82,7 @@ connectToDatabase();
 const generateToken = (userId) => {
   return jwt.sign(
     { userId },
-    process.env.JWT_SECRET || "sapphire_secret_2024",
+    getRequiredEnvValue("JWT_SECRET"),
     {
       expiresIn: "7d",
     },
@@ -92,7 +100,7 @@ const authMiddleware = async (req, res, next) => {
 
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || "sapphire_secret_2024",
+      getRequiredEnvValue("JWT_SECRET"),
     );
     const user = await User.findById(decoded.userId).select("-password");
 
@@ -411,7 +419,7 @@ const getTapLocationFromRequest = (body = {}) => {
 };
 
 const validateDeviceKey = (req, res, next) => {
-  const expectedKey = process.env.ARDUINO_DEVICE_KEY || "safepass-device-key";
+  const expectedKey = getRequiredEnvValue("ARDUINO_DEVICE_KEY");
   const providedKey = req.header("x-device-key") || req.body?.deviceKey;
 
   if (!providedKey || providedKey !== expectedKey) {
@@ -619,11 +627,9 @@ const normalizeOtpCode = (value) => String(value || "").replace(/\D/g, "").slice
 const createPasswordResetOtp = (req, user) => {
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
-  const resetToken = crypto.randomBytes(24).toString("hex");
-  const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
   const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
 
-  user.passwordResetTokenHash = resetTokenHash;
+  user.passwordResetTokenHash = "";
   user.passwordResetOtpHash = otpHash;
   user.passwordResetExpiresAt = expiresAt;
   user.passwordResetAttempts = 0;
@@ -647,11 +653,9 @@ const createPasswordResetOtp = (req, user) => {
     ].join("\n"),
   );
 
-  console.log(`\nPASSWORD RESET OTP for ${user.email}: ${otpCode}`);
-  console.log(`PASSWORD RESET TOKEN for ${user.email}: ${resetToken}`);
-  console.log("Enter this OTP in the forgot password screen.\n");
+  console.log(`Password reset code generated for ${user.email}.`);
 
-  return { otpCode, resetToken, expiresAt };
+  return { expiresAt };
 };
 
 const clearPasswordResetState = (user) => {
@@ -1659,10 +1663,7 @@ app.post("/api/auth/request-password-reset", async (req, res) => {
     res.json({
       success: true,
       message: "A password reset code has been sent to your email address.",
-      resetToken: otp.resetToken,
       expiresIn: 600,
-      simulation: true,
-      otpCode: otp.otpCode,
       otpExpiresAt: otp.expiresAt,
     });
   } catch (error) {
@@ -1678,12 +1679,11 @@ app.post("/api/auth/verify-password-reset", async (req, res) => {
   try {
     const email = normalizeEmailValue(req.body?.email);
     const otpCode = normalizeOtpCode(req.body?.otpCode);
-    const resetToken = String(req.body?.resetToken || "").trim();
 
-    if (!email || !otpCode || !resetToken) {
+    if (!email || !otpCode) {
       return res.status(400).json({
         success: false,
-        message: "Email, reset token, and OTP code are required.",
+        message: "Email and OTP code are required.",
       });
     }
 
@@ -1703,7 +1703,6 @@ app.post("/api/auth/verify-password-reset", async (req, res) => {
     }
 
     if (
-      !user.passwordResetTokenHash ||
       !user.passwordResetOtpHash ||
       !user.passwordResetExpiresAt
     ) {
@@ -1719,14 +1718,6 @@ app.post("/api/auth/verify-password-reset", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Reset code has expired. Please request a new one.",
-      });
-    }
-
-    const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
-    if (resetTokenHash !== user.passwordResetTokenHash) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid password reset session. Please request a new code.",
       });
     }
 
@@ -1774,12 +1765,11 @@ app.post("/api/auth/reset-password", async (req, res) => {
   try {
     const email = normalizeEmailValue(req.body?.email);
     const newPassword = String(req.body?.newPassword || "");
-    const resetToken = String(req.body?.resetToken || "").trim();
 
-    if (!email || !newPassword || !resetToken) {
+    if (!email || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: "Email, new password, and reset token are required.",
+        message: "Email and new password are required.",
       });
     }
 
@@ -1799,7 +1789,6 @@ app.post("/api/auth/reset-password", async (req, res) => {
     }
 
     if (
-      !user.passwordResetTokenHash ||
       !user.passwordResetOtpHash ||
       !user.passwordResetExpiresAt
     ) {
@@ -1815,14 +1804,6 @@ app.post("/api/auth/reset-password", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Reset session expired. Please request a new code.",
-      });
-    }
-
-    const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
-    if (resetTokenHash !== user.passwordResetTokenHash) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid password reset session. Please request a new code.",
       });
     }
 

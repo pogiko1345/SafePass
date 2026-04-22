@@ -784,12 +784,8 @@ export default function VisitorRegisterScreen({ navigation }) {
 
     setShowSuccess(false);
 
-    await AsyncStorage.multiRemove([
-      "pendingVisitor",
-      "authToken",
-      "userToken",
-      "currentUser",
-    ]);
+    await ApiService.clearAuth();
+    await AsyncStorage.removeItem("pendingVisitor");
     await AsyncStorage.setItem("isNewRegistration", "true");
 
     goToVisitorLogin({
