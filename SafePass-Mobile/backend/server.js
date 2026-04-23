@@ -8,6 +8,12 @@ const Visitor = require("./models/Visitor");
 const Notification = require("./models/Notification");
 const User = require("./models/User");
 const AccessLog = require("./models/AccessLog");
+const AppSettings = require("./models/AppSettings");
+const { createRateLimiter, getRateLimitKey } = require("./utils/securityUtils");
+const {
+  DEFAULT_SYSTEM_SETTINGS,
+  sanitizeSystemSettings,
+} = require("./utils/settingsUtils");
 const timestamp = Date.now();
 const randomString = Math.random().toString(36).substr(2, 10).toUpperCase();
 const tempNfcCardId = `PENDING-${timestamp}-${randomString}`;
@@ -16,6 +22,14 @@ require("dotenv").config();
 
 const app = express();
 const isVercelRuntime = Boolean(process.env.VERCEL);
+const sensitiveDebugLoggingEnabled =
+  String(process.env.ALLOW_SENSITIVE_DEBUG_LOGS || "").trim().toLowerCase() === "true";
+
+const GENERIC_AUTH_ERROR_MESSAGE = "Invalid email or password";
+const GENERIC_PASSWORD_RESET_REQUEST_MESSAGE =
+  "If an account matches that email, a password reset code will be sent.";
+const GENERIC_PASSWORD_RESET_VERIFY_MESSAGE =
+  "Invalid or expired verification code. Please request a new code and try again.";
 
 const getRequiredEnvValue = (name) => {
   const value = String(process.env[name] || "").trim();
@@ -23,6 +37,12 @@ const getRequiredEnvValue = (name) => {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+};
+
+const logSensitiveDebug = (...args) => {
+  if (sensitiveDebugLoggingEnabled) {
+    console.log(...args);
+  }
 };
 
 // ========== ENHANCED CORS CONFIGURATION ==========
@@ -77,7 +97,74 @@ const connectToDatabase = () => {
 
 connectToDatabase();
 
+const authAttemptLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "auth" }),
+});
+
+const passwordResetRequestLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "password-reset-request" }),
+});
+
+const passwordResetVerifyLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 6,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "password-reset-verify" }),
+});
+
+const passwordResetChangeLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 4,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "password-reset-change" }),
+});
+
+const registrationOtpRequestLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "registration-otp-request" }),
+});
+
+const registrationOtpVerifyLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 6,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "registration-otp-verify" }),
+});
+
+const phoneOtpRequestLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "phone-otp-request" }),
+});
+
+const phoneOtpVerifyLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 6,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "phone-otp-verify" }),
+});
+
 // ========== HELPER FUNCTIONS ==========
+const applyRateLimit = (res, limiterResult, retryMessage) => {
+  const retryAfterSeconds = Math.max(
+    1,
+    Math.ceil((limiterResult.resetAt - Date.now()) / 1000),
+  );
+  res.set("Retry-After", String(retryAfterSeconds));
+  return res.status(429).json({
+    success: false,
+    message: retryMessage,
+  });
+};
+
+const getSystemSettingsRecord = async () =>
+  AppSettings.findOneAndUpdate(
+    { key: "system" },
+    { $setOnInsert: { key: "system", ...DEFAULT_SYSTEM_SETTINGS } },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  );
+
 // Generate JWT Token
 const generateToken = (userId) => {
   return jwt.sign(
@@ -506,9 +593,7 @@ const sendEmail = (to, subject, body) => {
         text: body,
       })
       .then((info) => {
-        console.log(`\nEMAIL SENT TO ${to}`);
-        console.log(`SUBJECT: ${subject}`);
-        console.log(`MESSAGE ID: ${info.messageId}\n`);
+        console.log(`Email sent to ${to}. Message ID: ${info.messageId}`);
       })
       .catch((error) => {
         console.error(`\nFailed to send email to ${to}:`, error.message);
@@ -527,11 +612,8 @@ const sendEmail = (to, subject, body) => {
     );
   }
 
-  console.log(`\nEMAIL SIMULATION`);
-  console.log(`To: ${to}`);
-  console.log(`Subject: ${subject}`);
-  console.log(`Body: ${body}`);
-  console.log(`END EMAIL SIMULATION\n`);
+  console.log(`Email simulation generated for ${to}. Subject: ${subject}`);
+  logSensitiveDebug(`Simulated email body for ${to}:`, body);
   return { success: true, simulated: true };
 };
 
@@ -580,9 +662,8 @@ const sendVerificationEmailSimulation = (req, user) => {
     ].join("\n"),
   );
 
-  console.log(`\nEMAIL VERIFICATION LINK for ${user.email}:`);
-  console.log(verificationUrl);
-  console.log("Open this link to verify the visitor account.\n");
+  console.log(`Email verification link generated for ${user.email}.`);
+  logSensitiveDebug(`Verification URL for ${user.email}: ${verificationUrl}`);
 
   return { verificationUrl, expiresAt };
 };
@@ -617,10 +698,10 @@ const createRegistrationOtp = (user) => {
     ].join("\n"),
   );
 
-  console.log(`\nVISITOR REGISTRATION OTP for ${user.email}: ${otpCode}`);
-  console.log("Enter this OTP in the visitor registration screen.\n");
+  console.log(`Visitor registration OTP generated for ${user.email}.`);
+  logSensitiveDebug(`Visitor registration OTP for ${user.email}: ${otpCode}`);
 
-  return { otpCode, expiresAt };
+  return { expiresAt };
 };
 
 const normalizeOtpCode = (value) => String(value || "").replace(/\D/g, "").slice(0, 6);
@@ -1126,7 +1207,7 @@ const isStaffAllowedForAppointment = (staffUser = {}, visitor = {}) => {
 };
 
 app.post("/api/register", async (req, res) => {
-  console.log("📝 Registration attempt:", req.body);
+  console.log("Registration attempt received.");
 
   try {
     const {
@@ -1354,8 +1435,6 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
 
 // 2. LOGIN
 app.post("/api/login", async (req, res) => {
-  console.log("Login attempt:", req.body.email);
-
   try {
     const { email, password } = req.body;
     const loginIdentifier = String(email || "").toLowerCase().trim();
@@ -1364,16 +1443,33 @@ app.post("/api/login", async (req, res) => {
       return res.status(400).json({ error: "Username/email and password are required" });
     }
 
+    const loginRateLimit = authAttemptLimiter.hit({
+      req,
+      identifier: loginIdentifier,
+    });
+    if (!loginRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        loginRateLimit,
+        "Too many login attempts. Please wait a few minutes before trying again.",
+      );
+    }
+
     // Visitors can sign in using either their username or email address.
     const user = await User.findOne({
       $or: [{ email: loginIdentifier }, { username: loginIdentifier }],
     });
     if (!user) {
-      console.log("User not found:", loginIdentifier);
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({ error: GENERIC_AUTH_ERROR_MESSAGE });
     }
 
-    // Check if user is inactive
+    // Check password
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: GENERIC_AUTH_ERROR_MESSAGE });
+    }
+
+    // Only disclose account state after the password is valid.
     if (user.status === "inactive" || user.status === "suspended") {
       return res.status(401).json({ error: "Account is deactivated" });
     }
@@ -1386,15 +1482,7 @@ app.post("/api/login", async (req, res) => {
           "Please verify your account using the OTP sent during registration before logging in.",
         requiresEmailVerification: true,
         requiresOtpVerification: true,
-        email: user.email,
       });
-    }
-
-    // Check password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      console.log("Invalid password for:", loginIdentifier);
-      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     // Update last login
@@ -1424,7 +1512,7 @@ app.post("/api/login", async (req, res) => {
     const userResponse = user.toObject();
     delete userResponse.password;
 
-    console.log("Login successful:", user.email, "Role:", user.role);
+    console.log(`Login successful for ${user.email}.`);
 
     await createSystemActivity({
       actorUser: user,
@@ -1629,8 +1717,10 @@ app.post("/api/check-email", async (req, res) => {
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
     }
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
-    res.json({ exists: !!user });
+    res.json({
+      success: true,
+      message: "Use registration or password reset to continue.",
+    });
   } catch (error) {
     console.error("❌ Check email error:", error);
     res.status(500).json({ error: "Failed to check email" });
@@ -1648,23 +1738,39 @@ app.post("/api/auth/request-password-reset", async (req, res) => {
       });
     }
 
+    const resetRateLimit = passwordResetRequestLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!resetRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        resetRateLimit,
+        "Too many password reset requests. Please wait a few minutes before trying again.",
+      );
+    }
+
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "No account found with this email address.",
+    if (user) {
+      const otp = createPasswordResetOtp(req, user);
+      user.updatedAt = new Date();
+      await user.save();
+
+      return res.json({
+        success: true,
+        message: GENERIC_PASSWORD_RESET_REQUEST_MESSAGE,
+        expiresIn: 600,
+        otpExpiresAt: otp.expiresAt,
       });
     }
 
-    const otp = createPasswordResetOtp(req, user);
-    user.updatedAt = new Date();
-    await user.save();
+    const fallbackExpiry = new Date(Date.now() + 1000 * 60 * 10);
 
     res.json({
       success: true,
-      message: "A password reset code has been sent to your email address.",
+      message: GENERIC_PASSWORD_RESET_REQUEST_MESSAGE,
       expiresIn: 600,
-      otpExpiresAt: otp.expiresAt,
+      otpExpiresAt: fallbackExpiry,
     });
   } catch (error) {
     console.error("Request password reset error:", error);
@@ -1694,11 +1800,23 @@ app.post("/api/auth/verify-password-reset", async (req, res) => {
       });
     }
 
+    const resetVerifyRateLimit = passwordResetVerifyLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!resetVerifyRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        resetVerifyRateLimit,
+        "Too many verification attempts. Please request a new reset code and try again later.",
+      );
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        message: "User not found.",
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
       });
     }
 
@@ -1708,7 +1826,7 @@ app.post("/api/auth/verify-password-reset", async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "No active password reset request was found.",
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
       });
     }
 
@@ -1717,7 +1835,7 @@ app.post("/api/auth/verify-password-reset", async (req, res) => {
       await user.save();
       return res.status(400).json({
         success: false,
-        message: "Reset code has expired. Please request a new one.",
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
       });
     }
 
@@ -1726,7 +1844,7 @@ app.post("/api/auth/verify-password-reset", async (req, res) => {
       await user.save();
       return res.status(400).json({
         success: false,
-        message: "Too many invalid attempts. Please request a new reset code.",
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
       });
     }
 
@@ -1736,10 +1854,7 @@ app.post("/api/auth/verify-password-reset", async (req, res) => {
       await user.save();
       return res.status(400).json({
         success: false,
-        message: `Invalid verification code. ${Math.max(
-          0,
-          5 - user.passwordResetAttempts,
-        )} attempts remaining.`,
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
       });
     }
 
@@ -1780,11 +1895,23 @@ app.post("/api/auth/reset-password", async (req, res) => {
       });
     }
 
+    const resetChangeRateLimit = passwordResetChangeLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!resetChangeRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        resetChangeRateLimit,
+        "Too many password reset attempts. Please wait a few minutes before trying again.",
+      );
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        message: "User not found.",
+        message: "Please verify the reset code before changing your password.",
       });
     }
 
@@ -1971,9 +2098,9 @@ app.post("/api/auth/resend-verification", async (req, res) => {
     const user = await User.findOne({ email, role: "visitor" });
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Visitor account not found.",
+      return res.json({
+        success: true,
+        message: "A verification link has been sent if the account is eligible.",
       });
     }
 
@@ -1990,9 +2117,7 @@ app.post("/api/auth/resend-verification", async (req, res) => {
     res.json({
       success: true,
       message:
-        "Verification link generated. In simulation mode, check the backend logs.",
-      simulation: true,
-      verificationLink: verification.verificationUrl,
+        "A verification link has been sent if the account is eligible.",
       verificationExpiresAt: verification.expiresAt,
     });
   } catch (error) {
@@ -2023,11 +2148,23 @@ app.post("/api/auth/verify-registration-otp", async (req, res) => {
       });
     }
 
+    const registrationVerifyRateLimit = registrationOtpVerifyLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!registrationVerifyRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        registrationVerifyRateLimit,
+        "Too many OTP verification attempts. Please request a new code and try again later.",
+      );
+    }
+
     const user = await User.findOne({ email, role: "visitor" });
     if (!user) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        message: "Visitor account not found.",
+        message: "Invalid or expired OTP code. Please request a new code and try again.",
       });
     }
 
@@ -2134,11 +2271,24 @@ app.post("/api/auth/resend-registration-otp", async (req, res) => {
       });
     }
 
+    const registrationRequestRateLimit = registrationOtpRequestLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!registrationRequestRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        registrationRequestRateLimit,
+        "Too many OTP requests. Please wait a few minutes before requesting a new code.",
+      );
+    }
+
     const user = await User.findOne({ email, role: "visitor" });
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Visitor account not found.",
+      return res.json({
+        success: true,
+        message: "A new OTP code has been sent if the account is eligible.",
+        otpExpiresAt: new Date(Date.now() + 1000 * 60 * 10),
       });
     }
 
@@ -2155,9 +2305,7 @@ app.post("/api/auth/resend-registration-otp", async (req, res) => {
 
     res.json({
       success: true,
-      message: "A new OTP code was generated. In simulation mode, check the backend logs.",
-      simulation: true,
-      otpCode: otp.otpCode,
+      message: "A new OTP code has been sent if the account is eligible.",
       otpExpiresAt: otp.expiresAt,
     });
   } catch (error) {
@@ -2314,10 +2462,8 @@ app.post("/api/visitors/register", async (req, res) => {
     res.status(201).json({
       success: true,
       message:
-        "Visitor account created. Please enter the OTP code before logging in. In simulation mode, use the OTP shown in the backend logs.",
+        "Visitor account created. Please enter the OTP code sent to your email before logging in.",
       requiresOtpVerification: true,
-      simulation: true,
-      otpCode: otp.otpCode,
       otpExpiresAt: otp.expiresAt,
       user: {
         _id: user._id,
@@ -2507,7 +2653,6 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     const tempPassword =
       visitor.temporaryPassword ||
       `VIS${Math.random().toString(36).slice(-8).toUpperCase()}`;
-    console.log("🔐 Temporary Password:", tempPassword);
 
     // Update visitor status - THIS IS THE KEY PART
     console.log("\n📝 UPDATING VISITOR...");
@@ -2577,7 +2722,6 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       "Visitor Registration Approved - Sapphire Aviation",
       `Dear ${visitor.fullName},\n\nYour visitor registration has been approved!\n\nLogin Credentials:\nEmail: ${visitor.email}\nPassword: ${tempPassword}\n\nVisit Details:\nPurpose: ${visitor.purposeOfVisit}\nDate: ${new Date(visitor.visitDate).toLocaleDateString()}\nTime: ${new Date(visitor.visitTime).toLocaleTimeString()}\n\nThank you,\nSapphire Aviation Security Team`,
     );
-    console.log("📧 Approval email sent to:", visitor.email);
 
     // Create notification for security
     await createRoleNotification({
@@ -2595,10 +2739,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
         purposeOfVisit: visitor.purposeOfVisit,
       },
     });
-    console.log("🔔 Security notification created");
-
-    console.log("\n✅ VISITOR APPROVED SUCCESSFULLY!");
-    console.log("=".repeat(60) + "\n");
+    console.log(`Visitor approved successfully for ${visitor.email}.`);
 
     await createSystemActivity({
       actorUser: req.user,
@@ -3226,7 +3367,6 @@ app.post("/api/admin/notifications", authMiddleware, async (req, res) => {
 
 // Request OTP
 app.post("/api/auth/request-otp", async (req, res) => {
-  console.log("📱 OTP request for:", req.body.phoneNumber);
 
   try {
     const { phoneNumber, method } = req.body;
@@ -3237,6 +3377,18 @@ app.post("/api/auth/request-otp", async (req, res) => {
         success: false,
         message: "Please enter a valid Philippine mobile number.",
       });
+    }
+
+    const phoneRequestRateLimit = phoneOtpRequestLimiter.hit({
+      req,
+      identifier: cleanPhone,
+    });
+    if (!phoneRequestRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        phoneRequestRateLimit,
+        "Too many OTP requests. Please wait a few minutes before requesting another code.",
+      );
     }
 
     // Generate a random 6-digit OTP
@@ -3253,19 +3405,8 @@ app.post("/api/auth/request-otp", async (req, res) => {
     const tempToken =
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
 
-    // Log OTP to console (for development)
-    console.log("\n" + "=".repeat(50));
-    console.log(`🔐 OTP VERIFICATION CODE`);
-    console.log(`📱 Phone: ${cleanPhone}`);
-    console.log(`🔢 Code: ${otpCode}`);
-    console.log(`⏱️  Expires in: 5 minutes`);
-    console.log("=".repeat(50) + "\n");
-
-    // Also show an alert in the terminal for easy visibility
-    console.log(`\x1b[32m%s\x1b[0m`, `✅ OTP for ${cleanPhone}: ${otpCode}`);
-
-    // In a real app, you would send an SMS here
-    // For development, we'll just log it
+    console.log(`Phone OTP generated for ${cleanPhone}.`);
+    logSensitiveDebug(`Phone OTP for ${cleanPhone}: ${otpCode}`);
 
     res.json({
       success: true,
@@ -3284,7 +3425,6 @@ app.post("/api/auth/request-otp", async (req, res) => {
 });
 
 app.post("/api/auth/verify-otp", async (req, res) => {
-  console.log("🔐 OTP verification attempt:", req.body);
 
   try {
     const { phoneNumber, otpCode, tempToken } = req.body;
@@ -3307,10 +3447,21 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       });
     }
 
+    const phoneVerifyRateLimit = phoneOtpVerifyLimiter.hit({
+      req,
+      identifier: cleanPhone,
+    });
+    if (!phoneVerifyRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        phoneVerifyRateLimit,
+        "Too many verification attempts. Please request a new code and try again later.",
+      );
+    }
+
     const storedData = otpStore.get(cleanPhone);
 
     if (!storedData) {
-      console.log("❌ No OTP found for:", cleanPhone);
       return res.status(400).json({
         success: false,
         verified: false,
@@ -3319,7 +3470,6 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     if (storedData.expiresAt < Date.now()) {
-      console.log("❌ OTP expired for:", cleanPhone);
       otpStore.delete(cleanPhone);
       return res.status(400).json({
         success: false,
@@ -3329,7 +3479,6 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     if (storedData.attempts >= 5) {
-      console.log("❌ Too many attempts for:", cleanPhone);
       otpStore.delete(cleanPhone);
       return res.status(400).json({
         success: false,
@@ -3339,7 +3488,6 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     if (storedData.code === cleanOtpCode) {
-      console.log("✅ OTP verified successfully for:", cleanPhone);
       otpStore.delete(cleanPhone);
       return res.json({
         success: true,
@@ -3349,9 +3497,6 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     } else {
       storedData.attempts += 1;
       otpStore.set(cleanPhone, storedData);
-      console.log(
-        `❌ Invalid OTP for ${cleanPhone}. Attempts: ${storedData.attempts}/5`,
-      );
       return res.status(400).json({
         success: false,
         verified: false,
@@ -3410,6 +3555,12 @@ app.get("/api/admin/debug-visitors", authMiddleware, async (req, res) => {
 });
 
 app.get("/api/auth/debug-otp/:phone", async (req, res) => {
+  if (!sensitiveDebugLoggingEnabled) {
+    return res.status(404).json({
+      success: false,
+      message: "Route not found",
+    });
+  }
   const { phone } = req.params;
   const cleanPhone = normalizePhoneForOtp(phone);
   const storedData = otpStore.get(cleanPhone);
@@ -6465,16 +6616,11 @@ app.get("/api/admin/settings", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
+    const settingsRecord = await getSystemSettingsRecord();
+
     res.json({
       success: true,
-      settings: {
-        maintenanceMode: false,
-        emailNotifications: true,
-        smsAlerts: true,
-        backupFrequency: "daily",
-        sessionTimeout: "30",
-        maxLoginAttempts: "5",
-      },
+      settings: sanitizeSystemSettings(settingsRecord?.toObject?.() || settingsRecord || {}),
     });
   } catch (error) {
     console.error("Get system settings error:", error);
@@ -6489,7 +6635,12 @@ app.put("/api/admin/settings", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const settings = req.body;
+    const settings = sanitizeSystemSettings(req.body || {});
+    await AppSettings.findOneAndUpdate(
+      { key: "system" },
+      { $set: { ...settings, updatedAt: new Date() } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
 
     // Create access log
     const accessLog = new AccessLog({
@@ -6503,7 +6654,11 @@ app.put("/api/admin/settings", authMiddleware, async (req, res) => {
     });
     await accessLog.save();
 
-    res.json({ success: true, message: "Settings updated successfully" });
+    res.json({
+      success: true,
+      message: "Settings updated successfully",
+      settings,
+    });
   } catch (error) {
     console.error("Update system settings error:", error);
     res

@@ -461,18 +461,6 @@ export default function LoginScreen({ navigation, route }) {
     
     setIsLoading(true);
     try {
-      const emailExists = await ApiService.checkEmailExists(normalizedResetEmail);
-      
-      if (!emailExists) {
-        Alert.alert(
-          "Email Not Found",
-          "No account found with this email address.",
-          [{ text: "OK", style: "cancel" }]
-        );
-        setIsLoading(false);
-        return;
-      }
-      
       const response = await ApiService.requestPasswordReset(normalizedResetEmail);
       
       if (response.success) {

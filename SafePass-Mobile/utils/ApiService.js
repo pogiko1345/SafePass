@@ -395,11 +395,11 @@ async register(userData) {
 
   async checkEmailExists(email) {
     try {
-      const response = await this.fetch("/check-email", {
+      await this.fetch("/check-email", {
         method: "POST",
         body: { email },
       });
-      return response.exists;
+      return false;
     } catch {
       return false;
     }

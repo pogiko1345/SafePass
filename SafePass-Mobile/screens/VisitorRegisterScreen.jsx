@@ -673,27 +673,6 @@ export default function VisitorRegisterScreen({ navigation }) {
     setIsSubmitting(true);
 
     try {
-      const emailExists = await ApiService.checkEmailExists(formData.email);
-      if (emailExists) {
-        Alert.alert(
-          "Email Already Registered",
-          "An account with this email already exists. Please log in instead.",
-          [
-            {
-              text: "Go to Login",
-              onPress: () => {
-                setIsSubmitting(false);
-                goToVisitorLogin({
-                  initialEmail: formData.email,
-                });
-              },
-            },
-            { text: "OK", style: "cancel" },
-          ],
-        );
-        return;
-      }
-
       const response = await ApiService.registerVisitor({
         fullName: normalizeFullName(formData.fullName),
         email: formData.email,
