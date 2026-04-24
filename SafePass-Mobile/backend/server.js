@@ -1130,6 +1130,33 @@ const isVisitorOwner = (user = {}, visitor = {}) => {
   return sameVisitorId || sameEmail;
 };
 
+const findVisitorForUser = async (user) => {
+  if (!user) return null;
+
+  let visitor = null;
+
+  if (user.visitorId) {
+    visitor = await Visitor.findById(user.visitorId);
+  }
+
+  if (!visitor && user.email) {
+    visitor = await Visitor.findOne({ email: String(user.email).trim().toLowerCase() }).sort({
+      registeredAt: -1,
+      createdAt: -1,
+    });
+  }
+
+  if (
+    visitor &&
+    (!user.visitorId || String(user.visitorId) !== String(visitor._id))
+  ) {
+    user.visitorId = visitor._id;
+    await user.save();
+  }
+
+  return visitor;
+};
+
 const getCombinedAppointmentDateTime = (visitDateValue, visitTimeValue) => {
   const visitDate = new Date(visitDateValue);
   const visitTime = new Date(visitTimeValue);
@@ -1410,15 +1437,7 @@ const userData = {
 app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
   try {
     if (req.user.role === "visitor") {
-      let visitor = null;
-
-      if (req.user.visitorId) {
-        visitor = await Visitor.findById(req.user.visitorId);
-      }
-
-      if (!visitor) {
-        visitor = await Visitor.findOne({ email: req.user.email });
-      }
+      const visitor = await findVisitorForUser(req.user);
 
       if (visitor) {
         return res.json({
@@ -5638,17 +5657,7 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
   try {
     // If user is a visitor, get their visitor record
     if (req.user.role === "visitor") {
-      let visitor = null;
-
-      // Try to find by visitorId first
-      if (req.user.visitorId) {
-        visitor = await Visitor.findById(req.user.visitorId);
-      }
-
-      // If not found, try by email
-      if (!visitor) {
-        visitor = await Visitor.findOne({ email: req.user.email });
-      }
+      const visitor = await findVisitorForUser(req.user);
 
       if (visitor) {
         return res.json({
