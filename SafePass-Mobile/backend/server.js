@@ -24,6 +24,13 @@ const app = express();
 const isVercelRuntime = Boolean(process.env.VERCEL);
 const sensitiveDebugLoggingEnabled =
   String(process.env.ALLOW_SENSITIVE_DEBUG_LOGS || "").trim().toLowerCase() === "true";
+const phoneOtpSmsProviderConfigured = [
+  "SEMAPHORE_API_KEY",
+  "SEMAPHORE_API_TOKEN",
+  "SMS_API_KEY",
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+].some((name) => String(process.env[name] || "").trim());
 
 const GENERIC_AUTH_ERROR_MESSAGE = "Invalid email or password";
 const GENERIC_PASSWORD_RESET_REQUEST_MESSAGE =
@@ -43,6 +50,20 @@ const logSensitiveDebug = (...args) => {
   if (sensitiveDebugLoggingEnabled) {
     console.log(...args);
   }
+};
+
+const logPhoneOtpForDemo = ({ phoneNumber, otpCode, method }) => {
+  if (phoneOtpSmsProviderConfigured && !sensitiveDebugLoggingEnabled) {
+    return;
+  }
+
+  console.log("");
+  console.log("========== PHONE OTP DEMO ==========");
+  console.log(`Number : ${phoneNumber}`);
+  console.log(`Method : ${method || "sms"}`);
+  console.log(`OTP    : ${otpCode}`);
+  console.log("====================================");
+  console.log("");
 };
 
 // ========== ENHANCED CORS CONFIGURATION ==========
@@ -3406,6 +3427,11 @@ app.post("/api/auth/request-otp", async (req, res) => {
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
 
     console.log(`Phone OTP generated for ${cleanPhone}.`);
+    logPhoneOtpForDemo({
+      phoneNumber: cleanPhone,
+      otpCode,
+      method: method || "sms",
+    });
     logSensitiveDebug(`Phone OTP for ${cleanPhone}: ${otpCode}`);
 
     res.json({
@@ -3414,6 +3440,7 @@ app.post("/api/auth/request-otp", async (req, res) => {
       expiresIn: 300,
       method: method || "sms",
       phoneNumber: cleanPhone,
+      deliveryMode: phoneOtpSmsProviderConfigured ? "sms" : "backend_log",
     });
   } catch (error) {
     console.error("OTP request error:", error);
