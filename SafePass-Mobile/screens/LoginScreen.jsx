@@ -100,6 +100,8 @@ export default function LoginScreen({ navigation, route }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showLoginSplash, setShowLoginSplash] = useState(false);
+  const [loginSplashMessage, setLoginSplashMessage] = useState("Signing you in...");
   const [apiConnected, setApiConnected] = useState(true);
   const [errors, setErrors] = useState({});
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -587,6 +589,8 @@ export default function LoginScreen({ navigation, route }) {
     }
 
     setIsLoading(true);
+    setShowLoginSplash(true);
+    setLoginSplashMessage("Signing you in...");
     setLoginError("");
     
     try {
@@ -653,6 +657,7 @@ export default function LoginScreen({ navigation, route }) {
         setLoginError("Login failed. Please try again.");
       }
     } finally {
+      setShowLoginSplash(false);
       setIsLoading(false);
     }
   };
@@ -1548,6 +1553,33 @@ export default function LoginScreen({ navigation, route }) {
           </View>
         </Modal>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={showLoginSplash}
+        transparent={true}
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={loginStyles.loginSplashOverlay}>
+          <View style={loginStyles.loginSplashCard}>
+            <View style={loginStyles.loginSplashLogoRing}>
+              <Image
+                source={Logo}
+                style={loginStyles.loginSplashLogo}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={loginStyles.loginSplashTitle}>Welcome Back</Text>
+            <Text style={loginStyles.loginSplashMessage}>{loginSplashMessage}</Text>
+            <View style={loginStyles.loginSplashLoadingRow}>
+              <ActivityIndicator size="small" color="#0A3D91" />
+              <Text style={loginStyles.loginSplashLoadingText}>
+                Securing your account access...
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

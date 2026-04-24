@@ -62,13 +62,28 @@ const visitorSchema = new mongoose.Schema({
   },
   idNumber: { 
     type: String, 
-    required: [true, 'ID number is required'],
+    default: "",
     trim: true,
     index: true
+  },
+  idType: {
+    type: String,
+    default: "",
+    trim: true,
   },
   idImage: { 
     type: String,
     default: null
+  },
+  idValidationStatus: {
+    type: String,
+    default: "pending",
+    trim: true,
+  },
+  idValidationNotes: {
+    type: String,
+    default: "",
+    trim: true,
   },
   dataPrivacyAccepted: {
     type: Boolean,

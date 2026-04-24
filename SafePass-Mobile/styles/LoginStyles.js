@@ -36,6 +36,93 @@ export default StyleSheet.create({
     letterSpacing: 0.4,
   },
 
+  loginSplashOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(4, 30, 66, 0.58)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+
+  loginSplashCard: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 30,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 18 },
+        shadowOpacity: 0.16,
+        shadowRadius: 28,
+      },
+      android: {
+        elevation: 10,
+      },
+      web: {
+        boxShadow: "0px 24px 60px rgba(15, 23, 42, 0.18)",
+      },
+    }),
+  },
+
+  loginSplashLogoRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 4,
+    borderColor: "#D8E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+
+  loginSplashLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#FFFFFF",
+  },
+
+  loginSplashTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+
+  loginSplashMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#475569",
+    textAlign: "center",
+    marginBottom: 18,
+  },
+
+  loginSplashLoadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#F8FBFE",
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+  },
+
+  loginSplashLoadingText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0A3D91",
+  },
+
   header: {
     backgroundColor: "#041E42",
     paddingHorizontal: 24,

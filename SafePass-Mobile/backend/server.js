@@ -32,11 +32,68 @@ const phoneOtpSmsProviderConfigured = [
   "TWILIO_AUTH_TOKEN",
 ].some((name) => String(process.env[name] || "").trim());
 
+const APPOINTMENT_ID_TYPE_OPTIONS = [
+  "School ID",
+  "National ID",
+  "Driver's License",
+  "Passport",
+  "UMID",
+  "PhilHealth ID",
+  "Voter's ID",
+  "PRC ID",
+  "Postal ID",
+  "Senior Citizen ID",
+  "Company ID",
+  "Other Government ID",
+];
+
 const GENERIC_AUTH_ERROR_MESSAGE = "Invalid email or password";
 const GENERIC_PASSWORD_RESET_REQUEST_MESSAGE =
   "If an account matches that email, a password reset code will be sent.";
 const GENERIC_PASSWORD_RESET_VERIFY_MESSAGE =
   "Invalid or expired verification code. Please request a new code and try again.";
+
+const reviewAppointmentIdImageDemo = ({ idType, idImage }) => {
+  const normalizedIdType = String(idType || "").trim();
+  const normalizedIdImage = String(idImage || "").trim();
+
+  if (!normalizedIdType) {
+    return {
+      isAccepted: false,
+      status: "missing_id_type",
+      message: "Please choose which valid ID you will present.",
+    };
+  }
+
+  if (!normalizedIdImage) {
+    return {
+      isAccepted: false,
+      status: "missing_image",
+      message: "Please upload a clear image of your valid ID.",
+    };
+  }
+
+  const looksLikeImagePayload =
+    normalizedIdImage.startsWith("data:image/") ||
+    normalizedIdImage.startsWith("file:") ||
+    normalizedIdImage.startsWith("content:") ||
+    normalizedIdImage.startsWith("http");
+
+  if (!looksLikeImagePayload || normalizedIdImage.length < 120) {
+    return {
+      isAccepted: false,
+      status: "image_quality_failed",
+      message:
+        "Demo AI pre-check could not confirm the uploaded ID image. Please upload a clearer photo of the front of the ID.",
+    };
+  }
+
+  return {
+    isAccepted: true,
+    status: "demo_prechecked",
+    message: `Demo AI pre-check accepted the uploaded ${normalizedIdType}. Final validation still requires staff or security review.`,
+  };
+};
 
 const getRequiredEnvValue = (name) => {
   const value = String(process.env[name] || "").trim();
@@ -1191,6 +1248,15 @@ const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
   slotEnd.setMinutes(slotEnd.getMinutes() + 1);
 
   return { dayStart, dayEnd, slotStart, slotEnd };
+};
+
+const isAppointmentServiceDay = (dateValue) => {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return date.getDay() !== 0;
 };
 
 const countStaffAppointmentsForSlot = async ({
@@ -4317,6 +4383,13 @@ app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
       });
     }
 
+    if (!isAppointmentServiceDay(selectedDay)) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointments are only available from Monday to Saturday.",
+      });
+    }
+
     const slots = [];
     for (let hour = 7; hour <= 18; hour += 1) {
       for (const minute of [0, 30]) {
@@ -4391,6 +4464,7 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       officeToVisit,
       assignedOffice,
       appointmentDepartment,
+      idType,
       idNumber,
       idImage,
       dataPrivacyAccepted,
@@ -4460,13 +4534,20 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    const normalizedIdNumber = String(idNumber || "").trim();
-    const normalizedIdImage = String(idImage || "").trim();
-
-    if (!normalizedIdNumber) {
+    if (!isAppointmentServiceDay(finalVisitDate)) {
       return res.status(400).json({
         success: false,
-        message: "A valid ID number is required for appointment verification.",
+        message: "Appointments are only available from Monday to Saturday.",
+      });
+    }
+
+    const normalizedIdType = String(idType || idNumber || "").trim();
+    const normalizedIdImage = String(idImage || "").trim();
+
+    if (!normalizedIdType) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose which valid ID you will present for appointment verification.",
       });
     }
 
@@ -4481,6 +4562,27 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Please confirm the data privacy agreement before submitting.",
+      });
+    }
+
+    if (!isAllowedOption(normalizedIdType, APPOINTMENT_ID_TYPE_OPTIONS)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid ID type from the list.",
+      });
+    }
+
+    const idReview = reviewAppointmentIdImageDemo({
+      idType: normalizedIdType,
+      idImage: normalizedIdImage,
+    });
+
+    if (!idReview.isAccepted) {
+      return res.status(400).json({
+        success: false,
+        code: "ID_PRECHECK_FAILED",
+        idValidationStatus: idReview.status,
+        message: idReview.message,
       });
     }
 
@@ -4558,8 +4660,11 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         fullName: visitorFullName,
         email: user.email,
         phoneNumber: user.phone || "Not provided",
-        idNumber: normalizedIdNumber,
+        idType: normalizedIdType,
+        idNumber: normalizedIdType,
         idImage: normalizedIdImage,
+        idValidationStatus: idReview.status,
+        idValidationNotes: idReview.message,
         dataPrivacyAccepted: true,
         dataPrivacyAcceptedAt: dataPrivacyAcceptedAt
           ? new Date(dataPrivacyAcceptedAt)
@@ -4581,8 +4686,11 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     } else {
       visitor.fullName = visitor.fullName || visitorFullName;
       visitor.phoneNumber = user.phone || visitor.phoneNumber;
-      visitor.idNumber = normalizedIdNumber;
+      visitor.idType = normalizedIdType;
+      visitor.idNumber = normalizedIdType;
       visitor.idImage = normalizedIdImage;
+      visitor.idValidationStatus = idReview.status;
+      visitor.idValidationNotes = idReview.message;
       visitor.dataPrivacyAccepted = true;
       visitor.dataPrivacyAcceptedAt = dataPrivacyAcceptedAt
         ? new Date(dataPrivacyAcceptedAt)
@@ -4680,6 +4788,8 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       success: true,
       message: "Appointment request submitted successfully",
       visitor,
+      idValidationStatus: idReview.status,
+      idValidationMessage: idReview.message,
     });
   } catch (error) {
     console.error("Update visitor visit error:", error);
