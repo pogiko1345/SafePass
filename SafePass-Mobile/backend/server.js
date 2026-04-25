@@ -661,23 +661,21 @@ const generateUniqueEmployeeId = async () => {
   return candidate;
 };
 
-const sendEmail = (to, subject, body) => {
+const sendEmail = async (to, subject, body) => {
   if (mailTransporter) {
-    mailTransporter
-      .sendMail({
+    try {
+      const info = await mailTransporter.sendMail({
         from: getMailFromAddress(),
         to,
         subject,
         text: body,
-      })
-      .then((info) => {
-        console.log(`Email sent to ${to}. Message ID: ${info.messageId}`);
-      })
-      .catch((error) => {
-        console.error(`\nFailed to send email to ${to}:`, error.message);
       });
-
-    return { success: true, simulated: false };
+      console.log(`Email sent to ${to}. Message ID: ${info.messageId}`);
+      return { success: true, simulated: false, delivered: true, messageId: info.messageId };
+    } catch (error) {
+      console.error(`\nFailed to send email to ${to}:`, error.message);
+      return { success: false, simulated: false, delivered: false, error: error.message };
+    }
   }
 
   if (nodemailerLoadError) {
@@ -692,7 +690,7 @@ const sendEmail = (to, subject, body) => {
 
   console.log(`Email simulation generated for ${to}. Subject: ${subject}`);
   logSensitiveDebug(`Simulated email body for ${to}:`, body);
-  return { success: true, simulated: true };
+  return { success: true, simulated: true, delivered: false };
 };
 
 const logEmailOtpForDemo = ({ email, otpCode, label = "EMAIL OTP DEMO" }) => {
@@ -722,14 +720,14 @@ const getApiBaseUrl = (req) => {
   return `${protocol}://${host}`;
 };
 
-const sendVerificationEmailSimulation = (req, user) => {
+const sendVerificationEmailSimulation = async (req, user) => {
   const { token, tokenHash, expiresAt } = createVerificationToken();
   user.verificationTokenHash = tokenHash;
   user.verificationExpiresAt = expiresAt;
 
   const verificationUrl = `${getApiBaseUrl(req)}/api/auth/verify-email?token=${token}`;
 
-  sendEmail(
+  const emailResult = await sendEmail(
     user.email,
     "Verify your Sapphire SafePass account",
     [
@@ -752,10 +750,10 @@ const sendVerificationEmailSimulation = (req, user) => {
   console.log(`Email verification link generated for ${user.email}.`);
   logSensitiveDebug(`Verification URL for ${user.email}: ${verificationUrl}`);
 
-  return { verificationUrl, expiresAt };
+  return { verificationUrl, expiresAt, emailResult };
 };
 
-const createRegistrationOtp = (user) => {
+const createRegistrationOtp = async (user) => {
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
   const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
@@ -766,7 +764,7 @@ const createRegistrationOtp = (user) => {
   user.verificationTokenHash = "";
   user.verificationExpiresAt = null;
 
-  const emailResult = sendEmail(
+  const emailResult = await sendEmail(
     user.email,
     "Sapphire SafePass Visitor Verification Code",
     [
@@ -795,11 +793,11 @@ const createRegistrationOtp = (user) => {
     });
   }
 
-  return { expiresAt };
+  return { expiresAt, emailResult };
 };
 
 const normalizeOtpCode = (value) => String(value || "").replace(/\D/g, "").slice(0, 6);
-const createPasswordResetOtp = (req, user) => {
+const createPasswordResetOtp = async (req, user) => {
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
   const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
@@ -810,7 +808,7 @@ const createPasswordResetOtp = (req, user) => {
   user.passwordResetAttempts = 0;
   user.passwordResetVerifiedAt = null;
 
-  const emailResult = sendEmail(
+  const emailResult = await sendEmail(
     user.email,
     "Sapphire SafePass Password Reset Code",
     [
@@ -837,7 +835,7 @@ const createPasswordResetOtp = (req, user) => {
     });
   }
 
-  return { expiresAt };
+  return { expiresAt, emailResult };
 };
 
 const clearPasswordResetState = (user) => {
@@ -1881,7 +1879,13 @@ app.post("/api/auth/request-password-reset", async (req, res) => {
 
     const user = await User.findOne({ email });
     if (user) {
-      const otp = createPasswordResetOtp(req, user);
+      const otp = await createPasswordResetOtp(req, user);
+      if (!otp.emailResult?.success) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send password reset code.",
+        });
+      }
       user.updatedAt = new Date();
       await user.save();
 
@@ -2240,7 +2244,13 @@ app.post("/api/auth/resend-verification", async (req, res) => {
       });
     }
 
-    const verification = sendVerificationEmailSimulation(req, user);
+    const verification = await sendVerificationEmailSimulation(req, user);
+    if (!verification.emailResult?.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to resend verification link.",
+      });
+    }
     await user.save();
 
     res.json({
@@ -2429,7 +2439,13 @@ app.post("/api/auth/resend-registration-otp", async (req, res) => {
       });
     }
 
-    const otp = createRegistrationOtp(user);
+    const otp = await createRegistrationOtp(user);
+    if (!otp.emailResult?.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification OTP. Please try again.",
+      });
+    }
     await user.save();
 
     res.json({
@@ -2552,7 +2568,13 @@ app.post("/api/visitors/register", async (req, res) => {
     user.isActive = true;
     user.visitorId = existingVisitor?._id || user.visitorId || null;
 
-    const otp = createRegistrationOtp(user);
+    const otp = await createRegistrationOtp(user);
+    if (!otp.emailResult?.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification OTP. Please try again.",
+      });
+    }
     await user.save();
     console.log(
       existingUnverifiedUser
