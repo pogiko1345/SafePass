@@ -695,6 +695,15 @@ const sendEmail = (to, subject, body) => {
   return { success: true, simulated: true };
 };
 
+const logEmailOtpForDemo = ({ email, otpCode, label = "EMAIL OTP DEMO" }) => {
+  console.log("");
+  console.log(`========== ${label} ==========`);
+  console.log(`Email  : ${email}`);
+  console.log(`OTP    : ${otpCode}`);
+  console.log("====================================");
+  console.log("");
+};
+
 const createVerificationToken = () => {
   const token = crypto.randomBytes(32).toString("hex");
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
@@ -757,7 +766,7 @@ const createRegistrationOtp = (user) => {
   user.verificationTokenHash = "";
   user.verificationExpiresAt = null;
 
-  sendEmail(
+  const emailResult = sendEmail(
     user.email,
     "Sapphire SafePass Visitor Verification Code",
     [
@@ -778,6 +787,13 @@ const createRegistrationOtp = (user) => {
 
   console.log(`Visitor registration OTP generated for ${user.email}.`);
   logSensitiveDebug(`Visitor registration OTP for ${user.email}: ${otpCode}`);
+  if (emailResult?.simulated) {
+    logEmailOtpForDemo({
+      email: user.email,
+      otpCode,
+      label: "VISITOR REGISTRATION OTP",
+    });
+  }
 
   return { expiresAt };
 };
@@ -794,7 +810,7 @@ const createPasswordResetOtp = (req, user) => {
   user.passwordResetAttempts = 0;
   user.passwordResetVerifiedAt = null;
 
-  sendEmail(
+  const emailResult = sendEmail(
     user.email,
     "Sapphire SafePass Password Reset Code",
     [
@@ -813,6 +829,13 @@ const createPasswordResetOtp = (req, user) => {
   );
 
   console.log(`Password reset code generated for ${user.email}.`);
+  if (emailResult?.simulated) {
+    logEmailOtpForDemo({
+      email: user.email,
+      otpCode,
+      label: "PASSWORD RESET OTP",
+    });
+  }
 
   return { expiresAt };
 };
@@ -2476,17 +2499,32 @@ app.post("/api/visitors/register", async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({
+    const conflictingUsers = await User.find({
       $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
     });
+    const reusableUnverifiedUsers = conflictingUsers.filter(
+      (candidate) => candidate.role === "visitor" && candidate.isVerified === false
+    );
+    const blockingUser = conflictingUsers.find(
+      (candidate) => candidate.role !== "visitor" || candidate.isVerified !== false
+    );
 
-    if (existingUser) {
+    if (blockingUser) {
       return res.status(400).json({
         success: false,
         message:
-          existingUser.email === normalizedEmail
+          blockingUser.email === normalizedEmail
             ? "An account with this email already exists. Please log in instead."
             : "That username is already taken. Please choose another username.",
+      });
+    }
+
+    const reusableUserIds = [...new Set(reusableUnverifiedUsers.map((candidate) => String(candidate._id)))];
+    if (reusableUserIds.length > 1) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "An unverified account already exists with part of these details. Please use a different email or username, or finish verifying the existing account.",
       });
     }
 
@@ -2497,25 +2535,31 @@ app.post("/api/visitors/register", async (req, res) => {
     const firstName = nameParts.shift() || "Visitor";
     const lastName = nameParts.join(" ") || "User";
 
-    const user = new User({
-      firstName,
-      lastName,
-      username: normalizedUsername,
-      email: normalizedEmail,
-      password,
-      phone: normalizedPhone,
-      role: "visitor",
-      status: "active",
-      isVerified: false,
-      dataPrivacyAccepted: true,
-      dataPrivacyAcceptedAt,
-      isActive: true,
-      visitorId: existingVisitor?._id || null,
-    });
+    const existingUnverifiedUser = reusableUnverifiedUsers[0] || null;
+    const user = existingUnverifiedUser || new User();
+
+    user.firstName = firstName;
+    user.lastName = lastName;
+    user.username = normalizedUsername;
+    user.email = normalizedEmail;
+    user.password = password;
+    user.phone = normalizedPhone;
+    user.role = "visitor";
+    user.status = "active";
+    user.isVerified = false;
+    user.dataPrivacyAccepted = true;
+    user.dataPrivacyAcceptedAt = dataPrivacyAcceptedAt;
+    user.isActive = true;
+    user.visitorId = existingVisitor?._id || user.visitorId || null;
 
     const otp = createRegistrationOtp(user);
     await user.save();
-    console.log("Visitor account created, waiting for OTP verification:", normalizedEmail);
+    console.log(
+      existingUnverifiedUser
+        ? "Unverified visitor account refreshed, waiting for OTP verification:"
+        : "Visitor account created, waiting for OTP verification:",
+      normalizedEmail
+    );
 
     await createSystemActivity({
       actorUser: user,
@@ -2524,7 +2568,9 @@ app.post("/api/visitors/register", async (req, res) => {
       activityType: "visitor_account_registration",
       status: "pending",
       location: "Visitor Registration",
-      notes: `${normalizedFullName} created a visitor account and must verify OTP before login.`,
+      notes: existingUnverifiedUser
+        ? `${normalizedFullName} updated an unverified visitor account and must verify OTP before login.`
+        : `${normalizedFullName} created a visitor account and must verify OTP before login.`,
       metadata: {
         username: user.username,
         email: user.email,
@@ -2543,12 +2589,16 @@ app.post("/api/visitors/register", async (req, res) => {
       status: "pending",
       relatedUser: user._id,
       relatedVisitor: existingVisitor?._id || null,
-      notes: "Visitor account created and waiting for OTP verification",
+      notes: existingUnverifiedUser
+        ? "Unverified visitor account updated and waiting for OTP verification"
+        : "Visitor account created and waiting for OTP verification",
     });
 
     await createRoleNotification({
-      title: "New Visitor Account Registered",
-      message: `New visitor account registered: ${normalizedFullName}`,
+      title: existingUnverifiedUser ? "Visitor Account Updated" : "New Visitor Account Registered",
+      message: existingUnverifiedUser
+        ? `Visitor account updated before verification: ${normalizedFullName}`
+        : `New visitor account registered: ${normalizedFullName}`,
       targetRole: "admin",
       relatedVisitor: existingVisitor?._id || null,
       relatedUser: user._id,
@@ -2568,7 +2618,9 @@ app.post("/api/visitors/register", async (req, res) => {
     res.status(201).json({
       success: true,
       message:
-        "Visitor account created. Please enter the OTP code sent to your email before logging in.",
+        existingUnverifiedUser
+          ? "Your unverified visitor account was updated. Please enter the new OTP code sent to your email before logging in."
+          : "Visitor account created. Please enter the OTP code sent to your email before logging in.",
       requiresOtpVerification: true,
       otpExpiresAt: otp.expiresAt,
       user: {
