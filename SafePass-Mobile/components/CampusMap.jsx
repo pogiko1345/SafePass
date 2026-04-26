@@ -23,6 +23,15 @@ const TRACKING_FRESHNESS = {
   STALE: "stale",
 };
 
+const getCompactOfficeLabel = (label, maxLength = 16) => {
+  const normalizedLabel = String(label || "").trim();
+  if (normalizedLabel.length <= maxLength) {
+    return normalizedLabel;
+  }
+
+  return `${normalizedLabel.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+};
+
 const CampusMap = ({
   visitors = [],
   floors = [],
@@ -368,7 +377,9 @@ const CampusMap = ({
         >
           <View style={styles.officeLabelContent}>
             <Ionicons name={office.icon} size={12} color="#FFFFFF" />
-            <Text style={styles.officeLabelText}>{office.name}</Text>
+            <Text style={styles.officeLabelText} numberOfLines={1} ellipsizeMode="tail">
+              {getCompactOfficeLabel(office.name)}
+            </Text>
           </View>
         </TouchableOpacity>
       );

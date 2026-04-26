@@ -703,6 +703,13 @@ export default StyleSheet.create({
     marginBottom: 12,
   },
 
+  modularEditorHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+    marginBottom: 12,
+  },
+
   modularEditorSecondaryTitle: {
     marginTop: 18,
   },
@@ -742,6 +749,61 @@ export default StyleSheet.create({
     gap: 12,
   },
 
+  modularRoomTable: {
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+
+  modularRoomTableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+
+  modularRoomTableHeaderText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#334155",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  modularRoomTableActionsHeader: {
+    flex: 0,
+    width: 88,
+    textAlign: "center",
+  },
+
+  modularRoomTableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+
+  modularRoomTableNameCell: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 10,
+  },
+
+  modularRoomTablePositionCell: {
+    flex: 1,
+    textAlign: "left",
+    paddingRight: 10,
+  },
+
+  modularRoomTableActionsCell: {
+    width: 88,
+    justifyContent: "flex-end",
+    flexShrink: 0,
+  },
+
   modularListCard: {
     borderWidth: 1,
     borderRadius: 16,
@@ -757,6 +819,7 @@ export default StyleSheet.create({
 
   modularListCopy: {
     flex: 1,
+    minWidth: 0,
   },
 
   modularListTitle: {

@@ -840,6 +840,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [dataManagementFieldPage, setDataManagementFieldPage] = useState(1);
   const [dataManagementItemsPerPage] = useState(6);
   const [appointmentRecordsPage, setAppointmentRecordsPage] = useState(1);
+  const [roomManagementPage, setRoomManagementPage] = useState(1);
 
   // Modal States
   const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
@@ -1489,6 +1490,23 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     () => managedRooms.filter((room) => room.floor === selectedMapModuleFloor),
     [managedRooms, selectedMapModuleFloor],
   );
+  const roomManagementItemsPerPage = 5;
+  const roomManagementTotalPages = Math.max(
+    1,
+    Math.ceil(selectedFloorRooms.length / roomManagementItemsPerPage),
+  );
+  const paginatedSelectedFloorRooms = useMemo(() => {
+    const startIndex = (roomManagementPage - 1) * roomManagementItemsPerPage;
+    return selectedFloorRooms.slice(startIndex, startIndex + roomManagementItemsPerPage);
+  }, [roomManagementPage, selectedFloorRooms]);
+
+  useEffect(() => {
+    setRoomManagementPage(1);
+  }, [selectedMapModuleFloor]);
+
+  useEffect(() => {
+    setRoomManagementPage((currentPageValue) => Math.min(currentPageValue, roomManagementTotalPages));
+  }, [roomManagementTotalPages]);
 
   const selectedSubmoduleMeta = useMemo(() => {
     switch (selectedSubmodule) {
@@ -4570,35 +4588,33 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const submitRoomDraft = () => {
+    if (!editingRoomId) {
+      Alert.alert("Select a room", "Choose a room from the list first, then rename it.");
+      return;
+    }
+
     const trimmedName = roomDraft.name.trim();
     if (!trimmedName) {
       Alert.alert("Room name required", "Please enter a room name before saving.");
       return;
     }
 
-    const roomId = editingRoomId || normalizeTextToId(roomDraft.id || trimmedName);
+    const currentRoom = managedRooms.find((room) => room.id === editingRoomId);
+    if (!currentRoom) {
+      Alert.alert("Room not found", "Please choose the room again before renaming it.");
+      resetRoomEditor(selectedMapModuleFloor);
+      return;
+    }
+
+    const roomId = currentRoom.id;
     const nextRoom = {
-      id: roomId,
+      ...currentRoom,
       name: trimmedName,
-      floor: roomDraft.floor,
-      icon: roomDraft.icon?.trim() || "business-outline",
     };
 
     setManagedRooms((currentRooms) => {
-      const hasExistingRoom = currentRooms.some((room) => room.id === roomId);
-      if (hasExistingRoom) {
-        return currentRooms.map((room) => (room.id === roomId ? nextRoom : room));
-      }
-      return [...currentRooms, nextRoom];
+      return currentRooms.map((room) => (room.id === roomId ? nextRoom : room));
     });
-
-    setManagedRoomPositions((currentPositions) => ({
-      ...currentPositions,
-      [roomId]: {
-        x: clampValue(Number(roomDraft.x) || 50, 0, 100),
-        y: clampValue(Number(roomDraft.y) || 50, 0, 100),
-      },
-    }));
 
     resetRoomEditor(roomDraft.floor);
   };
@@ -5922,7 +5938,7 @@ const loadDashboardData = useCallback(async () => {
       <View style={styles.pageContainer}>
         <AdminSectionShell
           title={ADMIN_MODULE_FLOORS.find((floor) => floor.id === selectedMapModuleFloor)?.name || "Floor Map"}
-          subtitle="Use the shared map canvas on the left and keep the room registry editable on the right."
+          subtitle="Use the shared map canvas on the left and rename existing room labels from the panel on the right."
           badge={`${selectedFloorRooms.length} rooms`}
           isDarkMode={isDarkMode}
           theme={theme}
@@ -5982,7 +5998,10 @@ const loadDashboardData = useCallback(async () => {
               ]}
             >
               <Text style={[styles.modularEditorTitle, isDarkMode && styles.darkText]}>
-                {editingRoomId ? "Edit room" : "Add room"}
+                {editingRoomId ? "Rename room" : "Rename a room"}
+              </Text>
+              <Text style={[styles.modularEditorHint, isDarkMode && styles.darkTextSecondary]}>
+                Tap the pencil beside any room below, then update its display name here.
               </Text>
               <TextInput
                 style={[styles.modularTextInput, isDarkMode && styles.darkInput]}
@@ -5991,36 +6010,13 @@ const loadDashboardData = useCallback(async () => {
                 value={roomDraft.name}
                 onChangeText={(value) => handleRoomDraftChange("name", value)}
               />
-              <TextInput
-                style={[styles.modularTextInput, isDarkMode && styles.darkInput]}
-                placeholder="Room icon (Ionicons name)"
-                placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
-                value={roomDraft.icon}
-                onChangeText={(value) => handleRoomDraftChange("icon", value)}
-              />
-              <TextInput
-                style={[styles.modularTextInput, isDarkMode && styles.darkInput]}
-                placeholder="X position (0-100)"
-                placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
-                value={roomDraft.x}
-                keyboardType="numeric"
-                onChangeText={(value) => handleRoomDraftChange("x", value)}
-              />
-              <TextInput
-                style={[styles.modularTextInput, isDarkMode && styles.darkInput]}
-                placeholder="Y position (0-100)"
-                placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
-                value={roomDraft.y}
-                keyboardType="numeric"
-                onChangeText={(value) => handleRoomDraftChange("y", value)}
-              />
 
               <View style={styles.modularEditorActions}>
                 <TouchableOpacity style={styles.submitButton} onPress={submitRoomDraft}>
-                  <Text style={styles.submitButtonText}>{editingRoomId ? "Save Room" : "Add Room"}</Text>
+                  <Text style={styles.submitButtonText}>Save Name</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cancelButton} onPress={() => resetRoomEditor(selectedMapModuleFloor)}>
-                  <Text style={styles.cancelButtonText}>Clear</Text>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
 
@@ -6030,35 +6026,86 @@ const loadDashboardData = useCallback(async () => {
 
               <View style={styles.modularListStack}>
                 {selectedFloorRooms.length > 0 ? (
-                  selectedFloorRooms.map((room) => (
+                  <>
                     <View
-                      key={room.id}
                       style={[
-                        styles.modularListCard,
+                        styles.modularRoomTable,
                         {
                           backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                           borderColor: theme.borderColor,
                         },
                       ]}
                     >
-                      <View style={styles.modularListHeader}>
-                        <View style={styles.modularListCopy}>
-                          <Text style={[styles.modularListTitle, isDarkMode && styles.darkText]}>{room.name}</Text>
-                          <Text style={[styles.modularListMeta, isDarkMode && styles.darkTextSecondary]}>
-                            Position: {managedRoomPositions?.[room.id]?.x ?? 50}, {managedRoomPositions?.[room.id]?.y ?? 50}
-                          </Text>
-                        </View>
-                        <View style={styles.modularInlineActions}>
-                          <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleEditRoom(room)}>
-                            <Ionicons name="create-outline" size={16} color="#0A3D91" />
-                          </TouchableOpacity>
-                          <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleDeleteRoom(room)}>
-                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                          </TouchableOpacity>
-                        </View>
+                      <View
+                        style={[
+                          styles.modularRoomTableHeader,
+                          {
+                            backgroundColor: isDarkMode ? "#111827" : "#EEF5FF",
+                            borderColor: theme.borderColor,
+                          },
+                        ]}
+                      >
+                        <Text style={styles.modularRoomTableHeaderText}>Room</Text>
+                        <Text style={styles.modularRoomTableHeaderText}>Position</Text>
+                        <Text style={[styles.modularRoomTableHeaderText, styles.modularRoomTableActionsHeader]}>Actions</Text>
                       </View>
+
+                      {paginatedSelectedFloorRooms.map((room, index) => (
+                        <View
+                          key={room.id}
+                          style={[
+                            styles.modularRoomTableRow,
+                            {
+                              backgroundColor:
+                                isDarkMode
+                                  ? index % 2 === 0
+                                    ? "#0F172A"
+                                    : "#111827"
+                                  : index % 2 === 0
+                                    ? "#FFFFFF"
+                                    : "#F8FBFE",
+                              borderColor: theme.borderColor,
+                            },
+                          ]}
+                        >
+                          <View style={styles.modularRoomTableNameCell}>
+                            <Text
+                              style={[styles.modularListTitle, isDarkMode && styles.darkText]}
+                              numberOfLines={1}
+                              ellipsizeMode="tail"
+                            >
+                              {room.name}
+                            </Text>
+                          </View>
+                          <Text style={[styles.modularListMeta, styles.modularRoomTablePositionCell, isDarkMode && styles.darkTextSecondary]}>
+                            {managedRoomPositions?.[room.id]?.x ?? 50}, {managedRoomPositions?.[room.id]?.y ?? 50}
+                          </Text>
+                          <View style={[styles.modularInlineActions, styles.modularRoomTableActionsCell]}>
+                            <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleEditRoom(room)}>
+                              <Ionicons name="create-outline" size={16} color="#0A3D91" />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleDeleteRoom(room)}>
+                              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
                     </View>
-                  ))
+
+                    {roomManagementTotalPages > 1
+                      ? renderCompactPagination({
+                          currentPage: roomManagementPage,
+                          totalPages: roomManagementTotalPages,
+                          itemCount: selectedFloorRooms.length,
+                          itemLabel: "rooms",
+                          onPrevious: () => setRoomManagementPage((page) => Math.max(1, page - 1)),
+                          onNext: () =>
+                            setRoomManagementPage((page) =>
+                              Math.min(roomManagementTotalPages, page + 1),
+                            ),
+                        })
+                      : null}
+                  </>
                 ) : (
                   <View
                     style={[

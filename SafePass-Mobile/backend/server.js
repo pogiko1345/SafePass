@@ -5642,6 +5642,7 @@ app.post("/api/visitors/:id/report", authMiddleware, async (req, res) => {
   try {
     const { reason } = req.body;
     const visitor = await Visitor.findById(req.params.id);
+    const reportReason = String(reason || "").trim();
 
     if (!visitor) {
       return res.status(404).json({
@@ -5650,24 +5651,83 @@ app.post("/api/visitors/:id/report", authMiddleware, async (req, res) => {
       });
     }
 
+    if (!reportReason) {
+      return res.status(400).json({
+        success: false,
+        message: "A report reason is required.",
+      });
+    }
+
     visitor.reports.push({
-      reason,
+      reason: reportReason,
       reportedBy: req.user._id,
       reportedAt: new Date(),
     });
 
     await visitor.save();
+    const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
+    const reporterName = getFullName(req.user) || req.user.email || "A staff member";
 
-    // High severity notification for reports
-    const notification = new Notification({
-      title: "⚠️ Visitor Reported",
-      message: `${visitor.fullName} reported: ${reason}`,
+    await createRoleNotification({
+      title: "Visitor Reported",
+      message: `${visitor.fullName} was reported by ${reporterName}: ${reportReason}`,
       type: "alert",
       severity: "high",
       targetRole: "security",
       relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "visitor_reported",
+        reportedBy: req.user._id,
+        reason: reportReason,
+      },
     });
-    await notification.save();
+
+    await createRoleNotification({
+      title: "Visitor Incident Report",
+      message: `${visitor.fullName} was reported and needs admin review. Reason: ${reportReason}`,
+      type: "warning",
+      severity: "high",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "visitor_reported",
+        reportedBy: req.user._id,
+        reason: reportReason,
+      },
+    });
+
+    if (visitorUser) {
+      await createRoleNotification({
+        title: "Security Warning",
+        message: `A report has been filed on your visitor account. Reason: ${reportReason}. Please coordinate with school staff or security before your next visit.`,
+        type: "warning",
+        severity: "high",
+        targetRole: "visitor",
+        targetUser: visitorUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser._id,
+        metadata: {
+          activityType: "visitor_reported",
+          reportedBy: req.user._id,
+          reason: reportReason,
+        },
+      });
+    }
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "visitor_reported",
+      status: "flagged",
+      location: visitor.assignedOffice || visitor.host || req.user.department || "Security Desk",
+      notes: `${reporterName} reported ${visitor.fullName}.`,
+      metadata: {
+        reason: reportReason,
+      },
+    });
 
     res.json({
       success: true,

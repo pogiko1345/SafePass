@@ -223,6 +223,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const phoneLocationSubscriptionRef = useRef(null);
   const appointmentTransitionTimeoutRef = useRef(null);
   const appointmentWebDateInputRef = useRef(null);
+  const shownVisitorWarningIdsRef = useRef(new Set());
+  const visitorWarningCheckInFlightRef = useRef(false);
   const dashboardHeroAnim = useRef(new Animated.Value(0)).current;
   const dashboardContentAnim = useRef(new Animated.Value(0)).current;
   const isCompactVirtualCardView = viewportWidth <= 540;
@@ -494,6 +496,62 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     else setGreeting("Good Evening");
   };
 
+  const maybeShowVisitorWarning = async (activeUser = currentUser) => {
+    if (!activeUser?._id || String(activeUser?.role || "").toLowerCase() !== "visitor") {
+      return;
+    }
+
+    if (visitorWarningCheckInFlightRef.current) {
+      return;
+    }
+
+    visitorWarningCheckInFlightRef.current = true;
+
+    try {
+      const response = await ApiService.getNotifications({ read: "false", limit: 10 });
+      const unreadNotifications = Array.isArray(response?.notifications) ? response.notifications : [];
+      const latestWarning = unreadNotifications.find((notification) => {
+        const notificationId = String(notification?._id || "");
+        const notificationType = String(notification?.type || "").toLowerCase();
+        const severity = String(notification?.severity || "").toLowerCase();
+
+        return (
+          notificationId &&
+          !shownVisitorWarningIdsRef.current.has(notificationId) &&
+          (notificationType === "warning" || notificationType === "alert" || severity === "high")
+        );
+      });
+
+      if (!latestWarning?._id) {
+        return;
+      }
+
+      const warningId = String(latestWarning._id);
+      shownVisitorWarningIdsRef.current.add(warningId);
+
+      Alert.alert(
+        latestWarning.title || "Security Warning",
+        latestWarning.message || "A new notice has been added to your visitor account.",
+        [
+          {
+            text: "I Understand",
+            onPress: async () => {
+              try {
+                await ApiService.markNotificationAsRead(warningId);
+              } catch (error) {
+                console.error("Mark visitor warning as read error:", error);
+              }
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      console.error("Load visitor warning error:", error);
+    } finally {
+      visitorWarningCheckInFlightRef.current = false;
+    }
+  };
+
   const loadVisitorData = async () => {
     setIsLoading(true);
     try {
@@ -510,6 +568,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       } else {
         setVisitor(null);
       }
+
+      await maybeShowVisitorWarning(currentUser);
     } catch (error) {
       console.error("Load visitor data error:", error);
       const isProfileMissing =

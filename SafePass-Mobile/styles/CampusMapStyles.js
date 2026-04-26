@@ -281,6 +281,7 @@ export default StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    maxWidth: 96,
     zIndex: 5,
     ...Platform.select({
       web: {
@@ -297,12 +298,14 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    maxWidth: "100%",
   },
 
   officeLabelText: {
     fontSize: 10,
     fontWeight: "600",
     color: "#FFFFFF",
+    flexShrink: 1,
   },
 
   mapControls: {
