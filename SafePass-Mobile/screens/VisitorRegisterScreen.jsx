@@ -1145,7 +1145,14 @@ export default function VisitorRegisterScreen({ navigation }) {
               {renderStepInsights()}
 
               <View style={visitorRegisterStyles.formGrid}>
-                {Object.entries(fieldConfig).map(([field, config]) => (
+                {Object.entries(fieldConfig).map(([field, config]) => {
+                  const isPasswordField = field === "password" || field === "confirmPassword";
+                  const passwordIsVisible =
+                    field === "password" ? showPassword : showConfirmPassword;
+                  const togglePasswordVisibility =
+                    field === "password" ? setShowPassword : setShowConfirmPassword;
+
+                  return (
                   <View
                     key={field}
                     style={[
@@ -1191,27 +1198,19 @@ export default function VisitorRegisterScreen({ navigation }) {
                         secureTextEntry={config.secureTextEntry}
                         maxLength={config.maxLength}
                       />
-                      {field === "password" ? (
+                      {isPasswordField ? (
                         <TouchableOpacity
-                          onPress={() => setShowPassword((previous) => !previous)}
+                          onPress={() => togglePasswordVisibility((previous) => !previous)}
                           style={visitorRegisterStyles.passwordToggleButton}
                           activeOpacity={0.7}
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            passwordIsVisible ? "Hide password" : "Show password"
+                          }
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
                           <Ionicons
-                            name={showPassword ? "eye-off-outline" : "eye-outline"}
-                            size={20}
-                            color="#64748B"
-                          />
-                        </TouchableOpacity>
-                      ) : null}
-                      {field === "confirmPassword" ? (
-                        <TouchableOpacity
-                          onPress={() => setShowConfirmPassword((previous) => !previous)}
-                          style={visitorRegisterStyles.passwordToggleButton}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons
-                            name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                            name={passwordIsVisible ? "eye-off-outline" : "eye-outline"}
                             size={20}
                             color="#64748B"
                           />
@@ -1286,7 +1285,8 @@ export default function VisitorRegisterScreen({ navigation }) {
                       </View>
                     ) : null}
                   </View>
-                ))}
+                  );
+                })}
               </View>
 
               <View style={[visitorRegisterStyles.actionRow, actionRowResponsiveStyle]}>

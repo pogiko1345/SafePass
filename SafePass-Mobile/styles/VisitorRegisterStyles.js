@@ -640,6 +640,7 @@ export default StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#EEF5FF",
   },
   errorText: {
     fontSize: fontSizes.xs,
