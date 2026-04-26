@@ -634,12 +634,36 @@ export default StyleSheet.create({
     color: "#0F172A",
     paddingVertical: 12,
   },
+  passwordToggleButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   errorText: {
     fontSize: fontSizes.xs,
     color: "#DC2626",
     marginTop: 6,
     marginLeft: spacing.xs,
     fontWeight: "600",
+  },
+  passwordChecklist: {
+    marginTop: spacing.sm,
+    gap: 6,
+  },
+  passwordChecklistRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  passwordChecklistText: {
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  passwordChecklistTextComplete: {
+    color: "#166534",
   },
   inputHint: {
     fontSize: fontSizes.xs,

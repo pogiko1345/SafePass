@@ -115,8 +115,8 @@ const SuccessModal = ({
               </Text>
             </View>
             <Text style={visitorRegisterStyles.credentialsInfo}>
-              Use your account credentials after OTP verification. For local testing,
-              the OTP may also appear in backend logs if email delivery is not configured.
+              Use your account credentials after OTP verification. The 6-digit code
+              should arrive in your email inbox from SafePass.
             </Text>
             {account && (
               <>
@@ -156,7 +156,7 @@ const SuccessModal = ({
                   otpError && visitorRegisterStyles.otpInputError,
                 ]}
                 value={otpValue}
-                onChangeText={onOtpChange}
+                onChangeText={(value) => onOtpChange(String(value || "").replace(/\D/g, "").slice(0, 6))}
                 placeholder="6-digit OTP"
                 placeholderTextColor="#94A3B8"
                 keyboardType="number-pad"
@@ -433,6 +433,8 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
   const [registrationOtp, setRegistrationOtp] = useState("");
   const [registrationOtpError, setRegistrationOtpError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const goToVisitorLogin = (overrides = {}) => {
     navigation.reset({
@@ -515,6 +517,13 @@ export default function VisitorRegisterScreen({ navigation }) {
     return "";
   };
 
+  const passwordChecklist = {
+    minLength: formData.password.length >= 8,
+    uppercase: /[A-Z]/.test(formData.password),
+    lowercase: /[a-z]/.test(formData.password),
+    number: /\d/.test(formData.password),
+  };
+
   const validateConfirmPassword = (confirmPassword, password) => {
     if (!confirmPassword) return "Please confirm your password";
     if (confirmPassword !== password) return "Passwords do not match";
@@ -551,7 +560,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     } else if (field === "username") {
       nextValue = value.replace(/[^A-Za-z0-9._]/g, "").toLowerCase();
     } else if (field === "phone") {
-      nextValue = value.replace(/[^\d+\s-]/g, "");
+      nextValue = value.replace(/\D/g, "").slice(0, 11);
     }
 
     const nextFormData = { ...formData, [field]: nextValue };
@@ -799,7 +808,15 @@ export default function VisitorRegisterScreen({ navigation }) {
         }));
         Alert.alert(
           "Account Verified",
-          "Your visitor account is now verified. Press Continue to Login.",
+          "Your visitor account is now verified. You will be redirected to login.",
+          [
+            {
+              text: "Continue",
+              onPress: () => {
+                handleSuccessConfirm();
+              },
+            },
+          ],
         );
         return;
       }
@@ -837,7 +854,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         setRegistrationOtpError("");
         Alert.alert(
           "Verification Code Sent",
-          "A new OTP has been sent. If local email delivery is unavailable, check your backend logs.",
+          "A new OTP has been sent to your email. Please also check your spam folder just in case.",
         );
         return;
       }
@@ -909,6 +926,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       keyboard: "phone-pad",
       autoCapitalize: "none",
       secureTextEntry: false,
+      maxLength: 11,
     },
     password: {
       label: "Password",
@@ -916,7 +934,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       placeholder: "Create a password",
       keyboard: "default",
       autoCapitalize: "none",
-      secureTextEntry: true,
+      secureTextEntry: !showPassword,
     },
     confirmPassword: {
       label: "Confirm Password",
@@ -924,7 +942,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       placeholder: "Re-enter your password",
       keyboard: "default",
       autoCapitalize: "none",
-      secureTextEntry: true,
+      secureTextEntry: !showConfirmPassword,
     },
   };
 
@@ -1171,12 +1189,102 @@ export default function VisitorRegisterScreen({ navigation }) {
                         keyboardType={config.keyboard}
                         autoCapitalize={config.autoCapitalize}
                         secureTextEntry={config.secureTextEntry}
-                        maxLength={field === "phone" ? 16 : undefined}
+                        maxLength={config.maxLength}
                       />
+                      {field === "password" ? (
+                        <TouchableOpacity
+                          onPress={() => setShowPassword((previous) => !previous)}
+                          style={visitorRegisterStyles.passwordToggleButton}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={showPassword ? "eye-off-outline" : "eye-outline"}
+                            size={20}
+                            color="#64748B"
+                          />
+                        </TouchableOpacity>
+                      ) : null}
+                      {field === "confirmPassword" ? (
+                        <TouchableOpacity
+                          onPress={() => setShowConfirmPassword((previous) => !previous)}
+                          style={visitorRegisterStyles.passwordToggleButton}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                            size={20}
+                            color="#64748B"
+                          />
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                     {errors[field] && (
                       <Text style={visitorRegisterStyles.errorText}>{errors[field]}</Text>
                     )}
+                    {field === "password" ? (
+                      <View style={visitorRegisterStyles.passwordChecklist}>
+                        <View style={visitorRegisterStyles.passwordChecklistRow}>
+                          <Ionicons
+                            name={passwordChecklist.minLength ? "checkmark-circle" : "ellipse-outline"}
+                            size={16}
+                            color={passwordChecklist.minLength ? "#16A34A" : "#94A3B8"}
+                          />
+                          <Text
+                            style={[
+                              visitorRegisterStyles.passwordChecklistText,
+                              passwordChecklist.minLength && visitorRegisterStyles.passwordChecklistTextComplete,
+                            ]}
+                          >
+                            At least 8 characters
+                          </Text>
+                        </View>
+                        <View style={visitorRegisterStyles.passwordChecklistRow}>
+                          <Ionicons
+                            name={passwordChecklist.uppercase ? "checkmark-circle" : "ellipse-outline"}
+                            size={16}
+                            color={passwordChecklist.uppercase ? "#16A34A" : "#94A3B8"}
+                          />
+                          <Text
+                            style={[
+                              visitorRegisterStyles.passwordChecklistText,
+                              passwordChecklist.uppercase && visitorRegisterStyles.passwordChecklistTextComplete,
+                            ]}
+                          >
+                            Has an uppercase letter
+                          </Text>
+                        </View>
+                        <View style={visitorRegisterStyles.passwordChecklistRow}>
+                          <Ionicons
+                            name={passwordChecklist.lowercase ? "checkmark-circle" : "ellipse-outline"}
+                            size={16}
+                            color={passwordChecklist.lowercase ? "#16A34A" : "#94A3B8"}
+                          />
+                          <Text
+                            style={[
+                              visitorRegisterStyles.passwordChecklistText,
+                              passwordChecklist.lowercase && visitorRegisterStyles.passwordChecklistTextComplete,
+                            ]}
+                          >
+                            Has a lowercase letter
+                          </Text>
+                        </View>
+                        <View style={visitorRegisterStyles.passwordChecklistRow}>
+                          <Ionicons
+                            name={passwordChecklist.number ? "checkmark-circle" : "ellipse-outline"}
+                            size={16}
+                            color={passwordChecklist.number ? "#16A34A" : "#94A3B8"}
+                          />
+                          <Text
+                            style={[
+                              visitorRegisterStyles.passwordChecklistText,
+                              passwordChecklist.number && visitorRegisterStyles.passwordChecklistTextComplete,
+                            ]}
+                          >
+                            Has a number
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
                   </View>
                 ))}
               </View>

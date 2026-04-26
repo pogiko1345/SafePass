@@ -174,6 +174,7 @@ const connectToDatabase = () => {
 };
 
 connectToDatabase();
+verifyMailTransporter();
 
 const authAttemptLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -623,6 +624,21 @@ try {
 } catch (error) {
   nodemailerLoadError = error;
 }
+
+const verifyMailTransporter = async () => {
+  if (!mailTransporter) {
+    return false;
+  }
+
+  try {
+    await mailTransporter.verify();
+    console.log(`SMTP ready for ${String(process.env.MAIL_USER || "").trim()}`);
+    return true;
+  } catch (error) {
+    console.error("SMTP verification failed:", error.message);
+    return false;
+  }
+};
 
 const getMailFromAddress = () =>
   String(process.env.MAIL_FROM || process.env.MAIL_USER || "no-reply@safepass.local").trim();
