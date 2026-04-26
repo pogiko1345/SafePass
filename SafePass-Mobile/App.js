@@ -136,6 +136,14 @@ export default function App() {
           return;
         }
 
+        const rememberedSessionActive = await ApiService.isRememberedSessionActive();
+        if (!rememberedSessionActive) {
+          console.log("Remembered login expired. Asking user to sign in again.");
+          await ApiService.clearAuth();
+          setCurrentUser(null);
+          return;
+        }
+
         const normalizedRole = normalizeRole(user.role);
         const normalizedUser = { ...user, role: normalizedRole };
         if (
@@ -258,10 +266,21 @@ export default function App() {
     currentUser: null,
     isNewRegistration,
   });
+  const passwordResetLinkParams =
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? {
+          resetEmail: new URLSearchParams(window.location.search || "").get("resetEmail") || "",
+          resetToken: new URLSearchParams(window.location.search || "").get("resetToken") || "",
+        }
+      : { resetEmail: "", resetToken: "" };
+  const hasPasswordResetLink =
+    passwordResetLinkParams.resetEmail && passwordResetLinkParams.resetToken;
   if (!isNewRegistration && currentUser) {
     initialRoute = IS_VISITOR_ONLY_APP
       ? "VisitorDashboard"
       : getDashboardRoute(currentUser);
+  } else if (hasPasswordResetLink) {
+    initialRoute = "Login";
   }
 
   console.log("App.js initialRoute:", initialRoute);
@@ -286,7 +305,7 @@ export default function App() {
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
         )}
-        <Stack.Screen name="Login">
+        <Stack.Screen name="Login" initialParams={passwordResetLinkParams}>
           {(props) => (
             <LoginScreen
               {...props}
@@ -294,6 +313,7 @@ export default function App() {
                 ...props.route,
                 params: {
                   ...(props.route?.params || {}),
+                  ...(hasPasswordResetLink ? passwordResetLinkParams : {}),
                   ...(IS_VISITOR_ONLY_APP
                     ? getVisitorBuildNavigationParams()
                     : {}),

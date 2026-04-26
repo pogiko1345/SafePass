@@ -49,7 +49,7 @@ const APPOINTMENT_ID_TYPE_OPTIONS = [
 
 const GENERIC_AUTH_ERROR_MESSAGE = "Invalid email or password";
 const GENERIC_PASSWORD_RESET_REQUEST_MESSAGE =
-  "If an account matches that email, a password reset code will be sent.";
+  "If an account matches that email, a password reset code and secure reset link will be sent.";
 const GENERIC_PASSWORD_RESET_VERIFY_MESSAGE =
   "Invalid or expired verification code. Please request a new code and try again.";
 
@@ -816,9 +816,12 @@ const normalizeOtpCode = (value) => String(value || "").replace(/\D/g, "").slice
 const createPasswordResetOtp = async (req, user) => {
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
   const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
+  const resetLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(user.email)}&resetToken=${encodeURIComponent(resetToken)}`;
 
-  user.passwordResetTokenHash = "";
+  user.passwordResetTokenHash = resetTokenHash;
   user.passwordResetOtpHash = otpHash;
   user.passwordResetExpiresAt = expiresAt;
   user.passwordResetAttempts = 0;
@@ -831,11 +834,13 @@ const createPasswordResetOtp = async (req, user) => {
       `Good day, ${getEmailGreetingName(user)}.`,
       "",
       "We received a request to reset the password for your Sapphire SafePass account.",
-      "Use the code below to continue:",
+      "Use the code below or open the secure link to continue:",
       "",
       `Password reset code: ${otpCode}`,
+      `Password reset link: ${resetLink}`,
       "",
       "This code will expire in 10 minutes.",
+      "The reset link expires at the same time.",
       "If you did not request a password reset, you may ignore this email and keep your current password.",
       "",
       getSupportEmailSignature(),
@@ -843,15 +848,17 @@ const createPasswordResetOtp = async (req, user) => {
   );
 
   console.log(`Password reset code generated for ${user.email}.`);
+  logSensitiveDebug(`Password reset link for ${user.email}: ${resetLink}`);
   if (emailResult?.simulated) {
     logEmailOtpForDemo({
       email: user.email,
       otpCode,
       label: "PASSWORD RESET OTP",
     });
+    console.log(`Password reset link: ${resetLink}`);
   }
 
-  return { expiresAt, emailResult };
+  return { expiresAt, emailResult, resetLink };
 };
 
 const clearPasswordResetState = (user) => {
@@ -2029,6 +2036,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
   try {
     const email = normalizeEmailValue(req.body?.email);
     const newPassword = String(req.body?.newPassword || "");
+    const resetToken = String(req.body?.resetToken || "").trim();
 
     if (!email || !newPassword) {
       return res.status(400).json({
@@ -2064,10 +2072,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
       });
     }
 
-    if (
-      !user.passwordResetOtpHash ||
-      !user.passwordResetExpiresAt
-    ) {
+    if (!user.passwordResetExpiresAt) {
       return res.status(400).json({
         success: false,
         message: "No verified password reset request was found.",
@@ -2083,10 +2088,18 @@ app.post("/api/auth/reset-password", async (req, res) => {
       });
     }
 
-    if (!user.passwordResetVerifiedAt) {
+    const resetTokenHash = resetToken
+      ? crypto.createHash("sha256").update(resetToken).digest("hex")
+      : "";
+    const hasValidResetToken =
+      resetTokenHash &&
+      user.passwordResetTokenHash &&
+      resetTokenHash === user.passwordResetTokenHash;
+
+    if (!user.passwordResetVerifiedAt && !hasValidResetToken) {
       return res.status(400).json({
         success: false,
-        message: "Please verify the reset code before changing your password.",
+        message: "Please verify the reset code or use the secure reset link before changing your password.",
       });
     }
 

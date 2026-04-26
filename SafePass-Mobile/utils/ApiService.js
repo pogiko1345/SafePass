@@ -50,7 +50,15 @@ const API_BASE_URL_CANDIDATES =
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
 const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
-const SENSITIVE_STORAGE_KEYS = ["userToken", "authToken", "trustedDevice", "trustedUntil"];
+const REMEMBERED_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const REMEMBERED_SESSION_EXPIRES_AT_KEY = "rememberedSessionExpiresAt";
+const SENSITIVE_STORAGE_KEYS = [
+  "userToken",
+  "authToken",
+  "trustedDevice",
+  "trustedUntil",
+  REMEMBERED_SESSION_EXPIRES_AT_KEY,
+];
 
 const setSensitiveItem = async (key, value) => {
   const normalizedValue = value == null ? null : String(value);
@@ -98,6 +106,31 @@ class ApiService {
 
   async clearTrustedDevice() {
     await removeSensitiveItems(["trustedDevice", "trustedUntil"]);
+  }
+
+  async rememberCurrentSession(durationMs = REMEMBERED_SESSION_DURATION_MS) {
+    await setSensitiveItem(
+      REMEMBERED_SESSION_EXPIRES_AT_KEY,
+      String(Date.now() + durationMs),
+    );
+  }
+
+  async clearRememberedSession() {
+    await removeSensitiveItems([REMEMBERED_SESSION_EXPIRES_AT_KEY]);
+  }
+
+  async isRememberedSessionActive() {
+    const expiresAtRaw = await getSensitiveItem(REMEMBERED_SESSION_EXPIRES_AT_KEY);
+    const expiresAt = Number(expiresAtRaw);
+
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      if (expiresAtRaw) {
+        await this.clearAuth();
+      }
+      return false;
+    }
+
+    return true;
   }
 
   async isTrustedDeviceActive() {
@@ -746,11 +779,11 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async resetPassword(email, newPassword) {
+  async resetPassword(email, newPassword, resetToken = "") {
     try {
       const response = await this.fetch("/auth/reset-password", {
         method: "POST",
-        body: { email, newPassword },
+        body: { email, newPassword, resetToken },
       });
       return response;
     } catch (error) {

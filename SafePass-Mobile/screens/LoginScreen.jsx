@@ -117,6 +117,7 @@ export default function LoginScreen({ navigation, route }) {
   const [resetEmailError, setResetEmailError] = useState("");
   const [resetOtp, setResetOtp] = useState("");
   const [resetOtpError, setResetOtpError] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordError, setNewPasswordError] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -182,6 +183,33 @@ export default function LoginScreen({ navigation, route }) {
     }
   }, [initialEmail, initialPassword]);
 
+  useEffect(() => {
+    const routeResetEmail = route?.params?.resetEmail;
+    const routeResetToken = route?.params?.resetToken;
+    let linkResetEmail = routeResetEmail;
+    let linkResetToken = routeResetToken;
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const query = new URLSearchParams(window.location.search || "");
+      linkResetEmail = linkResetEmail || query.get("resetEmail");
+      linkResetToken = linkResetToken || query.get("resetToken");
+    }
+
+    if (linkResetEmail && linkResetToken) {
+      setShowForgotPassword(true);
+      setResetStep(3);
+      setResetEmail(normalizeResetEmailValue(linkResetEmail));
+      setResetToken(String(linkResetToken).trim());
+      setResetEmailError("");
+      setResetOtp("");
+      setResetOtpError("");
+      setNewPassword("");
+      setNewPasswordError("");
+      setConfirmNewPassword("");
+      setConfirmNewPasswordError("");
+    }
+  }, [route?.params?.resetEmail, route?.params?.resetToken]);
+
   // ============ AUTH CHECK ============
   useEffect(() => {
     checkAuthAndConnection();
@@ -225,6 +253,17 @@ export default function LoginScreen({ navigation, route }) {
       const userJson = await Storage.getItem('currentUser');
       
       if (token && userJson) {
+        const rememberedSessionActive = await ApiService.isRememberedSessionActive();
+        if (!rememberedSessionActive) {
+          const rememberedEmail = await Storage.getItem("rememberedEmail");
+          await ApiService.clearAuth();
+          if (rememberedEmail) {
+            setEmail(rememberedEmail);
+            setRememberMe(true);
+          }
+          return;
+        }
+
         let user;
         try {
           user = JSON.parse(userJson);
@@ -321,8 +360,12 @@ export default function LoginScreen({ navigation, route }) {
 
     if (rememberEmail) {
       await Storage.setItem("rememberedEmail", email.trim());
+      await ApiService.rememberCurrentSession();
+      await ApiService.trustDevice();
     } else {
       await Storage.removeItem("rememberedEmail");
+      await ApiService.clearRememberedSession();
+      await ApiService.clearTrustedDevice();
     }
 
     await Storage.removeItem("isNewRegistration");
@@ -422,6 +465,7 @@ export default function LoginScreen({ navigation, route }) {
     setResetEmailError("");
     setResetOtp("");
     setResetOtpError("");
+    setResetToken("");
     setNewPassword("");
     setNewPasswordError("");
     setConfirmNewPassword("");
@@ -447,6 +491,7 @@ export default function LoginScreen({ navigation, route }) {
     setResetEmailError("");
     setResetOtp("");
     setResetOtpError("");
+    setResetToken("");
     setNewPassword("");
     setNewPasswordError("");
     setConfirmNewPassword("");
@@ -460,6 +505,7 @@ export default function LoginScreen({ navigation, route }) {
 
     const normalizedResetEmail = normalizeResetEmailValue(resetEmail);
     setResetEmail(normalizedResetEmail);
+    setResetToken("");
     
     setIsLoading(true);
     try {
@@ -470,8 +516,8 @@ export default function LoginScreen({ navigation, route }) {
         setResetTimer(60);
         setCanResendReset(false);
         Alert.alert(
-          "Reset Code Sent",
-          `A 6-digit verification code has been sent to ${normalizedResetEmail}.`,
+          "Reset Email Sent",
+          `A verification code and secure reset link have been sent to ${normalizedResetEmail}.`,
           [{ text: "OK" }]
         );
       } else {
@@ -500,6 +546,7 @@ export default function LoginScreen({ navigation, route }) {
       );
       
       if (response.success) {
+        setResetToken("");
         setResetStep(3);
         Alert.alert("Code Verified", "Please enter your new password.");
       } else {
@@ -537,20 +584,22 @@ export default function LoginScreen({ navigation, route }) {
       const response = await ApiService.resetPassword(
         normalizeResetEmailValue(resetEmail),
         newPassword,
+        resetToken,
       );
       
       if (response.success) {
         Alert.alert(
           "Password Reset Successful",
-          "Your password has been changed successfully. Please login with your new password.",
+          "Thank you. Your password has been changed successfully. Try logging in now with your new password.",
           [
             {
-              text: "Go to Login",
+              text: "Back to Login",
               onPress: () => {
                 setShowForgotPassword(false);
                 setResetStep(1);
                 setEmail(normalizeResetEmailValue(resetEmail));
                 setPassword("");
+                setResetToken("");
               }
             }
           ]
@@ -756,10 +805,12 @@ export default function LoginScreen({ navigation, route }) {
         : "Create New Password";
   const resetStepSubtitle =
     resetStep === 1
-      ? "Use your school email so we can send a password reset code."
+      ? "Use your school email so we can send a password reset code and secure link."
       : resetStep === 2
         ? "Enter the verification code from your inbox to continue."
-        : "Create a new password that matches the same Secure Login standards.";
+        : resetToken
+          ? "Create a new password from your secure reset link."
+          : "Create a new password that matches the same Secure Login standards.";
 
   return (
     <SafeAreaView style={loginStyles.safeArea}>
@@ -1194,7 +1245,7 @@ export default function LoginScreen({ navigation, route }) {
                     <View style={loginStyles.modalInfoCard}>
                       <Ionicons name="mail-unread-outline" size={18} color="#0A3D91" />
                       <Text style={loginStyles.modalInfoText}>
-                        Use the email linked to your SafePass account. We will send a 6-digit verification code.
+                        Use the email linked to your SafePass account. We will send a 6-digit verification code and a secure reset link.
                       </Text>
                     </View>
 
@@ -1227,7 +1278,7 @@ export default function LoginScreen({ navigation, route }) {
                         <Text style={loginStyles.errorText}>{resetEmailError}</Text>
                       ) : (
                         <Text style={loginStyles.helperText}>
-                          We&apos;ll send a verification code to this email
+                          We&apos;ll send a verification code and reset link to this email
                         </Text>
                       )}
                     </View>
@@ -1338,7 +1389,9 @@ export default function LoginScreen({ navigation, route }) {
                     <View style={loginStyles.modalInfoCard}>
                       <Ionicons name="keypad-outline" size={18} color="#0A3D91" />
                       <Text style={loginStyles.modalInfoText}>
-                        Create a strong new password, then confirm it before returning to login.
+                        {resetToken
+                          ? "Create a strong new password from your secure reset link, then confirm it before returning to login."
+                          : "Create a strong new password, then confirm it before returning to login."}
                       </Text>
                     </View>
 

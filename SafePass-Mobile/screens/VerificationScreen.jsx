@@ -290,9 +290,12 @@ export default function VerificationScreen({ navigation, route }) {
       // Treat remember-me as a trusted device so future logins can follow the faster path.
       if (rememberMe && email) {
         await storeData("rememberedEmail", email);
+        await ApiService.rememberCurrentSession();
         await ApiService.trustDevice();
       } else if (email) {
         await Storage.removeItem("rememberedEmail");
+        await ApiService.clearRememberedSession();
+        await ApiService.clearTrustedDevice();
       }
       
       // Clear new registration flag
