@@ -174,7 +174,6 @@ const connectToDatabase = () => {
 };
 
 connectToDatabase();
-verifyMailTransporter();
 
 const authAttemptLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -639,6 +638,8 @@ const verifyMailTransporter = async () => {
     return false;
   }
 };
+
+verifyMailTransporter();
 
 const getMailFromAddress = () =>
   String(process.env.MAIL_FROM || process.env.MAIL_USER || "no-reply@safepass.local").trim();
