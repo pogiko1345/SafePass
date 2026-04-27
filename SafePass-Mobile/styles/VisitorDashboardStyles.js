@@ -30,7 +30,7 @@ export default StyleSheet.create({
 
   scrollContent: {
     flexGrow: 1,
-    paddingTop: 10,
+    paddingTop: 14,
     paddingBottom: 164,
   },
 
@@ -48,8 +48,8 @@ export default StyleSheet.create({
   // ============ HEADER ============
   header: {
     paddingHorizontal: width <= 390 ? 16 : 20,
-    paddingTop: Platform.select({ ios: 38, android: 10, web: 10 }),
-    paddingBottom: 12,
+    paddingTop: Platform.select({ ios: 50, android: 24, web: 14 }),
+    paddingBottom: 16,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
@@ -140,8 +140,8 @@ export default StyleSheet.create({
 
   miniBrandHeaderWrap: {
     paddingHorizontal: width <= 390 ? 16 : 20,
-    paddingTop: Platform.select({ ios: 14, android: 10, web: 10 }),
-    paddingBottom: 6,
+    paddingTop: Platform.select({ ios: 24, android: 18, web: 12 }),
+    paddingBottom: 10,
     backgroundColor: "#F4F7FB",
   },
 
@@ -319,7 +319,7 @@ export default StyleSheet.create({
 
   commandDeckCard: {
     backgroundColor: "#FFFFFF",
-    marginTop: -10,
+    marginTop: 6,
     marginBottom: 10,
     padding: 14,
     borderRadius: 22,
@@ -1270,7 +1270,7 @@ export default StyleSheet.create({
 
   // ============ PENDING APPROVAL ============ 
   pendingApprovalCard: {
-    marginTop: -18,
+    marginTop: 8,
     backgroundColor: "#FFFFFF",
     padding: 22,
     borderRadius: 24,

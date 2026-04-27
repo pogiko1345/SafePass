@@ -38,7 +38,7 @@ export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
   const { role, initialEmail = "", initialPassword = "" } = route?.params || { role: "visitor" };
   const effectiveRole = IS_VISITOR_ONLY_APP ? "visitor" : role;
-  const { width: viewportWidth } = useWindowDimensions();
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const isCompactLogin = viewportWidth <= 420;
   const isTabletLogin = viewportWidth >= 768;
   const loginHorizontalPadding = isCompactLogin ? 12 : 20;
@@ -93,6 +93,28 @@ export default function LoginScreen({ navigation, route }) {
   const footerLinkChipResponsiveStyle = isCompactLogin
     ? { width: "100%", justifyContent: "center" }
     : null;
+  const forgotModalContentResponsiveStyle = {
+    maxHeight: viewportHeight <= 760 ? "96%" : "92%",
+    borderRadius: isCompactLogin ? 18 : 24,
+  };
+  const forgotModalHeroResponsiveStyle = {
+    paddingHorizontal: isCompactLogin ? 16 : 24,
+    paddingTop: isCompactLogin ? 16 : 22,
+    paddingBottom: isCompactLogin ? 14 : 22,
+  };
+  const forgotModalHeroTopRowResponsiveStyle = isCompactLogin
+    ? { alignItems: "flex-start", gap: 10 }
+    : null;
+  const forgotModalBrandBadgeResponsiveStyle = isCompactLogin
+    ? { paddingVertical: 7, paddingHorizontal: 10 }
+    : null;
+  const forgotModalStepRowResponsiveStyle = isCompactLogin
+    ? { gap: 6, marginTop: 12 }
+    : null;
+  const forgotModalBodyContentResponsiveStyle = {
+    padding: isCompactLogin ? 16 : 24,
+    paddingBottom: isCompactLogin ? 24 : 28,
+  };
   
   // ============ STATE MANAGEMENT ============
   const [email, setEmail] = useState("");
@@ -459,6 +481,7 @@ export default function LoginScreen({ navigation, route }) {
 
   // ============ FORGOT PASSWORD FUNCTIONS ============
   const handleForgotPassword = () => {
+    clearPasswordResetRouteParams();
     setShowForgotPassword(true);
     setResetStep(1);
     setResetEmail("");
@@ -485,6 +508,7 @@ export default function LoginScreen({ navigation, route }) {
   };
 
   const handleCloseForgotPassword = () => {
+    clearPasswordResetRouteParams();
     setShowForgotPassword(false);
     setResetStep(1);
     setResetEmail("");
@@ -595,6 +619,7 @@ export default function LoginScreen({ navigation, route }) {
             {
               text: "Back to Login",
               onPress: () => {
+                clearPasswordResetRouteParams();
                 setShowForgotPassword(false);
                 setResetStep(1);
                 setEmail(normalizeResetEmailValue(resetEmail));
@@ -623,6 +648,15 @@ export default function LoginScreen({ navigation, route }) {
   const getPasswordStrengthText = () => {
     const texts = ['Enter password', 'Weak', 'Fair', 'Good', 'Strong', 'Very Strong'];
     return texts[passwordStrength] || texts[0];
+  };
+
+  const clearPasswordResetRouteParams = () => {
+    if (typeof navigation?.setParams === "function") {
+      navigation.setParams({
+        resetEmail: undefined,
+        resetToken: undefined,
+      });
+    }
   };
 
   // ============ LOGIN HANDLER - 2FA FOR EVERYONE ============
@@ -1177,10 +1211,10 @@ export default function LoginScreen({ navigation, route }) {
           onRequestClose={handleCloseForgotPassword}
         >
           <View style={loginStyles.modalOverlay}>
-            <View style={loginStyles.modalContent}>
-              <View style={loginStyles.modalHero}>
-                <View style={loginStyles.modalHeroTopRow}>
-                  <View style={loginStyles.modalBrandBadge}>
+            <View style={[loginStyles.modalContent, forgotModalContentResponsiveStyle]}>
+              <View style={[loginStyles.modalHero, forgotModalHeroResponsiveStyle]}>
+                <View style={[loginStyles.modalHeroTopRow, forgotModalHeroTopRowResponsiveStyle]}>
+                  <View style={[loginStyles.modalBrandBadge, forgotModalBrandBadgeResponsiveStyle]}>
                     <Image
                       source={Logo}
                       style={loginStyles.modalBrandBadgeLogo}
@@ -1207,7 +1241,7 @@ export default function LoginScreen({ navigation, route }) {
                   <Text style={loginStyles.modalSubtitle}>{resetStepSubtitle}</Text>
                 </View>
 
-                <View style={loginStyles.modalStepRow}>
+                <View style={[loginStyles.modalStepRow, forgotModalStepRowResponsiveStyle]}>
                   {[1, 2, 3].map((stepNumber) => {
                     const isActive = resetStep === stepNumber;
                     const isComplete = resetStep > stepNumber;
@@ -1236,19 +1270,13 @@ export default function LoginScreen({ navigation, route }) {
 
               <ScrollView
                 style={loginStyles.modalBody}
-                contentContainerStyle={loginStyles.modalBodyContent}
+                contentContainerStyle={[loginStyles.modalBodyContent, forgotModalBodyContentResponsiveStyle]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
               >
                 {resetStep === 1 && (
                   <>
-                    <View style={loginStyles.modalInfoCard}>
-                      <Ionicons name="mail-unread-outline" size={18} color="#0A3D91" />
-                      <Text style={loginStyles.modalInfoText}>
-                        Use the email linked to your SafePass account. We will send a 6-digit verification code and a secure reset link.
-                      </Text>
-                    </View>
-
                     <View style={loginStyles.inputBox}>
                       <Text style={loginStyles.label}>Email Address</Text>
                       <View style={[
@@ -1281,6 +1309,13 @@ export default function LoginScreen({ navigation, route }) {
                           We&apos;ll send a verification code and reset link to this email
                         </Text>
                       )}
+                    </View>
+
+                    <View style={loginStyles.modalInfoCard}>
+                      <Ionicons name="mail-unread-outline" size={18} color="#0A3D91" />
+                      <Text style={loginStyles.modalInfoText}>
+                        Use the email linked to your SafePass account. We will send a 6-digit verification code and a secure reset link.
+                      </Text>
                     </View>
 
                     <TouchableOpacity

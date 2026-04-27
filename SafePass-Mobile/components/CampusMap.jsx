@@ -292,23 +292,7 @@ const CampusMap = ({
 
   const renderMapEmptyState = (visibleVisitors) => {
     if (visibleVisitors.length > 0) return null;
-
-    const floorName = getDisplayFloorName(activeFloor);
-    const officeLabel = selectedOffice !== "all" ? selectedOffice : floorName;
-
-    return (
-      <View style={[styles.mapEmptyState, { pointerEvents: "none" }]}>
-        <View style={styles.mapEmptyStateCard}>
-          <View style={styles.mapEmptyStateIcon}>
-            <Ionicons name="location-outline" size={22} color="#64748B" />
-          </View>
-          <Text style={styles.mapEmptyStateTitle}>No active markers here</Text>
-          <Text style={styles.mapEmptyStateText}>
-            No checked-in visitors are currently showing for {officeLabel}. Try another floor or office.
-          </Text>
-        </View>
-      </View>
-    );
+    return null;
   };
 
   // Render floor navigation

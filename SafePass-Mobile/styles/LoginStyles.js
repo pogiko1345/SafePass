@@ -772,9 +772,10 @@ export default StyleSheet.create({
 
   modalContent: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    borderRadius: 24,
     width: "100%",
     maxWidth: 520,
+    minHeight: isSmallPhone ? 420 : 460,
     maxHeight: "92%",
     borderWidth: 1,
     borderColor: "#E6EDF7",
@@ -810,6 +811,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
+    minWidth: 0,
     backgroundColor: "rgba(255,255,255,0.14)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
@@ -925,12 +927,14 @@ export default StyleSheet.create({
   },
 
   modalBody: {
-    flex: 1,
     width: "100%",
+    flexGrow: 0,
   },
 
   modalBodyContent: {
     padding: isSmallPhone ? 18 : 24,
+    paddingBottom: isSmallPhone ? 24 : 28,
+    flexGrow: 1,
   },
 
   modalInfoCard: {
@@ -959,6 +963,7 @@ export default StyleSheet.create({
     color: "#0A3D91",
     marginBottom: 20,
     textAlign: "center",
+    flexWrap: "wrap",
   },
 
   otpInputContainer: {
@@ -977,7 +982,7 @@ export default StyleSheet.create({
     fontWeight: "600",
     color: "#111827",
     textAlign: "center",
-    letterSpacing: isSmallPhone ? 8 : 10,
+    letterSpacing: isSmallPhone ? 4 : 8,
     backgroundColor: "#F9FAFB",
   },
 

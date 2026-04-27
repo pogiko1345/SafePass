@@ -151,9 +151,12 @@ const VISITOR_CONNECTIVITY_REMINDER_KEY = "visitorConnectivityReminderShown";
 // For web: Use Web NFC API
 // For mobile: Use react-native-nfc-manager
 let NfcManager = null;
+let NfcEvents = null;
 if (Platform.OS !== 'web') {
   try {
-    NfcManager = require('react-native-nfc-manager').default;
+    const nfcModule = require('react-native-nfc-manager');
+    NfcManager = nfcModule.default;
+    NfcEvents = nfcModule.NfcEvents;
   } catch (e) {
     console.log('NFC module not available:', e);
   }
@@ -375,6 +378,27 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
     maybeShowConnectivityReminder();
   }, [visitor?._id, visitor?.appointmentStatus, visitor?.approvalFlow, visitor?.visitTime]);
+
+  useEffect(() => {
+    const accessReady =
+      !(
+        visitor?.status === "approved" ||
+        visitor?.status === "checked_in"
+      ) ||
+      isPendingApproval ||
+      isPendingStaffReview;
+
+    if (!accessReady) {
+      return;
+    }
+
+    setShowVirtualNfcModal(false);
+    setShowVirtualNfcSuccessModal(false);
+    setShowCheckInModal(false);
+    setShowCheckInSuccessModal(false);
+    setShowCheckOutModal(false);
+    setShowCheckOutSuccessModal(false);
+  }, [isPendingApproval, isPendingStaffReview, visitor?.status]);
 
   const stopPhoneLocationTracking = async () => {
     if (phoneLocationSubscriptionRef.current) {
@@ -630,6 +654,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   // Start NFC Reading
   const startNfcReading = async () => {
+    const accessReady =
+      !isPendingApproval &&
+      !isPendingStaffReview &&
+      (visitor?.status === "approved" || visitor?.status === "checked_in");
+
+    if (!accessReady) {
+      Alert.alert(
+        "Approval Required",
+        "Your NFC access tools will only be available after your visit is approved.",
+      );
+      return false;
+    }
+
     if (!isNfcSupported) {
       Alert.alert(
         "NFC Not Supported",
@@ -875,9 +912,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         // @ts-ignore
         nfcListenerRef.current.removeEventListener?.('reading', handleNfcTagRead);
         nfcListenerRef.current = null;
-      } else if (NfcManager) {
+      } else if (NfcManager && NfcEvents) {
         await NfcManager.unregisterTagEvent();
-        await NfcManager.setEventListener(null);
+        await NfcManager.setEventListener(NfcEvents.DiscoverTag, null);
+        await NfcManager.setEventListener(NfcEvents.SessionClosed, null);
       }
     } catch (error) {
       console.error("Stop NFC error:", error);
@@ -1336,6 +1374,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleVirtualNfcCardTap = async () => {
     if (!visitor || isVirtualTapLoading) return;
 
+    if (!(visitor?.status === "approved" || visitor?.status === "checked_in")) {
+      Alert.alert(
+        "Approval Required",
+        "Your virtual NFC card becomes available only after your visit is approved.",
+      );
+      return;
+    }
+
     setIsVirtualTapLoading(true);
     setNfcStatus({
       type: "processing",
@@ -1432,6 +1478,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleCheckInAction = () => {
+    if (!(visitor?.status === "approved" || visitor?.status === "checked_in")) {
+      Alert.alert(
+        "Approval Required",
+        "Check-in becomes available only after your visit is approved.",
+      );
+      return;
+    }
+
     if (!visitor || isCheckInLoading) return;
     setShowCheckInModal(true);
   };
@@ -1462,6 +1516,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleCheckOutAction = () => {
+    if (!(visitor?.status === "approved" || visitor?.status === "checked_in")) {
+      Alert.alert(
+        "Approval Required",
+        "Check-out becomes available only after your visit is approved.",
+      );
+      return;
+    }
+
     if (!visitor || isCheckOutLoading) return;
     setShowCheckOutModal(true);
   };
@@ -1645,6 +1707,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     visitor?.status === "approved";
   const isApprovedVisitor =
     !isPendingApproval && !isPendingStaffReview && visitor?.status === "approved";
+  const canUseVisitorAccessTools =
+    !isPendingApproval &&
+    !isPendingStaffReview &&
+    (visitor?.status === "approved" || visitor?.status === "checked_in");
   const canRequestNewAppointment =
     visitor?.approvalStatus === "approved" &&
     !isApprovedVisitor &&
@@ -2425,7 +2491,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             style={visitorDashboardStyles.approvedVirtualNfcCard}
             onPress={() => setShowVirtualNfcModal(true)}
             activeOpacity={0.9}
-            disabled={isVirtualTapLoading}
+            disabled={isVirtualTapLoading || !canUseVisitorAccessTools}
           >
             <LinearGradient
               colors={["#0F172A", "#041E42", "#0A3D91"]}
@@ -2469,7 +2535,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
               onPress={handleCheckInAction}
               activeOpacity={0.9}
-              disabled={isCheckInLoading || visitor?.status === "checked_in"}
+              disabled={!canUseVisitorAccessTools || isCheckInLoading || visitor?.status === "checked_in"}
             >
               <View style={[visitorDashboardStyles.approvedCompactActionIcon, { backgroundColor: "#DCFCE7" }]}>
                 {isCheckInLoading ? (
@@ -2492,7 +2558,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
               onPress={handleCheckOutAction}
               activeOpacity={0.9}
-              disabled={isCheckOutLoading || visitor?.status !== "checked_in"}
+              disabled={!canUseVisitorAccessTools || isCheckOutLoading || visitor?.status !== "checked_in"}
             >
               <View style={[visitorDashboardStyles.approvedCompactActionIcon, { backgroundColor: "#FEE2E2" }]}>
                 {isCheckOutLoading ? (
@@ -2549,70 +2615,79 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const renderActiveVisitorPanel = () => {
     if (selectedVisitorSection === "home") {
-      return visitor ? (
-        isPendingApproval ? (
-          <>
-            <View
-              style={[
-                visitorDashboardStyles.pendingApprovalCard,
-                dashboardSectionResponsiveStyle,
-                dashboardHeroCardResponsiveStyle,
-              ]}
-            >
-              <Text style={visitorDashboardStyles.pendingApprovalEyebrow}>Visitor Pass</Text>
-              <Text style={visitorDashboardStyles.pendingApprovalTitle}>{journeyTitle}</Text>
-              <Text style={visitorDashboardStyles.pendingApprovalSubtitle}>{journeySubtitle}</Text>
-              <View style={[visitorDashboardStyles.pendingApprovalBadge, { backgroundColor: `${statusColor}16` }]}>
-                <View style={[visitorDashboardStyles.pendingApprovalBadgeDot, { backgroundColor: statusColor }]} />
-                <Text style={[visitorDashboardStyles.pendingApprovalBadgeText, { color: statusColor }]}>
-                  {statusText}
-                </Text>
-              </View>
-              <View style={visitorDashboardStyles.pendingApprovalGrid}>
-                <View style={visitorDashboardStyles.pendingApprovalInfoCard}>
-                  <Ionicons name="calendar-clear-outline" size={18} color="#0A3D91" />
-                  <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Visit Date</Text>
-                  <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>
-                    {visitor?.visitDate ? formatDate(visitor.visitDate) : "Pending"}
-                  </Text>
+      return (
+        <Animated.View style={dashboardContentAnimatedStyle}>
+          {visitor ? (
+            isPendingApproval ? (
+              <>
+                <View
+                  style={[
+                    visitorDashboardStyles.pendingApprovalCard,
+                    dashboardSectionResponsiveStyle,
+                    dashboardHeroCardResponsiveStyle,
+                  ]}
+                >
+                  <Text style={visitorDashboardStyles.pendingApprovalEyebrow}>Visitor Pass</Text>
+                  <Text style={visitorDashboardStyles.pendingApprovalTitle}>{journeyTitle}</Text>
+                  <Text style={visitorDashboardStyles.pendingApprovalSubtitle}>{journeySubtitle}</Text>
+                  <View style={[visitorDashboardStyles.pendingApprovalBadge, { backgroundColor: `${statusColor}16` }]}>
+                    <View style={[visitorDashboardStyles.pendingApprovalBadgeDot, { backgroundColor: statusColor }]} />
+                    <Text style={[visitorDashboardStyles.pendingApprovalBadgeText, { color: statusColor }]}>
+                      {statusText}
+                    </Text>
+                  </View>
+                  <View style={visitorDashboardStyles.pendingApprovalGrid}>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoCard}>
+                      <Ionicons name="calendar-clear-outline" size={18} color="#0A3D91" />
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Visit Date</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>
+                        {visitor?.visitDate ? formatDate(visitor.visitDate) : "Pending"}
+                      </Text>
+                    </View>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoCard}>
+                      <Ionicons name="time-outline" size={18} color="#0A3D91" />
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Visit Time</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>
+                        {visitor?.visitTime ? formatTime(visitor.visitTime) : "Pending"}
+                      </Text>
+                    </View>
+                    <View style={visitorDashboardStyles.pendingApprovalInfoCard}>
+                      <Ionicons name="document-text-outline" size={18} color="#0A3D91" />
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Purpose</Text>
+                      <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>
+                        {visitor?.purposeOfVisit || "Pending"}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={visitorDashboardStyles.pendingApprovalPrimaryButton}
+                    onPress={openAppointmentRequestScreen}
+                    activeOpacity={0.88}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
+                    <Text style={visitorDashboardStyles.pendingApprovalPrimaryButtonText}>
+                      Register Appointment
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={visitorDashboardStyles.pendingApprovalInfoCard}>
-                  <Ionicons name="time-outline" size={18} color="#0A3D91" />
-                  <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Visit Time</Text>
-                  <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>
-                    {visitor?.visitTime ? formatTime(visitor.visitTime) : "Pending"}
-                  </Text>
-                </View>
-                <View style={visitorDashboardStyles.pendingApprovalInfoCard}>
-                  <Ionicons name="document-text-outline" size={18} color="#0A3D91" />
-                  <Text style={visitorDashboardStyles.pendingApprovalInfoLabel}>Purpose</Text>
-                  <Text style={visitorDashboardStyles.pendingApprovalInfoValue}>
-                    {visitor?.purposeOfVisit || "Pending"}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={visitorDashboardStyles.pendingApprovalPrimaryButton}
-                onPress={openAppointmentRequestScreen}
-                activeOpacity={0.88}
-              >
-                <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
-                <Text style={visitorDashboardStyles.pendingApprovalPrimaryButtonText}>
-                  Register Appointment
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {renderVisitorModuleNavigation()}
-          </>
-        ) : isApprovedVisitor ? (
-          renderApprovedVisitorDashboard()
-        ) : (
-          <>
-            {renderVisitorModuleNavigation()}
-            {renderVisitorEmptyState()}
-          </>
-        )
-      ) : null;
+                {renderVisitorModuleNavigation()}
+              </>
+            ) : isApprovedVisitor ? (
+              renderApprovedVisitorDashboard()
+            ) : (
+              <>
+                {renderVisitorModuleNavigation()}
+                {renderVisitorEmptyState()}
+              </>
+            )
+          ) : (
+            <>
+              {renderVisitorModuleNavigation()}
+              {renderVisitorEmptyState()}
+            </>
+          )}
+        </Animated.View>
+      );
     }
 
     return (
@@ -3489,6 +3564,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         mapBlueprints={MONITORING_MAP_BLUEPRINTS}
         officePositions={MONITORING_MAP_OFFICE_POSITIONS}
         onFloorChange={setSelectedVisitorMapFloor}
+        showFloorNavigation={false}
       />
 
       <View style={visitorDashboardStyles.visitorMapNote}>
