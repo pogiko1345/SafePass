@@ -679,9 +679,46 @@ export default function VisitorRegisterScreen({ navigation }) {
     } catch (error) {
       const errorMessage =
         error?.data?.message || error.message || "Failed to connect to server.";
+      const errorField = error?.data?.field;
       const normalizedMessage = errorMessage.toLowerCase();
 
-      if (normalizedMessage.includes("username")) {
+      if (
+        errorField === "email" ||
+        normalizedMessage.includes("email already") ||
+        normalizedMessage.includes("with this email already exists")
+      ) {
+        setErrors((previous) => ({
+          ...previous,
+          email: "A visitor account with this email already exists.",
+        }));
+        setTouchedFields((previous) => ({
+          ...previous,
+          email: true,
+        }));
+        Alert.alert(
+          "Email Already Registered",
+          "A visitor account with this email already exists. Please log in instead.",
+          [
+            {
+              text: "Go to Login",
+              onPress: () =>
+                goToVisitorLogin({
+                  role: "visitor",
+                  initialEmail: formData.email,
+                }),
+            },
+            { text: "OK", style: "cancel" },
+          ],
+        );
+      } else if (errorField === "username" || normalizedMessage.includes("username")) {
+        setErrors((previous) => ({
+          ...previous,
+          username: "That username is already taken.",
+        }));
+        setTouchedFields((previous) => ({
+          ...previous,
+          username: true,
+        }));
         Alert.alert(
           "Username Unavailable",
           "That username is already taken. Please choose another username.",

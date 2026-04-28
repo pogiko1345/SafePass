@@ -128,6 +128,7 @@ export default function LoginScreen({ navigation, route }) {
   const [errors, setErrors] = useState({});
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [loginError, setLoginError] = useState("");
+  const [loginSuccessMessage, setLoginSuccessMessage] = useState("");
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -355,6 +356,7 @@ export default function LoginScreen({ navigation, route }) {
   const handleEmailChange = (text) => {
     setEmail(text.replace(/^\s+/, ""));
     setLoginError("");
+    setLoginSuccessMessage("");
     if (errors.email) {
       setErrors({ ...errors, email: "" });
     }
@@ -363,6 +365,7 @@ export default function LoginScreen({ navigation, route }) {
   const handlePasswordChange = (text) => {
     setPassword(text);
     setLoginError("");
+    setLoginSuccessMessage("");
     if (errors.password) {
       setErrors({ ...errors, password: "" });
     }
@@ -482,6 +485,7 @@ export default function LoginScreen({ navigation, route }) {
   // ============ FORGOT PASSWORD FUNCTIONS ============
   const handleForgotPassword = () => {
     clearPasswordResetRouteParams();
+    setLoginSuccessMessage("");
     setShowForgotPassword(true);
     setResetStep(1);
     setResetEmail("");
@@ -612,23 +616,32 @@ export default function LoginScreen({ navigation, route }) {
       );
       
       if (response.success) {
-        Alert.alert(
-          "Password Reset Successful",
-          "Thank you. Your password has been changed successfully. Try logging in now with your new password.",
-          [
-            {
-              text: "Back to Login",
-              onPress: () => {
-                clearPasswordResetRouteParams();
-                setShowForgotPassword(false);
-                setResetStep(1);
-                setEmail(normalizeResetEmailValue(resetEmail));
-                setPassword("");
-                setResetToken("");
-              }
-            }
-          ]
-        );
+        const normalizedResetEmail = normalizeResetEmailValue(resetEmail);
+        clearPasswordResetRouteParams();
+        setShowForgotPassword(false);
+        setResetStep(1);
+        setEmail(normalizedResetEmail);
+        setPassword("");
+        setResetEmail(normalizedResetEmail);
+        setResetOtp("");
+        setResetOtpError("");
+        setResetToken("");
+        setNewPassword("");
+        setNewPasswordError("");
+        setConfirmNewPassword("");
+        setConfirmNewPasswordError("");
+        setShowNewPassword(false);
+        setShowConfirmNewPassword(false);
+        setPasswordStrength(0);
+        setPasswordChecks({
+          length: false,
+          uppercase: false,
+          lowercase: false,
+          number: false,
+          special: false,
+        });
+        setLoginError("");
+        setLoginSuccessMessage("Password reset successful. Please log in with your new password.");
       } else {
         Alert.alert("Error", response.message || "Failed to reset password");
       }
@@ -675,6 +688,7 @@ export default function LoginScreen({ navigation, route }) {
     setShowLoginSplash(true);
     setLoginSplashMessage("Signing you in...");
     setLoginError("");
+    setLoginSuccessMessage("");
     
     try {
       const normalizedIdentifier = normalizeLoginIdentifier(email);
@@ -984,6 +998,12 @@ export default function LoginScreen({ navigation, route }) {
                       <Text style={loginStyles.errorText}>{errors.email}</Text>
                     )}
                   </View>
+
+                  {loginSuccessMessage ? (
+                    <Text style={loginStyles.loginSuccessText}>
+                      {loginSuccessMessage}
+                    </Text>
+                  ) : null}
 
                   {/* Password Input with Error Message Below */}
                   <View style={loginStyles.inputBox}>

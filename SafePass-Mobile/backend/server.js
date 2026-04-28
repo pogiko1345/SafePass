@@ -2130,7 +2130,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
       actorUser: user,
       relatedUser: user,
       activityType: "password_reset",
-      status: "completed",
+      status: "granted",
       location: "Login Screen",
       notes: `${user.email} completed a password reset via forgot password.`,
     });
@@ -2563,32 +2563,21 @@ app.post("/api/visitors/register", async (req, res) => {
       });
     }
 
-    const conflictingUsers = await User.find({
-      $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
-    });
-    const reusableUnverifiedUsers = conflictingUsers.filter(
-      (candidate) => candidate.role === "visitor" && candidate.isVerified === false
-    );
-    const blockingUser = conflictingUsers.find(
-      (candidate) => candidate.role !== "visitor" || candidate.isVerified !== false
-    );
-
-    if (blockingUser) {
+    const existingEmailUser = await User.findOne({ email: normalizedEmail });
+    if (existingEmailUser) {
       return res.status(400).json({
         success: false,
-        message:
-          blockingUser.email === normalizedEmail
-            ? "An account with this email already exists. Please log in instead."
-            : "That username is already taken. Please choose another username.",
+        field: "email",
+        message: "An account with this email already exists. Please log in instead.",
       });
     }
 
-    const reusableUserIds = [...new Set(reusableUnverifiedUsers.map((candidate) => String(candidate._id)))];
-    if (reusableUserIds.length > 1) {
+    const existingUsernameUser = await User.findOne({ username: normalizedUsername });
+    if (existingUsernameUser) {
       return res.status(400).json({
         success: false,
-        message:
-          "An unverified account already exists with part of these details. Please use a different email or username, or finish verifying the existing account.",
+        field: "username",
+        message: "That username is already taken. Please choose another username.",
       });
     }
 
@@ -2599,8 +2588,7 @@ app.post("/api/visitors/register", async (req, res) => {
     const firstName = nameParts.shift() || "Visitor";
     const lastName = nameParts.join(" ") || "User";
 
-    const existingUnverifiedUser = reusableUnverifiedUsers[0] || null;
-    const user = existingUnverifiedUser || new User();
+    const user = new User();
 
     user.firstName = firstName;
     user.lastName = lastName;
@@ -2625,9 +2613,7 @@ app.post("/api/visitors/register", async (req, res) => {
     }
     await user.save();
     console.log(
-      existingUnverifiedUser
-        ? "Unverified visitor account refreshed, waiting for OTP verification:"
-        : "Visitor account created, waiting for OTP verification:",
+      "Visitor account created, waiting for OTP verification:",
       normalizedEmail
     );
 
@@ -2638,9 +2624,7 @@ app.post("/api/visitors/register", async (req, res) => {
       activityType: "visitor_account_registration",
       status: "pending",
       location: "Visitor Registration",
-      notes: existingUnverifiedUser
-        ? `${normalizedFullName} updated an unverified visitor account and must verify OTP before login.`
-        : `${normalizedFullName} created a visitor account and must verify OTP before login.`,
+      notes: `${normalizedFullName} created a visitor account and must verify OTP before login.`,
       metadata: {
         username: user.username,
         email: user.email,
@@ -2659,16 +2643,12 @@ app.post("/api/visitors/register", async (req, res) => {
       status: "pending",
       relatedUser: user._id,
       relatedVisitor: existingVisitor?._id || null,
-      notes: existingUnverifiedUser
-        ? "Unverified visitor account updated and waiting for OTP verification"
-        : "Visitor account created and waiting for OTP verification",
+      notes: "Visitor account created and waiting for OTP verification",
     });
 
     await createRoleNotification({
-      title: existingUnverifiedUser ? "Visitor Account Updated" : "New Visitor Account Registered",
-      message: existingUnverifiedUser
-        ? `Visitor account updated before verification: ${normalizedFullName}`
-        : `New visitor account registered: ${normalizedFullName}`,
+      title: "New Visitor Account Registered",
+      message: `New visitor account registered: ${normalizedFullName}`,
       targetRole: "admin",
       relatedVisitor: existingVisitor?._id || null,
       relatedUser: user._id,
@@ -2687,10 +2667,7 @@ app.post("/api/visitors/register", async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message:
-        existingUnverifiedUser
-          ? "Your unverified visitor account was updated. Please enter the new OTP code sent to your email before logging in."
-          : "Visitor account created. Please enter the OTP code sent to your email before logging in.",
+      message: "Visitor account created. Please enter the OTP code sent to your email before logging in.",
       requiresOtpVerification: true,
       otpExpiresAt: otp.expiresAt,
       otpDeliveryMode: getOtpDeliveryMode(otp.emailResult),

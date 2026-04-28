@@ -1119,6 +1119,19 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FECACA",
   },
+  loginSuccessText: {
+    color: "#166534",
+    fontSize: 13,
+    marginTop: -8,
+    marginBottom: 16,
+    fontWeight: "700",
+    backgroundColor: "#F0FDF4",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
 
   demoHelper: {
     backgroundColor: "#F0F9FF",
