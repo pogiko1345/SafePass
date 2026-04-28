@@ -3446,6 +3446,73 @@ export default StyleSheet.create({
     paddingBottom: 20,
     gap: 16,
   },
+  appointmentHistoryTable: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+  appointmentHistoryTableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    borderBottomWidth: 1,
+    borderBottomColor: "#DDE7F3",
+    minHeight: 44,
+    paddingHorizontal: 10,
+  },
+  appointmentHistoryTableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 58,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+  appointmentHistoryTableHeadText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#475569",
+    textTransform: "uppercase",
+  },
+  appointmentHistoryTableText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#0F172A",
+    paddingRight: 8,
+  },
+  appointmentHistoryPurposeCell: {
+    flex: 1.25,
+  },
+  appointmentHistoryOfficeCell: {
+    flex: 1.1,
+  },
+  appointmentHistoryDateCell: {
+    flex: 1,
+  },
+  appointmentHistoryTimeCell: {
+    flex: 0.85,
+  },
+  appointmentHistoryStatusCell: {
+    flex: 1,
+  },
+  appointmentHistoryStatusPillWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingRight: 4,
+  },
+  appointmentHistoryStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  appointmentHistoryStatusPillText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
 
   appointmentHistoryCard: {
     padding: 20,

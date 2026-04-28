@@ -53,6 +53,10 @@ const GENERIC_PASSWORD_RESET_REQUEST_MESSAGE =
 const GENERIC_PASSWORD_RESET_VERIFY_MESSAGE =
   "Invalid or expired verification code. Please request a new code and try again.";
 
+const AI_ID_VALIDATION_REQUIRED =
+  String(process.env.REQUIRE_AI_ID_VALIDATION || "").trim().toLowerCase() === "true";
+const OPENAI_ID_MODEL = String(process.env.OPENAI_ID_MODEL || "gpt-4.1-mini").trim();
+
 const reviewAppointmentIdImageDemo = ({ idType, idImage }) => {
   const normalizedIdType = String(idType || "").trim();
   const normalizedIdImage = String(idImage || "").trim();
@@ -93,6 +97,163 @@ const reviewAppointmentIdImageDemo = ({ idType, idImage }) => {
     status: "demo_prechecked",
     message: `Demo AI pre-check accepted the uploaded ${normalizedIdType}. Final validation still requires staff or security review.`,
   };
+};
+
+const extractOpenAIResponseText = (responseData) => {
+  if (!responseData) {
+    return "";
+  }
+
+  if (typeof responseData.output_text === "string") {
+    return responseData.output_text;
+  }
+
+  if (!Array.isArray(responseData.output)) {
+    return "";
+  }
+
+  return responseData.output
+    .flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
+    .map((contentItem) => contentItem?.text || contentItem?.content || "")
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+};
+
+const parseJsonObjectFromText = (text) => {
+  const cleanedText = String(text || "")
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  const jsonStart = cleanedText.indexOf("{");
+  const jsonEnd = cleanedText.lastIndexOf("}");
+
+  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(cleanedText.slice(jsonStart, jsonEnd + 1));
+  } catch (error) {
+    console.error("AI ID validation JSON parse error:", error.message);
+    return null;
+  }
+};
+
+const buildAppointmentIdImagePrompt = (idType) => `
+You are reviewing a visitor appointment valid ID image.
+
+Selected ID type: "${idType}"
+
+Decide whether the image appears to show the same type of identification selected by the visitor.
+Accept only when the image is clearly an ID document/card/passport/license and the visible document type reasonably matches the selected ID type.
+Reject screenshots, selfies without an ID, unrelated photos, unreadable/blurred images, and documents that visibly look like a different ID type.
+Do not verify the person's identity, ID number, face match, or authenticity. Only classify whether the image appears to match the selected ID type.
+
+Return only JSON in this exact shape:
+{
+  "isAccepted": true,
+  "status": "ai_id_matched",
+  "message": "Short visitor-friendly explanation.",
+  "detectedIdType": "Short detected ID type or unknown",
+  "confidence": 0.0
+}
+`;
+
+const reviewAppointmentIdImage = async ({ idType, idImage }) => {
+  const localReview = reviewAppointmentIdImageDemo({ idType, idImage });
+  if (!localReview.isAccepted) {
+    return localReview;
+  }
+
+  const openAiApiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (!openAiApiKey) {
+    return localReview;
+  }
+
+  try {
+    const aiResponse = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openAiApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: OPENAI_ID_MODEL,
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: buildAppointmentIdImagePrompt(idType),
+              },
+              {
+                type: "input_image",
+                image_url: idImage,
+                detail: "high",
+              },
+            ],
+          },
+        ],
+        max_output_tokens: 250,
+      }),
+    });
+
+    const responseData = await aiResponse.json().catch(() => null);
+
+    if (!aiResponse.ok) {
+      const errorMessage =
+        responseData?.error?.message || `OpenAI returned status ${aiResponse.status}`;
+      throw new Error(errorMessage);
+    }
+
+    const review = parseJsonObjectFromText(extractOpenAIResponseText(responseData));
+    if (!review || typeof review.isAccepted !== "boolean") {
+      throw new Error("AI ID validation returned an unreadable response.");
+    }
+
+    if (!review.isAccepted) {
+      return {
+        isAccepted: false,
+        status: review.status || "ai_id_mismatch",
+        message:
+          review.message ||
+          `The uploaded image does not appear to match the selected ${idType}. Please upload the correct ID.`,
+        detectedIdType: review.detectedIdType || "unknown",
+        confidence: Number(review.confidence) || 0,
+      };
+    }
+
+    return {
+      isAccepted: true,
+      status: review.status || "ai_id_matched",
+      message:
+        review.message ||
+        `AI pre-check accepted the uploaded ${idType}. Final validation still requires staff or security review.`,
+      detectedIdType: review.detectedIdType || idType,
+      confidence: Number(review.confidence) || 0,
+    };
+  } catch (error) {
+    console.error("AI ID validation error:", error.message);
+
+    if (AI_ID_VALIDATION_REQUIRED) {
+      return {
+        isAccepted: false,
+        status: "ai_id_validation_unavailable",
+        message:
+          "We could not validate the ID image right now. Please try again in a moment.",
+      };
+    }
+
+    return {
+      ...localReview,
+      status: "demo_prechecked_ai_unavailable",
+      message:
+        "Basic ID image pre-check passed. AI ID matching is temporarily unavailable, so staff or security will complete the final review.",
+    };
+  }
 };
 
 const getRequiredEnvValue = (name) => {
@@ -1252,18 +1413,8 @@ const isVisitorOwner = (user = {}, visitor = {}) => {
 const findVisitorForUser = async (user) => {
   if (!user) return null;
 
-  let visitor = null;
-
-  if (user.visitorId) {
-    visitor = await Visitor.findById(user.visitorId);
-  }
-
-  if (!visitor && user.email) {
-    visitor = await Visitor.findOne({ email: String(user.email).trim().toLowerCase() }).sort({
-      registeredAt: -1,
-      createdAt: -1,
-    });
-  }
+  const visitors = await findVisitorsForUser(user);
+  const visitor = getPrioritizedVisitor(visitors);
 
   if (
     visitor &&
@@ -1274,6 +1425,52 @@ const findVisitorForUser = async (user) => {
   }
 
   return visitor;
+};
+
+const findVisitorsForUser = async (user) => {
+  if (!user) return [];
+
+  const filters = [];
+  if (user.visitorId) {
+    filters.push({ _id: user.visitorId });
+  }
+  if (user.email) {
+    filters.push({ email: String(user.email).trim().toLowerCase() });
+  }
+
+  if (!filters.length) return [];
+
+  return Visitor.find({ $or: filters }).sort({
+    visitDate: 1,
+    visitTime: 1,
+    registeredAt: -1,
+    createdAt: -1,
+  });
+};
+
+const getVisitorScheduleTime = (visitor) => {
+  const combined = getCombinedAppointmentDateTime(visitor?.visitDate, visitor?.visitTime);
+  if (combined) return combined.getTime();
+
+  const fallback = new Date(visitor?.visitDate || visitor?.visitTime || visitor?.registeredAt || 0);
+  return Number.isNaN(fallback.getTime()) ? 0 : fallback.getTime();
+};
+
+const getPrioritizedVisitor = (visitors = []) => {
+  if (!Array.isArray(visitors) || !visitors.length) return null;
+
+  const now = Date.now();
+  const active = visitors.filter((visitor) =>
+    !["checked_out", "expired", "rejected"].includes(String(visitor?.status || "").toLowerCase()) &&
+    String(visitor?.appointmentStatus || "").toLowerCase() !== "rejected"
+  );
+  const upcoming = active
+    .filter((visitor) => getVisitorScheduleTime(visitor) >= now - 60 * 1000)
+    .sort((left, right) => getVisitorScheduleTime(left) - getVisitorScheduleTime(right));
+
+  if (upcoming[0]) return upcoming[0];
+
+  return [...visitors].sort((left, right) => getVisitorScheduleTime(right) - getVisitorScheduleTime(left))[0];
 };
 
 const getCombinedAppointmentDateTime = (visitDateValue, visitTimeValue) => {
@@ -1565,18 +1762,26 @@ const userData = {
 app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
   try {
     if (req.user.role === "visitor") {
-      const visitor = await findVisitorForUser(req.user);
+      const visitors = await findVisitorsForUser(req.user);
+      const visitor = getPrioritizedVisitor(visitors);
 
       if (visitor) {
+        if (!req.user.visitorId || String(req.user.visitorId) !== String(visitor._id)) {
+          req.user.visitorId = visitor._id;
+          await req.user.save();
+        }
+
         return res.json({
           success: true,
           visitor,
+          appointments: visitors,
         });
       }
 
       return res.json({
         success: true,
         visitor: null,
+        appointments: [],
         account: {
           _id: req.user._id,
           fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
@@ -4672,7 +4877,7 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    const idReview = reviewAppointmentIdImageDemo({
+    const idReview = await reviewAppointmentIdImage({
       idType: normalizedIdType,
       idImage: normalizedIdImage,
     });
@@ -4728,21 +4933,11 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    let visitor = null;
-    if (user.visitorId) {
-      visitor = await Visitor.findById(user.visitorId);
-    }
-
-    if (!visitor) {
-      visitor = await Visitor.findOne({ email: user.email }).sort({ registeredAt: -1 });
-    }
-
     const visitorFullName = `${user.firstName} ${user.lastName}`.trim();
     const slotCount = await countStaffAppointmentsForSlot({
       assignedStaff: routedStaff._id,
       visitDate: finalVisitDate,
       visitTime: finalVisitTime,
-      excludeVisitorId: visitor?._id || null,
     });
 
     if (slotCount >= APPOINTMENT_SLOT_LIMIT) {
@@ -4755,57 +4950,36 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    if (!visitor) {
-      visitor = new Visitor({
-        fullName: visitorFullName,
-        email: user.email,
-        phoneNumber: user.phone || "Not provided",
-        idType: normalizedIdType,
-        idNumber: normalizedIdType,
-        idImage: normalizedIdImage,
-        idValidationStatus: idReview.status,
-        idValidationNotes: idReview.message,
-        dataPrivacyAccepted: true,
-        dataPrivacyAcceptedAt: dataPrivacyAcceptedAt
-          ? new Date(dataPrivacyAcceptedAt)
-          : new Date(),
-      });
-      visitor.queueAppointmentRequest({
-        purposeOfVisit: resolvedPurpose,
-        purposeCategory: normalizedPurposeCategory || undefined,
-        customPurposeOfVisit: normalizedCustomPurpose || undefined,
-        visitDate: new Date(finalVisitDate),
-        visitTime: new Date(finalVisitTime),
-        department: formatDepartmentLabel(requestedDepartment),
-        assignedStaff: routedStaff._id,
-        assignedStaffName: getFullName(routedStaff),
-      });
-      await visitor.save();
-      user.visitorId = visitor._id;
-      await user.save();
-    } else {
-      visitor.fullName = visitor.fullName || visitorFullName;
-      visitor.phoneNumber = user.phone || visitor.phoneNumber;
-      visitor.idType = normalizedIdType;
-      visitor.idNumber = normalizedIdType;
-      visitor.idImage = normalizedIdImage;
-      visitor.idValidationStatus = idReview.status;
-      visitor.idValidationNotes = idReview.message;
-      visitor.dataPrivacyAccepted = true;
-      visitor.dataPrivacyAcceptedAt = dataPrivacyAcceptedAt
+    const visitor = new Visitor({
+      fullName: visitorFullName,
+      email: user.email,
+      phoneNumber: user.phone || "Not provided",
+      idType: normalizedIdType,
+      idNumber: normalizedIdType,
+      idImage: normalizedIdImage,
+      idValidationStatus: idReview.status,
+      idValidationNotes: idReview.message,
+      dataPrivacyAccepted: true,
+      dataPrivacyAcceptedAt: dataPrivacyAcceptedAt
         ? new Date(dataPrivacyAcceptedAt)
-        : new Date();
-      visitor.queueAppointmentRequest({
-        purposeOfVisit: resolvedPurpose,
-        purposeCategory: normalizedPurposeCategory || undefined,
-        customPurposeOfVisit: normalizedCustomPurpose || undefined,
-        visitDate: new Date(finalVisitDate),
-        visitTime: new Date(finalVisitTime),
-        department: formatDepartmentLabel(requestedDepartment),
-        assignedStaff: routedStaff._id,
-        assignedStaffName: getFullName(routedStaff),
-      });
-      await visitor.save();
+        : new Date(),
+    });
+    visitor.queueAppointmentRequest({
+      purposeOfVisit: resolvedPurpose,
+      purposeCategory: normalizedPurposeCategory || undefined,
+      customPurposeOfVisit: normalizedCustomPurpose || undefined,
+      visitDate: new Date(finalVisitDate),
+      visitTime: new Date(finalVisitTime),
+      department: formatDepartmentLabel(requestedDepartment),
+      assignedStaff: routedStaff._id,
+      assignedStaffName: getFullName(routedStaff),
+    });
+    await visitor.save();
+
+    const prioritizedVisitor = getPrioritizedVisitor(await findVisitorsForUser(user));
+    if (prioritizedVisitor) {
+      user.visitorId = prioritizedVisitor._id;
+      await user.save();
     }
 
     await createRoleNotification({

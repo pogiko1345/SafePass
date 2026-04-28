@@ -175,6 +175,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [selectedAppointmentScreen, setSelectedAppointmentScreen] = useState("menu");
   const [selectedVisitorMapFloor, setSelectedVisitorMapFloor] = useState("ground");
   const [appointmentFeedback, setAppointmentFeedback] = useState(null);
+  const [appointmentHistory, setAppointmentHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -198,8 +199,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [appointmentForm, setAppointmentForm] = useState({
     preferredDate: null,
     preferredTime: null,
-    department: "Registrar",
-    purposeSelection: "Enrollment",
+    department: "",
+    purposeSelection: "",
     customPurpose: "",
     idType: "",
     idImage: null,
@@ -600,8 +601,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       const profileResponse = await ApiService.getVisitorProfile();
       if (profileResponse.success && profileResponse.visitor) {
         setVisitor(profileResponse.visitor);
+        setAppointmentHistory(Array.isArray(profileResponse.appointments) ? profileResponse.appointments : []);
       } else {
         setVisitor(null);
+        setAppointmentHistory(Array.isArray(profileResponse.appointments) ? profileResponse.appointments : []);
       }
 
       await maybeShowVisitorWarning(currentUser);
@@ -1114,34 +1117,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const buildAppointmentForm = (visitorRecord = visitor) => {
-    const existingCategory = String(visitorRecord?.purposeCategory || "").trim();
-    const existingPurpose = String(visitorRecord?.purposeOfVisit || "").trim();
-    const matchedPurpose = APPOINTMENT_PURPOSE_OPTIONS.includes(existingCategory)
-      ? existingCategory
-      : APPOINTMENT_PURPOSE_OPTIONS.includes(existingPurpose)
-        ? existingPurpose
-        : existingPurpose
-          ? "Other"
-          : "Enrollment";
-    const existingDepartment = String(
-      visitorRecord?.appointmentDepartment || visitorRecord?.assignedOffice || visitorRecord?.host || "",
-    ).trim();
-    const mappedDepartment =
-      matchedPurpose === "Other"
-        ? existingDepartment
-        : getDefaultDepartmentForPurpose(matchedPurpose) || existingDepartment;
-
     return {
       preferredDate: getDefaultAppointmentDate(),
       preferredTime: getDefaultAppointmentTime(),
-      department: mappedDepartment,
-      purposeSelection: matchedPurpose,
-      customPurpose:
-        matchedPurpose === "Other"
-          ? String(visitorRecord?.customPurposeOfVisit || existingPurpose || "").trim()
-          : "",
+      department: "",
+      purposeSelection: "",
+      customPurpose: "",
       idType: getStoredVisitorIdType(visitorRecord),
-      idImage: visitorRecord?.idImage || null,
+      idImage: null,
       privacyAccepted: false,
     };
   };
@@ -1153,6 +1136,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const handlePickAppointmentIdImage = async () => {
     try {
+      if (!appointmentForm.idType) {
+        Alert.alert(
+          "Choose ID Type First",
+          "Please choose which valid ID you will present before uploading its picture.",
+        );
+        return;
+      }
+
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
@@ -1185,7 +1176,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       }));
       Alert.alert(
         "ID Image Saved",
-        "Demo AI pre-check ready. Final ID validation will still be confirmed by staff or security.",
+        `Your ${appointmentForm.idType} picture was saved. Please make sure the uploaded photo matches the ID type you selected.`,
       );
     } catch (error) {
       console.error("Pick appointment ID image error:", error);
@@ -1669,6 +1660,54 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
   };
 
+  const getAppointmentStatusText = (record = {}) => {
+    if (record?.approvalStatus === "pending") return "Pending Admin Approval";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "Pending Staff Review";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjusted") return "Time Adjusted";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "Appointment Declined";
+    switch (record?.status) {
+      case "checked_in": return "Checked In";
+      case "approved": return "Approved";
+      case "pending": return "Pending Approval";
+      case "checked_out": return "Checked Out";
+      case "expired": return "Expired";
+      case "rejected": return "Rejected";
+      default: return "Active";
+    }
+  };
+
+  const getAppointmentStatusColor = (record = {}) => {
+    if (record?.approvalStatus === "pending") return "#F59E0B";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "#F59E0B";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjusted") return "#0A3D91";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "#DC2626";
+    switch (record?.status) {
+      case "checked_in": return "#10B981";
+      case "approved": return "#0A3D91";
+      case "pending": return "#F59E0B";
+      case "checked_out": return "#6B7280";
+      case "expired": return "#EF4444";
+      case "rejected": return "#DC2626";
+      default: return "#0A3D91";
+    }
+  };
+
+  const getAppointmentStatusIcon = (record = {}) => {
+    if (record?.approvalStatus === "pending") return "time-outline";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "briefcase-outline";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjusted") return "swap-horizontal-outline";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "close-circle";
+    switch (record?.status) {
+      case "checked_in": return "checkmark-circle";
+      case "approved": return "checkmark-circle";
+      case "pending": return "time-outline";
+      case "checked_out": return "log-out";
+      case "expired": return "alert-circle";
+      case "rejected": return "close-circle";
+      default: return "id-card";
+    }
+  };
+
   const handleLogout = async () => {
     await stopNfcReading();
     Alert.alert(
@@ -1733,32 +1772,48 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     String(currentUser?.status || "").toLowerCase() === "active";
   const approvedActionLabel = isNfcReading ? "Stop NFC" : "Start NFC";
   const approvedActionIcon = isNfcReading ? "pause-circle" : "radio";
-  const appointmentHistoryEntries = [];
-
-  if (visitor?.visitDate || visitor?.visitTime || visitor?.purposeOfVisit || visitor?.appointmentStatus) {
-    appointmentHistoryEntries.push({
-      id: visitor?._id || "active-appointment",
-      title: visitor?.purposeOfVisit || "Campus Appointment",
+  const appointmentSourceRecords = [
+    ...appointmentHistory,
+    ...(visitor ? [visitor] : []),
+  ].filter(Boolean);
+  const uniqueAppointmentRecords = Array.from(
+    new Map(
+      appointmentSourceRecords.map((record) => [
+        String(record?._id || `${record?.visitDate}-${record?.visitTime}-${record?.purposeOfVisit}`),
+        record,
+      ]),
+    ).values(),
+  ).sort((left, right) => {
+    const leftDate = new Date(left?.visitTime || left?.visitDate || left?.registeredAt || 0).getTime();
+    const rightDate = new Date(right?.visitTime || right?.visitDate || right?.registeredAt || 0).getTime();
+    return rightDate - leftDate;
+  });
+  const appointmentHistoryEntries = uniqueAppointmentRecords.map((record) => {
+    const recordStatusText = getAppointmentStatusText(record);
+    const recordStatusColor = getAppointmentStatusColor(record);
+    return {
+      id: record?._id || `${record?.visitDate}-${record?.visitTime}`,
+      title: record?.purposeOfVisit || "Campus Appointment",
       office:
-        visitor?.appointmentDepartment ||
-        visitor?.assignedOffice ||
-        visitor?.host ||
+        record?.appointmentDepartment ||
+        record?.assignedOffice ||
+        record?.host ||
         "Not assigned",
-      dateLabel: visitor?.visitDate ? formatDate(visitor.visitDate) : "Not scheduled",
-      timeLabel: visitor?.visitTime ? formatTime(visitor.visitTime) : "Not scheduled",
-      statusLabel: statusText,
-      statusIcon,
-      statusColor,
+      dateLabel: record?.visitDate ? formatDate(record.visitDate) : "Not scheduled",
+      timeLabel: record?.visitTime ? formatTime(record.visitTime) : "Not scheduled",
+      statusLabel: recordStatusText,
+      statusIcon: getAppointmentStatusIcon(record),
+      statusColor: recordStatusColor,
       description:
-        visitor?.staffApprovalNote ||
-        visitor?.staffRejectionReason ||
-        visitor?.approvalNotes ||
+        record?.staffApprovalNote ||
+        record?.staffRejectionReason ||
+        record?.approvalNotes ||
         "Track the latest status of your submitted visit request here.",
-    });
-  }
+    };
+  });
 
   if (appointmentFeedback) {
-    appointmentHistoryEntries.push({
+    appointmentHistoryEntries.unshift({
       id: `feedback-${appointmentFeedback.date || "latest"}-${appointmentFeedback.time || "latest"}`,
       title: appointmentFeedback?.purpose || "Appointment Request",
       office: appointmentFeedback?.department || "Pending assignment",
@@ -3127,7 +3182,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 <View>
                   <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a purpose</Text>
                   <Text style={visitorDashboardStyles.appointmentPickerValue}>
-                    {appointmentForm.purposeSelection}
+                    {appointmentForm.purposeSelection || "Select purpose of visit"}
                   </Text>
                 </View>
               </View>
@@ -3150,23 +3205,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         isSelected && visitorDashboardStyles.purposeOptionItemActive,
                       ]}
                       onPress={() => {
-                        const currentDepartment = String(appointmentForm.department || "").trim();
-                        const currentPurpose = String(appointmentForm.purposeSelection || "").trim();
-                        const currentPurposeDefault =
-                          currentPurpose && currentPurpose !== "Other"
-                            ? getDefaultDepartmentForPurpose(currentPurpose)
-                            : "";
-                        const nextDepartment =
-                          option === "Other"
-                            ? currentDepartment
-                            : !currentDepartment || currentDepartment === currentPurposeDefault
-                              ? getDefaultDepartmentForPurpose(option)
-                              : currentDepartment;
                         setHasAppointmentDraft(true);
                         setAppointmentForm((prev) => ({
                           ...prev,
                           purposeSelection: option,
-                          department: nextDepartment,
                           customPurpose: option === "Other" ? prev.customPurpose : "",
                         }));
                         setShowPurposeDropdown(false);
@@ -3252,6 +3294,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         setAppointmentForm((prev) => ({
                           ...prev,
                           idType: option,
+                          idImage: prev.idType && prev.idType !== option ? null : prev.idImage,
                         }));
                         setShowIdTypeDropdown(false);
                       }}
@@ -3274,7 +3317,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
             ) : null}
             <Text style={visitorDashboardStyles.appointmentAutoHint}>
-              Select the ID you will bring on campus. Security will verify the physical ID on arrival.
+              Select the ID you will bring on campus. The uploaded image must match this selected ID type.
             </Text>
           </View>
 
@@ -3315,7 +3358,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </TouchableOpacity>
             ) : null}
             <Text style={visitorDashboardStyles.appointmentAutoHint}>
-              Demo AI pre-check reviews the uploaded image format and clarity signal. Final ID approval is still manual during staff or security verification.
+              Upload the same ID you selected above. AI will pre-check the ID type before staff or security completes the final review.
             </Text>
           </View>
 
@@ -3405,69 +3448,37 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           {renderAppointmentSegmentBar("history")}
 
           {appointmentHistoryEntries.length ? (
-            appointmentHistoryEntries.map((entry) => (
-              <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryCard}>
-                <View style={visitorDashboardStyles.appointmentHistoryTopRow}>
-                  <View style={[visitorDashboardStyles.appointmentHistoryStatusIcon, { backgroundColor: entry.statusColor }]}>
-                    <Ionicons name={entry.statusIcon} size={18} color="#FFFFFF" />
-                  </View>
-                  <View style={visitorDashboardStyles.appointmentHistoryCopy}>
-                    <Text style={visitorDashboardStyles.appointmentHistoryTitle}>{entry.title}</Text>
-                    <Text style={visitorDashboardStyles.appointmentHistoryDescription}>{entry.description}</Text>
-                  </View>
-                  <View style={[visitorDashboardStyles.appointmentHistoryBadge, { backgroundColor: `${entry.statusColor}16` }]}>
-                    <Text style={[visitorDashboardStyles.appointmentHistoryBadgeText, { color: entry.statusColor }]}>
+            <View style={visitorDashboardStyles.appointmentHistoryTable}>
+              <View style={visitorDashboardStyles.appointmentHistoryTableHeader}>
+                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryPurposeCell]}>Purpose</Text>
+                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryOfficeCell]}>Office</Text>
+                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryDateCell]}>Date</Text>
+                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryTimeCell]}>Time</Text>
+                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryStatusCell]}>Status</Text>
+              </View>
+              {appointmentHistoryEntries.map((entry) => (
+                <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryTableRow}>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryPurposeCell]} numberOfLines={2}>
+                    {entry.title}
+                  </Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryOfficeCell]} numberOfLines={2}>
+                    {entry.office}
+                  </Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryDateCell]} numberOfLines={2}>
+                    {entry.dateLabel}
+                  </Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryTimeCell]} numberOfLines={1}>
+                    {entry.timeLabel}
+                  </Text>
+                  <View style={[visitorDashboardStyles.appointmentHistoryStatusCell, visitorDashboardStyles.appointmentHistoryStatusPillWrap]}>
+                    <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
+                    <Text style={[visitorDashboardStyles.appointmentHistoryStatusPillText, { color: entry.statusColor }]} numberOfLines={2}>
                       {entry.statusLabel}
                     </Text>
                   </View>
                 </View>
-
-                <View style={visitorDashboardStyles.appointmentHistoryMetaGrid}>
-                  <View style={visitorDashboardStyles.appointmentHistoryMetaItem}>
-                    <Text style={visitorDashboardStyles.appointmentHistoryMetaLabel}>Office</Text>
-                    <Text style={visitorDashboardStyles.appointmentHistoryMetaValue}>{entry.office}</Text>
-                  </View>
-                  <View style={visitorDashboardStyles.appointmentHistoryMetaItem}>
-                    <Text style={visitorDashboardStyles.appointmentHistoryMetaLabel}>Date</Text>
-                    <Text style={visitorDashboardStyles.appointmentHistoryMetaValue}>{entry.dateLabel}</Text>
-                  </View>
-                  <View style={visitorDashboardStyles.appointmentHistoryMetaItem}>
-                    <Text style={visitorDashboardStyles.appointmentHistoryMetaLabel}>Time</Text>
-                    <Text style={visitorDashboardStyles.appointmentHistoryMetaValue}>{entry.timeLabel}</Text>
-                  </View>
-                </View>
-
-                <View style={visitorDashboardStyles.appointmentHistoryProgressWrap}>
-                  <View style={visitorDashboardStyles.appointmentHistoryProgressTrack}>
-                    <View
-                      style={[
-                        visitorDashboardStyles.appointmentHistoryProgressFill,
-                        {
-                          width:
-                            entry.statusLabel === "Approved" || entry.statusLabel === "Adjusted"
-                              ? "76%"
-                              : entry.statusLabel === "Completed" || entry.statusLabel === "Checked Out"
-                                ? "100%"
-                                : entry.statusLabel === "Rejected"
-                                  ? "38%"
-                                  : "52%",
-                          backgroundColor: entry.statusColor,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={visitorDashboardStyles.appointmentHistoryProgressText}>
-                    {entry.statusLabel === "Approved" || entry.statusLabel === "Adjusted"
-                      ? "Visit approved"
-                      : entry.statusLabel === "Completed" || entry.statusLabel === "Checked Out"
-                        ? "Visit closed"
-                        : entry.statusLabel === "Rejected"
-                          ? "Request closed"
-                          : "Awaiting review"}
-                  </Text>
-                </View>
-              </View>
-            ))
+              ))}
+            </View>
           ) : (
             <View style={visitorDashboardStyles.appointmentHistoryEmpty}>
               <Ionicons name="calendar-clear-outline" size={34} color="#94A3B8" />
