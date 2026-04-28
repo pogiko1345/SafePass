@@ -16,53 +16,16 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import visitorRegisterStyles from "../styles/VisitorRegisterStyles";
 import ApiService from "../utils/ApiService";
-import IDScannerService from "../utils/IDScannerService";
 import Logo from "../assets/LogoSapphire.jpg";
-import {
-  MONITORING_MAP_FLOORS,
-  MONITORING_MAP_OFFICES,
-} from "../utils/monitoringMapConfig";
 import {
   PHILIPPINE_MOBILE_NUMBER_MESSAGE,
   isValidPhilippineMobileNumber,
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
-
-let DateTimePickerComponent = null;
-if (Platform.OS !== "web") {
-  try {
-    const DateTimePickerModule = require("@react-native-community/datetimepicker");
-    DateTimePickerComponent = DateTimePickerModule.default;
-  } catch (error) {
-    console.warn("DateTimePicker not available:", error);
-  }
-}
-
-const purposeOptions = [
-  "Enrollment",
-  "Meeting with Staff",
-  "Maintenance Work",
-  "Package Delivery",
-  "Guest Visit",
-  "Tour of Campus",
-  "Emergency",
-  "Interview",
-  "Event Participation",
-  "Other",
-];
-
-const officeOptions = MONITORING_MAP_OFFICES.map((office) => {
-  const floor = MONITORING_MAP_FLOORS.find((item) => item.id === office.floor);
-  return {
-    ...office,
-    floorName: floor?.name || "Campus",
-  };
-});
 
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({
@@ -74,7 +37,7 @@ const SuccessModal = ({
   otpError,
   onOtpChange,
   onConfirm,
-  onVerifySimulation,
+  onVerifyOtp,
   onResendOtp,
 }) => {
   const handleCopy = (text, type) => {
@@ -177,7 +140,7 @@ const SuccessModal = ({
                 visitorRegisterStyles.successButton,
                 isVerified && visitorRegisterStyles.successButtonMuted,
               ]}
-              onPress={onVerifySimulation}
+              onPress={onVerifyOtp}
               disabled={isVerified || isVerifying}
               activeOpacity={0.7}
             >
@@ -782,7 +745,7 @@ export default function VisitorRegisterScreen({ navigation }) {
     });
   };
 
-  const handleVerifySimulation = async () => {
+  const handleVerifyRegistrationOtp = async () => {
     const email = registeredVisitor?.email || formData.email;
     const otpCode = String(registrationOtp || "").replace(/\D/g, "").slice(0, 6);
 
@@ -1360,7 +1323,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           }
         }}
         onConfirm={handleSuccessConfirm}
-        onVerifySimulation={handleVerifySimulation}
+        onVerifyOtp={handleVerifyRegistrationOtp}
         onResendOtp={handleResendRegistrationOtp}
       />
     </SafeAreaView>
