@@ -641,7 +641,7 @@ export default function LoginScreen({ navigation, route }) {
           special: false,
         });
         setLoginError("");
-        setLoginSuccessMessage("Password reset successful. Please log in with your new password.");
+        setLoginSuccessMessage("Thank you. Your password has been changed. Please log in with your new password.");
       } else {
         Alert.alert("Error", response.message || "Failed to reset password");
       }
