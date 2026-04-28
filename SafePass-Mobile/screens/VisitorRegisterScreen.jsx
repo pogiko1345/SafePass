@@ -769,18 +769,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           ...previous,
           isVerified: true,
         }));
-        Alert.alert(
-          "Account Verified",
-          "Your visitor account is now verified. You will be redirected to login.",
-          [
-            {
-              text: "Continue",
-              onPress: () => {
-                handleSuccessConfirm();
-              },
-            },
-          ],
-        );
+        await handleSuccessConfirm();
         return;
       }
 
