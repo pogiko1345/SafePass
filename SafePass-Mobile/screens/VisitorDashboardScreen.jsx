@@ -245,6 +245,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       : "100%";
   const approvedActionCardWidth = isTabletVisitorDashboard ? "48.5%" : "100%";
   const compactApprovedActionCardWidth = viewportWidth <= 560 ? "100%" : approvedActionCardWidth;
+  const isVisitorAccessApproved = (visitorRecord = visitor) => {
+    const approvalPending =
+      visitorRecord?.status === "pending" || visitorRecord?.approvalStatus === "pending";
+    const pendingStaffReview =
+      !approvalPending &&
+      visitorRecord?.approvalFlow === "staff" &&
+      visitorRecord?.appointmentStatus === "pending";
+
+    return (
+      !approvalPending &&
+      !pendingStaffReview &&
+      (visitorRecord?.status === "approved" || visitorRecord?.status === "checked_in")
+    );
+  };
   const appointmentTimeOptions = useMemo(() => {
     const options = [];
     for (let hour = 7; hour <= 18; hour += 1) {
@@ -381,6 +395,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }, [visitor?._id, visitor?.appointmentStatus, visitor?.approvalFlow, visitor?.visitTime]);
 
   useEffect(() => {
+<<<<<<< HEAD
+    if (isVisitorAccessApproved(visitor)) {
+=======
     const pendingApproval =
       visitor?.status === "pending" || visitor?.approvalStatus === "pending";
     const pendingStaffReview =
@@ -396,6 +413,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       pendingStaffReview;
 
     if (!accessReady) {
+>>>>>>> e845a9365692adbbdb25601857c044eb37c4e517
       return;
     }
 
@@ -405,12 +423,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setShowCheckInSuccessModal(false);
     setShowCheckOutModal(false);
     setShowCheckOutSuccessModal(false);
+<<<<<<< HEAD
+  }, [visitor?.status, visitor?.approvalStatus, visitor?.approvalFlow, visitor?.appointmentStatus]);
+=======
   }, [
     visitor?.approvalStatus,
     visitor?.appointmentStatus,
     visitor?.approvalFlow,
     visitor?.status,
   ]);
+>>>>>>> e845a9365692adbbdb25601857c044eb37c4e517
 
   const stopPhoneLocationTracking = async () => {
     if (phoneLocationSubscriptionRef.current) {
@@ -668,12 +690,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   // Start NFC Reading
   const startNfcReading = async () => {
-    const accessReady =
-      !isPendingApproval &&
-      !isPendingStaffReview &&
-      (visitor?.status === "approved" || visitor?.status === "checked_in");
-
-    if (!accessReady) {
+    if (!isVisitorAccessApproved(visitor)) {
       Alert.alert(
         "Approval Required",
         "Your NFC access tools will only be available after your visit is approved.",
@@ -1376,7 +1393,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleVirtualNfcCardTap = async () => {
     if (!visitor || isVirtualTapLoading) return;
 
-    if (!(visitor?.status === "approved" || visitor?.status === "checked_in")) {
+    if (!isVisitorAccessApproved(visitor)) {
       Alert.alert(
         "Approval Required",
         "Your virtual NFC card becomes available only after your visit is approved.",
@@ -1480,7 +1497,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleCheckInAction = () => {
-    if (!(visitor?.status === "approved" || visitor?.status === "checked_in")) {
+    if (!isVisitorAccessApproved(visitor)) {
       Alert.alert(
         "Approval Required",
         "Check-in becomes available only after your visit is approved.",
@@ -1518,7 +1535,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleCheckOutAction = () => {
-    if (!(visitor?.status === "approved" || visitor?.status === "checked_in")) {
+    if (!isVisitorAccessApproved(visitor)) {
       Alert.alert(
         "Approval Required",
         "Check-out becomes available only after your visit is approved.",
@@ -1758,9 +1775,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const isApprovedVisitor =
     !isPendingApproval && !isPendingStaffReview && visitor?.status === "approved";
   const canUseVisitorAccessTools =
-    !isPendingApproval &&
-    !isPendingStaffReview &&
-    (visitor?.status === "approved" || visitor?.status === "checked_in");
+    isVisitorAccessApproved(visitor);
   const canRequestNewAppointment =
     visitor?.approvalStatus === "approved" &&
     !isApprovedVisitor &&
