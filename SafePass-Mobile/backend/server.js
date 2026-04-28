@@ -710,6 +710,23 @@ const sendEmail = async (to, subject, body) => {
   return { success: true, simulated: true, delivered: false };
 };
 
+const canUseBackendLogOtpFallback = () => sensitiveDebugLoggingEnabled;
+
+const isOtpDeliveryUsable = (emailResult) =>
+  Boolean(emailResult?.success || canUseBackendLogOtpFallback());
+
+const getOtpDeliveryMode = (emailResult) => {
+  if (emailResult?.delivered) {
+    return "email";
+  }
+
+  if (emailResult?.simulated || canUseBackendLogOtpFallback()) {
+    return "backend_log";
+  }
+
+  return "failed";
+};
+
 const logEmailOtpForDemo = ({ email, otpCode, label = "EMAIL OTP DEMO" }) => {
   console.log("");
   console.log(`========== ${label} ==========`);
@@ -802,7 +819,7 @@ const createRegistrationOtp = async (user) => {
 
   console.log(`Visitor registration OTP generated for ${user.email}.`);
   logSensitiveDebug(`Visitor registration OTP for ${user.email}: ${otpCode}`);
-  if (emailResult?.simulated) {
+  if (emailResult?.simulated || canUseBackendLogOtpFallback()) {
     logEmailOtpForDemo({
       email: user.email,
       otpCode,
@@ -2470,7 +2487,7 @@ app.post("/api/auth/resend-registration-otp", async (req, res) => {
     }
 
     const otp = await createRegistrationOtp(user);
-    if (!otp.emailResult?.success) {
+    if (!isOtpDeliveryUsable(otp.emailResult)) {
       return res.status(500).json({
         success: false,
         message: "Failed to send verification OTP. Please try again.",
@@ -2482,6 +2499,7 @@ app.post("/api/auth/resend-registration-otp", async (req, res) => {
       success: true,
       message: "A new OTP code has been sent if the account is eligible.",
       otpExpiresAt: otp.expiresAt,
+      otpDeliveryMode: getOtpDeliveryMode(otp.emailResult),
     });
   } catch (error) {
     console.error("Resend registration OTP error:", error);
@@ -2599,7 +2617,7 @@ app.post("/api/visitors/register", async (req, res) => {
     user.visitorId = existingVisitor?._id || user.visitorId || null;
 
     const otp = await createRegistrationOtp(user);
-    if (!otp.emailResult?.success) {
+    if (!isOtpDeliveryUsable(otp.emailResult)) {
       return res.status(500).json({
         success: false,
         message: "Failed to send verification OTP. Please try again.",
@@ -2675,6 +2693,7 @@ app.post("/api/visitors/register", async (req, res) => {
           : "Visitor account created. Please enter the OTP code sent to your email before logging in.",
       requiresOtpVerification: true,
       otpExpiresAt: otp.expiresAt,
+      otpDeliveryMode: getOtpDeliveryMode(otp.emailResult),
       user: {
         _id: user._id,
         fullName: normalizedFullName,

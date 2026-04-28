@@ -33,6 +33,7 @@ const SuccessModal = ({
   account,
   isVerified,
   isVerifying,
+  otpDeliveryMode,
   otpValue,
   otpError,
   onOtpChange,
@@ -68,7 +69,9 @@ const SuccessModal = ({
           <Text style={visitorRegisterStyles.successMessage}>
             {isVerified
               ? "Your account is verified. Continue to sign in to your visitor account."
-              : "Enter the 6-digit OTP sent to your email to verify your visitor account before signing in."}
+              : otpDeliveryMode === "backend_log"
+                ? "Email delivery is not available right now. For local testing, enter the 6-digit OTP shown in the backend terminal."
+                : "Enter the 6-digit OTP sent to your email to verify your visitor account before signing in."}
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
             <View style={visitorRegisterStyles.credentialsTitleRow}>
@@ -660,6 +663,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           username: response.credentials?.username || formData.username,
           email: response.credentials?.email || formData.email,
           isVerified: false,
+          otpDeliveryMode: response.otpDeliveryMode || "email",
         });
         setRegistrationOtp("");
         setRegistrationOtpError("");
@@ -801,12 +805,15 @@ export default function VisitorRegisterScreen({ navigation }) {
       if (response?.success) {
         setRegisteredVisitor((previous) => ({
           ...previous,
+          otpDeliveryMode: response.otpDeliveryMode || previous?.otpDeliveryMode || "email",
         }));
         setRegistrationOtp("");
         setRegistrationOtpError("");
         Alert.alert(
           "Verification Code Sent",
-          "A new OTP has been sent to your email. Please also check your spam folder just in case.",
+          response.otpDeliveryMode === "backend_log"
+            ? "A new OTP has been generated. For local testing, check the backend terminal for the code."
+            : "A new OTP has been sent to your email. Please also check your spam folder just in case.",
         );
         return;
       }
@@ -1303,6 +1310,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         }
         isVerified={Boolean(registeredVisitor?.isVerified)}
         isVerifying={isVerifyingAccount}
+        otpDeliveryMode={registeredVisitor?.otpDeliveryMode || "email"}
         otpValue={registrationOtp}
         otpError={registrationOtpError}
         onOtpChange={(value) => {
