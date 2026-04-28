@@ -685,7 +685,6 @@ export default function LoginScreen({ navigation, route }) {
     }
 
     setIsLoading(true);
-    setShowLoginSplash(true);
     setLoginSplashMessage("Signing you in...");
     setLoginError("");
     setLoginSuccessMessage("");
@@ -696,6 +695,7 @@ export default function LoginScreen({ navigation, route }) {
       const verifyResponse = await ApiService.verifyCredentials(normalizedIdentifier, password);
       
       if (verifyResponse.success) {
+        setShowLoginSplash(true);
         const normalizedUser = {
           ...verifyResponse.user,
           role: normalizeRole(verifyResponse.user?.role) || "visitor",
@@ -969,7 +969,7 @@ export default function LoginScreen({ navigation, route }) {
                 <>
                   {/* Username / Email Input */}
                   <View style={loginStyles.inputBox}>
-                    <Text style={loginStyles.label}>Username</Text>
+                    <Text style={loginStyles.label}>Username / Email</Text>
                     <View style={[
                       loginStyles.inputContainer,
                       errors.email && loginStyles.inputError
