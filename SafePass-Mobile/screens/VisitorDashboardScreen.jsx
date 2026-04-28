@@ -380,13 +380,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }, [visitor?._id, visitor?.appointmentStatus, visitor?.approvalFlow, visitor?.visitTime]);
 
   useEffect(() => {
+    const pendingApproval =
+      visitor?.status === "pending" || visitor?.approvalStatus === "pending";
+    const pendingStaffReview =
+      !pendingApproval &&
+      visitor?.approvalFlow === "staff" &&
+      visitor?.appointmentStatus === "pending";
     const accessReady =
       !(
         visitor?.status === "approved" ||
         visitor?.status === "checked_in"
       ) ||
-      isPendingApproval ||
-      isPendingStaffReview;
+      pendingApproval ||
+      pendingStaffReview;
 
     if (!accessReady) {
       return;
@@ -398,7 +404,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setShowCheckInSuccessModal(false);
     setShowCheckOutModal(false);
     setShowCheckOutSuccessModal(false);
-  }, [isPendingApproval, isPendingStaffReview, visitor?.status]);
+  }, [
+    visitor?.approvalStatus,
+    visitor?.appointmentStatus,
+    visitor?.approvalFlow,
+    visitor?.status,
+  ]);
 
   const stopPhoneLocationTracking = async () => {
     if (phoneLocationSubscriptionRef.current) {
