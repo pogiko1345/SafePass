@@ -82,20 +82,20 @@ export default StyleSheet.create({
   // ============ CONTAINERS ============
   safeArea: {
     flex: 1,
-    backgroundColor: colors.gray[50],
+    backgroundColor: "#F4F8FC",
   },
 
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.primary,
+    backgroundColor: "#F8FBFE",
   },
 
   loadingText: {
-    fontSize: fontSize.xxxl,
-    fontWeight: "700",
-    color: colors.white,
+    fontSize: fontSize.md,
+    fontWeight: "600",
+    color: "#475569",
     textAlign: "center",
     marginTop: spacing.md,
   },
@@ -111,7 +111,7 @@ export default StyleSheet.create({
   mainContainer: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: colors.gray[50],
+    backgroundColor: "#F4F8FC",
   },
 
   mainContent: {
@@ -119,6 +119,38 @@ export default StyleSheet.create({
   },
 
   // ============ HEADER ============
+  pageHeaderWrap: {
+    padding: spacing.lg,
+    paddingBottom: 0,
+  },
+
+  pageHeaderCard: {
+    backgroundColor: "#FCFEFF",
+    borderRadius: 24,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: "#DCE8F4",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.05,
+        shadowRadius: 24,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 16px 30px rgba(15, 23, 42, 0.05)" },
+    }),
+  },
+
+  pageEyebrow: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+  },
+
   header: {
     paddingHorizontal: spacing.lg,
     paddingTop: Platform.select({
@@ -144,46 +176,51 @@ export default StyleSheet.create({
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.lg,
+    alignItems: "flex-start",
+    marginBottom: spacing.md,
+    gap: spacing.md,
+    flexWrap: "wrap",
   },
 
   headerLeft: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.md,
+    flex: 1,
+    minWidth: isSmallPhone ? "100%" : 260,
   },
 
   burgerButton: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.24)",
+    borderColor: "#D8E6F5",
     ...webHover({
       cursor: "pointer",
       transition: "all 0.2s ease",
       ":hover": {
-        backgroundColor: "rgba(255,255,255,0.26)",
+        backgroundColor: "#E6F0FF",
       },
     }),
   },
 
   headerTitle: {
-    fontSize: isSmallPhone ? 22 : isTablet ? 28 : 24,
-    fontWeight: "700",
-    color: colors.white,
-    letterSpacing: -0.5,
+    fontSize: isSmallPhone ? 22 : isTablet ? 28 : 28,
+    fontWeight: "800",
+    color: "#0F172A",
   },
 
   headerSubtitle: {
-    fontSize: fontSize.sm,
-    color: "rgba(255,255,255,0.9)",
+    fontSize: fontSize.base,
+    color: "#64748B",
     marginTop: spacing.xs,
     fontWeight: "500",
+    lineHeight: 21,
+    maxWidth: 720,
   },
 
   headerRight: {
@@ -196,11 +233,11 @@ export default StyleSheet.create({
     width: isSmallPhone ? 44 : 48,
     height: isSmallPhone ? 44 : 48,
     borderRadius: isSmallPhone ? 22 : 24,
-    backgroundColor: colors.white,
+    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: colors.white,
+    borderColor: "#D8E6F5",
     overflow: "hidden",
     ...webHover({
       cursor: "pointer",
@@ -214,7 +251,7 @@ export default StyleSheet.create({
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary,
   },
 
   profileIconText: {
@@ -228,16 +265,16 @@ export default StyleSheet.create({
     width: isSmallPhone ? 44 : 48,
     height: isSmallPhone ? 44 : 48,
     borderRadius: isSmallPhone ? 22 : 24,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.3)",
+    borderColor: "#D8E6F5",
     ...webHover({
       cursor: "pointer",
       transition: "all 0.2s ease",
       ":hover": {
-        backgroundColor: "rgba(255,255,255,0.25)",
+        backgroundColor: "#EEF5FF",
         transform: "scale(1.05)",
       },
     }),
@@ -267,10 +304,13 @@ export default StyleSheet.create({
   headerInfo: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 20,
+    backgroundColor: "#F8FBFE",
+    borderRadius: 18,
     padding: spacing.sm,
     marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    flexWrap: "wrap",
   },
 
   infoItem: {
@@ -281,33 +321,33 @@ export default StyleSheet.create({
   infoDivider: {
     width: 1,
     height: isSmallPhone ? 30 : 35,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "#E2E8F0",
     marginHorizontal: spacing.xs,
   },
 
   infoLabel: {
     fontSize: fontSize.xs,
-    color: "rgba(255,255,255,0.7)",
-    fontWeight: "500",
+    color: "#64748B",
+    fontWeight: "700",
     marginBottom: 2,
   },
 
   infoValue: {
     fontSize: isSmallPhone ? 14 : 16,
     fontWeight: "700",
-    color: colors.white,
+    color: "#0F172A",
   },
 
   statusValue: {
     fontSize: isSmallPhone ? 14 : 16,
     fontWeight: "700",
-    color: colors.successLight,
+    color: colors.success,
   },
 
   visitorCount: {
     fontSize: isSmallPhone ? 14 : 16,
     fontWeight: "700",
-    color: colors.warningLight,
+    color: colors.primary,
   },
 
   securityHeroSection: {
@@ -2355,19 +2395,21 @@ export default StyleSheet.create({
   // ============ SIDEBAR STYLES ============
   sidebar: {
     backgroundColor: "#F8FBFE",
-    borderRightWidth: 1,
-    borderRightColor: "#D8E8FF",
+    borderRightWidth: isDesktop ? 1 : 0,
+    borderBottomWidth: isDesktop ? 0 : 1,
+    borderColor: "#E2E8F0",
     overflow: "hidden",
     zIndex: 10,
+    padding: isDesktop ? 18 : 12,
     ...Platform.select({
       ios: {
-        shadowColor: colors.black,
-        shadowOffset: { width: 2, height: 0 },
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowRadius: 16,
       },
-      android: { elevation: 4 },
-      web: { boxShadow: "2px 0 18px rgba(4,30,66,0.08)" },
+      android: { elevation: 2 },
+      web: isDesktop ? { boxShadow: "8px 0px 24px rgba(15, 23, 42, 0.04)" } : {},
     }),
   },
 
@@ -2375,9 +2417,22 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.16)",
+    padding: 14,
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D8E6F5",
+    marginBottom: spacing.md,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 12px 22px rgba(15, 23, 42, 0.06)" },
+    }),
   },
 
   sidebarLogo: {
@@ -2388,67 +2443,69 @@ export default StyleSheet.create({
   },
 
   sidebarLogoImage: {
-    width: 42,
-    height: 42,
-    borderRadius: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.34)",
+    borderColor: "#D8E6F5",
   },
 
   sidebarLogoText: {
-    fontSize: fontSize.lg,
+    fontSize: fontSize.md,
     fontWeight: "800",
-    color: colors.white,
+    color: "#0F172A",
   },
 
   sidebarLogoSubtext: {
     marginTop: 2,
     fontSize: fontSize.xs,
     fontWeight: "700",
-    color: "rgba(255,255,255,0.76)",
+    color: "#64748B",
     textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.8,
   },
 
   sidebarClose: {
     width: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "#E2E8F0",
   },
 
   sidebarContent: {
     flex: 1,
-    backgroundColor: "#F8FBFE",
+    backgroundColor: "transparent",
   },
 
   sidebarUser: {
     flexDirection: "row",
     alignItems: "center",
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E6EDF7",
+    padding: spacing.md,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D9E4F0",
     gap: spacing.md,
     backgroundColor: colors.white,
+    marginBottom: spacing.md,
   },
 
   sidebarAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primaryLight,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
   },
 
   sidebarAvatarText: {
     fontSize: fontSize.xl,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.white,
   },
 
@@ -2458,28 +2515,34 @@ export default StyleSheet.create({
 
   sidebarUserName: {
     fontSize: fontSize.md,
-    fontWeight: "600",
-    color: colors.gray[900],
+    fontWeight: "800",
+    color: "#0F172A",
     marginBottom: 2,
   },
 
   sidebarUserRole: {
     fontSize: fontSize.xs,
-    color: colors.gray[500],
+    color: "#64748B",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
 
   sidebarNav: {
-    padding: spacing.md,
+    padding: 0,
   },
 
   sidebarNavItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     marginBottom: spacing.xs,
     position: "relative",
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderWidth: 1,
+    borderColor: "#D9E4F0",
     ...webHover({
       cursor: "pointer",
       transition: "all 0.2s ease",
@@ -2489,14 +2552,13 @@ export default StyleSheet.create({
 
   sidebarNavItemActive: {
     backgroundColor: "#EEF5FF",
-    borderWidth: 1,
-    borderColor: "#B7D5F6",
+    borderColor: "#9EC5F8",
   },
 
   sidebarNavIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     marginRight: spacing.md,
@@ -2504,8 +2566,8 @@ export default StyleSheet.create({
 
   sidebarNavLabel: {
     fontSize: fontSize.md,
-    fontWeight: "500",
-    color: colors.gray[700],
+    fontWeight: "700",
+    color: "#334155",
     flex: 1,
   },
 
@@ -2516,33 +2578,33 @@ export default StyleSheet.create({
 
   sidebarNavIndicator: {
     position: "absolute",
-    right: 0,
-    width: 3,
-    height: 20,
-    borderRadius: 2,
+    left: -1,
+    width: 4,
+    height: 24,
+    borderRadius: 999,
   },
 
   sidebarModuleCard: {
-    marginBottom: spacing.xs,
+    marginBottom: 10,
   },
 
   sidebarSubmoduleList: {
-    marginLeft: 48,
-    marginTop: -spacing.xs,
-    marginBottom: spacing.sm,
-    paddingLeft: spacing.sm,
+    marginLeft: 18,
+    marginTop: 8,
+    marginBottom: 0,
+    paddingLeft: 16,
     borderLeftWidth: 1,
-    borderLeftColor: colors.gray[200],
-    gap: spacing.xs,
+    borderLeftColor: "#E2E8F0",
+    gap: 8,
   },
 
   sidebarSubmoduleButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     backgroundColor: colors.white,
     ...webHover({
       cursor: "pointer",
@@ -2563,7 +2625,7 @@ export default StyleSheet.create({
   },
 
   sidebarSubmoduleLabelActive: {
-    color: colors.primary,
+    color: colors.primaryDark,
   },
 
   sidebarSubmoduleBadge: {
@@ -2584,11 +2646,11 @@ export default StyleSheet.create({
 
   sidebarStatsSection: {
     padding: spacing.md,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#E6EDF7",
+    borderWidth: 1,
+    borderColor: "#D9E4F0",
     marginVertical: spacing.sm,
     backgroundColor: colors.white,
+    borderRadius: 18,
   },
 
   sidebarStatsTitle: {
@@ -2608,7 +2670,7 @@ export default StyleSheet.create({
   sidebarStatItem: {
     flex: 1,
     backgroundColor: "#F8FBFE",
-    borderRadius: 8,
+    borderRadius: 12,
     padding: spacing.sm,
     alignItems: "center",
     borderWidth: 1,
@@ -2669,7 +2731,8 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    margin: spacing.md,
+    marginHorizontal: 0,
+    marginVertical: spacing.md,
     marginTop: spacing.xl,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
