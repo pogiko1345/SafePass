@@ -1000,6 +1000,36 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async getAppointmentOptions() {
+    try {
+      return await this.fetch("/appointments/options");
+    } catch (error) {
+      console.error("Get appointment options error:", error);
+      throw error;
+    }
+  }
+
+  async getAdminAppointmentOptions() {
+    try {
+      return await this.fetch("/admin/appointments/options");
+    } catch (error) {
+      console.error("Get admin appointment options error:", error);
+      throw error;
+    }
+  }
+
+  async updateAdminAppointmentOptions(options) {
+    try {
+      return await this.fetch("/admin/appointments/options", {
+        method: "PUT",
+        body: { options },
+      });
+    } catch (error) {
+      console.error("Update admin appointment options error:", error);
+      throw error;
+    }
+  }
+
   async getStaffAppointments(filters = {}) {
     try {
       const queryString = new URLSearchParams(filters).toString();

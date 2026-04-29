@@ -18,6 +18,32 @@ const appSettingsSchema = new mongoose.Schema(
     autoApprove: { type: Boolean, default: false },
     darkMode: { type: Boolean, default: false },
     twoFactorAuth: { type: Boolean, default: false },
+    appointmentOptions: {
+      offices: [
+        {
+          id: { type: String, trim: true },
+          label: { type: String, trim: true },
+          enabled: { type: Boolean, default: true },
+        },
+      ],
+      purposes: [
+        {
+          id: { type: String, trim: true },
+          label: { type: String, trim: true },
+          enabled: { type: Boolean, default: true },
+        },
+      ],
+      timeSlots: [
+        {
+          id: { type: String, trim: true },
+          label: { type: String, trim: true },
+          value: { type: String, trim: true },
+          hour: { type: Number },
+          minute: { type: Number },
+          enabled: { type: Boolean, default: true },
+        },
+      ],
+    },
   },
   {
     timestamps: true,

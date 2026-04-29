@@ -183,6 +183,55 @@ const DEFAULT_DATA_COLLECTION_FIELDS = [
   { id: "office-destination", label: "Office Destination", type: "select", required: true, enabled: true, scope: "visitor" },
 ];
 
+const normalizeTextToId = (value = "") =>
+  String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || `item-${Date.now()}`;
+
+const DEFAULT_APPOINTMENT_MANAGEMENT_OPTIONS = {
+  offices: [
+    "Registrar",
+    "Accounting",
+    "Information Desk",
+    "Guidance",
+    "Administration",
+    "Cashier",
+    "Flight Operations",
+    "Training",
+    "I.T Room",
+    "Faculty Room",
+    "Laboratory",
+    "TESDA",
+    "Workshop",
+    "Library",
+    "Student Services",
+    "STO",
+  ].map((label) => ({ id: `office-${normalizeTextToId(label)}`, label, enabled: true })),
+  purposes: ["Enrollment", "Payment", "Inquiry", "Document Request", "Other"].map((label) => ({
+    id: `purpose-${normalizeTextToId(label)}`,
+    label,
+    enabled: true,
+  })),
+  timeSlots: [],
+};
+
+for (let hour = 7; hour <= 18; hour += 1) {
+  for (const minute of [0, 30]) {
+    const hour12 = hour % 12 || 12;
+    const suffix = hour >= 12 ? "PM" : "AM";
+    DEFAULT_APPOINTMENT_MANAGEMENT_OPTIONS.timeSlots.push({
+      id: `slot-${String(hour).padStart(2, "0")}-${String(minute).padStart(2, "0")}`,
+      label: `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`,
+      value: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+      hour,
+      minute,
+      enabled: true,
+    });
+  }
+}
+
 const ROOM_STORAGE_KEY = "adminManagedRooms";
 const ROOM_POSITION_STORAGE_KEY = "adminManagedRoomPositions";
 const DATA_FIELDS_STORAGE_KEY = "adminDynamicDataFields";
@@ -193,13 +242,6 @@ const FLOOR_VIEW_TO_ID = {
   "map-second": "second",
   "map-third": "third",
 };
-
-const normalizeTextToId = (value = "") =>
-  String(value)
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || `item-${Date.now()}`;
 
 const createRoomDraft = (floor = "ground") => ({
   id: "",
@@ -879,6 +921,14 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [dataManagementItemsPerPage] = useState(6);
   const [appointmentRecordsPage, setAppointmentRecordsPage] = useState(1);
   const [roomManagementPage, setRoomManagementPage] = useState(1);
+  const [appointmentManagementOptions, setAppointmentManagementOptions] = useState(DEFAULT_APPOINTMENT_MANAGEMENT_OPTIONS);
+  const [appointmentOptionDrafts, setAppointmentOptionDrafts] = useState({
+    offices: "",
+    purposes: "",
+    timeSlots: "",
+  });
+  const [editingAppointmentOption, setEditingAppointmentOption] = useState(null);
+  const [isSavingAppointmentOptions, setIsSavingAppointmentOptions] = useState(false);
 
   // Modal States
   const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
@@ -2040,6 +2090,145 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     return true;
   }, [user]);
 
+  const loadAppointmentManagementOptions = useCallback(async () => {
+    try {
+      const response = await ApiService.getAdminAppointmentOptions();
+      if (response?.success && response.options) {
+        setAppointmentManagementOptions(response.options);
+      }
+    } catch (error) {
+      console.error("Load appointment management options error:", error);
+    }
+  }, []);
+
+  const saveAppointmentManagementOptions = async (nextOptions, successMessage) => {
+    if (!ensureAdminAccess()) return;
+    setIsSavingAppointmentOptions(true);
+    try {
+      const response = await ApiService.updateAdminAppointmentOptions(nextOptions);
+      if (response?.success) {
+        setAppointmentManagementOptions(response.options || nextOptions);
+        publishAdminNotice(
+          "success",
+          "Appointment options updated",
+          successMessage || "Visitor appointment request form options now use the latest configuration.",
+        );
+        return;
+      }
+      publishAdminNotice("error", "Options update failed", response?.message || "Unable to save appointment options.");
+    } catch (error) {
+      publishAdminNotice("error", "Options update failed", error?.message || "Unable to save appointment options.");
+    } finally {
+      setIsSavingAppointmentOptions(false);
+    }
+  };
+
+  const buildAppointmentTextOption = (groupKey, label, existing = {}) => ({
+    id: existing.id || `${groupKey}-${normalizeTextToId(label)}-${Date.now()}`,
+    label: String(label || "").trim().replace(/\s+/g, " "),
+    enabled: existing.enabled !== false,
+  });
+
+  const buildAppointmentTimeSlotOption = (value, existing = {}) => {
+    const normalized = String(value || "").trim();
+    const match = normalized.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+    if (!match) return null;
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+    const suffix = String(match[3] || "").toUpperCase();
+    if (suffix === "PM" && hour < 12) hour += 12;
+    if (suffix === "AM" && hour === 12) hour = 0;
+    if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      return null;
+    }
+    const timeValue = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const hour12 = hour % 12 || 12;
+    const label = `${hour12}:${String(minute).padStart(2, "0")} ${hour >= 12 ? "PM" : "AM"}`;
+    return {
+      id: existing.id || `slot-${timeValue.replace(":", "-")}-${Date.now()}`,
+      label,
+      value: timeValue,
+      hour,
+      minute,
+      enabled: existing.enabled !== false,
+    };
+  };
+
+  const updateAppointmentOptionGroup = (groupKey, updater, message) => {
+    const nextOptions = {
+      ...appointmentManagementOptions,
+      [groupKey]: updater(appointmentManagementOptions[groupKey] || []),
+    };
+    saveAppointmentManagementOptions(nextOptions, message);
+  };
+
+  const handleAddAppointmentOption = (groupKey) => {
+    const draft = String(appointmentOptionDrafts[groupKey] || "").trim();
+    if (!draft) {
+      Alert.alert("Option Required", "Please enter a value before adding it.");
+      return;
+    }
+
+    const newOption =
+      groupKey === "timeSlots"
+        ? buildAppointmentTimeSlotOption(draft)
+        : buildAppointmentTextOption(groupKey, draft);
+
+    if (!newOption) {
+      Alert.alert("Invalid Time Slot", "Use HH:MM, such as 09:00 or 2:30 PM.");
+      return;
+    }
+
+    updateAppointmentOptionGroup(
+      groupKey,
+      (items) => [...items, newOption],
+      `${newOption.label} was added to the visitor appointment form.`,
+    );
+    setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: "" }));
+  };
+
+  const handleSaveEditedAppointmentOption = (groupKey, option) => {
+    const draft = String(appointmentOptionDrafts[groupKey] || "").trim();
+    if (!draft) {
+      Alert.alert("Option Required", "Please enter a value before saving.");
+      return;
+    }
+
+    const updatedOption =
+      groupKey === "timeSlots"
+        ? buildAppointmentTimeSlotOption(draft, option)
+        : buildAppointmentTextOption(groupKey, draft, option);
+
+    if (!updatedOption) {
+      Alert.alert("Invalid Time Slot", "Use HH:MM, such as 09:00 or 2:30 PM.");
+      return;
+    }
+
+    updateAppointmentOptionGroup(
+      groupKey,
+      (items) => items.map((item) => (item.id === option.id ? updatedOption : item)),
+      `${updatedOption.label} was updated in the visitor appointment form.`,
+    );
+    setEditingAppointmentOption(null);
+    setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: "" }));
+  };
+
+  const handleToggleAppointmentOption = (groupKey, option) => {
+    updateAppointmentOptionGroup(
+      groupKey,
+      (items) => items.map((item) => (item.id === option.id ? { ...item, enabled: item.enabled === false } : item)),
+      `${option.label} was ${option.enabled === false ? "enabled" : "disabled"}.`,
+    );
+  };
+
+  const handleDeleteAppointmentOption = (groupKey, option) => {
+    updateAppointmentOptionGroup(
+      groupKey,
+      (items) => items.filter((item) => item.id !== option.id),
+      `${option.label} was removed from the visitor appointment form.`,
+    );
+  };
+
   // FIXED: Load All Visit Requests
   const loadAllVisitRequests = async ({ silent = false } = {}) => {
     try {
@@ -2209,6 +2398,7 @@ const loadDashboardData = useCallback(async () => {
       loadAllVisitRequests(),
       loadAllUsers(),
       loadRecentActivities(),
+      loadAppointmentManagementOptions(),
     ]);
   } catch (error) {
     console.error("Load dashboard error:", error);
@@ -2221,7 +2411,7 @@ const loadDashboardData = useCallback(async () => {
     setIsLoading(false);
     setRefreshing(false);
   }
-}, [navigation, handleAuthError, loadRecentActivities, loadAdminStats]);
+}, [navigation, handleAuthError, loadRecentActivities, loadAdminStats, loadAppointmentManagementOptions]);
 
   useEffect(() => {
     loadDashboardData();
@@ -6459,6 +6649,113 @@ const loadDashboardData = useCallback(async () => {
     </ScrollView>
   );
 
+  const renderAppointmentOptionManager = ({ title, subtitle, groupKey, placeholder }) => {
+    const options = appointmentManagementOptions[groupKey] || [];
+    const editingId =
+      editingAppointmentOption?.groupKey === groupKey ? editingAppointmentOption.optionId : null;
+
+    return (
+      <View
+        style={[
+          styles.modularEditorCard,
+          {
+            backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
+            borderColor: theme.borderColor,
+          },
+        ]}
+      >
+        <Text style={[styles.modularEditorTitle, isDarkMode && styles.darkText]}>{title}</Text>
+        <Text style={[styles.modularEditorHint, isDarkMode && styles.darkTextSecondary]}>
+          {subtitle}
+        </Text>
+        <View style={styles.adminTableActionRow}>
+          <TextInput
+            style={[styles.modularTextInput, { flex: 1, marginBottom: 0 }, isDarkMode && styles.darkInput]}
+            placeholder={placeholder}
+            placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+            value={appointmentOptionDrafts[groupKey]}
+            onChangeText={(value) => setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: value }))}
+          />
+          <TouchableOpacity
+            style={[styles.adminTableActionButton, { backgroundColor: "#EEF5FF", borderColor: "#B7D5F6" }]}
+            disabled={isSavingAppointmentOptions}
+            onPress={() => handleAddAppointmentOption(groupKey)}
+          >
+            <Ionicons name="add-outline" size={16} color="#0A3D91" />
+            <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>Add</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.modularListStack, { marginTop: 12 }]}>
+          {options.map((option) => {
+            const isEditing = editingId === option.id;
+            return (
+              <View
+                key={option.id || option.label}
+                style={[
+                  styles.modularRoomTableHeader,
+                  {
+                    borderWidth: 1,
+                    borderRadius: 14,
+                    borderColor: theme.borderColor,
+                    backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
+                  },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.adminTablePrimaryText, isDarkMode && styles.darkText]}>
+                    {option.label || option.value}
+                  </Text>
+                  <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
+                    {option.enabled === false ? "Disabled" : "Enabled"}
+                  </Text>
+                </View>
+                <View style={styles.adminTableActionRow}>
+                  {isEditing ? (
+                    <TouchableOpacity
+                      style={[styles.adminTableActionButton, { backgroundColor: "rgba(16,185,129,0.12)", borderColor: "rgba(16,185,129,0.24)" }]}
+                      disabled={isSavingAppointmentOptions}
+                      onPress={() => handleSaveEditedAppointmentOption(groupKey, option)}
+                    >
+                      <Text style={[styles.adminTableActionText, { color: "#10B981" }]}>Save</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.adminTableActionButton, { backgroundColor: "rgba(59,130,246,0.12)", borderColor: "rgba(59,130,246,0.24)" }]}
+                      disabled={isSavingAppointmentOptions}
+                      onPress={() => {
+                        setEditingAppointmentOption({ groupKey, optionId: option.id });
+                        setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: option.value || option.label || "" }));
+                      }}
+                    >
+                      <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.adminTableActionButton, { backgroundColor: "rgba(245,158,11,0.12)", borderColor: "rgba(245,158,11,0.24)" }]}
+                    disabled={isSavingAppointmentOptions}
+                    onPress={() => handleToggleAppointmentOption(groupKey, option)}
+                  >
+                    <Text style={[styles.adminTableActionText, { color: "#B45309" }]}>
+                      {option.enabled === false ? "Enable" : "Disable"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.adminTableActionButton, { backgroundColor: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.22)" }]}
+                    disabled={isSavingAppointmentOptions}
+                    onPress={() => handleDeleteAppointmentOption(groupKey, option)}
+                  >
+                    <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
+
   const renderAppointmentManagementContent = () => (
     <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.pageContainer}>
@@ -6476,6 +6773,27 @@ const loadDashboardData = useCallback(async () => {
             </View>
           }
         >
+          <View style={[styles.modularCardGrid, { marginBottom: 18 }]}>
+            {renderAppointmentOptionManager({
+              title: "Office to Visit",
+              subtitle: "These enabled offices appear in the visitor appointment request dropdown.",
+              groupKey: "offices",
+              placeholder: "Add office, e.g. Admissions",
+            })}
+            {renderAppointmentOptionManager({
+              title: "Purpose of Visit",
+              subtitle: "These enabled purposes appear in the visitor purpose picker.",
+              groupKey: "purposes",
+              placeholder: "Add purpose, e.g. Consultation",
+            })}
+            {renderAppointmentOptionManager({
+              title: "Available Time Slots",
+              subtitle: "Enabled time slots control the visitor time picker and availability checks.",
+              groupKey: "timeSlots",
+              placeholder: "Add time, e.g. 09:00 or 2:30 PM",
+            })}
+          </View>
+
           {renderRecordsSearchPanel({
             title: "Search Appointment Records",
             subtitle: "Manual lookup for a visitor name, office, purpose, phone, email, or exact date.",
