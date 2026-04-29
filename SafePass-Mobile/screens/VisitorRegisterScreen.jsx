@@ -202,7 +202,13 @@ const SuccessModal = ({
   );
 };
 // ================= DATA PRIVACY MODAL =================
-const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
+const DataPrivacyModal = ({
+  visible,
+  onAccept,
+  onDecline,
+  isSubmitting = false,
+  submissionError = "",
+}) => {
   const [accepted, setAccepted] = useState(false);
 
   useEffect(() => {
@@ -221,69 +227,86 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
       <View style={visitorRegisterStyles.modalOverlay}>
         <View style={visitorRegisterStyles.privacyModalContainer}>
           <View style={visitorRegisterStyles.privacyModalHeader}>
-            <View style={visitorRegisterStyles.privacyIconContainer}>
+            <View style={visitorRegisterStyles.privacyHeaderTopRow}>
               <LinearGradient
-                colors={["#0A3D91", "#0A3D91"]}
+                colors={["#0A3D91", "#1C6DD0"]}
                 style={visitorRegisterStyles.privacyIconGradient}
               >
-                <Ionicons name="shield-checkmark" size={28} color="#FFFFFF" />
+                <Ionicons name="shield-checkmark" size={24} color="#FFFFFF" />
               </LinearGradient>
+              <View style={visitorRegisterStyles.privacyHeaderBadge}>
+                <Ionicons name="lock-closed-outline" size={13} color="#0A3D91" />
+                <Text style={visitorRegisterStyles.privacyHeaderBadgeText}>Secure Consent</Text>
+              </View>
             </View>
             <Text style={visitorRegisterStyles.privacyModalTitle}>
-              Data Privacy Agreement
+              Review Data Privacy
             </Text>
             <Text style={visitorRegisterStyles.privacyModalSubtitle}>
-              By registering, you agree that your personal data will be collected and used for visitor monitoring and security purposes.
+              SafePass will use your details only for account creation, visitor appointments, access monitoring, and security records.
             </Text>
           </View>
           <ScrollView
             style={visitorRegisterStyles.privacyModalContent}
+            contentContainerStyle={visitorRegisterStyles.privacyModalContentInner}
             showsVerticalScrollIndicator={false}
           >
+            {submissionError ? (
+              <View style={visitorRegisterStyles.privacyErrorBanner}>
+                <View style={visitorRegisterStyles.privacyErrorIcon}>
+                  <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                </View>
+                <View style={visitorRegisterStyles.privacyErrorCopy}>
+                  <Text style={visitorRegisterStyles.privacyErrorTitle}>Account Creation Failed</Text>
+                  <Text style={visitorRegisterStyles.privacyErrorText}>{submissionError}</Text>
+                </View>
+              </View>
+            ) : null}
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="information-circle" size={20} color="#0A3D91" />
+                <View style={visitorRegisterStyles.privacySectionIcon}>
+                  <Ionicons name="person-outline" size={17} color="#0A3D91" />
+                </View>
                 <Text style={visitorRegisterStyles.privacySectionTitle}>
                   Information We Collect
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                - Full name, email address, username, and your password for account access.
+                Full name, email address, username, contact number, password, and registration verification details.
               </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="shield" size={20} color="#0A3D91" />
+                <View style={visitorRegisterStyles.privacySectionIcon}>
+                  <Ionicons name="analytics-outline" size={17} color="#0A3D91" />
+                </View>
                 <Text style={visitorRegisterStyles.privacySectionTitle}>
                   How We Use Your Data
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                - To create your visitor account and securely link future appointments to you.
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                - To let you log in, request appointments, and track approval status.
+                To create your account, verify your email, link future appointments, and show your approval status.
               </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="lock-closed" size={20} color="#0A3D91" />
+                <View style={visitorRegisterStyles.privacySectionIcon}>
+                  <Ionicons name="lock-closed-outline" size={17} color="#0A3D91" />
+                </View>
                 <Text style={visitorRegisterStyles.privacySectionTitle}>
                   Data Protection
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                - Your account details are stored securely and used only inside the SafePass system.
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                - Only authorized personnel can view appointment-related records when needed.
+                Your records stay inside SafePass and are visible only to authorized staff when needed for your visit.
               </Text>
             </View>
           </ScrollView>
           <TouchableOpacity
             style={visitorRegisterStyles.privacyCheckboxRow}
-            activeOpacity={0.8}
+            activeOpacity={isSubmitting ? 1 : 0.8}
             onPress={() => setAccepted((previous) => !previous)}
+            disabled={isSubmitting}
           >
             <View
               style={[
@@ -301,20 +324,27 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
             <TouchableOpacity
               style={visitorRegisterStyles.privacyDeclineButton}
               onPress={onDecline}
+              disabled={isSubmitting}
             >
-              <Text style={visitorRegisterStyles.privacyDeclineButtonText}>Cancel</Text>
+              <Text style={visitorRegisterStyles.privacyDeclineButtonText}>
+                {submissionError ? "Edit Details" : "Cancel"}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 visitorRegisterStyles.privacyAcceptButton,
-                !accepted && visitorRegisterStyles.privacyAcceptButtonDisabled,
+                (!accepted || isSubmitting) && visitorRegisterStyles.privacyAcceptButtonDisabled,
               ]}
               onPress={() => {
-                if (accepted) onAccept();
+                if (accepted && !isSubmitting) onAccept();
               }}
-              disabled={!accepted}
+              disabled={!accepted || isSubmitting}
             >
-              <Text style={visitorRegisterStyles.privacyAcceptButtonText}>Continue</Text>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={visitorRegisterStyles.privacyAcceptButtonText}>Create Account</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -376,6 +406,7 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDataPrivacy, setShowDataPrivacy] = useState(false);
+  const [privacySubmissionError, setPrivacySubmissionError] = useState("");
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -639,12 +670,13 @@ export default function VisitorRegisterScreen({ navigation }) {
 
   const handleSubmit = () => {
     if (validateForm()) {
+      setPrivacySubmissionError("");
       setShowDataPrivacy(true);
     }
   };
 
   const handlePrivacyAccept = async () => {
-    setShowDataPrivacy(false);
+    setPrivacySubmissionError("");
     setIsSubmitting(true);
 
     try {
@@ -659,6 +691,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       });
 
       if (response?.success) {
+        setShowDataPrivacy(false);
         setRegisteredVisitor({
           username: response.credentials?.username || formData.username,
           email: response.credentials?.email || formData.email,
@@ -671,8 +704,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           setShowSuccess(true);
         }, Platform.OS === "web" ? 120 : 80);
       } else {
-        Alert.alert(
-          "Registration Error",
+        setPrivacySubmissionError(
           response?.message || "Failed to create your account. Please try again.",
         );
       }
@@ -687,6 +719,9 @@ export default function VisitorRegisterScreen({ navigation }) {
         normalizedMessage.includes("email already") ||
         normalizedMessage.includes("with this email already exists")
       ) {
+        setPrivacySubmissionError(
+          "A visitor account with this email already exists. Edit the email or go to the login page.",
+        );
         setErrors((previous) => ({
           ...previous,
           email: "A visitor account with this email already exists.",
@@ -711,6 +746,9 @@ export default function VisitorRegisterScreen({ navigation }) {
           ],
         );
       } else if (errorField === "username" || normalizedMessage.includes("username")) {
+        setPrivacySubmissionError(
+          "That username is already taken. Edit your details and choose another username.",
+        );
         setErrors((previous) => ({
           ...previous,
           username: "That username is already taken.",
@@ -727,6 +765,9 @@ export default function VisitorRegisterScreen({ navigation }) {
         normalizedMessage.includes("already exists") ||
         normalizedMessage.includes("duplicate")
       ) {
+        setPrivacySubmissionError(
+          "A visitor account with these details already exists. Edit the details or log in instead.",
+        );
         Alert.alert(
           "Account Already Exists",
           "A visitor account with this email already exists. Please log in instead.",
@@ -746,12 +787,11 @@ export default function VisitorRegisterScreen({ navigation }) {
         normalizedMessage.includes("network request failed") ||
         normalizedMessage.includes("cannot connect to backend")
       ) {
-        Alert.alert(
-          "Network Error",
+        setPrivacySubmissionError(
           "Cannot connect to the server. Please check that your backend is running.",
         );
       } else {
-        Alert.alert("Registration Error", errorMessage);
+        setPrivacySubmissionError(errorMessage);
       }
     } finally {
       setIsSubmitting(false);
@@ -759,7 +799,10 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const handlePrivacyDecline = () => {
+    const hadSubmissionError = Boolean(privacySubmissionError);
     setShowDataPrivacy(false);
+    setPrivacySubmissionError("");
+    if (hadSubmissionError) return;
     Alert.alert(
       "Privacy Policy Required",
       "You must accept the data privacy policy to create an account.",
@@ -1334,6 +1377,8 @@ export default function VisitorRegisterScreen({ navigation }) {
         visible={showDataPrivacy}
         onAccept={handlePrivacyAccept}
         onDecline={handlePrivacyDecline}
+        isSubmitting={isSubmitting}
+        submissionError={privacySubmissionError}
       />
       <SuccessModal
         visible={showSuccess}
