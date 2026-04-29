@@ -738,8 +738,22 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       setCurrentUser(currentUser);
 
       const profileResponse = await ApiService.getVisitorProfile();
+      if (profileResponse?.account) {
+        setCurrentUser((previousUser) => ({
+          ...(previousUser || currentUser || {}),
+          ...profileResponse.account,
+        }));
+      }
       if (profileResponse.success && profileResponse.visitor) {
-        setVisitor(profileResponse.visitor);
+        const accountSafePassId =
+          profileResponse?.account?.nfcCardId ||
+          currentUser?.nfcCardId ||
+          profileResponse.visitor?.nfcCardId ||
+          "";
+        setVisitor({
+          ...profileResponse.visitor,
+          nfcCardId: accountSafePassId || profileResponse.visitor?.nfcCardId,
+        });
         setAppointmentHistory(Array.isArray(profileResponse.appointments) ? profileResponse.appointments : []);
       } else {
         setVisitor(null);
@@ -2660,6 +2674,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }[selectedVisitorSection];
 
   const visitorPresentedIdLabel = visitor?.idType || visitor?.idNumber || "Not provided";
+  const visitorSafePassId =
+    visitor?.nfcCardId ||
+    currentUser?.nfcCardId ||
+    visitor?.safePassId ||
+    currentUser?.safePassId ||
+    "Assigned on account creation";
 
   const renderSectionIntro = () => (
     <View
@@ -2889,7 +2909,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.approvedVirtualNfcCardNumberRow}>
                 <Text style={visitorDashboardStyles.approvedVirtualNfcCardLabel}>SafePass ID</Text>
                 <Text style={visitorDashboardStyles.approvedVirtualNfcCardNumber}>
-                  {visitor?.nfcCardId || visitorPresentedIdLabel || "Assigned on approval"}
+                  {visitorSafePassId}
                 </Text>
               </View>
             </LinearGradient>
@@ -4359,7 +4379,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     <View style={visitorDashboardStyles.virtualNfcIdBand}>
                       <Text style={visitorDashboardStyles.virtualNfcPreviewLabel}>SafePass ID</Text>
                       <Text style={visitorDashboardStyles.virtualNfcPreviewId}>
-                        {visitor?.nfcCardId || visitorPresentedIdLabel || "Assigned on approval"}
+                        {visitorSafePassId}
                       </Text>
                     </View>
 

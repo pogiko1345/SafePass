@@ -1,14 +1,14 @@
 {
   "files": {
-    "main.js": "/static/js/main.32f7856f.js",
+    "main.js": "/static/js/main.d39ff9ef.js",
     "static/js/668.d7ed8dc4.js": "/static/js/668.d7ed8dc4.js",
     "static/media/Ionicons.ttf": "/static/media/Ionicons.40518f95b2e2a69c5c07.ttf",
     "static/media/LogoSapphire.jpg": "/static/media/LogoSapphire.bf1c2f7a8da6d3f5b03b.jpg",
     "static/media/LogoSapphireAppIcon.png": "/static/media/LogoSapphireAppIcon.9a8d76681603f683726c.png",
-    "static/media/SecondFloor.png": "/static/media/SecondFloor.7353ebd1b1ec97d8652d.png",
-    "static/media/ThridFloor.png": "/static/media/ThridFloor.84017faed82dcd69286a.png",
-    "static/media/GroundFloor.png": "/static/media/GroundFloor.fbdfc4d8697c515f93b3.png",
-    "static/media/Mezzanine.png": "/static/media/Mezzanine.cf40ef08fd3c1d25b010.png",
+    "static/media/Mezzanine2.jpg": "/static/media/Mezzanine2.da8de84b641793f600b0.jpg",
+    "static/media/SecondFloor2.jpg": "/static/media/SecondFloor2.7ebd227d5a6fc9000753.jpg",
+    "static/media/ThirdFloor2.jpg": "/static/media/ThirdFloor2.3708fc12716febdfb44c.jpg",
+    "static/media/GroundFloor2.jpg": "/static/media/GroundFloor2.7d7dafa67f13306ad651.jpg",
     "favicon.ico": "/favicon.ico",
     "index.html": "/index.html",
     "favicon-32.png": "/favicon-32.png",
@@ -16,11 +16,11 @@
     "favicon-16.png": "/favicon-16.png",
     "manifest.json": "/manifest.json",
     "serve.json": "/serve.json",
-    "main.32f7856f.js.map": "/static/js/main.32f7856f.js.map",
+    "main.d39ff9ef.js.map": "/static/js/main.d39ff9ef.js.map",
     "668.d7ed8dc4.js.map": "/static/js/668.d7ed8dc4.js.map"
   },
   "entrypoints": [
     "static/js/668.d7ed8dc4.js",
-    "static/js/main.32f7856f.js"
+    "static/js/main.d39ff9ef.js"
   ]
 }

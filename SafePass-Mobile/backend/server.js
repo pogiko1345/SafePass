@@ -9,6 +9,7 @@ const Notification = require("./models/Notification");
 const User = require("./models/User");
 const AccessLog = require("./models/AccessLog");
 const AppSettings = require("./models/AppSettings");
+const Counter = require("./models/Counter");
 const { createRateLimiter, getRateLimitKey } = require("./utils/securityUtils");
 const {
   DEFAULT_SYSTEM_SETTINGS,
@@ -52,6 +53,46 @@ const GENERIC_PASSWORD_RESET_REQUEST_MESSAGE =
   "If an account matches that email, a password reset code and secure reset link will be sent.";
 const GENERIC_PASSWORD_RESET_VERIFY_MESSAGE =
   "Invalid or expired verification code. Please request a new code and try again.";
+
+const formatSafePassAccountId = (year, sequence) =>
+  `${year}-${String(sequence).padStart(6, "0")}`;
+
+const isSafePassAccountId = (value = "") => /^\d{4}-\d{6}$/.test(String(value || "").trim());
+
+const generateSafePassAccountId = async (createdAt = new Date()) => {
+  const createdDate = new Date(createdAt);
+  const year = Number.isNaN(createdDate.getTime())
+    ? new Date().getFullYear()
+    : createdDate.getFullYear();
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const counter = await Counter.findOneAndUpdate(
+      { _id: `safepass-account:${year}` },
+      {
+        $inc: { sequence: 1 },
+        $setOnInsert: { scope: "safepass-account", year },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+    const candidate = formatSafePassAccountId(year, counter.sequence);
+    const existing = await User.exists({ nfcCardId: candidate });
+    if (!existing) return candidate;
+  }
+
+  throw new Error("Unable to generate a unique SafePass account ID.");
+};
+
+const ensureSafePassAccountId = async (user) => {
+  if (!user || String(user.role || "").toLowerCase() !== "visitor") {
+    return user?.nfcCardId || "";
+  }
+
+  if (isSafePassAccountId(user.nfcCardId)) return user.nfcCardId;
+
+  user.nfcCardId = await generateSafePassAccountId(user.createdAt || new Date());
+  await user.save();
+  return user.nfcCardId;
+};
 
 const reviewAppointmentIdImage = ({ idType, idImage }) => {
   const normalizedIdType = String(idType || "").trim();
@@ -1601,6 +1642,7 @@ const userData = {
 app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
   try {
     if (req.user.role === "visitor") {
+      await ensureSafePassAccountId(req.user);
       const visitors = await findVisitorsForUser(req.user);
       const visitor = getPrioritizedVisitor(visitors);
 
@@ -1610,10 +1652,22 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
           await req.user.save();
         }
 
+        const visitorPayload = visitor.toObject();
+        visitorPayload.nfcCardId = req.user.nfcCardId || "";
+
         return res.json({
           success: true,
-          visitor,
+          visitor: visitorPayload,
           appointments: visitors,
+          account: {
+            _id: req.user._id,
+            fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
+            email: req.user.email,
+            phoneNumber: req.user.phone,
+            status: req.user.status,
+            nfcCardId: req.user.nfcCardId || "",
+            registeredAt: req.user.createdAt,
+          },
         });
       }
 
@@ -1627,6 +1681,7 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
           email: req.user.email,
           phoneNumber: req.user.phone,
           status: req.user.status,
+          nfcCardId: req.user.nfcCardId || "",
           registeredAt: req.user.createdAt,
         },
       });
@@ -1696,6 +1751,8 @@ app.post("/api/login", async (req, res) => {
         requiresOtpVerification: true,
       });
     }
+
+    await ensureSafePassAccountId(user);
 
     // Update last login
     user.lastLogin = new Date();
@@ -2643,6 +2700,7 @@ app.post("/api/visitors/register", async (req, res) => {
     user.role = "visitor";
     user.status = "active";
     user.isVerified = false;
+    user.nfcCardId = await generateSafePassAccountId(user.createdAt || new Date());
     user.dataPrivacyAccepted = true;
     user.dataPrivacyAcceptedAt = dataPrivacyAcceptedAt;
     user.isActive = true;
@@ -2722,6 +2780,7 @@ app.post("/api/visitors/register", async (req, res) => {
         username: user.username,
         role: user.role,
         status: user.status,
+        nfcCardId: user.nfcCardId,
         isVerified: user.isVerified,
       },
       credentials: {
@@ -2893,11 +2952,8 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     console.log(`   Visit Date: ${visitor.visitDate}`);
     console.log(`   Purpose: ${visitor.purposeOfVisit}`);
 
-    // Generate REAL NFC card ID
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substr(2, 8).toUpperCase();
-    const realNfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
-    console.log("\n🔑 Generated NFC Card ID:", realNfcCardId);
+    // Resolve the visitor's permanent SafePass account ID.
+    let realNfcCardId = null;
 
     // Generate temporary password if not already set
     const tempPassword =
@@ -2919,6 +2975,11 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     console.log("\n👤 CHECKING FOR USER ACCOUNT...");
     let user = await User.findOne({ email: visitor.email });
     console.log(`   User exists: ${user ? "Yes" : "No"}`);
+    realNfcCardId =
+      user
+        ? await ensureSafePassAccountId(user)
+        : await generateSafePassAccountId(new Date());
+    console.log("SafePass Account ID:", realNfcCardId);
 
     if (!user) {
       console.log("📝 Creating new user account...");
@@ -5944,12 +6005,24 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
   try {
     // If user is a visitor, get their visitor record
     if (req.user.role === "visitor") {
+      await ensureSafePassAccountId(req.user);
       const visitor = await findVisitorForUser(req.user);
 
       if (visitor) {
+        const visitorPayload = visitor.toObject();
+        visitorPayload.nfcCardId = req.user.nfcCardId || "";
         return res.json({
           success: true,
-          visitor,
+          visitor: visitorPayload,
+          account: {
+            _id: req.user._id,
+            fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
+            email: req.user.email,
+            phoneNumber: req.user.phone,
+            status: req.user.status,
+            nfcCardId: req.user.nfcCardId || "",
+            registeredAt: req.user.createdAt,
+          },
         });
       }
 
@@ -5962,6 +6035,7 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
           email: req.user.email,
           phoneNumber: req.user.phone,
           status: req.user.status,
+          nfcCardId: req.user.nfcCardId || "",
           registeredAt: req.user.createdAt,
         },
       });
