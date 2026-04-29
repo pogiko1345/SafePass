@@ -48,6 +48,7 @@ const CampusMap = ({
   renderHoverCard,
   fullscreen = false,
   mapBlueprints = null,
+  mapLabels = {},
   officePositions = {}, 
   onFloorChange,
   showFloorNavigation = true,
@@ -200,6 +201,16 @@ const CampusMap = ({
     }
     // Return null if no position data available - office won't be rendered
     return null;
+  };
+
+  const getFloorLabels = () => {
+    const normalizedActiveFloor = normalizeFloorId(activeFloor);
+    return (
+      mapLabels?.[activeFloor] ||
+      mapLabels?.[normalizedActiveFloor] ||
+      (normalizedActiveFloor === "first" ? mapLabels?.mezzanine : null) ||
+      []
+    );
   };
 
   // Get visitor position style based on coordinates
@@ -373,6 +384,53 @@ const CampusMap = ({
     });
   };
 
+  const renderMapLabels = () => {
+    const labels = getFloorLabels();
+    if (!labels.length) return null;
+
+    return labels.map((label) => {
+      const left =
+        typeof label.x === "number" && typeof label.width === "number"
+          ? `${label.x - label.width / 2}%`
+          : typeof label.x === "number"
+            ? `${label.x}%`
+            : label.x;
+      const top = typeof label.y === "number" ? `${label.y}%` : label.y;
+      const width = typeof label.width === "number" ? `${label.width}%` : label.width;
+
+      return (
+        <View
+          key={label.id || `${label.text}-${left}-${top}`}
+          pointerEvents="none"
+          style={[
+            styles.mapTextLabel,
+            {
+              left,
+              top,
+              width,
+            },
+            label.emphasis && styles.mapTextLabelEmphasis,
+            label.style,
+          ]}
+        >
+          <Text
+            style={[
+              styles.mapTextLabelText,
+              label.size ? { fontSize: label.size } : null,
+              label.color ? { color: label.color } : null,
+              label.textStyle,
+            ]}
+            numberOfLines={label.numberOfLines || 2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            {label.text}
+          </Text>
+        </View>
+      );
+    });
+  };
+
   // Render visitor markers
   const renderVisitorMarkers = (visibleVisitors) => {
     if (!showVisitorMarkers) return null;
@@ -516,6 +574,7 @@ const CampusMap = ({
     floorPlanImage.type === "diagram";
   const hasBlueprint = floorPlanImage !== null && !isDiagramBlueprint && !imageError;
   const shouldShowOfficeLabels = !hasBlueprint;
+  const shouldShowMapLabels = hasBlueprint && getFloorLabels().length > 0;
   const visibleVisitors = getVisibleVisitors();
 
   return (
@@ -584,7 +643,10 @@ const CampusMap = ({
             </View>
           )}
           
-          {/* Office labels are suppressed on real blueprint images to avoid duplicating printed room names. */}
+          {/* Editable text labels sit above the imported blueprint images. */}
+          {shouldShowMapLabels ? renderMapLabels() : null}
+
+          {/* Office pills are still used only when there is no real blueprint image. */}
           {shouldShowOfficeLabels ? renderOfficeLabels() : null}
           
           {/* Visitor Markers */}

@@ -15,6 +15,7 @@ import CampusMap from "../components/CampusMap";
 import {
   MONITORING_MAP_BLUEPRINTS,
   MONITORING_MAP_FLOORS,
+  MONITORING_MAP_LABELS,
   MONITORING_MAP_OFFICES,
   MONITORING_MAP_OFFICE_POSITIONS,
 } from "../utils/monitoringMapConfig";
@@ -310,6 +311,7 @@ export default function WebMapScreen({ navigation, route }) {
               showVisitorMarkers={false}
               showActiveVisitorsBadge={false}
               mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+              mapLabels={MONITORING_MAP_LABELS}
               officePositions={MONITORING_MAP_OFFICE_POSITIONS}
               onFloorChange={(floorId) => {
                 const firstLocationOnFloor = CAMPUS_LOCATIONS.find(

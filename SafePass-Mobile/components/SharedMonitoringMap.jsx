@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CampusMap from "./CampusMap";
+import { MONITORING_MAP_LABELS } from "../utils/monitoringMapConfig";
 
 export default function SharedMonitoringMap({
   title = "Monitoring Map",
@@ -17,6 +18,7 @@ export default function SharedMonitoringMap({
   selectedFloor = "all",
   selectedOffice = "all",
   mapBlueprints = null,
+  mapLabels = MONITORING_MAP_LABELS,
   officePositions = {},
   onFloorChange,
   onVisitorHover,
@@ -95,6 +97,7 @@ export default function SharedMonitoringMap({
           selectedFloor={selectedFloor}
           selectedOffice={selectedOffice}
           mapBlueprints={mapBlueprints}
+          mapLabels={mapLabels}
           officePositions={officePositions}
           onFloorChange={onFloorChange}
           onVisitorHover={onVisitorHover}

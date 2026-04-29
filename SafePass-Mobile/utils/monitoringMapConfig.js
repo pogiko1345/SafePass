@@ -1,7 +1,7 @@
-const GROUND_FLOOR_BLUEPRINT = require("../assets/maps/GroundFloor.png");
-const MEZZANINE_BLUEPRINT = require("../assets/maps/Mezzanine.png");
-const SECOND_FLOOR_BLUEPRINT = require("../assets/maps/SecondFloor.png");
-const THIRD_FLOOR_BLUEPRINT = require("../assets/maps/ThridFloor.png");
+const GROUND_FLOOR_BLUEPRINT = require("../assets/maps/GroundFloor2.jpg");
+const MEZZANINE_BLUEPRINT = require("../assets/maps/Mezzanine2.jpg");
+const SECOND_FLOOR_BLUEPRINT = require("../assets/maps/SecondFloor2.jpg");
+const THIRD_FLOOR_BLUEPRINT = require("../assets/maps/ThirdFloor2.jpg");
 
 export const MONITORING_MAP_FLOORS = [
   { id: "ground", name: "Ground Floor", icon: "home-outline" },
@@ -70,6 +70,84 @@ export const MONITORING_MAP_BLUEPRINTS = {
   mezzanine: MEZZANINE_BLUEPRINT,
   second: SECOND_FLOOR_BLUEPRINT,
   third: THIRD_FLOOR_BLUEPRINT,
+};
+
+// Text overlays for the new blueprint images. Rename or reposition rooms here.
+export const MONITORING_MAP_LABELS = {
+  ground: [
+    { id: "ground-lobby", text: "Lobby", x: 8, y: 34, width: 8 },
+    { id: "ground-cashier", text: "Cashier", x: 15.8, y: 20, width: 6 },
+    { id: "ground-up", text: "UP", x: 24.8, y: 19, width: 4 },
+    { id: "ground-file-room", text: "File Room", x: 33.5, y: 19, width: 9 },
+    { id: "ground-staff", text: "Staff", x: 15.7, y: 44, width: 6 },
+    { id: "ground-accounting", text: "Acct'G", x: 22.8, y: 44, width: 6 },
+    { id: "ground-registrar", text: "Register", x: 28.4, y: 44, width: 6 },
+    { id: "ground-storage-main", text: "Storage", x: 36, y: 44, width: 7 },
+    { id: "ground-storage-small", text: "Storage", x: 41.1, y: 43.5, width: 5 },
+    { id: "ground-offices", text: "Offices", x: 60.8, y: 35.5, width: 10 },
+    { id: "ground-pwd-cr", text: "PWD CR", x: 78.6, y: 32.5, width: 6 },
+    { id: "ground-he-she", text: "HE, SHE", x: 78.9, y: 41.8, width: 6 },
+    { id: "ground-kitchen", text: "Kitchen", x: 88.4, y: 24, width: 7 },
+    { id: "ground-fire-exit", text: "Fire Exit", x: 88.2, y: 45.8, width: 8 },
+  ],
+  first: [
+    { id: "conference-room", text: "Conference Room", x: 8.4, y: 36.5, width: 13 },
+    { id: "chairman", text: "Chairman", x: 19, y: 42, width: 8 },
+    { id: "flight-operations", text: "Flight Operations", x: 30, y: 47, width: 12 },
+    { id: "head-of-training-room", text: "Head Of Training\nRoom", x: 43.2, y: 42, width: 12 },
+    { id: "it-room", text: "I.T Room", x: 56, y: 46, width: 9 },
+    { id: "faculty-room", text: "Faculty Room", x: 70, y: 38, width: 11 },
+    { id: "academy-director", text: "Academy Director", x: 83.3, y: 38.8, width: 12 },
+    { id: "mezzanine-fire-exit", text: "Fire Exit", x: 88.8, y: 20, width: 8 },
+    { id: "mezzanine-cr", text: "CR", x: 97.5, y: 24.5, width: 4 },
+    { id: "sto", text: "STO", x: 96.8, y: 47, width: 4 },
+  ],
+  mezzanine: [
+    { id: "conference-room", text: "Conference Room", x: 8.4, y: 36.5, width: 13 },
+    { id: "chairman", text: "Chairman", x: 19, y: 42, width: 8 },
+    { id: "flight-operations", text: "Flight Operations", x: 30, y: 47, width: 12 },
+    { id: "head-of-training-room", text: "Head Of Training\nRoom", x: 43.2, y: 42, width: 12 },
+    { id: "it-room", text: "I.T Room", x: 56, y: 46, width: 9 },
+    { id: "faculty-room", text: "Faculty Room", x: 70, y: 38, width: 11 },
+    { id: "academy-director", text: "Academy Director", x: 83.3, y: 38.8, width: 12 },
+    { id: "mezzanine-fire-exit", text: "Fire Exit", x: 88.8, y: 20, width: 8 },
+    { id: "mezzanine-cr", text: "CR", x: 97.5, y: 24.5, width: 4 },
+    { id: "sto", text: "STO", x: 96.8, y: 47, width: 4 },
+  ],
+  second: [
+    { id: "second-classroom-top-left", text: "Classroom", x: 8.8, y: 24, width: 10 },
+    { id: "second-fire-exit-left", text: "Fire Exit", x: 15.6, y: 22, width: 8 },
+    { id: "second-mock-up", text: "Mock Up", x: 8.6, y: 53, width: 9 },
+    { id: "second-classroom-bottom-left", text: "Classroom", x: 8.7, y: 81.5, width: 10 },
+    { id: "second-classroom-1", text: "Classroom", x: 27, y: 42, width: 10 },
+    { id: "second-classroom-2", text: "Classroom", x: 27, y: 82, width: 10 },
+    { id: "second-classroom-3", text: "Classroom", x: 42, y: 42, width: 10 },
+    { id: "second-classroom-4", text: "Classroom", x: 42, y: 82, width: 10 },
+    { id: "second-fire-exit-center", text: "Fire Exit", x: 48, y: 22, width: 8 },
+    { id: "second-hallway", text: "Hallway", x: 47.5, y: 61, width: 10, size: 18 },
+    { id: "second-classroom-5", text: "Classroom", x: 56.5, y: 42, width: 10 },
+    { id: "second-classroom-6", text: "Classroom", x: 56.5, y: 82, width: 10 },
+    { id: "second-laboratory", text: "Laboratory", x: 71, y: 42, width: 10 },
+    { id: "second-classroom-7", text: "Classroom", x: 71, y: 82, width: 10 },
+    { id: "second-fire-exit-right", text: "Fire Exit", x: 78.5, y: 22, width: 8 },
+    { id: "second-tesda", text: "TESDA", x: 91, y: 22.5, width: 7 },
+    { id: "second-female-cr", text: "Female CR", x: 88.5, y: 44, width: 8 },
+    { id: "second-male-cr", text: "Male CR", x: 88.5, y: 56, width: 8 },
+  ],
+  third: [
+    { id: "third-workshop", text: "Workshop", x: 8.2, y: 38.5, width: 10 },
+    { id: "third-classroom-1", text: "Classroom", x: 25.4, y: 38.5, width: 10 },
+    { id: "third-classroom-2", text: "Classroom", x: 40.3, y: 38.5, width: 10 },
+    { id: "third-classroom-3", text: "Classroom", x: 55.2, y: 38.5, width: 10 },
+    { id: "third-library", text: "Library", x: 70.2, y: 38.5, width: 8 },
+    { id: "third-classroom-4", text: "Classroom", x: 25.8, y: 79, width: 10 },
+    { id: "third-classroom-5", text: "Classroom", x: 41.4, y: 79, width: 10 },
+    { id: "third-students-lounge", text: "Students Lounge", x: 64, y: 75, width: 15 },
+    { id: "third-tools-room", text: "Tools Room", x: 5.8, y: 88.5, width: 8 },
+    { id: "third-female-cr", text: "Female CR", x: 90.8, y: 38, width: 8 },
+    { id: "third-male-cr", text: "Male CR", x: 91, y: 52, width: 8 },
+    { id: "third-fire-exit", text: "Fire Exit", x: 49, y: 15, width: 8 },
+  ],
 };
 
 export const MONITORING_MAP_OFFICE_POSITIONS = {
