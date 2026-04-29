@@ -326,6 +326,7 @@ export default function VisitorRegisterScreen({ navigation }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isCompactRegister = viewportWidth <= 420;
   const isTabletRegister = viewportWidth >= 768;
+  const useTwoColumnFields = viewportWidth >= 640;
   const registerHorizontalMargin = isCompactRegister ? 12 : 16;
   const registerShellMaxWidth = Math.min(
     860,
@@ -372,6 +373,15 @@ export default function VisitorRegisterScreen({ navigation }) {
   const actionButtonResponsiveStyle = isCompactRegister
     ? { width: "100%", flex: 0 }
     : null;
+  const formGridResponsiveStyle = {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "stretch",
+  };
+  const formCardResponsiveStyle = {
+    width: useTwoColumnFields ? "48.5%" : "100%",
+    flexGrow: useTwoColumnFields ? 0 : 1,
+  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -1140,7 +1150,7 @@ export default function VisitorRegisterScreen({ navigation }) {
 
               {renderStepInsights()}
 
-              <View style={visitorRegisterStyles.formGrid}>
+              <View style={[visitorRegisterStyles.formGrid, formGridResponsiveStyle]}>
                 {Object.entries(fieldConfig).map(([field, config]) => {
                   const isPasswordField = field === "password" || field === "confirmPassword";
                   const passwordIsVisible =
@@ -1153,6 +1163,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                     key={field}
                     style={[
                       visitorRegisterStyles.formCard,
+                      formCardResponsiveStyle,
                       focusedField === field && visitorRegisterStyles.formCardFocused,
                       errors[field] && visitorRegisterStyles.formCardError,
                     ]}
