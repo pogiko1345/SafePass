@@ -300,6 +300,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [lastTapTime, setLastTapTime] = useState(0);
   const isVisitorHomeSection = selectedVisitorSection === "home";
   const nfcListenerRef = useRef(null);
+  const dashboardScrollRef = useRef(null);
   const phoneLocationSubscriptionRef = useRef(null);
   const appointmentTransitionTimeoutRef = useRef(null);
   const visitorPushNoticeTimeoutRef = useRef(null);
@@ -401,24 +402,34 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }, []);
 
   useEffect(() => {
+    const isAppointmentSection = selectedVisitorSection === "appointment";
+    const heroDuration = isVisitorHomeSection ? 180 : isAppointmentSection ? 210 : 160;
+    const contentDuration = isVisitorHomeSection ? 190 : isAppointmentSection ? 240 : 180;
+
     dashboardHeroAnim.setValue(0);
     dashboardContentAnim.setValue(0);
 
     Animated.parallel([
       Animated.timing(dashboardHeroAnim, {
         toValue: 1,
-        duration: isVisitorHomeSection ? 180 : 150,
-        easing: Easing.out(Easing.quad),
+        duration: heroDuration,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: Platform.OS !== "web",
       }),
       Animated.timing(dashboardContentAnim, {
         toValue: 1,
-        duration: isVisitorHomeSection ? 190 : 160,
-        easing: Easing.out(Easing.quad),
+        duration: contentDuration,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: Platform.OS !== "web",
       }),
     ]).start();
-  }, [isVisitorHomeSection, dashboardHeroAnim, dashboardContentAnim]);
+  }, [
+    selectedVisitorSection,
+    selectedAppointmentScreen,
+    isVisitorHomeSection,
+    dashboardHeroAnim,
+    dashboardContentAnim,
+  ]);
   const dashboardShellResponsiveStyle = {
     paddingHorizontal: dashboardHorizontalGutter,
     paddingBottom: isCompactVisitorDashboard ? 10 : 16,
@@ -469,11 +480,27 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return unsubscribe || undefined;
   }, [navigation]);
 
+  const scrollDashboardToTop = (animated = true) => {
+    requestAnimationFrame(() => {
+      dashboardScrollRef.current?.scrollTo?.({ y: 0, animated });
+    });
+  };
+
   const handleAppointmentScreenNavigation = (targetScreen, loadingLabel = "Loading appointment module...") => {
+    if (
+      selectedVisitorSection === "appointment" &&
+      selectedAppointmentScreen === targetScreen &&
+      !isAppointmentScreenTransitioning
+    ) {
+      scrollDashboardToTop(true);
+      return;
+    }
+
     if (appointmentTransitionTimeoutRef.current) {
       clearTimeout(appointmentTransitionTimeoutRef.current);
     }
 
+    scrollDashboardToTop(false);
     setAppointmentTransitionLabel(loadingLabel);
     setIsAppointmentScreenTransitioning(true);
     setShowAppointmentDatePicker(false);
@@ -486,18 +513,39 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       setSelectedAppointmentScreen(targetScreen);
       setIsAppointmentScreenTransitioning(false);
       appointmentTransitionTimeoutRef.current = null;
+      scrollDashboardToTop(false);
     }, 420);
   };
 
   const handleVisitorSectionChange = (sectionId) => {
+    scrollDashboardToTop(false);
+
     if (sectionId === "appointment") {
+      if (selectedVisitorSection === "appointment") {
+        if (selectedAppointmentScreen !== "menu") {
+          handleAppointmentScreenNavigation("menu", "Opening appointment center...");
+        }
+        return;
+      }
+
       setSelectedVisitorSection("appointment");
       handleAppointmentScreenNavigation("menu", "Opening appointment center...");
       return;
     }
 
+    if (appointmentTransitionTimeoutRef.current) {
+      clearTimeout(appointmentTransitionTimeoutRef.current);
+      appointmentTransitionTimeoutRef.current = null;
+    }
+    setIsAppointmentScreenTransitioning(false);
     setSelectedVisitorSection(sectionId);
   };
+
+  useEffect(() => {
+    if (!isAppointmentScreenTransitioning) {
+      scrollDashboardToTop(false);
+    }
+  }, [selectedVisitorSection, selectedAppointmentScreen, isAppointmentScreenTransitioning]);
 
   useEffect(() => {
     loadVisitorData();
@@ -2180,7 +2228,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       {
         translateY: dashboardContentAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: [7, 0],
+          outputRange: [selectedVisitorSection === "appointment" ? 16 : 7, 0],
+        }),
+      },
+      {
+        scale: dashboardContentAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [selectedVisitorSection === "appointment" ? 0.985 : 0.995, 1],
         }),
       },
     ],
@@ -4308,6 +4362,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       ) : null}
 
       <ScrollView
+        ref={dashboardScrollRef}
         style={[visitorDashboardStyles.mainScrollView, isVisitorDarkMode && visitorDashboardStyles.darkMainScrollView]}
         showsVerticalScrollIndicator
         contentContainerStyle={visitorDashboardStyles.scrollContent}
