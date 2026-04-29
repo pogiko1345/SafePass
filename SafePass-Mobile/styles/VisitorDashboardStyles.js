@@ -3410,6 +3410,243 @@ export default StyleSheet.create({
     fontWeight: "600",
   },
 
+  appointmentInsightsCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
+    padding: 18,
+    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 16,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.05)" },
+    }),
+  },
+
+  appointmentInsightsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 10,
+    flexWrap: "wrap",
+    marginBottom: 14,
+  },
+
+  appointmentInsightsEyebrow: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: "#0A3D91",
+    marginBottom: 4,
+  },
+
+  appointmentInsightsTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  appointmentInsightsAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+  },
+
+  appointmentInsightsActionText: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
+  appointmentInsightsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 14,
+  },
+
+  appointmentInsightsMetricCard: {
+    flexGrow: 1,
+    flexBasis: 92,
+    backgroundColor: "#F8FBFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E6EEF9",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+
+  appointmentInsightsMetricLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: "#7C8EA3",
+    marginBottom: 5,
+  },
+
+  appointmentInsightsMetricValue: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  appointmentInsightsStatusCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: "#F8FBFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E6EEF9",
+    padding: 14,
+  },
+
+  appointmentInsightsStatusIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#E8F2FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  appointmentInsightsStatusCopy: {
+    flex: 1,
+  },
+
+  appointmentInsightsStatusTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  appointmentInsightsStatusText: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "#64748B",
+  },
+
+  recentActivityCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
+    padding: 18,
+    marginTop: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 16,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.05)" },
+    }),
+  },
+
+  recentActivityHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 10,
+    flexWrap: "wrap",
+    marginBottom: 14,
+  },
+
+  recentActivityEyebrow: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: "#0A3D91",
+    marginBottom: 4,
+  },
+
+  recentActivityTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  recentActivityAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  recentActivityActionText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
+  recentActivityList: {
+    gap: 12,
+  },
+
+  recentActivityItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EDF2F7",
+  },
+
+  recentActivityStatusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 2,
+  },
+
+  recentActivityCopy: {
+    flex: 1,
+  },
+
+  recentActivityItemTitle: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+
+  recentActivityItemMeta: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+  },
+
+  recentActivityPill: {
+    maxWidth: 112,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  recentActivityPillText: {
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
   appointmentHistoryHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -3512,6 +3749,89 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: 11.5,
     fontWeight: "800",
+  },
+
+  appointmentHistoryCards: {
+    gap: 12,
+  },
+
+  appointmentHistoryCardItem: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
+    padding: 16,
+    gap: 12,
+  },
+
+  appointmentHistoryCardTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  appointmentHistoryCardCopy: {
+    flex: 1,
+  },
+
+  appointmentHistoryCardTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  appointmentHistoryCardOffice: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "#64748B",
+  },
+
+  appointmentHistoryCardPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    maxWidth: 124,
+  },
+
+  appointmentHistoryCardPillText: {
+    fontSize: 11,
+    fontWeight: "800",
+    flexShrink: 1,
+  },
+
+  appointmentHistoryCardMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  appointmentHistoryCardMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#F8FBFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E6EEF9",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+
+  appointmentHistoryCardMetaText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  appointmentHistoryCardDescription: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "#64748B",
   },
 
   appointmentHistoryCard: {

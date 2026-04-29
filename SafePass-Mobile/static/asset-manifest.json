@@ -1,7 +1,12 @@
 {
   "files": {
+<<<<<<< HEAD
     "main.js": "/static/js/main.5b67aeb3.js",
     "static/js/668.d7ed8dc4.js": "/static/js/668.d7ed8dc4.js",
+=======
+    "main.js": "/static/js/main.6c63bb71.js",
+    "static/js/361.e0eaaaeb.js": "/static/js/361.e0eaaaeb.js",
+>>>>>>> 9b1ded16fb13d3085747540cb7da5ad004c32302
     "static/media/Ionicons.ttf": "/static/media/Ionicons.40518f95b2e2a69c5c07.ttf",
     "static/media/LogoSapphire.jpg": "/static/media/LogoSapphire.bf1c2f7a8da6d3f5b03b.jpg",
     "static/media/LogoSapphireAppIcon.png": "/static/media/LogoSapphireAppIcon.9a8d76681603f683726c.png",
@@ -16,11 +21,20 @@
     "favicon-16.png": "/favicon-16.png",
     "manifest.json": "/manifest.json",
     "serve.json": "/serve.json",
+<<<<<<< HEAD
     "main.5b67aeb3.js.map": "/static/js/main.5b67aeb3.js.map",
     "668.d7ed8dc4.js.map": "/static/js/668.d7ed8dc4.js.map"
   },
   "entrypoints": [
     "static/js/668.d7ed8dc4.js",
     "static/js/main.5b67aeb3.js"
+=======
+    "main.6c63bb71.js.map": "/static/js/main.6c63bb71.js.map",
+    "361.e0eaaaeb.js.map": "/static/js/361.e0eaaaeb.js.map"
+  },
+  "entrypoints": [
+    "static/js/361.e0eaaaeb.js",
+    "static/js/main.6c63bb71.js"
+>>>>>>> 9b1ded16fb13d3085747540cb7da5ad004c32302
   ]
 }

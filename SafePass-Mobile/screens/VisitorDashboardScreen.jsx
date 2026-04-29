@@ -310,6 +310,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       : "100%";
   const approvedActionCardWidth = isTabletVisitorDashboard ? "48.5%" : "100%";
   const compactApprovedActionCardWidth = viewportWidth <= 560 ? "100%" : approvedActionCardWidth;
+  const isVisitorAccessApproved = (visitorRecord = visitor) => {
+    const approvalPending =
+      visitorRecord?.status === "pending" || visitorRecord?.approvalStatus === "pending";
+    const pendingStaffReview =
+      !approvalPending &&
+      visitorRecord?.approvalFlow === "staff" &&
+      visitorRecord?.appointmentStatus === "pending";
+
+    return (
+      !approvalPending &&
+      !pendingStaffReview &&
+      (visitorRecord?.status === "approved" || visitorRecord?.status === "checked_in")
+    );
+  };
   const appointmentTimeOptions = useMemo(() => {
     const options = [];
     for (let hour = 7; hour <= 18; hour += 1) {
@@ -446,21 +460,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }, [visitor?._id, visitor?.appointmentStatus, visitor?.approvalFlow, visitor?.visitTime]);
 
   useEffect(() => {
-    const pendingApproval =
-      visitor?.status === "pending" || visitor?.approvalStatus === "pending";
-    const pendingStaffReview =
-      !pendingApproval &&
-      visitor?.approvalFlow === "staff" &&
-      visitor?.appointmentStatus === "pending";
-    const accessReady =
-      !(
-        visitor?.status === "approved" ||
-        visitor?.status === "checked_in"
-      ) ||
-      pendingApproval ||
-      pendingStaffReview;
-
-    if (!accessReady) {
+    if (isVisitorAccessApproved(visitor)) {
       return;
     }
 
@@ -470,12 +470,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setShowCheckInSuccessModal(false);
     setShowCheckOutModal(false);
     setShowCheckOutSuccessModal(false);
-  }, [
-    visitor?.approvalStatus,
-    visitor?.appointmentStatus,
-    visitor?.approvalFlow,
-    visitor?.status,
-  ]);
+  }, [visitor?.status, visitor?.approvalStatus, visitor?.approvalFlow, visitor?.appointmentStatus]);
 
   const stopPhoneLocationTracking = async () => {
     if (phoneLocationSubscriptionRef.current) {
@@ -733,12 +728,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   // Start NFC Reading
   const startNfcReading = async () => {
-    const accessReady =
-      !isPendingApproval &&
-      !isPendingStaffReview &&
-      (visitor?.status === "approved" || visitor?.status === "checked_in");
-
-    if (!accessReady) {
+    if (!isVisitorAccessApproved(visitor)) {
       Alert.alert(
         "Approval Required",
         "Your NFC access tools will only be available after your visit is approved.",
@@ -1441,7 +1431,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleVirtualNfcCardTap = async () => {
     if (!visitor || isVirtualTapLoading) return;
 
-    if (!(visitor?.status === "approved" || visitor?.status === "checked_in")) {
+    if (!isVisitorAccessApproved(visitor)) {
       Alert.alert(
         "Approval Required",
         "Your virtual NFC card becomes available only after your visit is approved.",
@@ -1450,39 +1440,27 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     setIsVirtualTapLoading(true);
-    setNfcStatus({
-      type: "processing",
-      message: "Processing your virtual NFC tap and notifying the operations team...",
-    });
 
     try {
-      const response = await ApiService.visitorCheckIn(visitor._id, {
-        source: "virtual_nfc_card",
-      });
-
-      if (response?.success) {
-        setShowVirtualNfcModal(false);
-        setShowVirtualNfcSuccessModal(true);
-        setNfcStatus({
-          type: "success",
-          message: "Virtual NFC card accepted. Security and admin have been notified of your check-in.",
-        });
-        await loadVisitorData();
+      const started = await startNfcReading();
+      if (!started) {
         return;
       }
 
       setNfcStatus({
-        type: "error",
-        message: response?.message || "Your virtual NFC tap could not be completed.",
+        type: "info",
+        message:
+          visitor?.status === "checked_in"
+            ? "Tap your phone to the NFC hardware reader to check out."
+            : "Tap your phone to the NFC hardware reader to check in.",
       });
-      Alert.alert("Check-In Failed", response?.message || "Unable to check in right now.");
     } catch (error) {
       console.error("Virtual NFC card tap error:", error);
       setNfcStatus({
         type: "error",
-        message: error?.message || "Virtual NFC card tap failed. Please try again.",
+        message: error?.message || "Unable to start the NFC tap flow. Please try again.",
       });
-      Alert.alert("Check-In Failed", error?.message || "Unable to check in right now.");
+      Alert.alert("NFC Unavailable", error?.message || "Unable to start the NFC tap flow right now.");
     } finally {
       setIsVirtualTapLoading(false);
     }
@@ -1545,7 +1523,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleCheckInAction = () => {
-    if (!(visitor?.status === "approved" || visitor?.status === "checked_in")) {
+    if (!isVisitorAccessApproved(visitor)) {
       Alert.alert(
         "Approval Required",
         "Check-in becomes available only after your visit is approved.",
@@ -1583,7 +1561,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleCheckOutAction = () => {
-    if (!(visitor?.status === "approved" || visitor?.status === "checked_in")) {
+    if (!isVisitorAccessApproved(visitor)) {
       Alert.alert(
         "Approval Required",
         "Check-out becomes available only after your visit is approved.",
@@ -1829,9 +1807,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const isApprovedVisitor =
     !isPendingApproval && !isPendingStaffReview && visitor?.status === "approved";
   const canUseVisitorAccessTools =
-    !isPendingApproval &&
-    !isPendingStaffReview &&
-    (visitor?.status === "approved" || visitor?.status === "checked_in");
+    isVisitorAccessApproved(visitor);
   const canRequestNewAppointment =
     visitor?.approvalStatus === "approved" &&
     !isApprovedVisitor &&
@@ -1841,6 +1817,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     !visitor &&
     String(currentUser?.role || "").toLowerCase() === "visitor" &&
     String(currentUser?.status || "").toLowerCase() === "active";
+  const isCompactHistoryLayout = viewportWidth <= 760;
   const approvedActionLabel = isNfcReading ? "Stop NFC" : "Start NFC";
   const approvedActionIcon = isNfcReading ? "pause-circle" : "radio";
   const appointmentSourceRecords = [
@@ -1896,6 +1873,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       description: appointmentFeedback?.message || "Your latest request was sent to staff for review.",
     });
   }
+<<<<<<< HEAD
   const visitorDestinationInfo = getVisitorDestinationInfo(visitor);
   const visitorRouteSteps = buildVisitorRouteSteps(visitorDestinationInfo);
   const visitorDestinationMarker = {
@@ -1906,6 +1884,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     icon: "navigate",
     position: visitorDestinationInfo.position,
   };
+=======
+  const recentAppointmentEntries = appointmentHistoryEntries.slice(0, 3);
+  const approvedAppointmentCount = appointmentHistoryEntries.filter((entry) =>
+    String(entry.statusLabel || "").toLowerCase().includes("approved"),
+  ).length;
+  const pendingAppointmentCount = appointmentHistoryEntries.filter((entry) => {
+    const normalizedStatus = String(entry.statusLabel || "").toLowerCase();
+    return normalizedStatus.includes("pending") || normalizedStatus.includes("review");
+  }).length;
+>>>>>>> 9b1ded16fb13d3085747540cb7da5ad004c32302
   const displayName =
     visitor?.fullName ||
     [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") ||
@@ -2133,6 +2121,125 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       })}
     </View>
   );
+
+  const renderAppointmentInsightsCard = () => (
+    <View style={[visitorDashboardStyles.appointmentInsightsCard, dashboardSectionResponsiveStyle]}>
+      <View style={visitorDashboardStyles.appointmentInsightsHeader}>
+        <View>
+          <Text style={visitorDashboardStyles.appointmentInsightsEyebrow}>Visitor Summary</Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsTitle}>Appointment Snapshot</Text>
+        </View>
+        <TouchableOpacity
+          style={visitorDashboardStyles.appointmentInsightsAction}
+          activeOpacity={0.86}
+          onPress={() => handleVisitorSectionChange("appointment")}
+        >
+          <Text style={visitorDashboardStyles.appointmentInsightsActionText}>Open Module</Text>
+          <Ionicons name="arrow-forward-outline" size={16} color="#0A3D91" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={visitorDashboardStyles.appointmentInsightsGrid}>
+        <View style={visitorDashboardStyles.appointmentInsightsMetricCard}>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>Requests</Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricValue}>
+            {appointmentHistoryEntries.length || 0}
+          </Text>
+        </View>
+        <View style={visitorDashboardStyles.appointmentInsightsMetricCard}>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>Approved</Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricValue}>
+            {approvedAppointmentCount}
+          </Text>
+        </View>
+        <View style={visitorDashboardStyles.appointmentInsightsMetricCard}>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>In Review</Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricValue}>
+            {pendingAppointmentCount}
+          </Text>
+        </View>
+      </View>
+
+      <View style={visitorDashboardStyles.appointmentInsightsStatusCard}>
+        <View style={visitorDashboardStyles.appointmentInsightsStatusIcon}>
+          <Ionicons name="sparkles-outline" size={18} color="#0A3D91" />
+        </View>
+        <View style={visitorDashboardStyles.appointmentInsightsStatusCopy}>
+          <Text style={visitorDashboardStyles.appointmentInsightsStatusTitle}>
+            {recentAppointmentEntries[0]?.statusLabel || journeyTitle}
+          </Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsStatusText}>
+            {recentAppointmentEntries[0]?.description || journeySubtitle}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderRecentAppointmentRail = () => {
+    if (!recentAppointmentEntries.length) {
+      return null;
+    }
+
+    return (
+      <View style={[visitorDashboardStyles.recentActivityCard, dashboardSectionResponsiveStyle]}>
+        <View style={visitorDashboardStyles.recentActivityHeader}>
+          <View>
+            <Text style={visitorDashboardStyles.recentActivityEyebrow}>Recent Activity</Text>
+            <Text style={visitorDashboardStyles.recentActivityTitle}>Latest Appointment Trail</Text>
+          </View>
+          <TouchableOpacity
+            style={visitorDashboardStyles.recentActivityAction}
+            activeOpacity={0.86}
+            onPress={() => {
+              setSelectedVisitorSection("appointment");
+              handleAppointmentScreenNavigation("history", "Loading appointment history...");
+            }}
+          >
+            <Text style={visitorDashboardStyles.recentActivityActionText}>View all</Text>
+            <Ionicons name="arrow-forward-outline" size={16} color="#0A3D91" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={visitorDashboardStyles.recentActivityList}>
+          {recentAppointmentEntries.map((entry) => (
+            <View key={entry.id} style={visitorDashboardStyles.recentActivityItem}>
+              <View
+                style={[
+                  visitorDashboardStyles.recentActivityStatusDot,
+                  { backgroundColor: entry.statusColor },
+                ]}
+              />
+              <View style={visitorDashboardStyles.recentActivityCopy}>
+                <Text style={visitorDashboardStyles.recentActivityItemTitle} numberOfLines={1}>
+                  {entry.title}
+                </Text>
+                <Text style={visitorDashboardStyles.recentActivityItemMeta} numberOfLines={2}>
+                  {entry.office} · {entry.dateLabel} · {entry.timeLabel}
+                </Text>
+              </View>
+              <View
+                style={[
+                  visitorDashboardStyles.recentActivityPill,
+                  { backgroundColor: `${entry.statusColor}14` },
+                ]}
+              >
+                <Text
+                  style={[
+                    visitorDashboardStyles.recentActivityPillText,
+                    { color: entry.statusColor },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {entry.statusLabel}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
 
   const renderVisitorModuleNavigation = () => (
     <View style={[visitorDashboardStyles.visitorModuleCard, dashboardSectionResponsiveStyle]}>
@@ -2656,7 +2763,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </View>
                   <Text style={visitorDashboardStyles.approvedVirtualNfcTitle}>View Access Card</Text>
                   <Text style={visitorDashboardStyles.approvedVirtualNfcSubtitle}>
-                    Open your digital SafePass card before you head to campus.
+                    Open your digital SafePass card and tap your phone to the hardware reader for check-in or check-out.
                   </Text>
                 </View>
                 <View style={visitorDashboardStyles.approvedVirtualNfcIconWrap}>
@@ -2757,6 +2864,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           </View>
         </View>
       </View>
+
+      {renderRecentAppointmentRail()}
     </>
   );
 
@@ -2817,18 +2926,23 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     </Text>
                   </TouchableOpacity>
                 </View>
+                {renderAppointmentInsightsCard()}
                 {renderVisitorModuleNavigation()}
+                {renderRecentAppointmentRail()}
               </>
             ) : isApprovedVisitor ? (
               renderApprovedVisitorDashboard()
             ) : (
               <>
+                {renderAppointmentInsightsCard()}
                 {renderVisitorModuleNavigation()}
+                {renderRecentAppointmentRail()}
                 {renderVisitorEmptyState()}
               </>
             )
           ) : (
             <>
+              {renderAppointmentInsightsCard()}
               {renderVisitorModuleNavigation()}
               {renderVisitorEmptyState()}
             </>
@@ -3529,37 +3643,89 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           {renderAppointmentSegmentBar("history")}
 
           {appointmentHistoryEntries.length ? (
-            <View style={visitorDashboardStyles.appointmentHistoryTable}>
-              <View style={visitorDashboardStyles.appointmentHistoryTableHeader}>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryPurposeCell]}>Purpose</Text>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryOfficeCell]}>Office</Text>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryDateCell]}>Date</Text>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryTimeCell]}>Time</Text>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryStatusCell]}>Status</Text>
-              </View>
-              {appointmentHistoryEntries.map((entry) => (
-                <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryTableRow}>
-                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryPurposeCell]} numberOfLines={2}>
-                    {entry.title}
-                  </Text>
-                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryOfficeCell]} numberOfLines={2}>
-                    {entry.office}
-                  </Text>
-                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryDateCell]} numberOfLines={2}>
-                    {entry.dateLabel}
-                  </Text>
-                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryTimeCell]} numberOfLines={1}>
-                    {entry.timeLabel}
-                  </Text>
-                  <View style={[visitorDashboardStyles.appointmentHistoryStatusCell, visitorDashboardStyles.appointmentHistoryStatusPillWrap]}>
-                    <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
-                    <Text style={[visitorDashboardStyles.appointmentHistoryStatusPillText, { color: entry.statusColor }]} numberOfLines={2}>
-                      {entry.statusLabel}
+            isCompactHistoryLayout ? (
+              <View style={visitorDashboardStyles.appointmentHistoryCards}>
+                {appointmentHistoryEntries.map((entry) => (
+                  <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryCardItem}>
+                    <View style={visitorDashboardStyles.appointmentHistoryCardTop}>
+                      <View style={visitorDashboardStyles.appointmentHistoryCardCopy}>
+                        <Text style={visitorDashboardStyles.appointmentHistoryCardTitle} numberOfLines={2}>
+                          {entry.title}
+                        </Text>
+                        <Text style={visitorDashboardStyles.appointmentHistoryCardOffice} numberOfLines={2}>
+                          {entry.office}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          visitorDashboardStyles.appointmentHistoryCardPill,
+                          { backgroundColor: `${entry.statusColor}14` },
+                        ]}
+                      >
+                        <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
+                        <Text
+                          style={[visitorDashboardStyles.appointmentHistoryCardPillText, { color: entry.statusColor }]}
+                          numberOfLines={1}
+                        >
+                          {entry.statusLabel}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={visitorDashboardStyles.appointmentHistoryCardMetaRow}>
+                      <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+                        <Ionicons name="calendar-outline" size={15} color="#0A3D91" />
+                        <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
+                          {entry.dateLabel}
+                        </Text>
+                      </View>
+                      <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+                        <Ionicons name="time-outline" size={15} color="#0A3D91" />
+                        <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
+                          {entry.timeLabel}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={visitorDashboardStyles.appointmentHistoryCardDescription} numberOfLines={3}>
+                      {entry.description}
                     </Text>
                   </View>
+                ))}
+              </View>
+            ) : (
+              <View style={visitorDashboardStyles.appointmentHistoryTable}>
+                <View style={visitorDashboardStyles.appointmentHistoryTableHeader}>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryPurposeCell]}>Purpose</Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryOfficeCell]}>Office</Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryDateCell]}>Date</Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryTimeCell]}>Time</Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryStatusCell]}>Status</Text>
                 </View>
-              ))}
-            </View>
+                {appointmentHistoryEntries.map((entry) => (
+                  <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryTableRow}>
+                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryPurposeCell]} numberOfLines={2}>
+                      {entry.title}
+                    </Text>
+                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryOfficeCell]} numberOfLines={2}>
+                      {entry.office}
+                    </Text>
+                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryDateCell]} numberOfLines={2}>
+                      {entry.dateLabel}
+                    </Text>
+                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryTimeCell]} numberOfLines={1}>
+                      {entry.timeLabel}
+                    </Text>
+                    <View style={[visitorDashboardStyles.appointmentHistoryStatusCell, visitorDashboardStyles.appointmentHistoryStatusPillWrap]}>
+                      <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
+                      <Text style={[visitorDashboardStyles.appointmentHistoryStatusPillText, { color: entry.statusColor }]} numberOfLines={2}>
+                        {entry.statusLabel}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )
           ) : (
             <View style={visitorDashboardStyles.appointmentHistoryEmpty}>
               <Ionicons name="calendar-clear-outline" size={34} color="#94A3B8" />
@@ -4015,7 +4181,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View>
                 <Text style={visitorDashboardStyles.virtualNfcModalTitle}>Virtual NFC Card</Text>
                 <Text style={visitorDashboardStyles.virtualNfcModalSubtitle}>
-                  Rotate your phone sideways, present the pass to the reader, then confirm check-in when ready.
+                  Present your phone to the NFC hardware reader so the same card can handle both check-in and check-out.
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setShowVirtualNfcModal(false)}>
@@ -4121,10 +4287,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       </View>
                       <View style={visitorDashboardStyles.virtualNfcTapHintCopy}>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintTitle}>
-                          Tap This Card To Check In
+                          Tap This Card To The Hardware Reader
                         </Text>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintText}>
-                          Present this digital pass and tap once you are ready to enter campus.
+                          Use this digital pass at the NFC hardware reader. The system will check you in or out based on your current visit status.
                         </Text>
                       </View>
                     </View>
@@ -4139,9 +4305,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ]}
               >
                 {[
-                  "Use the card view above to verify your approved access details.",
-                  "Security will receive the visitor check-in notification.",
-                  "Admin monitoring will also record this check-in event.",
+                  "Use the card view above to confirm your approved visitor details before tapping.",
+                  "Tap your phone to the NFC hardware reader to process campus entry or exit.",
+                  "Security and admin monitoring will record the hardware tap event automatically.",
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.virtualNfcInfoRow}>
                     <Ionicons name="checkmark-circle-outline" size={18} color="#0A3D91" />
@@ -4175,7 +4341,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     <>
                       <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
                       <Text style={visitorDashboardStyles.virtualNfcPrimaryButtonText}>
-                        Check In With Card
+                        Start NFC Tap
                       </Text>
                     </>
                   )}
