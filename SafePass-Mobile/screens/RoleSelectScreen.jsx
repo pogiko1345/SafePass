@@ -192,26 +192,13 @@ export default function RoleSelectScreen({ navigation, route }) {
                 Secure Arrival and Access Control
               </Text>
 
-              <View style={roleSelectStyles.heroDivider} />
-
               <Text style={roleSelectStyles.heroDescription}>
-                Built for visitors, security personnel, and administrative teams in one streamlined
-                checkpoint experience.
+                Visitor access and checkpoint sign-in in one secure entry flow.
               </Text>
-
-              <View style={roleSelectStyles.heroMetrics}>
-                <View style={roleSelectStyles.heroMetricCard}>
-                  <Text style={roleSelectStyles.heroMetricValue}>24/7</Text>
-                  <Text style={roleSelectStyles.heroMetricLabel}>Gate Visibility</Text>
-                </View>
-                <View style={roleSelectStyles.heroMetricCard}>
-                  <Text style={roleSelectStyles.heroMetricValue}>NFC</Text>
-                  <Text style={roleSelectStyles.heroMetricLabel}>Access Ready</Text>
-                </View>
-                <View style={roleSelectStyles.heroMetricCard}>
-                  <Text style={roleSelectStyles.heroMetricValue}>Live</Text>
-                  <Text style={roleSelectStyles.heroMetricLabel}>Approval Tracking</Text>
-                </View>
+              <View style={roleSelectStyles.flightAccent}>
+                <View style={roleSelectStyles.flightAccentLine} />
+                <Ionicons name="airplane" size={13} color="rgba(255,255,255,0.92)" />
+                <View style={roleSelectStyles.flightAccentDot} />
               </View>
             </View>
           </LinearGradient>
@@ -268,12 +255,12 @@ export default function RoleSelectScreen({ navigation, route }) {
                 })}
               >
                 <LinearGradient
-                  colors={["#FFFFFF", "#F8FAFC"]}
+                  colors={["#FFFFFF", "#F8FBFE"]}
                   style={roleSelectStyles.cardGradient}
                 >
                   <View style={roleSelectStyles.cardIconWrapper}>
                     <LinearGradient
-                      colors={["#0F766E", "#14B8A6"]}
+                      colors={["#0A3D91", "#1C6DD0"]}
                       style={roleSelectStyles.cardIconGradient}
                     >
                       <Ionicons name="person-add-outline" size={28} color="#FFFFFF" />
@@ -287,21 +274,21 @@ export default function RoleSelectScreen({ navigation, route }) {
                     </Text>
                     <View style={roleSelectStyles.cardFeatures}>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="card-outline" size={12} color="#0F766E" />
+                        <Ionicons name="card-outline" size={12} color="#0A3D91" />
                         <Text style={roleSelectStyles.featurePillText}>Virtual NFC Card</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="calendar-outline" size={12} color="#0F766E" />
+                        <Ionicons name="calendar-outline" size={12} color="#0A3D91" />
                         <Text style={roleSelectStyles.featurePillText}>Schedule Visit</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="document-text-outline" size={12} color="#0F766E" />
+                        <Ionicons name="document-text-outline" size={12} color="#0A3D91" />
                         <Text style={roleSelectStyles.featurePillText}>Fast Check-In</Text>
                       </View>
                     </View>
                   </View>
                   <View style={roleSelectStyles.cardArrow}>
-                    <Ionicons name="arrow-forward" size={20} color="#0F766E" />
+                    <Ionicons name="arrow-forward" size={20} color="#0A3D91" />
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
@@ -329,7 +316,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                 onPress={handleLoginSelect}
                 activeOpacity={0.7}
                 accessibilityLabel="Login"
-                accessibilityHint="Login to your existing account"
+                accessibilityHint="Go to the login screen for your account"
                 accessibilityRole="button"
                 {...(isWeb && {
                   onKeyPress: (e) => handleKeyPress(e, handleLoginSelect),
@@ -349,7 +336,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                     </LinearGradient>
                   </View>
                   <View style={roleSelectStyles.cardContent}>
-                    <Text style={roleSelectStyles.cardTitle}>Existing User</Text>
+                    <Text style={roleSelectStyles.cardTitle}>Login</Text>
                     <Text style={roleSelectStyles.cardDescription}>
                       Sign in to review approvals, open your dashboard, manage appointments, and
                       continue your access flow.
@@ -387,7 +374,7 @@ export default function RoleSelectScreen({ navigation, route }) {
               <Text style={roleSelectStyles.infoCardText}>GPS Tracking</Text>
             </View>
             <View style={roleSelectStyles.infoCard}>
-              <Ionicons name="notifications-outline" size={19} color="#3B82F6" />
+              <Ionicons name="notifications-outline" size={19} color="#1C6DD0" />
               <Text style={roleSelectStyles.infoCardText}>Real-time Alerts</Text>
             </View>
           </View>
@@ -417,9 +404,18 @@ export default function RoleSelectScreen({ navigation, route }) {
             </View>
 
             <View style={roleSelectStyles.contactList}>
-              <Text style={roleSelectStyles.contactLine}>Website: sapphireaviationacademy.edu.ph</Text>
-              <Text style={roleSelectStyles.contactLine}>Tel No: (02) 7091 - 3362</Text>
-              <Text style={roleSelectStyles.contactLine}>Mobile No: 0917 580 4858</Text>
+              <View style={roleSelectStyles.contactRow}>
+                <Text style={roleSelectStyles.contactLabel}>Website</Text>
+                <Text style={roleSelectStyles.contactValue}>sapphireaviationacademy.edu.ph</Text>
+              </View>
+              <View style={roleSelectStyles.contactRow}>
+                <Text style={roleSelectStyles.contactLabel}>Tel No.</Text>
+                <Text style={roleSelectStyles.contactValue}>(02) 7091 - 3362</Text>
+              </View>
+              <View style={roleSelectStyles.contactRow}>
+                <Text style={roleSelectStyles.contactLabel}>Mobile No.</Text>
+                <Text style={roleSelectStyles.contactValue}>0917 580 4858</Text>
+              </View>
             </View>
 
             <View style={roleSelectStyles.contactLinkRow}>
@@ -452,7 +448,7 @@ export default function RoleSelectScreen({ navigation, route }) {
             </View>
 
             <Text style={roleSelectStyles.contactCopyright}>
-              ©2024. Sapphire International Aviation Academy
+              Copyright 2024. Sapphire International Aviation Academy
             </Text>
           </View>
 

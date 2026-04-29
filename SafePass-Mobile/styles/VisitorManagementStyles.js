@@ -24,7 +24,7 @@ export default StyleSheet.create({
 
   // Header
   header: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#1C6DD0",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -113,8 +113,8 @@ export default StyleSheet.create({
   },
 
   filterChipActive: {
-    backgroundColor: "#7C3AED",
-    borderColor: "#7C3AED",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   filterChipText: {
@@ -315,7 +315,7 @@ export default StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#1C6DD0",
   },
 
   modalSubmitText: {
@@ -460,7 +460,7 @@ export default StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#1C6DD0",
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "center",

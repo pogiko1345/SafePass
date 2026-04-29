@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 let AsyncStorage;
 
 if (Platform.OS === 'web') {
@@ -19,7 +20,14 @@ const WEB_FALLBACK_API_BASE_URL = (() => {
   }
 
   const { protocol, hostname } = window.location;
-  return `${protocol}//${hostname}:5000/api`;
+  const isLocalHost =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0";
+
+  return isLocalHost
+    ? `${protocol}//${hostname}:5000/api`
+    : "https://safepass-052h.onrender.com/api";
 })();
 
 const DEFAULT_API_BASE_URL = Platform.select({
@@ -34,14 +42,117 @@ const API_BASE_URL = (
   DEFAULT_API_BASE_URL
 ).replace(/\/$/, "");
 
+const API_BASE_URL_CANDIDATES =
+  process.env.EXPO_PUBLIC_API_BASE_URL || Platform.OS !== "android"
+    ? [API_BASE_URL]
+    : ["http://10.0.2.2:5000/api", "http://localhost:5000/api"];
+
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
+const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+const REMEMBERED_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const REMEMBERED_SESSION_EXPIRES_AT_KEY = "rememberedSessionExpiresAt";
+const SENSITIVE_STORAGE_KEYS = [
+  "userToken",
+  "authToken",
+  "trustedDevice",
+  "trustedUntil",
+  REMEMBERED_SESSION_EXPIRES_AT_KEY,
+];
+
+const setSensitiveItem = async (key, value) => {
+  const normalizedValue = value == null ? null : String(value);
+
+  if (Platform.OS === "web") {
+    if (normalizedValue == null) {
+      await AsyncStorage.removeItem(key);
+      return;
+    }
+    await AsyncStorage.setItem(key, normalizedValue);
+    return;
+  }
+
+  if (normalizedValue == null) {
+    await SecureStore.deleteItemAsync(key);
+    return;
+  }
+
+  await SecureStore.setItemAsync(key, normalizedValue);
+};
+
+const getSensitiveItem = async (key) => {
+  if (Platform.OS === "web") {
+    return AsyncStorage.getItem(key);
+  }
+
+  return SecureStore.getItemAsync(key);
+};
+
+const removeSensitiveItems = async (keys) => {
+  if (Platform.OS === "web") {
+    await AsyncStorage.multiRemove(keys);
+    return;
+  }
+
+  await Promise.all(keys.map((key) => SecureStore.deleteItemAsync(key)));
+};
 
 class ApiService {
   constructor() {
     this.token = null;
     this._lastOtp = null;
     this._lastReset = null;
+  }
+
+  async clearTrustedDevice() {
+    await removeSensitiveItems(["trustedDevice", "trustedUntil"]);
+  }
+
+  async rememberCurrentSession(durationMs = REMEMBERED_SESSION_DURATION_MS) {
+    await setSensitiveItem(
+      REMEMBERED_SESSION_EXPIRES_AT_KEY,
+      String(Date.now() + durationMs),
+    );
+  }
+
+  async clearRememberedSession() {
+    await removeSensitiveItems([REMEMBERED_SESSION_EXPIRES_AT_KEY]);
+  }
+
+  async isRememberedSessionActive() {
+    const expiresAtRaw = await getSensitiveItem(REMEMBERED_SESSION_EXPIRES_AT_KEY);
+    const expiresAt = Number(expiresAtRaw);
+
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      if (expiresAtRaw) {
+        await this.clearAuth();
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  async isTrustedDeviceActive() {
+    const [trustedDevice, trustedUntilRaw] = await Promise.all([
+      getSensitiveItem("trustedDevice"),
+      getSensitiveItem("trustedUntil"),
+    ]);
+
+    if (trustedDevice !== "true") {
+      if (trustedUntilRaw) {
+        await this.clearTrustedDevice();
+      }
+      return false;
+    }
+
+    const trustedUntil = Number(trustedUntilRaw);
+    if (!Number.isFinite(trustedUntil) || trustedUntil <= Date.now()) {
+      await this.clearTrustedDevice();
+      return false;
+    }
+
+    return true;
   }
 
   // ================= TOKEN HANDLING =================
@@ -57,18 +168,17 @@ class ApiService {
 
     this.token = validToken;
     if (validToken) {
-      await AsyncStorage.setItem("userToken", validToken);
+      await setSensitiveItem("userToken", validToken);
       // Backward compatibility for older screens still reading authToken.
-      await AsyncStorage.setItem("authToken", validToken);
+      await setSensitiveItem("authToken", validToken);
     } else {
-      await AsyncStorage.removeItem("userToken");
-      await AsyncStorage.removeItem("authToken");
+      await removeSensitiveItems(["userToken", "authToken"]);
     }
   }
 
   async getToken() {
     if (!this.token) {
-      const userTokenRaw = await AsyncStorage.getItem("userToken");
+      const userTokenRaw = await getSensitiveItem("userToken");
       const userToken =
         typeof userTokenRaw === "string"
           ? userTokenRaw.trim()
@@ -76,8 +186,7 @@ class ApiService {
 
       if (userToken) {
         if (userToken === "undefined" || userToken === "null") {
-          await AsyncStorage.removeItem("userToken");
-          await AsyncStorage.removeItem("authToken");
+          await removeSensitiveItems(["userToken", "authToken"]);
           this.token = null;
         } else {
           this.token = userToken;
@@ -96,7 +205,9 @@ class ApiService {
             this.token = null;
           } else {
             this.token = legacyToken;
-            await AsyncStorage.setItem("userToken", legacyToken);
+            await setSensitiveItem("userToken", legacyToken);
+            await setSensitiveItem("authToken", legacyToken);
+            await AsyncStorage.removeItem("authToken");
           }
         }
       }
@@ -106,11 +217,9 @@ class ApiService {
 
   async clearAuth() {
     this.token = null;
+    await removeSensitiveItems(SENSITIVE_STORAGE_KEYS);
     await AsyncStorage.multiRemove([
-      "userToken",
-      "authToken",
       "currentUser",
-      "trustedDevice",
       "isNewRegistration"
     ]);
   }
@@ -262,9 +371,19 @@ async register(userData) {
         status: staffData?.status || "active",
         isActive: staffData?.isActive ?? true,
       };
-      return await this.register(payload);
+      return await this.fetch("/admin/staff/create", {
+        method: "POST",
+        body: payload,
+      });
     } catch (error) {
-      const message = error?.message || "Failed to create staff account";
+      const errorMessage = String(error?.message || "").toLowerCase();
+      const message = errorMessage.includes("username already")
+        ? "Username already registered. Please use another username."
+        : errorMessage.includes("staff id already") || errorMessage.includes("employeeid")
+          ? "Staff ID already registered. Please use another staff ID."
+          : errorMessage.includes("email already")
+            ? "Email already registered. Please use another email address."
+            : error?.message || "Failed to create staff account";
       throw new Error(message);
     }
   }
@@ -284,6 +403,13 @@ async register(userData) {
     } catch (error) {
       console.error("Login API error:", error);
       
+      if (error?.data?.requiresEmailVerification || error?.status === 403) {
+        throw new Error(
+          error?.data?.message ||
+            "Your account is not yet verified. Please verify your account using OTP first."
+        );
+      }
+
       if (error.message.includes("401")) {
         throw new Error("Invalid email or password. Please check your credentials.");
       }
@@ -302,11 +428,11 @@ async register(userData) {
 
   async checkEmailExists(email) {
     try {
-      const response = await this.fetch("/check-email", {
+      await this.fetch("/check-email", {
         method: "POST",
         body: { email },
       });
-      return response.exists;
+      return false;
     } catch {
       return false;
     }
@@ -366,7 +492,7 @@ async verifyCredentials(email, password) {
       body: { email, password },
     });
     
-    const trustedDevice = await AsyncStorage.getItem('trustedDevice');
+    const trustedDevice = await this.isTrustedDeviceActive();
     
     // Check if user is pending
     if (loginResponse.user?.status === 'pending') {
@@ -379,18 +505,22 @@ async verifyCredentials(email, password) {
       };
     }
     
-    return {
-      success: true,
-      requires2FA: !trustedDevice,
-      user: loginResponse.user,
-      tempToken: loginResponse.token,
-    };
+      return {
+        success: true,
+        requires2FA: !trustedDevice,
+        user: loginResponse.user,
+        tempToken: loginResponse.token,
+      };
     
   } catch (error) {
     console.error("Verify credentials error:", error);
 
     if (!this.isDevFallbackEnabled()) {
-      throw new Error(error.message || "Invalid email or password");
+      throw new Error(
+        error?.data?.message ||
+          error.message ||
+          "Invalid email or password"
+      );
     }
 
     // Demo accounts (development fallback if backend not running)
@@ -543,8 +673,8 @@ async verifyCredentials(email, password) {
 
   async trustDevice() {
     try {
-      await AsyncStorage.setItem('trustedDevice', 'true');
-      await AsyncStorage.setItem('trustedUntil', Date.now() + 2592000000);
+      await setSensitiveItem('trustedDevice', 'true');
+      await setSensitiveItem('trustedUntil', String(Date.now() + TRUST_DEVICE_DURATION_MS));
       return { success: true };
     } catch (error) {
       console.error("Trust device error:", error);
@@ -592,11 +722,8 @@ async verifyCredentials(email, password) {
         throw error;
       }
 
-      const resetToken = "reset_" + Math.random().toString(36).substring(2);
-      
       this._lastReset = {
         email,
-        token: resetToken,
         otp: "123456",
         expiresAt: Date.now() + 600000
       };
@@ -611,17 +738,16 @@ async verifyCredentials(email, password) {
       
       return {
         success: true,
-        resetToken,
         expiresIn: 600
       };
     }
   }
 
-  async verifyPasswordResetOtp(email, otpCode, resetToken) {
+  async verifyPasswordResetOtp(email, otpCode) {
     try {
       const response = await this.fetch("/auth/verify-password-reset", {
         method: "POST",
-        body: { email, otpCode, resetToken },
+        body: { email, otpCode },
       });
       return response;
     } catch (error) {
@@ -631,8 +757,7 @@ async verifyCredentials(email, password) {
         throw error;
       }
 
-      const isValid = this._lastReset?.email === email && 
-                      this._lastReset?.token === resetToken &&
+      const isValid = this._lastReset?.email === email &&
                       this._lastReset?.expiresAt > Date.now() &&
                       (otpCode === this._lastReset?.otp || otpCode === "123456");
       
@@ -654,7 +779,7 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async resetPassword(email, newPassword, resetToken) {
+  async resetPassword(email, newPassword, resetToken = "") {
     try {
       const response = await this.fetch("/auth/reset-password", {
         method: "POST",
@@ -698,11 +823,56 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async verifyEmailToken(token) {
+    try {
+      return await this.fetch("/auth/verify-email", {
+        method: "POST",
+        body: { token },
+      });
+    } catch (error) {
+      console.error("Email verification error:", error);
+      throw error;
+    }
+  }
+
+  async verifyRegistrationOtp(email, otpCode) {
+    try {
+      return await this.fetch("/auth/verify-registration-otp", {
+        method: "POST",
+        body: { email, otpCode },
+      });
+    } catch (error) {
+      console.error("Registration OTP verification error:", error);
+      throw error;
+    }
+  }
+
+  async resendRegistrationOtp(email) {
+    try {
+      return await this.fetch("/auth/resend-registration-otp", {
+        method: "POST",
+        body: { email },
+      });
+    } catch (error) {
+      console.error("Registration OTP resend error:", error);
+      throw error;
+    }
+  }
+
   async getVisitorProfile() {
     try {
-      const response = await this.fetch("/visitor-profile");
+      const response = await this.fetch("/visitor/profile");
       return response;
     } catch (error) {
+      if (error?.status === 404) {
+        return {
+          success: false,
+          visitor: null,
+          notFound: true,
+          message: "Visitor profile not found",
+        };
+      }
+
       console.error("Get visitor profile error:", error);
       throw error;
     }
@@ -713,6 +883,15 @@ async verifyCredentials(email, password) {
       const response = await this.fetch(`/visitors/${visitorId}/logs`);
       return response;
     } catch (error) {
+      if (error?.status === 404) {
+        return {
+          success: true,
+          logs: [],
+          notFound: true,
+          message: "Visitor access logs not found",
+        };
+      }
+
       console.error("Get visitor logs error:", error);
       throw error;
     }
@@ -740,6 +919,19 @@ async verifyCredentials(email, password) {
       return response;
     } catch (error) {
       console.error("Visitor check-out error:", error);
+      throw error;
+    }
+  }
+
+  async updateVisitorPhoneLocation(visitorId, locationData) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/phone-location`, {
+        method: "PUT",
+        body: locationData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Update visitor phone location error:", error);
       throw error;
     }
   }
@@ -802,6 +994,19 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async getAppointmentAvailability({ date, department } = {}) {
+    try {
+      const queryString = new URLSearchParams({
+        date: date || "",
+        department: department || "",
+      }).toString();
+      return await this.fetch(`/appointments/availability?${queryString}`);
+    } catch (error) {
+      console.error("Get appointment availability error:", error);
+      throw error;
+    }
+  }
+
   async getStaffAppointments(filters = {}) {
     try {
       const queryString = new URLSearchParams(filters).toString();
@@ -847,6 +1052,18 @@ async verifyCredentials(email, password) {
       });
     } catch (error) {
       console.error("Reject staff appointment error:", error);
+      throw error;
+    }
+  }
+
+  async completeStaffAppointment(visitorId, note = "") {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/complete`, {
+        method: "PUT",
+        body: { note },
+      });
+    } catch (error) {
+      console.error("Complete staff appointment error:", error);
       throw error;
     }
   }
@@ -1159,14 +1376,10 @@ async createSecurityGuard(guardData) {
   try {
     console.log('👮 Creating security guard:', guardData);
     
-    // Generate a random password if not provided
-    const password = guardData.password || this.generateRandomPassword();
-    
     const response = await this.fetch("/admin/security/create", {
       method: "POST",
       body: {
         ...guardData,
-        password,
         role: 'guard',
         status: 'active'
       }
@@ -1452,7 +1665,19 @@ generateRandomPassword(length = 10) {
 
   async testConnection() {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), 5000)
+        : null;
+
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        signal: controller?.signal,
+      });
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       const data = await response.json();
       return data.status === "OK";
     } catch {
@@ -1461,4 +1686,101 @@ generateRandomPassword(length = 10) {
   }
 }
 
+ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, options = {}) {
+  const token = await this.getToken();
+  console.log(
+    `[ApiService] FETCH ${url}, Method: ${options.method || "GET"}, Has Token: ${!!token}`
+  );
+
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+
+  const config = {
+    ...options,
+    headers,
+  };
+
+  if (config.body && typeof config.body !== "string") {
+    config.body = JSON.stringify(config.body);
+  }
+
+  let lastError = null;
+
+  for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
+    try {
+      console.log(`[ApiService] Sending request to: ${baseUrl}${url}`);
+      const response = await fetch(`${baseUrl}${url}`, config);
+      const contentType = response.headers.get("content-type");
+      let data;
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = text ? { message: text } : {};
+      }
+
+      if (!response.ok) {
+        const apiError = new Error(
+          data.error || data.message || `HTTP ${response.status}`
+        );
+        apiError.status = response.status;
+        apiError.data = data;
+        throw apiError;
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error;
+      console.error(`[ApiService] Fetch error for ${url} via ${baseUrl}:`, error);
+
+      if (!String(error?.message || "").includes("Network request failed")) {
+        throw error;
+      }
+    }
+  }
+
+  if (String(lastError?.message || "").includes("Network request failed")) {
+    throw new Error(
+      "Cannot connect to backend. Make sure server is running on port 5000. On a real Android device, run adb reverse for ports 8081 and 5000."
+    );
+  }
+
+  throw lastError || new Error("Cannot connect to backend.");
+};
+
+ApiService.prototype.testConnection = async function testConnectionWithAndroidFallback() {
+  for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
+    try {
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), 5000)
+        : null;
+
+      const response = await fetch(`${baseUrl}/health`, {
+        signal: controller?.signal,
+      });
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      const data = await response.json();
+      if (data.status === "OK") {
+        return true;
+      }
+    } catch (error) {
+      console.error(`[ApiService] Health check failed via ${baseUrl}:`, error);
+    }
+  }
+
+  return false;
+};
+
 export default new ApiService();
+

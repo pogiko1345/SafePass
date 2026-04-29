@@ -6,19 +6,23 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
-  Linking,
-  ActivityIndicator,
-  Alert,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import MapStyles from "../styles/MapStyles";
 import CampusMap from "../components/CampusMap";
+import {
+  MONITORING_MAP_BLUEPRINTS,
+  MONITORING_MAP_FLOORS,
+  MONITORING_MAP_OFFICES,
+  MONITORING_MAP_OFFICE_POSITIONS,
+} from "../utils/monitoringMapConfig";
 
 const CAMPUS_LOCATIONS = [
   {
     name: "Main Gate",
+    floor: "ground",
     description: "Visitor entrance and primary security checkpoint.",
     icon: "business",
     coordinates: { lat: 14.5995, lng: 120.9842 },
@@ -32,6 +36,7 @@ const CAMPUS_LOCATIONS = [
   },
   {
     name: "Administration Building",
+    floor: "ground",
     description: "Visitor registration, approvals, and admin office support.",
     icon: "business",
     coordinates: { lat: 14.6001, lng: 120.985 },
@@ -44,59 +49,64 @@ const CAMPUS_LOCATIONS = [
     ],
   },
   {
-    name: "Library",
-    description: "Student resource center and quiet study hall.",
-    icon: "library",
-    coordinates: { lat: 14.5988, lng: 120.9848 },
-    mapPosition: { x: 58, y: 48 },
-    arrivalNote: "Best for academic meetings, consultations, and research visits.",
+    name: "Registrar's Office",
+    floor: "ground",
+    description: "Records, enrollment help, and visitor document routing.",
+    icon: "document-text",
+    coordinates: { lat: 14.5998, lng: 120.9849 },
+    mapPosition: { x: 45, y: 44 },
+    arrivalNote: "Best for document-related appointments and records assistance.",
     steps: [
-      "Walk past the administration building toward the central corridor.",
-      "Turn left at the study wing sign and continue to the library entrance.",
-      "Check in with the library desk if your host is meeting you inside.",
+      "Enter through the main gate and proceed toward the administration corridor.",
+      "Follow the office signage to the registrar counter.",
+      "Prepare your SafePass approval and valid ID before approaching the desk.",
     ],
   },
   {
-    name: "Cafeteria",
-    description: "Dining area and food court for students and staff.",
-    icon: "restaurant",
-    coordinates: { lat: 14.5992, lng: 120.9835 },
-    mapPosition: { x: 34, y: 58 },
-    arrivalNote: "Useful for waiting, meetups, and visitor rest stops.",
+    name: "Accounting Office",
+    floor: "ground",
+    description: "Payment, billing, and finance-related visitor assistance.",
+    icon: "calculator",
+    coordinates: { lat: 14.5999, lng: 120.9851 },
+    mapPosition: { x: 66, y: 42 },
+    arrivalNote: "Use this stop for official payments and billing concerns.",
     steps: [
-      "Follow the main path from the gate toward the courtyard.",
-      "Turn right at the open dining sign near the parking lane.",
-      "Use the side entry if you are meeting staff during meal hours.",
+      "Proceed from the main gate to the ground-floor office row.",
+      "Move past the registrar area toward the accounting counter.",
+      "Wait for staff confirmation before submitting documents or payments.",
     ],
   },
   {
-    name: "Aviation Hangar",
-    description: "Flight training center and aircraft storage area.",
-    icon: "airplane",
+    name: "Conference Room",
+    floor: "first",
+    description: "Mezzanine meeting space for scheduled visitor appointments.",
+    icon: "people",
     coordinates: { lat: 14.6005, lng: 120.9825 },
-    mapPosition: { x: 46, y: 70 },
-    arrivalNote: "Restricted training zone. Wait for staff escort before entering.",
+    mapPosition: { x: 10, y: 36 },
+    arrivalNote: "Proceed here only for scheduled meetings or escorted visits.",
     steps: [
-      "Proceed from the gate through the operations path toward the hangar lane.",
-      "Stop at the restricted area marker and wait for your assigned staff member.",
-      "Enter only after staff confirmation and security clearance.",
+      "Complete check-in at the ground-floor security point first.",
+      "Use the stair access to reach the mezzanine level.",
+      "Proceed to the left-side conference room and wait for your host.",
     ],
   },
   {
-    name: "Flight Simulator Lab",
-    description: "Simulator training and guided practice area.",
+    name: "I.T Room",
+    floor: "first",
+    description: "Mezzanine technology support and IT coordination room.",
     icon: "desktop",
     coordinates: { lat: 14.5978, lng: 120.9855 },
-    mapPosition: { x: 68, y: 58 },
-    arrivalNote: "Ideal for scheduled simulator sessions and guided demonstrations.",
+    mapPosition: { x: 57, y: 42 },
+    arrivalNote: "Best for approved IT-related appointments and support visits.",
     steps: [
-      "Walk past the administration wing toward the training corridor.",
-      "Keep left at the simulator signage and continue to the lab entrance.",
-      "Show your SafePass appointment to the assigned staff on entry.",
+      "Check in at the ground floor before moving upstairs.",
+      "Take the stairs to the mezzanine and follow the room labels.",
+      "Stop at the I.T Room and wait for staff acknowledgement.",
     ],
   },
   {
     name: "Security Office",
+    floor: "ground",
     description: "Main security office and manual assistance point.",
     icon: "shield",
     coordinates: { lat: 14.599, lng: 120.9838 },
@@ -110,6 +120,7 @@ const CAMPUS_LOCATIONS = [
   },
   {
     name: "Parking Area",
+    floor: "ground",
     description: "Visitor and staff parking zone near the entrance lane.",
     icon: "car",
     coordinates: { lat: 14.5985, lng: 120.9828 },
@@ -123,10 +134,24 @@ const CAMPUS_LOCATIONS = [
   },
 ];
 
-export default function WebMapScreen({ navigation }) {
-  const [loading, setLoading] = useState(false);
+const normalizeMapFloor = (floorId) => (floorId === "mezzanine" ? "first" : floorId);
+
+const findInitialDestinationName = (destinationOffice = "") => {
+  const normalizedDestination = String(destinationOffice || "").trim().toLowerCase();
+  if (!normalizedDestination) return "Administration Building";
+
+  return (
+    CAMPUS_LOCATIONS.find((location) =>
+      location.name.toLowerCase() === normalizedDestination ||
+      location.name.toLowerCase().includes(normalizedDestination) ||
+      normalizedDestination.includes(location.name.toLowerCase().replace("'s", ""))
+    )?.name || "Administration Building"
+  );
+};
+
+export default function WebMapScreen({ navigation, route }) {
   const [selectedLocationName, setSelectedLocationName] = useState(
-    "Administration Building"
+    findInitialDestinationName(route?.params?.destinationOffice)
   );
   const { width } = useWindowDimensions();
 
@@ -141,56 +166,23 @@ export default function WebMapScreen({ navigation }) {
     [selectedLocationName]
   );
 
-  const campusMapVisitors = useMemo(
-    () =>
-      CAMPUS_LOCATIONS.map((location) => ({
-        id: location.name,
-        name: location.name,
-        purpose: location.description,
-        status: location.name === selectedLocation.name ? "checked_in" : "active",
-        location: {
-          coordinates: location.mapPosition,
-        },
-      })),
-    [selectedLocation.name]
+  const destinationMarker = useMemo(
+    () => ({
+      id: selectedLocation.name,
+      floor: selectedLocation.floor,
+      label: selectedLocation.name,
+      icon: "navigate",
+      position: selectedLocation.mapPosition,
+    }),
+    [selectedLocation]
   );
-
-  const openGoogleMaps = () => {
-    setLoading(true);
-    const url =
-      "https://maps.google.com/?q=Sapphire+International+Aviation+Academy";
-    Linking.openURL(url)
-      .catch(() => {
-        Alert.alert("Error", "Unable to open Google Maps");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  const openDirections = (location) => {
-    const url = `https://maps.google.com/?q=${location.coordinates.lat},${location.coordinates.lng}`;
-    Linking.openURL(url).catch(() => {
-      Alert.alert("Error", "Unable to open directions");
-    });
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={MapStyles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
-        <ActivityIndicator size="large" color="#1D4ED8" />
-        <Text style={MapStyles.loadingText}>Opening Directions...</Text>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={MapStyles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
 
       <LinearGradient
-        colors={["#0F172A", "#1E3A8A", "#0F766E"]}
+        colors={["#0F172A", "#1E3A8A", "#0A3D91"]}
         style={MapStyles.header}
       >
         <TouchableOpacity
@@ -206,13 +198,9 @@ export default function WebMapScreen({ navigation }) {
           <Text style={MapStyles.headerTitle}>Campus Wayfinding</Text>
         </View>
 
-        <TouchableOpacity
-          onPress={openGoogleMaps}
-          style={MapStyles.headerAction}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="navigate-outline" size={18} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={MapStyles.headerAction}>
+          <Ionicons name="map-outline" size={18} color="#FFFFFF" />
+        </View>
       </LinearGradient>
 
       <ScrollView
@@ -220,23 +208,25 @@ export default function WebMapScreen({ navigation }) {
         contentContainerStyle={MapStyles.scrollContent}
       >
         <LinearGradient
-          colors={["#E0F2FE", "#ECFEFF", "#F8FAFC"]}
+          colors={["#E0F2FE", "#ECFEFF", "#F8FBFE"]}
           style={MapStyles.heroCard}
         >
           <View style={MapStyles.heroTopRow}>
             <View style={MapStyles.heroBadge}>
-              <Ionicons name="compass-outline" size={16} color="#0F766E" />
+              <Ionicons name="compass-outline" size={16} color="#0A3D91" />
               <Text style={MapStyles.heroBadgeText}>Wayfinding Assistant</Text>
             </View>
-            <Text style={MapStyles.heroSupportText}>8 destination points</Text>
+            <Text style={MapStyles.heroSupportText}>
+              {CAMPUS_LOCATIONS.length} destination points
+            </Text>
           </View>
 
           <Text style={MapStyles.heroTitle}>
             Find the right campus destination before you arrive.
           </Text>
           <Text style={MapStyles.heroSubtitle}>
-            Choose a destination, review the route steps, and launch external
-            directions only when you need them.
+            Choose a destination and review the route steps inside SafePass.
+            No external map app is required.
           </Text>
 
           <View
@@ -267,20 +257,20 @@ export default function WebMapScreen({ navigation }) {
           >
             <TouchableOpacity
               style={MapStyles.primaryActionButton}
-              onPress={() => openDirections(selectedLocation)}
+              onPress={() => setSelectedLocationName(selectedLocation.name)}
               activeOpacity={0.85}
             >
-              <Ionicons name="navigate" size={18} color="#FFFFFF" />
-              <Text style={MapStyles.primaryActionText}>Get Directions</Text>
+              <Ionicons name="list" size={18} color="#FFFFFF" />
+              <Text style={MapStyles.primaryActionText}>Review Route Steps</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={MapStyles.secondaryActionButton}
-              onPress={openGoogleMaps}
+              onPress={() => setSelectedLocationName("Security Office")}
               activeOpacity={0.85}
             >
-              <Ionicons name="globe-outline" size={18} color="#0F172A" />
-              <Text style={MapStyles.secondaryActionText}>Open Campus Map</Text>
+              <Ionicons name="shield-checkmark-outline" size={18} color="#0F172A" />
+              <Text style={MapStyles.secondaryActionText}>Security Help Point</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -298,7 +288,7 @@ export default function WebMapScreen({ navigation }) {
                 <Text style={MapStyles.sectionTitle}>Campus Guide Map</Text>
               </View>
               <View style={MapStyles.sectionChip}>
-                <Ionicons name="pin-outline" size={14} color="#0F766E" />
+                <Ionicons name="pin-outline" size={14} color="#0A3D91" />
                 <Text style={MapStyles.sectionChipText}>
                   {selectedLocation.name}
                 </Text>
@@ -311,11 +301,24 @@ export default function WebMapScreen({ navigation }) {
             </Text>
 
             <CampusMap
-              visitors={campusMapVisitors}
-              floors={[{ id: "all", name: "Campus", icon: "map-outline" }]}
-              offices={[]}
-              selectedFloor="all"
+              visitors={[]}
+              floors={MONITORING_MAP_FLOORS}
+              offices={MONITORING_MAP_OFFICES}
+              selectedFloor={selectedLocation.floor}
               selectedOffice="all"
+              destinationMarkers={[destinationMarker]}
+              showVisitorMarkers={false}
+              showActiveVisitorsBadge={false}
+              mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+              officePositions={MONITORING_MAP_OFFICE_POSITIONS}
+              onFloorChange={(floorId) => {
+                const firstLocationOnFloor = CAMPUS_LOCATIONS.find(
+                  (location) => normalizeMapFloor(location.floor) === normalizeMapFloor(floorId),
+                );
+                if (firstLocationOnFloor) {
+                  setSelectedLocationName(firstLocationOnFloor.name);
+                }
+              }}
             />
           </View>
 
@@ -341,7 +344,7 @@ export default function WebMapScreen({ navigation }) {
             </Text>
 
             <View style={MapStyles.routeNoticeCard}>
-              <Ionicons name="information-circle-outline" size={18} color="#0F766E" />
+              <Ionicons name="information-circle-outline" size={18} color="#0A3D91" />
               <Text style={MapStyles.routeNoticeText}>
                 {selectedLocation.arrivalNote}
               </Text>
@@ -361,12 +364,12 @@ export default function WebMapScreen({ navigation }) {
 
             <TouchableOpacity
               style={MapStyles.routeActionButton}
-              onPress={() => openDirections(selectedLocation)}
+              onPress={() => setSelectedLocationName(selectedLocation.name)}
               activeOpacity={0.85}
             >
-              <Ionicons name="navigate-circle-outline" size={20} color="#FFFFFF" />
+              <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
               <Text style={MapStyles.routeActionText}>
-                Start Directions To {selectedLocation.name}
+                Use These Directions To {selectedLocation.name}
               </Text>
             </TouchableOpacity>
           </View>
@@ -405,7 +408,7 @@ export default function WebMapScreen({ navigation }) {
                   <Ionicons
                     name={location.icon}
                     size={22}
-                    color={isSelected ? "#FFFFFF" : "#1D4ED8"}
+                    color={isSelected ? "#FFFFFF" : "#041E42"}
                   />
                 </View>
 
@@ -428,7 +431,7 @@ export default function WebMapScreen({ navigation }) {
 
                 <TouchableOpacity
                   style={MapStyles.directionButton}
-                  onPress={() => openDirections(location)}
+                  onPress={() => setSelectedLocationName(location.name)}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="navigate-outline" size={18} color="#0F172A" />
@@ -441,8 +444,8 @@ export default function WebMapScreen({ navigation }) {
         <View style={MapStyles.footerNote}>
           <Ionicons name="shield-checkmark-outline" size={16} color="#64748B" />
           <Text style={MapStyles.footerNoteText}>
-            Use the in-app campus guide for orientation, then open external
-            directions only if you need turn-by-turn navigation.
+            Use this in-app campus guide for orientation. Ask security for help
+            if the office is temporarily moved or restricted.
           </Text>
         </View>
       </ScrollView>

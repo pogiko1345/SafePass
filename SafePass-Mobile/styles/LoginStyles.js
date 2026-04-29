@@ -36,17 +36,104 @@ export default StyleSheet.create({
     letterSpacing: 0.4,
   },
 
+  loginSplashOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(4, 30, 66, 0.58)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+
+  loginSplashCard: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 30,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 18 },
+        shadowOpacity: 0.16,
+        shadowRadius: 28,
+      },
+      android: {
+        elevation: 10,
+      },
+      web: {
+        boxShadow: "0px 24px 60px rgba(15, 23, 42, 0.18)",
+      },
+    }),
+  },
+
+  loginSplashLogoRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 4,
+    borderColor: "#D8E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+
+  loginSplashLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#FFFFFF",
+  },
+
+  loginSplashTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+
+  loginSplashMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#475569",
+    textAlign: "center",
+    marginBottom: 18,
+  },
+
+  loginSplashLoadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#F8FBFE",
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+  },
+
+  loginSplashLoadingText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0A3D91",
+  },
+
   header: {
     backgroundColor: "#041E42",
     paddingHorizontal: 24,
     paddingTop: Platform.select({
-      ios: 60,
-      android: 50,
-      web: 54,
+      ios: 52,
+      android: 44,
+      web: 46,
     }),
-    paddingBottom: 88,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
+    paddingBottom: 62,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
     overflow: "hidden",
     ...Platform.select({
       ios: {
@@ -78,20 +165,40 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
     borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: 18,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    marginBottom: 14,
     ...Platform.select({
       web: { backdropFilter: "blur(10px)" },
     }),
   },
 
   brandBadgeLogo: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    marginRight: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
     backgroundColor: "#FFFFFF",
+  },
+
+  headerGlowOne: {
+    position: "absolute",
+    top: -26,
+    right: -14,
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+    backgroundColor: "rgba(255,255,255,0.09)",
+  },
+
+  headerGlowTwo: {
+    position: "absolute",
+    bottom: -52,
+    left: -28,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: "rgba(56,189,248,0.12)",
   },
 
   brandBadgeTextWrap: {
@@ -100,23 +207,23 @@ export default StyleSheet.create({
 
   brandBadgeEyebrow: {
     color: "rgba(255,255,255,0.78)",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
   },
 
   brandBadgeTitle: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
   },
 
   logoImage: {
-    width: isSmallPhone ? 92 : 108,
-    height: isSmallPhone ? 92 : 108,
-    borderRadius: isSmallPhone ? 46 : 54,
-    marginBottom: 16,
+    width: isSmallPhone ? 78 : 92,
+    height: isSmallPhone ? 78 : 92,
+    borderRadius: isSmallPhone ? 39 : 46,
+    marginBottom: 12,
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.28)",
     backgroundColor: "#FFFFFF",
@@ -134,22 +241,44 @@ export default StyleSheet.create({
 
   appName: {
     color: "#FFFFFF",
-    fontSize: isSmallPhone ? 21 : isTablet ? 26 : 24,
+    fontSize: isSmallPhone ? 18 : isTablet ? 24 : 22,
     fontWeight: "800",
     textAlign: "center",
-    lineHeight: isSmallPhone ? 28 : 32,
-    marginBottom: 10,
-    letterSpacing: -0.4,
+    lineHeight: isSmallPhone ? 24 : 28,
+    marginBottom: 8,
+    letterSpacing: 0,
   },
 
   headerTagline: {
     color: "rgba(255,255,255,0.86)",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
     textAlign: "center",
-    lineHeight: 21,
-    maxWidth: 460,
-    marginBottom: 18,
+    lineHeight: 19,
+    maxWidth: 380,
+    marginBottom: 14,
+  },
+
+  flightAccent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  flightAccentLine: {
+    width: 34,
+    height: 1.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.34)",
+  },
+
+  flightAccentDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "rgba(255,255,255,0.78)",
   },
 
   statusBadge: {
@@ -171,17 +300,17 @@ export default StyleSheet.create({
 
   statusText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
 
   card: {
     backgroundColor: "#FFFFFF",
-    marginTop: -42,
+    marginTop: -32,
     marginHorizontal: isSmallPhone ? 16 : 20,
     padding: isSmallPhone ? 20 : 24,
-    borderRadius: 28,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E6EDF7",
     ...Platform.select({
@@ -209,7 +338,7 @@ export default StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 14,
     backgroundColor: "#F3F7FB",
-    borderRadius: 999,
+    borderRadius: 8,
     gap: 6,
     borderWidth: 1,
     borderColor: "#E4EBF5",
@@ -226,7 +355,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F7FAFD",
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 14,
     borderWidth: 1,
     borderColor: "#E6EDF7",
@@ -236,7 +365,7 @@ export default StyleSheet.create({
   roleIconWrap: {
     width: 46,
     height: 46,
-    borderRadius: 16,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -267,7 +396,7 @@ export default StyleSheet.create({
     color: "#0F172A",
     textAlign: "center",
     marginBottom: 6,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
 
   welcomeSubtitle: {
@@ -295,7 +424,7 @@ export default StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: "#DCE5F0",
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: Platform.select({
       ios: 14,
@@ -383,7 +512,7 @@ export default StyleSheet.create({
   loginButton: {
     backgroundColor: "#0A3D91",
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 8,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
@@ -415,7 +544,7 @@ export default StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 12,
     backgroundColor: "#EEF5FF",
-    borderRadius: 14,
+    borderRadius: 8,
     gap: 8,
     marginBottom: 16,
     borderWidth: 1,
@@ -439,7 +568,7 @@ export default StyleSheet.create({
     color: "#111827",
     marginTop: 12,
     marginBottom: 6,
-    letterSpacing: -0.3,
+    letterSpacing: 0,
   },
 
   verificationSubtitle: {
@@ -473,7 +602,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: "#F3F4F6",
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -501,7 +630,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 8,
     gap: 8,
     marginBottom: 16,
   },
@@ -516,7 +645,8 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
     gap: 6,
   },
 
@@ -528,7 +658,7 @@ export default StyleSheet.create({
 
   infoBox: {
     marginTop: 16,
-    borderRadius: 14,
+    borderRadius: 8,
     padding: 14,
     backgroundColor: "#FEF2F2",
     flexDirection: "row",
@@ -563,7 +693,7 @@ export default StyleSheet.create({
     width: "100%",
     maxWidth: 520,
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    borderRadius: 8,
     padding: 16,
     borderWidth: 1,
     borderColor: "#E6EDF7",
@@ -610,7 +740,7 @@ export default StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 999,
+    borderRadius: 8,
     backgroundColor: "#F4F7FB",
     borderWidth: 1,
     borderColor: "#E5EDF6",
@@ -636,59 +766,204 @@ export default StyleSheet.create({
     backgroundColor: "rgba(4, 30, 66, 0.42)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
   },
 
   modalContent: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 28,
-    padding: isSmallPhone ? 20 : 24,
+    borderRadius: 24,
     width: "100%",
-    maxWidth: 420,
-    alignItems: "center",
+    maxWidth: 520,
+    minHeight: isSmallPhone ? 420 : 460,
+    maxHeight: "92%",
     borderWidth: 1,
     borderColor: "#E6EDF7",
+    overflow: "hidden",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 6 },
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.12,
-        shadowRadius: 16,
+        shadowRadius: 24,
       },
       android: { elevation: 8 },
       web: { boxShadow: "0px 16px 36px rgba(15, 23, 42, 0.14)" },
     }),
   },
 
-  modalHeader: {
+  modalHero: {
+    backgroundColor: "#041E42",
+    paddingHorizontal: isSmallPhone ? 18 : 24,
+    paddingTop: isSmallPhone ? 18 : 22,
+    paddingBottom: isSmallPhone ? 18 : 22,
+  },
+
+  modalHeroTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    width: "100%",
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 18,
+  },
+
+  modalBrandBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+
+  modalBrandBadgeLogo: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
+    backgroundColor: "#FFFFFF",
+  },
+
+  modalBrandBadgeTextWrap: {
+    justifyContent: "center",
+    flex: 1,
+  },
+
+  modalBrandBadgeEyebrow: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+
+  modalBrandBadgeTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalHeroContent: {
+    alignItems: "center",
+  },
+
+  modalHeroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
   },
 
   modalTitle: {
     fontSize: isSmallPhone ? 20 : 22,
     fontWeight: "800",
-    color: "#0F172A",
-    flex: 1,
-    marginLeft: 12,
+    color: "#FFFFFF",
+    textAlign: "center",
   },
 
   modalSubtitle: {
     fontSize: isSmallPhone ? 13 : 14,
-    color: "#64748B",
-    marginBottom: 4,
+    color: "rgba(255,255,255,0.82)",
+    marginTop: 6,
     textAlign: "center",
     lineHeight: 20,
+  },
+
+  modalStepRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+    width: "100%",
+  },
+
+  modalStepChip: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalStepChipActive: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#FFFFFF",
+  },
+
+  modalStepChipComplete: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+
+  modalStepChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.76)",
+  },
+
+  modalStepChipTextActive: {
+    color: "#041E42",
+  },
+
+  modalBody: {
+    width: "100%",
+    flexGrow: 0,
+  },
+
+  modalBodyContent: {
+    padding: isSmallPhone ? 18 : 24,
+    paddingBottom: isSmallPhone ? 24 : 28,
+    flexGrow: 1,
+  },
+
+  modalInfoCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    backgroundColor: "#F8FBFE",
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 18,
+  },
+
+  modalInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#475569",
+    fontWeight: "600",
   },
 
   modalPhone: {
     fontSize: isSmallPhone ? 16 : 18,
     fontWeight: "800",
     color: "#0A3D91",
-    marginBottom: 24,
+    marginBottom: 20,
+    textAlign: "center",
+    flexWrap: "wrap",
   },
 
   otpInputContainer: {
@@ -701,20 +976,21 @@ export default StyleSheet.create({
     height: isSmallPhone ? 56 : 64,
     borderWidth: 2,
     borderColor: "#E5E7EB",
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: isSmallPhone ? 24 : 28,
     fontWeight: "600",
     color: "#111827",
     textAlign: "center",
-    letterSpacing: isSmallPhone ? 8 : 10,
+    letterSpacing: isSmallPhone ? 4 : 8,
     backgroundColor: "#F9FAFB",
   },
 
   timerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    justifyContent: "center",
+    marginBottom: 20,
     gap: 8,
   },
 
@@ -730,7 +1006,7 @@ export default StyleSheet.create({
   otpVerifyButton: {
     backgroundColor: "#0A3D91",
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 8,
     alignItems: "center",
     marginBottom: 12,
   },
@@ -743,7 +1019,7 @@ export default StyleSheet.create({
 
   otpResendButton: {
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 8,
     alignItems: "center",
     backgroundColor: "#F3F7FB",
     borderWidth: 1,
@@ -759,7 +1035,7 @@ export default StyleSheet.create({
   passwordRequirements: {
     backgroundColor: "#F8FBFE",
     padding: isSmallPhone ? 16 : 18,
-    borderRadius: 16,
+    borderRadius: 8,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: "#E5EAF3",
@@ -838,16 +1114,29 @@ export default StyleSheet.create({
     backgroundColor: "#FEF2F2",
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     marginBottom: 4,
     borderWidth: 1,
     borderColor: "#FECACA",
+  },
+  loginSuccessText: {
+    color: "#166534",
+    fontSize: 13,
+    marginTop: -8,
+    marginBottom: 16,
+    fontWeight: "700",
+    backgroundColor: "#F0FDF4",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
   },
 
   demoHelper: {
     backgroundColor: "#F0F9FF",
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#BAE6FD",

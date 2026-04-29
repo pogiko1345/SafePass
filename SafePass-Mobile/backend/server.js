@@ -3,10 +3,17 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const Visitor = require("./models/Visitor");
 const Notification = require("./models/Notification");
 const User = require("./models/User");
 const AccessLog = require("./models/AccessLog");
+const AppSettings = require("./models/AppSettings");
+const { createRateLimiter, getRateLimitKey } = require("./utils/securityUtils");
+const {
+  DEFAULT_SYSTEM_SETTINGS,
+  sanitizeSystemSettings,
+} = require("./utils/settingsUtils");
 const timestamp = Date.now();
 const randomString = Math.random().toString(36).substr(2, 10).toUpperCase();
 const tempNfcCardId = `PENDING-${timestamp}-${randomString}`;
@@ -14,6 +21,268 @@ const otpStore = new Map();
 require("dotenv").config();
 
 const app = express();
+const isVercelRuntime = Boolean(process.env.VERCEL);
+const sensitiveDebugLoggingEnabled =
+  String(process.env.ALLOW_SENSITIVE_DEBUG_LOGS || "").trim().toLowerCase() === "true";
+const phoneOtpSmsProviderConfigured = [
+  "SEMAPHORE_API_KEY",
+  "SEMAPHORE_API_TOKEN",
+  "SMS_API_KEY",
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+].some((name) => String(process.env[name] || "").trim());
+
+const APPOINTMENT_ID_TYPE_OPTIONS = [
+  "School ID",
+  "National ID",
+  "Driver's License",
+  "Passport",
+  "UMID",
+  "PhilHealth ID",
+  "Voter's ID",
+  "PRC ID",
+  "Postal ID",
+  "Senior Citizen ID",
+  "Company ID",
+  "Other Government ID",
+];
+
+const GENERIC_AUTH_ERROR_MESSAGE = "Invalid email or password";
+const GENERIC_PASSWORD_RESET_REQUEST_MESSAGE =
+  "If an account matches that email, a password reset code and secure reset link will be sent.";
+const GENERIC_PASSWORD_RESET_VERIFY_MESSAGE =
+  "Invalid or expired verification code. Please request a new code and try again.";
+
+const AI_ID_VALIDATION_REQUIRED =
+  String(process.env.REQUIRE_AI_ID_VALIDATION || "").trim().toLowerCase() === "true";
+const OPENAI_ID_MODEL = String(process.env.OPENAI_ID_MODEL || "gpt-4.1-mini").trim();
+
+const reviewAppointmentIdImageDemo = ({ idType, idImage }) => {
+  const normalizedIdType = String(idType || "").trim();
+  const normalizedIdImage = String(idImage || "").trim();
+
+  if (!normalizedIdType) {
+    return {
+      isAccepted: false,
+      status: "missing_id_type",
+      message: "Please choose which valid ID you will present.",
+    };
+  }
+
+  if (!normalizedIdImage) {
+    return {
+      isAccepted: false,
+      status: "missing_image",
+      message: "Please upload a clear image of your valid ID.",
+    };
+  }
+
+  const looksLikeImagePayload =
+    normalizedIdImage.startsWith("data:image/") ||
+    normalizedIdImage.startsWith("file:") ||
+    normalizedIdImage.startsWith("content:") ||
+    normalizedIdImage.startsWith("http");
+
+  if (!looksLikeImagePayload || normalizedIdImage.length < 120) {
+    return {
+      isAccepted: false,
+      status: "image_quality_failed",
+      message:
+        "Demo AI pre-check could not confirm the uploaded ID image. Please upload a clearer photo of the front of the ID.",
+    };
+  }
+
+  return {
+    isAccepted: true,
+    status: "demo_prechecked",
+    message: `Demo AI pre-check accepted the uploaded ${normalizedIdType}. Final validation still requires staff or security review.`,
+  };
+};
+
+const extractOpenAIResponseText = (responseData) => {
+  if (!responseData) {
+    return "";
+  }
+
+  if (typeof responseData.output_text === "string") {
+    return responseData.output_text;
+  }
+
+  if (!Array.isArray(responseData.output)) {
+    return "";
+  }
+
+  return responseData.output
+    .flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
+    .map((contentItem) => contentItem?.text || contentItem?.content || "")
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+};
+
+const parseJsonObjectFromText = (text) => {
+  const cleanedText = String(text || "")
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  const jsonStart = cleanedText.indexOf("{");
+  const jsonEnd = cleanedText.lastIndexOf("}");
+
+  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(cleanedText.slice(jsonStart, jsonEnd + 1));
+  } catch (error) {
+    console.error("AI ID validation JSON parse error:", error.message);
+    return null;
+  }
+};
+
+const buildAppointmentIdImagePrompt = (idType) => `
+You are reviewing a visitor appointment valid ID image.
+
+Selected ID type: "${idType}"
+
+Decide whether the image appears to show the same type of identification selected by the visitor.
+Accept only when the image is clearly an ID document/card/passport/license and the visible document type reasonably matches the selected ID type.
+Reject screenshots, selfies without an ID, unrelated photos, unreadable/blurred images, and documents that visibly look like a different ID type.
+Do not verify the person's identity, ID number, face match, or authenticity. Only classify whether the image appears to match the selected ID type.
+
+Return only JSON in this exact shape:
+{
+  "isAccepted": true,
+  "status": "ai_id_matched",
+  "message": "Short visitor-friendly explanation.",
+  "detectedIdType": "Short detected ID type or unknown",
+  "confidence": 0.0
+}
+`;
+
+const reviewAppointmentIdImage = async ({ idType, idImage }) => {
+  const localReview = reviewAppointmentIdImageDemo({ idType, idImage });
+  if (!localReview.isAccepted) {
+    return localReview;
+  }
+
+  const openAiApiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (!openAiApiKey) {
+    return localReview;
+  }
+
+  try {
+    const aiResponse = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openAiApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: OPENAI_ID_MODEL,
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: buildAppointmentIdImagePrompt(idType),
+              },
+              {
+                type: "input_image",
+                image_url: idImage,
+                detail: "high",
+              },
+            ],
+          },
+        ],
+        max_output_tokens: 250,
+      }),
+    });
+
+    const responseData = await aiResponse.json().catch(() => null);
+
+    if (!aiResponse.ok) {
+      const errorMessage =
+        responseData?.error?.message || `OpenAI returned status ${aiResponse.status}`;
+      throw new Error(errorMessage);
+    }
+
+    const review = parseJsonObjectFromText(extractOpenAIResponseText(responseData));
+    if (!review || typeof review.isAccepted !== "boolean") {
+      throw new Error("AI ID validation returned an unreadable response.");
+    }
+
+    if (!review.isAccepted) {
+      return {
+        isAccepted: false,
+        status: review.status || "ai_id_mismatch",
+        message:
+          review.message ||
+          `The uploaded image does not appear to match the selected ${idType}. Please upload the correct ID.`,
+        detectedIdType: review.detectedIdType || "unknown",
+        confidence: Number(review.confidence) || 0,
+      };
+    }
+
+    return {
+      isAccepted: true,
+      status: review.status || "ai_id_matched",
+      message:
+        review.message ||
+        `AI pre-check accepted the uploaded ${idType}. Final validation still requires staff or security review.`,
+      detectedIdType: review.detectedIdType || idType,
+      confidence: Number(review.confidence) || 0,
+    };
+  } catch (error) {
+    console.error("AI ID validation error:", error.message);
+
+    if (AI_ID_VALIDATION_REQUIRED) {
+      return {
+        isAccepted: false,
+        status: "ai_id_validation_unavailable",
+        message:
+          "We could not validate the ID image right now. Please try again in a moment.",
+      };
+    }
+
+    return {
+      ...localReview,
+      status: "demo_prechecked_ai_unavailable",
+      message:
+        "Basic ID image pre-check passed. AI ID matching is temporarily unavailable, so staff or security will complete the final review.",
+    };
+  }
+};
+
+const getRequiredEnvValue = (name) => {
+  const value = String(process.env[name] || "").trim();
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+};
+
+const logSensitiveDebug = (...args) => {
+  if (sensitiveDebugLoggingEnabled) {
+    console.log(...args);
+  }
+};
+
+const logPhoneOtpForDemo = ({ phoneNumber, otpCode, method }) => {
+  if (phoneOtpSmsProviderConfigured && !sensitiveDebugLoggingEnabled) {
+    return;
+  }
+
+  console.log("");
+  console.log("========== PHONE OTP DEMO ==========");
+  console.log(`Number : ${phoneNumber}`);
+  console.log(`Method : ${method || "sms"}`);
+  console.log(`OTP    : ${otpCode}`);
+  console.log("====================================");
+  console.log("");
+};
 
 // ========== ENHANCED CORS CONFIGURATION ==========
 app.use(
@@ -21,12 +290,12 @@ app.use(
     origin: true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "x-device-key"],
   }),
 );
 
-// Handle preflight requests
-app.options("*", cors());
+// Handle preflight requests. Express 5 rejects bare "*" paths.
+app.options(/.*/, cors());
 
 // Body parser middleware
 app.use(express.json({ limit: "50mb" }));
@@ -35,24 +304,111 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // ========== DATABASE CONNECTION ==========
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/sapphire_aviation";
+const FRONTEND_URL =
+  process.env.FRONTEND_URL || "https://sapphiresafepass2.vercel.app";
 
-mongoose
-  .connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log("✅ MongoDB Connected (Local)"))
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error:", err);
-    console.log("Trying to connect to:", MONGODB_URI);
-  });
+let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
+
+const connectToDatabase = () => {
+  if (!mongoConnectionPromise) {
+    mongoConnectionPromise = mongoose
+      .connect(MONGODB_URI)
+
+      .then(() => {
+        console.log(
+          `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
+        );
+        return mongoose.connection;
+      })
+      .catch((err) => {
+        console.error("❌ MongoDB Connection Error:", err);
+        console.log("Trying to connect to:", MONGODB_URI);
+        mongoConnectionPromise = null;
+        global.__safepassMongoConnectionPromise = null;
+        throw err;
+      });
+
+    global.__safepassMongoConnectionPromise = mongoConnectionPromise;
+  }
+
+  return mongoConnectionPromise;
+};
+
+connectToDatabase();
+
+const authAttemptLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "auth" }),
+});
+
+const passwordResetRequestLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "password-reset-request" }),
+});
+
+const passwordResetVerifyLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 6,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "password-reset-verify" }),
+});
+
+const passwordResetChangeLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 4,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "password-reset-change" }),
+});
+
+const registrationOtpRequestLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "registration-otp-request" }),
+});
+
+const registrationOtpVerifyLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 6,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "registration-otp-verify" }),
+});
+
+const phoneOtpRequestLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "phone-otp-request" }),
+});
+
+const phoneOtpVerifyLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 6,
+  getKey: ({ req, identifier }) => getRateLimitKey({ req, identifier, scope: "phone-otp-verify" }),
+});
 
 // ========== HELPER FUNCTIONS ==========
+const applyRateLimit = (res, limiterResult, retryMessage) => {
+  const retryAfterSeconds = Math.max(
+    1,
+    Math.ceil((limiterResult.resetAt - Date.now()) / 1000),
+  );
+  res.set("Retry-After", String(retryAfterSeconds));
+  return res.status(429).json({
+    success: false,
+    message: retryMessage,
+  });
+};
+
+const getSystemSettingsRecord = async () =>
+  AppSettings.findOneAndUpdate(
+    { key: "system" },
+    { $setOnInsert: { key: "system", ...DEFAULT_SYSTEM_SETTINGS } },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  );
+
 // Generate JWT Token
 const generateToken = (userId) => {
   return jwt.sign(
     { userId },
-    process.env.JWT_SECRET || "sapphire_secret_2024",
+    getRequiredEnvValue("JWT_SECRET"),
     {
       expiresIn: "7d",
     },
@@ -70,7 +426,7 @@ const authMiddleware = async (req, res, next) => {
 
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || "sapphire_secret_2024",
+      getRequiredEnvValue("JWT_SECRET"),
     );
     const user = await User.findById(decoded.userId).select("-password");
 
@@ -92,6 +448,16 @@ const getNotificationTargetRoles = (role) => {
     return ["all", "security", "guard"];
   }
   return ["all", normalizedRole];
+};
+
+const notificationIsAccessibleToUser = (notification, user) => {
+  if (!notification || !user) return false;
+  const allowedRoles = getNotificationTargetRoles(user.role);
+  const targetRole = String(notification.targetRole || "all").toLowerCase();
+  const roleAllowed = allowedRoles.includes(targetRole);
+  const userAllowed =
+    !notification.targetUser || String(notification.targetUser) === String(user._id);
+  return roleAllowed && userAllowed;
 };
 
 const getFullName = (user = {}) =>
@@ -162,14 +528,540 @@ const createRoleNotification = async ({
   }
 };
 
-// ========== EMAIL SIMULATION (for demo) ==========
-const sendEmail = (to, subject, body) => {
-  console.log(`\n📧 ========== EMAIL SIMULATION ==========`);
-  console.log(`📧 To: ${to}`);
-  console.log(`📧 Subject: ${subject}`);
-  console.log(`📧 Body: ${body}`);
-  console.log(`📧 ====================================\n`);
-  return { success: true };
+const formatVisitSchedule = (visitDate, visitTime) => {
+  const resolvedDate = visitDate ? new Date(visitDate) : null;
+  const resolvedTime = visitTime ? new Date(visitTime) : null;
+  const dateLabel = resolvedDate
+    ? resolvedDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "an upcoming date";
+  const timeLabel = resolvedTime
+    ? resolvedTime.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "the scheduled time";
+
+  return `${dateLabel} at ${timeLabel}`;
+};
+
+const ensureOverstayAlerts = async () => {
+  try {
+    const graceMinutes = Math.max(
+      5,
+      parseInt(process.env.VISITOR_OVERSTAY_GRACE_MINUTES || "15", 10),
+    );
+    const threshold = new Date(Date.now() - graceMinutes * 60 * 1000);
+
+    const overstayedVisitors = await Visitor.find({
+      requestCategory: "appointment",
+      status: "checked_in",
+      appointmentCompletedAt: { $ne: null, $lte: threshold },
+      checkedOutAt: null,
+      overstayAlertedAt: null,
+    }).limit(50);
+
+    for (const visitor of overstayedVisitors) {
+      const visitorUser = await User.findOne({ email: visitor.email });
+      const scheduleLabel = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+
+      await createRoleNotification({
+        title: "Visitor Overstay Alert",
+        message: `${visitor.fullName} has not checked out ${graceMinutes} minutes after appointment completion. Scheduled visit was ${scheduleLabel}.`,
+        type: "alert",
+        severity: "high",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_overstay_alert",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes,
+        },
+      });
+
+      await createRoleNotification({
+        title: "Visitor Overstay Alert",
+        message: `${visitor.fullName} has not checked out after the appointment was marked complete.`,
+        type: "alert",
+        severity: "high",
+        targetRole: "admin",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_overstay_alert",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes,
+        },
+      });
+
+      await createSystemActivity({
+        actorUser: null,
+        relatedVisitor: visitor,
+        relatedUser: visitorUser,
+        activityType: "visitor_overstay_alert",
+        status: "flagged",
+        location: visitor.assignedOffice || visitor.host || "Campus",
+        notes: `${visitor.fullName} remained checked in after appointment completion.`,
+        metadata: {
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes,
+        },
+      });
+
+      visitor.overstayAlertedAt = new Date();
+      await visitor.save();
+    }
+  } catch (error) {
+    console.error("Ensure overstay alerts error:", error);
+  }
+};
+
+const CHECKPOINT_LOCATIONS = {
+  main_gate: {
+    floor: "ground",
+    office: "Main Gate",
+    coordinates: { x: 18, y: 78 },
+  },
+  administration: {
+    floor: "ground",
+    office: "Administration",
+    coordinates: { x: 18, y: 36 },
+  },
+  registrar: {
+    floor: "ground",
+    office: "Registrar's Office",
+    coordinates: { x: 45, y: 44 },
+  },
+  accounting: {
+    floor: "ground",
+    office: "Accounting Office",
+    coordinates: { x: 66, y: 42 },
+  },
+  conference_room: {
+    floor: "first",
+    office: "Conference Room",
+    coordinates: { x: 10, y: 36 },
+  },
+  chairman: {
+    floor: "first",
+    office: "Chairman",
+    coordinates: { x: 21, y: 40 },
+  },
+  flight_operations: {
+    floor: "first",
+    office: "Flight Operations",
+    coordinates: { x: 33, y: 43 },
+  },
+  head_of_training_room: {
+    floor: "first",
+    office: "Head Of Training Room",
+    coordinates: { x: 45, y: 42 },
+  },
+  it_room: {
+    floor: "first",
+    office: "I.T Room",
+    coordinates: { x: 57, y: 42 },
+  },
+  faculty_room: {
+    floor: "first",
+    office: "Faculty Room",
+    coordinates: { x: 69, y: 36 },
+  },
+  academy_director: {
+    floor: "first",
+    office: "Academy Director",
+    coordinates: { x: 82, y: 37 },
+  },
+  cr: {
+    floor: "first",
+    office: "CR",
+    coordinates: { x: 94, y: 25 },
+  },
+  sto: {
+    floor: "first",
+    office: "STO",
+    coordinates: { x: 94, y: 44 },
+  },
+};
+
+const normalizeCheckpointId = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const clampMapCoordinate = (value, min = 5, max = 95) =>
+  Math.max(min, Math.min(max, value));
+
+const mapGpsToCampusCoordinates = (latitude, longitude) => {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { x: null, y: null };
+  }
+
+  const latMin = Number(process.env.CAMPUS_LAT_MIN || 14.5976);
+  const latMax = Number(process.env.CAMPUS_LAT_MAX || 14.6007);
+  const lngMin = Number(process.env.CAMPUS_LNG_MIN || 120.9823);
+  const lngMax = Number(process.env.CAMPUS_LNG_MAX || 120.9857);
+
+  const x = ((lng - lngMin) / (lngMax - lngMin)) * 100;
+  const y = (1 - (lat - latMin) / (latMax - latMin)) * 100;
+
+  return {
+    x: Number(clampMapCoordinate(x).toFixed(2)),
+    y: Number(clampMapCoordinate(y).toFixed(2)),
+  };
+};
+
+const getTapLocationFromRequest = (body = {}) => {
+  const checkpointId = normalizeCheckpointId(body.checkpointId || body.checkpoint || body.office);
+  const knownCheckpoint = CHECKPOINT_LOCATIONS[checkpointId] || null;
+  const coordinates = body.coordinates || {};
+
+  return {
+    checkpointId,
+    floor: String(body.floor || knownCheckpoint?.floor || "").trim(),
+    office: String(body.office || knownCheckpoint?.office || checkpointId || "Unknown Checkpoint").trim(),
+    coordinates: {
+      x: Number.isFinite(Number(coordinates.x ?? knownCheckpoint?.coordinates?.x))
+        ? Number(coordinates.x ?? knownCheckpoint?.coordinates?.x)
+        : null,
+      y: Number.isFinite(Number(coordinates.y ?? knownCheckpoint?.coordinates?.y))
+        ? Number(coordinates.y ?? knownCheckpoint?.coordinates?.y)
+        : null,
+    },
+    source: String(body.source || "arduino_tap").trim(),
+  };
+};
+
+const validateDeviceKey = (req, res, next) => {
+  const expectedKey = getRequiredEnvValue("ARDUINO_DEVICE_KEY");
+  const providedKey = req.header("x-device-key") || req.body?.deviceKey;
+
+  if (!providedKey || providedKey !== expectedKey) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid device key",
+    });
+  }
+
+  next();
+};
+
+// ========== EMAIL DELIVERY ==========
+let mailTransporter = null;
+let nodemailerLoadError = null;
+
+try {
+  const nodemailer = require("nodemailer");
+  const mailHost = String(process.env.MAIL_HOST || "").trim();
+  const mailUser = String(process.env.MAIL_USER || "").trim();
+  const mailPass = String(process.env.MAIL_PASS || "").trim();
+  const mailPort = Number(process.env.MAIL_PORT || 587);
+  const mailSecure = String(process.env.MAIL_SECURE || "false").trim() === "true";
+
+  if (mailHost && mailUser && mailPass) {
+    mailTransporter = nodemailer.createTransport({
+      host: mailHost,
+      port: mailPort,
+      secure: mailSecure,
+      auth: {
+        user: mailUser,
+        pass: mailPass,
+      },
+    });
+  }
+} catch (error) {
+  nodemailerLoadError = error;
+}
+
+const verifyMailTransporter = async () => {
+  if (!mailTransporter) {
+    return false;
+  }
+
+  try {
+    await mailTransporter.verify();
+    console.log(`SMTP ready for ${String(process.env.MAIL_USER || "").trim()}`);
+    return true;
+  } catch (error) {
+    console.error("SMTP verification failed:", error.message);
+    return false;
+  }
+};
+
+verifyMailTransporter();
+
+const getMailFromAddress = () =>
+  String(process.env.MAIL_FROM || process.env.MAIL_USER || "no-reply@safepass.local").trim();
+
+const getEmailGreetingName = (user = {}) =>
+  String(user.firstName || user.fullName || "User").trim();
+
+const getSupportEmailSignature = () =>
+  [
+    "Thank you,",
+    "Sapphire SafePass",
+    "Sapphire International Aviation Academy",
+  ].join("\n");
+
+const generateTemporaryPassword = (length = 10) => {
+  const characters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  let password = "";
+  for (let index = 0; index < length; index += 1) {
+    const randomIndex = crypto.randomInt(0, characters.length);
+    password += characters[randomIndex];
+  }
+  return password;
+};
+
+const generateYearEmployeeIdCandidate = () => {
+  const currentYear = new Date().getFullYear();
+  const numericPart = crypto.randomInt(0, 1000000).toString().padStart(6, "0");
+  return `${currentYear}-${numericPart}`;
+};
+
+const generateUniqueEmployeeId = async () => {
+  let candidate = generateYearEmployeeIdCandidate();
+  while (await User.exists({ employeeId: candidate })) {
+    candidate = generateYearEmployeeIdCandidate();
+  }
+  return candidate;
+};
+
+const sendEmail = async (to, subject, body) => {
+  if (mailTransporter) {
+    try {
+      const info = await mailTransporter.sendMail({
+        from: getMailFromAddress(),
+        to,
+        subject,
+        text: body,
+      });
+      console.log(`Email sent to ${to}. Message ID: ${info.messageId}`);
+      return { success: true, simulated: false, delivered: true, messageId: info.messageId };
+    } catch (error) {
+      console.error(`\nFailed to send email to ${to}:`, error.message);
+      return { success: false, simulated: false, delivered: false, error: error.message };
+    }
+  }
+
+  if (nodemailerLoadError) {
+    console.warn(
+      "\nNodemailer is not installed yet. Run npm install in the backend folder to enable real email sending.",
+    );
+  } else if (!process.env.MAIL_HOST || !process.env.MAIL_USER || !process.env.MAIL_PASS) {
+    console.warn(
+      "\nMAIL_HOST / MAIL_USER / MAIL_PASS are not configured. Falling back to email simulation.",
+    );
+  }
+
+  console.log(`Email simulation generated for ${to}. Subject: ${subject}`);
+  logSensitiveDebug(`Simulated email body for ${to}:`, body);
+  return { success: true, simulated: true, delivered: false };
+};
+
+const canUseBackendLogOtpFallback = () => sensitiveDebugLoggingEnabled;
+
+const isOtpDeliveryUsable = (emailResult) =>
+  Boolean(emailResult?.success || canUseBackendLogOtpFallback());
+
+const getOtpDeliveryMode = (emailResult) => {
+  if (emailResult?.delivered) {
+    return "email";
+  }
+
+  if (emailResult?.simulated || canUseBackendLogOtpFallback()) {
+    return "backend_log";
+  }
+
+  return "failed";
+};
+
+const logEmailOtpForDemo = ({ email, otpCode, label = "EMAIL OTP DEMO" }) => {
+  console.log("");
+  console.log(`========== ${label} ==========`);
+  console.log(`Email  : ${email}`);
+  console.log(`OTP    : ${otpCode}`);
+  console.log("====================================");
+  console.log("");
+};
+
+const createVerificationToken = () => {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+
+  return { token, tokenHash, expiresAt };
+};
+
+const getApiBaseUrl = (req) => {
+  if (process.env.API_PUBLIC_URL) {
+    return process.env.API_PUBLIC_URL.replace(/\/$/, "");
+  }
+
+  const protocol = req.get("x-forwarded-proto") || req.protocol || "http";
+  const host = req.get("host");
+  return `${protocol}://${host}`;
+};
+
+const sendVerificationEmailSimulation = async (req, user) => {
+  const { token, tokenHash, expiresAt } = createVerificationToken();
+  user.verificationTokenHash = tokenHash;
+  user.verificationExpiresAt = expiresAt;
+
+  const verificationUrl = `${getApiBaseUrl(req)}/api/auth/verify-email?token=${token}`;
+
+  const emailResult = await sendEmail(
+    user.email,
+    "Verify your Sapphire SafePass account",
+    [
+      `Good day, ${getEmailGreetingName(user)}.`,
+      "",
+      "Welcome to Sapphire SafePass.",
+      "Please verify your visitor account by opening the secure link below:",
+      verificationUrl,
+      "",
+      "This verification link will expire in 24 hours.",
+      "",
+      `After verifying, return to ${FRONTEND_URL} and sign in to continue your visitor access request.`,
+      "",
+      "If you did not create this account, you may safely ignore this email.",
+      "",
+      getSupportEmailSignature(),
+    ].join("\n"),
+  );
+
+  console.log(`Email verification link generated for ${user.email}.`);
+  logSensitiveDebug(`Verification URL for ${user.email}: ${verificationUrl}`);
+
+  return { verificationUrl, expiresAt, emailResult };
+};
+
+const createRegistrationOtp = async (user) => {
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
+
+  user.verificationOtpHash = otpHash;
+  user.verificationOtpExpiresAt = expiresAt;
+  user.verificationOtpAttempts = 0;
+  user.verificationTokenHash = "";
+  user.verificationExpiresAt = null;
+
+  const emailResult = await sendEmail(
+    user.email,
+    "Sapphire SafePass Visitor Verification Code",
+    [
+      `Good day, ${getEmailGreetingName(user)}.`,
+      "",
+      "Use the verification code below to confirm your visitor account:",
+      "",
+      `Verification code: ${otpCode}`,
+      "",
+      "This code will expire in 10 minutes.",
+      "For your security, please do not share this code with anyone.",
+      "",
+      "If you did not request this code, you may safely ignore this email.",
+      "",
+      getSupportEmailSignature(),
+    ].join("\n"),
+  );
+
+  console.log(`Visitor registration OTP generated for ${user.email}.`);
+  logSensitiveDebug(`Visitor registration OTP for ${user.email}: ${otpCode}`);
+  if (emailResult?.simulated || canUseBackendLogOtpFallback()) {
+    logEmailOtpForDemo({
+      email: user.email,
+      otpCode,
+      label: "VISITOR REGISTRATION OTP",
+    });
+  }
+
+  return { expiresAt, emailResult };
+};
+
+const normalizeOtpCode = (value) => String(value || "").replace(/\D/g, "").slice(0, 6);
+const createPasswordResetOtp = async (req, user) => {
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
+  const resetLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(user.email)}&resetToken=${encodeURIComponent(resetToken)}`;
+
+  user.passwordResetTokenHash = resetTokenHash;
+  user.passwordResetOtpHash = otpHash;
+  user.passwordResetExpiresAt = expiresAt;
+  user.passwordResetAttempts = 0;
+  user.passwordResetVerifiedAt = null;
+
+  const emailResult = await sendEmail(
+    user.email,
+    "Sapphire SafePass Password Reset Code",
+    [
+      `Good day, ${getEmailGreetingName(user)}.`,
+      "",
+      "We received a request to reset the password for your Sapphire SafePass account.",
+      "Use the code below or open the secure link to continue:",
+      "",
+      `Password reset code: ${otpCode}`,
+      `Password reset link: ${resetLink}`,
+      "",
+      "This code will expire in 10 minutes.",
+      "The reset link expires at the same time.",
+      "If you did not request a password reset, you may ignore this email and keep your current password.",
+      "",
+      getSupportEmailSignature(),
+    ].join("\n"),
+  );
+
+  console.log(`Password reset code generated for ${user.email}.`);
+  logSensitiveDebug(`Password reset link for ${user.email}: ${resetLink}`);
+  if (emailResult?.simulated) {
+    logEmailOtpForDemo({
+      email: user.email,
+      otpCode,
+      label: "PASSWORD RESET OTP",
+    });
+    console.log(`Password reset link: ${resetLink}`);
+  }
+
+  return { expiresAt, emailResult, resetLink };
+};
+
+const clearPasswordResetState = (user) => {
+  user.passwordResetTokenHash = "";
+  user.passwordResetOtpHash = "";
+  user.passwordResetExpiresAt = null;
+  user.passwordResetAttempts = 0;
+  user.passwordResetVerifiedAt = null;
+};
+
+const normalizePhoneForOtp = (value) => {
+  let cleanPhone = String(value || "").replace(/[^\d]/g, "");
+
+  if (cleanPhone.startsWith("63")) {
+    cleanPhone = `0${cleanPhone.slice(2)}`;
+  } else if (cleanPhone.startsWith("9") && cleanPhone.length === 10) {
+    cleanPhone = `0${cleanPhone}`;
+  }
+
+  if (!cleanPhone.startsWith("09") && cleanPhone.length >= 9) {
+    cleanPhone = `09${cleanPhone.slice(-9)}`;
+  }
+
+  return cleanPhone;
 };
 
 // ========== ROUTES ==========
@@ -184,14 +1076,517 @@ app.get("/api/test", (req, res) => {
   });
 });
 
+app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
+  try {
+    const cardId = String(
+      req.body?.nfcCardId ||
+        req.body?.cardId ||
+        req.body?.uid ||
+        req.body?.tagId ||
+        "",
+    ).trim();
+    const deviceId = String(req.body?.deviceId || "arduino-reader").trim();
+    const tapLocation = getTapLocationFromRequest(req.body || {});
+
+    if (!cardId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing NFC card ID",
+      });
+    }
+
+    if (!tapLocation.floor || !tapLocation.office) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing checkpoint floor or office",
+      });
+    }
+
+    const visitorUser = await User.findOne({
+      nfcCardId: cardId,
+      role: "visitor",
+    }).select("_id email firstName lastName nfcCardId role");
+
+    if (!visitorUser) {
+      await AccessLog.create({
+        userEmail: "",
+        userName: "Unknown NFC Card",
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "arduino_location_tap",
+        status: "denied",
+        nfcCardId: cardId,
+        metadata: {
+          deviceId,
+          tapLocation,
+        },
+        notes: `Unknown NFC card tapped at ${tapLocation.office}`,
+      });
+
+      return res.status(404).json({
+        success: false,
+        message: "NFC card is not assigned to a visitor",
+      });
+    }
+
+    const visitor = await Visitor.findOne({
+      email: visitorUser.email,
+      status: "checked_in",
+    }).sort({ checkedInAt: -1 });
+
+    if (!visitor) {
+      await AccessLog.create({
+        userId: visitorUser._id,
+        userEmail: visitorUser.email,
+        userName: `${visitorUser.firstName || ""} ${visitorUser.lastName || ""}`.trim(),
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "arduino_location_tap",
+        status: "denied",
+        nfcCardId: cardId,
+        relatedUser: visitorUser._id,
+        metadata: {
+          deviceId,
+          tapLocation,
+        },
+        notes: `Card tapped at ${tapLocation.office}, but visitor is not checked in`,
+      });
+
+      return res.status(409).json({
+        success: false,
+        message: "Visitor must be checked in before tracking can start",
+      });
+    }
+
+    visitor.updateCurrentLocation(tapLocation, { deviceId });
+    await visitor.save();
+
+    await AccessLog.create({
+      userId: visitorUser._id,
+      userEmail: visitor.email,
+      userName: visitor.fullName,
+      actorRole: "device",
+      location: tapLocation.office,
+      accessType: "system",
+      activityType: "arduino_location_tap",
+      status: "granted",
+      nfcCardId: cardId,
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser._id,
+      metadata: {
+        deviceId,
+        currentLocation: visitor.currentLocation,
+      },
+      notes: `${visitor.fullName} tapped at ${tapLocation.office}`,
+    });
+
+    res.json({
+      success: true,
+      message: "Visitor location updated",
+      visitorId: visitor._id,
+      currentLocation: visitor.currentLocation,
+      visitor: {
+        _id: visitor._id,
+        fullName: visitor.fullName,
+        email: visitor.email,
+        status: visitor.status,
+        currentLocation: visitor.currentLocation,
+      },
+    });
+  } catch (error) {
+    console.error("Arduino location tap error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update visitor location",
+    });
+  }
+});
+
+app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+
+    if (!visitor) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor not found",
+      });
+    }
+
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const isOwnVisitorRecord =
+      requesterRole === "visitor" &&
+      String(visitor.email || "").toLowerCase() === String(req.user.email || "").toLowerCase();
+    const canUpdateTrackedLocation =
+      isOwnVisitorRecord || ["admin", "security", "guard"].includes(requesterRole);
+
+    if (!canUpdateTrackedLocation) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot update this visitor location",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(409).json({
+        success: false,
+        message: "Visitor must be checked in before phone GPS tracking can start",
+      });
+    }
+
+    const latitude = Number(req.body?.latitude);
+    const longitude = Number(req.body?.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid latitude and longitude are required",
+      });
+    }
+
+    const coordinates = mapGpsToCampusCoordinates(latitude, longitude);
+    visitor.updateCurrentLocation(
+      {
+        floor: req.body?.floor || visitor.currentLocation?.floor || "ground",
+        office: req.body?.office || visitor.currentLocation?.office || "Phone GPS",
+        checkpointId: "phone_gps",
+        coordinates,
+        gps: {
+          latitude,
+          longitude,
+          accuracy: req.body?.accuracy,
+          altitude: req.body?.altitude,
+          heading: req.body?.heading,
+          speed: req.body?.speed,
+        },
+        source: "phone_gps",
+      },
+      {
+        deviceId: req.body?.deviceId || `phone-${req.user._id}`,
+      },
+    );
+
+    await visitor.save();
+
+    res.json({
+      success: true,
+      message: "Phone GPS location updated",
+      visitorId: visitor._id,
+      currentLocation: visitor.currentLocation,
+    });
+  } catch (error) {
+    console.error("Phone GPS location update error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update phone GPS location",
+    });
+  }
+});
+
 // 1. REGISTER
+const normalizeEmailValue = (value = "") => String(value || "").toLowerCase().trim();
+const normalizeUsernameValue = (value = "") => String(value || "").toLowerCase().trim();
+const isValidEmailValue = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+const normalizeDepartmentValue = (value = "") => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/&/g, "and")
+    .replace(/\s+/g, " ");
+
+  const aliases = {
+    "registrars office": "registrar",
+    registrar: "registrar",
+    "finance office": "accounting",
+    finance: "accounting",
+    accounting: "accounting",
+    cashier: "accounting",
+    guidance: "guidance",
+    "guidance office": "guidance",
+    "student services": "guidance",
+    administration: "administration",
+    "administration office": "administration",
+    admissions: "admissions",
+    "admissions office": "admissions",
+    "flight operations": "flight operations",
+    training: "training",
+    "head of training room": "training",
+    "i.t room": "i.t room",
+    "it room": "i.t room",
+    "faculty room": "faculty room",
+    "information desk": "information desk",
+    lobby: "information desk",
+    "front desk": "information desk",
+    "ground offices": "administration",
+    "file room": "registrar",
+    laboratory: "laboratory",
+    tesda: "tesda",
+    workshop: "workshop",
+    "tools room": "workshop",
+    library: "library",
+    "students lounge": "student services",
+    "student lounge": "student services",
+    "student services": "student services",
+    sto: "sto",
+  };
+
+  return aliases[normalized] || normalized;
+};
+
+const formatDepartmentLabel = (value = "") =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const APPOINTMENT_SLOT_LIMIT = 3;
+const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted"];
+const APPOINTMENT_PURPOSE_OPTIONS = [
+  "Enrollment",
+  "Payment",
+  "Inquiry",
+  "Document Request",
+  "Other",
+];
+const APPOINTMENT_DEPARTMENT_OPTIONS = [
+  "Registrar",
+  "Accounting",
+  "Information Desk",
+  "Guidance",
+  "Administration",
+  "Cashier",
+  "Flight Operations",
+  "Training",
+  "I.T Room",
+  "Faculty Room",
+  "Laboratory",
+  "TESDA",
+  "Workshop",
+  "Library",
+  "Student Services",
+  "STO",
+];
+const ACCOUNT_ROLE_OPTIONS = ["admin", "staff", "security", "guard", "visitor"];
+const ACCOUNT_STATUS_OPTIONS = ["active", "inactive", "pending", "suspended"];
+
+const normalizeOptionValue = (value = "") =>
+  String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+const isAllowedOption = (value, options) => {
+  const normalizedValue = normalizeOptionValue(value);
+  return options.some((option) => normalizeOptionValue(option) === normalizedValue);
+};
+
+const normalizePhoneValue = (value = "") => {
+  const digits = String(value || "").replace(/\D/g, "");
+
+  if (/^09\d{9}$/.test(digits)) return digits;
+  if (/^639\d{9}$/.test(digits)) return `0${digits.slice(2)}`;
+  if (/^9\d{9}$/.test(digits)) return `0${digits}`;
+
+  return String(value || "").trim().replace(/\s+/g, " ");
+};
+
+const isValidPhoneValue = (value = "") =>
+  /^09\d{9}$/.test(normalizePhoneValue(value));
+
+const PHONE_VALIDATION_MESSAGE =
+  "Please enter a valid Philippine mobile number, e.g. 09123456789 or +639123456789.";
+
+const isSameObjectId = (left, right) =>
+  Boolean(left && right && String(left) === String(right));
+
+const isVisitorOwner = (user = {}, visitor = {}) => {
+  if (String(user.role || "").toLowerCase() !== "visitor") return false;
+
+  const sameVisitorId = isSameObjectId(user.visitorId, visitor._id);
+  const sameEmail =
+    String(user.email || "").trim().toLowerCase() ===
+    String(visitor.email || "").trim().toLowerCase();
+
+  return sameVisitorId || sameEmail;
+};
+
+const findVisitorForUser = async (user) => {
+  if (!user) return null;
+
+  const visitors = await findVisitorsForUser(user);
+  const visitor = getPrioritizedVisitor(visitors);
+
+  if (
+    visitor &&
+    (!user.visitorId || String(user.visitorId) !== String(visitor._id))
+  ) {
+    user.visitorId = visitor._id;
+    await user.save();
+  }
+
+  return visitor;
+};
+
+const findVisitorsForUser = async (user) => {
+  if (!user) return [];
+
+  const filters = [];
+  if (user.visitorId) {
+    filters.push({ _id: user.visitorId });
+  }
+  if (user.email) {
+    filters.push({ email: String(user.email).trim().toLowerCase() });
+  }
+
+  if (!filters.length) return [];
+
+  return Visitor.find({ $or: filters }).sort({
+    visitDate: 1,
+    visitTime: 1,
+    registeredAt: -1,
+    createdAt: -1,
+  });
+};
+
+const getVisitorScheduleTime = (visitor) => {
+  const combined = getCombinedAppointmentDateTime(visitor?.visitDate, visitor?.visitTime);
+  if (combined) return combined.getTime();
+
+  const fallback = new Date(visitor?.visitDate || visitor?.visitTime || visitor?.registeredAt || 0);
+  return Number.isNaN(fallback.getTime()) ? 0 : fallback.getTime();
+};
+
+const getPrioritizedVisitor = (visitors = []) => {
+  if (!Array.isArray(visitors) || !visitors.length) return null;
+
+  const now = Date.now();
+  const active = visitors.filter((visitor) =>
+    !["checked_out", "expired", "rejected"].includes(String(visitor?.status || "").toLowerCase()) &&
+    String(visitor?.appointmentStatus || "").toLowerCase() !== "rejected"
+  );
+  const upcoming = active
+    .filter((visitor) => getVisitorScheduleTime(visitor) >= now - 60 * 1000)
+    .sort((left, right) => getVisitorScheduleTime(left) - getVisitorScheduleTime(right));
+
+  if (upcoming[0]) return upcoming[0];
+
+  return [...visitors].sort((left, right) => getVisitorScheduleTime(right) - getVisitorScheduleTime(left))[0];
+};
+
+const getCombinedAppointmentDateTime = (visitDateValue, visitTimeValue) => {
+  const visitDate = new Date(visitDateValue);
+  const visitTime = new Date(visitTimeValue);
+
+  if (Number.isNaN(visitDate.getTime()) || Number.isNaN(visitTime.getTime())) {
+    return null;
+  }
+
+  const combined = new Date(visitDate);
+  combined.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+  return Number.isNaN(combined.getTime()) ? null : combined;
+};
+
+const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
+  const visitDate = new Date(visitDateValue);
+  const visitTime = new Date(visitTimeValue);
+
+  if (Number.isNaN(visitDate.getTime()) || Number.isNaN(visitTime.getTime())) {
+    return null;
+  }
+
+  const dayStart = new Date(visitDate);
+  dayStart.setHours(0, 0, 0, 0);
+
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const slotStart = new Date(visitDate);
+  slotStart.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+
+  const slotEnd = new Date(slotStart);
+  slotEnd.setMinutes(slotEnd.getMinutes() + 1);
+
+  return { dayStart, dayEnd, slotStart, slotEnd };
+};
+
+const isAppointmentServiceDay = (dateValue) => {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return date.getDay() !== 0;
+};
+
+const countStaffAppointmentsForSlot = async ({
+  assignedStaff,
+  visitDate,
+  visitTime,
+  excludeVisitorId = null,
+}) => {
+  const slot = getAppointmentSlotWindow(visitDate, visitTime);
+  if (!slot) return 0;
+
+  const query = {
+    requestCategory: "appointment",
+    approvalFlow: "staff",
+    appointmentStatus: { $in: APPOINTMENT_SLOT_STATUSES },
+    assignedStaff,
+    visitDate: { $gte: slot.dayStart, $lt: slot.dayEnd },
+    visitTime: { $gte: slot.slotStart, $lt: slot.slotEnd },
+  };
+
+  if (excludeVisitorId) {
+    query._id = { $ne: excludeVisitorId };
+  }
+
+  return Visitor.countDocuments(query);
+};
+
+const getStaffDepartmentQuery = (department = "") => {
+  const normalizedDepartment = normalizeDepartmentValue(department);
+  const aliasGroups = {
+    registrar: ["Registrar", "Registrar's Office"],
+    accounting: ["Accounting", "Finance", "Finance Office", "Cashier"],
+    guidance: ["Guidance", "Guidance Office", "Student Services"],
+    administration: ["Administration", "Administration Office"],
+    admissions: ["Admissions", "Admissions Office"],
+    "information desk": ["Information Desk", "Lobby", "Front Desk"],
+    "flight operations": ["Flight Operations"],
+    training: ["Training", "Head of Training Room"],
+    "i.t room": ["I.T Room", "IT Room"],
+    "faculty room": ["Faculty Room"],
+    laboratory: ["Laboratory"],
+    tesda: ["TESDA"],
+    workshop: ["Workshop", "Tools Room"],
+    library: ["Library"],
+    "student services": ["Student Services", "Students Lounge"],
+    sto: ["STO"],
+  };
+
+  const labels = aliasGroups[normalizedDepartment] || [department];
+  return { $in: labels.map((label) => new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")) };
+};
+
+const isStaffAllowedForAppointment = (staffUser = {}, visitor = {}) => {
+  if (String(staffUser.role).toLowerCase() === "admin") return true;
+
+  const staffDepartment = normalizeDepartmentValue(staffUser.department);
+  const appointmentDepartment = normalizeDepartmentValue(
+    visitor.appointmentDepartment || visitor.assignedOffice || visitor.host,
+  );
+
+  return Boolean(staffDepartment && appointmentDepartment && staffDepartment === appointmentDepartment);
+};
+
 app.post("/api/register", async (req, res) => {
-  console.log("📝 Registration attempt:", req.body);
+  console.log("Registration attempt received.");
 
   try {
     const {
       firstName,
       lastName,
+      username,
       email,
       password,
       phone,
@@ -208,10 +1603,43 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedUsername = normalizeUsernameValue(username);
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        error: "Invalid email format",
+        field: "email",
+      });
+    }
+
+    const normalizedPhone = normalizePhoneValue(phone);
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        error: PHONE_VALIDATION_MESSAGE,
+        field: "phone",
+      });
+    }
+
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const duplicateChecks = [{ email: normalizedEmail }];
+    if (normalizedUsername) {
+      duplicateChecks.push({ username: normalizedUsername });
+    }
+
+    const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
+      const duplicateField =
+        existingUser.email === normalizedEmail
+          ? "email"
+          : existingUser.username === normalizedUsername
+            ? "username"
+            : "email";
+
+      return res.status(400).json({
+        error: duplicateField === "username" ? "Username already registered" : "Email already registered",
+        field: duplicateField,
+      });
     }
 
     let nfcCardId = null;
@@ -237,15 +1665,15 @@ app.post("/api/register", async (req, res) => {
 const userData = {
   firstName,
   lastName,
-  email: email.toLowerCase().trim(),
+  username: normalizedUsername || undefined,
+  email: normalizedEmail,
   password,
-  phone,
+  phone: normalizedPhone,
   role: role || 'visitor',
   nfcCardId,
   employeeId: employeeId || undefined,
   department: req.body.department || '',
   position: req.body.position || '',     
-  shift: req.body.shift || 'Morning',     
   status: status || (role === 'visitor' ? 'pending' : 'active'),
   visitorId: visitorId || null,
 };
@@ -334,28 +1762,29 @@ const userData = {
 app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
   try {
     if (req.user.role === "visitor") {
-      let visitor = null;
-
-      if (req.user.visitorId) {
-        visitor = await Visitor.findById(req.user.visitorId);
-      }
-
-      if (!visitor) {
-        visitor = await Visitor.findOne({ email: req.user.email });
-      }
+      const visitors = await findVisitorsForUser(req.user);
+      const visitor = getPrioritizedVisitor(visitors);
 
       if (visitor) {
+        if (!req.user.visitorId || String(req.user.visitorId) !== String(visitor._id)) {
+          req.user.visitorId = visitor._id;
+          await req.user.save();
+        }
+
         return res.json({
           success: true,
           visitor,
+          appointments: visitors,
         });
       }
 
       return res.json({
         success: true,
-        visitor: {
+        visitor: null,
+        appointments: [],
+        account: {
           _id: req.user._id,
-          fullName: `${req.user.firstName} ${req.user.lastName}`,
+          fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
           email: req.user.email,
           phoneNumber: req.user.phone,
           status: req.user.status,
@@ -379,32 +1808,54 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
 
 // 2. LOGIN
 app.post("/api/login", async (req, res) => {
-  console.log("Login attempt:", req.body.email);
-
   try {
     const { email, password } = req.body;
+    const loginIdentifier = String(email || "").toLowerCase().trim();
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ error: "Username/email and password are required" });
     }
 
-    // Find user
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const loginRateLimit = authAttemptLimiter.hit({
+      req,
+      identifier: loginIdentifier,
+    });
+    if (!loginRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        loginRateLimit,
+        "Too many login attempts. Please wait a few minutes before trying again.",
+      );
+    }
+
+    // Visitors can sign in using either their username or email address.
+    const user = await User.findOne({
+      $or: [{ email: loginIdentifier }, { username: loginIdentifier }],
+    });
     if (!user) {
-      console.log("User not found:", email);
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-
-    // Check if user is inactive
-    if (user.status === "inactive" || user.status === "suspended") {
-      return res.status(401).json({ error: "Account is deactivated" });
+      return res.status(401).json({ error: GENERIC_AUTH_ERROR_MESSAGE });
     }
 
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      console.log("Invalid password for:", email);
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({ error: GENERIC_AUTH_ERROR_MESSAGE });
+    }
+
+    // Only disclose account state after the password is valid.
+    if (user.status === "inactive" || user.status === "suspended") {
+      return res.status(401).json({ error: "Account is deactivated" });
+    }
+
+    if (user.role === "visitor" && user.isVerified === false) {
+      return res.status(403).json({
+        success: false,
+        error: "Your account is not yet verified",
+        message:
+          "Please verify your account using the OTP sent during registration before logging in.",
+        requiresEmailVerification: true,
+        requiresOtpVerification: true,
+      });
     }
 
     // Update last login
@@ -434,7 +1885,7 @@ app.post("/api/login", async (req, res) => {
     const userResponse = user.toObject();
     delete userResponse.password;
 
-    console.log("Login successful:", user.email, "Role:", user.role);
+    console.log(`Login successful for ${user.email}.`);
 
     await createSystemActivity({
       actorUser: user,
@@ -484,20 +1935,101 @@ app.get("/api/profile", authMiddleware, async (req, res) => {
 // 4. UPDATE PROFILE (Protected)
 app.put("/api/profile", authMiddleware, async (req, res) => {
   try {
-    const updates = req.body;
+    const existingUser = await User.findById(req.user._id);
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-    // Don't allow password update through this route
-    delete updates.password;
-    delete updates.email; // Email cannot be changed
+    const body = req.body || {};
+    const updates = {};
+
+    if (body.firstName !== undefined) updates.firstName = String(body.firstName || "").trim();
+    if (body.lastName !== undefined) updates.lastName = String(body.lastName || "").trim();
+    if (body.phone !== undefined) updates.phone = String(body.phone || "").trim();
+    if (body.emergencyContact !== undefined) {
+      updates.emergencyContact = String(body.emergencyContact || "").trim();
+    }
+    if (body.profilePhoto !== undefined) updates.profilePhoto = body.profilePhoto || null;
+
+    if (body.email !== undefined) {
+      const normalizedEmail = normalizeEmailValue(body.email);
+      if (!normalizedEmail || !isValidEmailValue(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid email address.",
+        });
+      }
+
+      const duplicateEmail = await User.findOne({
+        _id: { $ne: existingUser._id },
+        email: normalizedEmail,
+      });
+
+      if (duplicateEmail) {
+        return res.status(409).json({
+          success: false,
+          message: "That email address is already used by another account.",
+        });
+      }
+
+      updates.email = normalizedEmail;
+    }
+
+    if (body.username !== undefined) {
+      const normalizedUsername = normalizeUsernameValue(body.username);
+      if (!normalizedUsername) {
+        return res.status(400).json({
+          success: false,
+          message: "Username cannot be empty.",
+        });
+      }
+
+      const duplicateUsername = await User.findOne({
+        _id: { $ne: existingUser._id },
+        username: normalizedUsername,
+      });
+
+      if (duplicateUsername) {
+        return res.status(409).json({
+          success: false,
+          message: "That username is already used by another account.",
+        });
+      }
+
+      updates.username = normalizedUsername;
+    }
+
+    if (updates.firstName !== undefined && !updates.firstName) {
+      return res.status(400).json({ success: false, message: "First name is required." });
+    }
+
+    if (updates.lastName !== undefined && !updates.lastName) {
+      return res.status(400).json({ success: false, message: "Last name is required." });
+    }
 
     const user = await User.findByIdAndUpdate(
-      req.user._id,
+      existingUser._id,
       { ...updates, updatedAt: new Date() },
       { new: true, runValidators: true },
     ).select("-password");
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+    if (user?.role === "visitor") {
+      const visitorUpdates = {};
+      if (updates.firstName !== undefined || updates.lastName !== undefined) {
+        visitorUpdates.fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+      }
+      if (updates.email !== undefined) visitorUpdates.email = user.email;
+      if (updates.phone !== undefined && updates.phone) visitorUpdates.phoneNumber = updates.phone;
+
+      if (Object.keys(visitorUpdates).length > 0) {
+        let visitor = null;
+        if (user.visitorId) visitor = await Visitor.findById(user.visitorId);
+        if (!visitor) visitor = await Visitor.findOne({ email: existingUser.email }).sort({ registeredAt: -1 });
+        if (visitor) {
+          Object.assign(visitor, visitorUpdates);
+          await visitor.save();
+        }
+      }
     }
 
     res.json({
@@ -558,11 +2090,628 @@ app.post("/api/check-email", async (req, res) => {
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
     }
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
-    res.json({ exists: !!user });
+    res.json({
+      success: true,
+      message: "Use registration or password reset to continue.",
+    });
   } catch (error) {
     console.error("❌ Check email error:", error);
     res.status(500).json({ error: "Failed to check email" });
+  }
+});
+
+app.post("/api/auth/request-password-reset", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+
+    if (!email || !isValidEmailValue(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
+    }
+
+    const resetRateLimit = passwordResetRequestLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!resetRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        resetRateLimit,
+        "Too many password reset requests. Please wait a few minutes before trying again.",
+      );
+    }
+
+    const user = await User.findOne({ email });
+    if (user) {
+      const otp = await createPasswordResetOtp(req, user);
+      if (!otp.emailResult?.success) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send password reset code.",
+        });
+      }
+      user.updatedAt = new Date();
+      await user.save();
+
+      return res.json({
+        success: true,
+        message: GENERIC_PASSWORD_RESET_REQUEST_MESSAGE,
+        expiresIn: 600,
+        otpExpiresAt: otp.expiresAt,
+      });
+    }
+
+    const fallbackExpiry = new Date(Date.now() + 1000 * 60 * 10);
+
+    res.json({
+      success: true,
+      message: GENERIC_PASSWORD_RESET_REQUEST_MESSAGE,
+      expiresIn: 600,
+      otpExpiresAt: fallbackExpiry,
+    });
+  } catch (error) {
+    console.error("Request password reset error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to send password reset code.",
+    });
+  }
+});
+
+app.post("/api/auth/verify-password-reset", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+    const otpCode = normalizeOtpCode(req.body?.otpCode);
+
+    if (!email || !otpCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP code are required.",
+      });
+    }
+
+    if (!/^\d{6}$/.test(otpCode)) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP code must be exactly 6 digits.",
+      });
+    }
+
+    const resetVerifyRateLimit = passwordResetVerifyLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!resetVerifyRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        resetVerifyRateLimit,
+        "Too many verification attempts. Please request a new reset code and try again later.",
+      );
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
+      });
+    }
+
+    if (
+      !user.passwordResetOtpHash ||
+      !user.passwordResetExpiresAt
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
+      });
+    }
+
+    if (user.passwordResetExpiresAt <= new Date()) {
+      clearPasswordResetState(user);
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
+      });
+    }
+
+    if ((user.passwordResetAttempts || 0) >= 5) {
+      clearPasswordResetState(user);
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
+      });
+    }
+
+    const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+    if (otpHash !== user.passwordResetOtpHash) {
+      user.passwordResetAttempts = (user.passwordResetAttempts || 0) + 1;
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: GENERIC_PASSWORD_RESET_VERIFY_MESSAGE,
+      });
+    }
+
+    user.passwordResetAttempts = 0;
+    user.passwordResetVerifiedAt = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      verified: true,
+      message: "Password reset code verified successfully.",
+    });
+  } catch (error) {
+    console.error("Verify password reset error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify password reset code.",
+    });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+    const newPassword = String(req.body?.newPassword || "");
+    const resetToken = String(req.body?.resetToken || "").trim();
+
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and new password are required.",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters long.",
+      });
+    }
+
+    const resetChangeRateLimit = passwordResetChangeLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!resetChangeRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        resetChangeRateLimit,
+        "Too many password reset attempts. Please wait a few minutes before trying again.",
+      );
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Please verify the reset code before changing your password.",
+      });
+    }
+
+    if (!user.passwordResetExpiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: "No verified password reset request was found.",
+      });
+    }
+
+    if (user.passwordResetExpiresAt <= new Date()) {
+      clearPasswordResetState(user);
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: "Reset session expired. Please request a new code.",
+      });
+    }
+
+    const resetTokenHash = resetToken
+      ? crypto.createHash("sha256").update(resetToken).digest("hex")
+      : "";
+    const hasValidResetToken =
+      resetTokenHash &&
+      user.passwordResetTokenHash &&
+      resetTokenHash === user.passwordResetTokenHash;
+
+    if (!user.passwordResetVerifiedAt && !hasValidResetToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Please verify the reset code or use the secure reset link before changing your password.",
+      });
+    }
+
+    user.password = newPassword;
+    clearPasswordResetState(user);
+    user.updatedAt = new Date();
+    await user.save();
+
+    await createSystemActivity({
+      actorUser: user,
+      relatedUser: user,
+      activityType: "password_reset",
+      status: "granted",
+      location: "Login Screen",
+      notes: `${user.email} completed a password reset via forgot password.`,
+    });
+
+    res.json({
+      success: true,
+      message: "Password reset successfully.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset password.",
+    });
+  }
+});
+
+app.get("/api/auth/verify-email", async (req, res) => {
+  try {
+    const token = String(req.query.token || "").trim();
+
+    if (!token) {
+      return res.status(400).send("Missing verification token.");
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      verificationTokenHash: tokenHash,
+      verificationExpiresAt: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).send(
+        "This verification link is invalid or expired. Please request a new verification email.",
+      );
+    }
+
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.verificationTokenHash = "";
+    user.verificationExpiresAt = null;
+    if (user.status === "pending") {
+      user.status = "active";
+    }
+    await user.save();
+
+    console.log(`Email verified for ${user.email}`);
+
+    res.send(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Email Verified</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f3f7f5; color: #0f172a; padding: 40px; }
+            .card { max-width: 520px; margin: 8vh auto; background: white; border-radius: 18px; padding: 32px; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12); }
+            h1 { color: #047857; margin-top: 0; }
+            a { display: inline-block; margin-top: 18px; background: #047857; color: white; padding: 12px 18px; border-radius: 10px; text-decoration: none; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Email verified</h1>
+            <p>Your Sapphire SafePass account has been verified. You can now return to the app and log in.</p>
+            <a href="${FRONTEND_URL}">Go to SafePass</a>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Verify email error:", error);
+    res.status(500).send("Failed to verify email.");
+  }
+});
+
+app.post("/api/auth/verify-email", async (req, res) => {
+  try {
+    const token = String(req.body?.token || "").trim();
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing verification token.",
+      });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      verificationTokenHash: tokenHash,
+      verificationExpiresAt: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This verification link is invalid or expired. Please request a new verification email.",
+      });
+    }
+
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.verificationTokenHash = "";
+    user.verificationExpiresAt = null;
+    if (user.status === "pending") {
+      user.status = "active";
+    }
+    await user.save();
+
+    console.log(`Email verified for ${user.email}`);
+
+    return res.json({
+      success: true,
+      message: "Email verified. You can now log in.",
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error("Verify email API error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify email.",
+    });
+  }
+});
+
+app.post("/api/auth/resend-verification", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const user = await User.findOne({ email, role: "visitor" });
+
+    if (!user) {
+      return res.json({
+        success: true,
+        message: "A verification link has been sent if the account is eligible.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.json({
+        success: true,
+        message: "This account is already verified.",
+      });
+    }
+
+    const verification = await sendVerificationEmailSimulation(req, user);
+    if (!verification.emailResult?.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to resend verification link.",
+      });
+    }
+    await user.save();
+
+    res.json({
+      success: true,
+      message:
+        "A verification link has been sent if the account is eligible.",
+      verificationExpiresAt: verification.expiresAt,
+    });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to resend verification link.",
+    });
+  }
+});
+
+app.post("/api/auth/verify-registration-otp", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+    const otpCode = normalizeOtpCode(req.body?.otpCode);
+
+    if (!email || !otpCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP code are required.",
+      });
+    }
+
+    if (!/^\d{6}$/.test(otpCode)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter the 6-digit OTP code.",
+      });
+    }
+
+    const registrationVerifyRateLimit = registrationOtpVerifyLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!registrationVerifyRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        registrationVerifyRateLimit,
+        "Too many OTP verification attempts. Please request a new code and try again later.",
+      );
+    }
+
+    const user = await User.findOne({ email, role: "visitor" });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP code. Please request a new code and try again.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.json({
+        success: true,
+        verified: true,
+        message: "This account is already verified.",
+      });
+    }
+
+    if (!user.verificationOtpHash || !user.verificationOtpExpiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: "No OTP verification code was found. Please request a new code.",
+      });
+    }
+
+    if (new Date(user.verificationOtpExpiresAt).getTime() < Date.now()) {
+      user.verificationOtpHash = "";
+      user.verificationOtpExpiresAt = null;
+      user.verificationOtpAttempts = 0;
+      await user.save();
+
+      return res.status(400).json({
+        success: false,
+        message: "OTP code has expired. Please request a new code.",
+      });
+    }
+
+    if ((user.verificationOtpAttempts || 0) >= 5) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many incorrect OTP attempts. Please request a new code.",
+      });
+    }
+
+    const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
+    if (otpHash !== user.verificationOtpHash) {
+      user.verificationOtpAttempts = (user.verificationOtpAttempts || 0) + 1;
+      await user.save();
+
+      return res.status(400).json({
+        success: false,
+        message: `Invalid OTP code. ${Math.max(0, 5 - user.verificationOtpAttempts)} attempts remaining.`,
+      });
+    }
+
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.verificationOtpHash = "";
+    user.verificationOtpExpiresAt = null;
+    user.verificationOtpAttempts = 0;
+    user.verificationTokenHash = "";
+    user.verificationExpiresAt = null;
+    if (user.status === "pending") {
+      user.status = "active";
+    }
+    await user.save();
+
+    await createRoleNotification({
+      title: "Visitor Account Verified",
+      message: `${getFullName(user)} verified their visitor account using OTP.`,
+      targetRole: "admin",
+      relatedUser: user._id,
+      type: "visitor",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_account_otp_verified",
+        email: user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    res.json({
+      success: true,
+      verified: true,
+      message: "OTP verified. You can now log in.",
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error("Verify registration OTP error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify OTP.",
+    });
+  }
+});
+
+app.post("/api/auth/resend-registration-otp", async (req, res) => {
+  try {
+    const email = normalizeEmailValue(req.body?.email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const registrationRequestRateLimit = registrationOtpRequestLimiter.hit({
+      req,
+      identifier: email,
+    });
+    if (!registrationRequestRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        registrationRequestRateLimit,
+        "Too many OTP requests. Please wait a few minutes before requesting a new code.",
+      );
+    }
+
+    const user = await User.findOne({ email, role: "visitor" });
+    if (!user) {
+      return res.json({
+        success: true,
+        message: "A new OTP code has been sent if the account is eligible.",
+        otpExpiresAt: new Date(Date.now() + 1000 * 60 * 10),
+      });
+    }
+
+    if (user.isVerified) {
+      return res.json({
+        success: true,
+        verified: true,
+        message: "This account is already verified.",
+      });
+    }
+
+    const otp = await createRegistrationOtp(user);
+    if (!isOtpDeliveryUsable(otp.emailResult)) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification OTP. Please try again.",
+      });
+    }
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "A new OTP code has been sent if the account is eligible.",
+      otpExpiresAt: otp.expiresAt,
+      otpDeliveryMode: getOtpDeliveryMode(otp.emailResult),
+    });
+  } catch (error) {
+    console.error("Resend registration OTP error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to resend OTP.",
+    });
   }
 });
 
@@ -570,211 +2719,194 @@ app.post("/api/check-email", async (req, res) => {
 
 // Register a new visitor (Complete version with UNIQUE NFC ID for pending visitors)
 app.post("/api/visitors/register", async (req, res) => {
-  let createdVisitor = null;
-  let createdUser = null;
-
   try {
     const visitorData = req.body || {};
-    const normalizedEmail = String(visitorData.email || "")
-      .toLowerCase()
-      .trim();
     const normalizedFullName = String(visitorData.fullName || "").trim();
-    const normalizedPhoneNumber = String(visitorData.phoneNumber || "").trim();
-    const normalizedIdNumber = String(visitorData.idNumber || "").trim();
-    const normalizedPurpose = String(visitorData.purposeOfVisit || "").trim();
-    const normalizedVehicleNumber = String(visitorData.vehicleNumber || "").trim();
+    const normalizedEmail = normalizeEmailValue(visitorData.email);
+    const normalizedUsername = normalizeUsernameValue(visitorData.username);
+    const normalizedPhone = normalizePhoneValue(visitorData.phone || visitorData.phoneNumber);
+    const password = String(visitorData.password || "");
+    const dataPrivacyAccepted = visitorData.privacyAccepted === true;
+    const dataPrivacyAcceptedAt = visitorData.privacyAcceptedAt
+      ? new Date(visitorData.privacyAcceptedAt)
+      : new Date();
 
-    // 1. Check if user already exists
-    const existingUser = await User.findOne({
-      email: normalizedEmail,
-    });
-    if (existingUser) {
-      const existingVisitorForUser = await Visitor.findOne({
-        email: normalizedEmail,
-      }).sort({ registeredAt: -1 });
+    if (!normalizedFullName || !normalizedEmail || !normalizedUsername || !normalizedPhone || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Full name, email, username, contact number, and password are required.",
+      });
+    }
 
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long.",
+      });
+    }
+
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: PHONE_VALIDATION_MESSAGE,
+        field: "phone",
+      });
+    }
+
+    if (!dataPrivacyAccepted) {
       return res.status(400).json({
         success: false,
         message:
-          existingUser.role === "visitor" &&
-          (existingUser.status === "pending" ||
-            existingVisitorForUser?.approvalStatus === "pending")
-            ? "You already have a pending registration. Please log in to track your approval status."
-            : "An account with this email already exists. Please login instead.",
+          "By registering, you must agree that your personal data will be collected and used for visitor monitoring and security purposes.",
       });
     }
 
-    // 2. Check if visitor already exists
-    const existingVisitor = await Visitor.findOne({
-      email: normalizedEmail,
-    }).sort({ registeredAt: -1 });
-    if (existingVisitor) {
-      if (existingVisitor.approvalStatus === "pending") {
-        return res.status(400).json({
-          success: false,
-          message:
-            "You already have a pending registration. Please log in to track your approval status.",
-        });
-      } else if (existingVisitor.approvalStatus === "approved") {
-        return res.status(400).json({
-          success: false,
-          message:
-            "You already have an approved visitor account. Please login instead.",
-        });
-      }
+    const existingEmailUser = await User.findOne({ email: normalizedEmail });
+    if (existingEmailUser) {
       return res.status(400).json({
         success: false,
-        message: "A visitor with this email already exists.",
+        field: "email",
+        message: "An account with this email already exists. Please log in instead.",
       });
     }
 
-    // 3. Generate the temporary visitor password before creating linked records
-    const tempPassword = `VIS${Math.random().toString(36).slice(-8).toUpperCase()}`;
+    const existingUsernameUser = await User.findOne({ username: normalizedUsername });
+    if (existingUsernameUser) {
+      return res.status(400).json({
+        success: false,
+        field: "username",
+        message: "That username is already taken. Please choose another username.",
+      });
+    }
 
-    // 4. Create new visitor
-    const visitor = new Visitor({
-      fullName: normalizedFullName,
-      email: normalizedEmail,
-      phoneNumber: normalizedPhoneNumber,
-      idNumber: normalizedIdNumber,
-      idImage: visitorData.idImage,
-      purposeOfVisit: normalizedPurpose,
-      host: String(visitorData.host || "").trim(),
-      assignedOffice: String(visitorData.assignedOffice || "").trim(),
-      vehicleNumber: normalizedVehicleNumber,
-      visitDate: new Date(visitorData.visitDate),
-      visitTime: new Date(visitorData.visitTime),
-      registeredAt: new Date(),
-      requestCategory: "registration",
-      approvalFlow: "admin",
-      temporaryPassword: tempPassword,
+    const existingVisitor = await Visitor.findOne({ email: normalizedEmail }).sort({
+      registeredAt: -1,
     });
+    const nameParts = normalizedFullName.split(/\s+/).filter(Boolean);
+    const firstName = nameParts.shift() || "Visitor";
+    const lastName = nameParts.join(" ") || "User";
 
-    visitor.markRegistrationPending();
-    await visitor.save();
-    createdVisitor = visitor;
-    console.log("✅ Visitor registered:", visitorData.email);
+    const user = new User();
 
-    // 5. Generate UNIQUE temporary NFC card ID (KEY FIX!)
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substr(2, 10).toUpperCase();
-    const tempNfcCardId = `PENDING-${timestamp}-${randomString}`;
+    user.firstName = firstName;
+    user.lastName = lastName;
+    user.username = normalizedUsername;
+    user.email = normalizedEmail;
+    user.password = password;
+    user.phone = normalizedPhone;
+    user.role = "visitor";
+    user.status = "active";
+    user.isVerified = false;
+    user.dataPrivacyAccepted = true;
+    user.dataPrivacyAcceptedAt = dataPrivacyAcceptedAt;
+    user.isActive = true;
+    user.visitorId = existingVisitor?._id || user.visitorId || null;
 
-    // 6. Create user account with UNIQUE NFC card ID (NOT NULL!)
-    const user = new User({
-      firstName: normalizedFullName.split(" ")[0] || "Visitor",
-      lastName: normalizedFullName.split(" ").slice(1).join(" ") || "User",
-      email: normalizedEmail,
-      password: tempPassword,
-      phone: normalizedPhoneNumber,
-      role: "visitor",
-      status: "pending",
-      isActive: false,
-      visitorId: visitor._id,
-      nfcCardId: tempNfcCardId,
-    });
-
+    const otp = await createRegistrationOtp(user);
+    if (!isOtpDeliveryUsable(otp.emailResult)) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification OTP. Please try again.",
+      });
+    }
     await user.save();
-    createdUser = user;
-    console.log("✅ User account created with NFC ID:", tempNfcCardId);
-
-    // 7. Create notifications for ALL admins
-    const admins = await User.find({ role: "admin", isActive: true });
-
-    for (const admin of admins) {
-      const notification = new Notification({
-        title: "New Visitor Registration",
-        message:
-          `${visitorData.fullName} (${visitorData.email}) has registered for a visit.\n\n` +
-          `Purpose: ${visitorData.purposeOfVisit}\n` +
-          `Date: ${new Date(visitorData.visitDate).toLocaleDateString()}\n` +
-          `Time: ${new Date(visitorData.visitTime).toLocaleTimeString()}\n` +
-          `Phone: ${visitorData.phoneNumber}`,
-        type: "visitor",
-        severity: "medium",
-        targetRole: "admin",
-        targetUser: admin._id,
-        relatedVisitor: visitor._id,
-        metadata: {
-          visitorName: visitorData.fullName,
-          visitorEmail: visitorData.email,
-          purpose: visitorData.purposeOfVisit,
-          visitDate: visitorData.visitDate,
-          visitTime: visitorData.visitTime,
-          phoneNumber: visitorData.phoneNumber,
-        },
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
-
-      await notification.save();
-    }
-
     console.log(
-      `📢 Created ${admins.length} admin notifications for new visitor`,
+      "Visitor account created, waiting for OTP verification:",
+      normalizedEmail
     );
 
     await createSystemActivity({
       actorUser: user,
-      relatedVisitor: visitor,
+      relatedVisitor: existingVisitor?._id ? existingVisitor : null,
       relatedUser: user,
-      activityType: "visitor_registration_request",
+      activityType: "visitor_account_registration",
       status: "pending",
-      location: visitor.assignedOffice || visitor.host || "Visitor Registration",
-      notes: `${visitor.fullName} submitted a visitor registration request.`,
+      location: "Visitor Registration",
+      notes: `${normalizedFullName} created a visitor account and must verify OTP before login.`,
       metadata: {
-        requestCategory: "registration",
-        visitDate: visitor.visitDate,
-        visitTime: visitor.visitTime,
-        purposeOfVisit: visitor.purposeOfVisit,
+        username: user.username,
+        email: user.email,
+        requiresOtpVerification: true,
       },
     });
 
-    // 8. Return response with credentials
+    await AccessLog.create({
+      userId: user._id,
+      userEmail: user.email,
+      userName: normalizedFullName,
+      actorRole: "visitor",
+      location: "Visitor Registration",
+      accessType: "system",
+      activityType: "visitor_account_registration",
+      status: "pending",
+      relatedUser: user._id,
+      relatedVisitor: existingVisitor?._id || null,
+      notes: "Visitor account created and waiting for OTP verification",
+    });
+
+    await createRoleNotification({
+      title: "New Visitor Account Registered",
+      message: `New visitor account registered: ${normalizedFullName}`,
+      targetRole: "admin",
+      relatedVisitor: existingVisitor?._id || null,
+      relatedUser: user._id,
+      type: "visitor",
+      severity: "low",
+      metadata: {
+        activityType: "visitor_account_registration",
+        userId: user._id,
+        email: user.email,
+        fullName: normalizedFullName,
+        isVerified: false,
+        requiresOtpVerification: true,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
     res.status(201).json({
       success: true,
-      message:
-        "Visitor registration submitted successfully. Pending admin approval.",
-      visitor: {
-        _id: visitor._id,
-        fullName: visitor.fullName,
-        email: visitor.email,
-        status: "pending",
-        approvalStatus: "pending",
+      message: "Visitor account created. Please enter the OTP code sent to your email before logging in.",
+      requiresOtpVerification: true,
+      otpExpiresAt: otp.expiresAt,
+      otpDeliveryMode: getOtpDeliveryMode(otp.emailResult),
+      user: {
+        _id: user._id,
+        fullName: normalizedFullName,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        status: user.status,
+        isVerified: user.isVerified,
       },
       credentials: {
+        username: user.username,
         email: user.email,
-        password: tempPassword,
+        password,
       },
     });
   } catch (error) {
     console.error("Visitor registration error:", error);
 
-    // Handle duplicate key error specifically
     if (error.code === 11000) {
       const duplicateField =
         Object.keys(error.keyPattern || {})[0] ||
         Object.keys(error.keyValue || {})[0] ||
         "";
 
-      if (createdVisitor && !createdUser) {
-        try {
-          await Visitor.deleteOne({ _id: createdVisitor._id });
-          console.log(
-            "↩️ Rolled back partial visitor record after duplicate registration error:",
-            createdVisitor.email,
-          );
-        } catch (rollbackError) {
-          console.error("Visitor rollback error:", rollbackError);
-        }
-      }
-
       return res.status(400).json({
         success: false,
         message:
           duplicateField === "email"
             ? "An account with this email already exists. Please log in instead."
-            : duplicateField === "nfcCardId"
-              ? "Unable to assign a visitor access card right now. Please try submitting again."
+            : duplicateField === "username"
+              ? "That username is already taken. Please choose another username."
               : "A duplicate entry was found. Please try again with different details.",
         duplicateField,
       });
@@ -932,7 +3064,6 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     const tempPassword =
       visitor.temporaryPassword ||
       `VIS${Math.random().toString(36).slice(-8).toUpperCase()}`;
-    console.log("🔐 Temporary Password:", tempPassword);
 
     // Update visitor status - THIS IS THE KEY PART
     console.log("\n📝 UPDATING VISITOR...");
@@ -1002,7 +3133,6 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       "Visitor Registration Approved - Sapphire Aviation",
       `Dear ${visitor.fullName},\n\nYour visitor registration has been approved!\n\nLogin Credentials:\nEmail: ${visitor.email}\nPassword: ${tempPassword}\n\nVisit Details:\nPurpose: ${visitor.purposeOfVisit}\nDate: ${new Date(visitor.visitDate).toLocaleDateString()}\nTime: ${new Date(visitor.visitTime).toLocaleTimeString()}\n\nThank you,\nSapphire Aviation Security Team`,
     );
-    console.log("📧 Approval email sent to:", visitor.email);
 
     // Create notification for security
     await createRoleNotification({
@@ -1020,10 +3150,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
         purposeOfVisit: visitor.purposeOfVisit,
       },
     });
-    console.log("🔔 Security notification created");
-
-    console.log("\n✅ VISITOR APPROVED SUCCESSFULLY!");
-    console.log("=".repeat(60) + "\n");
+    console.log(`Visitor approved successfully for ${visitor.email}.`);
 
     await createSystemActivity({
       actorUser: req.user,
@@ -1134,8 +3261,8 @@ app.put("/api/admin/visitors/:id/reject", authMiddleware, async (req, res) => {
 
 // ============ SECURITY GUARD MANAGEMENT ROUTES ============
 
-// Create security guard (admin only)
-app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
+// Create staff account (admin only)
+app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ success: false, message: "Access denied" });
@@ -1144,83 +3271,124 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
     const {
       firstName,
       lastName,
+      username,
       email,
-      password,
       phone,
-      shift,
+      department,
       position,
-      employeeId,
+      status,
     } = req.body;
 
-    // Validate required fields
-    if (!firstName || !lastName || !email || !password || !phone) {
+    const normalizedFirstName = String(firstName || "").trim();
+    const normalizedLastName = String(lastName || "").trim();
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedUsername = normalizeUsernameValue(username);
+    const normalizedPhone = normalizePhoneValue(phone);
+    const normalizedDepartment = String(department || "").trim();
+    const normalizedPosition = String(position || "Staff Member").trim();
+    const normalizedStatus = status === "inactive" ? "inactive" : "active";
+
+    if (
+      !normalizedFirstName ||
+      !normalizedLastName ||
+      !normalizedUsername ||
+      !normalizedEmail ||
+      !normalizedPhone ||
+      !normalizedDepartment
+    ) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
+        required: ["firstName", "lastName", "username", "email", "phone", "department"],
       });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    if (!isValidEmailValue(normalizedEmail)) {
       return res.status(400).json({
         success: false,
-        message: "Email already registered",
+        message: "Invalid email format",
+        field: "email",
       });
     }
 
-    // Generate NFC Card ID
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substr(2, 6).toUpperCase();
-    const nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
-
-    // Generate employee ID if not provided
-    let finalEmployeeId = employeeId;
-    if (!finalEmployeeId) {
-      const timeStamp = Date.now().toString().slice(-6);
-      const random = Math.random().toString(36).substr(2, 3).toUpperCase();
-      finalEmployeeId = `GRD-${timeStamp}-${random}`;
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: PHONE_VALIDATION_MESSAGE,
+        field: "phone",
+      });
     }
 
-    // Create user
+    const duplicateChecks = [
+      { email: normalizedEmail },
+      { username: normalizedUsername },
+    ];
+
+    const existingUser = await User.findOne({ $or: duplicateChecks });
+    if (existingUser) {
+      const duplicateField =
+        existingUser.email === normalizedEmail
+          ? "email"
+          : existingUser.username === normalizedUsername
+            ? "username"
+            : "email";
+
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "username"
+            ? "Username already registered"
+            : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
+    const finalEmployeeId = await generateUniqueEmployeeId();
+    const temporaryPassword = generateTemporaryPassword();
+
+    const nfcCardId = `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
     const user = new User({
-      firstName,
-      lastName,
-      email: email.toLowerCase().trim(),
-      password,
-      phone,
-      role: "guard",
-      nfcCardId,
+      firstName: normalizedFirstName,
+      lastName: normalizedLastName,
+      username: normalizedUsername,
+      email: normalizedEmail,
+      password: temporaryPassword,
+      phone: normalizedPhone,
+      role: "staff",
+      status: normalizedStatus,
+      isActive: normalizedStatus === "active",
       employeeId: finalEmployeeId,
-      shift: shift || "Morning",
-      position: position || "Security Guard",
-      status: "active",
-      isActive: true,
+      department: normalizedDepartment,
+      position: normalizedPosition,
+      nfcCardId,
     });
 
     await user.save();
 
-    // Send welcome email
+    const accessLog = new AccessLog({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      userName: `${req.user.firstName} ${req.user.lastName}`,
+      location: "Admin Panel",
+      accessType: "system",
+      status: "granted",
+      notes: `Created staff account: ${user.email}`,
+    });
+    await accessLog.save();
+
     sendEmail(
       user.email,
-      `Welcome to Sapphire Aviation - Security Guard Account`,
+      `Welcome to Sapphire Aviation - Staff Account`,
       `Dear ${user.firstName} ${user.lastName},\n\n` +
-        `Your Security Guard account has been created!\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `🔐 LOGIN CREDENTIALS\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `📧 Email: ${user.email}\n` +
-        `🔑 Password: ${password}\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `📋 ACCOUNT DETAILS\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `👤 Name: ${user.firstName} ${user.lastName}\n` +
-        `🎭 Role: SECURITY GUARD\n` +
-        `🆔 Employee ID: ${user.employeeId}\n` +
-        `⏰ Shift: ${shift || "Morning"}\n` +
-        `📱 Phone: ${user.phone}\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `Please login to the app and change your password for security.\n\n` +
+        `Your staff account has been created by the administrator.\n\n` +
+        `Username: ${user.username}\n` +
+        `Email: ${user.email}\n` +
+        `Temporary Password: ${temporaryPassword}\n` +
+        `Staff ID: ${user.employeeId}\n` +
+        `Department: ${user.department}\n` +
+        `Status: ${user.status.toUpperCase()}\n\n` +
+        `Please sign in and change your password when convenient.\n\n` +
         `Thank you,\n` +
         `Sapphire Aviation Security Team`,
     );
@@ -1230,19 +3398,118 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Security guard created successfully",
+      message: "Staff account created successfully",
       user: userResponse,
     });
   } catch (error) {
-    console.error("Create security guard error:", error);
+    console.error("Create staff account error:", error);
+
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateField === "username"
+            ? "Username already registered"
+            : "Email already registered",
+        field: duplicateField,
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: "Failed to create security guard",
+      message: "Failed to create staff account",
       error: error.message,
     });
   }
 });
 
+// Create security guard (admin only)
+app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const { firstName, lastName, email, phone, shift, position } = req.body;
+
+    const normalizedFirstName = String(firstName || "").trim();
+    const normalizedLastName = String(lastName || "").trim();
+    const normalizedEmail = normalizeEmailValue(email);
+    const normalizedPhone = normalizePhoneValue(phone);
+    const normalizedPosition = String(position || "Security Guard").trim();
+
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedPhone) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
+
+    if (!isValidEmailValue(normalizedEmail)) {
+      return res.status(400).json({ success: false, message: "Invalid email format", field: "email" });
+    }
+
+    if (!isValidPhoneValue(normalizedPhone)) {
+      return res.status(400).json({ success: false, message: PHONE_VALIDATION_MESSAGE, field: "phone" });
+    }
+
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: "Email already registered", field: "email" });
+    }
+
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substr(2, 6).toUpperCase();
+    const nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
+    const finalEmployeeId = await generateUniqueEmployeeId();
+    const temporaryPassword = generateTemporaryPassword();
+
+    const user = new User({
+      firstName: normalizedFirstName,
+      lastName: normalizedLastName,
+      email: normalizedEmail,
+      password: temporaryPassword,
+      phone: normalizedPhone,
+      role: "guard",
+      nfcCardId,
+      employeeId: finalEmployeeId,
+      position: normalizedPosition,
+      shift: String(shift || "").trim(),
+      status: "active",
+      isActive: true,
+    });
+
+    await user.save();
+
+    sendEmail(
+      user.email,
+      "Welcome to Sapphire Aviation - Security Guard Account",
+      `Dear ${user.firstName} ${user.lastName},\n\n` +
+        `Your security account has been created by the administrator.\n\n` +
+        `Email: ${user.email}\n` +
+        `Temporary Password: ${temporaryPassword}\n` +
+        `Employee ID: ${user.employeeId}\n` +
+        `Phone: ${user.phone}\n` +
+        `Position: ${user.position}\n` +
+        `Shift: ${user.shift || "To be assigned"}\n\n` +
+        `Please sign in and change your password when convenient.\n\n` +
+        `Thank you,\n` +
+        `Sapphire Aviation Security Team`,
+    );
+
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({ success: true, message: "Security guard created successfully", user: userResponse });
+  } catch (error) {
+    console.error("Create security guard error:", error);
+
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
+      return res.status(400).json({ success: false, message: "Email already registered", field: duplicateField });
+    }
+
+    res.status(500).json({ success: false, message: "Failed to create security guard", error: error.message });
+  }
+});
 // Get all security guards
 app.get("/api/admin/security", authMiddleware, async (req, res) => {
   try {
@@ -1511,16 +3778,35 @@ app.post("/api/admin/notifications", authMiddleware, async (req, res) => {
 
 // Request OTP
 app.post("/api/auth/request-otp", async (req, res) => {
-  console.log("📱 OTP request for:", req.body.phoneNumber);
 
   try {
     const { phoneNumber, method } = req.body;
+    const cleanPhone = normalizePhoneForOtp(phoneNumber);
+
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid Philippine mobile number.",
+      });
+    }
+
+    const phoneRequestRateLimit = phoneOtpRequestLimiter.hit({
+      req,
+      identifier: cleanPhone,
+    });
+    if (!phoneRequestRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        phoneRequestRateLimit,
+        "Too many OTP requests. Please wait a few minutes before requesting another code.",
+      );
+    }
 
     // Generate a random 6-digit OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Store OTP with expiration (5 minutes)
-    otpStore.set(phoneNumber, {
+    otpStore.set(cleanPhone, {
       code: otpCode,
       expiresAt: Date.now() + 5 * 60 * 1000,
       attempts: 0,
@@ -1530,25 +3816,21 @@ app.post("/api/auth/request-otp", async (req, res) => {
     const tempToken =
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
 
-    // Log OTP to console (for development)
-    console.log("\n" + "=".repeat(50));
-    console.log(`🔐 OTP VERIFICATION CODE`);
-    console.log(`📱 Phone: ${phoneNumber}`);
-    console.log(`🔢 Code: ${otpCode}`);
-    console.log(`⏱️  Expires in: 5 minutes`);
-    console.log("=".repeat(50) + "\n");
-
-    // Also show an alert in the terminal for easy visibility
-    console.log(`\x1b[32m%s\x1b[0m`, `✅ OTP for ${phoneNumber}: ${otpCode}`);
-
-    // In a real app, you would send an SMS here
-    // For development, we'll just log it
+    console.log(`Phone OTP generated for ${cleanPhone}.`);
+    logPhoneOtpForDemo({
+      phoneNumber: cleanPhone,
+      otpCode,
+      method: method || "sms",
+    });
+    logSensitiveDebug(`Phone OTP for ${cleanPhone}: ${otpCode}`);
 
     res.json({
       success: true,
       tempToken: tempToken,
       expiresIn: 300,
       method: method || "sms",
+      phoneNumber: cleanPhone,
+      deliveryMode: phoneOtpSmsProviderConfigured ? "sms" : "backend_log",
     });
   } catch (error) {
     console.error("OTP request error:", error);
@@ -1560,26 +3842,43 @@ app.post("/api/auth/request-otp", async (req, res) => {
 });
 
 app.post("/api/auth/verify-otp", async (req, res) => {
-  console.log("🔐 OTP verification attempt:", req.body);
 
   try {
     const { phoneNumber, otpCode, tempToken } = req.body;
+    const cleanPhone = normalizePhoneForOtp(phoneNumber);
+    const cleanOtpCode = normalizeOtpCode(otpCode);
 
-    // Clean phone number
-    let cleanPhone = phoneNumber.replace(/[\s\.\-]/g, "");
-    if (cleanPhone.startsWith("63")) {
-      cleanPhone = "0" + cleanPhone.slice(2);
-    } else if (cleanPhone.startsWith("9") && cleanPhone.length === 10) {
-      cleanPhone = "0" + cleanPhone;
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: "Please enter a valid Philippine mobile number.",
+      });
     }
-    if (!cleanPhone.startsWith("09")) {
-      cleanPhone = "09" + cleanPhone.slice(-9);
+
+    if (!/^\d{6}$/.test(cleanOtpCode)) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: "Please enter the 6-digit OTP code.",
+      });
+    }
+
+    const phoneVerifyRateLimit = phoneOtpVerifyLimiter.hit({
+      req,
+      identifier: cleanPhone,
+    });
+    if (!phoneVerifyRateLimit.allowed) {
+      return applyRateLimit(
+        res,
+        phoneVerifyRateLimit,
+        "Too many verification attempts. Please request a new code and try again later.",
+      );
     }
 
     const storedData = otpStore.get(cleanPhone);
 
     if (!storedData) {
-      console.log("❌ No OTP found for:", cleanPhone);
       return res.status(400).json({
         success: false,
         verified: false,
@@ -1588,7 +3887,6 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     if (storedData.expiresAt < Date.now()) {
-      console.log("❌ OTP expired for:", cleanPhone);
       otpStore.delete(cleanPhone);
       return res.status(400).json({
         success: false,
@@ -1598,7 +3896,6 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     if (storedData.attempts >= 5) {
-      console.log("❌ Too many attempts for:", cleanPhone);
       otpStore.delete(cleanPhone);
       return res.status(400).json({
         success: false,
@@ -1607,8 +3904,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       });
     }
 
-    if (storedData.code === otpCode) {
-      console.log("✅ OTP verified successfully for:", cleanPhone);
+    if (storedData.code === cleanOtpCode) {
       otpStore.delete(cleanPhone);
       return res.json({
         success: true,
@@ -1618,9 +3914,6 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     } else {
       storedData.attempts += 1;
       otpStore.set(cleanPhone, storedData);
-      console.log(
-        `❌ Invalid OTP for ${cleanPhone}. Attempts: ${storedData.attempts}/5`,
-      );
       return res.status(400).json({
         success: false,
         verified: false,
@@ -1679,17 +3972,24 @@ app.get("/api/admin/debug-visitors", authMiddleware, async (req, res) => {
 });
 
 app.get("/api/auth/debug-otp/:phone", async (req, res) => {
+  if (!sensitiveDebugLoggingEnabled) {
+    return res.status(404).json({
+      success: false,
+      message: "Route not found",
+    });
+  }
   const { phone } = req.params;
-  const storedData = otpStore.get(phone);
+  const cleanPhone = normalizePhoneForOtp(phone);
+  const storedData = otpStore.get(cleanPhone);
   if (storedData) {
     res.json({
-      phone,
+      phone: cleanPhone,
       otp: storedData.code,
       expiresAt: new Date(storedData.expiresAt),
       attempts: storedData.attempts,
     });
   } else {
-    res.json({ phone, otp: null, message: "No OTP found for this number" });
+    res.json({ phone: cleanPhone, otp: null, message: "No OTP found for this number" });
   }
 });
 
@@ -2091,6 +4391,13 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       });
     }
 
+    if (!isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only check in using your own visitor appointment.",
+      });
+    }
+
     if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
@@ -2198,6 +4505,13 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       });
     }
 
+    if (!isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only check out using your own visitor appointment.",
+      });
+    }
+
     if (visitor.status === "checked_out") {
       return res.status(400).json({
         success: false,
@@ -2293,6 +4607,18 @@ app.get("/api/visitors/:id/logs", authMiddleware, async (req, res) => {
       });
     }
 
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const canReadLogs =
+      ["admin", "security", "guard", "staff"].includes(requesterRole) ||
+      isVisitorOwner(req.user, visitor);
+
+    if (!canReadLogs) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot view another visitor's access logs.",
+      });
+    }
+
     const logs = await AccessLog.find({
       $or: [{ userEmail: visitor.email }, { userName: visitor.fullName }],
     })
@@ -2312,21 +4638,270 @@ app.get("/api/visitors/:id/logs", authMiddleware, async (req, res) => {
   }
 });
 
+// Visitor appointment slot availability
+app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
+  try {
+    const { date, department } = req.query || {};
+    const requestedDepartment = String(department || "").trim();
+
+    if (!date || !requestedDepartment) {
+      return res.status(400).json({
+        success: false,
+        message: "Date and office or department are required.",
+      });
+    }
+
+    const routedStaff = await User.findOne({
+      role: "staff",
+      isActive: true,
+      status: "active",
+      department: getStaffDepartmentQuery(requestedDepartment),
+    }).sort({ lastLogin: -1, createdAt: 1 });
+
+    if (!routedStaff) {
+      return res.json({
+        success: true,
+        limit: APPOINTMENT_SLOT_LIMIT,
+        department: formatDepartmentLabel(requestedDepartment),
+        assignedStaff: null,
+        slots: [],
+        message: `No active staff account is assigned to ${requestedDepartment}.`,
+      });
+    }
+
+    const selectedDate = new Date(date);
+    if (Number.isNaN(selectedDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid appointment date.",
+      });
+    }
+
+    const selectedDay = new Date(selectedDate);
+    selectedDay.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDay < today) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointment date cannot be in the past.",
+      });
+    }
+
+    if (!isAppointmentServiceDay(selectedDay)) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointments are only available from Monday to Saturday.",
+      });
+    }
+
+    const slots = [];
+    for (let hour = 7; hour <= 18; hour += 1) {
+      for (const minute of [0, 30]) {
+        const slotTime = new Date(selectedDate);
+        slotTime.setHours(hour, minute, 0, 0);
+        const count = await countStaffAppointmentsForSlot({
+          assignedStaff: routedStaff._id,
+          visitDate: selectedDate,
+          visitTime: slotTime,
+        });
+
+        slots.push({
+          value: slotTime.toISOString(),
+          hour,
+          minute,
+          count,
+          limit: APPOINTMENT_SLOT_LIMIT,
+          available: Math.max(APPOINTMENT_SLOT_LIMIT - count, 0),
+          isFull: count >= APPOINTMENT_SLOT_LIMIT,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      limit: APPOINTMENT_SLOT_LIMIT,
+      department: formatDepartmentLabel(requestedDepartment),
+      assignedStaff: {
+        id: routedStaff._id,
+        name: getFullName(routedStaff),
+      },
+      slots,
+    });
+  } catch (error) {
+    console.error("Get appointment availability error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load appointment availability.",
+    });
+  }
+});
+
 // Visitor appointment request / reappointment
 app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
   try {
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    if (requesterRole !== "visitor" && requesterRole !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only visitors can create appointment requests.",
+      });
+    }
+
+    if (requesterRole === "visitor" && !isSameObjectId(req.user._id, req.params.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only request appointments for your own account.",
+      });
+    }
+
     const requestedUserId =
-      req.user.role === "visitor" ? req.user._id : req.params.userId;
-    const { visitDate, preferredDate, visitTime, preferredTime, purposeOfVisit } =
-      req.body || {};
+      requesterRole === "visitor" ? req.user._id : req.params.userId;
+    const {
+      visitDate,
+      preferredDate,
+      visitTime,
+      preferredTime,
+      purposeOfVisit,
+      purposeCategory,
+      customPurposeOfVisit,
+      department,
+      officeToVisit,
+      assignedOffice,
+      appointmentDepartment,
+      idType,
+      idNumber,
+      idImage,
+      dataPrivacyAccepted,
+      dataPrivacyAcceptedAt,
+    } = req.body || {};
 
     const finalVisitDate = visitDate || preferredDate;
     const finalVisitTime = visitTime || preferredTime;
+    const normalizedPurposeCategory = String(purposeCategory || "").trim();
+    const normalizedCustomPurpose = String(customPurposeOfVisit || "").trim();
+    const requestedDepartment = String(
+      appointmentDepartment || department || officeToVisit || assignedOffice || "",
+    ).trim();
+    const resolvedPurpose =
+      normalizedPurposeCategory === "Other" && normalizedCustomPurpose
+        ? normalizedCustomPurpose
+        : String(purposeOfVisit || normalizedPurposeCategory || "").trim();
 
-    if (!finalVisitDate || !finalVisitTime || !purposeOfVisit) {
+    if (!finalVisitDate || !finalVisitTime || !resolvedPurpose) {
       return res.status(400).json({
         success: false,
         message: "Preferred date, preferred time, and purpose of visit are required.",
+      });
+    }
+
+    if (!isAllowedOption(normalizedPurposeCategory, APPOINTMENT_PURPOSE_OPTIONS)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid purpose of visit.",
+      });
+    }
+
+    if (normalizedPurposeCategory === "Other" && !normalizedCustomPurpose) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter your custom purpose of visit.",
+      });
+    }
+
+    if (!requestedDepartment) {
+      return res.status(400).json({
+        success: false,
+        message: "Office or department is required for this appointment.",
+      });
+    }
+
+    if (!isAllowedOption(requestedDepartment, APPOINTMENT_DEPARTMENT_OPTIONS)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid office to visit.",
+      });
+    }
+
+    const appointmentDateTime = getCombinedAppointmentDateTime(finalVisitDate, finalVisitTime);
+    if (!appointmentDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid appointment date and time.",
+      });
+    }
+
+    const minimumScheduleTime = new Date(Date.now() - 60 * 1000);
+    if (appointmentDateTime < minimumScheduleTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointment schedule cannot be in the past.",
+      });
+    }
+
+    if (!isAppointmentServiceDay(finalVisitDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointments are only available from Monday to Saturday.",
+      });
+    }
+
+    const normalizedIdType = String(idType || idNumber || "").trim();
+    const normalizedIdImage = String(idImage || "").trim();
+
+    if (!normalizedIdType) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose which valid ID you will present for appointment verification.",
+      });
+    }
+
+    if (!normalizedIdImage) {
+      return res.status(400).json({
+        success: false,
+        message: "A clear valid ID picture is required for appointment verification.",
+      });
+    }
+
+    if (dataPrivacyAccepted !== true) {
+      return res.status(400).json({
+        success: false,
+        message: "Please confirm the data privacy agreement before submitting.",
+      });
+    }
+
+    if (!isAllowedOption(normalizedIdType, APPOINTMENT_ID_TYPE_OPTIONS)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid ID type from the list.",
+      });
+    }
+
+    const idReview = await reviewAppointmentIdImage({
+      idType: normalizedIdType,
+      idImage: normalizedIdImage,
+    });
+
+    if (!idReview.isAccepted) {
+      return res.status(400).json({
+        success: false,
+        code: "ID_PRECHECK_FAILED",
+        idValidationStatus: idReview.status,
+        message: idReview.message,
+      });
+    }
+
+    const routedStaff = await User.findOne({
+      role: "staff",
+      isActive: true,
+      status: "active",
+      department: getStaffDepartmentQuery(requestedDepartment),
+    }).sort({ lastLogin: -1, createdAt: 1 });
+
+    if (!routedStaff) {
+      return res.status(400).json({
+        success: false,
+        message: `No active staff account is assigned to ${requestedDepartment}. Please choose another office or contact admin.`,
       });
     }
 
@@ -2342,6 +4917,15 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
+    if (user.isVerified === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your visitor account with OTP before requesting an appointment.",
+        requiresEmailVerification: true,
+        requiresOtpVerification: true,
+      });
+    }
+
     if (String(user.status).toLowerCase() !== "active") {
       return res.status(400).json({
         success: false,
@@ -2349,73 +4933,78 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    let visitor = null;
-    if (user.visitorId) {
-      visitor = await Visitor.findById(user.visitorId);
-    }
-
-    if (!visitor) {
-      visitor = await Visitor.findOne({ email: user.email }).sort({ registeredAt: -1 });
-    }
-
     const visitorFullName = `${user.firstName} ${user.lastName}`.trim();
+    const slotCount = await countStaffAppointmentsForSlot({
+      assignedStaff: routedStaff._id,
+      visitDate: finalVisitDate,
+      visitTime: finalVisitTime,
+    });
 
-    if (!visitor) {
-      visitor = new Visitor({
-        fullName: visitorFullName,
-        email: user.email,
-        phoneNumber: user.phone,
-        idNumber: user.employeeId || `VIS-${Date.now().toString().slice(-6)}`,
+    if (slotCount >= APPOINTMENT_SLOT_LIMIT) {
+      return res.status(409).json({
+        success: false,
+        code: "APPOINTMENT_SLOT_FULL",
+        message: `${formatDepartmentLabel(requestedDepartment)} is already full for that time. Please choose another time slot.`,
+        limit: APPOINTMENT_SLOT_LIMIT,
+        currentCount: slotCount,
       });
-      visitor.queueAppointmentRequest({
-        purposeOfVisit: String(purposeOfVisit).trim(),
-        visitDate: new Date(finalVisitDate),
-        visitTime: new Date(finalVisitTime),
-      });
-      await visitor.save();
-      user.visitorId = visitor._id;
-      await user.save();
-    } else {
-      visitor.fullName = visitor.fullName || visitorFullName;
-      visitor.phoneNumber = user.phone || visitor.phoneNumber;
-      visitor.queueAppointmentRequest({
-        purposeOfVisit: String(purposeOfVisit).trim(),
-        visitDate: new Date(finalVisitDate),
-        visitTime: new Date(finalVisitTime),
-      });
-      await visitor.save();
     }
 
-    const staffMembers = await User.find({
-      role: "staff",
-      isActive: true,
-      status: "active",
-    }).select("_id");
+    const visitor = new Visitor({
+      fullName: visitorFullName,
+      email: user.email,
+      phoneNumber: user.phone || "Not provided",
+      idType: normalizedIdType,
+      idNumber: normalizedIdType,
+      idImage: normalizedIdImage,
+      idValidationStatus: idReview.status,
+      idValidationNotes: idReview.message,
+      dataPrivacyAccepted: true,
+      dataPrivacyAcceptedAt: dataPrivacyAcceptedAt
+        ? new Date(dataPrivacyAcceptedAt)
+        : new Date(),
+    });
+    visitor.queueAppointmentRequest({
+      purposeOfVisit: resolvedPurpose,
+      purposeCategory: normalizedPurposeCategory || undefined,
+      customPurposeOfVisit: normalizedCustomPurpose || undefined,
+      visitDate: new Date(finalVisitDate),
+      visitTime: new Date(finalVisitTime),
+      department: formatDepartmentLabel(requestedDepartment),
+      assignedStaff: routedStaff._id,
+      assignedStaffName: getFullName(routedStaff),
+    });
+    await visitor.save();
 
-    await Promise.all(
-      staffMembers.map((staffMember) =>
-        createRoleNotification({
-          title: "New Appointment Request",
-          message: `${visitor.fullName} requested a visit on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}. Purpose: ${visitor.purposeOfVisit}`,
-          type: "visitor",
-          severity: "medium",
-          targetRole: "staff",
-          targetUser: staffMember._id,
-          relatedVisitor: visitor._id,
-          relatedUser: user._id,
-          metadata: {
-            activityType: "visitor_appointment_request",
-            visitDate: visitor.visitDate,
-            visitTime: visitor.visitTime,
-            purposeOfVisit: visitor.purposeOfVisit,
-          },
-        }),
-      ),
-    );
+    const prioritizedVisitor = getPrioritizedVisitor(await findVisitorsForUser(user));
+    if (prioritizedVisitor) {
+      user.visitorId = prioritizedVisitor._id;
+      await user.save();
+    }
+
+    await createRoleNotification({
+      title: "New Department Appointment Request",
+      message: `${visitor.fullName} requested ${visitor.appointmentDepartment || visitor.assignedOffice} on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}. Purpose: ${visitor.purposeOfVisit}`,
+      type: "visitor",
+      severity: "medium",
+      targetRole: "staff",
+      targetUser: routedStaff._id,
+      relatedVisitor: visitor._id,
+      relatedUser: user._id,
+      metadata: {
+        activityType: "visitor_appointment_request",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        purposeCategory: visitor.purposeCategory,
+        customPurposeOfVisit: visitor.customPurposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+      },
+    });
 
     await createRoleNotification({
       title: "Visitor Appointment Requested",
-      message: `${visitor.fullName} submitted a new appointment request for staff review.`,
+      message: `${visitor.fullName} submitted a new appointment request for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
       type: "info",
       severity: "medium",
       targetRole: "admin",
@@ -2426,6 +5015,27 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
         purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Appointment Request Queued",
+      message: `${visitor.fullName} requested an appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}. Security will handle gate entry after staff approval.`,
+      type: "info",
+      severity: "low",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: user._id,
+      metadata: {
+        activityType: "visitor_appointment_request",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
+        pendingStaffApproval: true,
       },
     });
 
@@ -2435,14 +5045,16 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       relatedUser: user,
       activityType: "visitor_appointment_request",
       status: "pending",
-      location: visitor.assignedOffice || visitor.host || "Appointment Request",
-      notes: `${visitor.fullName} requested a new appointment.`,
+      location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment Request",
+      notes: `${visitor.fullName} requested a new appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
       metadata: {
         requestCategory: "appointment",
         approvalFlow: "staff",
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
         purposeOfVisit: visitor.purposeOfVisit,
+        department: visitor.appointmentDepartment || visitor.assignedOffice,
+        assignedStaff: routedStaff._id,
       },
     });
 
@@ -2450,6 +5062,8 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       success: true,
       message: "Appointment request submitted successfully",
       visitor,
+      idValidationStatus: idReview.status,
+      idValidationMessage: idReview.message,
     });
   } catch (error) {
     console.error("Update visitor visit error:", error);
@@ -2474,9 +5088,11 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
     };
 
     if (normalizedRole === "staff") {
+      const staffDepartmentQuery = getStaffDepartmentQuery(req.user.department);
       query.$or = [
         { assignedStaff: req.user._id },
-        { appointmentStatus: "pending" },
+        { appointmentDepartment: staffDepartmentQuery },
+        { assignedOffice: staffDepartmentQuery },
       ];
     }
 
@@ -2527,6 +5143,13 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       });
     }
 
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only approve appointments assigned to your department.",
+      });
+    }
+
     if ((visitor.appointmentStatus || "pending") !== "pending") {
       return res.status(400).json({
         success: false,
@@ -2534,17 +5157,26 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       });
     }
 
+    const appointmentDateTime = getCombinedAppointmentDateTime(visitor.visitDate, visitor.visitTime);
+    if (!appointmentDateTime || appointmentDateTime < new Date(Date.now() - 60 * 1000)) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment schedule is no longer valid. Please adjust it before approving.",
+      });
+    }
+
     visitor.approveAppointment(req.user, req.body?.note || "");
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     const updatedVisitor = await Visitor.findById(visitor._id)
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
 
     await createRoleNotification({
       title: "Appointment Approved",
-      message: `${visitor.fullName}'s appointment was approved by ${getFullName(req.user)}.`,
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was approved by ${getFullName(req.user)}.`,
       type: "success",
       severity: "low",
       targetRole: "security",
@@ -2560,7 +5192,7 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
     if (visitorUser) {
       await createRoleNotification({
         title: "Your Appointment Is Approved",
-        message: `Your visit on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()} has been approved.`,
+        message: `Your visit on ${visitSchedule} has been approved. Please provide internet before going to the site.`,
         type: "success",
         severity: "low",
         targetRole: "visitor",
@@ -2572,6 +5204,21 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
         },
       });
     }
+
+    await createRoleNotification({
+      title: "Appointment Approved",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} has been approved and recorded.`,
+      type: "success",
+      severity: "low",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_approved_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     await createSystemActivity({
       actorUser: req.user,
@@ -2631,10 +5278,52 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       });
     }
 
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only adjust appointments assigned to your department.",
+      });
+    }
+
     if ((visitor.appointmentStatus || "pending") !== "pending") {
       return res.status(400).json({
         success: false,
         message: "Only pending appointments can be adjusted.",
+      });
+    }
+
+    const adjustedDate = finalVisitDate || visitor.visitDate;
+    const adjustedDateTime = getCombinedAppointmentDateTime(adjustedDate, finalVisitTime);
+    if (!adjustedDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid adjusted date and time.",
+      });
+    }
+
+    const minimumScheduleTime = new Date(Date.now() - 60 * 1000);
+    if (adjustedDateTime < minimumScheduleTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Adjusted appointment time cannot be in the past.",
+      });
+    }
+
+    const slotStaffId = visitor.assignedStaff || req.user._id;
+    const adjustedSlotCount = await countStaffAppointmentsForSlot({
+      assignedStaff: slotStaffId,
+      visitDate: adjustedDate,
+      visitTime: finalVisitTime,
+      excludeVisitorId: visitor._id,
+    });
+
+    if (adjustedSlotCount >= APPOINTMENT_SLOT_LIMIT) {
+      return res.status(409).json({
+        success: false,
+        code: "APPOINTMENT_SLOT_FULL",
+        message: "That adjusted time slot is already full. Please choose another time.",
+        limit: APPOINTMENT_SLOT_LIMIT,
+        currentCount: adjustedSlotCount,
       });
     }
 
@@ -2646,13 +5335,14 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     const updatedVisitor = await Visitor.findById(visitor._id)
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
 
     await createRoleNotification({
       title: "Appointment Time Adjusted",
-      message: `${getFullName(req.user)} adjusted ${visitor.fullName}'s appointment to ${new Date(visitor.visitTime).toLocaleTimeString()}.`,
+      message: `${getFullName(req.user)} adjusted ${visitor.fullName}'s appointment to ${visitSchedule}.`,
       type: "warning",
       severity: "medium",
       targetRole: "security",
@@ -2669,7 +5359,7 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     if (visitorUser) {
       await createRoleNotification({
         title: "Appointment Time Updated",
-        message: `Your appointment was adjusted to ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}.`,
+        message: `Your appointment was adjusted to ${visitSchedule}. Please provide internet before going to the site.`,
         type: "warning",
         severity: "medium",
         targetRole: "visitor",
@@ -2682,6 +5372,22 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
         },
       });
     }
+
+    await createRoleNotification({
+      title: "Appointment Time Adjusted",
+      message: `${visitor.fullName}'s appointment has been updated to ${visitSchedule}.`,
+      type: "warning",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_adjusted_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: visitor.staffAdjustmentNote,
+      },
+    });
 
     await createSystemActivity({
       actorUser: req.user,
@@ -2731,6 +5437,13 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
       });
     }
 
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only reject appointments assigned to your department.",
+      });
+    }
+
     if ((visitor.appointmentStatus || "pending") !== "pending") {
       return res.status(400).json({
         success: false,
@@ -2746,6 +5459,7 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
     await visitor.save();
 
     const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     const updatedVisitor = await Visitor.findById(visitor._id)
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
@@ -2766,6 +5480,38 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
         },
       });
     }
+
+    await createRoleNotification({
+      title: "Appointment Request Declined",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was declined. Reason: ${rejectionReason}`,
+      type: "alert",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_rejected_appointment",
+        reason: rejectionReason,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Appointment Request Declined",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was declined by ${getFullName(req.user)}.`,
+      type: "alert",
+      severity: "medium",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_rejected_appointment",
+        reason: rejectionReason,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
 
     await createSystemActivity({
       actorUser: req.user,
@@ -2796,10 +5542,148 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
   }
 });
 
+app.put("/api/staff/appointments/:id/complete", authMiddleware, async (req, res) => {
+  try {
+    if (!["staff", "admin"].includes(String(req.user.role).toLowerCase())) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be completed here.",
+      });
+    }
+
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only complete appointments assigned to your department.",
+      });
+    }
+
+    if (visitor.status !== "checked_in") {
+      return res.status(400).json({
+        success: false,
+        message: "The visitor must be checked in before the appointment can be completed.",
+      });
+    }
+
+    if (visitor.checkedOutAt) {
+      return res.status(400).json({
+        success: false,
+        message: "This visit has already been checked out.",
+      });
+    }
+
+    if (visitor.appointmentCompletedAt) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment has already been marked complete.",
+      });
+    }
+
+    const completionNote = String(
+      req.body?.note || "Appointment completed. Visitor can proceed to check-out.",
+    ).trim();
+
+    visitor.completeAppointment(req.user, completionNote);
+    await visitor.save();
+
+    const visitorUser = await User.findOne({ email: visitor.email });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department")
+      .populate("appointmentCompletedBy", "firstName lastName email department");
+
+    await createRoleNotification({
+      title: "Appointment Completed",
+      message: `${getFullName(req.user)} marked ${visitor.fullName}'s appointment complete. Please prepare for check-out.`,
+      type: "info",
+      severity: "medium",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_completed_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: completionNote,
+      },
+    });
+
+    await createRoleNotification({
+      title: "Appointment Completed",
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} was marked complete by ${getFullName(req.user)}.`,
+      type: "info",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "staff_completed_appointment",
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: completionNote,
+      },
+    });
+
+    if (visitorUser) {
+      await createRoleNotification({
+        title: "Appointment Completed",
+        message: "Your appointment is complete. Please proceed to check-out with security before leaving the site.",
+        type: "info",
+        severity: "medium",
+        targetRole: "visitor",
+        targetUser: visitorUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser._id,
+        metadata: {
+          activityType: "staff_completed_appointment",
+          note: completionNote,
+        },
+      });
+    }
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "staff_completed_appointment",
+      status: "granted",
+      location: visitor.assignedOffice || visitor.host || req.user.department || "Staff Office",
+      notes: `${getFullName(req.user)} completed ${visitor.fullName}'s appointment.`,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        note: completionNote,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Appointment marked complete successfully",
+      visitor: updatedVisitor,
+    });
+  } catch (error) {
+    console.error("Staff complete appointment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to complete appointment",
+    });
+  }
+});
+
 // Check-in visitor (by security)
 app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
   try {
-    if (!["admin", "security", "guard", "staff"].includes(req.user.role)) {
+    if (!["admin", "security", "guard"].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
@@ -2818,7 +5702,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
     if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
-        message: "Visitor is still waiting for admin approval",
+        message: "Visitor does not have an approved visit window yet",
       });
     }
 
@@ -2881,7 +5765,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
 // Check-out visitor (by security)
 app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
   try {
-    if (!["admin", "security", "guard", "staff"].includes(req.user.role)) {
+    if (!["admin", "security", "guard"].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
@@ -2900,7 +5784,7 @@ app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
     if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
-        message: "Visitor is not approved for checkout flow",
+        message: "Visitor does not have an approved visit window yet",
       });
     }
 
@@ -2958,6 +5842,7 @@ app.post("/api/visitors/:id/report", authMiddleware, async (req, res) => {
   try {
     const { reason } = req.body;
     const visitor = await Visitor.findById(req.params.id);
+    const reportReason = String(reason || "").trim();
 
     if (!visitor) {
       return res.status(404).json({
@@ -2966,24 +5851,83 @@ app.post("/api/visitors/:id/report", authMiddleware, async (req, res) => {
       });
     }
 
+    if (!reportReason) {
+      return res.status(400).json({
+        success: false,
+        message: "A report reason is required.",
+      });
+    }
+
     visitor.reports.push({
-      reason,
+      reason: reportReason,
       reportedBy: req.user._id,
       reportedAt: new Date(),
     });
 
     await visitor.save();
+    const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
+    const reporterName = getFullName(req.user) || req.user.email || "A staff member";
 
-    // High severity notification for reports
-    const notification = new Notification({
-      title: "⚠️ Visitor Reported",
-      message: `${visitor.fullName} reported: ${reason}`,
+    await createRoleNotification({
+      title: "Visitor Reported",
+      message: `${visitor.fullName} was reported by ${reporterName}: ${reportReason}`,
       type: "alert",
       severity: "high",
       targetRole: "security",
       relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "visitor_reported",
+        reportedBy: req.user._id,
+        reason: reportReason,
+      },
     });
-    await notification.save();
+
+    await createRoleNotification({
+      title: "Visitor Incident Report",
+      message: `${visitor.fullName} was reported and needs admin review. Reason: ${reportReason}`,
+      type: "warning",
+      severity: "high",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "visitor_reported",
+        reportedBy: req.user._id,
+        reason: reportReason,
+      },
+    });
+
+    if (visitorUser) {
+      await createRoleNotification({
+        title: "Security Warning",
+        message: `A report has been filed on your visitor account. Reason: ${reportReason}. Please coordinate with school staff or security before your next visit.`,
+        type: "warning",
+        severity: "high",
+        targetRole: "visitor",
+        targetUser: visitorUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser._id,
+        metadata: {
+          activityType: "visitor_reported",
+          reportedBy: req.user._id,
+          reason: reportReason,
+        },
+      });
+    }
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "visitor_reported",
+      status: "flagged",
+      location: visitor.assignedOffice || visitor.host || req.user.department || "Security Desk",
+      notes: `${reporterName} reported ${visitor.fullName}.`,
+      metadata: {
+        reason: reportReason,
+      },
+    });
 
     res.json({
       success: true,
@@ -3001,6 +5945,8 @@ app.post("/api/visitors/:id/report", authMiddleware, async (req, res) => {
 // Get notifications (for security dashboard)
 app.get("/api/notifications", authMiddleware, async (req, res) => {
   try {
+    await ensureOverstayAlerts();
+
     const { read, limit = 50 } = req.query;
     const targetRoles = getNotificationTargetRoles(req.user.role);
 
@@ -3016,7 +5962,7 @@ app.get("/api/notifications", authMiddleware, async (req, res) => {
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
-      .populate("relatedVisitor", "fullName")
+      .populate("relatedVisitor", "fullName visitDate visitTime appointmentStatus appointmentDepartment assignedOffice")
       .populate("relatedUser", "firstName lastName");
 
     const unreadCount = await Notification.countDocuments({
@@ -3047,6 +5993,13 @@ app.put("/api/notifications/:id/read", authMiddleware, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Notification not found",
+      });
+    }
+
+    if (!notificationIsAccessibleToUser(notification, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to access this notification",
       });
     }
 
@@ -3148,17 +6101,7 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
   try {
     // If user is a visitor, get their visitor record
     if (req.user.role === "visitor") {
-      let visitor = null;
-
-      // Try to find by visitorId first
-      if (req.user.visitorId) {
-        visitor = await Visitor.findById(req.user.visitorId);
-      }
-
-      // If not found, try by email
-      if (!visitor) {
-        visitor = await Visitor.findOne({ email: req.user.email });
-      }
+      const visitor = await findVisitorForUser(req.user);
 
       if (visitor) {
         return res.json({
@@ -3166,6 +6109,19 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
           visitor,
         });
       }
+
+      return res.json({
+        success: true,
+        visitor: null,
+        account: {
+          _id: req.user._id,
+          fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
+          email: req.user.email,
+          phoneNumber: req.user.phone,
+          status: req.user.status,
+          registeredAt: req.user.createdAt,
+        },
+      });
     }
 
     res.status(404).json({
@@ -3185,6 +6141,26 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
 app.get("/api/visitors/user/:userId", authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
+    const requesterRole = String(req.user.role || "").toLowerCase();
+
+    if (
+      requesterRole === "visitor" &&
+      !isSameObjectId(req.user._id, userId)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view your own visitor profile.",
+      });
+    }
+
+    if (
+      !["visitor", "admin", "security", "guard", "staff"].includes(requesterRole)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
 
     const user = await User.findById(userId);
     if (!user) {
@@ -3241,7 +6217,12 @@ app.get("/api/admin/activities", authMiddleware, async (req, res) => {
       registrationRequests: activities.filter((item) => item.activityType === "visitor_registration_request").length,
       appointmentRequests: activities.filter((item) => item.activityType === "visitor_appointment_request").length,
       staffActions: activities.filter((item) =>
-        ["staff_approved_appointment", "staff_adjusted_appointment", "staff_rejected_appointment"].includes(item.activityType),
+        [
+          "staff_approved_appointment",
+          "staff_adjusted_appointment",
+          "staff_rejected_appointment",
+          "staff_completed_appointment",
+        ].includes(item.activityType),
       ).length,
       completedVisits: activities.filter((item) =>
         item.activityType === "security_checkout" || item.activityType === "visitor_self_checkout",
@@ -3442,22 +6423,168 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const updates = req.body;
+    const updates = { ...req.body };
     delete updates.password; // Don't allow password update through this route
     delete updates._id;
     delete updates.__v;
+
+    const existingUser = await User.findById(req.params.id);
+    if (!existingUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    if (updates.firstName !== undefined) {
+      updates.firstName = String(updates.firstName || "").trim();
+      if (!updates.firstName) {
+        return res.status(400).json({
+          success: false,
+          message: "First name is required.",
+          field: "firstName",
+        });
+      }
+    }
+
+    if (updates.lastName !== undefined) {
+      updates.lastName = String(updates.lastName || "").trim();
+      if (!updates.lastName) {
+        return res.status(400).json({
+          success: false,
+          message: "Last name is required.",
+          field: "lastName",
+        });
+      }
+    }
+
+    if (updates.email !== undefined) {
+      const normalizedEmail = normalizeEmailValue(updates.email);
+      if (!normalizedEmail || !isValidEmailValue(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid email address.",
+          field: "email",
+        });
+      }
+
+      const emailConflict = await User.findOne({
+        email: normalizedEmail,
+        _id: { $ne: req.params.id },
+      });
+
+      if (emailConflict) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already registered",
+          field: "email",
+        });
+      }
+
+      updates.email = normalizedEmail;
+    }
+
+    if (updates.phone !== undefined) {
+      updates.phone = normalizePhoneValue(updates.phone);
+      if (updates.phone && !isValidPhoneValue(updates.phone)) {
+        return res.status(400).json({
+          success: false,
+          message: PHONE_VALIDATION_MESSAGE,
+          field: "phone",
+        });
+      }
+    }
+
+    if (updates.role !== undefined) {
+      updates.role = String(updates.role || "").toLowerCase().trim();
+      if (!ACCOUNT_ROLE_OPTIONS.includes(updates.role)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid role",
+          field: "role",
+        });
+      }
+    }
+
+    if (updates.status !== undefined) {
+      updates.status = String(updates.status || "").toLowerCase().trim();
+      if (!ACCOUNT_STATUS_OPTIONS.includes(updates.status)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid account status",
+          field: "status",
+        });
+      }
+      updates.isActive = updates.status === "active";
+    }
+
+    if (updates.department !== undefined) {
+      updates.department = String(updates.department || "").trim();
+    }
+
+    if (updates.position !== undefined) {
+      updates.position = String(updates.position || "").trim();
+    }
+
+    if (updates.username !== undefined) {
+      const normalizedUsername = normalizeUsernameValue(updates.username);
+      if (!normalizedUsername) {
+        delete updates.username;
+      } else {
+        const usernameConflict = await User.findOne({
+          username: normalizedUsername,
+          _id: { $ne: req.params.id },
+        });
+
+        if (usernameConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Username already registered",
+            field: "username",
+          });
+        }
+
+        updates.username = normalizedUsername;
+      }
+    }
+
+    if (updates.employeeId !== undefined) {
+      const normalizedEmployeeId = String(updates.employeeId || "").trim();
+      if (!normalizedEmployeeId) {
+        delete updates.employeeId;
+      } else {
+        const employeeIdConflict = await User.findOne({
+          employeeId: normalizedEmployeeId,
+          _id: { $ne: req.params.id },
+        });
+
+        if (employeeIdConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Staff ID already registered",
+            field: "employeeId",
+          });
+        }
+
+        updates.employeeId = normalizedEmployeeId;
+      }
+    }
+
+    const finalRole = updates.role || existingUser.role;
+    const finalDepartment =
+      updates.department !== undefined ? updates.department : existingUser.department;
+    if (finalRole === "staff" && !String(finalDepartment || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Department is required for staff accounts.",
+        field: "department",
+      });
+    }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { ...updates, updatedAt: new Date() },
       { new: true, runValidators: true },
     ).select("-password");
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    }
 
     // Create access log for the update
     const accessLog = new AccessLog({
@@ -3487,13 +6614,15 @@ app.put("/api/admin/users/:id/role", authMiddleware, async (req, res) => {
 
     const { role } = req.body;
 
-    if (!["student", "staff", "security", "admin", "visitor"].includes(role)) {
+    const normalizedRole = String(role || "").toLowerCase().trim();
+
+    if (!ACCOUNT_ROLE_OPTIONS.includes(normalizedRole)) {
       return res.status(400).json({ success: false, message: "Invalid role" });
     }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { role, updatedAt: new Date() },
+      { role: normalizedRole, updatedAt: new Date() },
       { new: true },
     ).select("-password");
 
@@ -3511,7 +6640,7 @@ app.put("/api/admin/users/:id/role", authMiddleware, async (req, res) => {
       location: "Admin Panel",
       accessType: "system",
       status: "granted",
-      notes: `Updated role for ${user.email} to ${role}`,
+      notes: `Updated role for ${user.email} to ${normalizedRole}`,
     });
     await accessLog.save();
 
@@ -3967,16 +7096,11 @@ app.get("/api/admin/settings", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
+    const settingsRecord = await getSystemSettingsRecord();
+
     res.json({
       success: true,
-      settings: {
-        maintenanceMode: false,
-        emailNotifications: true,
-        smsAlerts: true,
-        backupFrequency: "daily",
-        sessionTimeout: "30",
-        maxLoginAttempts: "5",
-      },
+      settings: sanitizeSystemSettings(settingsRecord?.toObject?.() || settingsRecord || {}),
     });
   } catch (error) {
     console.error("Get system settings error:", error);
@@ -3991,7 +7115,12 @@ app.put("/api/admin/settings", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const settings = req.body;
+    const settings = sanitizeSystemSettings(req.body || {});
+    await AppSettings.findOneAndUpdate(
+      { key: "system" },
+      { $set: { ...settings, updatedAt: new Date() } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
 
     // Create access log
     const accessLog = new AccessLog({
@@ -4005,7 +7134,11 @@ app.put("/api/admin/settings", authMiddleware, async (req, res) => {
     });
     await accessLog.save();
 
-    res.json({ success: true, message: "Settings updated successfully" });
+    res.json({
+      success: true,
+      message: "Settings updated successfully",
+      settings,
+    });
   } catch (error) {
     console.error("Update system settings error:", error);
     res
@@ -4088,36 +7221,42 @@ app.use((err, req, res, next) => {
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 5000;
 
-// Check if port is available
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📁 Database: ${MONGODB_URI}`);
-  console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
-  console.log(`✅ Test endpoint: http://localhost:${PORT}/api/health`);
-  console.log(`✅ Test endpoint: http://localhost:${PORT}/api/test`);
-  console.log(`👑 Admin routes available at /api/admin/*`);
-  console.log(`📝 Visitor approval routes available at /api/admin/visitors/*`);
-});
+if (!isVercelRuntime && require.main === module) {
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📁 Database: ${MONGODB_URI}`);
+    console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
+    console.log(`✅ Test endpoint: http://localhost:${PORT}/api/health`);
+    console.log(`✅ Test endpoint: http://localhost:${PORT}/api/test`);
+    console.log(`👑 Admin routes available at /api/admin/*`);
+    console.log(`📝 Visitor approval routes available at /api/admin/visitors/*`);
+  });
 
-// Handle server errors
-server.on("error", (error) => {
-  if (error.code === "EADDRINUSE") {
-    console.error(`❌ Port ${PORT} is already in use. Try a different port:`);
-    console.log(`   Try: PORT=5001 npm run dev`);
-    process.exit(1);
-  } else {
-    console.error("❌ Server error:", error);
-  }
-});
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(`❌ Port ${PORT} is already in use. Try a different port:`);
+      console.log(`   Try: PORT=5001 npm run dev`);
+      process.exit(1);
+    } else {
+      console.error("❌ Server error:", error);
+    }
+  });
 
-// Handle graceful shutdown
-process.on("SIGINT", () => {
-  console.log("\n🛑 Shutting down server...");
-  server.close(() => {
-    console.log("✅ Server closed");
-    mongoose.connection.close(false, () => {
-      console.log("✅ MongoDB connection closed");
-      process.exit(0);
+  process.on("SIGINT", () => {
+    console.log("\n🛑 Shutting down server...");
+    server.close(() => {
+      console.log("✅ Server closed");
+      mongoose.connection.close(false, () => {
+        console.log("✅ MongoDB connection closed");
+        process.exit(0);
+      });
     });
   });
-});
+}
+
+module.exports = app;
+
+
+
+
+

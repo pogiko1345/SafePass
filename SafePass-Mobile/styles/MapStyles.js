@@ -116,7 +116,7 @@ export default StyleSheet.create({
   heroSupportText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#0F766E",
+    color: "#0A3D91",
   },
 
   heroTitle: {
@@ -153,7 +153,7 @@ export default StyleSheet.create({
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#EEF5FF",
   },
 
   heroStatLabel: {
@@ -283,7 +283,7 @@ export default StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 1,
     textTransform: "uppercase",
-    color: "#0F766E",
+    color: "#0A3D91",
     marginBottom: 5,
   },
 
@@ -308,7 +308,7 @@ export default StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
     borderColor: "#CCFBF1",
   },
@@ -316,7 +316,7 @@ export default StyleSheet.create({
   sectionChipText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#0F766E",
+    color: "#0A3D91",
   },
 
   routeIconBadge: {
@@ -325,9 +325,9 @@ export default StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#B7D5F6",
   },
 
   routeDescription: {
@@ -406,7 +406,7 @@ export default StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: "#1D4ED8",
+    backgroundColor: "#041E42",
   },
 
   routeActionText: {
@@ -449,7 +449,7 @@ export default StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 1,
     textTransform: "uppercase",
-    color: "#0F766E",
+    color: "#0A3D91",
     marginBottom: 5,
   },
 
@@ -464,7 +464,7 @@ export default StyleSheet.create({
     fontSize: 13,
     color: "#475569",
     fontWeight: "700",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
@@ -500,14 +500,14 @@ export default StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
   },
 
   locationIconContainerSelected: {
-    backgroundColor: "#1D4ED8",
+    backgroundColor: "#041E42",
   },
 
   locationInfo: {
@@ -538,13 +538,13 @@ export default StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#EEF5FF",
   },
 
   locationSelectedPillText: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#1D4ED8",
+    color: "#041E42",
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
@@ -553,7 +553,7 @@ export default StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,

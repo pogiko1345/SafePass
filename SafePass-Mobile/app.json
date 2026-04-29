@@ -7,9 +7,9 @@
     "icon": "./assets/LogoSapphireAppIcon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/LogoSapphire.jpg",
+      "image": "./assets/splash-screen.png",
       "resizeMode": "contain",
-      "backgroundColor": "#041E42"
+      "backgroundColor": "#052044"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -18,16 +18,19 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to take photos of your ID for verification",
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload your ID"
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload your ID",
+        "NSLocationWhenInUseUsageDescription": "SafePass uses your location while you are checked in so security can monitor active visitor presence."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/LogoSapphireAppIcon.png",
-        "backgroundColor": "#041E42"
+        "backgroundColor": "#052044"
       },
       "permissions": [
         "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
@@ -44,6 +47,12 @@
         {
           "photosPermission": "The app needs access to your photos to upload your ID.",
           "cameraPermission": "The app needs access to your camera to take photos of your ID."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SafePass uses your location while you are checked in so security can monitor active visitor presence."
         }
       ]
     ]

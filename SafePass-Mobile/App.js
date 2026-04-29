@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, ActivityIndicator, Platform } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, View, Text, ActivityIndicator, Platform } from "react-native";
+import { CommonActions, NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 // ============ ONLY VISITOR, SECURITY, ADMIN SCREENS ============
@@ -58,6 +58,7 @@ const Storage =
 const Stack = createNativeStackNavigator();
 const APP_NAME = APP_DISPLAY_NAME;
 const APP_ORGANIZATION = APP_ORGANIZATION_NAME;
+const IDLE_LOGOUT_MS = 15 * 60 * 1000;
 const WEB_ROUTE_TITLES = {
   RoleSelect: `Access Portal | ${APP_ORGANIZATION}`,
   Login: `Login | ${APP_ORGANIZATION}`,
@@ -83,23 +84,111 @@ const WEB_ROUTE_TITLES = {
 let logoutCallback = null;
 
 export default function App() {
+  const navigationRef = useNavigationContainerRef();
+  const idleTimerRef = useRef(null);
+  const appStateRef = useRef(AppState.currentState);
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isNewRegistration, setIsNewRegistration] = useState(false);
+
+  const resetToAuthRoute = useCallback(() => {
+    const routeName = IS_VISITOR_ONLY_APP ? "Login" : "RoleSelect";
+    if (navigationRef.isReady()) {
+      navigationRef.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: routeName }],
+        }),
+      );
+    }
+  }, [navigationRef]);
+
+  const performAppLogout = useCallback(async ({ resetNavigation = true } = {}) => {
+    try {
+      await ApiService.logout();
+    } catch (error) {
+      console.log("App logout API error ignored:", error);
+      await ApiService.clearAuth();
+    } finally {
+      setCurrentUser(null);
+      setIsLoading(false);
+      if (resetNavigation) {
+        resetToAuthRoute();
+      }
+    }
+  }, [resetToAuthRoute]);
+
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+
+    if (!currentUser) return;
+
+    idleTimerRef.current = setTimeout(() => {
+      performAppLogout({ resetNavigation: true });
+    }, IDLE_LOGOUT_MS);
+  }, [currentUser, performAppLogout]);
 
   useEffect(() => {
     checkAuthStatus();
 
     logoutCallback = () => {
       console.log("Global logout triggered from App.js");
-      setCurrentUser(null);
-      setIsLoading(false);
+      performAppLogout({ resetNavigation: true });
     };
 
     return () => {
       logoutCallback = null;
     };
-  }, []);
+  }, [performAppLogout]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+      return undefined;
+    }
+
+    resetIdleTimer();
+
+    const appStateSubscription = AppState.addEventListener("change", (nextState) => {
+      const wasBackground = /inactive|background/.test(appStateRef.current);
+      appStateRef.current = nextState;
+      if (nextState === "active" && wasBackground) {
+        resetIdleTimer();
+      }
+    });
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const activityEvents = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];
+      activityEvents.forEach((eventName) => {
+        window.addEventListener(eventName, resetIdleTimer, { passive: true });
+      });
+
+      return () => {
+        appStateSubscription.remove();
+        activityEvents.forEach((eventName) => {
+          window.removeEventListener(eventName, resetIdleTimer);
+        });
+        if (idleTimerRef.current) {
+          clearTimeout(idleTimerRef.current);
+          idleTimerRef.current = null;
+        }
+      };
+    }
+
+    return () => {
+      appStateSubscription.remove();
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+    };
+  }, [currentUser, resetIdleTimer]);
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined" && isLoading) {
@@ -131,6 +220,14 @@ export default function App() {
           console.log(
             "User cache exists but auth token is missing. Clearing stale auth state.",
           );
+          await ApiService.clearAuth();
+          setCurrentUser(null);
+          return;
+        }
+
+        const rememberedSessionActive = await ApiService.isRememberedSessionActive();
+        if (!rememberedSessionActive) {
+          console.log("Remembered login expired. Asking user to sign in again.");
           await ApiService.clearAuth();
           setCurrentUser(null);
           return;
@@ -258,23 +355,36 @@ export default function App() {
     currentUser: null,
     isNewRegistration,
   });
+  const passwordResetLinkParams =
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? {
+          resetEmail: new URLSearchParams(window.location.search || "").get("resetEmail") || "",
+          resetToken: new URLSearchParams(window.location.search || "").get("resetToken") || "",
+        }
+      : { resetEmail: "", resetToken: "" };
+  const hasPasswordResetLink =
+    passwordResetLinkParams.resetEmail && passwordResetLinkParams.resetToken;
   if (!isNewRegistration && currentUser) {
     initialRoute = IS_VISITOR_ONLY_APP
       ? "VisitorDashboard"
       : getDashboardRoute(currentUser);
+  } else if (hasPasswordResetLink) {
+    initialRoute = "Login";
   }
 
   console.log("App.js initialRoute:", initialRoute);
   console.log("Current user:", currentUser ? `${currentUser.role}` : "None");
 
   return (
-    <NavigationContainer
-      documentTitle={{
-        enabled: Platform.OS === "web",
-        formatter: (_options, route) =>
-          WEB_ROUTE_TITLES[route?.name] || `${APP_NAME} | ${APP_ORGANIZATION}`,
-      }}
-    >
+    <View style={{ flex: 1 }} onTouchStart={resetIdleTimer}>
+      <NavigationContainer
+        ref={navigationRef}
+        documentTitle={{
+          enabled: Platform.OS === "web",
+          formatter: (_options, route) =>
+            WEB_ROUTE_TITLES[route?.name] || `${APP_NAME} | ${APP_ORGANIZATION}`,
+        }}
+      >
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{
@@ -286,7 +396,7 @@ export default function App() {
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
         )}
-        <Stack.Screen name="Login">
+        <Stack.Screen name="Login" initialParams={passwordResetLinkParams}>
           {(props) => (
             <LoginScreen
               {...props}
@@ -294,6 +404,7 @@ export default function App() {
                 ...props.route,
                 params: {
                   ...(props.route?.params || {}),
+                  ...(hasPasswordResetLink ? passwordResetLinkParams : {}),
                   ...(IS_VISITOR_ONLY_APP
                     ? getVisitorBuildNavigationParams()
                     : {}),
@@ -384,7 +495,8 @@ export default function App() {
           <Stack.Screen name="Settings" component={SettingsScreen} />
         )}
       </Stack.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+    </View>
   );
 }
 

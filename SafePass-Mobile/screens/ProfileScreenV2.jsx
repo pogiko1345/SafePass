@@ -24,6 +24,11 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as LocalAuthentication from "expo-local-authentication";
 import ApiService from "../utils/ApiService";
+import {
+  PHILIPPINE_MOBILE_NUMBER_MESSAGE,
+  isValidPhilippineMobileNumber,
+  normalizePhilippineMobileNumber,
+} from "../utils/phoneValidation";
 
 const Storage =
   Platform.OS === "web" ? require("../utils/webStorage").default : AsyncStorage;
@@ -32,6 +37,7 @@ const DEFAULT_PROFILE = {
   _id: "",
   firstName: "",
   lastName: "",
+  username: "",
   email: "",
   phone: "",
   role: "visitor",
@@ -67,6 +73,12 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("English");
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -96,7 +108,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       admin: {
         label: "Administrator",
         icon: "settings-outline",
-        gradients: ["#7C3AED", "#4F46E5"],
+        gradients: ["#1C6DD0", "#0A3D91"],
       },
       security: {
         label: "Security Team",
@@ -111,12 +123,12 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       staff: {
         label: "Staff Member",
         icon: "briefcase-outline",
-        gradients: ["#0F766E", "#14B8A6"],
+        gradients: ["#0A3D91", "#1C6DD0"],
       },
       visitor: {
         label: "Visitor Account",
         icon: "person-outline",
-        gradients: ["#1D4ED8", "#0EA5E9"],
+        gradients: ["#041E42", "#1C6DD0"],
       },
     };
     return map[role] || map.visitor;
@@ -126,6 +138,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   const infoRows = [
     ["First Name", "firstName", true],
     ["Last Name", "lastName", true],
+    ["Username", "username", true],
     ["Email", "email", true],
     ["Phone", "phone", true],
     ["Emergency Contact", "emergencyContact", true],
@@ -272,16 +285,26 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   };
   const handleSave = async () => {
     if (!editedProfile) return;
+    if (editedProfile.phone && !isValidPhilippineMobileNumber(editedProfile.phone)) {
+      Alert.alert("Invalid Contact Number", PHILIPPINE_MOBILE_NUMBER_MESSAGE);
+      return;
+    }
+
     setIsSaving(true);
     try {
       const updates = {
         firstName: editedProfile.firstName || "",
         lastName: editedProfile.lastName || "",
         email: editedProfile.email || "",
-        phone: editedProfile.phone || "",
+        phone: editedProfile.phone ? normalizePhilippineMobileNumber(editedProfile.phone) : "",
         emergencyContact: editedProfile.emergencyContact || "",
         profilePhoto: editedProfile.profilePhoto || null,
       };
+
+      if (editedProfile.username || profile?.username) {
+        updates.username = editedProfile.username || "";
+      }
+
       const response = await ApiService.updateProfile(updates);
       if (!response?.user)
         throw new Error("No updated profile returned from server");
@@ -301,6 +324,50 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       Alert.alert("Error", e.message || "Failed to update profile.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const updatePasswordField = (field, value) => {
+    setPasswordForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleChangePassword = async () => {
+    const currentPassword = passwordForm.currentPassword.trim();
+    const newPassword = passwordForm.newPassword.trim();
+    const confirmPassword = passwordForm.confirmPassword.trim();
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert("Missing Information", "Please complete all password fields.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert("Password Too Short", "New password must be at least 6 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Password Mismatch", "New password and confirmation do not match.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const response = await ApiService.changePassword({
+        currentPassword,
+        newPassword,
+      });
+
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      Alert.alert("Password Updated", response?.message || "Your password was changed successfully.");
+    } catch (e) {
+      Alert.alert("Unable To Change Password", e.message || "Please check your current password and try again.");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -375,8 +442,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   if (isLoading && !profile) {
     return (
       <SafeAreaView style={styles.center}>
-        <StatusBar barStyle="light-content" backgroundColor="#1D4ED8" />
-        <ActivityIndicator size="large" color="#1D4ED8" />
+        <StatusBar barStyle="light-content" backgroundColor="#041E42" />
+        <ActivityIndicator size="large" color="#041E42" />
         <Text style={styles.loadingText}>Loading your profile...</Text>
       </SafeAreaView>
     );
@@ -385,7 +452,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   if (error && !profile) {
     return (
       <SafeAreaView style={styles.center}>
-        <StatusBar barStyle="light-content" backgroundColor="#1D4ED8" />
+        <StatusBar barStyle="light-content" backgroundColor="#041E42" />
         <Ionicons name="alert-circle-outline" size={56} color="#DC2626" />
         <Text style={styles.errorTitle}>Unable to load profile</Text>
         <Text style={styles.errorText}>{error}</Text>
@@ -443,7 +510,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
               onChangeText={(text) =>
                 setEditedProfile((prev) => ({ ...prev, [key]: text }))
               }
-              autoCapitalize={key === "email" ? "none" : "words"}
+              autoCapitalize={key === "email" || key === "username" ? "none" : "words"}
+              autoCorrect={false}
               keyboardType={
                 key === "phone"
                   ? "phone-pad"
@@ -451,8 +519,9 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     ? "email-address"
                     : "default"
               }
-              placeholder={`Enter ${label.toLowerCase()}`}
+              placeholder={key === "phone" ? "09123456789" : `Enter ${label.toLowerCase()}`}
               placeholderTextColor="#94A3B8"
+              maxLength={key === "phone" ? 16 : undefined}
             />
           ) : (
             <Text style={styles.fieldValue}>
@@ -491,6 +560,86 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
     </View>
   );
 
+  const renderSecurity = () => (
+    <View style={styles.stack}>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Change Password</Text>
+        <Text style={styles.muted}>
+          Use a strong password that you do not use on other accounts. Your current password is required before saving.
+        </Text>
+
+        <View style={styles.passwordForm}>
+          <View style={styles.field}>
+            <Text style={styles.kicker}>Current Password</Text>
+            <TextInput
+              style={styles.input}
+              value={passwordForm.currentPassword}
+              onChangeText={(text) => updatePasswordField("currentPassword", text)}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Enter current password"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.kicker}>New Password</Text>
+            <TextInput
+              style={styles.input}
+              value={passwordForm.newPassword}
+              onChangeText={(text) => updatePasswordField("newPassword", text)}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Enter new password"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.kicker}>Confirm New Password</Text>
+            <TextInput
+              style={styles.input}
+              value={passwordForm.confirmPassword}
+              onChangeText={(text) => updatePasswordField("confirmPassword", text)}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Re-enter new password"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={handleChangePassword}
+            disabled={isChangingPassword}
+          >
+            {isChangingPassword ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="key-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.primaryBtnText}>Update Password</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.securityNoteCard}>
+        <Ionicons name="shield-checkmark-outline" size={22} color="#0A3D91" />
+        <View style={styles.securityNoteCopy}>
+          <Text style={styles.securityNoteTitle}>Account Safety</Text>
+          <Text style={styles.securityNoteText}>
+            If you change your email or username, use the updated value the next time you sign in.
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
   const renderPreferences = () => (
     <View style={styles.card}>
       <View style={styles.prefRow}>
@@ -503,7 +652,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         <Switch
           value={notificationsEnabled}
           onValueChange={setNotificationsEnabled}
-          trackColor={{ false: "#CBD5E1", true: "#2563EB" }}
+          trackColor={{ false: "#CBD5E1", true: "#0A3D91" }}
           thumbColor="#FFFFFF"
         />
       </View>
@@ -517,7 +666,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         <Switch
           value={biometricEnabled}
           onValueChange={toggleBiometric}
-          trackColor={{ false: "#CBD5E1", true: "#2563EB" }}
+          trackColor={{ false: "#CBD5E1", true: "#0A3D91" }}
           thumbColor="#FFFFFF"
         />
       </View>
@@ -531,7 +680,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         <Switch
           value={darkModeEnabled}
           onValueChange={setDarkModeEnabled}
-          trackColor={{ false: "#CBD5E1", true: "#2563EB" }}
+          trackColor={{ false: "#CBD5E1", true: "#0A3D91" }}
           thumbColor="#FFFFFF"
         />
       </View>
@@ -550,7 +699,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   return (
     <>
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor="#1D4ED8" />
+        <StatusBar barStyle="light-content" backgroundColor="#041E42" />
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -668,6 +817,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     ["overview", "Overview", "grid-outline"],
                     ["account", "Account", "person-circle-outline"],
                     ["access", "Access", "shield-checkmark-outline"],
+                    ["security", "Security", "key-outline"],
                     ["preferences", "Preferences", "options-outline"],
                   ].map(([id, label, icon]) => {
                     const active = tab === id;
@@ -697,6 +847,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                 {tab === "overview" && renderOverview()}
                 {tab === "account" && renderAccount()}
                 {tab === "access" && renderAccess()}
+                {tab === "security" && renderSecurity()}
                 {tab === "preferences" && renderPreferences()}
               </View>
               <View style={[styles.side, isDesktop && styles.sideDesktop]}>
@@ -744,6 +895,14 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                       <>
                         <TouchableOpacity
                           style={styles.secondaryBtn}
+                          onPress={() => setTab("security")}
+                        >
+                          <Text style={styles.secondaryBtnText}>
+                            Change Password
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.secondaryBtn}
                           onPress={loadProfile}
                         >
                           <Text style={styles.secondaryBtnText}>
@@ -778,7 +937,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     <Ionicons
                       name="checkmark-circle-outline"
                       size={18}
-                      color="#2563EB"
+                      color="#0A3D91"
                     />
                     <Text style={styles.noteText}>
                       Keep your contact details updated for smoother account
@@ -789,7 +948,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     <Ionicons
                       name="checkmark-circle-outline"
                       size={18}
-                      color="#2563EB"
+                      color="#0A3D91"
                     />
                     <Text style={styles.noteText}>
                       Your mobile and web layouts now use the same responsive
@@ -852,14 +1011,14 @@ const shadow = Platform.select({
   web: { boxShadow: "0px 10px 28px rgba(15,23,42,0.08)" },
 });
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F8FAFC" },
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  safeArea: { flex: 1, backgroundColor: "#F8FBFE" },
+  container: { flex: 1, backgroundColor: "#F8FBFE" },
   scrollContent: { paddingBottom: 36 },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 28,
   },
   loadingText: {
@@ -883,7 +1042,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#0A3D91",
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 14,
@@ -896,7 +1055,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
@@ -920,7 +1079,7 @@ const styles = StyleSheet.create({
     color: "#92400E",
     fontWeight: "600",
   },
-  cacheAction: { fontSize: 12, fontWeight: "800", color: "#1D4ED8" },
+  cacheAction: { fontSize: 12, fontWeight: "800", color: "#041E42" },
   hero: {
     marginHorizontal: 20,
     marginTop: 18,
@@ -1049,7 +1208,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
   },
-  tabBtnActive: { backgroundColor: "#1D4ED8", borderColor: "#1D4ED8" },
+  tabBtnActive: { backgroundColor: "#041E42", borderColor: "#041E42" },
   tabText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
   tabTextActive: { color: "#FFFFFF" },
   stack: { gap: 18 },
@@ -1104,11 +1263,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#CBD5E1",
     borderRadius: 16,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
     color: "#0F172A",
+  },
+  passwordForm: {
+    gap: 4,
+    marginTop: 18,
+  },
+  securityNoteCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    borderRadius: 20,
+    padding: 16,
+  },
+  securityNoteCopy: { flex: 1 },
+  securityNoteTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#041E42",
+    marginBottom: 4,
+  },
+  securityNoteText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#0A3D91",
+    fontWeight: "600",
   },
   accessCard: { borderRadius: 24, padding: 20, ...shadow },
   accessLabel: {
@@ -1148,7 +1334,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#1D4ED8",
+    backgroundColor: "#041E42",
     borderRadius: 16,
     paddingVertical: 14,
   },
@@ -1158,7 +1344,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 16,
     paddingVertical: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#CBD5E1",
   },
@@ -1226,7 +1412,7 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: "row", gap: 12 },
   modalSecondary: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#CBD5E1",
     borderRadius: 14,

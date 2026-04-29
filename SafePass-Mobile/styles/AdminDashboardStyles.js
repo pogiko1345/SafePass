@@ -1,7 +1,7 @@
 import { Dimensions, Platform, StyleSheet } from "react-native";
 
 const { width, height } = Dimensions.get("window");
-const sidebarWidth = 260;
+const sidebarWidth = 284;
 const isWeb = Platform.OS === "web";
 
 export default StyleSheet.create({
@@ -9,27 +9,27 @@ export default StyleSheet.create({
   
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#EEF4FA",
   },
 
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#EEF4FA",
   },
 
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: "#3B82F6",
+    color: "#1C6DD0",
     fontWeight: "500",
   },
 
   mainContainer: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#EEF4FA",
   },
 
   // ============================================
@@ -38,30 +38,39 @@ export default StyleSheet.create({
 
   sidebar: {
     width: sidebarWidth,
-    backgroundColor: "#0F2A43",
+    backgroundColor: "#0B1F33",
     height: "100%",
-    borderTopRightRadius: 26,
-    borderBottomRightRadius: 26,
+    borderTopRightRadius: 34,
+    borderBottomRightRadius: 34,
     overflow: "hidden",
+    borderRightWidth: 1,
+    borderRightColor: "rgba(148,163,184,0.16)",
+    ...Platform.select({
+      web: {
+        boxShadow: "18px 0px 48px rgba(11,31,51,0.18)",
+      },
+    }),
   },
 
   sidebarContent: {
-    paddingBottom: 30,
+    paddingBottom: 36,
   },
 
   sidebarHeader: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingHorizontal: 22,
+    paddingVertical: 28,
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    borderBottomColor: "rgba(255,255,255,0.10)",
   },
 
   sidebarLogoImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginBottom: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.12)",
   },
 
   sidebarLogo: {
@@ -75,34 +84,39 @@ export default StyleSheet.create({
   },
 
   sidebarBrand: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "700",
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: "800",
     color: "#FFF",
-    marginBottom: 8,
+    marginBottom: 10,
     textAlign: "center",
   },
 
   sidebarRoleBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: "#3B82F6",
-    marginBottom: 16,
+    backgroundColor: "rgba(56,189,248,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(125,211,252,0.28)",
+    marginBottom: 18,
   },
 
   sidebarRoleText: {
     fontSize: 10,
-    fontWeight: "700",
-    color: "#FFF",
+    fontWeight: "800",
+    color: "#BAE6FD",
+    letterSpacing: 0.8,
   },
 
   sidebarStats: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: "rgba(15,23,42,0.42)",
+    borderRadius: 18,
+    padding: 14,
     width: "100%",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
 
   sidebarStat: {
@@ -111,15 +125,15 @@ export default StyleSheet.create({
   },
 
   sidebarStatNumber: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
     color: "#FFF",
   },
 
   sidebarStatLabel: {
-    fontSize: 9,
-    color: "rgba(255,255,255,0.7)",
-    marginTop: 2,
+    fontSize: 10,
+    color: "rgba(226,232,240,0.76)",
+    marginTop: 4,
   },
 
   sidebarStatDivider: {
@@ -131,11 +145,11 @@ export default StyleSheet.create({
   sidebarMenuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    marginHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 6,
+    marginHorizontal: 14,
+    borderRadius: 16,
+    marginBottom: 8,
   },
 
   sidebarMenuItemActive: {
@@ -145,9 +159,9 @@ export default StyleSheet.create({
   },
 
   sidebarMenuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -156,8 +170,8 @@ export default StyleSheet.create({
   sidebarMenuLabel: {
     flex: 1,
     fontSize: 14,
-    fontWeight: "500",
-    color: "rgba(255,255,255,0.85)",
+    fontWeight: "600",
+    color: "rgba(241,245,249,0.88)",
   },
 
   sidebarMenuLabelActive: {
@@ -184,10 +198,130 @@ export default StyleSheet.create({
     color: "#FFF",
   },
 
+  sidebarOverviewButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 14,
+    marginTop: 14,
+    borderRadius: 18,
+    marginBottom: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  sidebarOverviewButtonActive: {
+    backgroundColor: "rgba(56,189,248,0.18)",
+    borderColor: "rgba(125,211,252,0.35)",
+  },
+
+  sidebarModuleGroup: {
+    paddingHorizontal: 14,
+    gap: 12,
+  },
+
+  sidebarModuleCard: {
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    overflow: "hidden",
+  },
+
+  sidebarModuleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+
+  sidebarModuleButtonActive: {
+    backgroundColor: "rgba(56,189,248,0.12)",
+    borderColor: "rgba(125,211,252,0.35)",
+  },
+
+  sidebarModuleCopy: {
+    flex: 1,
+  },
+
+  sidebarModuleHint: {
+    fontSize: 11,
+    color: "rgba(203,213,225,0.60)",
+    marginTop: 3,
+    lineHeight: 16,
+  },
+
+  sidebarSubmoduleList: {
+    paddingHorizontal: 10,
+    paddingBottom: 12,
+    gap: 8,
+  },
+
+  sidebarSubmoduleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    backgroundColor: "rgba(15,23,42,0.48)",
+  },
+
+  sidebarSubmoduleButtonActive: {
+    backgroundColor: "#ECFEFF",
+  },
+
+  sidebarSubmoduleLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.84)",
+  },
+
+  sidebarSubmoduleLabelActive: {
+    color: "#0F172A",
+  },
+
+  sidebarSubmoduleBadge: {
+    minWidth: 26,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  sidebarSubmoduleBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  sidebarUtilityButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 14,
+    marginTop: 14,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  sidebarUtilityButtonActive: {
+    backgroundColor: "rgba(148,163,184,0.18)",
+    borderColor: "rgba(203,213,225,0.28)",
+  },
+
   sidebarUserSection: {
-    marginTop: 20,
-    marginHorizontal: 16,
-    paddingTop: 16,
+    marginTop: 24,
+    marginHorizontal: 18,
+    paddingTop: 18,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.1)",
   },
@@ -198,10 +332,10 @@ export default StyleSheet.create({
   },
 
   sidebarUserAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#fff",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#E2E8F0",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -215,7 +349,7 @@ export default StyleSheet.create({
 
   sidebarUserName: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#FFF",
     marginBottom: 2,
   },
@@ -228,12 +362,14 @@ export default StyleSheet.create({
   sidebarLogoutButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: 16,
-    marginHorizontal: 16,
+    marginHorizontal: 18,
     marginTop: 16,
-    borderRadius: 10,
-    backgroundColor: "rgba(239,68,68,0.15)",
+    borderRadius: 16,
+    backgroundColor: "rgba(239,68,68,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.14)",
     gap: 12,
   },
 
@@ -267,7 +403,7 @@ export default StyleSheet.create({
 
   contentArea: {
     flex: 1,
-    backgroundColor: "#F5F8FC",
+    backgroundColor: "#EEF4FA",
   },
 
   adminContentShell: {
@@ -279,7 +415,7 @@ export default StyleSheet.create({
   adminMonitoringDock: {
     width: 420,
     borderLeftWidth: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255,255,255,0.94)",
   },
 
   adminMonitoringDockHeader: {
@@ -287,8 +423,8 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
     borderBottomWidth: 1,
   },
 
@@ -306,17 +442,17 @@ export default StyleSheet.create({
   },
 
   adminMonitoringDockClose: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F1F5F9",
   },
 
   adminMonitoringDockBody: {
     flex: 1,
-    padding: 16,
+    padding: 18,
   },
 
   contentScrollView: {
@@ -328,21 +464,34 @@ export default StyleSheet.create({
   },
 
   pageContainer: {
-    padding: 22,
+    paddingHorizontal: 26,
+    paddingTop: 22,
+    paddingBottom: 26,
   },
 
   pageHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 22,
   },
 
   adminSectionShell: {
-    borderRadius: 22,
+    borderRadius: 28,
     borderWidth: 1,
-    padding: 18,
-    marginBottom: 18,
+    padding: 22,
+    marginBottom: 20,
+    backgroundColor: "rgba(255,255,255,0.88)",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.08,
+        shadowRadius: 28,
+      },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 16px 40px rgba(15,23,42,0.08)" },
+    }),
   },
 
   adminSectionShellHeader: {
@@ -350,7 +499,7 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 12,
-    marginBottom: 18,
+    marginBottom: 20,
     flexWrap: "wrap",
   },
 
@@ -388,9 +537,9 @@ export default StyleSheet.create({
   adminFeedbackBanner: {
     marginHorizontal: 22,
     marginTop: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 22,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "flex-start",
@@ -427,9 +576,420 @@ export default StyleSheet.create({
   },
 
   pageTitle: {
-    fontSize: 25,
+    fontSize: 28,
     fontWeight: "800",
-    color: "#1E293B",
+    color: "#0F172A",
+    letterSpacing: -0.4,
+  },
+
+  modularCardGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+  },
+
+  modularActionCard: {
+    minWidth: 220,
+    flexGrow: 1,
+    flexBasis: 220,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+  },
+
+  modularActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+
+  modularActionTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 6,
+  },
+
+  modularActionDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+    marginBottom: 14,
+  },
+
+  modularActionBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+
+  modularActionBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  modularInfoPanel: {
+    marginTop: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+  },
+
+  modularInfoTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 12,
+  },
+
+  modularInfoStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  modularInfoStatCard: {
+    minWidth: 120,
+    flexGrow: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
+
+  modularInfoStatValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+
+  modularInfoStatLabel: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  modularTwoColumnLayout: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+
+  modularMapColumn: {
+    flex: 1.45,
+    minWidth: 340,
+  },
+
+  modularEditorCard: {
+    flex: 1,
+    minWidth: 300,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+  },
+
+  modularRoomsPanel: {
+    maxWidth: 420,
+  },
+
+  modularEditorTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 12,
+  },
+
+  modularEditorHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+    marginBottom: 12,
+  },
+
+  modularEditorSecondaryTitle: {
+    marginTop: 18,
+  },
+
+  modularTextInput: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: "#0F172A",
+    backgroundColor: "#F8FBFE",
+    marginBottom: 10,
+  },
+
+  modularSwitchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+
+  modularSwitchLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0F172A",
+  },
+
+  modularEditorActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+  },
+
+  modularListStack: {
+    gap: 12,
+  },
+
+  modularRoomTable: {
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+
+  modularRoomTableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+
+  modularRoomTableHeaderText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#334155",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  modularRoomTableActionsHeader: {
+    flex: 0,
+    width: 88,
+    textAlign: "center",
+  },
+
+  modularRoomTableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+
+  modularRoomTableNameCell: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 10,
+  },
+
+  modularRoomTablePositionCell: {
+    flex: 1,
+    textAlign: "left",
+    paddingRight: 10,
+  },
+
+  modularRoomTableActionsCell: {
+    width: 88,
+    justifyContent: "flex-end",
+    flexShrink: 0,
+  },
+
+  modularListCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+  },
+
+  modularListHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  modularListCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  modularListTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  modularListMeta: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+  },
+
+  modularInlineActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  modularInlineButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  modularEmptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+  },
+
+  modularEmptyStateText: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    color: "#64748B",
+  },
+
+  modularStatCard: {
+    minWidth: 160,
+    flexGrow: 1,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+  },
+
+  modularStatValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+
+  modularStatLabel: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  adminTableScroll: {
+    marginTop: 14,
+    alignSelf: "stretch",
+    overflow: "visible",
+  },
+
+  adminTableScrollContent: {
+    alignItems: "flex-start",
+    alignSelf: "stretch",
+  },
+
+  adminTable: {
+    alignSelf: "stretch",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
+  },
+
+  adminTableHeaderRow: {
+    flexDirection: "row",
+    backgroundColor: "#F8FBFE",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  adminTableRow: {
+    flexDirection: "row",
+    minHeight: 54,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  adminTableCell: {
+    paddingHorizontal: 9,
+    paddingVertical: 10,
+    justifyContent: "center",
+  },
+
+  adminTableHeaderCell: {
+    paddingVertical: 12,
+  },
+
+  adminTableFlexCell: {
+    flex: 1,
+    minWidth: 100,
+  },
+
+  adminTableHeaderText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#334155",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  adminTableCellText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#0F172A",
+  },
+
+  adminTablePrimaryText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 2,
+  },
+
+  adminTableSecondaryText: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: "#64748B",
+  },
+
+  adminTableIdentityCell: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  adminTableIdentityCopy: {
+    flex: 1,
+  },
+
+  adminTableActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+
+  adminTableActionButton: {
+    borderWidth: 1,
+    borderRadius: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+
+  adminTableActionText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
 
   // ============================================
@@ -437,23 +997,23 @@ export default StyleSheet.create({
   // ============================================
 
   header: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 24,
+    backgroundColor: "rgba(255,255,255,0.94)",
+    paddingHorizontal: 28,
     paddingTop: Platform.select({ ios: 50, android: 20, web: 20 }),
-    paddingBottom: 16,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
+    paddingBottom: 18,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: "rgba(148,163,184,0.18)",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.08,
-        shadowRadius: 10,
+        shadowRadius: 24,
       },
-      android: { elevation: 3 },
-      web: { boxShadow: "0px 2px 12px rgba(15,23,42,0.08)" },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 12px 30px rgba(15,23,42,0.08)" },
     }),
   },
 
@@ -464,9 +1024,10 @@ export default StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1E293B",
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#0F172A",
+    letterSpacing: -0.4,
   },
 
   headerCopy: {
@@ -476,28 +1037,28 @@ export default StyleSheet.create({
 
   headerSubtitle: {
     fontSize: 13,
-    color: "#64748B",
-    marginTop: 4,
-    lineHeight: 19,
+    color: "#526277",
+    marginTop: 6,
+    lineHeight: 20,
   },
 
   headerMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 10,
+    gap: 10,
+    marginTop: 12,
   },
 
   headerMetaBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#DCE6F2",
   },
 
   headerMetaText: {
@@ -507,47 +1068,60 @@ export default StyleSheet.create({
   },
 
   profileButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(14,165,233,0.12)",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(14,165,233,0.08)",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#0EA5E9",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
   },
 
   profileIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#0EA5E9",
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#1C6DD0",
     justifyContent: "center",
     alignItems: "center",
   },
 
   pageRefreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#EFF6FF",
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#D6E1EC",
+    ...Platform.select({
+      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.08)" },
+    }),
   },
 
   dashboardHeroCard: {
-    marginBottom: 14,
-    borderRadius: 18,
+    marginBottom: 18,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: "#DBEAFE",
-    backgroundColor: "#F0F9FF",
-    padding: 16,
+    borderColor: "#D9E5F3",
+    backgroundColor: "#F8FBFF",
+    padding: 22,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 12,
+    gap: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.08,
+        shadowRadius: 28,
+      },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 18px 40px rgba(15,23,42,0.08)" },
+    }),
   },
 
   dashboardHeroLeft: {
@@ -555,26 +1129,29 @@ export default StyleSheet.create({
   },
 
   dashboardHeroTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: "800",
     color: "#0F172A",
-    marginBottom: 5,
+    marginBottom: 7,
+    letterSpacing: -0.3,
   },
 
   dashboardHeroSubtitle: {
-    fontSize: 12,
-    color: "#475569",
-    lineHeight: 18,
+    fontSize: 13,
+    color: "#526277",
+    lineHeight: 20,
   },
 
   dashboardHeroBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#E0F2FE",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: "#EAF4FF",
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#CFE0F5",
   },
 
   dashboardHeroBadgeText: {
@@ -586,18 +1163,19 @@ export default StyleSheet.create({
   dashboardStatsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 14,
+    marginBottom: 18,
   },
 
   dashboardStatCard: {
     borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 20,
+    padding: 18,
     shadowColor: "#0F172A",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.07,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 18,
+    elevation: 3,
   },
 
   dashboardStatHeader: {
@@ -609,32 +1187,99 @@ export default StyleSheet.create({
   dashboardStatLabel: {
     fontSize: 12,
     color: "#64748B",
+    fontWeight: "600",
   },
 
   dashboardStatIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
 
   dashboardStatValue: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "800",
-    marginTop: 10,
+    marginTop: 14,
+    letterSpacing: -0.4,
+  },
+
+  dashboardNotificationCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 18,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 14,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.07,
+    shadowOffset: { width: 0, height: 12 },
+    shadowRadius: 22,
+    elevation: 3,
+  },
+
+  dashboardNotificationLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  dashboardNotificationIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: "#FEF3C7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  dashboardNotificationTextWrap: {
+    flex: 1,
+  },
+
+  dashboardNotificationTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 3,
+  },
+
+  dashboardNotificationText: {
+    fontSize: 12,
+    color: "#64748B",
+    lineHeight: 18,
+  },
+
+  dashboardNotificationBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#FFF7ED",
+  },
+
+  dashboardNotificationBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#F59E0B",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
 
   dashboardSectionCard: {
     marginTop: 14,
-    borderRadius: 14,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 14,
+    padding: 18,
     shadowColor: "#0F172A",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 7,
-    elevation: 2,
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 22,
+    elevation: 3,
   },
 
   dashboardSectionHeader: {
@@ -653,7 +1298,7 @@ export default StyleSheet.create({
   dashboardSectionLink: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#2563EB",
+    color: "#0A3D91",
   },
 
   sectionTitleContainer: {
@@ -665,30 +1310,47 @@ export default StyleSheet.create({
   viewAll: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#2563EB",
+    color: "#0A3D91",
   },
 
   adminMapSection: {
     marginTop: 14,
-    borderRadius: 18,
+    borderRadius: 24,
     borderWidth: 1,
-    padding: 16,
+    padding: 18,
   },
 
   adminMapFilters: {
     borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
     marginBottom: 14,
   },
 
   adminMapFilterRow: {
     paddingRight: 8,
+    paddingBottom: 10,
+  },
+
+  adminMapFilterLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+
+  adminMapActivityFilterPanel: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
   },
 
   adminMapFilterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 9,
     borderRadius: 999,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -741,7 +1403,7 @@ export default StyleSheet.create({
 
   adminMapContainer: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E2E8F0",
@@ -749,9 +1411,9 @@ export default StyleSheet.create({
 
   adminMapSideCard: {
     marginTop: 14,
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 16,
+    padding: 18,
   },
 
   adminMapSummaryGrid: {
@@ -765,15 +1427,15 @@ export default StyleSheet.create({
     flexBasis: "47%",
     flexGrow: 1,
     borderWidth: 1,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 15,
   },
 
   adminMapFocusCard: {
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 14,
+    padding: 16,
     marginBottom: 14,
   },
 
@@ -838,8 +1500,9 @@ export default StyleSheet.create({
   dashboardRequestCard: {
     marginTop: 10,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: "rgba(255,255,255,0.92)",
   },
 
   dashboardRequestCardTop: {
@@ -908,17 +1571,17 @@ export default StyleSheet.create({
   // ============================================
 
   welcomeBanner: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
     margin: 20,
     marginTop: 16,
-    padding: 20,
-    borderRadius: 20,
+    padding: 22,
+    borderRadius: 28,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     ...Platform.select({
       ios: {
-        shadowColor: "#3B82F6",
+        shadowColor: "#1C6DD0",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 12,
@@ -985,8 +1648,8 @@ export default StyleSheet.create({
     flex: 1,
     minWidth: (width - sidebarWidth - 56) / 2,
     backgroundColor: "#FFF",
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 24,
+    padding: 18,
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
@@ -995,13 +1658,13 @@ export default StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
       },
-      android: { elevation: 2 },
+      android: { elevation: 3 },
       web: {
-        boxShadow: "0px 2px 4px rgba(0,0,0,0.05)",
+        boxShadow: "0px 14px 32px rgba(15,23,42,0.07)",
       },
     }),
   },
@@ -1050,7 +1713,7 @@ export default StyleSheet.create({
 
   sectionLink: {
     fontSize: 13,
-    color: "#3B82F6",
+    color: "#1C6DD0",
     fontWeight: "600",
   },
 
@@ -1073,7 +1736,7 @@ export default StyleSheet.create({
   },
 
   chartTypeButtonActive: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
   },
 
   chartTypeText: {
@@ -1180,7 +1843,7 @@ export default StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -1215,50 +1878,56 @@ export default StyleSheet.create({
   quickActionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
-    marginTop: 12,
-    marginBottom: 16,
+    gap: 12,
+    marginTop: 2,
+    marginBottom: 14,
   },
 
   quickActionCard: {
-    minWidth: 180,
-    flexGrow: 1,
-    flexBasis: 180,
+    minWidth: 220,
     backgroundColor: "#FFF",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
-    alignItems: "center",
+    minHeight: 132,
+    justifyContent: "space-between",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 14,
+    elevation: 2,
   },
 
   quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  quickActionContent: {
+    marginTop: 12,
     marginBottom: 12,
   },
 
   quickActionTitle: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "800",
     color: "#1E293B",
-    marginBottom: 4,
-    textAlign: "center",
+    marginBottom: 2,
   },
 
   quickActionSubtitle: {
     fontSize: 11,
     color: "#64748B",
-    textAlign: "center",
     lineHeight: 17,
   },
 
   quickActionBadge: {
-    marginTop: 12,
-    paddingHorizontal: 12,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
   },
@@ -1362,7 +2031,7 @@ export default StyleSheet.create({
   overviewBadgeText: {
     fontSize: 10,
     fontWeight: "600",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   // ============================================
@@ -1389,11 +2058,11 @@ export default StyleSheet.create({
   },
 
   tabActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
     ...Platform.select({
       ios: {
-        shadowColor: "#3B82F6",
+        shadowColor: "#1C6DD0",
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.18,
         shadowRadius: 14,
@@ -1589,7 +2258,7 @@ export default StyleSheet.create({
   roleBadgeText: {
     fontSize: 9,
     fontWeight: "700",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   deptBadge: {
@@ -1702,14 +2371,14 @@ export default StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#EEF5FF",
     backgroundColor: "#EFF6FF",
   },
 
   managementSecondaryButtonText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   managementStatsGrid: {
@@ -1785,7 +2454,7 @@ export default StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: "#EEF5FF",
     backgroundColor: "#EFF6FF",
   },
 
@@ -1934,7 +2603,7 @@ export default StyleSheet.create({
   },
 
   userPaginationButtonDisabled: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderColor: "#E2E8F0",
   },
 
@@ -1952,7 +2621,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 22,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     paddingHorizontal: 20,
   },
 
@@ -1995,8 +2664,8 @@ export default StyleSheet.create({
   },
 
   filterChipActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   filterChipText: {
@@ -2007,6 +2676,474 @@ export default StyleSheet.create({
 
   filterChipTextActive: {
     color: "#FFF",
+  },
+
+  recordsToolPanel: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    marginBottom: 14,
+  },
+
+  recordsFilterPanel: {
+    marginBottom: 18,
+  },
+
+  recordsToolHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  recordsToolIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  recordsToolCopy: {
+    flex: 1,
+  },
+
+  recordsResetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  recordsResetButtonText: {
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  recordsToolTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+
+  recordsToolSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+  },
+
+  recordsSearchRow: {
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "stretch" : "center",
+    gap: 10,
+  },
+
+  recordsSearchInputWrap: {
+    flex: 1,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+  },
+
+  recordsSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: "#0F172A",
+    paddingVertical: Platform.OS === "web" ? 10 : 8,
+  },
+
+  recordsSearchButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+  },
+
+  recordsSearchButtonText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  recordsFilterChips: {
+    flexDirection: "row",
+    gap: 10,
+    paddingRight: 8,
+  },
+
+  recordsFilterFooter: {
+    marginTop: 10,
+  },
+
+  recordsFilterAccordion: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+
+  recordsFilterAccordionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  recordsFilterAccordionLabel: {
+    marginBottom: 0,
+  },
+
+  recordsFilterGroup: {
+    marginTop: 8,
+  },
+
+  recordsFilterGroupLabel: {
+    marginBottom: 8,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.45,
+  },
+
+  recordsFilterChip: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+
+  recordsDateRangeWrap: {
+    marginTop: 2,
+  },
+
+  recordsDateRangeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  recordsDateButton: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  recordsDateButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#334155",
+  },
+
+  recordsDateClearButton: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  recordsDateClearText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  recordsFilterChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+
+  recordsFilterChipTextActive: {
+    color: "#FFFFFF",
+  },
+
+  dataManagementToolbar: {
+    marginTop: 14,
+    marginBottom: 10,
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "stretch" : "center",
+    gap: 8,
+  },
+
+  dataManagementSearchBox: {
+    flex: 1,
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 11,
+  },
+
+  dataManagementSearchInput: {
+    flex: 1,
+    fontSize: 12,
+    color: "#0F172A",
+    paddingVertical: Platform.OS === "web" ? 8 : 7,
+  },
+
+  dataManagementPrimaryButton: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: "#0A3D91",
+  },
+
+  dataManagementPrimaryButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  dataManagementGhostButton: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#EEF5FF",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 12,
+  },
+
+  dataManagementGhostButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
+  dataManagementFilterBox: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FBFE",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 8,
+    marginBottom: 10,
+  },
+
+  dataManagementFilterRow: {
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "stretch" : "center",
+    gap: 8,
+  },
+
+  dataManagementFilterLabel: {
+    width: width < 760 ? "auto" : 54,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.55,
+    textTransform: "uppercase",
+    color: "#64748B",
+  },
+
+  dataManagementChipRow: {
+    gap: 7,
+    paddingRight: 8,
+  },
+
+  dataManagementChip: {
+    minHeight: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+
+  dataManagementChipActive: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+
+  dataManagementChipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#475569",
+  },
+
+  dataManagementChipTextActive: {
+    color: "#FFFFFF",
+  },
+
+  userDataBottomPanel: {
+    borderWidth: 1,
+    borderColor: "#EEF5FF",
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    marginBottom: 18,
+  },
+
+  userDataPanelHeader: {
+    flexDirection: width < 760 ? "column" : "row",
+    justifyContent: "space-between",
+    alignItems: width < 760 ? "stretch" : "flex-start",
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  userDataPanelIdentity: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  userDataPanelAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+  },
+
+  userDataPanelTitleBlock: {
+    flex: 1,
+  },
+
+  userDataPanelTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+
+  userDataPanelSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+    marginBottom: 8,
+  },
+
+  userDataPanelActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: width < 760 ? "flex-start" : "flex-end",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+
+  userDataInfoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  userDataInfoCard: {
+    flexGrow: 1,
+    flexBasis: width < 900 ? 180 : 220,
+    minWidth: 170,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+
+  userDataInfoCopy: {
+    flex: 1,
+  },
+
+  userDataEditGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  userDataCompactOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  userDataCompactOption: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 999,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  userDataCompactOptionActive: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+
+  userDataCompactOptionText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#475569",
+  },
+
+  userDataCompactOptionTextActive: {
+    color: "#FFFFFF",
+  },
+
+  userDataPanelFooter: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 4,
   },
 
   // ============================================
@@ -2058,6 +3195,15 @@ export default StyleSheet.create({
     color: "#1E293B",
   },
 
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8FBFE",
+  },
+
   modalBody: {
     padding: 20,
   },
@@ -2068,6 +3214,54 @@ export default StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
     gap: 12,
+  },
+
+  pendingRequestsModal: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    width: "100%",
+    maxWidth: 760,
+    maxHeight: "86%",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  pendingRequestsModalSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  pendingRequestsModalList: {
+    maxHeight: 520,
+  },
+
+  pendingRequestsModalListContent: {
+    padding: 16,
+    gap: 12,
+  },
+
+  pendingRequestsModalEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 42,
+    paddingHorizontal: 20,
+  },
+
+  pendingRequestsModalEmptyTitle: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  pendingRequestsModalEmptyText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 18,
   },
 
   userProfileModal: {
@@ -2207,7 +3401,7 @@ export default StyleSheet.create({
     gap: 10,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#B7D5F6",
     backgroundColor: "#EFF6FF",
     paddingHorizontal: 14,
     paddingVertical: 13,
@@ -2217,7 +3411,7 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 19,
-    color: "#1D4ED8",
+    color: "#041E42",
   },
 
   userEditorModal: {
@@ -2300,7 +3494,7 @@ export default StyleSheet.create({
     borderRadius: 30,
     paddingHorizontal: 16,
     paddingVertical: 13,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     marginBottom: 12,
   },
 
@@ -2309,6 +3503,81 @@ export default StyleSheet.create({
     fontSize: 14,
     color: "#1E293B",
     fontWeight: "600",
+  },
+
+  staffDropdownTrigger: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 30,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#F8FBFE",
+  },
+
+  staffDropdownValueWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  staffDropdownValue: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "700",
+  },
+
+  staffDropdownMenu: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+
+  staffDropdownOption: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  staffDropdownOptionActive: {
+    backgroundColor: "#10B981",
+    borderBottomColor: "#10B981",
+  },
+
+  staffDropdownOptionText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  staffDropdownOptionTextActive: {
+    color: "#FFFFFF",
+  },
+
+  staffDropdownOptionMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  staffDropdownOptionMetaActive: {
+    color: "rgba(255,255,255,0.82)",
   },
 
   userEditorRoleWrap: {
@@ -2383,7 +3652,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 22,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     padding: 16,
     gap: 14,
   },
@@ -2413,7 +3682,7 @@ export default StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: "#1E293B",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     marginBottom: 12,
   },
 
@@ -2436,7 +3705,7 @@ export default StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 30,
     alignItems: "center",
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
   },
 
   submitButtonText: {
@@ -2507,7 +3776,7 @@ export default StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 6,
@@ -2518,7 +3787,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 18,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     padding: 16,
     gap: 12,
     marginBottom: 14,
@@ -2554,7 +3823,7 @@ export default StyleSheet.create({
     gap: 8,
     backgroundColor: "#EFF6FF",
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#B7D5F6",
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -2565,7 +3834,7 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
-    color: "#1D4ED8",
+    color: "#041E42",
     fontWeight: "600",
   },
 
@@ -2588,7 +3857,7 @@ export default StyleSheet.create({
     textAlignVertical: "top",
     minHeight: 90,
     marginVertical: 20,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     color: "#1E293B",
   },
 
@@ -2704,7 +3973,7 @@ export default StyleSheet.create({
   requestAvatarText: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   requestInfo: {
@@ -2731,7 +4000,7 @@ export default StyleSheet.create({
   },
 
   requestDetails: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -2817,8 +4086,8 @@ export default StyleSheet.create({
   },
 
   roleOptionActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   roleText: {
@@ -2929,7 +4198,7 @@ export default StyleSheet.create({
   analyticsHeroBadgeText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#4F46E5",
+    color: "#0A3D91",
   },
 
   analyticsHeroTitle: {
@@ -3017,7 +4286,7 @@ export default StyleSheet.create({
   refreshButtonText: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   keyMetricsRow: {
@@ -3129,7 +4398,7 @@ export default StyleSheet.create({
   },
 
   analyticsDatasetButtonActive: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
   },
 
   analyticsDatasetButtonText: {
@@ -3314,7 +4583,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#D1FAE5",
+    backgroundColor: "#EEF5FF",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 20,
@@ -3341,7 +4610,7 @@ export default StyleSheet.create({
   todayStatValue: {
     fontSize: 32,
     fontWeight: "800",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   todayStatLabel: {
@@ -3720,8 +4989,8 @@ export default StyleSheet.create({
   },
 
   historyFilterChipActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   historyFilterChipText: {
@@ -3737,7 +5006,7 @@ export default StyleSheet.create({
   historySearchBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 12,
@@ -3754,7 +5023,7 @@ export default StyleSheet.create({
   },
 
   historyItem: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
@@ -3781,7 +5050,7 @@ export default StyleSheet.create({
   historyItemAvatarText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   historyItemInfo: {
@@ -3977,7 +5246,7 @@ export default StyleSheet.create({
     gap: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
     borderRadius: 12,
   },
 
@@ -4027,7 +5296,7 @@ export default StyleSheet.create({
   },
 
   settingsTabTextActive: {
-    color: "#3B82F6",
+    color: "#1C6DD0",
     fontWeight: "600",
   },
 
@@ -4064,7 +5333,7 @@ export default StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -4093,7 +5362,7 @@ export default StyleSheet.create({
 
   profileRole: {
     fontSize: 12,
-    color: "#3B82F6",
+    color: "#1C6DD0",
     fontWeight: "600",
     marginTop: 2,
   },
@@ -4108,7 +5377,7 @@ export default StyleSheet.create({
   editProfileButtonText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#3B82F6",
+    color: "#1C6DD0",
   },
 
   divider: {
@@ -4193,8 +5462,8 @@ export default StyleSheet.create({
   },
 
   selectOptionActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   selectOptionText: {
@@ -4234,7 +5503,7 @@ export default StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#1E293B",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F8FBFE",
   },
 
   dangerButton: {
@@ -4260,5 +5529,101 @@ export default StyleSheet.create({
     fontSize: 11,
     color: "#FCA5A5",
     marginTop: 2,
+  },
+
+  staffCreationLayout: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 18,
+    alignItems: "flex-start",
+  },
+
+  staffCreationFormCard: {
+    flex: 1,
+    minWidth: 320,
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 20,
+    gap: 18,
+  },
+
+  staffCreationAside: {
+    width: 320,
+    gap: 18,
+  },
+
+  managementQuickStatsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+  },
+
+  managementQuickStatCard: {
+    minWidth: 180,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+    gap: 6,
+  },
+
+  managementQuickStatIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+
+  managementQuickStatValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+
+  managementQuickStatLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#334155",
+  },
+
+  managementQuickStatMeta: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  staffChecklist: {
+    gap: 12,
+    marginTop: 8,
+  },
+
+  staffChecklistItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  staffChecklistText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+  },
+
+  inlineCreateFooter: {
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+  },
+
+  inputErrorState: {
+    borderColor: "#EF4444",
+  },
+
+  formErrorText: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#DC2626",
   },
 });

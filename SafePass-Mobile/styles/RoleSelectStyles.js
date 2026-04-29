@@ -42,13 +42,13 @@ export default StyleSheet.create({
 
   hero: {
     paddingTop: Platform.select({
-      ios: isSmallPhone ? 58 : 78,
-      android: isSmallPhone ? 48 : 68,
-      web: isSmallPhone ? 42 : 56,
+      ios: 52,
+      android: 44,
+      web: 46,
     }),
-    paddingBottom: isSmallPhone ? 38 : 48,
-    borderBottomLeftRadius: isSmallPhone ? 28 : 34,
-    borderBottomRightRadius: isSmallPhone ? 28 : 34,
+    paddingBottom: 62,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -66,21 +66,21 @@ export default StyleSheet.create({
 
   heroGlowOne: {
     position: "absolute",
-    top: -30,
-    right: -10,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    top: -26,
+    right: -14,
+    width: 148,
+    height: 148,
+    borderRadius: 74,
     backgroundColor: "rgba(255,255,255,0.09)",
   },
 
   heroGlowTwo: {
     position: "absolute",
-    bottom: -60,
-    left: -30,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    bottom: -52,
+    left: -28,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
     backgroundColor: "rgba(56,189,248,0.12)",
   },
 
@@ -100,19 +100,19 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
     borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: spacing.lg,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    marginBottom: 14,
     ...Platform.select({
       web: { backdropFilter: "blur(10px)" },
     }),
   },
 
   brandBadgeLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
     backgroundColor: "#FFFFFF",
   },
 
@@ -124,96 +124,80 @@ export default StyleSheet.create({
     fontSize: fontSizes.xs,
     color: "rgba(255,255,255,0.78)",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     fontWeight: "700",
   },
 
   brandBadgeTitle: {
-    fontSize: fontSizes.sm,
+    fontSize: 13,
     color: "#FFFFFF",
     fontWeight: "700",
   },
 
   logoContainer: {
-    marginBottom: spacing.base,
+    marginBottom: 12,
   },
 
   logoImage: {
-    width: isSmallPhone ? 88 : 112,
-    height: isSmallPhone ? 88 : 112,
-    borderRadius: isSmallPhone ? 44 : 56,
+    width: isSmallPhone ? 78 : 92,
+    height: isSmallPhone ? 78 : 92,
+    borderRadius: isSmallPhone ? 39 : 46,
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.28)",
     backgroundColor: "#FFFFFF",
   },
 
   heroTitle: {
-    fontSize: isSmallPhone ? 28 : 34,
+    fontSize: isSmallPhone ? 18 : isTablet ? 24 : 22,
     fontWeight: "800",
     color: "#FFFFFF",
     textAlign: "center",
-    lineHeight: isSmallPhone ? 34 : 42,
-    letterSpacing: -0.6,
-    maxWidth: 620,
+    lineHeight: isSmallPhone ? 24 : 28,
+    letterSpacing: 0,
+    marginBottom: 8,
+    maxWidth: 520,
   },
 
   heroSubtitle: {
-    fontSize: fontSizes.lg,
+    fontSize: 13,
     fontWeight: "600",
     color: "rgba(255,255,255,0.94)",
     textAlign: "center",
-    marginTop: 8,
-  },
-
-  heroDivider: {
-    width: 72,
-    height: 4,
-    backgroundColor: "rgba(255,255,255,0.36)",
-    borderRadius: 999,
-    marginVertical: spacing.md,
+    marginTop: 0,
+    marginBottom: 14,
+    lineHeight: 19,
+    maxWidth: 380,
   },
 
   heroDescription: {
-    fontSize: fontSizes.sm,
-    color: "rgba(255,255,255,0.88)",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.86)",
     fontWeight: "500",
     textAlign: "center",
-    lineHeight: 22,
-    maxWidth: 560,
+    lineHeight: 19,
+    maxWidth: 380,
+    marginBottom: 14,
   },
 
-  heroMetrics: {
+  flightAccent: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    width: "100%",
-  },
-
-  heroMetricCard: {
-    minWidth: 118,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.13)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
 
-  heroMetricValue: {
-    fontSize: fontSizes.lg,
-    fontWeight: "800",
-    color: "#FFFFFF",
+  flightAccentLine: {
+    width: 34,
+    height: 1.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.34)",
   },
 
-  heroMetricLabel: {
-    fontSize: fontSizes.xs,
-    color: "rgba(255,255,255,0.82)",
-    fontWeight: "600",
-    marginTop: 4,
-    textAlign: "center",
+  flightAccentDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "rgba(255,255,255,0.78)",
   },
 
   content: {
@@ -481,14 +465,33 @@ export default StyleSheet.create({
   },
 
   contactList: {
-    gap: 6,
+    gap: 8,
     marginBottom: spacing.sm,
   },
 
-  contactLine: {
+  contactRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF3F8",
+  },
+
+  contactLabel: {
+    fontSize: fontSizes.sm,
+    color: "#64748B",
+    fontWeight: "600",
+    minWidth: isSmallPhone ? 78 : 92,
+  },
+
+  contactValue: {
+    flex: 1,
     fontSize: fontSizes.sm,
     color: "#334155",
-    fontWeight: "600",
+    fontWeight: "700",
+    textAlign: "right",
   },
 
   contactLinkRow: {
@@ -496,6 +499,7 @@ export default StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.xs,
     marginTop: spacing.xs,
+    justifyContent: "flex-start",
   },
 
   contactLinkChip: {
@@ -522,6 +526,7 @@ export default StyleSheet.create({
     fontSize: fontSizes.xs,
     color: "#94A3B8",
     fontWeight: "600",
+    textAlign: "left",
   },
 
   versionText: {

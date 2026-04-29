@@ -259,15 +259,14 @@ router.put('/:visitorId/self-checkin', async (req, res) => {
       });
     }
 
-    if (visitor.approvalStatus !== 'approved') {
+    if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Visit not approved yet' 
+        message: 'Visitor does not have an approved visit window yet' 
       });
     }
 
-    visitor.status = 'checked_in';
-    visitor.checkedInAt = new Date();
+    visitor.markCheckedIn(req.user?.id || null);
     await visitor.save();
 
     res.json({
@@ -297,8 +296,7 @@ router.put('/:visitorId/self-checkout', async (req, res) => {
       });
     }
 
-    visitor.status = 'checked_out';
-    visitor.checkedOutAt = new Date();
+    visitor.markCheckedOut(req.user?.id || null);
     await visitor.save();
 
     res.json({

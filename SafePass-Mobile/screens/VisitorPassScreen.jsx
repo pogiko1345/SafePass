@@ -192,8 +192,8 @@ export default function VisitorPassScreen({ navigation, route }) {
   if (isLoading) {
     return (
       <SafeAreaView style={visitorPassStyles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
-        <ActivityIndicator size="large" color="#4F46E5" />
+        <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
+        <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={visitorPassStyles.loadingText}>Loading your visitor pass...</Text>
       </SafeAreaView>
     );
@@ -202,7 +202,7 @@ export default function VisitorPassScreen({ navigation, route }) {
   if (error || !visitor) {
     return (
       <SafeAreaView style={visitorPassStyles.errorContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+        <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
         <View style={visitorPassStyles.header}>
           <TouchableOpacity
             style={visitorPassStyles.backButton}
@@ -234,7 +234,7 @@ export default function VisitorPassScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={visitorPassStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
       
       {/* Header */}
       <View style={visitorPassStyles.header}>
@@ -360,7 +360,7 @@ export default function VisitorPassScreen({ navigation, route }) {
 
           <TouchableOpacity style={visitorPassStyles.quickAction} onPress={handleEmailPass}>
             <View style={[visitorPassStyles.quickActionIcon, { backgroundColor: '#F3E8FF' }]}>
-              <Ionicons name="mail-outline" size={20} color="#7C3AED" />
+              <Ionicons name="mail-outline" size={20} color="#1C6DD0" />
             </View>
             <Text style={visitorPassStyles.quickActionText}>Email Pass</Text>
           </TouchableOpacity>
@@ -376,7 +376,7 @@ export default function VisitorPassScreen({ navigation, route }) {
         {/* Appointment Details */}
         <View style={visitorPassStyles.detailsCard}>
           <View style={visitorPassStyles.detailsHeader}>
-            <Ionicons name="calendar" size={20} color="#4F46E5" />
+            <Ionicons name="calendar" size={20} color="#0A3D91" />
             <Text style={visitorPassStyles.detailsTitle}>Appointment Details</Text>
           </View>
 
@@ -426,7 +426,7 @@ export default function VisitorPassScreen({ navigation, route }) {
         {/* Visitor Information */}
         <View style={visitorPassStyles.detailsCard}>
           <View style={visitorPassStyles.detailsHeader}>
-            <Ionicons name="person-circle-outline" size={20} color="#4F46E5" />
+            <Ionicons name="person-circle-outline" size={20} color="#0A3D91" />
             <Text style={visitorPassStyles.detailsTitle}>Visitor Information</Text>
           </View>
 
@@ -455,7 +455,7 @@ export default function VisitorPassScreen({ navigation, route }) {
         {(visitor.checkedInAt || visitor.checkedOutAt) && (
           <View style={visitorPassStyles.detailsCard}>
             <View style={visitorPassStyles.detailsHeader}>
-              <Ionicons name="log-in-outline" size={20} color="#4F46E5" />
+              <Ionicons name="log-in-outline" size={20} color="#0A3D91" />
               <Text style={visitorPassStyles.detailsTitle}>Check-in/out History</Text>
             </View>
 

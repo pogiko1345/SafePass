@@ -13,42 +13,34 @@ import {
   Image,
   ActivityIndicator,
   Modal,
-  Linking,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import visitorRegisterStyles from "../styles/VisitorRegisterStyles";
 import ApiService from "../utils/ApiService";
-import IDScannerService from "../utils/IDScannerService";
 import Logo from "../assets/LogoSapphire.jpg";
-
-let DateTimePickerComponent = null;
-if (Platform.OS !== "web") {
-  try {
-    const DateTimePickerModule = require("@react-native-community/datetimepicker");
-    DateTimePickerComponent = DateTimePickerModule.default;
-  } catch (error) {
-    console.warn("DateTimePicker not available:", error);
-  }
-}
-
-const purposeOptions = [
-  "Meeting with Staff",
-  "Maintenance Work",
-  "Package Delivery",
-  "Guest Visit",
-  "Tour of Campus",
-  "Emergency",
-  "Interview",
-  "Event Participation",
-  "Other",
-];
+import {
+  PHILIPPINE_MOBILE_NUMBER_MESSAGE,
+  isValidPhilippineMobileNumber,
+  normalizePhilippineMobileNumber,
+} from "../utils/phoneValidation";
 
 // ================= SUCCESS MODAL COMPONENT =================
-const SuccessModal = ({ visible, credentials, onConfirm }) => {
+const SuccessModal = ({
+  visible,
+  account,
+  isVerified,
+  isVerifying,
+  otpDeliveryMode,
+  otpValue,
+  otpError,
+  onOtpChange,
+  onConfirm,
+  onVerifyOtp,
+  onResendOtp,
+}) => {
   const handleCopy = (text, type) => {
     if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(text).catch(() => {});
@@ -67,74 +59,139 @@ const SuccessModal = ({ visible, credentials, onConfirm }) => {
         <View style={visitorRegisterStyles.successModalContainer}>
           <View style={visitorRegisterStyles.successIconContainer}>
             <LinearGradient
-              colors={["#10B981", "#059669"]}
+              colors={["#0A3D91", "#041E42"]}
               style={visitorRegisterStyles.successIconGradient}
             >
               <Ionicons name="checkmark-done" size={48} color="#FFFFFF" />
             </LinearGradient>
           </View>
-          <Text style={visitorRegisterStyles.successTitle}>
-            Registration Submitted!
-          </Text>
+          <Text style={visitorRegisterStyles.successTitle}>Registration Successful</Text>
           <Text style={visitorRegisterStyles.successMessage}>
-            Your request has been sent to the admin for approval. You can log in
-            now using these credentials, and your dashboard will show that your
-            visit is waiting for approval.
+            {isVerified
+              ? "Your account is verified. Continue to sign in to your visitor account."
+              : otpDeliveryMode === "backend_log"
+                ? "Email delivery is not available right now. For local testing, enter the 6-digit OTP shown in the backend terminal."
+                : "Enter the 6-digit OTP sent to your email to verify your visitor account before signing in."}
           </Text>
           <View style={visitorRegisterStyles.credentialsBox}>
             <View style={visitorRegisterStyles.credentialsTitleRow}>
-              <Ionicons name="mail-outline" size={16} color="#059669" />
+              <Ionicons name="person-circle-outline" size={16} color="#0A3D91" />
               <Text style={visitorRegisterStyles.credentialsTitle}>
-                Your Credentials
+                Account Details
               </Text>
             </View>
             <Text style={visitorRegisterStyles.credentialsInfo}>
-              Save these login details. Your account is already available for sign in.
+              Use your account credentials after OTP verification. The 6-digit code
+              should arrive in your email inbox from SafePass.
             </Text>
-            {credentials && (
+            {account && (
               <>
                 <View style={visitorRegisterStyles.credentialRow}>
-                  <Text style={visitorRegisterStyles.credentialLabel}>
-                    Email:
-                  </Text>
+                  <Text style={visitorRegisterStyles.credentialLabel}>Username</Text>
                   <Text style={visitorRegisterStyles.credentialValue}>
-                    {credentials.email}
+                    {account.username}
                   </Text>
                   <TouchableOpacity
-                    onPress={() => handleCopy(credentials.email, "Email")}
+                    onPress={() => handleCopy(account.username, "Username")}
                     style={visitorRegisterStyles.copyButton}
                   >
-                    <Ionicons name="copy-outline" size={18} color="#059669" />
+                    <Ionicons name="copy-outline" size={18} color="#0A3D91" />
                   </TouchableOpacity>
                 </View>
                 <View style={visitorRegisterStyles.credentialRow}>
-                  <Text style={visitorRegisterStyles.credentialLabel}>
-                    Password:
-                  </Text>
+                  <Text style={visitorRegisterStyles.credentialLabel}>Email</Text>
                   <Text style={visitorRegisterStyles.credentialValue}>
-                    {credentials.password}
+                    {account.email}
                   </Text>
                   <TouchableOpacity
-                    onPress={() => handleCopy(credentials.password, "Password")}
+                    onPress={() => handleCopy(account.email, "Email")}
                     style={visitorRegisterStyles.copyButton}
                   >
-                    <Ionicons name="copy-outline" size={18} color="#059669" />
+                    <Ionicons name="copy-outline" size={18} color="#0A3D91" />
                   </TouchableOpacity>
                 </View>
               </>
             )}
           </View>
+          {!isVerified ? (
+            <View style={visitorRegisterStyles.otpVerifyBox}>
+              <Text style={visitorRegisterStyles.credentialLabel}>Enter OTP Code</Text>
+              <TextInput
+                style={[
+                  visitorRegisterStyles.otpInput,
+                  otpError && visitorRegisterStyles.otpInputError,
+                ]}
+                value={otpValue}
+                onChangeText={(value) => onOtpChange(String(value || "").replace(/\D/g, "").slice(0, 6))}
+                placeholder="6-digit OTP"
+                placeholderTextColor="#94A3B8"
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+              {otpError ? (
+                <Text style={visitorRegisterStyles.otpErrorText}>{otpError}</Text>
+              ) : (
+                <Text style={visitorRegisterStyles.otpHintText}>
+                  We will check the code after you press Verify OTP.
+                </Text>
+              )}
+            </View>
+          ) : null}
+          {!isVerified ? (
+            <TouchableOpacity
+              style={[
+                visitorRegisterStyles.successButton,
+                isVerified && visitorRegisterStyles.successButtonMuted,
+              ]}
+              onPress={onVerifyOtp}
+              disabled={isVerified || isVerifying}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={["#0A3D91", "#041E42"]}
+                style={visitorRegisterStyles.successGradient}
+              >
+                <Text style={visitorRegisterStyles.successButtonText}>
+                  {isVerifying
+                    ? "Verifying..."
+                    : isVerified
+                      ? "Account Verified"
+                      : "Verify OTP"}
+                </Text>
+                <Ionicons
+                  name={isVerified ? "checkmark-circle-outline" : "keypad-outline"}
+                  size={20}
+                  color="#FFFFFF"
+                />
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : null}
+          {!isVerified ? (
+            <TouchableOpacity
+              style={visitorRegisterStyles.resendOtpButton}
+              onPress={onResendOtp}
+              disabled={isVerifying}
+            >
+              <Text style={visitorRegisterStyles.resendOtpButtonText}>
+                Resend OTP
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
-            style={visitorRegisterStyles.successButton}
+            style={[
+              visitorRegisterStyles.successButton,
+              !isVerified && visitorRegisterStyles.successButtonMuted,
+            ]}
             onPress={onConfirm}
+            disabled={!isVerified}
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={["#059669", "#047857"]}
+              colors={isVerified ? ["#0A3D91", "#0A3D91"] : ["#94A3B8", "#64748B"]}
               style={visitorRegisterStyles.successGradient}
             >
               <Text style={visitorRegisterStyles.successButtonText}>
-                Go to Login
+                {isVerified ? "Continue to Sign In" : "Verify OTP First"}
               </Text>
               <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
             </LinearGradient>
@@ -144,10 +201,15 @@ const SuccessModal = ({ visible, credentials, onConfirm }) => {
     </Modal>
   );
 };
-
 // ================= DATA PRIVACY MODAL =================
 const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
   const [accepted, setAccepted] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setAccepted(false);
+    }
+  }, [visible]);
 
   return (
     <Modal
@@ -161,7 +223,7 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
           <View style={visitorRegisterStyles.privacyModalHeader}>
             <View style={visitorRegisterStyles.privacyIconContainer}>
               <LinearGradient
-                colors={["#059669", "#047857"]}
+                colors={["#0A3D91", "#0A3D91"]}
                 style={visitorRegisterStyles.privacyIconGradient}
               >
                 <Ionicons name="shield-checkmark" size={28} color="#FFFFFF" />
@@ -171,7 +233,7 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
               Data Privacy Agreement
             </Text>
             <Text style={visitorRegisterStyles.privacyModalSubtitle}>
-              Please review and accept our data privacy policy
+              By registering, you agree that your personal data will be collected and used for visitor monitoring and security purposes.
             </Text>
           </View>
           <ScrollView
@@ -180,103 +242,48 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
           >
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="information-circle" size={20} color="#059669" />
+                <Ionicons name="information-circle" size={20} color="#0A3D91" />
                 <Text style={visitorRegisterStyles.privacySectionTitle}>
                   Information We Collect
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • Full name and contact information (email, phone number)
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • Government-issued ID number and photo
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • Visit details including purpose, date, and time
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • Vehicle information (if applicable)
+                - Full name, email address, username, and your password for account access.
               </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="shield" size={20} color="#059669" />
+                <Ionicons name="shield" size={20} color="#0A3D91" />
                 <Text style={visitorRegisterStyles.privacySectionTitle}>
                   How We Use Your Data
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • To verify your identity for campus access
+                - To create your visitor account and securely link future appointments to you.
               </Text>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • To maintain security logs and access records
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • To contact you regarding your visit
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • For compliance with legal and regulatory requirements
+                - To let you log in, request appointments, and track approval status.
               </Text>
             </View>
             <View style={visitorRegisterStyles.privacySection}>
               <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="lock-closed" size={20} color="#059669" />
+                <Ionicons name="lock-closed" size={20} color="#0A3D91" />
                 <Text style={visitorRegisterStyles.privacySectionTitle}>
                   Data Protection
                 </Text>
               </View>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • Your data is encrypted using 256-bit encryption
+                - Your account details are stored securely and used only inside the SafePass system.
               </Text>
               <Text style={visitorRegisterStyles.privacySectionText}>
-                • We never share your information with third parties
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • You can request data deletion at any time
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • Records are automatically deleted after 30 days
-              </Text>
-            </View>
-            <View style={visitorRegisterStyles.privacySection}>
-              <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="time" size={20} color="#059669" />
-                <Text style={visitorRegisterStyles.privacySectionTitle}>
-                  Retention Period
-                </Text>
-              </View>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • Visitor records are kept for 30 days for security purposes
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • After 30 days, all personal data is automatically anonymized
-              </Text>
-            </View>
-            <View style={visitorRegisterStyles.privacySection}>
-              <View style={visitorRegisterStyles.privacySectionHeader}>
-                <Ionicons name="document-text" size={20} color="#059669" />
-                <Text style={visitorRegisterStyles.privacySectionTitle}>
-                  Your Rights
-                </Text>
-              </View>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • Right to access your personal data
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • Right to rectification of inaccurate data
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • Right to erasure (right to be forgotten)
-              </Text>
-              <Text style={visitorRegisterStyles.privacySectionText}>
-                • Right to restrict processing
+                - Only authorized personnel can view appointment-related records when needed.
               </Text>
             </View>
           </ScrollView>
           <TouchableOpacity
-            style={visitorRegisterStyles.privacyCheckboxContainer}
-            onPress={() => setAccepted(!accepted)}
-            activeOpacity={0.7}
+            style={visitorRegisterStyles.privacyCheckboxRow}
+            activeOpacity={0.8}
+            onPress={() => setAccepted((previous) => !previous)}
           >
             <View
               style={[
@@ -284,50 +291,30 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
                 accepted && visitorRegisterStyles.privacyCheckboxChecked,
               ]}
             >
-              {accepted && (
-                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-              )}
+              {accepted ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}
             </View>
             <Text style={visitorRegisterStyles.privacyCheckboxText}>
-              I have read and agree to the{" "}
-              <Text
-                style={visitorRegisterStyles.privacyLinkText}
-                onPress={() => Linking.openURL("https://example.com/privacy")}
-              >
-                Privacy Policy
-              </Text>
+              I understand and accept the data privacy policy.
             </Text>
           </TouchableOpacity>
-          <View style={visitorRegisterStyles.privacyModalActions}>
+          <View style={visitorRegisterStyles.privacyButtonRow}>
             <TouchableOpacity
               style={visitorRegisterStyles.privacyDeclineButton}
               onPress={onDecline}
-              activeOpacity={0.7}
             >
-              <Text style={visitorRegisterStyles.privacyDeclineText}>
-                Decline
-              </Text>
+              <Text style={visitorRegisterStyles.privacyDeclineButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 visitorRegisterStyles.privacyAcceptButton,
                 !accepted && visitorRegisterStyles.privacyAcceptButtonDisabled,
               ]}
-              onPress={() => accepted && onAccept()}
+              onPress={() => {
+                if (accepted) onAccept();
+              }}
               disabled={!accepted}
-              activeOpacity={0.7}
             >
-              <LinearGradient
-                colors={
-                  accepted ? ["#059669", "#047857"] : ["#9CA3AF", "#9CA3AF"]
-                }
-                style={visitorRegisterStyles.privacyAcceptGradient}
-              >
-                <Text style={visitorRegisterStyles.privacyAcceptText}>
-                  Accept & Continue
-                </Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-              </LinearGradient>
+              <Text style={visitorRegisterStyles.privacyAcceptButtonText}>Continue</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -335,8 +322,6 @@ const DataPrivacyModal = ({ visible, onAccept, onDecline }) => {
     </Modal>
   );
 };
-
-// ================= MAIN COMPONENT =================
 export default function VisitorRegisterScreen({ navigation }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isCompactRegister = viewportWidth <= 420;
@@ -344,10 +329,10 @@ export default function VisitorRegisterScreen({ navigation }) {
   const registerHorizontalMargin = isCompactRegister ? 12 : 16;
   const registerShellMaxWidth = Math.min(
     860,
-    Math.max(viewportWidth - registerHorizontalMargin * 2, 300)
+    Math.max(viewportWidth - registerHorizontalMargin * 2, 300),
   );
   const headerResponsiveStyle = {
-    paddingBottom: isCompactRegister ? 34 : 42,
+    paddingBottom: isCompactRegister ? 22 : 28,
   };
   const headerButtonsResponsiveStyle = {
     left: registerHorizontalMargin,
@@ -358,9 +343,9 @@ export default function VisitorRegisterScreen({ navigation }) {
     maxWidth: isTabletRegister ? 720 : 640,
   };
   const headerIconGradientResponsiveStyle = {
-    width: isCompactRegister ? 64 : 72,
-    height: isCompactRegister ? 64 : 72,
-    borderRadius: isCompactRegister ? 32 : 36,
+    width: isCompactRegister ? 48 : 56,
+    height: isCompactRegister ? 48 : 56,
+    borderRadius: isCompactRegister ? 24 : 28,
   };
   const headerTitleResponsiveStyle = {
     fontSize: isCompactRegister ? 24 : undefined,
@@ -388,59 +373,49 @@ export default function VisitorRegisterScreen({ navigation }) {
     ? { width: "100%", flex: 0 }
     : null;
 
-  const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDataPrivacy, setShowDataPrivacy] = useState(false);
-  const [showPurposePicker, setShowPurposePicker] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState(0);
-
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
-    phoneNumber: "",
-    idNumber: "",
+    username: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
   });
-
-  const [visitData, setVisitData] = useState({
-    purposeOfVisit: "",
-    vehicleNumber: "",
-    visitDate: new Date(),
-    visitTime: new Date(),
-  });
-
   const [errors, setErrors] = useState({
     fullName: "",
     email: "",
-    phoneNumber: "",
-    idNumber: "",
-    idImage: "",
-    purposeOfVisit: "",
+    username: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
   });
-
-  const [idImage, setIdImage] = useState(null);
-  const [idImageBase64, setIdImageBase64] = useState(null);
-  const [idImageFileName, setIdImageFileName] = useState("");
   const [focusedField, setFocusedField] = useState(null);
+  const [touchedFields, setTouchedFields] = useState({});
   const [completedFields, setCompletedFields] = useState({});
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [webDate, setWebDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
-  const [webTime, setWebTime] = useState(
-    new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }),
-  );
   const [registeredVisitor, setRegisteredVisitor] = useState(null);
+  const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
+  const [registrationOtp, setRegistrationOtp] = useState("");
+  const [registrationOtpError, setRegistrationOtpError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  useEffect(() => {
-    checkPermissions();
-  }, []);
+  const goToVisitorLogin = (overrides = {}) => {
+    navigation.reset({
+      index: 0,
+      routes: [
+        {
+          name: "Login",
+          params: {
+            role: "visitor",
+            ...overrides,
+          },
+        },
+      ],
+    });
+  };
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
@@ -449,110 +424,27 @@ export default function VisitorRegisterScreen({ navigation }) {
     }
   }, []);
 
-  const getStepConfig = () => {
-    switch (currentStep) {
-      case 1:
-        return {
-          title: "Personal Information",
-          subtitle:
-            "Provide your basic details and a valid government ID so the campus team can verify your visit request.",
-          icon: "person-circle-outline",
-        };
-      case 2:
-        return {
-          title: "Visit Details",
-          subtitle:
-            "Tell us why you are visiting, when you plan to arrive, and any optional vehicle details for gate coordination.",
-          icon: "calendar-clear-outline",
-        };
-      case 3:
-        return {
-          title: "Review & Submit",
-          subtitle:
-            "Confirm your registration details before sending them for approval. You can still go back and edit anything.",
-          icon: "checkmark-done-circle-outline",
-        };
-      default:
-        return {
-          title: "Visitor Registration",
-          subtitle: "Complete your registration to request campus access.",
-          icon: "document-text-outline",
-        };
-    }
-  };
+  const normalizeFullName = (name) => name.replace(/\s{2,}/g, " ").trim();
 
-  const stepConfig = getStepConfig();
-
-  const checkPermissions = async () => {
-    if (Platform.OS !== "web") {
-      try {
-        await ImagePicker.getCameraPermissionsAsync();
-        await ImagePicker.getMediaLibraryPermissionsAsync();
-      } catch (error) {
-        console.error("Error checking permissions:", error);
-      }
-    }
-  };
-
-  const handleScanID = async () => {
-    if (!idImage) {
-      Alert.alert("No ID Photo", "Please upload an ID photo first to scan.");
-      return;
-    }
-    setIsScanning(true);
-    setScanProgress(0);
-    try {
-      const progressInterval = setInterval(() => {
-        setScanProgress((prev) => Math.min(prev + 10, 90));
-      }, 200);
-      const scannedData = await IDScannerService.scanIDImage({
-        uri: idImage,
-        base64: idImageBase64,
-        fileName: idImageFileName,
-      });
-      clearInterval(progressInterval);
-      setScanProgress(100);
-      if (scannedData?.success) {
-        let filledFields = [];
-        if (scannedData.fullName) {
-          setFormData((prev) => ({ ...prev, fullName: scannedData.fullName }));
-          setCompletedFields((prev) => ({ ...prev, fullName: true }));
-          filledFields.push("Full Name");
-        }
-        if (scannedData.idNumber) {
-          setFormData((prev) => ({ ...prev, idNumber: scannedData.idNumber }));
-          setCompletedFields((prev) => ({ ...prev, idNumber: true }));
-          filledFields.push("ID Number");
-        }
-        if (filledFields.length > 0) {
-          Alert.alert("Scan Complete", `Extracted: ${filledFields.join(", ")}`);
-        } else {
-          Alert.alert(
-            "Could Not Read ID",
-            "Please ensure the ID is clear and well-lit.",
-          );
-        }
-      } else if (scannedData?.message) {
-        Alert.alert("ID Scan", scannedData.message);
-      } else {
-        Alert.alert(
-          "Scan Failed",
-          "Could not process the ID image. Please try again.",
-        );
-      }
-    } catch (error) {
-      Alert.alert("Scan Error", "An error occurred while scanning.");
-    } finally {
-      setTimeout(() => {
-        setIsScanning(false);
-        setScanProgress(0);
-      }, 500);
-    }
-  };
+  const normalizeUsername = (username) => username.trim().toLowerCase();
 
   const validateName = (name) => {
-    if (!name.trim()) return "Full name is required";
-    if (name.trim().length < 2) return "Name must be at least 2 characters";
+    const normalizedName = normalizeFullName(String(name || ""));
+
+    if (!normalizedName) return "Full name is required";
+    if (normalizedName.length < 5) return "Please enter your full name";
+
+    const nameParts = normalizedName.split(" ").filter(Boolean);
+    if (nameParts.length < 2) return "Please enter at least first and last name";
+
+    if (!/^[A-Za-z][A-Za-z\s\-']*[A-Za-z]$/.test(normalizedName)) {
+      return "Name must start and end with a letter";
+    }
+
+    if (/[-']{2,}/.test(normalizedName)) {
+      return "Name contains invalid punctuation";
+    }
+
     return "";
   };
 
@@ -563,143 +455,47 @@ export default function VisitorRegisterScreen({ navigation }) {
     return "";
   };
 
-  const validatePhoneNumber = (phone) => {
-    const phoneRegex = /^\d+$/;
-    if (!phone.trim()) return "Phone number is required";
-    if (!phoneRegex.test(phone)) return "Phone number can only contain digits";
-    if (phone.length !== 11) return "Phone number must be exactly 11 digits";
+  const validateUsername = (username) => {
+    const normalizedUsername = normalizeUsername(String(username || ""));
+
+    if (!normalizedUsername) return "Username is required";
+    if (normalizedUsername.length < 4) return "Username must be at least 4 characters";
+    if (normalizedUsername.length > 20) return "Username must be 20 characters or less";
+    if (!/^[a-z][a-z0-9._]*$/.test(normalizedUsername)) {
+      return "Use lowercase letters, numbers, dots, or underscores only";
+    }
+
     return "";
   };
 
-  const validateIdNumber = (id) => {
-    if (!id.trim()) return "ID number is required";
-    if (id.trim().length < 5) return "ID number must be at least 5 characters";
+  const validatePhone = (phone) => {
+    if (!String(phone || "").trim()) return "Contact number is required";
+    if (!isValidPhilippineMobileNumber(phone)) return PHILIPPINE_MOBILE_NUMBER_MESSAGE;
     return "";
   };
 
-  const validateIdImage = (image) => {
-    if (!image) return "Please upload a photo of your ID";
+  const validatePassword = (password) => {
+    if (!password) return "Password is required";
+    if (password.length < 8) return "Password must be at least 8 characters";
+    if (!/[A-Z]/.test(password)) return "Password must include at least one uppercase letter";
+    if (!/[a-z]/.test(password)) return "Password must include at least one lowercase letter";
+    if (!/\d/.test(password)) return "Password must include at least one number";
     return "";
   };
 
-  const validatePurposeOfVisit = (purpose) => {
-    if (!purpose || purpose.trim() === "")
-      return "Purpose of visit is required";
+  const passwordChecklist = {
+    minLength: formData.password.length >= 8,
+    uppercase: /[A-Z]/.test(formData.password),
+    lowercase: /[a-z]/.test(formData.password),
+    number: /\d/.test(formData.password),
+  };
+
+  const validateConfirmPassword = (confirmPassword, password) => {
+    if (!confirmPassword) return "Please confirm your password";
+    if (confirmPassword !== password) return "Passwords do not match";
     return "";
   };
 
-  const handleInputChange = (field, value) => {
-    let error = "";
-    switch (field) {
-      case "fullName":
-        const filteredName = value.replace(/[^A-Za-z\s\-']/g, "");
-        setFormData({ ...formData, [field]: filteredName });
-        error = validateName(filteredName);
-        break;
-      case "email":
-        setFormData({ ...formData, [field]: value });
-        error = validateEmail(value);
-        break;
-      case "phoneNumber":
-        const filteredPhone = value.replace(/[^\d]/g, "").slice(0, 11);
-        setFormData({ ...formData, [field]: filteredPhone });
-        error = validatePhoneNumber(filteredPhone);
-        break;
-      case "idNumber":
-        setFormData({ ...formData, [field]: value });
-        error = validateIdNumber(value);
-        break;
-      case "purposeOfVisit":
-        setVisitData({ ...visitData, [field]: value });
-        error = validatePurposeOfVisit(value);
-        break;
-      case "vehicleNumber":
-        setVisitData({ ...visitData, [field]: value });
-        error = "";
-        break;
-      default:
-        setFormData({ ...formData, [field]: value });
-    }
-    setErrors({ ...errors, [field]: error });
-    if (value && value.trim() && !error) {
-      setCompletedFields({ ...completedFields, [field]: true });
-    } else {
-      setCompletedFields({ ...completedFields, [field]: false });
-    }
-  };
-
-  const pickImage = async () => {
-    try {
-      const permissionResult =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert("Permission Required", "Please allow gallery access.");
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.7,
-        base64: true,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        let uri = result.assets[0].uri;
-        let base64 = result.assets[0].base64;
-        let fileName = result.assets[0].fileName || "";
-        if (Platform.OS === "android" && !uri.startsWith("file://")) {
-          uri = "file://" + uri;
-        }
-        IDScannerService.clearCache();
-        setIdImage(uri);
-        setIdImageBase64(base64);
-        setIdImageFileName(fileName);
-        setErrors((prev) => ({ ...prev, idImage: "" }));
-        setCompletedFields((prev) => ({ ...prev, idImage: true }));
-        Alert.alert("Success", "ID photo uploaded successfully!");
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to open gallery.");
-    }
-  };
-
-  const onDateChange = (event, selectedDate) => {
-    if (Platform.OS === "android") setShowDatePicker(false);
-    if (selectedDate) setVisitData({ ...visitData, visitDate: selectedDate });
-  };
-
-  const onTimeChange = (event, selectedTime) => {
-    if (Platform.OS === "android") setShowTimePicker(false);
-    if (selectedTime) setVisitData({ ...visitData, visitTime: selectedTime });
-  };
-
-  const handleWebDateChange = (text) => {
-    setWebDate(text);
-    if (text) {
-      const newDate = new Date(text);
-      if (!isNaN(newDate.getTime()))
-        setVisitData({ ...visitData, visitDate: newDate });
-    }
-  };
-
-  const handleWebTimeChange = (text) => {
-    setWebTime(text);
-    if (text) {
-      const [hours, minutes] = text.split(":").map(Number);
-      const newDate = new Date(visitData.visitTime);
-      newDate.setHours(hours, minutes);
-      setVisitData({ ...visitData, visitTime: newDate });
-    }
-  };
-
-  const formatTime = (date) =>
-    date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-
-  // Helper to show validation errors
   const showValidationAlert = (errorsList) => {
     Alert.alert(
       "Missing Information",
@@ -708,194 +504,239 @@ export default function VisitorRegisterScreen({ navigation }) {
     );
   };
 
-  const validateStep1 = () => {
-    const nameError = validateName(formData.fullName);
-    const emailError = validateEmail(formData.email);
-    const phoneError = validatePhoneNumber(formData.phoneNumber);
-    const idError = validateIdNumber(formData.idNumber);
-    const imageError = validateIdImage(idImage);
+  const getFieldError = (field, value, nextFormData = formData) => {
+    if (field === "fullName") return validateName(value);
+    if (field === "email") return validateEmail(value);
+    if (field === "username") return validateUsername(value);
+    if (field === "phone") return validatePhone(value);
+    if (field === "password") return validatePassword(value);
+    if (field === "confirmPassword") {
+      return validateConfirmPassword(value, nextFormData.password);
+    }
+    return "";
+  };
 
-    setErrors({
-      ...errors,
-      fullName: nameError,
-      email: emailError,
-      phoneNumber: phoneError,
-      idNumber: idError,
-      idImage: imageError,
-    });
+  const handleInputChange = (field, value) => {
+    let nextValue = value;
 
-    const hasErrors =
-      nameError || emailError || phoneError || idError || imageError;
+    if (field === "fullName") {
+      nextValue = value.replace(/[^A-Za-z\s\-']/g, "").replace(/\s{2,}/g, " ");
+    } else if (field === "email") {
+      nextValue = value.trim().toLowerCase();
+    } else if (field === "username") {
+      nextValue = value.replace(/[^A-Za-z0-9._]/g, "").toLowerCase();
+    } else if (field === "phone") {
+      nextValue = value.replace(/\D/g, "").slice(0, 11);
+    }
 
-    if (hasErrors) {
-      const errorMessages = [];
-      if (nameError) errorMessages.push(`• Full Name: ${nameError}`);
-      if (emailError) errorMessages.push(`• Email: ${emailError}`);
-      if (phoneError) errorMessages.push(`• Phone: ${phoneError}`);
-      if (idError) errorMessages.push(`• ID Number: ${idError}`);
-      if (imageError) errorMessages.push(`• ID Photo: ${imageError}`);
+    const nextFormData = { ...formData, [field]: nextValue };
+    const nextFieldError = getFieldError(field, nextValue, nextFormData);
+    const nextConfirmPasswordError = getFieldError(
+      "confirmPassword",
+      nextFormData.confirmPassword,
+      nextFormData,
+    );
+
+    setFormData(nextFormData);
+    setErrors((previous) => ({
+      ...previous,
+      [field]: touchedFields[field] ? nextFieldError : "",
+      confirmPassword:
+        field === "password"
+          ? touchedFields.confirmPassword
+            ? nextConfirmPasswordError
+            : ""
+          : previous.confirmPassword,
+    }));
+    setCompletedFields((previous) => ({
+      ...previous,
+      [field]: Boolean(nextValue && !nextFieldError),
+      confirmPassword:
+        field === "password"
+          ? Boolean(nextFormData.confirmPassword && !nextConfirmPasswordError)
+          : previous.confirmPassword,
+    }));
+  };
+
+  const handleFieldBlur = (field) => {
+    setFocusedField(null);
+    if (field === "fullName") {
+      setFormData((previous) => ({
+        ...previous,
+        fullName: normalizeFullName(previous.fullName),
+      }));
+    } else if (field === "username") {
+      setFormData((previous) => ({
+        ...previous,
+        username: normalizeUsername(previous.username),
+      }));
+    }
+    setTouchedFields((previous) => ({ ...previous, [field]: true }));
+    setErrors((previous) => ({
+      ...previous,
+      [field]: getFieldError(
+        field,
+        field === "fullName"
+          ? normalizeFullName(formData[field])
+          : field === "username"
+            ? normalizeUsername(formData[field])
+            : formData[field],
+        {
+          ...formData,
+          ...(field === "fullName"
+            ? { fullName: normalizeFullName(formData.fullName) }
+            : field === "username"
+              ? { username: normalizeUsername(formData.username) }
+              : {}),
+        },
+      ),
+    }));
+  };
+
+  const validateForm = () => {
+    const nextErrors = {
+      fullName: validateName(formData.fullName),
+      email: validateEmail(formData.email),
+      username: validateUsername(formData.username),
+      phone: validatePhone(formData.phone),
+      password: validatePassword(formData.password),
+      confirmPassword: validateConfirmPassword(
+        formData.confirmPassword,
+        formData.password,
+      ),
+    };
+
+    setErrors(nextErrors);
+
+    const labels = {
+      fullName: "Full Name",
+      email: "Email",
+      username: "Username",
+      phone: "Contact Number",
+      password: "Password",
+      confirmPassword: "Confirm Password",
+    };
+
+    const errorMessages = Object.entries(nextErrors)
+      .filter(([, message]) => Boolean(message))
+      .map(([field, message]) => `- ${labels[field]}: ${message}`);
+
+    if (errorMessages.length > 0) {
+      setTouchedFields({
+        fullName: true,
+        email: true,
+        username: true,
+        phone: true,
+        password: true,
+        confirmPassword: true,
+      });
       showValidationAlert(errorMessages);
       return false;
     }
+
     return true;
   };
 
-  const validateStep2 = () => {
-    const purposeError = validatePurposeOfVisit(visitData.purposeOfVisit);
-    setErrors({ ...errors, purposeOfVisit: purposeError });
-
-    if (purposeError) {
-      showValidationAlert([`• Purpose of Visit: ${purposeError}`]);
-      return false;
-    }
-    return true;
-  };
-
-  const handleNext = () => {
-    if (currentStep === 1 && validateStep1()) {
-      setCurrentStep(2);
-    } else if (currentStep === 2 && validateStep2()) {
-      setCurrentStep(3);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
-    else navigation.goBack();
-  };
-
-  const handleEditPersonal = () => {
-    setCurrentStep(1);
-  };
-
-  const handleEditVisit = () => {
-    setCurrentStep(2);
-  };
-
-  const handleSubmit = async () => {
-    // Final validation before showing privacy modal
-    const isStep1Valid = validateStep1();
-    const isStep2Valid = validateStep2();
-
-    if (isStep1Valid && isStep2Valid) {
+  const handleSubmit = () => {
+    if (validateForm()) {
       setShowDataPrivacy(true);
-    } else {
-      Alert.alert(
-        "Incomplete Information",
-        "Please complete all required fields before submitting.",
-      );
     }
   };
 
   const handlePrivacyAccept = async () => {
     setShowDataPrivacy(false);
     setIsSubmitting(true);
+
     try {
-      if (!ApiService) {
-        throw new Error(
-          "ApiService is not configured. Please check your utils/ApiService.js",
-        );
-      }
-
-      const emailExists = await ApiService.checkEmailExists(formData.email);
-      if (emailExists) {
-        Alert.alert(
-          "Email Already Registered",
-          "An account with this email already exists. Please login instead.",
-          [
-            {
-              text: "Go to Login",
-              onPress: () => {
-                setIsSubmitting(false);
-                navigation.navigate("Login", { role: "visitor" });
-              },
-            },
-            { text: "OK", style: "cancel" },
-          ],
-        );
-        return;
-      }
-
-      const visitorData = {
-        fullName: formData.fullName,
+      const response = await ApiService.registerVisitor({
+        fullName: normalizeFullName(formData.fullName),
         email: formData.email,
-        phoneNumber: formData.phoneNumber,
-        idNumber: formData.idNumber,
-        idImage: idImageBase64
-          ? `data:image/jpeg;base64,${idImageBase64}`
-          : null,
-        purposeOfVisit: visitData.purposeOfVisit,
-        vehicleNumber: visitData.vehicleNumber || "",
-        visitDate: visitData.visitDate.toISOString(),
-        visitTime: visitData.visitTime.toISOString(),
+        username: normalizeUsername(formData.username),
+        phone: normalizePhilippineMobileNumber(formData.phone),
+        password: formData.password,
         privacyAccepted: true,
         privacyAcceptedAt: new Date().toISOString(),
-      };
+      });
 
-      console.log("Submitting visitor data:", visitorData);
-      const response = await ApiService.registerVisitor(visitorData);
-
-      if (response && response.success) {
-        const submittedVisitor = {
-          fullName: formData.fullName,
-          email: formData.email,
-          userEmail: response.credentials?.email || formData.email,
-          userPassword: response.credentials?.password || "Check your email",
-        };
-
-        setRegisteredVisitor(submittedVisitor);
-
-        // Give the privacy modal a beat to close before showing the success popup.
+      if (response?.success) {
+        setRegisteredVisitor({
+          username: response.credentials?.username || formData.username,
+          email: response.credentials?.email || formData.email,
+          isVerified: false,
+          otpDeliveryMode: response.otpDeliveryMode || "email",
+        });
+        setRegistrationOtp("");
+        setRegistrationOtpError("");
         setTimeout(() => {
           setShowSuccess(true);
-        }, Platform.OS === "web" ? 180 : 80);
-
+        }, Platform.OS === "web" ? 120 : 80);
       } else {
         Alert.alert(
           "Registration Error",
-          response?.message || "Failed to register. Please try again.",
+          response?.message || "Failed to create your account. Please try again.",
         );
       }
     } catch (error) {
-      console.error("Registration error:", error);
-      let errorMessage =
+      const errorMessage =
         error?.data?.message || error.message || "Failed to connect to server.";
+      const errorField = error?.data?.field;
       const normalizedMessage = errorMessage.toLowerCase();
 
       if (
-        normalizedMessage.includes("pending registration") ||
-        normalizedMessage.includes("track your approval status")
+        errorField === "email" ||
+        normalizedMessage.includes("email already") ||
+        normalizedMessage.includes("with this email already exists")
       ) {
+        setErrors((previous) => ({
+          ...previous,
+          email: "A visitor account with this email already exists.",
+        }));
+        setTouchedFields((previous) => ({
+          ...previous,
+          email: true,
+        }));
         Alert.alert(
-          "Registration Already Submitted",
-          "This visitor already has a pending registration. You can log in now to view the waiting-for-approval screen.",
+          "Email Already Registered",
+          "A visitor account with this email already exists. Please log in instead.",
           [
             {
               text: "Go to Login",
               onPress: () =>
-                navigation.navigate("Login", {
+                goToVisitorLogin({
                   role: "visitor",
-                  initialEmail: formData.email.trim(),
+                  initialEmail: formData.email,
                 }),
             },
             { text: "OK", style: "cancel" },
           ],
         );
+      } else if (errorField === "username" || normalizedMessage.includes("username")) {
+        setErrors((previous) => ({
+          ...previous,
+          username: "That username is already taken.",
+        }));
+        setTouchedFields((previous) => ({
+          ...previous,
+          username: true,
+        }));
+        Alert.alert(
+          "Username Unavailable",
+          "That username is already taken. Please choose another username.",
+        );
       } else if (
         normalizedMessage.includes("already exists") ||
-        normalizedMessage.includes("duplicate entry") ||
         normalizedMessage.includes("duplicate")
       ) {
         Alert.alert(
-          "Email Already Registered",
-          "A visitor account with this email already exists. Please log in instead, or use Forgot Password if you no longer have the password.",
+          "Account Already Exists",
+          "A visitor account with this email already exists. Please log in instead.",
           [
             {
               text: "Go to Login",
               onPress: () =>
-                navigation.navigate("Login", {
+                goToVisitorLogin({
                   role: "visitor",
-                  initialEmail: formData.email.trim(),
+                  initialEmail: formData.email,
                 }),
             },
             { text: "OK", style: "cancel" },
@@ -907,7 +748,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       ) {
         Alert.alert(
           "Network Error",
-          "Cannot connect to the server. Please check your internet connection.",
+          "Cannot connect to the server. Please check that your backend is running.",
         );
       } else {
         Alert.alert("Registration Error", errorMessage);
@@ -921,683 +762,222 @@ export default function VisitorRegisterScreen({ navigation }) {
     setShowDataPrivacy(false);
     Alert.alert(
       "Privacy Policy Required",
-      "You must accept the data privacy policy to continue.",
+      "You must accept the data privacy policy to create an account.",
     );
   };
 
   const handleSuccessConfirm = async () => {
-    const loginEmail = registeredVisitor?.userEmail || formData.email;
+    const loginIdentifier =
+      registeredVisitor?.email ||
+      registeredVisitor?.username ||
+      formData.email;
     const loginPassword =
-      registeredVisitor?.userPassword || "Check your email";
+      registeredVisitor?.password || formData.password;
 
     setShowSuccess(false);
 
-    await AsyncStorage.multiRemove([
-      "pendingVisitor",
-      "authToken",
-      "userToken",
-      "currentUser",
-    ]);
+    await ApiService.clearAuth();
+    await AsyncStorage.removeItem("pendingVisitor");
     await AsyncStorage.setItem("isNewRegistration", "true");
 
-    setTimeout(() => {
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: "Login",
-            params: {
-              role: "visitor",
-              initialEmail: loginEmail,
-              initialPassword: loginPassword,
-            },
-          },
-        ],
-      });
-      setRegisteredVisitor(null);
-    }, Platform.OS === "web" ? 60 : 150);
+    goToVisitorLogin({
+      initialEmail: loginIdentifier,
+      initialPassword: loginPassword,
+    });
   };
 
-  const getProgressPercentage = () => {
-    if (currentStep === 1) return 33;
-    if (currentStep === 2) return 66;
-    return 100;
-  };
+  const handleVerifyRegistrationOtp = async () => {
+    const email = registeredVisitor?.email || formData.email;
+    const otpCode = String(registrationOtp || "").replace(/\D/g, "").slice(0, 6);
 
-  const personalCompletionCount = [
-    completedFields.fullName,
-    completedFields.email,
-    completedFields.phoneNumber,
-    completedFields.idNumber,
-    completedFields.idImage,
-  ].filter(Boolean).length;
-
-  const visitCompletionCount = [
-    completedFields.purposeOfVisit,
-    !!visitData.visitDate,
-    !!visitData.visitTime,
-  ].filter(Boolean).length;
-
-  const renderStepInsights = () => {
-    if (currentStep === 1) {
-      return (
-        <View style={visitorRegisterStyles.stepInsightCard}>
-          <View style={visitorRegisterStyles.stepInsightHeader}>
-            <View style={visitorRegisterStyles.stepInsightIcon}>
-              <Ionicons name="shield-checkmark-outline" size={18} color="#047857" />
-            </View>
-            <View style={visitorRegisterStyles.stepInsightTextWrap}>
-              <Text style={visitorRegisterStyles.stepInsightTitle}>Identity Checkpoint</Text>
-              <Text style={visitorRegisterStyles.stepInsightSubtitle}>
-                Upload your ID and complete the required contact fields so the campus team can verify you quickly.
-              </Text>
-            </View>
-          </View>
-          <View style={visitorRegisterStyles.stepInsightStats}>
-            <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>{personalCompletionCount}/5</Text>
-              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Complete</Text>
-            </View>
-            <View style={visitorRegisterStyles.stepInsightDivider} />
-            <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>AI</Text>
-              <Text style={visitorRegisterStyles.stepInsightStatLabel}>ID auto-fill</Text>
-            </View>
-            <View style={visitorRegisterStyles.stepInsightDivider} />
-            <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>Secure</Text>
-              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Encrypted upload</Text>
-            </View>
-          </View>
-        </View>
-      );
+    if (!email || !otpCode) {
+      setRegistrationOtpError("Please enter the 6-digit OTP code.");
+      return;
     }
 
-    if (currentStep === 2) {
-      return (
-        <View style={visitorRegisterStyles.stepInsightCard}>
-          <View style={visitorRegisterStyles.stepInsightHeader}>
-            <View style={visitorRegisterStyles.stepInsightIcon}>
-              <Ionicons name="calendar-outline" size={18} color="#047857" />
-            </View>
-            <View style={visitorRegisterStyles.stepInsightTextWrap}>
-              <Text style={visitorRegisterStyles.stepInsightTitle}>Visit Scheduling</Text>
-              <Text style={visitorRegisterStyles.stepInsightSubtitle}>
-                Add the reason for your visit and confirm your preferred arrival date and time for smoother gate coordination.
-              </Text>
-            </View>
-          </View>
-          <View style={visitorRegisterStyles.stepInsightStats}>
-            <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitCompletionCount}/3</Text>
-              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Ready</Text>
-            </View>
-            <View style={visitorRegisterStyles.stepInsightDivider} />
-            <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>{visitData.purposeOfVisit ? "Set" : "Pick"}</Text>
-              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Visit purpose</Text>
-            </View>
-            <View style={visitorRegisterStyles.stepInsightDivider} />
-            <View style={visitorRegisterStyles.stepInsightStat}>
-              <Text style={visitorRegisterStyles.stepInsightStatValue}>{formatTime(visitData.visitTime)}</Text>
-              <Text style={visitorRegisterStyles.stepInsightStatLabel}>Arrival time</Text>
-            </View>
-          </View>
-        </View>
-      );
+    if (otpCode.length !== 6) {
+      setRegistrationOtpError("The OTP must be exactly 6 digits.");
+      return;
     }
 
-    return (
-      <View style={visitorRegisterStyles.stepInsightCard}>
-        <View style={visitorRegisterStyles.stepInsightHeader}>
-          <View style={visitorRegisterStyles.stepInsightIcon}>
-            <Ionicons name="checkmark-done-outline" size={18} color="#047857" />
-          </View>
-          <View style={visitorRegisterStyles.stepInsightTextWrap}>
-            <Text style={visitorRegisterStyles.stepInsightTitle}>Final Review</Text>
-            <Text style={visitorRegisterStyles.stepInsightSubtitle}>
-              Double-check your details before submitting. Once approved, your temporary visitor credentials will be activated.
-            </Text>
-          </View>
-        </View>
-        <View style={visitorRegisterStyles.reviewChecklist}>
-          {[
-            { label: "Personal details completed", done: personalCompletionCount === 5 },
-            { label: "Visit purpose selected", done: !!visitData.purposeOfVisit },
-            { label: "Preferred visit schedule confirmed", done: !!visitData.visitDate && !!visitData.visitTime },
-          ].map((item) => (
-            <View key={item.label} style={visitorRegisterStyles.reviewChecklistItem}>
-              <Ionicons
-                name={item.done ? "checkmark-circle" : "ellipse-outline"}
-                size={16}
-                color={item.done ? "#059669" : "#94A3B8"}
-              />
-              <Text style={visitorRegisterStyles.reviewChecklistText}>{item.label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    );
+    try {
+      setRegistrationOtpError("");
+      setIsVerifyingAccount(true);
+      const response = await ApiService.verifyRegistrationOtp(email, otpCode);
+
+      if (response?.success) {
+        setRegisteredVisitor((previous) => ({
+          ...previous,
+          isVerified: true,
+        }));
+        await handleSuccessConfirm();
+        return;
+      }
+
+      Alert.alert(
+        "OTP Verification Failed",
+        response?.message || "Unable to verify the OTP. Please try again.",
+      );
+    } catch (error) {
+      setRegistrationOtpError(error?.message || "Please try again or request a new OTP.");
+      Alert.alert(
+        "Unable to Verify OTP",
+        error?.message || "Please try again or request a new OTP.",
+      );
+    } finally {
+      setIsVerifyingAccount(false);
+    }
   };
 
-  const renderStep1 = () => (
-    <>
-      <View style={visitorRegisterStyles.idUploadSection}>
-        <View style={visitorRegisterStyles.idCardContainer}>
-          <Text style={visitorRegisterStyles.idCardTitle}>Government ID</Text>
-          <Text style={visitorRegisterStyles.idCardSubtitle}>
-            Upload a valid government-issued ID
-          </Text>
-        </View>
-        <View
-          style={[
-            visitorRegisterStyles.formCard,
-            errors.idImage && visitorRegisterStyles.formCardError,
-          ]}
-        >
-          <View style={visitorRegisterStyles.cardHeader}>
-            <View
-              style={[
-                visitorRegisterStyles.cardIcon,
-                { backgroundColor: "#ECFDF5" },
-              ]}
-            >
-              <Ionicons name="card" size={20} color="#059669" />
-            </View>
-            <Text style={visitorRegisterStyles.cardLabel}>ID Photo</Text>
-            <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
-          </View>
-          <TouchableOpacity
-            style={[
-              visitorRegisterStyles.uploadArea,
-              errors.idImage && visitorRegisterStyles.uploadAreaError,
-            ]}
-            onPress={pickImage}
-            activeOpacity={0.7}
-          >
-            {idImage ? (
-              <View style={visitorRegisterStyles.uploadPreview}>
-                <Image
-                  source={{ uri: idImage }}
-                  style={visitorRegisterStyles.previewImage}
-                  resizeMode="cover"
-                />
-                <View style={visitorRegisterStyles.uploadOverlay}>
-                  <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.6)"]}
-                    style={visitorRegisterStyles.uploadGradient}
-                  >
-                    <Ionicons name="camera-reverse" size={24} color="#FFFFFF" />
-                    <Text style={visitorRegisterStyles.changePhotoText}>
-                      Change Photo
-                    </Text>
-                  </LinearGradient>
-                </View>
-              </View>
-            ) : (
-              <View style={visitorRegisterStyles.uploadPlaceholder}>
-                <View style={visitorRegisterStyles.uploadIconContainer}>
-                  <Ionicons name="cloud-upload" size={32} color="#059669" />
-                </View>
-                <Text style={visitorRegisterStyles.uploadTitle}>Upload ID</Text>
-                <Text style={visitorRegisterStyles.uploadSubtitle}>
-                  Tap to select from gallery
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          {idImage && !isScanning && (
-            <TouchableOpacity
-              style={visitorRegisterStyles.scanButton}
-              onPress={handleScanID}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={["#059669", "#047857"]}
-                style={visitorRegisterStyles.scanGradient}
-              >
-                <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
-                <Text style={visitorRegisterStyles.scanButtonText}>
-                  Scan ID to Auto-Fill
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-          {isScanning && (
-            <View style={visitorRegisterStyles.scanningContainer}>
-              <ActivityIndicator size="small" color="#059669" />
-              <Text style={visitorRegisterStyles.scanningText}>
-                Scanning ID Card... {scanProgress}%
-              </Text>
-              <View style={visitorRegisterStyles.scanProgressContainer}>
-                <View
-                  style={[
-                    visitorRegisterStyles.scanProgressBar,
-                    { width: `${scanProgress}%` },
-                  ]}
-                />
-              </View>
-            </View>
-          )}
-          {errors.idImage && (
-            <Text style={visitorRegisterStyles.errorText}>
-              {errors.idImage}
-            </Text>
-          )}
-        </View>
-      </View>
+  const handleResendRegistrationOtp = async () => {
+    const email = registeredVisitor?.email || formData.email;
+    if (!email) {
+      Alert.alert("Email Missing", "Unable to find the visitor email for OTP resend.");
+      return;
+    }
 
-      {["fullName", "email", "phoneNumber", "idNumber"].map((field) => {
-        const labels = {
-          fullName: {
-            label: "Full Name",
-            icon: "person",
-            placeholder: "Enter your full name",
-            keyboard: "default",
-          },
-          email: {
-            label: "Email Address",
-            icon: "mail",
-            placeholder: "your@email.com",
-            keyboard: "email-address",
-          },
-          phoneNumber: {
-            label: "Phone Number",
-            icon: "call",
-            placeholder: "09123456789",
-            keyboard: "phone-pad",
-          },
-          idNumber: {
-            label: "ID Number",
-            icon: "card",
-            placeholder: "Enter your ID number",
-            keyboard: "default",
-          },
-        };
-        return (
-          <View
-            key={field}
-            style={[
-              visitorRegisterStyles.formCard,
-              focusedField === field && visitorRegisterStyles.formCardFocused,
-              errors[field] && visitorRegisterStyles.formCardError,
-            ]}
-          >
-            <View style={visitorRegisterStyles.cardHeader}>
-              <View
-                style={[
-                  visitorRegisterStyles.cardIcon,
-                  { backgroundColor: "#ECFDF5" },
-                ]}
-              >
-                <Ionicons name={labels[field].icon} size={20} color="#059669" />
-              </View>
-              <Text style={visitorRegisterStyles.cardLabel}>
-                {labels[field].label}
-              </Text>
-              <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
-            </View>
-            <View
-              style={[
-                visitorRegisterStyles.inputContainer,
-                focusedField === field &&
-                  visitorRegisterStyles.inputContainerFocused,
-                errors[field] && visitorRegisterStyles.inputContainerError,
-              ]}
-            >
-              <Ionicons
-                name={`${labels[field].icon}-outline`}
-                size={18}
-                color={errors[field] ? "#EF4444" : "#9CA3AF"}
-              />
-              <TextInput
-                style={visitorRegisterStyles.input}
-                placeholder={labels[field].placeholder}
-                placeholderTextColor="#9CA3AF"
-                value={formData[field]}
-                onChangeText={(text) => handleInputChange(field, text)}
-                onFocus={() => setFocusedField(field)}
-                onBlur={() => {
-                  setFocusedField(null);
-                  handleInputChange(field, formData[field]);
-                }}
-                keyboardType={labels[field].keyboard}
-                autoCapitalize={field === "email" ? "none" : "words"}
-              />
-            </View>
-            {errors[field] && (
-              <Text style={visitorRegisterStyles.errorText}>
-                {errors[field]}
-              </Text>
-            )}
-          </View>
+    try {
+      setIsVerifyingAccount(true);
+      const response = await ApiService.resendRegistrationOtp(email);
+      if (response?.success) {
+        setRegisteredVisitor((previous) => ({
+          ...previous,
+          otpDeliveryMode: response.otpDeliveryMode || previous?.otpDeliveryMode || "email",
+        }));
+        setRegistrationOtp("");
+        setRegistrationOtpError("");
+        Alert.alert(
+          "Verification Code Sent",
+          response.otpDeliveryMode === "backend_log"
+            ? "A new OTP has been generated. For local testing, check the backend terminal for the code."
+            : "A new OTP has been sent to your email. Please also check your spam folder just in case.",
         );
-      })}
-    </>
+        return;
+      }
+
+      Alert.alert("Unable to Resend OTP", response?.message || "Please try again.");
+    } catch (error) {
+      Alert.alert("Unable to Resend OTP", error?.message || "Please try again.");
+    } finally {
+      setIsVerifyingAccount(false);
+    }
+  };
+
+  const registrationFields = [
+    { key: "fullName", label: "Name", icon: "person-outline" },
+    { key: "email", label: "Email", icon: "mail-outline" },
+    { key: "username", label: "Username", icon: "at-outline" },
+    { key: "phone", label: "Phone", icon: "call-outline" },
+    { key: "password", label: "Password", icon: "lock-closed-outline" },
+    { key: "confirmPassword", label: "Confirm", icon: "shield-checkmark-outline" },
+  ];
+  const fieldCompletion = {
+    fullName: Boolean(formData.fullName && !validateName(formData.fullName)),
+    email: Boolean(formData.email && !validateEmail(formData.email)),
+    username: Boolean(formData.username && !validateUsername(formData.username)),
+    phone: Boolean(formData.phone && !validatePhone(formData.phone)),
+    password: Boolean(formData.password && !validatePassword(formData.password)),
+    confirmPassword: Boolean(
+      formData.confirmPassword &&
+        !validateConfirmPassword(formData.confirmPassword, formData.password),
+    ),
+  };
+  const totalRegistrationFields = registrationFields.length;
+  const completionCount = registrationFields.filter(
+    (field) => fieldCompletion[field.key],
+  ).length;
+  const registrationProgressPercentage = Math.round(
+    (completionCount / totalRegistrationFields) * 100,
   );
 
-  const renderStep2 = () => (
-    <>
-      <View
-        style={[
-          visitorRegisterStyles.formCard,
-          errors.purposeOfVisit && visitorRegisterStyles.formCardError,
-        ]}
-      >
-        <View style={visitorRegisterStyles.cardHeader}>
-          <View
-            style={[
-              visitorRegisterStyles.cardIcon,
-              { backgroundColor: "#ECFDF5" },
-            ]}
-          >
-            <Ionicons name="document-text" size={20} color="#059669" />
-          </View>
-          <Text style={visitorRegisterStyles.cardLabel}>Purpose of Visit</Text>
-          <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
-        </View>
-        <TouchableOpacity
-          style={visitorRegisterStyles.dropdownButton}
-          onPress={() => setShowPurposePicker(true)}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              visitorRegisterStyles.dropdownButtonText,
-              !visitData.purposeOfVisit &&
-                visitorRegisterStyles.dropdownButtonPlaceholder,
-            ]}
-          >
-            {visitData.purposeOfVisit || "Select purpose of visit"}
-          </Text>
-          <Ionicons name="chevron-down" size={20} color="#64748B" />
-        </TouchableOpacity>
-        {errors.purposeOfVisit && (
-          <Text style={visitorRegisterStyles.errorText}>
-            {errors.purposeOfVisit}
-          </Text>
-        )}
-      </View>
+  const fieldConfig = {
+    fullName: {
+      label: "Full Name",
+      icon: "person",
+      placeholder: "Enter your full name",
+      keyboard: "default",
+      autoCapitalize: "words",
+      secureTextEntry: false,
+    },
+    email: {
+      label: "Email Address",
+      icon: "mail",
+      placeholder: "your@email.com",
+      keyboard: "email-address",
+      autoCapitalize: "none",
+      secureTextEntry: false,
+    },
+    username: {
+      label: "Username",
+      icon: "at",
+      placeholder: "Choose a username",
+      keyboard: "default",
+      autoCapitalize: "none",
+      secureTextEntry: false,
+    },
+    phone: {
+      label: "Contact Number",
+      icon: "call",
+      placeholder: "09123456789",
+      keyboard: "phone-pad",
+      autoCapitalize: "none",
+      secureTextEntry: false,
+      maxLength: 11,
+    },
+    password: {
+      label: "Password",
+      icon: "lock-closed",
+      placeholder: "Create a password",
+      keyboard: "default",
+      autoCapitalize: "none",
+      secureTextEntry: !showPassword,
+    },
+    confirmPassword: {
+      label: "Confirm Password",
+      icon: "shield-checkmark",
+      placeholder: "Re-enter your password",
+      keyboard: "default",
+      autoCapitalize: "none",
+      secureTextEntry: !showConfirmPassword,
+    },
+  };
 
-      <Modal
-        visible={showPurposePicker}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowPurposePicker(false)}
-      >
-        <View style={visitorRegisterStyles.pickerModalOverlay}>
-          <View style={visitorRegisterStyles.pickerModalContainer}>
-            <View style={visitorRegisterStyles.pickerModalHeader}>
-              <Text style={visitorRegisterStyles.pickerModalTitle}>
-                Select Purpose
-              </Text>
-              <TouchableOpacity onPress={() => setShowPurposePicker(false)}>
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView>
-              {purposeOptions.map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  style={[
-                    visitorRegisterStyles.pickerModalOption,
-                    visitData.purposeOfVisit === option &&
-                      visitorRegisterStyles.pickerModalOptionActive,
-                  ]}
-                  onPress={() => {
-                    handleInputChange("purposeOfVisit", option);
-                    setShowPurposePicker(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      visitorRegisterStyles.pickerModalOptionText,
-                      visitData.purposeOfVisit === option &&
-                        visitorRegisterStyles.pickerModalOptionTextActive,
-                    ]}
-                  >
-                    {option}
-                  </Text>
-                  {visitData.purposeOfVisit === option && (
-                    <Ionicons name="checkmark" size={20} color="#059669" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+  const renderStepInsights = () => (
+    <View style={visitorRegisterStyles.stepInsightCard}>
+      <View style={visitorRegisterStyles.stepInsightHeader}>
+        <View style={visitorRegisterStyles.stepInsightIcon}>
+          <Ionicons name="shield-checkmark-outline" size={18} color="#0A3D91" />
         </View>
-      </Modal>
-
-      {/* Compact Date and Time Row */}
-      <View style={visitorRegisterStyles.formRow}>
-        <View
-          style={[
-            visitorRegisterStyles.formCard,
-            visitorRegisterStyles.halfCard,
-          ]}
-        >
-          <View style={visitorRegisterStyles.cardHeader}>
-            <View
-              style={[
-                visitorRegisterStyles.cardIcon,
-                { backgroundColor: "#ECFDF5" },
-              ]}
-            >
-              <Ionicons name="calendar" size={18} color="#059669" />
-            </View>
-            <Text style={visitorRegisterStyles.cardLabelSmall}>Visit Date</Text>
-          </View>
-          {Platform.OS === "web" ? (
-            <input
-              type="date"
-              value={webDate}
-              onChange={(e) => handleWebDateChange(e.target.value)}
-              min={new Date().toISOString().split("T")[0]}
-              style={visitorRegisterStyles.webDateInputCompact}
-            />
-          ) : (
-            <TouchableOpacity
-              style={visitorRegisterStyles.datePickerButtonCompact}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Ionicons name="calendar-outline" size={16} color="#059669" />
-              <Text style={visitorRegisterStyles.datePickerTextCompact}>
-                {visitData.visitDate.toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        <View
-          style={[
-            visitorRegisterStyles.formCard,
-            visitorRegisterStyles.halfCard,
-          ]}
-        >
-          <View style={visitorRegisterStyles.cardHeader}>
-            <View
-              style={[
-                visitorRegisterStyles.cardIcon,
-                { backgroundColor: "#ECFDF5" },
-              ]}
-            >
-              <Ionicons name="time" size={18} color="#059669" />
-            </View>
-            <Text style={visitorRegisterStyles.cardLabelSmall}>Visit Time</Text>
-          </View>
-          {Platform.OS === "web" ? (
-            <input
-              type="time"
-              value={webTime}
-              onChange={(e) => handleWebTimeChange(e.target.value)}
-              style={visitorRegisterStyles.webTimeInputCompact}
-            />
-          ) : (
-            <TouchableOpacity
-              style={visitorRegisterStyles.datePickerButtonCompact}
-              onPress={() => setShowTimePicker(true)}
-            >
-              <Ionicons name="time-outline" size={16} color="#059669" />
-              <Text style={visitorRegisterStyles.datePickerTextCompact}>
-                {formatTime(visitData.visitTime)}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      <View style={visitorRegisterStyles.formCard}>
-        <View style={visitorRegisterStyles.cardHeader}>
-          <View
-            style={[
-              visitorRegisterStyles.cardIcon,
-              { backgroundColor: "#F3F4F6" },
-            ]}
-          >
-            <Ionicons name="car" size={20} color="#6B7280" />
-          </View>
-          <Text style={visitorRegisterStyles.cardLabel}>Vehicle Number</Text>
-          <Text style={visitorRegisterStyles.optionalBadge}>Optional</Text>
-        </View>
-        <View style={visitorRegisterStyles.inputContainer}>
-          <Ionicons name="car-outline" size={18} color="#9CA3AF" />
-          <TextInput
-            style={visitorRegisterStyles.input}
-            placeholder="Enter vehicle number (if applicable)"
-            placeholderTextColor="#9CA3AF"
-            value={visitData.vehicleNumber}
-            onChangeText={(text) => handleInputChange("vehicleNumber", text)}
-          />
-        </View>
-      </View>
-
-      {Platform.OS !== "web" && showDatePicker && DateTimePickerComponent && (
-        <DateTimePickerComponent
-          value={visitData.visitDate}
-          mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={onDateChange}
-          minimumDate={new Date()}
-        />
-      )}
-      {Platform.OS !== "web" && showTimePicker && DateTimePickerComponent && (
-        <DateTimePickerComponent
-          value={visitData.visitTime}
-          mode="time"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={onTimeChange}
-        />
-      )}
-    </>
-  );
-
-  const renderStep3 = () => (
-    <>
-      <View style={visitorRegisterStyles.reviewCard}>
-        <View style={visitorRegisterStyles.reviewHeader}>
-          <Ionicons name="person-circle" size={22} color="#059669" />
-          <Text style={visitorRegisterStyles.reviewHeaderText}>
-            Personal Information
-          </Text>
-          <TouchableOpacity
-            style={visitorRegisterStyles.editButton}
-            onPress={handleEditPersonal}
-          >
-            <Ionicons name="pencil" size={16} color="#059669" />
-            <Text style={visitorRegisterStyles.editButtonText}>Edit</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={visitorRegisterStyles.reviewItem}>
-          <Text style={visitorRegisterStyles.reviewLabel}>Full Name</Text>
-          <Text style={visitorRegisterStyles.reviewValue}>
-            {formData.fullName || "—"}
-          </Text>
-        </View>
-        <View style={visitorRegisterStyles.reviewItem}>
-          <Text style={visitorRegisterStyles.reviewLabel}>Email</Text>
-          <Text style={visitorRegisterStyles.reviewValue}>
-            {formData.email || "—"}
-          </Text>
-        </View>
-        <View style={visitorRegisterStyles.reviewItem}>
-          <Text style={visitorRegisterStyles.reviewLabel}>Phone</Text>
-          <Text style={visitorRegisterStyles.reviewValue}>
-            {formData.phoneNumber || "—"}
-          </Text>
-        </View>
-        <View style={visitorRegisterStyles.reviewItem}>
-          <Text style={visitorRegisterStyles.reviewLabel}>ID Number</Text>
-          <Text style={visitorRegisterStyles.reviewValue}>
-            {formData.idNumber || "—"}
+        <View style={visitorRegisterStyles.stepInsightTextWrap}>
+          <Text style={visitorRegisterStyles.stepInsightTitle}>Account Setup</Text>
+          <Text style={visitorRegisterStyles.stepInsightSubtitle}>
+            Create your visitor account first. Appointment requests will only be
+            created after login so everything stays tied to your account.
           </Text>
         </View>
       </View>
-      <View style={visitorRegisterStyles.reviewCard}>
-        <View style={visitorRegisterStyles.reviewHeader}>
-          <Ionicons name="calendar" size={22} color="#059669" />
-          <Text style={visitorRegisterStyles.reviewHeaderText}>
-            Visit Details
-          </Text>
-          <TouchableOpacity
-            style={visitorRegisterStyles.editButton}
-            onPress={handleEditVisit}
-          >
-            <Ionicons name="pencil" size={16} color="#059669" />
-            <Text style={visitorRegisterStyles.editButtonText}>Edit</Text>
-          </TouchableOpacity>
+      <View style={visitorRegisterStyles.stepInsightStats}>
+        <View style={visitorRegisterStyles.stepInsightStat}>
+          <Text style={visitorRegisterStyles.stepInsightStatValue}>{completionCount}/6</Text>
+          <Text style={visitorRegisterStyles.stepInsightStatLabel}>Complete</Text>
         </View>
-        <View style={visitorRegisterStyles.reviewItem}>
-          <Text style={visitorRegisterStyles.reviewLabel}>Purpose</Text>
-          <Text style={visitorRegisterStyles.reviewValue}>
-            {visitData.purposeOfVisit || "—"}
-          </Text>
+        <View style={visitorRegisterStyles.stepInsightDivider} />
+        <View style={visitorRegisterStyles.stepInsightStat}>
+          <Text style={visitorRegisterStyles.stepInsightStatValue}>Login</Text>
+          <Text style={visitorRegisterStyles.stepInsightStatLabel}>Ready after signup</Text>
         </View>
-        <View style={visitorRegisterStyles.reviewItem}>
-          <Text style={visitorRegisterStyles.reviewLabel}>Date</Text>
-          <Text style={visitorRegisterStyles.reviewValue}>
-            {visitData.visitDate.toLocaleDateString()}
-          </Text>
+        <View style={visitorRegisterStyles.stepInsightDivider} />
+        <View style={visitorRegisterStyles.stepInsightStat}>
+          <Text style={visitorRegisterStyles.stepInsightStatValue}>Secure</Text>
+          <Text style={visitorRegisterStyles.stepInsightStatLabel}>Account-based flow</Text>
         </View>
-        <View style={visitorRegisterStyles.reviewItem}>
-          <Text style={visitorRegisterStyles.reviewLabel}>Time</Text>
-          <Text style={visitorRegisterStyles.reviewValue}>
-            {formatTime(visitData.visitTime)}
-          </Text>
-        </View>
-        {visitData.vehicleNumber && (
-          <View style={visitorRegisterStyles.reviewItem}>
-            <Text style={visitorRegisterStyles.reviewLabel}>Vehicle</Text>
-            <Text style={visitorRegisterStyles.reviewValue}>
-              {visitData.vehicleNumber}
-            </Text>
-          </View>
-        )}
       </View>
-      {idImage && (
-        <View style={visitorRegisterStyles.reviewCard}>
-          <View style={visitorRegisterStyles.reviewHeader}>
-            <Ionicons name="card" size={22} color="#059669" />
-            <Text style={visitorRegisterStyles.reviewHeaderText}>ID Photo</Text>
-            <TouchableOpacity
-              style={visitorRegisterStyles.editButton}
-              onPress={handleEditPersonal}
-            >
-              <Ionicons name="pencil" size={16} color="#059669" />
-              <Text style={visitorRegisterStyles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-          <Image
-            source={{ uri: idImage }}
-            style={visitorRegisterStyles.reviewImage}
-            resizeMode="cover"
-          />
-        </View>
-      )}
-    </>
+    </View>
   );
 
   return (
     <SafeAreaView style={visitorRegisterStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#059669" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 12}
@@ -1611,7 +991,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           contentContainerStyle={visitorRegisterStyles.scrollContainer}
         >
           <LinearGradient
-            colors={["#063B34", "#047857", "#059669"]}
+            colors={["#041E42", "#0A3D91", "#0A3D91"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[visitorRegisterStyles.header, headerResponsiveStyle]}
@@ -1619,7 +999,7 @@ export default function VisitorRegisterScreen({ navigation }) {
             <View style={[visitorRegisterStyles.headerButtons, headerButtonsResponsiveStyle]}>
               <TouchableOpacity
                 style={visitorRegisterStyles.backButton}
-                onPress={handleBack}
+                onPress={() => goToVisitorLogin()}
                 activeOpacity={0.7}
               >
                 <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
@@ -1653,19 +1033,31 @@ export default function VisitorRegisterScreen({ navigation }) {
                 </LinearGradient>
               </View>
               <Text style={[visitorRegisterStyles.headerTitle, headerTitleResponsiveStyle]}>
-                Request Your Campus Visit
+                Create Your Visitor Account
               </Text>
-              <Text style={visitorRegisterStyles.headerSubtitle}>
-                {stepConfig.title}
-              </Text>
+              <Text style={visitorRegisterStyles.headerSubtitle}>Account Registration</Text>
               <Text
                 style={[
                   visitorRegisterStyles.headerDescription,
                   headerDescriptionResponsiveStyle,
                 ]}
               >
-                Complete this short guided form to submit your visit for approval and receive your SafePass access details.
+                Register first, then log in to request appointments and view the
+                campus map from your visitor dashboard.
               </Text>
+              <View style={visitorRegisterStyles.aviationStrip}>
+                <View style={visitorRegisterStyles.aviationChip}>
+                  <Ionicons name="airplane-outline" size={16} color="#FFFFFF" />
+                  <Text style={visitorRegisterStyles.aviationChipText}>
+                    Sapphire Aviation
+                  </Text>
+                </View>
+                <View style={visitorRegisterStyles.aviationRoute}>
+                  <View style={visitorRegisterStyles.aviationDot} />
+                  <View style={visitorRegisterStyles.aviationTrail} />
+                  <Ionicons name="airplane" size={16} color="#D6E7FF" />
+                </View>
+              </View>
             </View>
           </LinearGradient>
 
@@ -1676,112 +1068,54 @@ export default function VisitorRegisterScreen({ navigation }) {
                   Registration Progress
                 </Text>
                 <Text style={visitorRegisterStyles.progressPercentage}>
-                  {getProgressPercentage()}%
+                  {registrationProgressPercentage}%
                 </Text>
               </View>
               <View style={visitorRegisterStyles.progressBarContainer}>
                 <View
                   style={[
                     visitorRegisterStyles.progressBar,
-                    { width: `${getProgressPercentage()}%` },
+                    { width: `${registrationProgressPercentage}%` },
                   ]}
                 />
               </View>
-            </View>
-
-            <View
-              style={[
-                visitorRegisterStyles.stepIndicatorContainer,
-                sectionCardResponsiveStyle,
-              ]}
-            >
-              <View style={visitorRegisterStyles.stepWrapper}>
-                <View
-                  style={[
-                    visitorRegisterStyles.stepCircle,
-                    currentStep >= 1 && visitorRegisterStyles.stepCircleActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      visitorRegisterStyles.stepCircleText,
-                      currentStep >= 1 &&
-                        visitorRegisterStyles.stepCircleTextActive,
-                    ]}
-                  >
-                    1
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    visitorRegisterStyles.stepConnector,
-                    currentStep > 1 && visitorRegisterStyles.stepConnectorActive,
-                  ]}
-                />
-                <View
-                  style={[
-                    visitorRegisterStyles.stepCircle,
-                    currentStep >= 2 && visitorRegisterStyles.stepCircleActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      visitorRegisterStyles.stepCircleText,
-                      currentStep >= 2 &&
-                        visitorRegisterStyles.stepCircleTextActive,
-                    ]}
-                  >
-                    2
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    visitorRegisterStyles.stepConnector,
-                    currentStep > 2 && visitorRegisterStyles.stepConnectorActive,
-                  ]}
-                />
-                <View
-                  style={[
-                    visitorRegisterStyles.stepCircle,
-                    currentStep >= 3 && visitorRegisterStyles.stepCircleActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      visitorRegisterStyles.stepCircleText,
-                      currentStep >= 3 &&
-                        visitorRegisterStyles.stepCircleTextActive,
-                    ]}
-                  >
-                    3
-                  </Text>
-                </View>
+              <View style={visitorRegisterStyles.progressMetaRow}>
+                <Text style={visitorRegisterStyles.progressMetaText}>
+                  {completionCount} of {totalRegistrationFields} required details complete
+                </Text>
+                <Text style={visitorRegisterStyles.progressMetaText}>
+                  {registrationProgressPercentage === 100
+                    ? "Ready to create"
+                    : "Complete all fields"}
+                </Text>
               </View>
-              <View style={visitorRegisterStyles.stepLabels}>
-                <Text
-                  style={[
-                    visitorRegisterStyles.stepLabel,
-                    currentStep >= 1 && visitorRegisterStyles.stepLabelActive,
-                  ]}
-                >
-                  Personal
-                </Text>
-                <Text
-                  style={[
-                    visitorRegisterStyles.stepLabel,
-                    currentStep >= 2 && visitorRegisterStyles.stepLabelActive,
-                  ]}
-                >
-                  Visit
-                </Text>
-                <Text
-                  style={[
-                    visitorRegisterStyles.stepLabel,
-                    currentStep >= 3 && visitorRegisterStyles.stepLabelActive,
-                  ]}
-                >
-                  Review
-                </Text>
+              <View style={visitorRegisterStyles.progressChecklist}>
+                {registrationFields.map((field) => {
+                  const isComplete = fieldCompletion[field.key];
+                  return (
+                    <View
+                      key={field.key}
+                      style={[
+                        visitorRegisterStyles.progressChip,
+                        isComplete && visitorRegisterStyles.progressChipComplete,
+                      ]}
+                    >
+                      <Ionicons
+                        name={isComplete ? "checkmark-circle" : field.icon}
+                        size={14}
+                        color={isComplete ? "#0A3D91" : "#94A3B8"}
+                      />
+                      <Text
+                        style={[
+                          visitorRegisterStyles.progressChipText,
+                          isComplete && visitorRegisterStyles.progressChipTextComplete,
+                        ]}
+                      >
+                        {field.label}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
 
@@ -1789,41 +1123,180 @@ export default function VisitorRegisterScreen({ navigation }) {
               <View style={[visitorRegisterStyles.sectionHeader, sectionHeaderResponsiveStyle]}>
                 <View style={visitorRegisterStyles.sectionTextBlock}>
                   <Text style={visitorRegisterStyles.sectionTitle}>
-                    {stepConfig.title}
+                    Create Visitor Account
                   </Text>
                   <Text style={visitorRegisterStyles.sectionDescription}>
-                    {stepConfig.subtitle}
+                    Sign up using only your account details. Appointment details
+                    will be filled in later after you log in.
                   </Text>
                 </View>
                 <View style={visitorRegisterStyles.sectionBadge}>
-                  <Ionicons name={stepConfig.icon} size={14} color="#047857" />
+                  <Ionicons name="person-circle-outline" size={14} color="#0A3D91" />
                   <Text style={visitorRegisterStyles.sectionBadgeText}>
-                    Step {currentStep}/3
+                    Account Details
                   </Text>
                 </View>
               </View>
+
               {renderStepInsights()}
+
               <View style={visitorRegisterStyles.formGrid}>
-                {currentStep === 1 && renderStep1()}
-                {currentStep === 2 && renderStep2()}
-                {currentStep === 3 && renderStep3()}
+                {Object.entries(fieldConfig).map(([field, config]) => {
+                  const isPasswordField = field === "password" || field === "confirmPassword";
+                  const passwordIsVisible =
+                    field === "password" ? showPassword : showConfirmPassword;
+                  const togglePasswordVisibility =
+                    field === "password" ? setShowPassword : setShowConfirmPassword;
+
+                  return (
+                  <View
+                    key={field}
+                    style={[
+                      visitorRegisterStyles.formCard,
+                      focusedField === field && visitorRegisterStyles.formCardFocused,
+                      errors[field] && visitorRegisterStyles.formCardError,
+                    ]}
+                  >
+                    <View style={visitorRegisterStyles.cardHeader}>
+                      <View
+                        style={[
+                          visitorRegisterStyles.cardIcon,
+                          { backgroundColor: "#EEF5FF" },
+                        ]}
+                      >
+                        <Ionicons name={config.icon} size={20} color="#0A3D91" />
+                      </View>
+                      <Text style={visitorRegisterStyles.cardLabel}>{config.label}</Text>
+                      <Text style={visitorRegisterStyles.requiredBadge}>Required</Text>
+                    </View>
+                    <View
+                      style={[
+                        visitorRegisterStyles.inputContainer,
+                        focusedField === field && visitorRegisterStyles.inputContainerFocused,
+                        errors[field] && visitorRegisterStyles.inputContainerError,
+                      ]}
+                    >
+                      <Ionicons
+                        name={`${config.icon}-outline`}
+                        size={18}
+                        color={errors[field] ? "#EF4444" : "#9CA3AF"}
+                      />
+                      <TextInput
+                        style={visitorRegisterStyles.input}
+                        placeholder={config.placeholder}
+                        placeholderTextColor="#9CA3AF"
+                        value={formData[field]}
+                        onChangeText={(text) => handleInputChange(field, text)}
+                        onFocus={() => setFocusedField(field)}
+                        onBlur={() => handleFieldBlur(field)}
+                        keyboardType={config.keyboard}
+                        autoCapitalize={config.autoCapitalize}
+                        secureTextEntry={config.secureTextEntry}
+                        maxLength={config.maxLength}
+                      />
+                      {isPasswordField ? (
+                        <TouchableOpacity
+                          onPress={() => togglePasswordVisibility((previous) => !previous)}
+                          style={visitorRegisterStyles.passwordToggleButton}
+                          activeOpacity={0.7}
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            passwordIsVisible ? "Hide password" : "Show password"
+                          }
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons
+                            name={passwordIsVisible ? "eye-off-outline" : "eye-outline"}
+                            size={20}
+                            color="#64748B"
+                          />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                    {errors[field] && (
+                      <Text style={visitorRegisterStyles.errorText}>{errors[field]}</Text>
+                    )}
+                    {field === "password" ? (
+                      <View style={visitorRegisterStyles.passwordChecklist}>
+                        <View style={visitorRegisterStyles.passwordChecklistRow}>
+                          <Ionicons
+                            name={passwordChecklist.minLength ? "checkmark-circle" : "ellipse-outline"}
+                            size={16}
+                            color={passwordChecklist.minLength ? "#16A34A" : "#94A3B8"}
+                          />
+                          <Text
+                            style={[
+                              visitorRegisterStyles.passwordChecklistText,
+                              passwordChecklist.minLength && visitorRegisterStyles.passwordChecklistTextComplete,
+                            ]}
+                          >
+                            At least 8 characters
+                          </Text>
+                        </View>
+                        <View style={visitorRegisterStyles.passwordChecklistRow}>
+                          <Ionicons
+                            name={passwordChecklist.uppercase ? "checkmark-circle" : "ellipse-outline"}
+                            size={16}
+                            color={passwordChecklist.uppercase ? "#16A34A" : "#94A3B8"}
+                          />
+                          <Text
+                            style={[
+                              visitorRegisterStyles.passwordChecklistText,
+                              passwordChecklist.uppercase && visitorRegisterStyles.passwordChecklistTextComplete,
+                            ]}
+                          >
+                            Has an uppercase letter
+                          </Text>
+                        </View>
+                        <View style={visitorRegisterStyles.passwordChecklistRow}>
+                          <Ionicons
+                            name={passwordChecklist.lowercase ? "checkmark-circle" : "ellipse-outline"}
+                            size={16}
+                            color={passwordChecklist.lowercase ? "#16A34A" : "#94A3B8"}
+                          />
+                          <Text
+                            style={[
+                              visitorRegisterStyles.passwordChecklistText,
+                              passwordChecklist.lowercase && visitorRegisterStyles.passwordChecklistTextComplete,
+                            ]}
+                          >
+                            Has a lowercase letter
+                          </Text>
+                        </View>
+                        <View style={visitorRegisterStyles.passwordChecklistRow}>
+                          <Ionicons
+                            name={passwordChecklist.number ? "checkmark-circle" : "ellipse-outline"}
+                            size={16}
+                            color={passwordChecklist.number ? "#16A34A" : "#94A3B8"}
+                          />
+                          <Text
+                            style={[
+                              visitorRegisterStyles.passwordChecklistText,
+                              passwordChecklist.number && visitorRegisterStyles.passwordChecklistTextComplete,
+                            ]}
+                          >
+                            Has a number
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                  );
+                })}
               </View>
+
               <View style={[visitorRegisterStyles.actionRow, actionRowResponsiveStyle]}>
                 <TouchableOpacity
                   style={[
                     visitorRegisterStyles.secondaryActionButton,
                     actionButtonResponsiveStyle,
                   ]}
-                  onPress={handleBack}
+                  onPress={() => goToVisitorLogin()}
                   activeOpacity={0.8}
                 >
-                  <Ionicons
-                    name={currentStep === 1 ? "arrow-back" : "chevron-back"}
-                    size={18}
-                    color="#475569"
-                  />
+                  <Ionicons name="arrow-back" size={18} color="#475569" />
                   <Text style={visitorRegisterStyles.secondaryActionText}>
-                    {currentStep === 1 ? "Back to Portal" : "Previous Step"}
+                    Back to Login
                   </Text>
                 </TouchableOpacity>
 
@@ -1832,12 +1305,12 @@ export default function VisitorRegisterScreen({ navigation }) {
                     visitorRegisterStyles.continueButton,
                     actionButtonResponsiveStyle,
                   ]}
-                  onPress={currentStep === 3 ? handleSubmit : handleNext}
+                  onPress={handleSubmit}
                   activeOpacity={0.8}
                   disabled={isSubmitting}
                 >
                   <LinearGradient
-                    colors={["#059669", "#047857"]}
+                    colors={["#0A3D91", "#0A3D91"]}
                     style={visitorRegisterStyles.gradientButton}
                   >
                     {isSubmitting ? (
@@ -1845,17 +1318,9 @@ export default function VisitorRegisterScreen({ navigation }) {
                     ) : (
                       <>
                         <Text style={visitorRegisterStyles.continueButtonText}>
-                          {currentStep === 1 && "Continue"}
-                          {currentStep === 2 && "Review"}
-                          {currentStep === 3 && "Submit Registration"}
+                          Create Account
                         </Text>
-                        <Ionicons
-                          name={
-                            currentStep === 3 ? "checkmark-circle" : "arrow-forward"
-                          }
-                          size={20}
-                          color="#FFFFFF"
-                        />
+                        <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
                       </>
                     )}
                   </LinearGradient>
@@ -1872,16 +1337,31 @@ export default function VisitorRegisterScreen({ navigation }) {
       />
       <SuccessModal
         visible={showSuccess}
-        credentials={
+        account={
           registeredVisitor
             ? {
-                email: registeredVisitor.userEmail,
-                password: registeredVisitor.userPassword,
+                username: registeredVisitor.username,
+                email: registeredVisitor.email,
               }
             : null
         }
+        isVerified={Boolean(registeredVisitor?.isVerified)}
+        isVerifying={isVerifyingAccount}
+        otpDeliveryMode={registeredVisitor?.otpDeliveryMode || "email"}
+        otpValue={registrationOtp}
+        otpError={registrationOtpError}
+        onOtpChange={(value) => {
+          setRegistrationOtp(String(value || "").replace(/\D/g, "").slice(0, 6));
+          if (registrationOtpError) {
+            setRegistrationOtpError("");
+          }
+        }}
         onConfirm={handleSuccessConfirm}
+        onVerifyOtp={handleVerifyRegistrationOtp}
+        onResendOtp={handleResendRegistrationOtp}
       />
     </SafeAreaView>
   );
 }
+
+

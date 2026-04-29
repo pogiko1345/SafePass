@@ -75,7 +75,7 @@ export default StyleSheet.create({
   },
 
   retryButton: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#0A3D91",
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
     borderRadius: 12,
@@ -93,7 +93,7 @@ export default StyleSheet.create({
 
   // ============ HEADER ============
   header: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#0A3D91",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -104,7 +104,7 @@ export default StyleSheet.create({
     borderBottomRightRadius: 30,
     ...Platform.select({
       ios: {
-        shadowColor: "#4F46E5",
+        shadowColor: "#0A3D91",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -183,7 +183,7 @@ export default StyleSheet.create({
   },
 
   cardBackground: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#0A3D91",
     padding: spacing.lg,
     position: "relative",
     overflow: "hidden",
@@ -437,13 +437,13 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#0A3D91",
     paddingVertical: spacing.md,
     borderRadius: 12,
     gap: spacing.xs,
     ...Platform.select({
       ios: {
-        shadowColor: "#4F46E5",
+        shadowColor: "#0A3D91",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -453,7 +453,7 @@ export default StyleSheet.create({
         cursor: "pointer",
         transition: "all 0.2s ease",
         ":hover": {
-          backgroundColor: "#7C3AED",
+          backgroundColor: "#1C6DD0",
           transform: "translateY(-2px)",
         },
       },

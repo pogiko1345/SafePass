@@ -3,6 +3,7 @@ import { StyleSheet, Platform, Dimensions } from "react-native";
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 const isSmallPhone = width <= 390;
+const isTablet = width >= 768;
 const isWide = width >= 1024;
 
 const webHover = (styles) => (isWeb ? styles : {});
@@ -10,7 +11,7 @@ const webHover = (styles) => (isWeb ? styles : {});
 export default StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#EEF4F7",
+    backgroundColor: "#F4F8FC",
   },
 
   scrollContainer: {
@@ -21,10 +22,17 @@ export default StyleSheet.create({
   hero: {
     paddingTop: Platform.select({ ios: 58, android: 44, web: 44 }),
     paddingHorizontal: isWide ? 44 : 20,
-    paddingBottom: 34,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
     overflow: "hidden",
+  },
+
+  heroInner: {
+    width: "100%",
+    maxWidth: 1180,
+    alignSelf: "center",
+    alignItems: isWide ? "flex-start" : "center",
   },
 
   backButton: {
@@ -39,7 +47,7 @@ export default StyleSheet.create({
 
   heroBadge: {
     marginTop: 22,
-    alignSelf: "flex-start",
+    alignSelf: isWide ? "flex-start" : "center",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -54,24 +62,26 @@ export default StyleSheet.create({
   heroBadgeText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#ECFDF5",
+    color: "#EEF5FF",
   },
 
   heroBody: {
     marginTop: 22,
     maxWidth: 760,
+    alignItems: isWide ? "flex-start" : "center",
+    alignSelf: isWide ? "flex-start" : "center",
   },
 
   heroIconShell: {
-    width: 76,
-    height: 76,
-    borderRadius: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 14,
   },
 
   heroTitle: {
@@ -80,6 +90,7 @@ export default StyleSheet.create({
     fontWeight: "800",
     color: "#FFFFFF",
     maxWidth: 620,
+    textAlign: isWide ? "left" : "center",
   },
 
   heroSubtitle: {
@@ -88,20 +99,27 @@ export default StyleSheet.create({
     lineHeight: 24,
     color: "rgba(255,255,255,0.82)",
     maxWidth: 640,
+    textAlign: isWide ? "left" : "center",
   },
 
   heroStats: {
-    marginTop: 24,
+    marginTop: 18,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+    justifyContent: isWide ? "flex-start" : "center",
+    alignSelf: isWide ? "flex-start" : "center",
+    width: "100%",
+    maxWidth: 760,
   },
 
   heroStatCard: {
-    minWidth: isWide ? 156 : 110,
+    minWidth: isWide ? 156 : isSmallPhone ? 96 : 110,
+    flex: isWide ? 0 : 1,
+    maxWidth: isWide ? undefined : 180,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 20,
+    borderRadius: 8,
     backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
@@ -117,6 +135,7 @@ export default StyleSheet.create({
   heroStatLabel: {
     fontSize: 12,
     color: "rgba(255,255,255,0.74)",
+    textAlign: "center",
   },
 
   pageShell: {
@@ -124,12 +143,12 @@ export default StyleSheet.create({
     maxWidth: 1180,
     alignSelf: "center",
     paddingHorizontal: isWide ? 28 : 16,
-    marginTop: -18,
+    marginTop: -14,
   },
 
   sectionCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 28,
+    borderRadius: 8,
     padding: isWide ? 28 : 20,
     marginTop: 18,
     borderWidth: 1,
@@ -152,6 +171,7 @@ export default StyleSheet.create({
 
   sectionHeader: {
     marginBottom: 18,
+    alignItems: isWide ? "flex-start" : "center",
   },
 
   sectionEyebrow: {
@@ -159,7 +179,7 @@ export default StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1,
     textTransform: "uppercase",
-    color: "#0F766E",
+    color: "#0A3D91",
     marginBottom: 8,
   },
 
@@ -168,6 +188,7 @@ export default StyleSheet.create({
     fontWeight: "800",
     color: "#0F172A",
     marginBottom: 8,
+    textAlign: isWide ? "left" : "center",
   },
 
   sectionSubtitle: {
@@ -175,29 +196,37 @@ export default StyleSheet.create({
     lineHeight: 22,
     color: "#64748B",
     maxWidth: 720,
+    textAlign: isWide ? "left" : "center",
   },
 
   contactGrid: {
-    flexDirection: isWide ? "row" : "column",
+    flexDirection: isTablet ? "row" : "column",
     flexWrap: "wrap",
     gap: 14,
+    alignItems: "stretch",
   },
 
   contactCard: {
     flex: 1,
-    minWidth: isWide ? 0 : "100%",
+    minWidth: isWide ? 0 : isTablet ? 280 : "100%",
     backgroundColor: "#F8FBFC",
-    borderRadius: 22,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#DDEAF0",
     padding: 18,
+    minHeight: 220,
+    justifyContent: "space-between",
     ...webHover({ cursor: "pointer" }),
+  },
+
+  contactCardContent: {
+    flex: 1,
   },
 
   contactIconWrap: {
     width: 52,
     height: 52,
-    borderRadius: 16,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 14,
@@ -221,14 +250,18 @@ export default StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: "#64748B",
-    minHeight: 40,
+    minHeight: isTablet ? 60 : 40,
   },
 
   contactLinkRow: {
     marginTop: 14,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 6,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
   },
 
   contactLinkText: {
@@ -237,23 +270,25 @@ export default StyleSheet.create({
   },
 
   guideGrid: {
-    flexDirection: isWide ? "row" : "column",
+    flexDirection: isTablet ? "row" : "column",
     gap: 14,
+    alignItems: "stretch",
   },
 
   guideCard: {
     flex: 1,
     padding: 18,
-    borderRadius: 22,
-    backgroundColor: "#F8FAFC",
+    borderRadius: 8,
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    minHeight: 172,
   },
 
   guideIconWrap: {
     width: 46,
     height: 46,
-    borderRadius: 14,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 14,
@@ -277,8 +312,8 @@ export default StyleSheet.create({
   },
 
   faqItem: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 20,
+    backgroundColor: "#F8FBFE",
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     paddingHorizontal: 16,
@@ -320,15 +355,16 @@ export default StyleSheet.create({
 
   ctaCard: {
     marginTop: 18,
-    borderRadius: 28,
+    borderRadius: 8,
     padding: isWide ? 28 : 20,
     borderWidth: 1,
-    borderColor: "#E7E5E4",
+    borderColor: "#DCE6EE",
   },
 
   ctaTextWrap: {
     marginBottom: 18,
     maxWidth: 760,
+    alignItems: isWide ? "flex-start" : "center",
   },
 
   ctaTitle: {
@@ -336,23 +372,28 @@ export default StyleSheet.create({
     fontWeight: "800",
     color: "#0F172A",
     marginBottom: 8,
+    textAlign: isWide ? "left" : "center",
   },
 
   ctaSubtitle: {
     fontSize: 14,
     lineHeight: 22,
     color: "#475569",
+    textAlign: isWide ? "left" : "center",
   },
 
   ctaActions: {
     flexDirection: isSmallPhone ? "column" : "row",
     gap: 12,
+    alignItems: "stretch",
   },
 
   secondaryCta: {
+    flex: isSmallPhone ? 0 : 1,
+    minHeight: 48,
     paddingHorizontal: 18,
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 8,
     backgroundColor: "rgba(255,255,255,0.76)",
     borderWidth: 1,
     borderColor: "#D6E1E8",
@@ -368,10 +409,12 @@ export default StyleSheet.create({
   },
 
   primaryCta: {
+    flex: isSmallPhone ? 0 : 1,
+    minHeight: 48,
     paddingHorizontal: 18,
     paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: "#0F766E",
+    borderRadius: 8,
+    backgroundColor: "#0A3D91",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",

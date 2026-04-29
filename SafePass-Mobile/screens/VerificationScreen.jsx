@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Image,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +26,7 @@ import {
   isRoleAllowedInCurrentVariant,
 } from "../utils/appVariant";
 import verificationStyles from "../styles/VerificationStyles";
+import Logo from "../assets/LogoSapphire.jpg";
 
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
@@ -50,23 +52,6 @@ const storeData = async (key, value) => {
   }
 };
 
-const getData = async (key) => {
-  try {
-    if (!Storage || typeof Storage.getItem !== 'function') {
-      console.error("Storage is not available");
-      // Fallback for web - use localStorage
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
-      }
-      return null;
-    }
-    return await Storage.getItem(key);
-  } catch (error) {
-    console.error(`Error getting ${key}:`, error);
-    return null;
-  }
-};
-
 export default function VerificationScreen({ navigation, route }) {
   // Properly extract params with defaults
   const { email, password, rememberMe, tempToken, user: userData } = route.params || {};
@@ -75,8 +60,6 @@ export default function VerificationScreen({ navigation, route }) {
   const isTabletLayout = viewportWidth >= 768;
   const isCompactWidth = viewportWidth <= 520;
   const isPhoneWidth = viewportWidth <= 420;
-  
-  console.log("📱 VerificationScreen mounted with:", { email, hasTempToken: !!tempToken, userRole: userData?.role });
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -89,7 +72,6 @@ export default function VerificationScreen({ navigation, route }) {
   const [otpTimer, setOtpTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [otpMethod, setOtpMethod] = useState('sms');
   const [showPhoneInput, setShowPhoneInput] = useState(true);
   const [otpVerified, setOtpVerified] = useState(false);
   const [phoneError, setPhoneError] = useState("");
@@ -179,7 +161,7 @@ export default function VerificationScreen({ navigation, route }) {
         cleanPhone = '09' + cleanPhone.slice(-9);
       }
       
-      const response = await ApiService.requestOtp(cleanPhone, otpMethod);
+      const response = await ApiService.requestOtp(cleanPhone, "sms");
       
       if (response.success) {
         setOtpSent(true);
@@ -188,7 +170,7 @@ export default function VerificationScreen({ navigation, route }) {
         setCanResend(false);
         
         Alert.alert(
-          "📱 Verification Code Sent",
+          "Verification Code Sent",
           `A 6-digit code has been sent to ${cleanPhone}\n\nCheck your terminal/console for the OTP code.`,
           [{ text: "OK" }]
         );
@@ -207,10 +189,6 @@ export default function VerificationScreen({ navigation, route }) {
     setOtpError("");
     const numericValue = text.replace(/[^0-9]/g, '');
     setOtpCode(numericValue);
-    
-    if (numericValue.length === 6 && !isLoading) {
-      setTimeout(() => verifyOtp(), 100);
-    }
   };
 
   const verifyOtp = async () => {
@@ -273,8 +251,6 @@ export default function VerificationScreen({ navigation, route }) {
         return;
       }
       
-      console.log("💾 Storing user data:", finalUser.email, "Role:", finalUser.role);
-      
       // Reuse the token returned during credential verification to avoid a second login request.
       let sessionToken = verificationResponse?.token || tempToken || null;
       if (!sessionToken && email && password) {
@@ -286,10 +262,8 @@ export default function VerificationScreen({ navigation, route }) {
       }
       if (sessionToken) {
         await ApiService.setToken(sessionToken);
-        console.log("✅ Auth token stored");
       } else if (tempToken) {
         await ApiService.setToken(tempToken);
-        console.log("⚠️ Using temporary token fallback");
       }
       
       const userRole = normalizeRole(finalUser.role) || "visitor";
@@ -312,23 +286,22 @@ export default function VerificationScreen({ navigation, route }) {
 
       // Store user data
       await storeData("currentUser", JSON.stringify({ ...finalUser, role: userRole }));
-      console.log("✅ User data stored");
       
       // Treat remember-me as a trusted device so future logins can follow the faster path.
       if (rememberMe && email) {
         await storeData("rememberedEmail", email);
+        await ApiService.rememberCurrentSession();
         await ApiService.trustDevice();
-        console.log("✅ Remembered email stored");
       } else if (email) {
         await Storage.removeItem("rememberedEmail");
+        await ApiService.clearRememberedSession();
+        await ApiService.clearTrustedDevice();
       }
       
       // Clear new registration flag
       await Storage.removeItem("isNewRegistration");
       
       const dashboardRoute = IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(userRole);
-      
-      console.log('✅ Verification complete - Navigating to:', dashboardRoute, 'Role:', userRole);
       
       // Small delay to ensure storage is complete
       setTimeout(() => {
@@ -375,7 +348,7 @@ export default function VerificationScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={verificationStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
       
       <KeyboardAvoidingView
         style={verificationStyles.container}
@@ -405,7 +378,7 @@ export default function VerificationScreen({ navigation, route }) {
               ]}
             >
               <LinearGradient
-                colors={['#1D4ED8', '#4F46E5', '#7C3AED']}
+                colors={['#041E42', '#0A3D91', '#1C6DD0']}
                 style={[
                   verificationStyles.heroPanel,
                   !isDesktopLayout && {
@@ -420,6 +393,8 @@ export default function VerificationScreen({ navigation, route }) {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
+                <View style={verificationStyles.heroGlowOne} />
+                <View style={verificationStyles.heroGlowTwo} />
                 <TouchableOpacity
                   style={verificationStyles.backButton}
                   onPress={handleBack}
@@ -429,7 +404,7 @@ export default function VerificationScreen({ navigation, route }) {
                 </TouchableOpacity>
 
                 <View style={verificationStyles.heroBadge}>
-                  <Ionicons name="shield-checkmark-outline" size={14} color="#DBEAFE" />
+                  <Ionicons name="shield-checkmark-outline" size={14} color="#EEF5FF" />
                   <Text style={verificationStyles.heroBadgeText}>Two-Step Verification</Text>
                 </View>
 
@@ -445,7 +420,11 @@ export default function VerificationScreen({ navigation, route }) {
                       colors={['rgba(255,255,255,0.32)', 'rgba(255,255,255,0.08)']}
                       style={verificationStyles.iconGradient}
                     >
-                      <Ionicons name="shield-checkmark" size={44} color="#FFFFFF" />
+                      <Image
+                        source={Logo}
+                        style={verificationStyles.logoImage}
+                        resizeMode="contain"
+                      />
                     </LinearGradient>
                   </View>
                   <Text
@@ -465,35 +444,19 @@ export default function VerificationScreen({ navigation, route }) {
                   >
                     Secure access to your SafePass account with a one-time verification code.
                   </Text>
+                  <View
+                    style={[
+                      verificationStyles.flightAccent,
+                      !isDesktopLayout && { alignSelf: "center" },
+                      isDesktopLayout && { alignSelf: "flex-start" },
+                    ]}
+                  >
+                    <View style={verificationStyles.flightAccentLine} />
+                    <Ionicons name="airplane" size={13} color="rgba(255,255,255,0.92)" />
+                    <View style={verificationStyles.flightAccentDot} />
+                  </View>
                 </View>
 
-                <View
-                  style={[
-                    verificationStyles.heroMetaRow,
-                    isCompactWidth && { flexDirection: "column", flexWrap: "nowrap" },
-                  ]}
-                >
-                  <View
-                    style={[
-                      verificationStyles.heroMetaCard,
-                      isCompactWidth && { width: "100%" },
-                    ]}
-                  >
-                    <Text style={verificationStyles.heroMetaLabel}>Account</Text>
-                    <Text style={verificationStyles.heroMetaValue}>{email || "User"}</Text>
-                  </View>
-                  <View
-                    style={[
-                      verificationStyles.heroMetaCard,
-                      isCompactWidth && { width: "100%" },
-                    ]}
-                  >
-                    <Text style={verificationStyles.heroMetaLabel}>Method</Text>
-                    <Text style={verificationStyles.heroMetaValue}>
-                      {otpSent ? (otpMethod === "sms" ? "SMS Code" : "Voice Call") : "Phone Setup"}
-                    </Text>
-                  </View>
-                </View>
               </LinearGradient>
 
               <Animated.View
@@ -541,15 +504,43 @@ export default function VerificationScreen({ navigation, route }) {
                   </View>
                 </View>
 
+                <View
+                  style={[
+                    verificationStyles.panelMetaRow,
+                    isCompactWidth && { flexDirection: "column", flexWrap: "nowrap" },
+                  ]}
+                >
+                  <View
+                    style={[
+                      verificationStyles.panelMetaCard,
+                      isCompactWidth && { width: "100%" },
+                    ]}
+                  >
+                    <Text style={verificationStyles.panelMetaLabel}>Account</Text>
+                    <Text style={verificationStyles.panelMetaValue}>{email || "User"}</Text>
+                  </View>
+                  <View
+                    style={[
+                      verificationStyles.panelMetaCard,
+                      isCompactWidth && { width: "100%" },
+                    ]}
+                  >
+                    <Text style={verificationStyles.panelMetaLabel}>Method</Text>
+                    <Text style={verificationStyles.panelMetaValue}>
+                      {otpSent ? "Text Message" : "Phone Setup"}
+                    </Text>
+                  </View>
+                </View>
+
                 {!otpVerified && (
                   <>
                     <View style={verificationStyles.userInfoCard}>
                       <View style={verificationStyles.avatarContainer}>
                         <LinearGradient
-                          colors={['#EEF2FF', '#E0E7FF']}
+                          colors={['#EEF5FF', '#D8E8FF']}
                           style={verificationStyles.avatarGradient}
                         >
-                          <Ionicons name="person" size={28} color="#4F46E5" />
+                          <Ionicons name="person" size={28} color="#0A3D91" />
                         </LinearGradient>
                       </View>
                       <View style={verificationStyles.userInfoCopy}>
@@ -565,7 +556,7 @@ export default function VerificationScreen({ navigation, route }) {
                         <View style={verificationStyles.panelHeader}>
                           <Text style={verificationStyles.sectionTitle}>Verify with Phone</Text>
                           <Text style={verificationStyles.sectionSubtitle}>
-                            Choose how you want to receive your one-time access code.
+                            Enter your mobile number and we will send your one-time access code by text.
                           </Text>
                         </View>
 
@@ -602,54 +593,6 @@ export default function VerificationScreen({ navigation, route }) {
                           )}
                         </View>
 
-                        <View style={verificationStyles.methodContainer}>
-                          <Text style={verificationStyles.methodLabel}>Receive code via</Text>
-                          <View
-                            style={[
-                              verificationStyles.methodButtons,
-                              isCompactWidth && { flexDirection: "column" },
-                            ]}
-                          >
-                            <TouchableOpacity
-                              style={[
-                                verificationStyles.methodButton,
-                                otpMethod === 'sms' && verificationStyles.methodButtonActive
-                              ]}
-                              onPress={() => setOtpMethod('sms')}
-                              activeOpacity={0.7}
-                            >
-                              <Ionicons 
-                                name="chatbubble-outline" 
-                                size={20} 
-                                color={otpMethod === 'sms' ? '#FFFFFF' : '#6B7280'} 
-                              />
-                              <Text style={[
-                                verificationStyles.methodButtonText,
-                                otpMethod === 'sms' && verificationStyles.methodButtonTextActive
-                              ]}>SMS</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity
-                              style={[
-                                verificationStyles.methodButton,
-                                otpMethod === 'call' && verificationStyles.methodButtonActive
-                              ]}
-                              onPress={() => setOtpMethod('call')}
-                              activeOpacity={0.7}
-                            >
-                              <Ionicons 
-                                name="call-outline" 
-                                size={20} 
-                                color={otpMethod === 'call' ? '#FFFFFF' : '#6B7280'} 
-                              />
-                              <Text style={[
-                                verificationStyles.methodButtonText,
-                                otpMethod === 'call' && verificationStyles.methodButtonTextActive
-                              ]}>Voice Call</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-
                         <TouchableOpacity
                           style={[
                             verificationStyles.sendButton,
@@ -673,10 +616,10 @@ export default function VerificationScreen({ navigation, route }) {
                       <View style={verificationStyles.otpCard}>
                         <View style={verificationStyles.otpHeader}>
                           <LinearGradient
-                            colors={['#EEF2FF', '#E0E7FF']}
+                            colors={['#EEF5FF', '#D8E8FF']}
                             style={verificationStyles.otpIconContainer}
                           >
-                            <Ionicons name="key-outline" size={30} color="#4F46E5" />
+                            <Ionicons name="key-outline" size={30} color="#0A3D91" />
                           </LinearGradient>
                           <Text style={verificationStyles.otpTitle}>Enter Verification Code</Text>
                           <Text style={verificationStyles.otpSubtitle}>
@@ -726,14 +669,14 @@ export default function VerificationScreen({ navigation, route }) {
                         <TouchableOpacity
                           style={[
                             verificationStyles.verifyButton,
-                            (isLoading || otpCode.length !== 6) && verificationStyles.buttonDisabled
+                            isLoading && verificationStyles.buttonDisabled
                           ]}
                           onPress={verifyOtp}
-                          disabled={isLoading || otpCode.length !== 6}
+                          disabled={isLoading}
                           activeOpacity={0.8}
                         >
                           <LinearGradient
-                            colors={['#1D4ED8', '#4F46E5', '#7C3AED']}
+                            colors={['#041E42', '#0A3D91', '#1C6DD0']}
                             style={verificationStyles.verifyGradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
@@ -755,7 +698,7 @@ export default function VerificationScreen({ navigation, route }) {
                           disabled={!canResend || isLoading}
                           activeOpacity={0.7}
                         >
-                          <Ionicons name="refresh-outline" size={18} color={canResend ? "#4F46E5" : "#9CA3AF"} />
+                          <Ionicons name="refresh-outline" size={18} color={canResend ? "#0A3D91" : "#9CA3AF"} />
                           <Text style={[
                             verificationStyles.resendButtonText,
                             canResend && verificationStyles.resendButtonTextActive

@@ -38,7 +38,7 @@ export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
   const { role, initialEmail = "", initialPassword = "" } = route?.params || { role: "visitor" };
   const effectiveRole = IS_VISITOR_ONLY_APP ? "visitor" : role;
-  const { width: viewportWidth } = useWindowDimensions();
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const isCompactLogin = viewportWidth <= 420;
   const isTabletLogin = viewportWidth >= 768;
   const loginHorizontalPadding = isCompactLogin ? 12 : 20;
@@ -48,20 +48,20 @@ export default function LoginScreen({ navigation, route }) {
   );
   const headerResponsiveStyle = {
     paddingHorizontal: isCompactLogin ? 18 : isTabletLogin ? 28 : 24,
-    paddingBottom: isCompactLogin ? 72 : 88,
+    paddingBottom: isCompactLogin ? 56 : isTabletLogin ? 68 : 62,
   };
   const logoResponsiveStyle = {
-    width: isCompactLogin ? 88 : isTabletLogin ? 116 : 108,
-    height: isCompactLogin ? 88 : isTabletLogin ? 116 : 108,
-    borderRadius: isCompactLogin ? 44 : isTabletLogin ? 58 : 54,
+    width: isCompactLogin ? 74 : isTabletLogin ? 100 : 92,
+    height: isCompactLogin ? 74 : isTabletLogin ? 100 : 92,
+    borderRadius: isCompactLogin ? 37 : isTabletLogin ? 50 : 46,
   };
   const appNameResponsiveStyle = {
-    fontSize: isCompactLogin ? 20 : isTabletLogin ? 26 : 24,
-    lineHeight: isCompactLogin ? 27 : isTabletLogin ? 34 : 32,
+    fontSize: isCompactLogin ? 18 : isTabletLogin ? 24 : 22,
+    lineHeight: isCompactLogin ? 24 : isTabletLogin ? 30 : 28,
   };
   const cardResponsiveStyle = {
     marginHorizontal: loginHorizontalPadding,
-    marginTop: isCompactLogin ? -34 : -42,
+    marginTop: isCompactLogin ? -26 : -32,
     padding: isCompactLogin ? 18 : 24,
     ...(isWeb ? { maxWidth: loginMaxContentWidth } : null),
   };
@@ -69,7 +69,7 @@ export default function LoginScreen({ navigation, route }) {
     ? { padding: 12, alignItems: "flex-start" }
     : null;
   const roleIconResponsiveStyle = isCompactLogin
-    ? { width: 42, height: 42, borderRadius: 14, marginRight: 10 }
+    ? { width: 42, height: 42, borderRadius: 8, marginRight: 10 }
     : null;
   const welcomeTitleResponsiveStyle = {
     fontSize: isCompactLogin ? 24 : isTabletLogin ? 30 : 28,
@@ -93,6 +93,28 @@ export default function LoginScreen({ navigation, route }) {
   const footerLinkChipResponsiveStyle = isCompactLogin
     ? { width: "100%", justifyContent: "center" }
     : null;
+  const forgotModalContentResponsiveStyle = {
+    maxHeight: viewportHeight <= 760 ? "96%" : "92%",
+    borderRadius: isCompactLogin ? 18 : 24,
+  };
+  const forgotModalHeroResponsiveStyle = {
+    paddingHorizontal: isCompactLogin ? 16 : 24,
+    paddingTop: isCompactLogin ? 16 : 22,
+    paddingBottom: isCompactLogin ? 14 : 22,
+  };
+  const forgotModalHeroTopRowResponsiveStyle = isCompactLogin
+    ? { alignItems: "flex-start", gap: 10 }
+    : null;
+  const forgotModalBrandBadgeResponsiveStyle = isCompactLogin
+    ? { paddingVertical: 7, paddingHorizontal: 10 }
+    : null;
+  const forgotModalStepRowResponsiveStyle = isCompactLogin
+    ? { gap: 6, marginTop: 12 }
+    : null;
+  const forgotModalBodyContentResponsiveStyle = {
+    padding: isCompactLogin ? 16 : 24,
+    paddingBottom: isCompactLogin ? 24 : 28,
+  };
   
   // ============ STATE MANAGEMENT ============
   const [email, setEmail] = useState("");
@@ -100,10 +122,13 @@ export default function LoginScreen({ navigation, route }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showLoginSplash, setShowLoginSplash] = useState(false);
+  const [loginSplashMessage, setLoginSplashMessage] = useState("Signing you in...");
   const [apiConnected, setApiConnected] = useState(true);
   const [errors, setErrors] = useState({});
-  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [loginError, setLoginError] = useState("");
+  const [loginSuccessMessage, setLoginSuccessMessage] = useState("");
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -115,6 +140,7 @@ export default function LoginScreen({ navigation, route }) {
   const [resetEmailError, setResetEmailError] = useState("");
   const [resetOtp, setResetOtp] = useState("");
   const [resetOtpError, setResetOtpError] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordError, setNewPasswordError] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -122,7 +148,6 @@ export default function LoginScreen({ navigation, route }) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const [resetStep, setResetStep] = useState(1);
-  const [resetToken, setResetToken] = useState(null);
   const [resetTimer, setResetTimer] = useState(60);
   const [canResendReset, setCanResendReset] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -161,14 +186,52 @@ export default function LoginScreen({ navigation, route }) {
     }
   }, []);
 
+  const normalizeLoginIdentifier = (value) => {
+    const trimmedValue = String(value || "").trim();
+    return trimmedValue.includes("@") ? trimmedValue.toLowerCase() : trimmedValue;
+  };
+
+  const normalizeResetEmailValue = (value) => String(value || "").trim().toLowerCase();
+
+  const normalizeResetOtpValue = (value) =>
+    String(value || "").replace(/[^0-9]/g, "").slice(0, 6);
+
   useEffect(() => {
     if (initialEmail) {
       setEmail(initialEmail);
+      setRememberMe(true);
     }
     if (initialPassword) {
       setPassword(initialPassword);
     }
   }, [initialEmail, initialPassword]);
+
+  useEffect(() => {
+    const routeResetEmail = route?.params?.resetEmail;
+    const routeResetToken = route?.params?.resetToken;
+    let linkResetEmail = routeResetEmail;
+    let linkResetToken = routeResetToken;
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const query = new URLSearchParams(window.location.search || "");
+      linkResetEmail = linkResetEmail || query.get("resetEmail");
+      linkResetToken = linkResetToken || query.get("resetToken");
+    }
+
+    if (linkResetEmail && linkResetToken) {
+      setShowForgotPassword(true);
+      setResetStep(3);
+      setResetEmail(normalizeResetEmailValue(linkResetEmail));
+      setResetToken(String(linkResetToken).trim());
+      setResetEmailError("");
+      setResetOtp("");
+      setResetOtpError("");
+      setNewPassword("");
+      setNewPasswordError("");
+      setConfirmNewPassword("");
+      setConfirmNewPasswordError("");
+    }
+  }, [route?.params?.resetEmail, route?.params?.resetToken]);
 
   // ============ AUTH CHECK ============
   useEffect(() => {
@@ -192,12 +255,19 @@ export default function LoginScreen({ navigation, route }) {
     try {
       const connected = await ApiService.testConnection();
       setApiConnected(connected);
+
+      if (!initialEmail) {
+        const rememberedEmail = await Storage.getItem("rememberedEmail");
+        if (rememberedEmail) {
+          setEmail(rememberedEmail);
+          setRememberMe(true);
+        }
+      }
       
       const isNewRegistration = await Storage.getItem('isNewRegistration');
       
       if (isNewRegistration === 'true') {
-        console.log("📝 New registration detected - clearing token");
-        await Storage.multiRemove(['authToken', 'userToken', 'currentUser', 'isNewRegistration']);
+        await ApiService.clearAuth();
         setIsCheckingAuth(false);
         return;
       }
@@ -206,9 +276,25 @@ export default function LoginScreen({ navigation, route }) {
       const userJson = await Storage.getItem('currentUser');
       
       if (token && userJson) {
-        const user = JSON.parse(userJson);
-        console.log("🔑 Auto-login detected for:", user.email);
-        
+        const rememberedSessionActive = await ApiService.isRememberedSessionActive();
+        if (!rememberedSessionActive) {
+          const rememberedEmail = await Storage.getItem("rememberedEmail");
+          await ApiService.clearAuth();
+          if (rememberedEmail) {
+            setEmail(rememberedEmail);
+            setRememberMe(true);
+          }
+          return;
+        }
+
+        let user;
+        try {
+          user = JSON.parse(userJson);
+        } catch {
+          await ApiService.clearAuth();
+          setLoginError("Your saved session was invalid. Please sign in again.");
+          return;
+        }
         const normalizedRole = normalizeRole(user.role);
         if (!isRoleAllowedInCurrentVariant(normalizedRole)) {
           await ApiService.clearAuth();
@@ -220,6 +306,8 @@ export default function LoginScreen({ navigation, route }) {
           index: 0,
           routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : route }],
         });
+      } else if (token || userJson) {
+        await ApiService.clearAuth();
       }
     } catch (error) {
       console.error("Auth check error:", error);
@@ -231,11 +319,12 @@ export default function LoginScreen({ navigation, route }) {
   // ============ VALIDATION ============
   const validateForm = () => {
     const newErrors = {};
+    const normalizedIdentifier = normalizeLoginIdentifier(email);
     
-    if (!email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = "Please enter a valid email";
+    if (!normalizedIdentifier) {
+      newErrors.email = "Username or email is required";
+    } else if (normalizedIdentifier.includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedIdentifier)) {
+      newErrors.email = "Please enter a valid email address";
     }
     
     if (!password.trim()) {
@@ -246,10 +335,28 @@ export default function LoginScreen({ navigation, route }) {
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateEmailField = () => {
+    const normalizedIdentifier = normalizeLoginIdentifier(email);
+    const emailError = !normalizedIdentifier
+      ? "Username or email is required"
+      : normalizedIdentifier.includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedIdentifier)
+        ? "Please enter a valid email address"
+        : "";
+    setErrors((prev) => ({ ...prev, email: emailError }));
+    return !emailError;
+  };
+
+  const validatePasswordField = () => {
+    const passwordError = password.trim() ? "" : "Password is required";
+    setErrors((prev) => ({ ...prev, password: passwordError }));
+    return !passwordError;
+  };
+
   // Clear login error when user starts typing
   const handleEmailChange = (text) => {
-    setEmail(text);
+    setEmail(text.replace(/^\s+/, ""));
     setLoginError("");
+    setLoginSuccessMessage("");
     if (errors.email) {
       setErrors({ ...errors, email: "" });
     }
@@ -258,6 +365,7 @@ export default function LoginScreen({ navigation, route }) {
   const handlePasswordChange = (text) => {
     setPassword(text);
     setLoginError("");
+    setLoginSuccessMessage("");
     if (errors.password) {
       setErrors({ ...errors, password: "" });
     }
@@ -277,8 +385,12 @@ export default function LoginScreen({ navigation, route }) {
 
     if (rememberEmail) {
       await Storage.setItem("rememberedEmail", email.trim());
+      await ApiService.rememberCurrentSession();
+      await ApiService.trustDevice();
     } else {
       await Storage.removeItem("rememberedEmail");
+      await ApiService.clearRememberedSession();
+      await ApiService.clearTrustedDevice();
     }
 
     await Storage.removeItem("isNewRegistration");
@@ -287,11 +399,13 @@ export default function LoginScreen({ navigation, route }) {
 
   // ============ FORGOT PASSWORD VALIDATION ============
   const validateResetEmailField = () => {
-    if (!resetEmail.trim()) {
+    const normalizedResetEmail = normalizeResetEmailValue(resetEmail);
+
+    if (!normalizedResetEmail) {
       setResetEmailError("Email is required");
       return false;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetEmail)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedResetEmail)) {
       setResetEmailError("Please enter a valid email address");
       return false;
     }
@@ -300,16 +414,14 @@ export default function LoginScreen({ navigation, route }) {
   };
 
   const validateResetOtpField = () => {
-    if (!resetOtp.trim()) {
+    const normalizedResetOtp = normalizeResetOtpValue(resetOtp);
+
+    if (!normalizedResetOtp) {
       setResetOtpError("Verification code is required");
       return false;
     }
-    if (resetOtp.length !== 6) {
+    if (normalizedResetOtp.length !== 6) {
       setResetOtpError("Code must be 6 digits");
-      return false;
-    }
-    if (!/^\d+$/.test(resetOtp)) {
-      setResetOtpError("Code must contain only numbers");
       return false;
     }
     setResetOtpError("");
@@ -372,18 +484,23 @@ export default function LoginScreen({ navigation, route }) {
 
   // ============ FORGOT PASSWORD FUNCTIONS ============
   const handleForgotPassword = () => {
+    clearPasswordResetRouteParams();
+    setLoginSuccessMessage("");
     setShowForgotPassword(true);
     setResetStep(1);
     setResetEmail("");
     setResetEmailError("");
     setResetOtp("");
     setResetOtpError("");
+    setResetToken("");
     setNewPassword("");
     setNewPasswordError("");
     setConfirmNewPassword("");
     setConfirmNewPasswordError("");
     setResetTimer(60);
     setCanResendReset(false);
+    setShowNewPassword(false);
+    setShowConfirmNewPassword(false);
     setPasswordStrength(0);
     setPasswordChecks({
       length: false,
@@ -395,52 +512,46 @@ export default function LoginScreen({ navigation, route }) {
   };
 
   const handleCloseForgotPassword = () => {
+    clearPasswordResetRouteParams();
     setShowForgotPassword(false);
     setResetStep(1);
     setResetEmail("");
     setResetEmailError("");
     setResetOtp("");
     setResetOtpError("");
+    setResetToken("");
     setNewPassword("");
     setNewPasswordError("");
     setConfirmNewPassword("");
     setConfirmNewPasswordError("");
+    setShowNewPassword(false);
+    setShowConfirmNewPassword(false);
   };
 
   const handleSendResetOtp = async () => {
     if (!validateResetEmailField()) return;
+
+    const normalizedResetEmail = normalizeResetEmailValue(resetEmail);
+    setResetEmail(normalizedResetEmail);
+    setResetToken("");
     
     setIsLoading(true);
     try {
-      const emailExists = await ApiService.checkEmailExists(resetEmail);
-      
-      if (!emailExists) {
-        Alert.alert(
-          "Email Not Found",
-          "No account found with this email address.",
-          [{ text: "OK", style: "cancel" }]
-        );
-        setIsLoading(false);
-        return;
-      }
-      
-      const response = await ApiService.requestPasswordReset(resetEmail);
+      const response = await ApiService.requestPasswordReset(normalizedResetEmail);
       
       if (response.success) {
         setResetStep(2);
-        setResetToken(response.resetToken);
         setResetTimer(60);
         setCanResendReset(false);
         Alert.alert(
-          "✅ Reset Code Sent",
-          `A 6-digit verification code has been sent to ${resetEmail}.`,
+          "Reset Email Sent",
+          `A verification code and secure reset link have been sent to ${normalizedResetEmail}.`,
           [{ text: "OK" }]
         );
       } else {
         Alert.alert("Error", response.message || "Failed to send reset code");
       }
     } catch (error) {
-      console.error("Password reset request error:", error);
       Alert.alert("Error", "Failed to send reset code. Please try again.");
     } finally {
       setIsLoading(false);
@@ -450,19 +561,27 @@ export default function LoginScreen({ navigation, route }) {
   const handleVerifyResetOtp = async () => {
     if (!validateResetOtpField()) return;
 
+    const normalizedResetEmail = normalizeResetEmailValue(resetEmail);
+    const normalizedResetOtp = normalizeResetOtpValue(resetOtp);
+    setResetEmail(normalizedResetEmail);
+    setResetOtp(normalizedResetOtp);
+
     setIsLoading(true);
     try {
-      const response = await ApiService.verifyPasswordResetOtp(resetEmail, resetOtp, resetToken);
+      const response = await ApiService.verifyPasswordResetOtp(
+        normalizedResetEmail,
+        normalizedResetOtp,
+      );
       
       if (response.success) {
+        setResetToken("");
         setResetStep(3);
-        Alert.alert("✅ Code Verified", "Please enter your new password.");
+        Alert.alert("Code Verified", "Please enter your new password.");
       } else {
         setResetOtpError("Invalid verification code");
         Alert.alert("Error", response.message || "Invalid verification code. Please try again.");
       }
     } catch (error) {
-      console.error("OTP verification error:", error);
       setResetOtpError("Verification failed");
       Alert.alert("Error", "Verification failed. Please try again.");
     } finally {
@@ -490,29 +609,43 @@ export default function LoginScreen({ navigation, route }) {
     
     setIsLoading(true);
     try {
-      const response = await ApiService.resetPassword(resetEmail, newPassword, resetToken);
+      const response = await ApiService.resetPassword(
+        normalizeResetEmailValue(resetEmail),
+        newPassword,
+        resetToken,
+      );
       
       if (response.success) {
-        Alert.alert(
-          "✅ Password Reset Successful",
-          "Your password has been changed successfully. Please login with your new password.",
-          [
-            {
-              text: "Go to Login",
-              onPress: () => {
-                setShowForgotPassword(false);
-                setResetStep(1);
-                setEmail(resetEmail);
-                setPassword("");
-              }
-            }
-          ]
-        );
+        const normalizedResetEmail = normalizeResetEmailValue(resetEmail);
+        clearPasswordResetRouteParams();
+        setShowForgotPassword(false);
+        setResetStep(1);
+        setEmail(normalizedResetEmail);
+        setPassword("");
+        setResetEmail(normalizedResetEmail);
+        setResetOtp("");
+        setResetOtpError("");
+        setResetToken("");
+        setNewPassword("");
+        setNewPasswordError("");
+        setConfirmNewPassword("");
+        setConfirmNewPasswordError("");
+        setShowNewPassword(false);
+        setShowConfirmNewPassword(false);
+        setPasswordStrength(0);
+        setPasswordChecks({
+          length: false,
+          uppercase: false,
+          lowercase: false,
+          number: false,
+          special: false,
+        });
+        setLoginError("");
+        setLoginSuccessMessage("Thank you. Your password has been changed. Please log in with your new password.");
       } else {
         Alert.alert("Error", response.message || "Failed to reset password");
       }
     } catch (error) {
-      console.error("Password reset error:", error);
       Alert.alert("Error", "Failed to reset password. Please try again.");
     } finally {
       setIsLoading(false);
@@ -521,13 +654,22 @@ export default function LoginScreen({ navigation, route }) {
 
   // ============ PASSWORD STRENGTH UI ============
   const getPasswordStrengthColor = () => {
-    const colors = ['#E5E7EB', '#EF4444', '#F59E0B', '#10B981', '#059669', '#0A3D91'];
+    const colors = ['#E5E7EB', '#EF4444', '#F59E0B', '#10B981', '#0A3D91', '#0A3D91'];
     return colors[passwordStrength] || colors[0];
   };
 
   const getPasswordStrengthText = () => {
     const texts = ['Enter password', 'Weak', 'Fair', 'Good', 'Strong', 'Very Strong'];
     return texts[passwordStrength] || texts[0];
+  };
+
+  const clearPasswordResetRouteParams = () => {
+    if (typeof navigation?.setParams === "function") {
+      navigation.setParams({
+        resetEmail: undefined,
+        resetToken: undefined,
+      });
+    }
   };
 
   // ============ LOGIN HANDLER - 2FA FOR EVERYONE ============
@@ -543,14 +685,17 @@ export default function LoginScreen({ navigation, route }) {
     }
 
     setIsLoading(true);
+    setLoginSplashMessage("Signing you in...");
     setLoginError("");
+    setLoginSuccessMessage("");
     
     try {
-      console.log('🔑 Attempting login for:', email);
-      const verifyResponse = await ApiService.verifyCredentials(email, password);
-      console.log('📥 Verify response:', verifyResponse);
+      const normalizedIdentifier = normalizeLoginIdentifier(email);
+      setEmail(normalizedIdentifier);
+      const verifyResponse = await ApiService.verifyCredentials(normalizedIdentifier, password);
       
       if (verifyResponse.success) {
+        setShowLoginSplash(true);
         const normalizedUser = {
           ...verifyResponse.user,
           role: normalizeRole(verifyResponse.user?.role) || "visitor",
@@ -559,6 +704,12 @@ export default function LoginScreen({ navigation, route }) {
         if (!isRoleAllowedInCurrentVariant(normalizedUser.role)) {
           await ApiService.clearAuth();
           setLoginError(getVariantBlockedRoleMessage(normalizedUser.role));
+          return;
+        }
+
+        if (normalizedUser.status === "pending" || verifyResponse.status === "pending") {
+          await ApiService.clearAuth();
+          setLoginError("Your account is pending approval. Please wait for admin approval.");
           return;
         }
 
@@ -577,7 +728,7 @@ export default function LoginScreen({ navigation, route }) {
         }
 
         navigation.navigate("Verification", {
-          email: email,
+          email: normalizedIdentifier,
           password: password,
           rememberMe: rememberMe,
           tempToken: verifyResponse.tempToken,
@@ -585,18 +736,25 @@ export default function LoginScreen({ navigation, route }) {
         });
       }
     } catch (error) {
-      console.error("Login error:", error);
+      const errorMessage = String(error?.message || "");
       
-      if (error.message.includes("pending")) {
+      if (
+        errorMessage.includes("not yet verified") ||
+        errorMessage.includes("verify your email") ||
+        errorMessage.toLowerCase().includes("otp")
+      ) {
+        setLoginError("Your account is not yet verified. Please verify your account using OTP first.");
+      } else if (errorMessage.includes("pending")) {
         setLoginError("Your account is pending approval. Please wait for admin approval.");
-      } else if (error.message.includes("Invalid email") || error.message.includes("password")) {
+      } else if (errorMessage.includes("Invalid email") || errorMessage.includes("password")) {
         setLoginError("Incorrect email or password. Please try again.");
-      } else if (error.message.includes("Network request failed")) {
+      } else if (errorMessage.includes("Network request failed")) {
         setLoginError("Cannot connect to server. Please check your connection.");
       } else {
         setLoginError("Login failed. Please try again.");
       }
     } finally {
+      setShowLoginSplash(false);
       setIsLoading(false);
     }
   };
@@ -609,7 +767,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Continue Your Visit Journey",
           subtitle: "Track approvals, manage appointments, and keep your Sapphire visit details in one secure place.",
           icon: "person-outline",
-          accent: "#0F766E",
+          accent: "#0A3D91",
           panel: "Visitor Coordination",
         };
       case "security":
@@ -628,7 +786,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Appointment Desk Sign-In",
           subtitle: "Review visitor appointments, adjust schedules, and respond to requests from the staff dashboard.",
           icon: "briefcase-outline",
-          accent: "#0F766E",
+          accent: "#0A3D91",
           panel: "Staff Coordination",
         };
       case "admin":
@@ -637,7 +795,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Command and Oversight Login",
           subtitle: "Open the administrative control center for user review, access supervision, and reporting.",
           icon: "settings-outline",
-          accent: "#7C3AED",
+          accent: "#1C6DD0",
           panel: "Admin Control",
         };
       default:
@@ -687,6 +845,20 @@ export default function LoginScreen({ navigation, route }) {
   const roleConfig = getRoleConfig();
   const showVisitorRegisterEntry =
     IS_VISITOR_ONLY_APP || normalizeRole(effectiveRole) === "visitor";
+  const resetStepTitle =
+    resetStep === 1
+      ? "Reset Password"
+      : resetStep === 2
+        ? "Verify Code"
+        : "Create New Password";
+  const resetStepSubtitle =
+    resetStep === 1
+      ? "Use your school email so we can send a password reset code and secure link."
+      : resetStep === 2
+        ? "Enter the verification code from your inbox to continue."
+        : resetToken
+          ? "Create a new password from your secure reset link."
+          : "Create a new password that matches the same Secure Login standards.";
 
   return (
     <SafeAreaView style={loginStyles.safeArea}>
@@ -707,6 +879,8 @@ export default function LoginScreen({ navigation, route }) {
             {/* Header with Logo */}
             <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
               <View style={[loginStyles.header, headerResponsiveStyle]}>
+                <View style={loginStyles.headerGlowOne} />
+                <View style={loginStyles.headerGlowTwo} />
                 <View style={loginStyles.headerContent}>
                   <View style={loginStyles.brandBadge}>
                     <Image
@@ -729,8 +903,13 @@ export default function LoginScreen({ navigation, route }) {
                     Sapphire International{"\n"}Aviation Academy
                   </Text>
                   <Text style={loginStyles.headerTagline}>
-                    Campus arrival, access, and visitor authentication in one secure checkpoint flow
+                    Secure campus access and visitor sign-in
                   </Text>
+                  <View style={loginStyles.flightAccent}>
+                    <View style={loginStyles.flightAccentLine} />
+                    <Ionicons name="airplane" size={13} color="rgba(255,255,255,0.92)" />
+                    <View style={loginStyles.flightAccentDot} />
+                  </View>
                   
                   {/* API Status Badge */}
                   <View style={[
@@ -788,23 +967,27 @@ export default function LoginScreen({ navigation, route }) {
 
                 {/* STANDARD LOGIN FORM */}
                 <>
-                  {/* Email Input */}
+                  {/* Username / Email Input */}
                   <View style={loginStyles.inputBox}>
-                    <Text style={loginStyles.label}>Email Address</Text>
+                    <Text style={loginStyles.label}>Username / Email</Text>
                     <View style={[
                       loginStyles.inputContainer,
                       errors.email && loginStyles.inputError
                     ]}>
-                      <Ionicons name="mail-outline" size={20} color="#6B7280" />
+                      <Ionicons name="person-outline" size={20} color="#6B7280" />
                       <TextInput
                         ref={emailInputRef}
                         style={loginStyles.input}
-                        placeholder="your.email@sapphire.edu"
+                        placeholder="Enter username or email"
                         placeholderTextColor="#9CA3AF"
                         value={email}
                         onChangeText={handleEmailChange}
-                        onBlur={() => validateForm()}
-                        keyboardType="email-address"
+                        onBlur={() => {
+                          const normalizedIdentifier = normalizeLoginIdentifier(email);
+                          setEmail(normalizedIdentifier);
+                          validateEmailField();
+                        }}
+                        keyboardType="default"
                         autoCapitalize="none"
                         editable={!isLoading}
                         returnKeyType="next"
@@ -815,6 +998,12 @@ export default function LoginScreen({ navigation, route }) {
                       <Text style={loginStyles.errorText}>{errors.email}</Text>
                     )}
                   </View>
+
+                  {loginSuccessMessage ? (
+                    <Text style={loginStyles.loginSuccessText}>
+                      {loginSuccessMessage}
+                    </Text>
+                  ) : null}
 
                   {/* Password Input with Error Message Below */}
                   <View style={loginStyles.inputBox}>
@@ -831,6 +1020,7 @@ export default function LoginScreen({ navigation, route }) {
                         placeholderTextColor="#9CA3AF"
                         value={password}
                         onChangeText={handlePasswordChange}
+                        onBlur={validatePasswordField}
                         secureTextEntry={!showPassword}
                         editable={!isLoading}
                         returnKeyType="done"
@@ -914,7 +1104,7 @@ export default function LoginScreen({ navigation, route }) {
                     <View
                       style={{
                         marginBottom: 16,
-                        borderRadius: 16,
+                        borderRadius: 8,
                         borderWidth: 1,
                         borderColor: "#DDE7F3",
                         backgroundColor: "#F8FBFE",
@@ -947,9 +1137,9 @@ export default function LoginScreen({ navigation, route }) {
                       <TouchableOpacity
                         style={{
                           borderWidth: 1,
-                          borderColor: "#C7D2FE",
-                          backgroundColor: "#EEF2FF",
-                          borderRadius: 14,
+                          borderColor: "#B7D5F6",
+                          backgroundColor: "#EEF5FF",
+                          borderRadius: 8,
                           paddingVertical: 13,
                           paddingHorizontal: 16,
                           flexDirection: "row",
@@ -960,12 +1150,12 @@ export default function LoginScreen({ navigation, route }) {
                         onPress={() => navigation.navigate("VisitorRegister")}
                         activeOpacity={0.85}
                       >
-                        <Ionicons name="person-add-outline" size={18} color="#4F46E5" />
+                        <Ionicons name="person-add-outline" size={18} color="#0A3D91" />
                         <Text
                           style={{
                             fontSize: 14,
                             fontWeight: "800",
-                            color: "#4338CA",
+                            color: "#0A3D91",
                           }}
                         >
                           Create Account
@@ -1025,7 +1215,7 @@ export default function LoginScreen({ navigation, route }) {
                     </TouchableOpacity>
                   </View>
                   <Text style={loginStyles.footerCopyright}>
-                    ©2024. Sapphire International Aviation Academy
+                    Copyright 2024. Sapphire International Aviation Academy
                   </Text>
                 </View>
               </View>
@@ -1041,350 +1231,463 @@ export default function LoginScreen({ navigation, route }) {
           onRequestClose={handleCloseForgotPassword}
         >
           <View style={loginStyles.modalOverlay}>
-            <View style={loginStyles.modalContent}>
-              <View style={loginStyles.modalHeader}>
-                <Ionicons name="lock-open-outline" size={32} color="#1A2A6C" />
-                <Text style={loginStyles.modalTitle}>
-                  {resetStep === 1 ? 'Reset Password' : 
-                   resetStep === 2 ? 'Verify Code' : 
-                   'Create New Password'}
-                </Text>
-                <TouchableOpacity onPress={handleCloseForgotPassword}>
-                  <Ionicons name="close" size={24} color="#6B7280" />
-                </TouchableOpacity>
+            <View style={[loginStyles.modalContent, forgotModalContentResponsiveStyle]}>
+              <View style={[loginStyles.modalHero, forgotModalHeroResponsiveStyle]}>
+                <View style={[loginStyles.modalHeroTopRow, forgotModalHeroTopRowResponsiveStyle]}>
+                  <View style={[loginStyles.modalBrandBadge, forgotModalBrandBadgeResponsiveStyle]}>
+                    <Image
+                      source={Logo}
+                      style={loginStyles.modalBrandBadgeLogo}
+                      resizeMode="contain"
+                    />
+                    <View style={loginStyles.modalBrandBadgeTextWrap}>
+                      <Text style={loginStyles.modalBrandBadgeEyebrow}>Account Recovery</Text>
+                      <Text style={loginStyles.modalBrandBadgeTitle}>Sapphire SafePass</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={loginStyles.modalCloseButton}
+                    onPress={handleCloseForgotPassword}
+                  >
+                    <Ionicons name="close" size={22} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={loginStyles.modalHeroContent}>
+                  <View style={loginStyles.modalHeroIcon}>
+                    <Ionicons name="lock-open-outline" size={26} color="#FFFFFF" />
+                  </View>
+                  <Text style={loginStyles.modalTitle}>{resetStepTitle}</Text>
+                  <Text style={loginStyles.modalSubtitle}>{resetStepSubtitle}</Text>
+                </View>
+
+                <View style={[loginStyles.modalStepRow, forgotModalStepRowResponsiveStyle]}>
+                  {[1, 2, 3].map((stepNumber) => {
+                    const isActive = resetStep === stepNumber;
+                    const isComplete = resetStep > stepNumber;
+                    return (
+                      <View
+                        key={stepNumber}
+                        style={[
+                          loginStyles.modalStepChip,
+                          isActive && loginStyles.modalStepChipActive,
+                          isComplete && loginStyles.modalStepChipComplete,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            loginStyles.modalStepChipText,
+                            (isActive || isComplete) && loginStyles.modalStepChipTextActive,
+                          ]}
+                        >
+                          {stepNumber === 1 ? "Email" : stepNumber === 2 ? "Code" : "Password"}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
 
-              {resetStep === 1 && (
-                // STEP 1: Enter Email
-                <>
-                  <Text style={loginStyles.modalSubtitle}>
-                    Enter your email to receive a password reset code.
-                  </Text>
-
-                  <View style={loginStyles.inputBox}>
-                    <Text style={loginStyles.label}>Email Address</Text>
-                    <View style={[
-                      loginStyles.inputContainer,
-                      resetEmailError ? loginStyles.inputError : null
-                    ]}>
-                      <Ionicons name="mail-outline" size={20} color="#6B7280" />
-                      <TextInput
-                        style={loginStyles.input}
-                        placeholder="your.email@sapphire.edu"
-                        placeholderTextColor="#9CA3AF"
-                        value={resetEmail}
-                        onChangeText={(text) => {
-                          setResetEmail(text);
-                          setResetEmailError("");
-                        }}
-                        onBlur={validateResetEmailField}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        editable={!isLoading}
-                      />
-                    </View>
-                    {resetEmailError ? (
-                      <Text style={loginStyles.errorText}>{resetEmailError}</Text>
-                    ) : (
-                      <Text style={loginStyles.helperText}>
-                        We'll send a verification code to this email
-                      </Text>
-                    )}
-                  </View>
-
-                  <TouchableOpacity
-                    style={[
-                      loginStyles.otpButton,
-                      isLoading && loginStyles.buttonDisabled
-                    ]}
-                    onPress={handleSendResetOtp}
-                    disabled={isLoading}
-                    activeOpacity={0.8}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Ionicons name="send-outline" size={20} color="#FFFFFF" />
-                        <Text style={loginStyles.otpButtonText}>Send Reset Code</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </>
-              )}
-
-              {resetStep === 2 && (
-                // STEP 2: Enter OTP
-                <>
-                  <Text style={loginStyles.modalSubtitle}>
-                    Enter the 6-digit verification code sent to
-                  </Text>
-                  <Text style={loginStyles.modalPhone}>
-                    {resetEmail}
-                  </Text>
-
-                  <View style={loginStyles.inputBox}>
-                    <View style={[
-                      loginStyles.inputContainer,
-                      resetOtpError ? loginStyles.inputError : null
-                    ]}>
-                      <Ionicons name="key-outline" size={20} color="#6B7280" />
-                      <TextInput
-                        style={loginStyles.input}
-                        placeholder="000000"
-                        placeholderTextColor="#9CA3AF"
-                        value={resetOtp}
-                        onChangeText={(text) => {
-                          const numericValue = text.replace(/[^0-9]/g, '');
-                          setResetOtp(numericValue);
-                          setResetOtpError("");
-                        }}
-                        onBlur={validateResetOtpField}
-                        keyboardType="numeric"
-                        maxLength={6}
-                        autoFocus={!isWeb}
-                        editable={!isLoading}
-                      />
-                    </View>
-                    {resetOtpError && (
-                      <Text style={loginStyles.errorText}>{resetOtpError}</Text>
-                    )}
-                  </View>
-
-                  <View style={loginStyles.timerContainer}>
-                    <Ionicons name="time-outline" size={16} color="#6B7280" />
-                    <Text style={loginStyles.timerText}>
-                      {canResendReset ? 'Code expired' : `Resend in ${resetTimer}s`}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    style={[
-                      loginStyles.otpVerifyButton,
-                      (isLoading || resetOtp.length !== 6) && loginStyles.buttonDisabled
-                    ]}
-                    onPress={handleVerifyResetOtp}
-                    disabled={isLoading || resetOtp.length !== 6}
-                    activeOpacity={0.8}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={loginStyles.otpVerifyText}>Verify Code</Text>
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      loginStyles.otpResendButton,
-                      (!canResendReset || isLoading) && loginStyles.buttonDisabled,
-                      { marginTop: 12 }
-                    ]}
-                    onPress={handleResendResetOtp}
-                    disabled={!canResendReset || isLoading}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={loginStyles.otpResendText}>Resend Code</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-
-              {resetStep === 3 && (
-                // STEP 3: New Password
-                <>
-                  <Text style={loginStyles.modalSubtitle}>
-                    Create a strong password for your account.
-                  </Text>
-
-                  {/* Password Requirements */}
-                  <View style={loginStyles.passwordRequirements}>
-                    <Text style={loginStyles.requirementsTitle}>Password must contain:</Text>
-                    <View style={loginStyles.requirementItem}>
-                      <Ionicons 
-                        name={passwordChecks.length ? "checkmark-circle" : "ellipse-outline"} 
-                        size={16} 
-                        color={passwordChecks.length ? "#10B981" : "#9CA3AF"} 
-                      />
-                      <Text style={[loginStyles.requirementText, passwordChecks.length && loginStyles.requirementMet]}>
-                        At least 8 characters
-                      </Text>
-                    </View>
-                    <View style={loginStyles.requirementItem}>
-                      <Ionicons 
-                        name={passwordChecks.uppercase ? "checkmark-circle" : "ellipse-outline"} 
-                        size={16} 
-                        color={passwordChecks.uppercase ? "#10B981" : "#9CA3AF"} 
-                      />
-                      <Text style={[loginStyles.requirementText, passwordChecks.uppercase && loginStyles.requirementMet]}>
-                        One uppercase letter
-                      </Text>
-                    </View>
-                    <View style={loginStyles.requirementItem}>
-                      <Ionicons 
-                        name={passwordChecks.lowercase ? "checkmark-circle" : "ellipse-outline"} 
-                        size={16} 
-                        color={passwordChecks.lowercase ? "#10B981" : "#9CA3AF"} 
-                      />
-                      <Text style={[loginStyles.requirementText, passwordChecks.lowercase && loginStyles.requirementMet]}>
-                        One lowercase letter
-                      </Text>
-                    </View>
-                    <View style={loginStyles.requirementItem}>
-                      <Ionicons 
-                        name={passwordChecks.number ? "checkmark-circle" : "ellipse-outline"} 
-                        size={16} 
-                        color={passwordChecks.number ? "#10B981" : "#9CA3AF"} 
-                      />
-                      <Text style={[loginStyles.requirementText, passwordChecks.number && loginStyles.requirementMet]}>
-                        One number
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* New Password Input */}
-                  <View style={loginStyles.inputBox}>
-                    <Text style={loginStyles.label}>New Password</Text>
-                    <View style={[
-                      loginStyles.inputContainer,
-                      newPasswordError ? loginStyles.inputError : null
-                    ]}>
-                      <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
-                      <TextInput
-                        style={loginStyles.input}
-                        placeholder="Enter new password"
-                        placeholderTextColor="#9CA3AF"
-                        value={newPassword}
-                        onChangeText={(text) => {
-                          setNewPassword(text);
-                          setNewPasswordError("");
-                          validatePasswordStrength(text);
-                        }}
-                        onBlur={validateNewPasswordField}
-                        secureTextEntry={!showNewPassword}
-                        editable={!isLoading}
-                      />
-                      <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)}>
-                        <Ionicons 
-                          name={showNewPassword ? "eye-off-outline" : "eye-outline"} 
-                          size={20} 
-                          color="#6B7280" 
-                        />
-                      </TouchableOpacity>
-                    </View>
-                    {newPasswordError ? (
-                      <Text style={loginStyles.errorText}>{newPasswordError}</Text>
-                    ) : (
-                      newPassword.length > 0 && (
-                        <View style={loginStyles.passwordStrengthContainer}>
-                          <View style={loginStyles.passwordStrengthBar}>
-                            {[1, 2, 3, 4, 5].map((level) => (
-                              <View
-                                key={level}
-                                style={[
-                                  loginStyles.passwordStrengthSegment,
-                                  { backgroundColor: level <= passwordStrength ? getPasswordStrengthColor() : '#E5E7EB' }
-                                ]}
-                              />
-                            ))}
-                          </View>
-                          <Text style={[loginStyles.passwordStrengthText, { color: getPasswordStrengthColor() }]}>
-                            {getPasswordStrengthText()}
-                          </Text>
-                        </View>
-                      )
-                    )}
-                  </View>
-
-                  {/* Confirm Password Input */}
-                  <View style={loginStyles.inputBox}>
-                    <Text style={loginStyles.label}>Confirm Password</Text>
-                    <View style={[
-                      loginStyles.inputContainer,
-                      confirmNewPasswordError ? loginStyles.inputError : null
-                    ]}>
-                      <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
-                      <TextInput
-                        style={loginStyles.input}
-                        placeholder="Confirm new password"
-                        placeholderTextColor="#9CA3AF"
-                        value={confirmNewPassword}
-                        onChangeText={(text) => {
-                          setConfirmNewPassword(text);
-                          setConfirmNewPasswordError("");
-                        }}
-                        onBlur={validateConfirmPasswordField}
-                        secureTextEntry={!showConfirmNewPassword}
-                        editable={!isLoading}
-                      />
-                      <TouchableOpacity onPress={() => setShowConfirmNewPassword(!showConfirmNewPassword)}>
-                        <Ionicons 
-                          name={showConfirmNewPassword ? "eye-off-outline" : "eye-outline"} 
-                          size={20} 
-                          color="#6B7280" 
-                        />
-                      </TouchableOpacity>
-                    </View>
-                    {confirmNewPasswordError && (
-                      <Text style={loginStyles.errorText}>{confirmNewPasswordError}</Text>
-                    )}
-                  </View>
-
-                  {/* Password Match Indicator */}
-                  {newPassword && confirmNewPassword && !newPasswordError && !confirmNewPasswordError && (
-                    <View style={loginStyles.passwordMatchContainer}>
-                      <Ionicons 
-                        name={newPassword === confirmNewPassword ? "checkmark-circle" : "close-circle"} 
-                        size={16} 
-                        color={newPassword === confirmNewPassword ? "#10B981" : "#EF4444"} 
-                      />
-                      <Text style={[
-                        loginStyles.passwordMatchText,
-                        { color: newPassword === confirmNewPassword ? "#10B981" : "#EF4444" }
-                      ]}>
-                        {newPassword === confirmNewPassword ? "Passwords match" : "Passwords do not match"}
-                      </Text>
-                    </View>
-                  )}
-
-                  <TouchableOpacity
-                    style={[
-                      loginStyles.otpVerifyButton,
-                      (isLoading || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword) && 
-                      loginStyles.buttonDisabled
-                    ]}
-                    onPress={handleResetPassword}
-                    disabled={isLoading || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword}
-                    activeOpacity={0.8}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={loginStyles.otpVerifyText}>Reset Password</Text>
-                    )}
-                  </TouchableOpacity>
-                </>
-              )}
-
-              <TouchableOpacity
-                style={loginStyles.backLink}
-                onPress={() => {
-                  if (resetStep === 1) {
-                    handleCloseForgotPassword();
-                  } else {
-                    setResetStep(resetStep - 1);  
-                  }
-                }}
-                activeOpacity={0.7}
+              <ScrollView
+                style={loginStyles.modalBody}
+                contentContainerStyle={[loginStyles.modalBodyContent, forgotModalBodyContentResponsiveStyle]}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
               >
-                <Ionicons name="arrow-back" size={16} color="#6B7280" />
-                <Text style={loginStyles.backLinkText}>
-                  {resetStep === 1 ? 'Back to Login' : 'Back'}
-                </Text>
-              </TouchableOpacity>
+                {resetStep === 1 && (
+                  <>
+                    <View style={loginStyles.inputBox}>
+                      <Text style={loginStyles.label}>Email Address</Text>
+                      <View style={[
+                        loginStyles.inputContainer,
+                        resetEmailError ? loginStyles.inputError : null
+                      ]}>
+                        <Ionicons name="mail-outline" size={20} color="#6B7280" />
+                        <TextInput
+                          style={loginStyles.input}
+                          placeholder="your.email@sapphireaviationacademy.edu.ph"
+                          placeholderTextColor="#9CA3AF"
+                          value={resetEmail}
+                          onChangeText={(text) => {
+                            setResetEmail(text.replace(/\s+/g, ""));
+                            setResetEmailError("");
+                          }}
+                          onBlur={() => {
+                            setResetEmail(normalizeResetEmailValue(resetEmail));
+                            validateResetEmailField();
+                          }}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          editable={!isLoading}
+                        />
+                      </View>
+                      {resetEmailError ? (
+                        <Text style={loginStyles.errorText}>{resetEmailError}</Text>
+                      ) : (
+                        <Text style={loginStyles.helperText}>
+                          We&apos;ll send a verification code and reset link to this email
+                        </Text>
+                      )}
+                    </View>
+
+                    <View style={loginStyles.modalInfoCard}>
+                      <Ionicons name="mail-unread-outline" size={18} color="#0A3D91" />
+                      <Text style={loginStyles.modalInfoText}>
+                        Use the email linked to your SafePass account. We will send a 6-digit verification code and a secure reset link.
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[
+                        loginStyles.otpButton,
+                        isLoading && loginStyles.buttonDisabled
+                      ]}
+                      onPress={handleSendResetOtp}
+                      disabled={isLoading}
+                      activeOpacity={0.8}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons name="send-outline" size={20} color="#FFFFFF" />
+                          <Text style={loginStyles.otpButtonText}>Send Reset Code</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {resetStep === 2 && (
+                  <>
+                    <View style={loginStyles.modalInfoCard}>
+                      <Ionicons name="shield-checkmark-outline" size={18} color="#0A3D91" />
+                      <Text style={loginStyles.modalInfoText}>
+                        Enter the 6-digit verification code sent to the email below.
+                      </Text>
+                    </View>
+                    <Text style={loginStyles.modalPhone}>{resetEmail}</Text>
+
+                    <View style={loginStyles.inputBox}>
+                      <View style={[
+                        loginStyles.inputContainer,
+                        resetOtpError ? loginStyles.inputError : null
+                      ]}>
+                        <Ionicons name="key-outline" size={20} color="#6B7280" />
+                        <TextInput
+                          style={loginStyles.input}
+                          placeholder="000000"
+                          placeholderTextColor="#9CA3AF"
+                          value={resetOtp}
+                          onChangeText={(text) => {
+                            const numericValue = normalizeResetOtpValue(text);
+                            setResetOtp(numericValue);
+                            setResetOtpError("");
+                          }}
+                          onBlur={() => {}}
+                          keyboardType="numeric"
+                          maxLength={6}
+                          autoFocus={!isWeb}
+                          editable={!isLoading}
+                        />
+                      </View>
+                      {resetOtpError ? (
+                        <Text style={loginStyles.errorText}>{resetOtpError}</Text>
+                      ) : (
+                        <Text style={loginStyles.helperText}>
+                          The code will be checked after you press Verify Code.
+                        </Text>
+                      )}
+                    </View>
+
+                    <View style={loginStyles.timerContainer}>
+                      <Ionicons name="time-outline" size={16} color="#6B7280" />
+                      <Text style={loginStyles.timerText}>
+                        {canResendReset ? 'Code expired' : `Resend in ${resetTimer}s`}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[
+                        loginStyles.otpVerifyButton,
+                        isLoading && loginStyles.buttonDisabled
+                      ]}
+                      onPress={handleVerifyResetOtp}
+                      disabled={isLoading}
+                      activeOpacity={0.8}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={loginStyles.otpVerifyText}>Verify Code</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        loginStyles.otpResendButton,
+                        (!canResendReset || isLoading) && loginStyles.buttonDisabled,
+                        { marginTop: 12 }
+                      ]}
+                      onPress={handleResendResetOtp}
+                      disabled={!canResendReset || isLoading}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={loginStyles.otpResendText}>Resend Code</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {resetStep === 3 && (
+                  <>
+                    <View style={loginStyles.modalInfoCard}>
+                      <Ionicons name="keypad-outline" size={18} color="#0A3D91" />
+                      <Text style={loginStyles.modalInfoText}>
+                        {resetToken
+                          ? "Create a strong new password from your secure reset link, then confirm it before returning to login."
+                          : "Create a strong new password, then confirm it before returning to login."}
+                      </Text>
+                    </View>
+
+                    <View style={loginStyles.passwordRequirements}>
+                      <Text style={loginStyles.requirementsTitle}>Password must contain:</Text>
+                      <View style={loginStyles.requirementItem}>
+                        <Ionicons 
+                          name={passwordChecks.length ? "checkmark-circle" : "ellipse-outline"} 
+                          size={16} 
+                          color={passwordChecks.length ? "#10B981" : "#9CA3AF"} 
+                        />
+                        <Text style={[loginStyles.requirementText, passwordChecks.length && loginStyles.requirementMet]}>
+                          At least 8 characters
+                        </Text>
+                      </View>
+                      <View style={loginStyles.requirementItem}>
+                        <Ionicons 
+                          name={passwordChecks.uppercase ? "checkmark-circle" : "ellipse-outline"} 
+                          size={16} 
+                          color={passwordChecks.uppercase ? "#10B981" : "#9CA3AF"} 
+                        />
+                        <Text style={[loginStyles.requirementText, passwordChecks.uppercase && loginStyles.requirementMet]}>
+                          One uppercase letter
+                        </Text>
+                      </View>
+                      <View style={loginStyles.requirementItem}>
+                        <Ionicons 
+                          name={passwordChecks.lowercase ? "checkmark-circle" : "ellipse-outline"} 
+                          size={16} 
+                          color={passwordChecks.lowercase ? "#10B981" : "#9CA3AF"} 
+                        />
+                        <Text style={[loginStyles.requirementText, passwordChecks.lowercase && loginStyles.requirementMet]}>
+                          One lowercase letter
+                        </Text>
+                      </View>
+                      <View style={loginStyles.requirementItem}>
+                        <Ionicons 
+                          name={passwordChecks.number ? "checkmark-circle" : "ellipse-outline"} 
+                          size={16} 
+                          color={passwordChecks.number ? "#10B981" : "#9CA3AF"} 
+                        />
+                        <Text style={[loginStyles.requirementText, passwordChecks.number && loginStyles.requirementMet]}>
+                          One number
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={loginStyles.inputBox}>
+                      <Text style={loginStyles.label}>New Password</Text>
+                      <View style={[
+                        loginStyles.inputContainer,
+                        newPasswordError ? loginStyles.inputError : null
+                      ]}>
+                        <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
+                        <TextInput
+                          style={loginStyles.input}
+                          placeholder="Enter new password"
+                          placeholderTextColor="#9CA3AF"
+                          value={newPassword}
+                          onChangeText={(text) => {
+                            setNewPassword(text);
+                            setNewPasswordError("");
+                            validatePasswordStrength(text);
+                            if (confirmNewPassword) {
+                              setConfirmNewPasswordError(
+                                confirmNewPassword === text ? "" : "Passwords do not match",
+                              );
+                            }
+                          }}
+                          onBlur={validateNewPasswordField}
+                          secureTextEntry={!showNewPassword}
+                          editable={!isLoading}
+                        />
+                        <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)}>
+                          <Ionicons 
+                            name={showNewPassword ? "eye-off-outline" : "eye-outline"} 
+                            size={20} 
+                            color="#6B7280" 
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      {newPasswordError ? (
+                        <Text style={loginStyles.errorText}>{newPasswordError}</Text>
+                      ) : (
+                        newPassword.length > 0 && (
+                          <View style={loginStyles.passwordStrengthContainer}>
+                            <View style={loginStyles.passwordStrengthBar}>
+                              {[1, 2, 3, 4, 5].map((level) => (
+                                <View
+                                  key={level}
+                                  style={[
+                                    loginStyles.passwordStrengthSegment,
+                                    { backgroundColor: level <= passwordStrength ? getPasswordStrengthColor() : '#E5E7EB' }
+                                  ]}
+                                />
+                              ))}
+                            </View>
+                            <Text style={[loginStyles.passwordStrengthText, { color: getPasswordStrengthColor() }]}>
+                              {getPasswordStrengthText()}
+                            </Text>
+                          </View>
+                        )
+                      )}
+                    </View>
+
+                    <View style={loginStyles.inputBox}>
+                      <Text style={loginStyles.label}>Confirm Password</Text>
+                      <View style={[
+                        loginStyles.inputContainer,
+                        confirmNewPasswordError ? loginStyles.inputError : null
+                      ]}>
+                        <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
+                        <TextInput
+                          style={loginStyles.input}
+                          placeholder="Confirm new password"
+                          placeholderTextColor="#9CA3AF"
+                          value={confirmNewPassword}
+                          onChangeText={(text) => {
+                            setConfirmNewPassword(text);
+                            setConfirmNewPasswordError("");
+                          }}
+                          onBlur={validateConfirmPasswordField}
+                          secureTextEntry={!showConfirmNewPassword}
+                          editable={!isLoading}
+                        />
+                        <TouchableOpacity onPress={() => setShowConfirmNewPassword(!showConfirmNewPassword)}>
+                          <Ionicons 
+                            name={showConfirmNewPassword ? "eye-off-outline" : "eye-outline"} 
+                            size={20} 
+                            color="#6B7280" 
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      {confirmNewPasswordError && (
+                        <Text style={loginStyles.errorText}>{confirmNewPasswordError}</Text>
+                      )}
+                    </View>
+
+                    {newPassword && confirmNewPassword && !newPasswordError && !confirmNewPasswordError && (
+                      <View style={loginStyles.passwordMatchContainer}>
+                        <Ionicons 
+                          name={newPassword === confirmNewPassword ? "checkmark-circle" : "close-circle"} 
+                          size={16} 
+                          color={newPassword === confirmNewPassword ? "#10B981" : "#EF4444"} 
+                        />
+                        <Text style={[
+                          loginStyles.passwordMatchText,
+                          { color: newPassword === confirmNewPassword ? "#10B981" : "#EF4444" }
+                        ]}>
+                          {newPassword === confirmNewPassword ? "Passwords match" : "Passwords do not match"}
+                        </Text>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      style={[
+                        loginStyles.otpVerifyButton,
+                        (isLoading || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword) && 
+                        loginStyles.buttonDisabled
+                      ]}
+                      onPress={handleResetPassword}
+                      disabled={isLoading || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword}
+                      activeOpacity={0.8}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={loginStyles.otpVerifyText}>Reset Password</Text>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                <TouchableOpacity
+                  style={loginStyles.backLink}
+                  onPress={() => {
+                    if (resetStep === 1) {
+                      handleCloseForgotPassword();
+                    } else {
+                      if (resetStep === 2) {
+                        setResetOtp("");
+                        setResetOtpError("");
+                      }
+                      if (resetStep === 3) {
+                        setNewPassword("");
+                        setNewPasswordError("");
+                        setConfirmNewPassword("");
+                        setConfirmNewPasswordError("");
+                        setShowNewPassword(false);
+                        setShowConfirmNewPassword(false);
+                        setPasswordStrength(0);
+                        setPasswordChecks({
+                          length: false,
+                          uppercase: false,
+                          lowercase: false,
+                          number: false,
+                          special: false,
+                        });
+                      }
+                      setResetStep(resetStep - 1);  
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="arrow-back" size={16} color="#6B7280" />
+                  <Text style={loginStyles.backLinkText}>
+                    {resetStep === 1 ? 'Back to Login' : 'Back'}
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           </View>
         </Modal>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={showLoginSplash}
+        transparent={true}
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={loginStyles.loginSplashOverlay}>
+          <View style={loginStyles.loginSplashCard}>
+            <View style={loginStyles.loginSplashLogoRing}>
+              <Image
+                source={Logo}
+                style={loginStyles.loginSplashLogo}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={loginStyles.loginSplashTitle}>Welcome Back</Text>
+            <Text style={loginStyles.loginSplashMessage}>{loginSplashMessage}</Text>
+            <View style={loginStyles.loginSplashLoadingRow}>
+              <ActivityIndicator size="small" color="#0A3D91" />
+              <Text style={loginStyles.loginSplashLoadingText}>
+                Securing your account access...
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

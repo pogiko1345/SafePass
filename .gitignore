@@ -1,4 +1,8 @@
 .vercel
 .env*.local
+SafePass-Mobile/backend/.env
+SafePass-Mobile/backend/.env.*
+!SafePass-Mobile/backend/.env.example
 SafePass-Mobile/.gradle-local/
+SafePass-Mobile/.gradle-codex/
 SafePass-Mobile/visitor-build.log

@@ -16,6 +16,9 @@ export default function SharedMonitoringMap({
   offices = [],
   selectedFloor = "all",
   selectedOffice = "all",
+  mapBlueprints = null,
+  officePositions = {},
+  onFloorChange,
   onVisitorHover,
   onVisitorLeave,
   onVisitorSelect,
@@ -29,6 +32,7 @@ export default function SharedMonitoringMap({
   textSecondary = "#64748B",
   summaryItems = [],
   statusLabel = "Live monitoring",
+  showFloorNavigation = true,
   containerStyle,
   mapWrapperStyle,
 }) {
@@ -90,12 +94,16 @@ export default function SharedMonitoringMap({
           offices={offices}
           selectedFloor={selectedFloor}
           selectedOffice={selectedOffice}
+          mapBlueprints={mapBlueprints}
+          officePositions={officePositions}
+          onFloorChange={onFloorChange}
           onVisitorHover={onVisitorHover}
           onVisitorLeave={onVisitorLeave}
           onVisitorSelect={onVisitorSelect}
           hoveredVisitor={hoveredVisitor}
           renderHoverCard={renderHoverCard}
           fullscreen={fullscreen}
+          showFloorNavigation={showFloorNavigation}
         />
       </View>
     </View>
@@ -158,7 +166,7 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#2563EB",
+    color: "#0A3D91",
   },
   summaryRow: {
     flexDirection: "row",

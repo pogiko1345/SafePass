@@ -154,7 +154,7 @@ export default function AIAssistantModal({ visible, onClose, onFillForm, current
         <Animated.View style={[aiAssistantStyles.modalContainer, { transform: [{ translateY: slideAnim }] }]}>
           {/* Header */}
           <LinearGradient
-            colors={['#4F46E5', '#7C3AED']}
+            colors={['#0A3D91', '#1C6DD0']}
             style={aiAssistantStyles.header}
           >
             <View style={aiAssistantStyles.headerContent}>
@@ -169,11 +169,11 @@ export default function AIAssistantModal({ visible, onClose, onFillForm, current
           {/* Quick Actions */}
           <View style={aiAssistantStyles.quickActions}>
             <TouchableOpacity style={aiAssistantStyles.quickAction} onPress={handleUploadID}>
-              <Ionicons name="camera" size={20} color="#4F46E5" />
+              <Ionicons name="camera" size={20} color="#0A3D91" />
               <Text style={aiAssistantStyles.quickActionText}>Scan ID</Text>
             </TouchableOpacity>
             <TouchableOpacity style={aiAssistantStyles.quickAction} onPress={handleAutoFill}>
-              <Ionicons name="flash" size={20} color="#4F46E5" />
+              <Ionicons name="flash" size={20} color="#0A3D91" />
               <Text style={aiAssistantStyles.quickActionText}>Demo Fill</Text>
             </TouchableOpacity>
           </View>
@@ -194,7 +194,7 @@ export default function AIAssistantModal({ visible, onClose, onFillForm, current
               >
                 {msg.role === 'assistant' && (
                   <View style={aiAssistantStyles.assistantIcon}>
-                    <Ionicons name="chatbubble" size={16} color="#4F46E5" />
+                    <Ionicons name="chatbubble" size={16} color="#0A3D91" />
                   </View>
                 )}
                 <Text style={[
@@ -207,7 +207,7 @@ export default function AIAssistantModal({ visible, onClose, onFillForm, current
             ))}
             {isProcessing && (
               <View style={aiAssistantStyles.loadingBubble}>
-                <ActivityIndicator size="small" color="#4F46E5" />
+                <ActivityIndicator size="small" color="#0A3D91" />
                 <Text style={aiAssistantStyles.loadingText}>AI is thinking...</Text>
               </View>
             )}

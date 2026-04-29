@@ -183,8 +183,8 @@ export default function VisitorScreen({ navigation, route }) {
   if (isLoading && !visitor) {
     return (
       <SafeAreaView style={visitorScreenStyles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
-        <ActivityIndicator size="large" color="#4F46E5" />
+        <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
+        <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={visitorScreenStyles.loadingText}>Loading your visitor pass...</Text>
       </SafeAreaView>
     );
@@ -193,7 +193,7 @@ export default function VisitorScreen({ navigation, route }) {
   if (error && !visitor) {
     return (
       <SafeAreaView style={visitorScreenStyles.errorContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+        <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
         <View style={visitorScreenStyles.header}>
           <TouchableOpacity
             style={visitorScreenStyles.backButton}
@@ -219,7 +219,7 @@ export default function VisitorScreen({ navigation, route }) {
   if (!visitor) {
     return (
       <SafeAreaView style={visitorScreenStyles.errorContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+        <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
         <View style={visitorScreenStyles.header}>
           <TouchableOpacity
             style={visitorScreenStyles.backButton}
@@ -244,7 +244,7 @@ export default function VisitorScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={visitorScreenStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
       
       {/* Header */}
       <View style={visitorScreenStyles.header}>
@@ -376,7 +376,7 @@ export default function VisitorScreen({ navigation, route }) {
 
           <TouchableOpacity style={visitorScreenStyles.quickAction} onPress={() => Alert.alert("Email", "Sending pass to your email")}>
             <View style={[visitorScreenStyles.quickActionIcon, { backgroundColor: '#F3E8FF' }]}>
-              <Ionicons name="mail-outline" size={20} color="#7C3AED" />
+              <Ionicons name="mail-outline" size={20} color="#1C6DD0" />
             </View>
             <Text style={visitorScreenStyles.quickActionText}>Email</Text>
           </TouchableOpacity>
@@ -385,7 +385,7 @@ export default function VisitorScreen({ navigation, route }) {
         {/* Appointment Details */}
         <View style={visitorScreenStyles.detailsCard}>
           <View style={visitorScreenStyles.detailsHeader}>
-            <Ionicons name="calendar" size={20} color="#4F46E5" />
+            <Ionicons name="calendar" size={20} color="#0A3D91" />
             <Text style={visitorScreenStyles.detailsTitle}>Appointment Details</Text>
           </View>
 
@@ -431,7 +431,7 @@ export default function VisitorScreen({ navigation, route }) {
         {/* Visitor Information */}
         <View style={visitorScreenStyles.detailsCard}>
           <View style={visitorScreenStyles.detailsHeader}>
-            <Ionicons name="person-circle-outline" size={20} color="#4F46E5" />
+            <Ionicons name="person-circle-outline" size={20} color="#0A3D91" />
             <Text style={visitorScreenStyles.detailsTitle}>Visitor Information</Text>
           </View>
 

@@ -62,13 +62,36 @@ const visitorSchema = new mongoose.Schema({
   },
   idNumber: { 
     type: String, 
-    required: [true, 'ID number is required'],
+    default: "",
     trim: true,
     index: true
+  },
+  idType: {
+    type: String,
+    default: "",
+    trim: true,
   },
   idImage: { 
     type: String,
     default: null
+  },
+  idValidationStatus: {
+    type: String,
+    default: "pending",
+    trim: true,
+  },
+  idValidationNotes: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  dataPrivacyAccepted: {
+    type: Boolean,
+    default: false,
+  },
+  dataPrivacyAcceptedAt: {
+    type: Date,
+    default: null,
   },
   
   // ============ Visit Details ============
@@ -76,6 +99,16 @@ const visitorSchema = new mongoose.Schema({
     type: String, 
     required: [true, 'Purpose of visit is required'],
     trim: true
+  },
+  purposeCategory: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  customPurposeOfVisit: {
+    type: String,
+    default: "",
+    trim: true,
   },
   host: {
     type: String,
@@ -86,6 +119,12 @@ const visitorSchema = new mongoose.Schema({
     type: String,
     default: "",
     trim: true,
+  },
+  appointmentDepartment: {
+    type: String,
+    default: "",
+    trim: true,
+    index: true,
   },
   vehicleNumber: { 
     type: String, 
@@ -177,6 +216,24 @@ const visitorSchema = new mongoose.Schema({
     default: "",
     trim: true,
   },
+  appointmentCompletedAt: {
+    type: Date,
+    default: null,
+  },
+  appointmentCompletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  appointmentCompletionNote: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  overstayAlertedAt: {
+    type: Date,
+    default: null,
+  },
   
   // ============ Check-in/out Status ============
   status: { 
@@ -203,6 +260,80 @@ const visitorSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+
+  // ============ Live Location Tracking ============
+  currentLocation: {
+    floor: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    office: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    checkpointId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    coordinates: {
+      x: { type: Number, default: null },
+      y: { type: Number, default: null },
+    },
+    gps: {
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
+      accuracy: { type: Number, default: null },
+      altitude: { type: Number, default: null },
+      heading: { type: Number, default: null },
+      speed: { type: Number, default: null },
+    },
+    source: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    deviceId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    lastSeenAt: {
+      type: Date,
+      default: null,
+    },
+    isActive: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  locationHistory: [
+    {
+      floor: String,
+      office: String,
+      checkpointId: String,
+      coordinates: {
+        x: Number,
+        y: Number,
+      },
+      gps: {
+        latitude: Number,
+        longitude: Number,
+        accuracy: Number,
+        altitude: Number,
+        heading: Number,
+        speed: Number,
+      },
+      source: String,
+      deviceId: String,
+      tappedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
   
   // ============ Notifications ============
   hostNotified: { 
@@ -312,8 +443,14 @@ visitorSchema.methods = {
       this.staffActionAt = null;
       this.staffAdjustmentNote = "";
       this.staffRejectionReason = "";
+      this.appointmentCompletedAt = null;
+      this.appointmentCompletedBy = null;
+      this.appointmentCompletionNote = "";
+      this.overstayAlertedAt = null;
     } else {
-      if (this.approvalStatus !== "approved") {
+      if (this.appointmentStatus === "rejected") {
+        this.approvalStatus = "rejected";
+      } else if (this.approvalStatus !== "approved") {
         this.approvalStatus = "approved";
       }
       if (!this.appointmentStatus || this.appointmentStatus === "not_requested") {
@@ -387,21 +524,39 @@ visitorSchema.methods = {
     return this;
   },
 
-  queueAppointmentRequest({ visitDate, visitTime, purposeOfVisit }) {
+  queueAppointmentRequest({
+    visitDate,
+    visitTime,
+    purposeOfVisit,
+    purposeCategory = "",
+    customPurposeOfVisit = "",
+    department = "",
+    assignedStaff = null,
+    assignedStaffName = "",
+  }) {
     this.requestCategory = "appointment";
     this.approvalFlow = "staff";
     this.approvalStatus = "approved";
     this.visitDate = visitDate;
     this.visitTime = visitTime;
     this.purposeOfVisit = purposeOfVisit;
+    this.purposeCategory = String(purposeCategory || "").trim();
+    this.customPurposeOfVisit = String(customPurposeOfVisit || "").trim();
+    this.appointmentDepartment = String(department || "").trim();
+    this.assignedOffice = this.appointmentDepartment || this.assignedOffice || "";
+    this.host = this.appointmentDepartment || this.host || "";
     this.appointmentStatus = "pending";
     this.appointmentRequestedAt = new Date();
     this.staffActionBy = null;
     this.staffActionAt = null;
     this.staffAdjustmentNote = "";
     this.staffRejectionReason = "";
-    this.assignedStaff = null;
-    this.assignedStaffName = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.overstayAlertedAt = null;
+    this.assignedStaff = assignedStaff || null;
+    this.assignedStaffName = String(assignedStaffName || "").trim();
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;
@@ -423,6 +578,10 @@ visitorSchema.methods = {
     this.staffActionAt = new Date();
     this.staffAdjustmentNote = String(note || "").trim();
     this.staffRejectionReason = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.overstayAlertedAt = null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;
@@ -450,6 +609,10 @@ visitorSchema.methods = {
     this.staffActionAt = new Date();
     this.staffAdjustmentNote = String(note || "Preferred time adjusted by staff.").trim();
     this.staffRejectionReason = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.overstayAlertedAt = null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;
@@ -461,7 +624,7 @@ visitorSchema.methods = {
   rejectAppointment(staffUser, reason = "") {
     this.requestCategory = "appointment";
     this.approvalFlow = "staff";
-    this.approvalStatus = "approved";
+    this.approvalStatus = "rejected";
     this.appointmentStatus = "rejected";
     this.assignedStaff = staffUser?._id || null;
     this.assignedStaffName = staffUser
@@ -470,10 +633,38 @@ visitorSchema.methods = {
     this.staffActionBy = staffUser?._id || null;
     this.staffActionAt = new Date();
     this.staffRejectionReason = String(reason || "Appointment request declined by staff.").trim();
+    this.staffAdjustmentNote = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.overstayAlertedAt = null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;
     this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  completeAppointment(staffUser, note = "") {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    if (!APPOINTMENT_APPROVED_STATUSES.includes(this.appointmentStatus)) {
+      this.appointmentStatus = "approved";
+    }
+    this.assignedStaff = staffUser?._id || this.assignedStaff || null;
+    this.assignedStaffName = staffUser
+      ? `${staffUser.firstName || ""} ${staffUser.lastName || ""}`.trim()
+      : this.assignedStaffName;
+    this.staffActionBy = staffUser?._id || null;
+    this.staffActionAt = new Date();
+    this.appointmentCompletedAt = new Date();
+    this.appointmentCompletedBy = staffUser?._id || null;
+    this.appointmentCompletionNote = String(
+      note || "Appointment completed. Visitor can proceed to check-out.",
+    ).trim();
+    this.overstayAlertedAt = null;
     this.syncWorkflowState();
     return this;
   },
@@ -483,6 +674,7 @@ visitorSchema.methods = {
     this.checkedInBy = actorId || null;
     this.checkedOutAt = null;
     this.checkedOutBy = null;
+    this.overstayAlertedAt = null;
     this.syncWorkflowState();
     return this;
   },
@@ -490,7 +682,52 @@ visitorSchema.methods = {
   markCheckedOut(actorId) {
     this.checkedOutAt = new Date();
     this.checkedOutBy = actorId || null;
+    this.currentLocation = {
+      ...(this.currentLocation || {}),
+      isActive: false,
+      lastSeenAt: this.currentLocation?.lastSeenAt || new Date(),
+    };
+    this.overstayAlertedAt = null;
     this.syncWorkflowState();
+    return this;
+  },
+
+  updateCurrentLocation(location = {}, metadata = {}) {
+    const now = new Date();
+    const coordinates = location.coordinates || {};
+    const gps = location.gps || {};
+    const nextLocation = {
+      floor: String(location.floor || "").trim(),
+      office: String(location.office || "").trim(),
+      checkpointId: String(location.checkpointId || "").trim(),
+      coordinates: {
+        x: Number.isFinite(Number(coordinates.x)) ? Number(coordinates.x) : null,
+        y: Number.isFinite(Number(coordinates.y)) ? Number(coordinates.y) : null,
+      },
+      gps: {
+        latitude: Number.isFinite(Number(gps.latitude)) ? Number(gps.latitude) : null,
+        longitude: Number.isFinite(Number(gps.longitude)) ? Number(gps.longitude) : null,
+        accuracy: Number.isFinite(Number(gps.accuracy)) ? Number(gps.accuracy) : null,
+        altitude: Number.isFinite(Number(gps.altitude)) ? Number(gps.altitude) : null,
+        heading: Number.isFinite(Number(gps.heading)) ? Number(gps.heading) : null,
+        speed: Number.isFinite(Number(gps.speed)) ? Number(gps.speed) : null,
+      },
+      source: String(location.source || "arduino_tap").trim(),
+      deviceId: String(metadata.deviceId || location.deviceId || "").trim(),
+      lastSeenAt: now,
+      isActive: this.status === "checked_in",
+    };
+
+    this.currentLocation = nextLocation;
+    this.locationHistory.push({
+      ...nextLocation,
+      tappedAt: now,
+    });
+
+    if (this.locationHistory.length > 50) {
+      this.locationHistory = this.locationHistory.slice(-50);
+    }
+
     return this;
   },
 
@@ -605,14 +842,12 @@ visitorSchema.statics = {
 
 // ============ Middleware ============
 // Update timestamp on save
-visitorSchema.pre('save', function(next) {
+visitorSchema.pre('save', function() {
   this.updatedAt = new Date();
-  next();
 });
 
-visitorSchema.pre('save', function(next) {
+visitorSchema.pre('save', function() {
   this.syncWorkflowState();
-  next();
 });
 
 // ============ Ensure Virtuals are Included in JSON ============

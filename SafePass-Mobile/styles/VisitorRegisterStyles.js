@@ -51,21 +51,21 @@ export default StyleSheet.create({
 
   header: {
     width: "100%",
-    paddingTop: Platform.select({ ios: 54, android: 42, web: 46 }),
-    paddingBottom: 42,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
+    paddingTop: Platform.select({ ios: 50, android: 36, web: 40 }),
+    paddingBottom: 28,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
     overflow: "hidden",
     ...Platform.select({
       ios: {
-        shadowColor: "#063B34",
+        shadowColor: "#041E42",
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.16,
         shadowRadius: 18,
       },
       android: { elevation: 7 },
       web: {
-        boxShadow: "0px 18px 40px rgba(6, 59, 52, 0.18)",
+        boxShadow: "0px 18px 40px rgba(4, 30, 66, 0.18)",
       },
     }),
   },
@@ -121,17 +121,17 @@ export default StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
     ...Platform.select({
       web: { backdropFilter: "blur(10px)" },
     }),
   },
   headerBadgeLogo: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: "#FFFFFF",
-    marginRight: 10,
+    marginRight: 8,
   },
   headerBadgeTextWrap: {
     justifyContent: "center",
@@ -149,14 +149,14 @@ export default StyleSheet.create({
     color: "#FFFFFF",
   },
   headerIconContainer: {
-    marginBottom: spacing.sm,
-    borderRadius: 36,
+    marginBottom: spacing.xs,
+    borderRadius: 28,
     overflow: "hidden",
   },
   headerIconGradient: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -166,23 +166,65 @@ export default StyleSheet.create({
     fontSize: fontSizes.xxl,
     fontWeight: "800",
     color: "#FFFFFF",
-    marginBottom: 6,
+    marginBottom: 4,
     textAlign: "center",
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
   headerSubtitle: {
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.base,
     color: "rgba(255,255,255,0.94)",
     fontWeight: "700",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   headerDescription: {
     fontSize: fontSizes.sm,
     color: "rgba(255,255,255,0.84)",
     textAlign: "center",
-    lineHeight: 22,
-    maxWidth: 540,
+    lineHeight: 20,
+    maxWidth: 500,
+  },
+  aviationStrip: {
+    width: "100%",
+    maxWidth: 420,
+    marginTop: spacing.base,
+    gap: spacing.sm,
+    alignItems: "center",
+  },
+  aviationChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  aviationChipText: {
+    color: "#FFFFFF",
+    fontSize: fontSizes.xs,
+    fontWeight: "700",
+  },
+  aviationRoute: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  aviationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+  },
+  aviationTrail: {
+    flex: 1,
+    maxWidth: 180,
+    height: 1,
+    backgroundColor: "rgba(214,231,255,0.5)",
   },
 
   progressContainer: {
@@ -191,7 +233,7 @@ export default StyleSheet.create({
     marginTop: -22,
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.base,
-    borderRadius: 20,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E4EDF7",
     ...Platform.select({
@@ -219,7 +261,7 @@ export default StyleSheet.create({
   progressPercentage: {
     fontSize: fontSizes.sm,
     fontWeight: "700",
-    color: "#047857",
+    color: "#0A3D91",
   },
   progressBarContainer: {
     height: 6,
@@ -229,8 +271,50 @@ export default StyleSheet.create({
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
     borderRadius: 999,
+  },
+  progressMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+    flexWrap: "wrap",
+  },
+  progressMetaText: {
+    fontSize: fontSizes.xs,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  progressChecklist: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  progressChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  progressChipComplete: {
+    backgroundColor: "#EEF5FF",
+    borderColor: "#B7D5F6",
+  },
+  progressChipText: {
+    fontSize: fontSizes.xs,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  progressChipTextComplete: {
+    color: "#0A3D91",
   },
 
   stepIndicatorContainer: {
@@ -239,7 +323,7 @@ export default StyleSheet.create({
     marginTop: spacing.base,
     paddingHorizontal: spacing.base,
     paddingVertical: spacing.base,
-    borderRadius: 20,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E4EDF7",
   },
@@ -257,7 +341,7 @@ export default StyleSheet.create({
     alignItems: "center",
   },
   stepCircleActive: {
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
   },
   stepCircleText: {
     fontSize: 14,
@@ -275,7 +359,7 @@ export default StyleSheet.create({
     borderRadius: 999,
   },
   stepConnectorActive: {
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
   },
   stepLabels: {
     flexDirection: "row",
@@ -288,7 +372,7 @@ export default StyleSheet.create({
     color: "#94A3B8",
   },
   stepLabelActive: {
-    color: "#047857",
+    color: "#0A3D91",
   },
 
   content: {
@@ -309,7 +393,7 @@ export default StyleSheet.create({
     fontSize: fontSizes.xl,
     fontWeight: "800",
     color: "#0F172A",
-    letterSpacing: -0.4,
+    letterSpacing: 0,
     marginBottom: 4,
   },
   sectionDescription: {
@@ -321,18 +405,18 @@ export default StyleSheet.create({
   sectionBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 999,
     gap: 4,
     borderWidth: 1,
-    borderColor: "#CFF4E5",
+    borderColor: "#B7D5F6",
   },
   sectionBadgeText: {
     fontSize: fontSizes.xs,
     fontWeight: "700",
-    color: "#047857",
+    color: "#0A3D91",
   },
   formGrid: {
     gap: spacing.base,
@@ -340,21 +424,21 @@ export default StyleSheet.create({
   },
 
   stepInsightCard: {
-    backgroundColor: "#F7FFFA",
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
-    borderColor: "#CDEEDF",
-    borderRadius: 22,
+    borderColor: "#D8E8FF",
+    borderRadius: 8,
     padding: spacing.base,
     marginBottom: spacing.base,
     ...Platform.select({
       ios: {
-        shadowColor: "#047857",
+        shadowColor: "#0A3D91",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
         shadowRadius: 10,
       },
       android: { elevation: 1 },
-      web: { boxShadow: "0px 10px 22px rgba(5, 150, 105, 0.06)" },
+      web: { boxShadow: "0px 10px 22px rgba(10, 61, 145, 0.08)" },
     }),
   },
   stepInsightHeader: {
@@ -366,7 +450,7 @@ export default StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: "#DDF8EA",
+    backgroundColor: "#D8E8FF",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -376,7 +460,7 @@ export default StyleSheet.create({
   stepInsightTitle: {
     fontSize: fontSizes.base,
     fontWeight: "800",
-    color: "#065F46",
+    color: "#041E42",
     marginBottom: 4,
   },
   stepInsightSubtitle: {
@@ -457,7 +541,7 @@ export default StyleSheet.create({
 
   formCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
+    borderRadius: 8,
     padding: spacing.base,
     borderWidth: 1,
     borderColor: "#E4EDF7",
@@ -473,7 +557,7 @@ export default StyleSheet.create({
     }),
   },
   formCardFocused: {
-    borderColor: "#059669",
+    borderColor: "#0A3D91",
     borderWidth: 2,
   },
   formCardError: {
@@ -530,13 +614,13 @@ export default StyleSheet.create({
     backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2EAF2",
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: spacing.base,
     minHeight: 52,
     gap: spacing.xs,
   },
   inputContainerFocused: {
-    borderColor: "#059669",
+    borderColor: "#0A3D91",
     borderWidth: 2,
     backgroundColor: "#FFFFFF",
   },
@@ -550,6 +634,14 @@ export default StyleSheet.create({
     color: "#0F172A",
     paddingVertical: 12,
   },
+  passwordToggleButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
   errorText: {
     fontSize: fontSizes.xs,
     color: "#DC2626",
@@ -557,26 +649,62 @@ export default StyleSheet.create({
     marginLeft: spacing.xs,
     fontWeight: "600",
   },
+  passwordChecklist: {
+    marginTop: spacing.sm,
+    gap: 6,
+  },
+  passwordChecklistRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  passwordChecklistText: {
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  passwordChecklistTextComplete: {
+    color: "#166534",
+  },
   inputHint: {
     fontSize: fontSizes.xs,
     color: "#64748B",
     marginTop: 4,
   },
 
+  otherPurposeInput: {
+    minHeight: 92,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: "#D7E3EE",
+    borderRadius: 8,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: spacing.base,
+    paddingVertical: 12,
+    fontSize: fontSizes.base,
+    color: "#0F172A",
+    lineHeight: 22,
+  },
+
+  otherPurposeInputError: {
+    borderColor: "#EF4444",
+    backgroundColor: "#FEF2F2",
+  },
+
   uploadArea: {
-    borderRadius: 18,
+    borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#F8FBFE",
     borderWidth: 2,
-    borderColor: "#DCE8E2",
+    borderColor: "#D8E8FF",
     borderStyle: "dashed",
     minHeight: 176,
     ...(isWeb && {
       cursor: "pointer",
       transition: "border-color 0.2s ease, background-color 0.2s ease",
       ":hover": {
-        borderColor: "#059669",
-        backgroundColor: "#ECFDF5",
+        borderColor: "#0A3D91",
+        backgroundColor: "#EEF5FF",
       },
     }),
   },
@@ -593,7 +721,7 @@ export default StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: spacing.sm,
@@ -642,7 +770,7 @@ export default StyleSheet.create({
   },
 
   scanButton: {
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: "hidden",
     marginTop: spacing.sm,
     ...(isWeb && {
@@ -666,17 +794,17 @@ export default StyleSheet.create({
   },
   scanningContainer: {
     backgroundColor: "#F8FBFE",
-    borderRadius: 16,
+    borderRadius: 8,
     padding: spacing.base,
     marginTop: spacing.sm,
     alignItems: "center",
     gap: spacing.xs,
     borderWidth: 1,
-    borderColor: "#DCE8E2",
+    borderColor: "#D8E8FF",
   },
   scanningText: {
     fontSize: fontSizes.sm,
-    color: "#047857",
+    color: "#0A3D91",
     fontWeight: "600",
   },
   scanProgressContainer: {
@@ -688,7 +816,7 @@ export default StyleSheet.create({
   },
   scanProgressBar: {
     height: "100%",
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
     borderRadius: 999,
   },
 
@@ -699,7 +827,7 @@ export default StyleSheet.create({
     backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2EAF2",
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: spacing.base,
     paddingVertical: 15,
     minHeight: 52,
@@ -707,8 +835,8 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "border-color 0.2s ease, background-color 0.2s ease",
       ":hover": {
-        borderColor: "#059669",
-        backgroundColor: "#ECFDF5",
+        borderColor: "#0A3D91",
+        backgroundColor: "#EEF5FF",
       },
     }),
   },
@@ -716,6 +844,16 @@ export default StyleSheet.create({
     fontSize: fontSizes.base,
     color: "#0F172A",
     flex: 1,
+  },
+  dropdownButtonContent: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  dropdownButtonMeta: {
+    marginTop: 3,
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    fontWeight: "600",
   },
   dropdownButtonPlaceholder: {
     color: "#94A3B8",
@@ -761,14 +899,24 @@ export default StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   pickerModalOptionActive: {
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
   },
   pickerModalOptionText: {
     fontSize: fontSizes.base,
     color: "#0F172A",
   },
+  pickerModalOptionContent: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  pickerModalOptionMeta: {
+    marginTop: 3,
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    fontWeight: "600",
+  },
   pickerModalOptionTextActive: {
-    color: "#059669",
+    color: "#0A3D91",
     fontWeight: "700",
   },
 
@@ -797,8 +945,8 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "border-color 0.2s ease, background-color 0.2s ease",
       ":hover": {
-        borderColor: "#059669",
-        backgroundColor: "#ECFDF5",
+        borderColor: "#0A3D91",
+        backgroundColor: "#EEF5FF",
       },
     }),
   },
@@ -833,7 +981,7 @@ export default StyleSheet.create({
 
   reviewCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
+    borderRadius: 8,
     padding: spacing.base,
     marginBottom: spacing.base,
     borderWidth: 1,
@@ -883,7 +1031,7 @@ export default StyleSheet.create({
   editButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 999,
@@ -892,7 +1040,7 @@ export default StyleSheet.create({
       cursor: "pointer",
       transition: "background-color 0.2s ease, transform 0.2s ease",
       ":hover": {
-        backgroundColor: "#D1FAE5",
+        backgroundColor: "#EEF5FF",
         transform: "translateY(-1px)",
       },
     }),
@@ -900,12 +1048,12 @@ export default StyleSheet.create({
   editButtonText: {
     fontSize: fontSizes.xs,
     fontWeight: "700",
-    color: "#059669",
+    color: "#0A3D91",
   },
 
   continueButton: {
     flex: 1.35,
-    borderRadius: 18,
+    borderRadius: 8,
     overflow: "hidden",
     marginBottom: spacing.base,
     ...(isWeb && {
@@ -913,7 +1061,7 @@ export default StyleSheet.create({
       transition: "transform 0.2s ease, box-shadow 0.2s ease",
       ":hover": {
         transform: "translateY(-2px)",
-        boxShadow: "0px 10px 24px rgba(5, 150, 105, 0.28)",
+        boxShadow: "0px 10px 24px rgba(10, 61, 145, 0.24)",
       },
     }),
   },
@@ -940,7 +1088,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xs,
-    borderRadius: 18,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#D6E0EA",
     backgroundColor: "#FFFFFF",
@@ -952,7 +1100,7 @@ export default StyleSheet.create({
         cursor: "pointer",
         transition: "transform 0.2s ease, background-color 0.2s ease",
         ":hover": {
-          backgroundColor: "#F8FAFC",
+          backgroundColor: "#F8FBFE",
           transform: "translateY(-1px)",
         },
       },
@@ -976,10 +1124,13 @@ export default StyleSheet.create({
     borderRadius: 28,
     width: "90%",
     maxWidth: 520,
-    maxHeight: "82%",
+    maxHeight: "88%",
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E4EDF7",
+    ...(isWeb && {
+      boxShadow: "0px 18px 40px rgba(15, 23, 42, 0.18)",
+    }),
   },
   privacyModalHeader: {
     padding: spacing.lg,
@@ -1010,10 +1161,11 @@ export default StyleSheet.create({
     fontSize: fontSizes.sm,
     color: "#64748B",
     textAlign: "center",
+    lineHeight: 22,
   },
   privacyModalContent: {
     padding: spacing.lg,
-    maxHeight: 400,
+    maxHeight: 320,
   },
   privacySection: {
     marginBottom: spacing.lg,
@@ -1038,33 +1190,45 @@ export default StyleSheet.create({
   },
   privacyCheckboxContainer: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     padding: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
     backgroundColor: "#F8FBFE",
+  },
+  privacyCheckboxRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.base,
+    paddingBottom: spacing.base,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    backgroundColor: "#F8FBFE",
+    gap: spacing.sm,
   },
   privacyCheckbox: {
     width: 22,
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#059669",
+    borderColor: "#0A3D91",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: spacing.sm,
     backgroundColor: "#FFFFFF",
+    marginTop: 1,
   },
   privacyCheckboxChecked: {
-    backgroundColor: "#059669",
+    backgroundColor: "#0A3D91",
   },
   privacyCheckboxText: {
     fontSize: fontSizes.sm,
     color: "#475569",
     flex: 1,
+    lineHeight: 21,
   },
   privacyLinkText: {
-    color: "#059669",
+    color: "#0A3D91",
     fontWeight: "700",
   },
   privacyModalActions: {
@@ -1073,6 +1237,15 @@ export default StyleSheet.create({
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+  },
+  privacyButtonRow: {
+    flexDirection: "row",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+    gap: spacing.sm,
+    backgroundColor: "#FFFFFF",
   },
   privacyDeclineButton: {
     flex: 1,
@@ -1080,16 +1253,27 @@ export default StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#F1F5F9",
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
   },
   privacyDeclineText: {
     fontSize: fontSizes.base,
     fontWeight: "700",
     color: "#64748B",
   },
+  privacyDeclineButtonText: {
+    fontSize: fontSizes.base,
+    fontWeight: "700",
+    color: "#64748B",
+  },
   privacyAcceptButton: {
-    flex: 2,
+    flex: 1,
     borderRadius: 14,
     overflow: "hidden",
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0A3D91",
   },
   privacyAcceptButtonDisabled: {
     opacity: 0.6,
@@ -1102,6 +1286,11 @@ export default StyleSheet.create({
     gap: spacing.xs,
   },
   privacyAcceptText: {
+    fontSize: fontSizes.base,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  privacyAcceptButtonText: {
     fontSize: fontSizes.base,
     fontWeight: "700",
     color: "#FFFFFF",
@@ -1155,7 +1344,7 @@ export default StyleSheet.create({
   credentialsTitle: {
     fontSize: fontSizes.base,
     fontWeight: "700",
-    color: "#059669",
+    color: "#0A3D91",
   },
   credentialsTitleRow: {
     flexDirection: "row",
@@ -1193,12 +1382,65 @@ export default StyleSheet.create({
   copyButton: {
     padding: spacing.xs,
     borderRadius: 10,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#EEF5FF",
+  },
+  otpVerifyBox: {
+    width: "100%",
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#DCE7F3",
+    borderRadius: 8,
+    padding: spacing.base,
+    marginBottom: spacing.base,
+  },
+  otpInput: {
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    paddingHorizontal: spacing.base,
+    paddingVertical: Platform.select({ ios: 14, android: 12, web: 12 }),
+    fontSize: fontSizes.lg,
+    fontWeight: "800",
+    letterSpacing: 4,
+    color: "#0F172A",
+    textAlign: "center",
+    backgroundColor: "#FFFFFF",
+    ...(Platform.OS === "web" ? { outlineStyle: "none" } : {}),
+  },
+  otpInputError: {
+    borderColor: "#DC2626",
+    backgroundColor: "#FEF2F2",
+  },
+  otpHintText: {
+    marginTop: spacing.xs,
+    fontSize: fontSizes.xs,
+    color: "#64748B",
+    lineHeight: 18,
+  },
+  otpErrorText: {
+    marginTop: spacing.xs,
+    fontSize: fontSizes.xs,
+    color: "#DC2626",
+    fontWeight: "600",
+  },
+  resendOtpButton: {
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  resendOtpButtonText: {
+    textAlign: "center",
+    color: "#0A3D91",
+    fontSize: fontSizes.sm,
+    fontWeight: "800",
   },
   successButton: {
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: "hidden",
     width: "100%",
+  },
+  successButtonMuted: {
+    opacity: 0.9,
   },
   successGradient: {
     flexDirection: "row",
