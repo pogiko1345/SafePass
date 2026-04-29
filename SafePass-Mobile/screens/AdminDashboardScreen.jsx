@@ -819,6 +819,25 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   };
 
   const normalizeFilterValue = (value) => String(value || "").trim().toLowerCase();
+  const normalizeSearchValue = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  const recordMatchesSearch = (record = {}, query = "", fields = []) => {
+    const normalizedQuery = normalizeSearchValue(query);
+    if (!normalizedQuery) return true;
+
+    const tokens = normalizedQuery.split(" ").filter(Boolean);
+    const haystack = fields
+      .map((field) => (typeof field === "function" ? field(record) : record?.[field]))
+      .flat()
+      .filter((value) => value !== undefined && value !== null)
+      .map((value) => normalizeSearchValue(value))
+      .join(" ");
+
+    return tokens.every((token) => haystack.includes(token));
+  };
 
   // User Management States
   const [allUsers, setAllUsers] = useState([]);
@@ -844,6 +863,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
 
   // Modal States
   const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
+  const [officeEditValue, setOfficeEditValue] = useState("");
+  const [isUpdatingOffice, setIsUpdatingOffice] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -1051,23 +1072,27 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       });
     }
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (r) => {
-          const dateValues = [r.visitDate, r.createdAt, r.updatedAt]
+      filtered = filtered.filter((r) =>
+        recordMatchesSearch(r, searchQuery, [
+          "fullName",
+          "email",
+          "phoneNumber",
+          "purposeOfVisit",
+          "purposeCategory",
+          "customPurposeOfVisit",
+          "assignedOffice",
+          "appointmentDepartment",
+          "host",
+          "status",
+          "approvalStatus",
+          "appointmentStatus",
+          "nfcCardId",
+          "safePassId",
+          (record) => getRequestStatus(record),
+          (record) => [record.visitDate, record.visitTime, record.createdAt, record.updatedAt]
             .filter(Boolean)
-            .map((dateValue) => formatDateTime(dateValue).toLowerCase());
-
-          return (
-            r.fullName?.toLowerCase().includes(query) ||
-            r.email?.toLowerCase().includes(query) ||
-            r.phoneNumber?.includes(query) ||
-            r.purposeOfVisit?.toLowerCase().includes(query) ||
-            r.assignedOffice?.toLowerCase().includes(query) ||
-            r.host?.toLowerCase().includes(query) ||
-            dateValues.some((dateValue) => dateValue.includes(query))
-          );
-        },
+            .map((dateValue) => formatDateTime(dateValue)),
+        ]),
       );
     }
     return filtered.sort((a, b) => {
@@ -1113,18 +1138,20 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
 
     if (userSearchQuery.trim()) {
-      const query = userSearchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (u) =>
-          u.firstName?.toLowerCase().includes(query) ||
-          u.lastName?.toLowerCase().includes(query) ||
-          `${u.firstName || ""} ${u.lastName || ""}`.trim().toLowerCase().includes(query) ||
-          u.username?.toLowerCase().includes(query) ||
-          u.email?.toLowerCase().includes(query) ||
-          u.phone?.includes(query) ||
-          u.department?.toLowerCase().includes(query) ||
-          u.employeeId?.toLowerCase().includes(query) ||
-          u.role?.toLowerCase().includes(query),
+      filtered = filtered.filter((u) =>
+        recordMatchesSearch(u, userSearchQuery, [
+          "firstName",
+          "lastName",
+          "username",
+          "email",
+          "phone",
+          "department",
+          "employeeId",
+          "role",
+          "status",
+          "nfcCardId",
+          (userItem) => `${userItem.firstName || ""} ${userItem.lastName || ""}`,
+        ]),
       );
     }
 
@@ -1363,19 +1390,21 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
 
     if (userSearchQuery.trim()) {
-      const query = userSearchQuery.trim().toLowerCase();
-      filtered = filtered.filter((userItem) => {
-        const fullName = `${userItem.firstName || ""} ${userItem.lastName || ""}`.trim().toLowerCase();
-        return (
-          fullName.includes(query) ||
-          String(userItem.username || "").toLowerCase().includes(query) ||
-          String(userItem.email || "").toLowerCase().includes(query) ||
-          String(userItem.phone || "").includes(query) ||
-          String(userItem.department || "").toLowerCase().includes(query) ||
-          String(userItem.employeeId || "").toLowerCase().includes(query) ||
-          String(userItem.role || "").toLowerCase().includes(query)
-        );
-      });
+      filtered = filtered.filter((userItem) =>
+        recordMatchesSearch(userItem, userSearchQuery, [
+          "firstName",
+          "lastName",
+          "username",
+          "email",
+          "phone",
+          "department",
+          "employeeId",
+          "role",
+          "status",
+          "nfcCardId",
+          (item) => `${item.firstName || ""} ${item.lastName || ""}`,
+        ]),
+      );
     }
 
     return filtered.sort((a, b) => {
@@ -1668,7 +1697,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     let filtered = [...visitorHistory];
     
     if (historyFilter !== "all") {
-      filtered = filtered.filter(v => v.status === historyFilter);
+      filtered = filtered.filter(v =>
+        historyFilter === "reported"
+          ? v.reportType === "security_report"
+          : getRequestStatus(v) === historyFilter || v.status === historyFilter,
+      );
     }
 
     if (historyDateFilter !== "all") {
@@ -1682,15 +1715,25 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
     
     if (historySearchQuery.trim()) {
-      const query = historySearchQuery.toLowerCase();
-      filtered = filtered.filter(v =>
-        v.fullName?.toLowerCase().includes(query) ||
-        v.email?.toLowerCase().includes(query) ||
-        v.purposeOfVisit?.toLowerCase().includes(query) ||
-        v.assignedOffice?.toLowerCase().includes(query) ||
-        v.host?.toLowerCase().includes(query) ||
-        v.status?.toLowerCase().includes(query) ||
-        formatDateTime(v.visitDate || v.createdAt).toLowerCase().includes(query)
+      filtered = filtered.filter((v) =>
+        recordMatchesSearch(v, historySearchQuery, [
+          "fullName",
+          "email",
+          "purposeOfVisit",
+          "assignedOffice",
+          "appointmentDepartment",
+          "host",
+          "status",
+          "approvalStatus",
+          "appointmentStatus",
+          "reportReason",
+          "reporterName",
+          "reportType",
+          "nfcCardId",
+          "safePassId",
+          (visitor) => getRequestStatus(visitor),
+          (visitor) => formatDateTime(visitor.visitDate || visitor.createdAt || visitor.reportedAt),
+        ]),
       ); 
     }
     
@@ -1714,11 +1757,12 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
 
   const getHistoryStats = useCallback(() => {
     const total = visitorHistory.length;
-    const approved = visitorHistory.filter(v => v.status === "approved").length;
-    const pending = visitorHistory.filter(v => v.status === "pending").length;
-    const rejected = visitorHistory.filter(v => v.status === "rejected").length;
+    const approved = visitorHistory.filter(v => getRequestStatus(v) === "approved").length;
+    const pending = visitorHistory.filter(v => getRequestStatus(v) === "pending").length;
+    const rejected = visitorHistory.filter(v => getRequestStatus(v) === "rejected").length;
     const checkedIn = visitorHistory.filter(v => v.status === "checked_in").length;
     const checkedOut = visitorHistory.filter(v => v.status === "checked_out").length;
+    const reported = visitorHistory.filter(v => v.reportType === "security_report").length;
     const uniqueEmails = new Set(visitorHistory.map(v => v.email).filter(Boolean)).size;
     
     const monthlyData = {};
@@ -1729,13 +1773,102 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       }
     });
     
-    return { total, approved, pending, rejected, checkedIn, checkedOut, uniqueEmails, monthlyData };
+    return {
+      total,
+      totalVisits: total,
+      approved,
+      pending,
+      pendingVisits: pending,
+      rejected,
+      rejectedVisits: rejected,
+      checkedIn,
+      checkedOut,
+      completedVisits: checkedOut,
+      reported,
+      uniqueEmails,
+      monthlyData,
+    };
   }, [visitorHistory]);
 
   const loadVisitorHistory = useCallback(() => {
-    const sortedVisitors = [...visitRequests].sort((a, b) => new Date(b.visitDate) - new Date(a.visitDate));
+    const reportRows = visitRequests.flatMap((visitor) =>
+      (visitor.reports || []).map((report) => {
+        const reporter = report.reportedBy || {};
+        const reporterName = [reporter.firstName, reporter.lastName].filter(Boolean).join(" ") ||
+          reporter.email ||
+          "Security";
+        return {
+          ...visitor,
+          _id: `${visitor._id || visitor.id}-report-${report._id || report.reportedAt || report.reason}`,
+          sourceVisitorId: visitor._id || visitor.id,
+          status: "reported",
+          reportType: "security_report",
+          reportReason: report.reason || "Security report",
+          reporterName,
+          reportedAt: report.reportedAt,
+          resolved: report.resolved,
+          createdAt: report.reportedAt || visitor.updatedAt || visitor.createdAt,
+        };
+      }),
+    );
+    const sortedVisitors = [...visitRequests, ...reportRows].sort((a, b) =>
+      new Date(b.reportedAt || b.visitDate || b.createdAt || 0) -
+      new Date(a.reportedAt || a.visitDate || a.createdAt || 0),
+    );
     setVisitorHistory(sortedVisitors);
   }, [visitRequests]);
+
+  const handleSaveAppointmentOffice = async () => {
+    const visitorId = selectedRequest?._id || selectedRequest?.id || selectedRequest?.sourceVisitorId;
+    const office = String(officeEditValue || "").trim();
+
+    if (!visitorId) {
+      Alert.alert("Missing Visitor", "Please select an appointment record first.");
+      return;
+    }
+
+    if (!office) {
+      Alert.alert("Office Required", "Please enter the office or department for this appointment.");
+      return;
+    }
+
+    setIsUpdatingOffice(true);
+    try {
+      const response = await ApiService.updateVisitorAppointmentOffice(visitorId, office);
+      if (response?.success) {
+        const updatedVisitor = response.visitor;
+        setSelectedRequest((current) => ({
+          ...(current || {}),
+          ...(updatedVisitor || {}),
+          assignedOffice: office,
+          appointmentDepartment: office,
+          host: office,
+        }));
+        setVisitRequests((currentRequests) =>
+          currentRequests.map((request) =>
+            String(request._id || request.id) === String(visitorId)
+              ? {
+                  ...request,
+                  ...(updatedVisitor || {}),
+                  assignedOffice: office,
+                  appointmentDepartment: office,
+                  host: office,
+                }
+              : request,
+          ),
+        );
+        publishAdminNotice("success", "Appointment office updated", `${selectedRequest?.fullName || "Visitor"} is now assigned to ${office}.`);
+        return;
+      }
+
+      Alert.alert("Update Failed", response?.message || "Failed to update appointment office.");
+    } catch (error) {
+      console.error("Update appointment office error:", error);
+      Alert.alert("Update Failed", error?.message || "Failed to update appointment office.");
+    } finally {
+      setIsUpdatingOffice(false);
+    }
+  };
 
   const getVisitorSafePassId = (visitor = {}) =>
     visitor.nfcCardId ||
@@ -6312,7 +6445,10 @@ const loadDashboardData = useCallback(async () => {
             title: "Search Appointment Records",
             subtitle: "Manual lookup for a visitor name, office, purpose, phone, email, or exact date.",
             value: requestSearchTerm,
-            onChangeText: setRequestSearchTerm,
+            onChangeText: (value) => {
+              setRequestSearchTerm(value);
+              setSearchQuery(value.trim());
+            },
             onApply: () => setSearchQuery(requestSearchTerm.trim()),
             onClear: () => {
               setRequestSearchTerm("");
@@ -6426,7 +6562,7 @@ const loadDashboardData = useCallback(async () => {
                 width: 170,
                 render: (request) => (
                   <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
-                    {request.assignedOffice || request.host || "-"}
+                    {request.assignedOffice || request.appointmentDepartment || request.host || "-"}
                   </Text>
                 ),
               },
@@ -6455,6 +6591,7 @@ const loadDashboardData = useCallback(async () => {
                       style={[styles.adminTableActionButton, { borderColor: "rgba(59,130,246,0.24)", backgroundColor: "rgba(59,130,246,0.12)" }]}
                       onPress={() => {
                         setSelectedRequest(request);
+                        setOfficeEditValue(request.assignedOffice || request.appointmentDepartment || request.host || "");
                         setShowRequestDetailsModal(true);
                       }}
                     >
@@ -6482,6 +6619,16 @@ const loadDashboardData = useCallback(async () => {
                         </TouchableOpacity>
                       </>
                     ) : null}
+                    <TouchableOpacity
+                      style={[styles.adminTableActionButton, { borderColor: "rgba(245,158,11,0.24)", backgroundColor: "rgba(245,158,11,0.12)" }]}
+                      onPress={() => {
+                        setSelectedRequest(request);
+                        setOfficeEditValue(request.assignedOffice || request.appointmentDepartment || request.host || "");
+                        setShowRequestDetailsModal(true);
+                      }}
+                    >
+                      <Text style={[styles.adminTableActionText, { color: "#B45309" }]}>Office</Text>
+                    </TouchableOpacity>
                   </View>
                 ),
               },
@@ -6521,7 +6668,8 @@ const loadDashboardData = useCallback(async () => {
                 { label: "Total History", value: historyStats.totalVisits, color: "#0A3D91" },
                 { label: "Completed", value: historyStats.completedVisits, color: "#10B981" },
                 { label: "Pending", value: historyStats.pendingVisits, color: "#F59E0B" },
-                { label: "Rejected", value: historyStats.rejectedVisits, color: "#EF4444" },
+                { label: "Rejected", value: historyStats.rejected, color: "#EF4444" },
+                { label: "Security Reports", value: historyStats.reported, color: "#DC2626" },
               ].map((item) => (
                 <View
                   key={item.label}
@@ -6565,8 +6713,10 @@ const loadDashboardData = useCallback(async () => {
                   label: "Purpose",
                   width: 210,
                   render: (visitor) => (
-                    <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
-                      {visitor.purposeOfVisit || "-"}
+                  <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                      {visitor.reportType === "security_report"
+                        ? `Reported: ${visitor.reportReason || "-"}`
+                        : visitor.purposeOfVisit || "-"}
                     </Text>
                   ),
                 },
@@ -6585,7 +6735,9 @@ const loadDashboardData = useCallback(async () => {
                   label: "Status",
                   width: 120,
                   render: (visitor) => {
-                    const statusInfo = getStatusColor(getRequestStatus(visitor));
+                    const statusInfo = visitor.reportType === "security_report"
+                      ? { bg: "rgba(220,38,38,0.12)", text: "#DC2626", label: "Reported" }
+                      : getStatusColor(getRequestStatus(visitor));
                     return (
                       <View style={[styles.dashboardStatusBadge, { backgroundColor: statusInfo.bg, alignSelf: "flex-start" }]}>
                         <Text style={[styles.dashboardStatusText, { color: statusInfo.text }]}>
@@ -6601,7 +6753,17 @@ const loadDashboardData = useCallback(async () => {
                   width: 170,
                   render: (visitor) => (
                     <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
-                      {formatDateTime(visitor.visitDate || visitor.createdAt)}
+                      {formatDateTime(visitor.reportedAt || visitor.visitDate || visitor.createdAt)}
+                    </Text>
+                  ),
+                },
+                {
+                  key: "reporter",
+                  label: "Reporter",
+                  width: 160,
+                  render: (visitor) => (
+                    <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                      {visitor.reportType === "security_report" ? visitor.reporterName || "Security" : "-"}
                     </Text>
                   ),
                 },
@@ -6690,6 +6852,7 @@ const loadDashboardData = useCallback(async () => {
       { key: "checked_in", label: "Checked In" },
       { key: "checked_out", label: "Checked Out" },
       { key: "rejected", label: "Rejected" },
+      { key: "reported", label: "Reported" },
     ];
 
     return (
@@ -7907,6 +8070,41 @@ const loadDashboardData = useCallback(async () => {
                 <View style={[styles.detailSection, isDarkMode && { borderBottomColor: theme.borderColor }]}>
                   <Text style={[styles.detailLabel, isDarkMode && styles.darkTextSecondary]}>Purpose of Visit</Text>
                   <Text style={[styles.detailValue, isDarkMode && styles.darkText]}>{selectedRequest.purposeOfVisit}</Text>
+                </View>
+                <View style={[styles.detailSection, isDarkMode && { borderBottomColor: theme.borderColor }]}>
+                  <Text style={[styles.detailLabel, isDarkMode && styles.darkTextSecondary]}>Office / Department</Text>
+                  <Text style={[styles.detailValue, isDarkMode && styles.darkText]}>
+                    {selectedRequest.assignedOffice || selectedRequest.appointmentDepartment || selectedRequest.host || "Unassigned"}
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.rejectInput,
+                      {
+                        minHeight: 46,
+                        marginTop: 10,
+                        textAlignVertical: "center",
+                      },
+                      isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                    ]}
+                    placeholder="Update office shown in visitor appointment"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    value={officeEditValue}
+                    onChangeText={setOfficeEditValue}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.submitButton,
+                      { alignSelf: "flex-start", marginTop: 10, backgroundColor: "#F59E0B" },
+                    ]}
+                    onPress={handleSaveAppointmentOffice}
+                    disabled={isUpdatingOffice}
+                  >
+                    {isUpdatingOffice ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Save Office</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
                 <View style={[styles.detailSection, isDarkMode && { borderBottomColor: theme.borderColor }]}>
                   <Text style={[styles.detailLabel, isDarkMode && styles.darkTextSecondary]}>Visit Date & Time</Text>

@@ -186,6 +186,8 @@ const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/sapphire_aviation";
 const FRONTEND_URL =
   process.env.FRONTEND_URL || "https://sapphiresafepass2.vercel.app";
+const maskMongoUri = (uri = "") =>
+  String(uri).replace(/\/\/([^:]+):([^@]+)@/, "//$1:***@");
 
 let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
 
@@ -202,7 +204,7 @@ const connectToDatabase = () => {
       })
       .catch((err) => {
         console.error("❌ MongoDB Connection Error:", err);
-        console.log("Trying to connect to:", MONGODB_URI);
+        console.log("Trying to connect to:", maskMongoUri(MONGODB_URI));
         mongoConnectionPromise = null;
         global.__safepassMongoConnectionPromise = null;
         throw err;
@@ -2933,7 +2935,8 @@ app.get("/api/admin/visitors", authMiddleware, async (req, res) => {
     const visitors = await Visitor.find(query)
       .sort({ registeredAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .populate("reports.reportedBy", "firstName lastName email role department");
 
     const total = await Visitor.countDocuments(query);
     const visitorsWithSafePassIds = await attachSafePassIdsToVisitors(visitors);
@@ -2952,6 +2955,66 @@ app.get("/api/admin/visitors", authMiddleware, async (req, res) => {
   } catch (error) {
     console.error("Get all visitors error:", error);
     res.status(500).json({ success: false, message: "Failed to get visitors" });
+  }
+});
+
+app.put("/api/admin/visitors/:id/appointment-office", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const office = String(
+      req.body?.office ||
+      req.body?.appointmentDepartment ||
+      req.body?.assignedOffice ||
+      "",
+    ).trim();
+
+    if (!office) {
+      return res.status(400).json({
+        success: false,
+        message: "Office or department is required.",
+      });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Visitor not found" });
+    }
+
+    const previousOffice = visitor.appointmentDepartment || visitor.assignedOffice || visitor.host || "";
+    visitor.appointmentDepartment = office;
+    visitor.assignedOffice = office;
+    visitor.host = office;
+    visitor.updatedAt = new Date();
+    await visitor.save();
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      activityType: "admin_updated_appointment_office",
+      status: "granted",
+      location: office,
+      notes: `${getFullName(req.user)} updated ${visitor.fullName}'s appointment office from ${previousOffice || "Unassigned"} to ${office}.`,
+      metadata: {
+        previousOffice,
+        office,
+      },
+    });
+
+    const [visitorPayload] = await attachSafePassIdsToVisitors([visitor]);
+    res.json({
+      success: true,
+      message: "Appointment office updated successfully.",
+      visitor: visitorPayload,
+    });
+  } catch (error) {
+    console.error("Update appointment office error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update appointment office.",
+    });
   }
 });
 

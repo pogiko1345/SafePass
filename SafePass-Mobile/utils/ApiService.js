@@ -1644,6 +1644,22 @@ generateRandomPassword(length = 10) {
     }
   }
 
+  async updateVisitorAppointmentOffice(visitorId, office) {
+    try {
+      return await this.fetch(`/admin/visitors/${visitorId}/appointment-office`, {
+        method: "PUT",
+        body: {
+          office,
+          appointmentDepartment: office,
+          assignedOffice: office,
+        },
+      });
+    } catch (error) {
+      console.error("Update visitor appointment office error:", error);
+      throw error;
+    }
+  }
+
   async deleteVisitor(visitorId) {
     try {
       return await this.fetch(`/visitors/${visitorId}`, {

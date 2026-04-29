@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
-  RefreshControl,
   Image,
   Platform,
   StatusBar,
@@ -250,7 +249,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [appointmentFeedback, setAppointmentFeedback] = useState(null);
   const [appointmentHistory, setAppointmentHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showAppointmentDatePicker, setShowAppointmentDatePicker] = useState(false);
   const [showAppointmentTimePicker, setShowAppointmentTimePicker] = useState(false);
@@ -867,7 +865,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       }
     } finally {
       setIsLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -1176,11 +1173,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     } catch (error) {
       console.error("Stop NFC error:", error);
     }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadVisitorData();
   };
 
   const getValidDate = (dateString) => {
@@ -4371,9 +4363,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         nestedScrollEnabled
         overScrollMode="always"
         persistentScrollbar={Platform.OS === "android"}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#0A3D91"]} />
-        }
       >
         <View
           style={[
