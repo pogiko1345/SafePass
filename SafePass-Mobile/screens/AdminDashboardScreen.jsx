@@ -285,6 +285,25 @@ const formatTime = (date) => {
   });
 };
 
+const formatDateInputValue = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatTimeInputValue = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
+
 const formatDate = (date) => {
   if (!date) return "N/A";
   const d = new Date(date);
@@ -864,6 +883,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   // Modal States
   const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
   const [officeEditValue, setOfficeEditValue] = useState("");
+  const [appointmentEditDateValue, setAppointmentEditDateValue] = useState("");
+  const [appointmentEditTimeValue, setAppointmentEditTimeValue] = useState("");
   const [isUpdatingOffice, setIsUpdatingOffice] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -1821,6 +1842,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const handleSaveAppointmentOffice = async () => {
     const visitorId = selectedRequest?._id || selectedRequest?.id || selectedRequest?.sourceVisitorId;
     const office = String(officeEditValue || "").trim();
+    const visitDate = String(appointmentEditDateValue || "").trim();
+    const visitTime = String(appointmentEditTimeValue || "").trim();
 
     if (!visitorId) {
       Alert.alert("Missing Visitor", "Please select an appointment record first.");
@@ -1832,9 +1855,25 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
+    if (visitDate && !/^\d{4}-\d{2}-\d{2}$/.test(visitDate)) {
+      Alert.alert("Invalid Date", "Please use YYYY-MM-DD for the visit date.");
+      return;
+    }
+
+    if (visitTime && !/^\d{1,2}:\d{2}$/.test(visitTime)) {
+      Alert.alert("Invalid Time", "Please use HH:MM for the visit time.");
+      return;
+    }
+
     setIsUpdatingOffice(true);
     try {
-      const response = await ApiService.updateVisitorAppointmentOffice(visitorId, office);
+      const response = await ApiService.updateVisitorAppointmentOffice(visitorId, {
+        office,
+        appointmentDepartment: office,
+        assignedOffice: office,
+        visitDate: visitDate || undefined,
+        visitTime: visitTime || undefined,
+      });
       if (response?.success) {
         const updatedVisitor = response.visitor;
         setSelectedRequest((current) => ({
@@ -1843,6 +1882,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           assignedOffice: office,
           appointmentDepartment: office,
           host: office,
+          visitDate: updatedVisitor?.visitDate || current?.visitDate,
+          visitTime: updatedVisitor?.visitTime || current?.visitTime,
         }));
         setVisitRequests((currentRequests) =>
           currentRequests.map((request) =>
@@ -1853,11 +1894,13 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
                   assignedOffice: office,
                   appointmentDepartment: office,
                   host: office,
+                  visitDate: updatedVisitor?.visitDate || request.visitDate,
+                  visitTime: updatedVisitor?.visitTime || request.visitTime,
                 }
               : request,
           ),
         );
-        publishAdminNotice("success", "Appointment office updated", `${selectedRequest?.fullName || "Visitor"} is now assigned to ${office}.`);
+        publishAdminNotice("success", "Appointment request updated", `${selectedRequest?.fullName || "Visitor"} now has the updated office and schedule.`);
         return;
       }
 
@@ -6567,6 +6610,21 @@ const loadDashboardData = useCallback(async () => {
                 ),
               },
               {
+                key: "schedule",
+                label: "Schedule",
+                width: 170,
+                render: (request) => (
+                  <View>
+                    <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                      {request.visitDate ? formatDateTime(request.visitDate) : "-"}
+                    </Text>
+                    <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
+                      {request.visitTime ? formatTime(request.visitTime) : "No time"}
+                    </Text>
+                  </View>
+                ),
+              },
+              {
                 key: "status",
                 label: "Status",
                 width: 120,
@@ -6584,7 +6642,7 @@ const loadDashboardData = useCallback(async () => {
               {
                 key: "actions",
                 label: "Actions",
-                width: 220,
+                width: 260,
                 render: (request) => (
                   <View style={styles.adminTableActionRow}>
                     <TouchableOpacity
@@ -6592,6 +6650,8 @@ const loadDashboardData = useCallback(async () => {
                       onPress={() => {
                         setSelectedRequest(request);
                         setOfficeEditValue(request.assignedOffice || request.appointmentDepartment || request.host || "");
+                        setAppointmentEditDateValue(formatDateInputValue(request.visitDate));
+                        setAppointmentEditTimeValue(formatTimeInputValue(request.visitTime));
                         setShowRequestDetailsModal(true);
                       }}
                     >
@@ -6624,10 +6684,12 @@ const loadDashboardData = useCallback(async () => {
                       onPress={() => {
                         setSelectedRequest(request);
                         setOfficeEditValue(request.assignedOffice || request.appointmentDepartment || request.host || "");
+                        setAppointmentEditDateValue(formatDateInputValue(request.visitDate));
+                        setAppointmentEditTimeValue(formatTimeInputValue(request.visitTime));
                         setShowRequestDetailsModal(true);
                       }}
                     >
-                      <Text style={[styles.adminTableActionText, { color: "#B45309" }]}>Office</Text>
+                      <Text style={[styles.adminTableActionText, { color: "#B45309" }]}>Update</Text>
                     </TouchableOpacity>
                   </View>
                 ),
@@ -8072,9 +8134,9 @@ const loadDashboardData = useCallback(async () => {
                   <Text style={[styles.detailValue, isDarkMode && styles.darkText]}>{selectedRequest.purposeOfVisit}</Text>
                 </View>
                 <View style={[styles.detailSection, isDarkMode && { borderBottomColor: theme.borderColor }]}>
-                  <Text style={[styles.detailLabel, isDarkMode && styles.darkTextSecondary]}>Office / Department</Text>
+                  <Text style={[styles.detailLabel, isDarkMode && styles.darkTextSecondary]}>Appointment Request Update</Text>
                   <Text style={[styles.detailValue, isDarkMode && styles.darkText]}>
-                    {selectedRequest.assignedOffice || selectedRequest.appointmentDepartment || selectedRequest.host || "Unassigned"}
+                    Current: {selectedRequest.assignedOffice || selectedRequest.appointmentDepartment || selectedRequest.host || "Unassigned"} · {formatDateTime(selectedRequest.visitDate)} · {formatTime(selectedRequest.visitTime)}
                   </Text>
                   <TextInput
                     style={[
@@ -8091,6 +8153,38 @@ const loadDashboardData = useCallback(async () => {
                     value={officeEditValue}
                     onChangeText={setOfficeEditValue}
                   />
+                  <View style={{ flexDirection: width < 560 ? "column" : "row", gap: 10, marginTop: 10 }}>
+                    <TextInput
+                      style={[
+                        styles.rejectInput,
+                        {
+                          flex: 1,
+                          minHeight: 46,
+                          textAlignVertical: "center",
+                        },
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
+                      placeholder="Visit date: YYYY-MM-DD"
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                      value={appointmentEditDateValue}
+                      onChangeText={setAppointmentEditDateValue}
+                    />
+                    <TextInput
+                      style={[
+                        styles.rejectInput,
+                        {
+                          flex: 1,
+                          minHeight: 46,
+                          textAlignVertical: "center",
+                        },
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
+                      placeholder="Visit time: HH:MM"
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                      value={appointmentEditTimeValue}
+                      onChangeText={setAppointmentEditTimeValue}
+                    />
+                  </View>
                   <TouchableOpacity
                     style={[
                       styles.submitButton,
@@ -8102,7 +8196,7 @@ const loadDashboardData = useCallback(async () => {
                     {isUpdatingOffice ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.submitButtonText}>Save Office</Text>
+                      <Text style={styles.submitButtonText}>Save Appointment Update</Text>
                     )}
                   </TouchableOpacity>
                 </View>

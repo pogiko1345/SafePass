@@ -1644,15 +1644,26 @@ generateRandomPassword(length = 10) {
     }
   }
 
-  async updateVisitorAppointmentOffice(visitorId, office) {
+  async updateVisitorAppointmentOffice(visitorId, appointmentUpdate) {
     try {
+      const payload =
+        typeof appointmentUpdate === "string"
+          ? {
+              office: appointmentUpdate,
+              appointmentDepartment: appointmentUpdate,
+              assignedOffice: appointmentUpdate,
+            }
+          : {
+              ...appointmentUpdate,
+              office:
+                appointmentUpdate?.office ||
+                appointmentUpdate?.appointmentDepartment ||
+                appointmentUpdate?.assignedOffice,
+            };
+
       return await this.fetch(`/admin/visitors/${visitorId}/appointment-office`, {
         method: "PUT",
-        body: {
-          office,
-          appointmentDepartment: office,
-          assignedOffice: office,
-        },
+        body: payload,
       });
     } catch (error) {
       console.error("Update visitor appointment office error:", error);

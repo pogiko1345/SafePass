@@ -2983,37 +2983,81 @@ app.put("/api/admin/visitors/:id/appointment-office", authMiddleware, async (req
       return res.status(404).json({ success: false, message: "Visitor not found" });
     }
 
+    const nextVisitDate = req.body?.visitDate ? new Date(req.body.visitDate) : null;
+    if (req.body?.visitDate && Number.isNaN(nextVisitDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid appointment date.",
+      });
+    }
+
+    let nextVisitTime = null;
+    if (req.body?.visitTime) {
+      const timeValue = String(req.body.visitTime).trim();
+      const timeMatch = timeValue.match(/^(\d{1,2}):(\d{2})$/);
+      if (timeMatch) {
+        const hours = Number(timeMatch[1]);
+        const minutes = Number(timeMatch[2]);
+        if (hours > 23 || minutes > 59) {
+          return res.status(400).json({
+            success: false,
+            message: "Please enter a valid appointment time.",
+          });
+        }
+        const baseDate = nextVisitDate || new Date(visitor.visitDate || Date.now());
+        nextVisitTime = new Date(baseDate);
+        nextVisitTime.setHours(hours, minutes, 0, 0);
+      } else {
+        nextVisitTime = new Date(timeValue);
+      }
+
+      if (Number.isNaN(nextVisitTime.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid appointment time.",
+        });
+      }
+    }
+
     const previousOffice = visitor.appointmentDepartment || visitor.assignedOffice || visitor.host || "";
+    const previousVisitDate = visitor.visitDate;
+    const previousVisitTime = visitor.visitTime;
     visitor.appointmentDepartment = office;
     visitor.assignedOffice = office;
     visitor.host = office;
+    if (nextVisitDate) visitor.visitDate = nextVisitDate;
+    if (nextVisitTime) visitor.visitTime = nextVisitTime;
     visitor.updatedAt = new Date();
     await visitor.save();
 
     await createSystemActivity({
       actorUser: req.user,
       relatedVisitor: visitor,
-      activityType: "admin_updated_appointment_office",
+      activityType: "admin_updated_appointment_request",
       status: "granted",
       location: office,
-      notes: `${getFullName(req.user)} updated ${visitor.fullName}'s appointment office from ${previousOffice || "Unassigned"} to ${office}.`,
+      notes: `${getFullName(req.user)} updated ${visitor.fullName}'s appointment request details.`,
       metadata: {
         previousOffice,
         office,
+        previousVisitDate,
+        previousVisitTime,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
       },
     });
 
     const [visitorPayload] = await attachSafePassIdsToVisitors([visitor]);
     res.json({
       success: true,
-      message: "Appointment office updated successfully.",
+      message: "Appointment request updated successfully.",
       visitor: visitorPayload,
     });
   } catch (error) {
-    console.error("Update appointment office error:", error);
+    console.error("Update appointment request error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to update appointment office.",
+      message: "Failed to update appointment request.",
     });
   }
 });
