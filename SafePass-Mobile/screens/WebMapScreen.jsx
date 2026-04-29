@@ -6,9 +6,6 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
-  Linking,
-  ActivityIndicator,
-  Alert,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -139,10 +136,22 @@ const CAMPUS_LOCATIONS = [
 
 const normalizeMapFloor = (floorId) => (floorId === "mezzanine" ? "first" : floorId);
 
-export default function WebMapScreen({ navigation }) {
-  const [loading, setLoading] = useState(false);
+const findInitialDestinationName = (destinationOffice = "") => {
+  const normalizedDestination = String(destinationOffice || "").trim().toLowerCase();
+  if (!normalizedDestination) return "Administration Building";
+
+  return (
+    CAMPUS_LOCATIONS.find((location) =>
+      location.name.toLowerCase() === normalizedDestination ||
+      location.name.toLowerCase().includes(normalizedDestination) ||
+      normalizedDestination.includes(location.name.toLowerCase().replace("'s", ""))
+    )?.name || "Administration Building"
+  );
+};
+
+export default function WebMapScreen({ navigation, route }) {
   const [selectedLocationName, setSelectedLocationName] = useState(
-    "Administration Building"
+    findInitialDestinationName(route?.params?.destinationOffice)
   );
   const { width } = useWindowDimensions();
 
@@ -157,50 +166,16 @@ export default function WebMapScreen({ navigation }) {
     [selectedLocationName]
   );
 
-  const campusMapVisitors = useMemo(
-    () =>
-      CAMPUS_LOCATIONS.map((location) => ({
-        id: location.name,
-        name: location.name,
-        purpose: location.description,
-        status: location.name === selectedLocation.name ? "checked_in" : "active",
-        location: {
-          floor: location.floor,
-          coordinates: location.mapPosition,
-        },
-      })),
-    [selectedLocation.name]
+  const destinationMarker = useMemo(
+    () => ({
+      id: selectedLocation.name,
+      floor: selectedLocation.floor,
+      label: selectedLocation.name,
+      icon: "navigate",
+      position: selectedLocation.mapPosition,
+    }),
+    [selectedLocation]
   );
-
-  const openGoogleMaps = () => {
-    setLoading(true);
-    const url =
-      "https://maps.google.com/?q=Sapphire+International+Aviation+Academy";
-    Linking.openURL(url)
-      .catch(() => {
-        Alert.alert("Error", "Unable to open Google Maps");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  const openDirections = (location) => {
-    const url = `https://maps.google.com/?q=${location.coordinates.lat},${location.coordinates.lng}`;
-    Linking.openURL(url).catch(() => {
-      Alert.alert("Error", "Unable to open directions");
-    });
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={MapStyles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
-        <ActivityIndicator size="large" color="#041E42" />
-        <Text style={MapStyles.loadingText}>Opening Directions...</Text>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={MapStyles.safeArea}>
@@ -223,13 +198,9 @@ export default function WebMapScreen({ navigation }) {
           <Text style={MapStyles.headerTitle}>Campus Wayfinding</Text>
         </View>
 
-        <TouchableOpacity
-          onPress={openGoogleMaps}
-          style={MapStyles.headerAction}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="navigate-outline" size={18} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={MapStyles.headerAction}>
+          <Ionicons name="map-outline" size={18} color="#FFFFFF" />
+        </View>
       </LinearGradient>
 
       <ScrollView
@@ -254,8 +225,8 @@ export default function WebMapScreen({ navigation }) {
             Find the right campus destination before you arrive.
           </Text>
           <Text style={MapStyles.heroSubtitle}>
-            Choose a destination, review the route steps, and launch external
-            directions only when you need them.
+            Choose a destination and review the route steps inside SafePass.
+            No external map app is required.
           </Text>
 
           <View
@@ -286,20 +257,20 @@ export default function WebMapScreen({ navigation }) {
           >
             <TouchableOpacity
               style={MapStyles.primaryActionButton}
-              onPress={() => openDirections(selectedLocation)}
+              onPress={() => setSelectedLocationName(selectedLocation.name)}
               activeOpacity={0.85}
             >
-              <Ionicons name="navigate" size={18} color="#FFFFFF" />
-              <Text style={MapStyles.primaryActionText}>Get Directions</Text>
+              <Ionicons name="list" size={18} color="#FFFFFF" />
+              <Text style={MapStyles.primaryActionText}>Review Route Steps</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={MapStyles.secondaryActionButton}
-              onPress={openGoogleMaps}
+              onPress={() => setSelectedLocationName("Security Office")}
               activeOpacity={0.85}
             >
-              <Ionicons name="globe-outline" size={18} color="#0F172A" />
-              <Text style={MapStyles.secondaryActionText}>Open Campus Map</Text>
+              <Ionicons name="shield-checkmark-outline" size={18} color="#0F172A" />
+              <Text style={MapStyles.secondaryActionText}>Security Help Point</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -330,11 +301,14 @@ export default function WebMapScreen({ navigation }) {
             </Text>
 
             <CampusMap
-              visitors={campusMapVisitors}
+              visitors={[]}
               floors={MONITORING_MAP_FLOORS}
               offices={MONITORING_MAP_OFFICES}
               selectedFloor={selectedLocation.floor}
               selectedOffice="all"
+              destinationMarkers={[destinationMarker]}
+              showVisitorMarkers={false}
+              showActiveVisitorsBadge={false}
               mapBlueprints={MONITORING_MAP_BLUEPRINTS}
               officePositions={MONITORING_MAP_OFFICE_POSITIONS}
               onFloorChange={(floorId) => {
@@ -390,12 +364,12 @@ export default function WebMapScreen({ navigation }) {
 
             <TouchableOpacity
               style={MapStyles.routeActionButton}
-              onPress={() => openDirections(selectedLocation)}
+              onPress={() => setSelectedLocationName(selectedLocation.name)}
               activeOpacity={0.85}
             >
-              <Ionicons name="navigate-circle-outline" size={20} color="#FFFFFF" />
+              <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
               <Text style={MapStyles.routeActionText}>
-                Start Directions To {selectedLocation.name}
+                Use These Directions To {selectedLocation.name}
               </Text>
             </TouchableOpacity>
           </View>
@@ -457,7 +431,7 @@ export default function WebMapScreen({ navigation }) {
 
                 <TouchableOpacity
                   style={MapStyles.directionButton}
-                  onPress={() => openDirections(location)}
+                  onPress={() => setSelectedLocationName(location.name)}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="navigate-outline" size={18} color="#0F172A" />
@@ -470,8 +444,8 @@ export default function WebMapScreen({ navigation }) {
         <View style={MapStyles.footerNote}>
           <Ionicons name="shield-checkmark-outline" size={16} color="#64748B" />
           <Text style={MapStyles.footerNoteText}>
-            Use the in-app campus guide for orientation, then open external
-            directions only if you need turn-by-turn navigation.
+            Use this in-app campus guide for orientation. Ask security for help
+            if the office is temporarily moved or restricted.
           </Text>
         </View>
       </ScrollView>

@@ -38,6 +38,9 @@ const CampusMap = ({
   offices = [],
   selectedFloor = "ground",
   selectedOffice = "all",
+  destinationMarkers = [],
+  showVisitorMarkers = true,
+  showActiveVisitorsBadge = true,
   onVisitorHover,
   onVisitorLeave,
   onVisitorSelect,
@@ -372,6 +375,7 @@ const CampusMap = ({
 
   // Render visitor markers
   const renderVisitorMarkers = (visibleVisitors) => {
+    if (!showVisitorMarkers) return null;
     if (visibleVisitors.length === 0) return null;
 
     return visibleVisitors.map((visitor) => {
@@ -421,6 +425,39 @@ const CampusMap = ({
             </View>
           ))}
         </Animated.View>
+      );
+    });
+  };
+
+  const renderDestinationMarkers = () => {
+    const normalizedActiveFloor = normalizeFloorId(activeFloor);
+    const visibleDestinations = destinationMarkers.filter(
+      (marker) => normalizeFloorId(marker.floor) === normalizedActiveFloor
+    );
+
+    if (!visibleDestinations.length) return null;
+
+    return visibleDestinations.map((marker) => {
+      const position = marker.position || getOfficePosition(marker.officeId);
+      if (!position) return null;
+      const left = typeof position.x === "number" ? `${position.x}%` : position.x;
+      const top = typeof position.y === "number" ? `${position.y}%` : position.y;
+
+      return (
+        <View
+          key={marker.id || marker.officeId || marker.label}
+          style={[styles.destinationMarker, { left, top }]}
+        >
+          <View style={styles.destinationMarkerPulse} />
+          <View style={styles.destinationMarkerPin}>
+            <Ionicons name={marker.icon || "navigate"} size={16} color="#FFFFFF" />
+          </View>
+          <View style={styles.destinationMarkerLabel}>
+            <Text style={styles.destinationMarkerLabelText} numberOfLines={1}>
+              {marker.label || "Go here"}
+            </Text>
+          </View>
+        </View>
       );
     });
   };
@@ -552,6 +589,9 @@ const CampusMap = ({
           
           {/* Visitor Markers */}
           {renderVisitorMarkers(visibleVisitors)}
+
+          {/* Destination markers for visitor wayfinding */}
+          {renderDestinationMarkers()}
         </Animated.View>
 
         {renderMapEmptyState(visibleVisitors)}
@@ -579,12 +619,14 @@ const CampusMap = ({
         </View>
         
         {/* Active Visitors Count */}
-        <View style={styles.activeVisitorsBadge}>
-          <Ionicons name="people" size={16} color="#FFFFFF" />
-          <Text style={styles.activeVisitorsBadgeText}>
-            {visibleVisitors.length} Active
-          </Text>
-        </View>
+        {showActiveVisitorsBadge ? (
+          <View style={styles.activeVisitorsBadge}>
+            <Ionicons name="people" size={16} color="#FFFFFF" />
+            <Text style={styles.activeVisitorsBadgeText}>
+              {visibleVisitors.length} Active
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.zoomLevelBadge}>
           <Text style={styles.zoomLevelText}>{Math.round(mapScale * 100)}%</Text>

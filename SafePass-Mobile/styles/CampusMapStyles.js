@@ -217,6 +217,60 @@ export default StyleSheet.create({
     fontWeight: "900",
   },
 
+  destinationMarker: {
+    position: "absolute",
+    alignItems: "center",
+    zIndex: 18,
+    transform: [{ translateX: -18 }, { translateY: -36 }],
+  },
+
+  destinationMarkerPulse: {
+    position: "absolute",
+    top: 7,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(10, 61, 145, 0.20)",
+  },
+
+  destinationMarkerPin: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0A3D91",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+      },
+      android: { elevation: 5 },
+      web: { boxShadow: "0px 8px 20px rgba(15, 23, 42, 0.22)" },
+    }),
+  },
+
+  destinationMarkerLabel: {
+    marginTop: 6,
+    maxWidth: 130,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+
+  destinationMarkerLabelText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
   mapEmptyState: {
     position: "absolute",
     top: 0,

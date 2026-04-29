@@ -4355,6 +4355,83 @@ export default StyleSheet.create({
     lineHeight: 20,
   },
 
+  visitorRouteCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#F8FBFE",
+    padding: 16,
+    marginBottom: 16,
+  },
+
+  visitorRouteHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  visitorRouteIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#0A3D91",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  visitorRouteHeaderCopy: {
+    flex: 1,
+  },
+
+  visitorRouteTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  visitorRouteSubtitle: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+
+  visitorRouteSteps: {
+    gap: 10,
+  },
+
+  visitorRouteStepRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  visitorRouteStepIndex: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#E0ECFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+
+  visitorRouteStepIndexText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+
+  visitorRouteStepText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#334155",
+    fontWeight: "600",
+  },
+
   visitorFlowPanelHeader: {
     flexDirection: "row",
     alignItems: "flex-start",

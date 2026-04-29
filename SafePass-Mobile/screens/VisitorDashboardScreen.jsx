@@ -147,6 +147,71 @@ const PHONE_TRACKING_INTERVAL_MS = 15000;
 const PHONE_TRACKING_DISTANCE_METERS = 8;
 const VISITOR_CONNECTIVITY_REMINDER_KEY = "visitorConnectivityReminderShown";
 
+const VISITOR_OFFICE_MAP_ALIASES = {
+  Registrar: "ground-registrar",
+  Accounting: "ground-accounting",
+  Cashier: "ground-cashier",
+  "Information Desk": "ground-lobby",
+  Guidance: "ground-offices",
+  Administration: "ground-offices",
+  "Flight Operations": "flight-operations",
+  Training: "head-of-training-room",
+  "I.T Room": "it-room",
+  "Faculty Room": "faculty-room",
+  Laboratory: "second-laboratory",
+  TESDA: "second-tesda",
+  Workshop: "third-workshop",
+  Library: "third-library",
+  "Student Services": "ground-staff",
+  STO: "sto",
+};
+
+const getVisitorDestinationInfo = (visitorRecord = {}) => {
+  const requestedOffice = String(
+    visitorRecord?.appointmentDepartment ||
+      visitorRecord?.assignedOffice ||
+      visitorRecord?.host ||
+      "",
+  ).trim();
+  const officeId =
+    VISITOR_OFFICE_MAP_ALIASES[requestedOffice] ||
+    MONITORING_MAP_OFFICES.find(
+      (office) => office.name.toLowerCase() === requestedOffice.toLowerCase(),
+    )?.id ||
+    "ground-lobby";
+  const office = MONITORING_MAP_OFFICES.find((item) => item.id === officeId) || MONITORING_MAP_OFFICES[0];
+  const floor = MONITORING_MAP_FLOORS.find((item) => item.id === office?.floor) || MONITORING_MAP_FLOORS[0];
+
+  return {
+    officeId,
+    officeName: requestedOffice || office?.name || "Lobby",
+    floorId: floor?.id || "ground",
+    floorName: floor?.name || "Ground Floor",
+    icon: office?.icon || "navigate-outline",
+    position: MONITORING_MAP_OFFICE_POSITIONS[officeId],
+  };
+};
+
+const buildVisitorRouteSteps = (destination = {}) => {
+  const officeName = destination.officeName || "your assigned office";
+  const floorName = destination.floorName || "Ground Floor";
+  const steps = [
+    "Enter through the main gate and present your SafePass approval with your selected valid ID.",
+    "Proceed to the security or information point for confirmation before entering the office area.",
+  ];
+
+  if (destination.floorId === "ground") {
+    steps.push(`Stay on the ground floor and follow the office labels toward ${officeName}.`);
+  } else if (destination.floorId === "first") {
+    steps.push(`Use the stairs to reach the mezzanine, then follow the room labels toward ${officeName}.`);
+  } else {
+    steps.push(`Use the approved stair route to reach the ${floorName}, then follow the room labels toward ${officeName}.`);
+  }
+
+  steps.push("Wait at the office reception or doorway until staff confirms your appointment.");
+  return steps;
+};
+
 // NFC Configuration
 // For web: Use Web NFC API
 // For mobile: Use react-native-nfc-manager
@@ -1719,12 +1784,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           text: "Logout", 
           style: "destructive",
           onPress: async () => {
-            await ApiService.logout();
-            if (onLogout) onLogout();
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "RoleSelect" }],
-            });
+            try {
+              await ApiService.logout();
+            } catch (error) {
+              console.log("Visitor logout API error ignored:", error);
+              await ApiService.clearAuth();
+            } finally {
+              if (onLogout) onLogout();
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              });
+            }
           }
         }
       ]
@@ -1825,6 +1896,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       description: appointmentFeedback?.message || "Your latest request was sent to staff for review.",
     });
   }
+  const visitorDestinationInfo = getVisitorDestinationInfo(visitor);
+  const visitorRouteSteps = buildVisitorRouteSteps(visitorDestinationInfo);
+  const visitorDestinationMarker = {
+    id: "visitor-appointment-destination",
+    officeId: visitorDestinationInfo.officeId,
+    floor: visitorDestinationInfo.floorId,
+    label: visitorDestinationInfo.officeName,
+    icon: "navigate",
+    position: visitorDestinationInfo.position,
+  };
   const displayName =
     visitor?.fullName ||
     [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") ||
@@ -3503,7 +3584,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Map Module</Text>
           <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Campus Map And Directions</Text>
           <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
-            View floor layouts only. Editing rooms stays with admin.
+            Follow your in-app route to the office assigned for your appointment.
           </Text>
         </View>
       </View>
@@ -3516,7 +3597,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <View style={visitorDashboardStyles.mapSummaryCopy}>
             <Text style={visitorDashboardStyles.mapSummaryTitle}>Arrival Guide</Text>
             <Text style={visitorDashboardStyles.mapSummaryText}>
-              Review your assigned floor before arrival so you can move directly to the correct office.
+              Review your assigned floor and route steps before arrival so you know exactly where to go.
             </Text>
           </View>
         </View>
@@ -3525,15 +3606,39 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <View style={visitorDashboardStyles.mapSummaryMetricCard}>
             <Text style={visitorDashboardStyles.mapSummaryMetricLabel}>Current Floor</Text>
             <Text style={visitorDashboardStyles.mapSummaryMetricValue}>
-              {MONITORING_MAP_FLOORS.find((floor) => floor.id === selectedVisitorMapFloor)?.name || "Ground Floor"}
+              {visitorDestinationInfo.floorName}
             </Text>
           </View>
           <View style={visitorDashboardStyles.mapSummaryMetricCard}>
             <Text style={visitorDashboardStyles.mapSummaryMetricLabel}>Assigned Office</Text>
             <Text style={visitorDashboardStyles.mapSummaryMetricValue}>
-              {visitor?.appointmentDepartment || visitor?.assignedOffice || "Use your appointment details"}
+              {visitorDestinationInfo.officeName}
             </Text>
           </View>
+        </View>
+      </View>
+
+      <View style={visitorDashboardStyles.visitorRouteCard}>
+        <View style={visitorDashboardStyles.visitorRouteHeader}>
+          <View style={visitorDashboardStyles.visitorRouteIconWrap}>
+            <Ionicons name="navigate" size={18} color="#FFFFFF" />
+          </View>
+          <View style={visitorDashboardStyles.visitorRouteHeaderCopy}>
+            <Text style={visitorDashboardStyles.visitorRouteTitle}>Directions To {visitorDestinationInfo.officeName}</Text>
+            <Text style={visitorDashboardStyles.visitorRouteSubtitle}>
+              {visitorDestinationInfo.floorName} route based on your latest appointment.
+            </Text>
+          </View>
+        </View>
+        <View style={visitorDashboardStyles.visitorRouteSteps}>
+          {visitorRouteSteps.map((step, index) => (
+            <View key={`visitor-route-${index}`} style={visitorDashboardStyles.visitorRouteStepRow}>
+              <View style={visitorDashboardStyles.visitorRouteStepIndex}>
+                <Text style={visitorDashboardStyles.visitorRouteStepIndexText}>{index + 1}</Text>
+              </View>
+              <Text style={visitorDashboardStyles.visitorRouteStepText}>{step}</Text>
+            </View>
+          ))}
         </View>
       </View>
 
@@ -3581,8 +3686,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         visitors={[]}
         floors={MONITORING_MAP_FLOORS}
         offices={MONITORING_MAP_OFFICES}
-        selectedFloor={selectedVisitorMapFloor}
+        selectedFloor={visitorDestinationInfo.floorId || selectedVisitorMapFloor}
         selectedOffice="all"
+        destinationMarkers={[visitorDestinationMarker]}
+        showVisitorMarkers={false}
+        showActiveVisitorsBadge={false}
         mapBlueprints={MONITORING_MAP_BLUEPRINTS}
         officePositions={MONITORING_MAP_OFFICE_POSITIONS}
         onFloorChange={setSelectedVisitorMapFloor}
@@ -3592,18 +3700,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       <View style={visitorDashboardStyles.visitorMapNote}>
         <Ionicons name="information-circle-outline" size={18} color="#0A3D91" />
         <Text style={visitorDashboardStyles.visitorMapNoteText}>
-          Use pinch/zoom controls and drag the map to inspect the floor. For external directions,
-          open the full campus map.
+          Use pinch/zoom controls and drag the map to inspect the floor. The blue pin marks the office you should go to.
         </Text>
       </View>
 
       <TouchableOpacity
         style={visitorDashboardStyles.visitorFlowSecondaryButton}
-        onPress={() => navigation.navigate("WebMapScreen")}
+        onPress={() => navigation.navigate("WebMapScreen", { destinationOffice: visitorDestinationInfo.officeName })}
         activeOpacity={0.86}
       >
         <Ionicons name="navigate-outline" size={18} color="#0A3D91" />
-        <Text style={visitorDashboardStyles.visitorFlowSecondaryButtonText}>Open Full Directions</Text>
+        <Text style={visitorDashboardStyles.visitorFlowSecondaryButtonText}>View Full In-App Directions</Text>
       </TouchableOpacity>
     </View>
   );
