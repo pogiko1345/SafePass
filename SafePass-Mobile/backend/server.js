@@ -5949,10 +5949,12 @@ app.get("/api/notifications", authMiddleware, async (req, res) => {
 
     const { read, limit = 50 } = req.query;
     const targetRoles = getNotificationTargetRoles(req.user.role);
+    const now = new Date();
 
     let query = {
       targetRole: { $in: targetRoles },
       $or: [{ targetUser: null }, { targetUser: req.user._id }],
+      $and: [{ $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] }],
     };
 
     if (read === "false") {
@@ -6029,10 +6031,12 @@ app.put("/api/notifications/:id/read", authMiddleware, async (req, res) => {
 app.put("/api/notifications/read-all", authMiddleware, async (req, res) => {
   try {
     const targetRoles = getNotificationTargetRoles(req.user.role);
+    const now = new Date();
     await Notification.updateMany(
       {
         targetRole: { $in: targetRoles },
         $or: [{ targetUser: null }, { targetUser: req.user._id }],
+        $and: [{ $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] }],
         "readBy.user": { $ne: req.user._id },
       },
       {

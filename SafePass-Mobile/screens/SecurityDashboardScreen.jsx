@@ -639,14 +639,26 @@ export default function SecurityDashboardScreen({ navigation }) {
     try {
       const response = await ApiService.getNotifications({ limit: 100 });
       const normalizedNotifications = normalizeNotifications(
-        response.notifications || [],
+        Array.isArray(response?.notifications) ? response.notifications : [],
         currentUser?._id,
-      );
+      )
+        .filter((notification) => notification?._id)
+        .filter(
+          (notification, index, items) =>
+            index === items.findIndex((item) => String(item?._id) === String(notification?._id)),
+        )
+        .sort(
+          (left, right) =>
+            new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime(),
+        );
       const unreadNotifications = normalizedNotifications.filter((notification) => !notification.read);
       const alertNotifications = unreadNotifications.filter(isActiveAlertNotification);
+      const normalizedUnreadCount = Number.isFinite(Number(response?.unreadCount))
+        ? Number(response.unreadCount)
+        : unreadNotifications.length;
 
       setNotifications(normalizedNotifications);
-      setUnreadCount(unreadNotifications.length);
+      setUnreadCount(normalizedUnreadCount);
       setAlerts(alertNotifications);
       setDashboardStats((current) => ({
         ...current,
@@ -787,9 +799,6 @@ export default function SecurityDashboardScreen({ navigation }) {
       if (
         normalizeFloorId(visitor.location.floor) !== normalizeFloorId(selectedFloor)
       ) {
-        return false;
-      }
-      if (selectedOffice !== 'all' && visitor.location.office !== selectedOffice) {
         return false;
       }
       return true;
@@ -1732,7 +1741,6 @@ export default function SecurityDashboardScreen({ navigation }) {
           iconColor="#10B981"
           actionLabel="Full Screen"
           onActionPress={() => setShowMapModal(true)}
-          controls={renderMapFilters()}
           visitors={getFilteredVisitorLocations()}
           floors={floors}
           offices={offices}
@@ -2249,73 +2257,6 @@ export default function SecurityDashboardScreen({ navigation }) {
         )}
       </View>
     </ScrollView>
-  );
-
-  // Render Map Filters
-  const renderMapFilters = () => (
-    <View style={styles.mapFilters}>
-      <View style={styles.filterGroup}>
-        <Text style={styles.filterLabel}>Floor:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          {floors.map((floor) => (
-            <TouchableOpacity
-              key={floor.id}
-              style={[styles.filterChip, selectedFloor === floor.id && styles.filterChipActive]}
-              onPress={() => {
-                setSelectedFloor(floor.id);
-                setSelectedOffice('all');
-              }}
-            >
-              <Ionicons name={floor.icon} size={16} color={selectedFloor === floor.id ? "#FFFFFF" : "#6B7280"} />
-              <Text style={[styles.filterChipText, selectedFloor === floor.id && styles.filterChipTextActive]}>
-                {floor.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-      
-      <View style={styles.filterGroup}>
-        <Text style={styles.filterLabel}>Office:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          <TouchableOpacity
-            style={[styles.filterChip, selectedOffice === 'all' && styles.filterChipActive]}
-            onPress={() => setSelectedOffice('all')}
-          >
-            <Text style={[styles.filterChipText, selectedOffice === 'all' && styles.filterChipTextActive]}>
-              All Offices
-            </Text>
-          </TouchableOpacity>
-          {offices.filter((office) => normalizeFloorId(office.floor) === normalizeFloorId(selectedFloor)).map((office) => (
-            <TouchableOpacity
-              key={office.id}
-              style={[styles.filterChip, selectedOffice === office.name && styles.filterChipActive]}
-              onPress={() => setSelectedOffice(office.name)}
-            >
-              <Ionicons name={office.icon} size={16} color={selectedOffice === office.name ? "#FFFFFF" : "#6B7280"} />
-              <Text style={[styles.filterChipText, selectedOffice === office.name && styles.filterChipTextActive]}>
-                {office.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-      
-      <View style={styles.mapLegend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
-          <Text style={styles.legendText}>Active Visitor</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
-          <Text style={styles.legendText}>Moving</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
-          <Text style={styles.legendText}>Alert</Text>
-        </View>
-      </View>
-    </View>
   );
 
   const getTrackingSourceLabel = (source) => {
@@ -3027,7 +2968,6 @@ export default function SecurityDashboardScreen({ navigation }) {
               subtitle="Monitor approved visitors, check-ins, and on-site movement from one shared monitoring map."
               iconName="map-outline"
               iconColor="#10B981"
-              controls={renderMapFilters()}
               visitors={getFilteredVisitorLocations()}
               floors={floors}
               offices={offices}
