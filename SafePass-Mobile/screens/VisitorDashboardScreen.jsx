@@ -3550,7 +3550,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </TouchableOpacity>
             ) : null}
             <Text style={visitorDashboardStyles.appointmentAutoHint}>
-              Upload the same ID you selected above. AI will pre-check the ID type before staff or security completes the final review.
+              Upload the same ID type you selected above. Staff or security will complete the final review.
             </Text>
           </View>
 

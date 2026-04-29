@@ -53,11 +53,7 @@ const GENERIC_PASSWORD_RESET_REQUEST_MESSAGE =
 const GENERIC_PASSWORD_RESET_VERIFY_MESSAGE =
   "Invalid or expired verification code. Please request a new code and try again.";
 
-const AI_ID_VALIDATION_REQUIRED =
-  String(process.env.REQUIRE_AI_ID_VALIDATION || "").trim().toLowerCase() === "true";
-const OPENAI_ID_MODEL = String(process.env.OPENAI_ID_MODEL || "gpt-4.1-mini").trim();
-
-const reviewAppointmentIdImageDemo = ({ idType, idImage }) => {
+const reviewAppointmentIdImage = ({ idType, idImage }) => {
   const normalizedIdType = String(idType || "").trim();
   const normalizedIdImage = String(idImage || "").trim();
 
@@ -88,172 +84,15 @@ const reviewAppointmentIdImageDemo = ({ idType, idImage }) => {
       isAccepted: false,
       status: "image_quality_failed",
       message:
-        "Demo AI pre-check could not confirm the uploaded ID image. Please upload a clearer photo of the front of the ID.",
+        "We could not confirm the uploaded file is a valid ID image. Please upload a clearer photo of the front of the ID.",
     };
   }
 
   return {
     isAccepted: true,
-    status: "demo_prechecked",
-    message: `Demo AI pre-check accepted the uploaded ${normalizedIdType}. Final validation still requires staff or security review.`,
+    status: "image_uploaded",
+    message: `Uploaded ${normalizedIdType} image saved. Final validation will be completed by staff or security.`,
   };
-};
-
-const extractOpenAIResponseText = (responseData) => {
-  if (!responseData) {
-    return "";
-  }
-
-  if (typeof responseData.output_text === "string") {
-    return responseData.output_text;
-  }
-
-  if (!Array.isArray(responseData.output)) {
-    return "";
-  }
-
-  return responseData.output
-    .flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
-    .map((contentItem) => contentItem?.text || contentItem?.content || "")
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-};
-
-const parseJsonObjectFromText = (text) => {
-  const cleanedText = String(text || "")
-    .trim()
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/i, "")
-    .trim();
-  const jsonStart = cleanedText.indexOf("{");
-  const jsonEnd = cleanedText.lastIndexOf("}");
-
-  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(cleanedText.slice(jsonStart, jsonEnd + 1));
-  } catch (error) {
-    console.error("AI ID validation JSON parse error:", error.message);
-    return null;
-  }
-};
-
-const buildAppointmentIdImagePrompt = (idType) => `
-You are reviewing a visitor appointment valid ID image.
-
-Selected ID type: "${idType}"
-
-Decide whether the image appears to show the same type of identification selected by the visitor.
-Accept only when the image is clearly an ID document/card/passport/license and the visible document type reasonably matches the selected ID type.
-Reject screenshots, selfies without an ID, unrelated photos, unreadable/blurred images, and documents that visibly look like a different ID type.
-Do not verify the person's identity, ID number, face match, or authenticity. Only classify whether the image appears to match the selected ID type.
-
-Return only JSON in this exact shape:
-{
-  "isAccepted": true,
-  "status": "ai_id_matched",
-  "message": "Short visitor-friendly explanation.",
-  "detectedIdType": "Short detected ID type or unknown",
-  "confidence": 0.0
-}
-`;
-
-const reviewAppointmentIdImage = async ({ idType, idImage }) => {
-  const localReview = reviewAppointmentIdImageDemo({ idType, idImage });
-  if (!localReview.isAccepted) {
-    return localReview;
-  }
-
-  const openAiApiKey = String(process.env.OPENAI_API_KEY || "").trim();
-  if (!openAiApiKey) {
-    return localReview;
-  }
-
-  try {
-    const aiResponse = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAiApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: OPENAI_ID_MODEL,
-        input: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "input_text",
-                text: buildAppointmentIdImagePrompt(idType),
-              },
-              {
-                type: "input_image",
-                image_url: idImage,
-                detail: "high",
-              },
-            ],
-          },
-        ],
-        max_output_tokens: 250,
-      }),
-    });
-
-    const responseData = await aiResponse.json().catch(() => null);
-
-    if (!aiResponse.ok) {
-      const errorMessage =
-        responseData?.error?.message || `OpenAI returned status ${aiResponse.status}`;
-      throw new Error(errorMessage);
-    }
-
-    const review = parseJsonObjectFromText(extractOpenAIResponseText(responseData));
-    if (!review || typeof review.isAccepted !== "boolean") {
-      throw new Error("AI ID validation returned an unreadable response.");
-    }
-
-    if (!review.isAccepted) {
-      return {
-        isAccepted: false,
-        status: review.status || "ai_id_mismatch",
-        message:
-          review.message ||
-          `The uploaded image does not appear to match the selected ${idType}. Please upload the correct ID.`,
-        detectedIdType: review.detectedIdType || "unknown",
-        confidence: Number(review.confidence) || 0,
-      };
-    }
-
-    return {
-      isAccepted: true,
-      status: review.status || "ai_id_matched",
-      message:
-        review.message ||
-        `AI pre-check accepted the uploaded ${idType}. Final validation still requires staff or security review.`,
-      detectedIdType: review.detectedIdType || idType,
-      confidence: Number(review.confidence) || 0,
-    };
-  } catch (error) {
-    console.error("AI ID validation error:", error.message);
-
-    if (AI_ID_VALIDATION_REQUIRED) {
-      return {
-        isAccepted: false,
-        status: "ai_id_validation_unavailable",
-        message:
-          "We could not validate the ID image right now. Please try again in a moment.",
-      };
-    }
-
-    return {
-      ...localReview,
-      status: "demo_prechecked_ai_unavailable",
-      message:
-        "Basic ID image pre-check passed. AI ID matching is temporarily unavailable, so staff or security will complete the final review.",
-    };
-  }
 };
 
 const getRequiredEnvValue = (name) => {
@@ -4877,7 +4716,7 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    const idReview = await reviewAppointmentIdImage({
+    const idReview = reviewAppointmentIdImage({
       idType: normalizedIdType,
       idImage: normalizedIdImage,
     });
