@@ -5566,4 +5566,52 @@ export default StyleSheet.create({
   bottomNavLabelActive: {
     color: "#FFFFFF",
   },
+
+  darkSafeArea: {
+    backgroundColor: "#07111F",
+  },
+
+  darkMainScrollView: {
+    backgroundColor: "#07111F",
+  },
+
+  darkSurfaceCard: {
+    backgroundColor: "#0F172A",
+    borderColor: "#243244",
+  },
+
+  darkNestedCard: {
+    backgroundColor: "#111C2E",
+    borderColor: "#2B3B52",
+  },
+
+  darkInsetCard: {
+    backgroundColor: "#0B1524",
+    borderColor: "#243244",
+  },
+
+  darkMiniBrandHeader: {
+    borderColor: "#243244",
+  },
+
+  darkPrimaryText: {
+    color: "#F8FAFC",
+  },
+
+  darkMutedText: {
+    color: "#CBD5E1",
+  },
+
+  darkDividerBorder: {
+    borderBottomColor: "#243244",
+  },
+
+  darkBottomNavBar: {
+    backgroundColor: "rgba(15,23,42,0.98)",
+    borderColor: "#243244",
+  },
+
+  darkBottomNavLabel: {
+    color: "#CBD5E1",
+  },
 });

@@ -36,6 +36,8 @@ import {
 } from "../utils/monitoringMapConfig";
 
 const visitorBrandLogo = require("../assets/LogoSapphireAppIcon.png");
+const Storage =
+  Platform.OS === "web" ? require("../utils/webStorage").default : AsyncStorage;
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== "web") {
@@ -262,6 +264,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [showCheckOutModal, setShowCheckOutModal] = useState(false);
   const [showCheckOutSuccessModal, setShowCheckOutSuccessModal] = useState(false);
   const [visitorPushNotice, setVisitorPushNotice] = useState(null);
+  const [isVisitorDarkMode, setIsVisitorDarkMode] = useState(false);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
   const [isVirtualTapLoading, setIsVirtualTapLoading] = useState(false);
   const [isCheckInLoading, setIsCheckInLoading] = useState(false);
@@ -449,6 +452,22 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const approvedSectionHeaderResponsiveStyle = viewportWidth <= 560
     ? { marginBottom: 12 }
     : null;
+
+  const loadVisitorPreferences = async () => {
+    try {
+      const savedDarkMode = await Storage.getItem("darkModeEnabled");
+      setIsVisitorDarkMode(savedDarkMode === "true");
+    } catch (error) {
+      console.log("Load visitor preferences error:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadVisitorPreferences();
+    const unsubscribe = navigation?.addListener?.("focus", loadVisitorPreferences);
+    return unsubscribe || undefined;
+  }, [navigation]);
+
   const handleAppointmentScreenNavigation = (targetScreen, loadingLabel = "Loading appointment module...") => {
     if (appointmentTransitionTimeoutRef.current) {
       clearTimeout(appointmentTransitionTimeoutRef.current);
@@ -2260,11 +2279,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   );
 
   const renderAppointmentInsightsCard = () => (
-    <View style={[visitorDashboardStyles.appointmentInsightsCard, dashboardSectionResponsiveStyle]}>
+    <View
+      style={[
+        visitorDashboardStyles.appointmentInsightsCard,
+        dashboardSectionResponsiveStyle,
+        isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard,
+      ]}
+    >
       <View style={visitorDashboardStyles.appointmentInsightsHeader}>
         <View>
           <Text style={visitorDashboardStyles.appointmentInsightsEyebrow}>Visitor Summary</Text>
-          <Text style={visitorDashboardStyles.appointmentInsightsTitle}>Appointment Snapshot</Text>
+          <Text style={[visitorDashboardStyles.appointmentInsightsTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+            Appointment Snapshot
+          </Text>
         </View>
         <TouchableOpacity
           style={visitorDashboardStyles.appointmentInsightsAction}
@@ -2277,35 +2304,35 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       </View>
 
       <View style={visitorDashboardStyles.appointmentInsightsGrid}>
-        <View style={visitorDashboardStyles.appointmentInsightsMetricCard}>
+        <View style={[visitorDashboardStyles.appointmentInsightsMetricCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>Requests</Text>
-          <Text style={visitorDashboardStyles.appointmentInsightsMetricValue}>
+          <Text style={[visitorDashboardStyles.appointmentInsightsMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
             {appointmentHistoryEntries.length || 0}
           </Text>
         </View>
-        <View style={visitorDashboardStyles.appointmentInsightsMetricCard}>
+        <View style={[visitorDashboardStyles.appointmentInsightsMetricCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>Approved</Text>
-          <Text style={visitorDashboardStyles.appointmentInsightsMetricValue}>
+          <Text style={[visitorDashboardStyles.appointmentInsightsMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
             {approvedAppointmentCount}
           </Text>
         </View>
-        <View style={visitorDashboardStyles.appointmentInsightsMetricCard}>
+        <View style={[visitorDashboardStyles.appointmentInsightsMetricCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>In Review</Text>
-          <Text style={visitorDashboardStyles.appointmentInsightsMetricValue}>
+          <Text style={[visitorDashboardStyles.appointmentInsightsMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
             {pendingAppointmentCount}
           </Text>
         </View>
       </View>
 
-      <View style={visitorDashboardStyles.appointmentInsightsStatusCard}>
+      <View style={[visitorDashboardStyles.appointmentInsightsStatusCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
         <View style={visitorDashboardStyles.appointmentInsightsStatusIcon}>
           <Ionicons name="sparkles-outline" size={18} color="#0A3D91" />
         </View>
         <View style={visitorDashboardStyles.appointmentInsightsStatusCopy}>
-          <Text style={visitorDashboardStyles.appointmentInsightsStatusTitle}>
+          <Text style={[visitorDashboardStyles.appointmentInsightsStatusTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
             {recentAppointmentEntries[0]?.statusLabel || journeyTitle}
           </Text>
-          <Text style={visitorDashboardStyles.appointmentInsightsStatusText}>
+          <Text style={[visitorDashboardStyles.appointmentInsightsStatusText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             {recentAppointmentEntries[0]?.description || journeySubtitle}
           </Text>
         </View>
@@ -2319,11 +2346,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     return (
-      <View style={[visitorDashboardStyles.recentActivityCard, dashboardSectionResponsiveStyle]}>
+      <View
+        style={[
+          visitorDashboardStyles.recentActivityCard,
+          dashboardSectionResponsiveStyle,
+          isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard,
+        ]}
+      >
         <View style={visitorDashboardStyles.recentActivityHeader}>
           <View>
             <Text style={visitorDashboardStyles.recentActivityEyebrow}>Recent Activity</Text>
-            <Text style={visitorDashboardStyles.recentActivityTitle}>Latest Appointment Trail</Text>
+            <Text style={[visitorDashboardStyles.recentActivityTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+              Latest Appointment Trail
+            </Text>
           </View>
           <TouchableOpacity
             style={visitorDashboardStyles.recentActivityAction}
@@ -2340,7 +2375,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
         <View style={visitorDashboardStyles.recentActivityList}>
           {recentAppointmentEntries.map((entry) => (
-            <View key={entry.id} style={visitorDashboardStyles.recentActivityItem}>
+            <View key={entry.id} style={[visitorDashboardStyles.recentActivityItem, isVisitorDarkMode && visitorDashboardStyles.darkDividerBorder]}>
               <View
                 style={[
                   visitorDashboardStyles.recentActivityStatusDot,
@@ -2348,10 +2383,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ]}
               />
               <View style={visitorDashboardStyles.recentActivityCopy}>
-                <Text style={visitorDashboardStyles.recentActivityItemTitle} numberOfLines={1}>
+                <Text
+                  style={[visitorDashboardStyles.recentActivityItemTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}
+                  numberOfLines={1}
+                >
                   {entry.title}
                 </Text>
-                <Text style={visitorDashboardStyles.recentActivityItemMeta} numberOfLines={2}>
+                <Text
+                  style={[visitorDashboardStyles.recentActivityItemMeta, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}
+                  numberOfLines={2}
+                >
                   {entry.office} · {entry.dateLabel} · {entry.timeLabel}
                 </Text>
               </View>
@@ -2379,11 +2420,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const renderVisitorModuleNavigation = () => (
-    <View style={[visitorDashboardStyles.visitorModuleCard, dashboardSectionResponsiveStyle]}>
+    <View
+      style={[
+        visitorDashboardStyles.visitorModuleCard,
+        dashboardSectionResponsiveStyle,
+        isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard,
+      ]}
+    >
       <View style={visitorDashboardStyles.visitorModuleHeader}>
         <View>
           <Text style={visitorDashboardStyles.visitorModuleEyebrow}>About the School</Text>
-          <Text style={visitorDashboardStyles.visitorModuleTitle}>Plan Your Campus Visit</Text>
+          <Text style={[visitorDashboardStyles.visitorModuleTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+            Plan Your Campus Visit
+          </Text>
         </View>
         <View style={visitorDashboardStyles.visitorModuleHeaderBadge}>
           <Ionicons name="school-outline" size={14} color="#0A3D91" />
@@ -2391,37 +2440,37 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
       </View>
 
-      <Text style={visitorDashboardStyles.visitorModuleIntroText}>
+      <Text style={[visitorDashboardStyles.visitorModuleIntroText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
         SafePass helps visitors coordinate appointments, access campus directions, and prepare requirements before arrival.
       </Text>
 
       <View style={visitorDashboardStyles.visitorAboutGrid}>
-        <View style={visitorDashboardStyles.visitorAboutCard}>
+        <View style={[visitorDashboardStyles.visitorAboutCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <View style={[visitorDashboardStyles.visitorAboutIconWrap, { backgroundColor: "#EEF5FF" }]}>
             <Ionicons name="calendar-clear-outline" size={18} color="#0A3D91" />
           </View>
-          <Text style={visitorDashboardStyles.visitorAboutTitle}>Appointments</Text>
-          <Text style={visitorDashboardStyles.visitorAboutText}>
+          <Text style={[visitorDashboardStyles.visitorAboutTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Appointments</Text>
+          <Text style={[visitorDashboardStyles.visitorAboutText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Request a schedule, wait for staff review, and track approval updates here.
           </Text>
         </View>
 
-        <View style={visitorDashboardStyles.visitorAboutCard}>
+        <View style={[visitorDashboardStyles.visitorAboutCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <View style={[visitorDashboardStyles.visitorAboutIconWrap, { backgroundColor: "#EAF3FF" }]}>
             <Ionicons name="map-outline" size={18} color="#0B4EA2" />
           </View>
-          <Text style={visitorDashboardStyles.visitorAboutTitle}>Campus Guide</Text>
-          <Text style={visitorDashboardStyles.visitorAboutText}>
+          <Text style={[visitorDashboardStyles.visitorAboutTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Campus Guide</Text>
+          <Text style={[visitorDashboardStyles.visitorAboutText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Review the floors and offices first so you can head directly to the right destination.
           </Text>
         </View>
 
-        <View style={visitorDashboardStyles.visitorAboutCard}>
+        <View style={[visitorDashboardStyles.visitorAboutCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <View style={[visitorDashboardStyles.visitorAboutIconWrap, { backgroundColor: "#DCEBFF" }]}>
             <Ionicons name="shield-checkmark-outline" size={18} color="#174EA6" />
           </View>
-          <Text style={visitorDashboardStyles.visitorAboutTitle}>Visit Reminders</Text>
-          <Text style={visitorDashboardStyles.visitorAboutText}>
+          <Text style={[visitorDashboardStyles.visitorAboutTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Visit Reminders</Text>
+          <Text style={[visitorDashboardStyles.visitorAboutText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Bring a valid ID and keep Wi-Fi or mobile data on when visiting the campus.
           </Text>
         </View>
@@ -2439,15 +2488,23 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   );
 
   const renderAccountPanel = () => (
-    <View style={[visitorDashboardStyles.visitorFlowPanel, dashboardSectionResponsiveStyle]}>
+    <View
+      style={[
+        visitorDashboardStyles.visitorFlowPanel,
+        dashboardSectionResponsiveStyle,
+        isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard,
+      ]}
+    >
       <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
         <View style={visitorDashboardStyles.visitorFlowPanelIcon}>
           <Ionicons name="person-circle-outline" size={24} color="#0A3D91" />
         </View>
         <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
           <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Account Management</Text>
-          <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Your Visitor Account</Text>
-          <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
+          <Text style={[visitorDashboardStyles.visitorFlowPanelTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+            Your Visitor Account
+          </Text>
+          <Text style={[visitorDashboardStyles.visitorFlowPanelSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Review your visitor details, open your profile, or sign out securely.
           </Text>
         </View>
@@ -2500,37 +2557,37 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
       </LinearGradient>
 
-      <View style={visitorDashboardStyles.accountPanelCard}>
-        <View style={visitorDashboardStyles.accountPanelRow}>
+      <View style={[visitorDashboardStyles.accountPanelCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
+        <View style={[visitorDashboardStyles.accountPanelRow, isVisitorDarkMode && visitorDashboardStyles.darkDividerBorder]}>
           <Text style={visitorDashboardStyles.accountPanelLabel}>Full Name</Text>
-          <Text style={visitorDashboardStyles.accountPanelValue}>
+          <Text style={[visitorDashboardStyles.accountPanelValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
             {visitor?.fullName || displayName}
           </Text>
         </View>
-        <View style={visitorDashboardStyles.accountPanelRow}>
+        <View style={[visitorDashboardStyles.accountPanelRow, isVisitorDarkMode && visitorDashboardStyles.darkDividerBorder]}>
           <Text style={visitorDashboardStyles.accountPanelLabel}>Email</Text>
-          <Text style={visitorDashboardStyles.accountPanelValue}>
+          <Text style={[visitorDashboardStyles.accountPanelValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
             {currentUser?.email || visitor?.email || "Not available"}
           </Text>
         </View>
-        <View style={visitorDashboardStyles.accountPanelRow}>
+        <View style={[visitorDashboardStyles.accountPanelRow, isVisitorDarkMode && visitorDashboardStyles.darkDividerBorder]}>
           <Text style={visitorDashboardStyles.accountPanelLabel}>Role</Text>
-          <Text style={visitorDashboardStyles.accountPanelValue}>Visitor</Text>
+          <Text style={[visitorDashboardStyles.accountPanelValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Visitor</Text>
         </View>
-        <View style={visitorDashboardStyles.accountPanelRow}>
+        <View style={[visitorDashboardStyles.accountPanelRow, isVisitorDarkMode && visitorDashboardStyles.darkDividerBorder]}>
           <Text style={visitorDashboardStyles.accountPanelLabel}>Status</Text>
-          <Text style={visitorDashboardStyles.accountPanelValue}>
+          <Text style={[visitorDashboardStyles.accountPanelValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
             {statusText}
           </Text>
         </View>
       </View>
 
-      <View style={visitorDashboardStyles.accountVisitSummaryCard}>
+      <View style={[visitorDashboardStyles.accountVisitSummaryCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
         <Text style={visitorDashboardStyles.accountVisitSummaryEyebrow}>Visitor Pass</Text>
-        <Text style={visitorDashboardStyles.accountVisitSummaryTitle}>
+        <Text style={[visitorDashboardStyles.accountVisitSummaryTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
           {journeyTitle}
         </Text>
-        <Text style={visitorDashboardStyles.accountVisitSummaryText}>
+        <Text style={[visitorDashboardStyles.accountVisitSummaryText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
           {journeySubtitle}
         </Text>
 
@@ -2547,21 +2604,21 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
 
         <View style={visitorDashboardStyles.accountVisitSummaryGrid}>
-          <View style={visitorDashboardStyles.accountVisitSummaryMetric}>
+          <View style={[visitorDashboardStyles.accountVisitSummaryMetric, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
             <Text style={visitorDashboardStyles.accountVisitSummaryMetricLabel}>Visit Date</Text>
-            <Text style={visitorDashboardStyles.accountVisitSummaryMetricValue}>
+            <Text style={[visitorDashboardStyles.accountVisitSummaryMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
               {visitor?.visitDate ? formatDate(visitor.visitDate) : "Not scheduled"}
             </Text>
           </View>
-          <View style={visitorDashboardStyles.accountVisitSummaryMetric}>
+          <View style={[visitorDashboardStyles.accountVisitSummaryMetric, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
             <Text style={visitorDashboardStyles.accountVisitSummaryMetricLabel}>Visit Time</Text>
-            <Text style={visitorDashboardStyles.accountVisitSummaryMetricValue}>
+            <Text style={[visitorDashboardStyles.accountVisitSummaryMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
               {visitor?.visitTime ? formatTime(visitor.visitTime) : "Not scheduled"}
             </Text>
           </View>
-          <View style={visitorDashboardStyles.accountVisitSummaryMetric}>
+          <View style={[visitorDashboardStyles.accountVisitSummaryMetric, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
             <Text style={visitorDashboardStyles.accountVisitSummaryMetricLabel}>Purpose</Text>
-            <Text style={visitorDashboardStyles.accountVisitSummaryMetricValue}>
+            <Text style={[visitorDashboardStyles.accountVisitSummaryMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
               {visitor?.purposeOfVisit || "Pending purpose"}
             </Text>
           </View>
@@ -2569,21 +2626,21 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       </View>
 
       <View style={visitorDashboardStyles.accountActionGrid}>
-        <View style={visitorDashboardStyles.accountActionCard}>
+        <View style={[visitorDashboardStyles.accountActionCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <View style={visitorDashboardStyles.accountActionIcon}>
             <Ionicons name="mail-outline" size={18} color="#0A3D91" />
           </View>
-          <Text style={visitorDashboardStyles.accountActionTitle}>Verification</Text>
-          <Text style={visitorDashboardStyles.accountActionText}>
+          <Text style={[visitorDashboardStyles.accountActionTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Verification</Text>
+          <Text style={[visitorDashboardStyles.accountActionText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Keep your email active so appointment updates and approval notices reach you.
           </Text>
         </View>
-        <View style={visitorDashboardStyles.accountActionCard}>
+        <View style={[visitorDashboardStyles.accountActionCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <View style={visitorDashboardStyles.accountActionIcon}>
             <Ionicons name="document-text-outline" size={18} color="#0A3D91" />
           </View>
-          <Text style={visitorDashboardStyles.accountActionTitle}>Appointment Records</Text>
-          <Text style={visitorDashboardStyles.accountActionText}>
+          <Text style={[visitorDashboardStyles.accountActionTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Appointment Records</Text>
+          <Text style={[visitorDashboardStyles.accountActionText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Your active visit status and assigned office appear here once requests are processed.
           </Text>
         </View>
@@ -2615,7 +2672,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const renderBottomNavigation = () => (
     <View style={visitorDashboardStyles.bottomNavShell}>
-      <View style={visitorDashboardStyles.bottomNavBar}>
+      <View style={[visitorDashboardStyles.bottomNavBar, isVisitorDarkMode && visitorDashboardStyles.darkBottomNavBar]}>
         {VISITOR_MODULES.map((module) => {
           const isActive = selectedVisitorSection === module.id;
 
@@ -2632,11 +2689,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <Ionicons
                 name={module.icon}
                 size={20}
-                color={isActive ? "#FFFFFF" : "#64748B"}
+                color={isActive ? "#FFFFFF" : isVisitorDarkMode ? "#CBD5E1" : "#64748B"}
               />
               <Text
                 style={[
                   visitorDashboardStyles.bottomNavLabel,
+                  isVisitorDarkMode && visitorDashboardStyles.darkBottomNavLabel,
                   isActive && visitorDashboardStyles.bottomNavLabelActive,
                 ]}
               >
@@ -4042,7 +4100,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   );
 
   return (
-    <SafeAreaView style={visitorDashboardStyles.safeArea}>
+    <SafeAreaView style={[visitorDashboardStyles.safeArea, isVisitorDarkMode && visitorDashboardStyles.darkSafeArea]}>
       <StatusBar barStyle="light-content" backgroundColor="#061A2E" />
 
       {isVisitorHomeSection ? (
@@ -4115,14 +4173,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       ) : null}
 
       {!isVisitorHomeSection ? (
-        <View style={visitorDashboardStyles.miniBrandHeaderWrap}>
+          <View style={visitorDashboardStyles.miniBrandHeaderWrap}>
           <View
             style={[
               visitorDashboardStyles.miniBrandHeader,
               {
-                backgroundColor: sectionIntro.accentSoft,
+                backgroundColor: isVisitorDarkMode ? "#0F172A" : sectionIntro.accentSoft,
                 borderColor: `${sectionIntro.accent}26`,
               },
+              isVisitorDarkMode && visitorDashboardStyles.darkMiniBrandHeader,
             ]}
           >
             <View style={visitorDashboardStyles.miniBrandIdentity}>
@@ -4139,8 +4198,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 />
               </View>
               <View style={visitorDashboardStyles.miniBrandCopy}>
-                <Text style={visitorDashboardStyles.miniBrandTitle}>SafePass</Text>
-                <Text style={visitorDashboardStyles.miniBrandSubtitle}>{sectionIntro.title}</Text>
+                <Text style={[visitorDashboardStyles.miniBrandTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>SafePass</Text>
+                <Text style={[visitorDashboardStyles.miniBrandSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
+                  {sectionIntro.title}
+                </Text>
               </View>
             </View>
             <View style={visitorDashboardStyles.miniBrandHeaderRight}>
@@ -4183,7 +4244,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       ) : null}
 
       <ScrollView
-        style={visitorDashboardStyles.mainScrollView}
+        style={[visitorDashboardStyles.mainScrollView, isVisitorDarkMode && visitorDashboardStyles.darkMainScrollView]}
         showsVerticalScrollIndicator
         contentContainerStyle={visitorDashboardStyles.scrollContent}
         contentInsetAdjustmentBehavior="automatic"
@@ -4214,12 +4275,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               !isVisitorHomeSection && visitorDashboardStyles.commandDeckCardInline,
               compactCommandDeckStyle,
               dashboardCardResponsiveStyle,
+              isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard,
             ]}
           >
             <View style={[visitorDashboardStyles.commandDeckHeader, isWideVisitorDashboard && visitorDashboardStyles.commandDeckHeaderWide]}>
               <View style={visitorDashboardStyles.commandDeckTitleWrap}>
-                <Text style={visitorDashboardStyles.commandDeckTitle}>{journeyTitle}</Text>
-                <Text style={visitorDashboardStyles.commandDeckSubtitle}>{journeySubtitle}</Text>
+                <Text style={[visitorDashboardStyles.commandDeckTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+                  {journeyTitle}
+                </Text>
+                <Text style={[visitorDashboardStyles.commandDeckSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
+                  {journeySubtitle}
+                </Text>
               </View>
               <View style={[visitorDashboardStyles.commandDeckBadge, { backgroundColor: `${statusColor}18` }]}>
                 <View style={[visitorDashboardStyles.commandDeckBadgeDot, { backgroundColor: statusColor }]} />
@@ -4236,6 +4302,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   style={[
                     visitorDashboardStyles.commandMetricCard,
                     { width: compactCommandMetricCardWidth },
+                    isVisitorDarkMode && visitorDashboardStyles.darkNestedCard,
                   ]}
                   onPress={() => item.target && handleVisitorSectionChange(item.target)}
                   activeOpacity={0.86}
@@ -4243,10 +4310,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <View style={visitorDashboardStyles.commandMetricIcon}>
                     <Ionicons name={item.icon} size={16} color="#0A3D91" />
                   </View>
-                  <Text style={visitorDashboardStyles.commandMetricLabel} numberOfLines={1}>
+                  <Text style={[visitorDashboardStyles.commandMetricLabel, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]} numberOfLines={1}>
                     {item.label}
                   </Text>
-                  <Text style={visitorDashboardStyles.commandMetricValue} numberOfLines={1}>
+                  <Text style={[visitorDashboardStyles.commandMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]} numberOfLines={1}>
                     {item.value}
                   </Text>
                 </TouchableOpacity>
