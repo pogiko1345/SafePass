@@ -1370,6 +1370,12 @@ const getPrioritizedVisitor = (visitors = []) => {
   if (!Array.isArray(visitors) || !visitors.length) return null;
 
   const now = Date.now();
+  const checkedIn = visitors
+    .filter((visitor) => String(visitor?.status || "").toLowerCase() === "checked_in")
+    .sort((left, right) => getVisitorScheduleTime(right) - getVisitorScheduleTime(left));
+
+  if (checkedIn[0]) return checkedIn[0];
+
   const active = visitors.filter((visitor) =>
     !["checked_out", "expired", "rejected"].includes(String(visitor?.status || "").toLowerCase()) &&
     String(visitor?.appointmentStatus || "").toLowerCase() !== "rejected"

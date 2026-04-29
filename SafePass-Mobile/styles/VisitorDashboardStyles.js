@@ -4059,6 +4059,24 @@ export default StyleSheet.create({
     color: "#64748B",
   },
 
+  appointmentHistoryCheckOutButton: {
+    minHeight: 42,
+    borderRadius: 14,
+    backgroundColor: "#DC2626",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+
+  appointmentHistoryCheckOutButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
   appointmentHistoryCard: {
     padding: 20,
     borderRadius: 28,
@@ -5222,6 +5240,41 @@ export default StyleSheet.create({
     marginBottom: 16,
   },
 
+  accountSectionTitle: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 4,
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  accountMobilePanel: {
+    padding: 14,
+    borderRadius: 24,
+  },
+
+  accountMobileHeader: {
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  accountMobileHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 15,
+  },
+
+  accountMobileTitle: {
+    fontSize: 19,
+    lineHeight: 23,
+  },
+
+  accountMobileSubtitle: {
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+
   accountHeroCard: {
     borderRadius: 28,
     padding: 18,
@@ -5238,9 +5291,20 @@ export default StyleSheet.create({
     }),
   },
 
+  accountHeroCardMobile: {
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 14,
+  },
+
   accountHeroTopRow: {
     gap: 14,
     marginBottom: 16,
+  },
+
+  accountHeroTopRowMobile: {
+    gap: 12,
+    marginBottom: 14,
   },
 
   accountHeroIdentity: {
@@ -5256,6 +5320,12 @@ export default StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  accountHeroAvatarMobile: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
 
   accountHeroInitials: {
@@ -5275,10 +5345,20 @@ export default StyleSheet.create({
     marginBottom: 4,
   },
 
+  accountHeroNameMobile: {
+    fontSize: 18,
+    lineHeight: 22,
+  },
+
   accountHeroSubtext: {
     fontSize: 13,
     lineHeight: 19,
     color: "rgba(255,255,255,0.84)",
+  },
+
+  accountHeroSubtextMobile: {
+    fontSize: 12,
+    lineHeight: 17,
   },
 
   accountHeroBadge: {
@@ -5317,6 +5397,18 @@ export default StyleSheet.create({
     borderColor: "rgba(255,255,255,0.14)",
   },
 
+  accountStatCardMobile: {
+    flexBasis: "47%",
+    minWidth: 0,
+    padding: 12,
+  },
+
+  accountStatCardWideMobile: {
+    flexBasis: "100%",
+    minWidth: "100%",
+    padding: 12,
+  },
+
   accountStatLabel: {
     fontSize: 11,
     fontWeight: "700",
@@ -5342,6 +5434,14 @@ export default StyleSheet.create({
     borderBottomColor: "#EEF2F7",
   },
 
+  accountPanelRowMobile: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
   accountPanelLabel: {
     flex: 0.42,
     fontSize: 11,
@@ -5359,11 +5459,29 @@ export default StyleSheet.create({
     textAlign: "right",
   },
 
+  accountPanelValueMobile: {
+    flex: 0,
+    width: "100%",
+    textAlign: "left",
+    fontSize: 14,
+    lineHeight: 19,
+  },
+
+  accountMobileCard: {
+    borderRadius: 20,
+    marginBottom: 14,
+  },
+
   accountActionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
     marginBottom: 16,
+  },
+
+  accountActionGridMobile: {
+    gap: 10,
+    marginBottom: 14,
   },
 
   accountActionCard: {
@@ -5377,6 +5495,14 @@ export default StyleSheet.create({
     padding: 16,
   },
 
+  accountActionCardMobile: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 18,
+    padding: 14,
+  },
+
   accountActionIcon: {
     width: 38,
     height: 38,
@@ -5385,6 +5511,14 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
+  },
+
+  accountActionCardMobileIcon: {
+    marginBottom: 0,
+  },
+
+  accountActionCopy: {
+    flex: 1,
   },
 
   accountActionTitle: {
@@ -5471,6 +5605,19 @@ export default StyleSheet.create({
     borderColor: "#E2E8F0",
     paddingHorizontal: 14,
     paddingVertical: 14,
+  },
+
+  accountButtonDock: {
+    gap: 10,
+  },
+
+  accountDockPrimaryButton: {
+    minHeight: 50,
+  },
+
+  accountDockLogoutButton: {
+    marginTop: 0,
+    minHeight: 50,
   },
 
   accountVisitSummaryMetricLabel: {
