@@ -4300,11 +4300,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </TouchableOpacity>
             </LinearGradient>
 
-            <View
-              style={[
+            <ScrollView
+              style={visitorDashboardStyles.virtualNfcModalScroll}
+              contentContainerStyle={[
                 visitorDashboardStyles.virtualNfcModalBody,
                 isCompactVirtualCardView && visitorDashboardStyles.virtualNfcModalBodyCompact,
               ]}
+              showsVerticalScrollIndicator={false}
             >
               <View
                 style={[
@@ -4426,38 +4428,38 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </View>
                 ))}
               </View>
+            </ScrollView>
 
-              <View
-                style={[
-                  visitorDashboardStyles.virtualNfcModalFooter,
-                  isCompactVirtualCardView && visitorDashboardStyles.virtualNfcModalFooterCompact,
-                ]}
+            <View
+              style={[
+                visitorDashboardStyles.virtualNfcModalFooter,
+                isCompactVirtualCardView && visitorDashboardStyles.virtualNfcModalFooterCompact,
+              ]}
+            >
+              <TouchableOpacity
+                style={visitorDashboardStyles.virtualNfcSecondaryButton}
+                onPress={() => setShowVirtualNfcModal(false)}
+                disabled={isVirtualTapLoading}
               >
-                <TouchableOpacity
-                  style={visitorDashboardStyles.virtualNfcSecondaryButton}
-                  onPress={() => setShowVirtualNfcModal(false)}
-                  disabled={isVirtualTapLoading}
-                >
-                  <Text style={visitorDashboardStyles.virtualNfcSecondaryButtonText}>Cancel</Text>
-                </TouchableOpacity>
+                <Text style={visitorDashboardStyles.virtualNfcSecondaryButtonText}>Cancel</Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={visitorDashboardStyles.virtualNfcPrimaryButton}
-                  onPress={handleVirtualNfcCardTap}
-                  disabled={isVirtualTapLoading}
-                >
-                  {isVirtualTapLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
-                      <Text style={visitorDashboardStyles.virtualNfcPrimaryButtonText}>
-                        Start NFC Tap
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={visitorDashboardStyles.virtualNfcPrimaryButton}
+                onPress={handleVirtualNfcCardTap}
+                disabled={isVirtualTapLoading}
+              >
+                {isVirtualTapLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
+                    <Text style={visitorDashboardStyles.virtualNfcPrimaryButtonText}>
+                      Start NFC Tap
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </View>

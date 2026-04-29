@@ -2171,12 +2171,14 @@ export default StyleSheet.create({
     borderRadius: 24,
     width: "88%",
     maxWidth: 660,
+    maxHeight: "88%",
     overflow: "hidden",
   },
 
   virtualNfcModalContentCompact: {
-    width: "92%",
+    width: "88%",
     maxWidth: 380,
+    maxHeight: "86%",
     borderRadius: 22,
   },
 
@@ -2189,8 +2191,10 @@ export default StyleSheet.create({
   },
 
   virtualNfcModalHeaderCompact: {
-    padding: 18,
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+    gap: 10,
   },
 
   virtualNfcModalTitle: {
@@ -2207,14 +2211,18 @@ export default StyleSheet.create({
     maxWidth: 280,
   },
 
+  virtualNfcModalScroll: {
+    flexGrow: 0,
+  },
+
   virtualNfcModalBody: {
     padding: 16,
     gap: 14,
   },
 
   virtualNfcModalBodyCompact: {
-    padding: 14,
-    gap: 12,
+    padding: 12,
+    gap: 10,
   },
 
   virtualNfcDisplayRow: {
@@ -2244,12 +2252,12 @@ export default StyleSheet.create({
 
   virtualNfcPreviewCardCompact: {
     maxWidth: "100%",
-    borderRadius: 24,
+    borderRadius: 22,
   },
 
   virtualNfcCardGradient: {
-    padding: 22,
-    gap: 18,
+    padding: width <= 390 ? 14 : 22,
+    gap: width <= 390 ? 12 : 18,
   },
 
   virtualNfcCardTopBar: {
@@ -2279,14 +2287,14 @@ export default StyleSheet.create({
   },
 
   virtualNfcPreviewSchool: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: width <= 390 ? 10.5 : 12,
+    lineHeight: width <= 390 ? 15 : 18,
     color: "rgba(255,255,255,0.72)",
-    maxWidth: 220,
+    maxWidth: width <= 390 ? 180 : 220,
   },
 
   virtualNfcPreviewLabel: {
-    fontSize: 11,
+    fontSize: width <= 390 ? 9.5 : 11,
     fontWeight: "700",
     color: "rgba(255,255,255,0.72)",
     textTransform: "uppercase",
@@ -2295,15 +2303,15 @@ export default StyleSheet.create({
   },
 
   virtualNfcPreviewName: {
-    fontSize: 22,
+    fontSize: width <= 390 ? 18 : 22,
     fontWeight: "800",
     color: "#FFFFFF",
   },
 
   virtualNfcPreviewChip: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: width <= 390 ? 36 : 44,
+    height: width <= 390 ? 36 : 44,
+    borderRadius: width <= 390 ? 12 : 14,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(59,130,246,0.22)",
@@ -2311,31 +2319,32 @@ export default StyleSheet.create({
 
   virtualNfcIdBand: {
     backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderRadius: width <= 390 ? 14 : 18,
+    paddingHorizontal: width <= 390 ? 12 : 16,
+    paddingVertical: width <= 390 ? 11 : 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
 
   virtualNfcPreviewId: {
-    fontSize: 17,
+    fontSize: width <= 390 ? 14.5 : 17,
     fontWeight: "800",
     color: "#FFFFFF",
   },
 
   virtualNfcDetailsGrid: {
     flexDirection: "row",
-    gap: 12,
+    gap: width <= 390 ? 8 : 12,
     flexWrap: "wrap",
   },
 
   virtualNfcDetailCard: {
-    flex: 1,
-    minWidth: 130,
+    flex: width <= 390 ? undefined : 1,
+    width: width <= 390 ? "100%" : undefined,
+    minWidth: width <= 390 ? 0 : 130,
     backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: width <= 390 ? 13 : 16,
+    padding: width <= 390 ? 10 : 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -2343,14 +2352,14 @@ export default StyleSheet.create({
   virtualNfcDetailCardWide: {
     width: "100%",
     backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: width <= 390 ? 13 : 16,
+    padding: width <= 390 ? 10 : 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
 
   virtualNfcPreviewMetaLabel: {
-    fontSize: 11,
+    fontSize: width <= 390 ? 9.5 : 11,
     fontWeight: "700",
     color: "rgba(255,255,255,0.72)",
     textTransform: "uppercase",
@@ -2359,7 +2368,7 @@ export default StyleSheet.create({
   },
 
   virtualNfcPreviewMetaValue: {
-    fontSize: 14,
+    fontSize: width <= 390 ? 12.5 : 14,
     fontWeight: "700",
     color: "#FFFFFF",
   },
@@ -2367,18 +2376,18 @@ export default StyleSheet.create({
   virtualNfcTapHint: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: width <= 390 ? 10 : 12,
     backgroundColor: "#F8FBFE",
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: width <= 390 ? 16 : 20,
+    padding: width <= 390 ? 12 : 16,
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
 
   virtualNfcTapHintIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: width <= 390 ? 38 : 44,
+    height: width <= 390 ? 38 : 44,
+    borderRadius: width <= 390 ? 12 : 14,
     backgroundColor: "#FDE68A",
     justifyContent: "center",
     alignItems: "center",
@@ -2389,15 +2398,15 @@ export default StyleSheet.create({
   },
 
   virtualNfcTapHintTitle: {
-    fontSize: 15,
+    fontSize: width <= 390 ? 13.5 : 15,
     fontWeight: "800",
     color: "#0F172A",
     marginBottom: 4,
   },
 
   virtualNfcTapHintText: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: width <= 390 ? 11.5 : 12,
+    lineHeight: width <= 390 ? 16 : 18,
     color: "#475569",
   },
 
@@ -2443,7 +2452,7 @@ export default StyleSheet.create({
   },
 
   virtualNfcInfoCardCompact: {
-    padding: 14,
+    padding: 12,
     borderRadius: 16,
   },
 
@@ -2455,8 +2464,8 @@ export default StyleSheet.create({
 
   virtualNfcInfoText: {
     flex: 1,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: width <= 390 ? 11.5 : 13,
+    lineHeight: width <= 390 ? 17 : 20,
     color: "#334155",
     fontWeight: "500",
   },
@@ -2464,34 +2473,46 @@ export default StyleSheet.create({
   virtualNfcModalFooter: {
     flexDirection: "row",
     gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
   },
 
   virtualNfcModalFooterCompact: {
-    flexDirection: "column",
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
   },
 
   virtualNfcSecondaryButton: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#CBD5E1",
-    paddingVertical: 14,
+    paddingVertical: width <= 390 ? 11 : 14,
+    minHeight: 46,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#FFFFFF",
   },
 
   virtualNfcSecondaryButtonText: {
-    fontSize: 15,
+    fontSize: width <= 390 ? 13 : 15,
     fontWeight: "700",
     color: "#475569",
   },
 
   virtualNfcPrimaryButton: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 14,
     backgroundColor: "#041E42",
-    paddingVertical: 14,
+    paddingVertical: width <= 390 ? 11 : 14,
+    minHeight: 46,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -2510,7 +2531,7 @@ export default StyleSheet.create({
   },
 
   virtualNfcPrimaryButtonText: {
-    fontSize: 15,
+    fontSize: width <= 390 ? 13 : 15,
     fontWeight: "800",
     color: "#FFFFFF",
   },
