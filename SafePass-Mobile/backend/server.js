@@ -1328,6 +1328,36 @@ const findVisitorsForUser = async (user) => {
   });
 };
 
+const attachSafePassIdsToVisitors = async (visitors = []) => {
+  if (!Array.isArray(visitors) || !visitors.length) return [];
+
+  const emails = [
+    ...new Set(
+      visitors
+        .map((visitor) => String(visitor?.email || "").trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+
+  const users = emails.length
+    ? await User.find({ role: "visitor", email: { $in: emails } })
+    : [];
+
+  await Promise.all(users.map((user) => ensureSafePassAccountId(user)));
+
+  const safePassByEmail = new Map(
+    users.map((user) => [String(user.email || "").trim().toLowerCase(), user.nfcCardId || ""]),
+  );
+
+  return visitors.map((visitor) => {
+    const payload = typeof visitor.toObject === "function" ? visitor.toObject() : { ...visitor };
+    const email = String(payload.email || "").trim().toLowerCase();
+    payload.nfcCardId = safePassByEmail.get(email) || payload.nfcCardId || "";
+    payload.safePassId = payload.nfcCardId;
+    return payload;
+  });
+};
+
 const getVisitorScheduleTime = (visitor) => {
   const combined = getCombinedAppointmentDateTime(visitor?.visitDate, visitor?.visitTime);
   if (combined) return combined.getTime();
@@ -2840,9 +2870,11 @@ app.get("/api/admin/visitors/pending", authMiddleware, async (req, res) => {
       );
     });
 
+    const visitorsWithSafePassIds = await attachSafePassIdsToVisitors(visitors);
+
     res.json({
       success: true,
-      visitors,
+      visitors: visitorsWithSafePassIds,
     });
   } catch (error) {
     console.error("Get pending visitors error:", error);
@@ -2898,6 +2930,7 @@ app.get("/api/admin/visitors", authMiddleware, async (req, res) => {
       .limit(parseInt(limit));
 
     const total = await Visitor.countDocuments(query);
+    const visitorsWithSafePassIds = await attachSafePassIdsToVisitors(visitors);
 
     console.log(
       `📋 Found ${visitors.length} visitors with status: ${status || "all"}`,
@@ -2905,7 +2938,7 @@ app.get("/api/admin/visitors", authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      visitors,
+      visitors: visitorsWithSafePassIds,
       totalPages: Math.ceil(total / parseInt(limit)),
       currentPage: parseInt(page),
       total,
@@ -6128,12 +6161,29 @@ app.get("/api/admin/activities", authMiddleware, async (req, res) => {
       .sort({ timestamp: -1 })
       .limit(limit)
       .populate("relatedVisitor", "fullName email visitDate visitTime purposeOfVisit assignedOffice host status appointmentStatus approvalStatus")
-      .populate("relatedUser", "firstName lastName email role department");
+      .populate("relatedUser", "firstName lastName email role department nfcCardId");
+
+    const visitorActivityUsers = activities
+      .map((activity) => activity.relatedUser)
+      .filter((user) => user && String(user.role || "").toLowerCase() === "visitor");
+    await Promise.all(visitorActivityUsers.map((user) => ensureSafePassAccountId(user)));
+
+    const activityPayloads = activities.map((activity) => {
+      const payload = activity.toObject();
+      if (payload.relatedUser?.nfcCardId) {
+        payload.nfcCardId = payload.relatedUser.nfcCardId;
+      }
+      if (payload.relatedVisitor && payload.relatedUser?.nfcCardId) {
+        payload.relatedVisitor.nfcCardId = payload.relatedUser.nfcCardId;
+        payload.relatedVisitor.safePassId = payload.relatedUser.nfcCardId;
+      }
+      return payload;
+    });
 
     const summary = {
-      registrationRequests: activities.filter((item) => item.activityType === "visitor_registration_request").length,
-      appointmentRequests: activities.filter((item) => item.activityType === "visitor_appointment_request").length,
-      staffActions: activities.filter((item) =>
+      registrationRequests: activityPayloads.filter((item) => item.activityType === "visitor_registration_request").length,
+      appointmentRequests: activityPayloads.filter((item) => item.activityType === "visitor_appointment_request").length,
+      staffActions: activityPayloads.filter((item) =>
         [
           "staff_approved_appointment",
           "staff_adjusted_appointment",
@@ -6141,17 +6191,17 @@ app.get("/api/admin/activities", authMiddleware, async (req, res) => {
           "staff_completed_appointment",
         ].includes(item.activityType),
       ).length,
-      completedVisits: activities.filter((item) =>
+      completedVisits: activityPayloads.filter((item) =>
         item.activityType === "security_checkout" || item.activityType === "visitor_self_checkout",
       ).length,
-      approvals: activities.filter((item) =>
+      approvals: activityPayloads.filter((item) =>
         item.activityType === "admin_approved_registration" || item.activityType === "staff_approved_appointment",
       ).length,
     };
 
     res.json({
       success: true,
-      activities,
+      activities: activityPayloads,
       summary,
     });
   } catch (error) {

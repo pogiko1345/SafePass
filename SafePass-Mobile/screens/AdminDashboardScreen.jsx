@@ -1737,6 +1737,13 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     setVisitorHistory(sortedVisitors);
   }, [visitRequests]);
 
+  const getVisitorSafePassId = (visitor = {}) =>
+    visitor.nfcCardId ||
+    visitor.safePassId ||
+    visitor.relatedUser?.nfcCardId ||
+    visitor.relatedVisitor?.nfcCardId ||
+    "Not assigned";
+
   const getCurrentChartData = () => visitorStats[activeChartDataset] || visitorStats.daily;
 
   const getWeekNumber = (date) => {
@@ -4284,6 +4291,9 @@ const loadDashboardData = useCallback(async () => {
                   <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
                     {activity.notes || activity.relatedVisitor?.fullName || "Recent system action"}
                   </Text>
+                  <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 4, fontWeight: "700" }}>
+                    SafePass ID: {getVisitorSafePassId(activity)}
+                  </Text>
                 </TouchableOpacity>
               );
             }) : (
@@ -4419,6 +4429,9 @@ const loadDashboardData = useCallback(async () => {
                   </Text>
                   <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
                     {activity.notes || activity.relatedVisitor?.fullName || "Recent system action"}
+                  </Text>
+                  <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4, fontWeight: "700" }}>
+                    SafePass ID: {getVisitorSafePassId(activity)}
                   </Text>
                   <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 6 }}>
                     {formatDate(activity.timestamp)}
@@ -6194,6 +6207,9 @@ const loadDashboardData = useCallback(async () => {
                     <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
                       {request.email || "-"}
                     </Text>
+                    <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
+                      SafePass ID: {getVisitorSafePassId(request)}
+                    </Text>
                   </View>
                 ),
               },
@@ -7000,6 +7016,9 @@ const loadDashboardData = useCallback(async () => {
                         <View style={styles.historyItemInfo}>
                           <Text style={[styles.historyItemName, { color: theme.textPrimary }]}>{visitor.fullName}</Text>
                           <Text style={[styles.historyItemEmail, { color: theme.textSecondary }]}>{visitor.email}</Text>
+                          <Text style={[styles.historyItemEmail, { color: theme.textSecondary }]}>
+                            SafePass ID: {getVisitorSafePassId(visitor)}
+                          </Text>
                           <Text style={[styles.historyItemPurpose, { color: theme.textSecondary }]}>
                             {visitor.purposeOfVisit || "No purpose provided"}
                           </Text>
@@ -9590,6 +9609,9 @@ const loadDashboardData = useCallback(async () => {
                       </Text>
                       <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
                         {activity.notes || activity.relatedVisitor?.fullName || "Recent system action"}
+                      </Text>
+                      <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4, fontWeight: "700" }}>
+                        SafePass ID: {getVisitorSafePassId(activity)}
                       </Text>
                       <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 6 }}>
                         {formatDate(activity.timestamp)}
