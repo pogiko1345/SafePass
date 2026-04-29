@@ -121,12 +121,14 @@ class ApiService {
 
   async isRememberedSessionActive() {
     const expiresAtRaw = await getSensitiveItem(REMEMBERED_SESSION_EXPIRES_AT_KEY);
+    if (!expiresAtRaw) {
+      return true;
+    }
+
     const expiresAt = Number(expiresAtRaw);
 
     if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-      if (expiresAtRaw) {
-        await this.clearAuth();
-      }
+      await this.clearAuth();
       return false;
     }
 

@@ -382,14 +382,13 @@ export default function LoginScreen({ navigation, route }) {
     }
 
     await Storage.setItem("currentUser", JSON.stringify(normalizedUser));
+    await ApiService.rememberCurrentSession();
 
     if (rememberEmail) {
       await Storage.setItem("rememberedEmail", email.trim());
-      await ApiService.rememberCurrentSession();
       await ApiService.trustDevice();
     } else {
       await Storage.removeItem("rememberedEmail");
-      await ApiService.clearRememberedSession();
       await ApiService.clearTrustedDevice();
     }
 

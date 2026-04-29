@@ -286,15 +286,14 @@ export default function VerificationScreen({ navigation, route }) {
 
       // Store user data
       await storeData("currentUser", JSON.stringify({ ...finalUser, role: userRole }));
+      await ApiService.rememberCurrentSession();
       
       // Treat remember-me as a trusted device so future logins can follow the faster path.
       if (rememberMe && email) {
         await storeData("rememberedEmail", email);
-        await ApiService.rememberCurrentSession();
         await ApiService.trustDevice();
       } else if (email) {
         await Storage.removeItem("rememberedEmail");
-        await ApiService.clearRememberedSession();
         await ApiService.clearTrustedDevice();
       }
       

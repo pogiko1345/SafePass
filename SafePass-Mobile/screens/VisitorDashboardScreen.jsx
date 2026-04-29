@@ -146,6 +146,10 @@ const getStoredVisitorIdType = (visitorRecord = {}) => {
 const PHONE_TRACKING_INTERVAL_MS = 15000;
 const PHONE_TRACKING_DISTANCE_METERS = 8;
 const VISITOR_CONNECTIVITY_REMINDER_KEY = "visitorConnectivityReminderShown";
+const VISITOR_SELECTED_SECTION_KEY = "visitorDashboardSelectedSection";
+const VISITOR_APPOINTMENT_SCREEN_KEY = "visitorDashboardAppointmentScreen";
+const VISITOR_MAP_FLOOR_KEY = "visitorDashboardMapFloor";
+const VISITOR_APPOINTMENT_SCREENS = ["menu", "request", "history", "status"];
 
 const VISITOR_OFFICE_MAP_ALIASES = {
   Registrar: "ground-registrar",
@@ -239,6 +243,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [selectedVisitorSection, setSelectedVisitorSection] = useState("home");
   const [selectedAppointmentScreen, setSelectedAppointmentScreen] = useState("menu");
   const [selectedVisitorMapFloor, setSelectedVisitorMapFloor] = useState("ground");
+  const visitorScreenRestoreReadyRef = useRef(false);
   const [appointmentFeedback, setAppointmentFeedback] = useState(null);
   const [appointmentHistory, setAppointmentHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -310,6 +315,57 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       : "100%";
   const approvedActionCardWidth = isTabletVisitorDashboard ? "48.5%" : "100%";
   const compactApprovedActionCardWidth = viewportWidth <= 560 ? "100%" : approvedActionCardWidth;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const restoreVisitorScreen = async () => {
+      try {
+        const [savedSection, savedAppointmentScreen, savedMapFloor] = await Promise.all([
+          AsyncStorage.getItem(VISITOR_SELECTED_SECTION_KEY),
+          AsyncStorage.getItem(VISITOR_APPOINTMENT_SCREEN_KEY),
+          AsyncStorage.getItem(VISITOR_MAP_FLOOR_KEY),
+        ]);
+
+        if (!isMounted) return;
+
+        if (VISITOR_MODULES.some((module) => module.id === savedSection)) {
+          setSelectedVisitorSection(savedSection);
+        }
+
+        if (VISITOR_APPOINTMENT_SCREENS.includes(savedAppointmentScreen)) {
+          setSelectedAppointmentScreen(savedAppointmentScreen);
+        }
+
+        if (MONITORING_MAP_FLOORS.some((floor) => floor.id === savedMapFloor)) {
+          setSelectedVisitorMapFloor(savedMapFloor);
+        }
+      } finally {
+        if (isMounted) {
+          visitorScreenRestoreReadyRef.current = true;
+        }
+      }
+    };
+
+    restoreVisitorScreen();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!visitorScreenRestoreReadyRef.current) return;
+
+    AsyncStorage.multiSet([
+      [VISITOR_SELECTED_SECTION_KEY, selectedVisitorSection],
+      [VISITOR_APPOINTMENT_SCREEN_KEY, selectedAppointmentScreen],
+      [VISITOR_MAP_FLOOR_KEY, selectedVisitorMapFloor],
+    ]).catch((error) => {
+      console.log("Save visitor screen state error:", error);
+    });
+  }, [selectedVisitorSection, selectedAppointmentScreen, selectedVisitorMapFloor]);
+
   const isVisitorAccessApproved = (visitorRecord = visitor) => {
     const approvalPending =
       visitorRecord?.status === "pending" || visitorRecord?.approvalStatus === "pending";
@@ -1768,6 +1824,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               console.log("Visitor logout API error ignored:", error);
               await ApiService.clearAuth();
             } finally {
+              await AsyncStorage.multiRemove([
+                VISITOR_SELECTED_SECTION_KEY,
+                VISITOR_APPOINTMENT_SCREEN_KEY,
+                VISITOR_MAP_FLOOR_KEY,
+              ]);
               if (onLogout) onLogout();
               navigation.reset({
                 index: 0,
