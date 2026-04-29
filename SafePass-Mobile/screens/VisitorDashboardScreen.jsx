@@ -1873,7 +1873,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       description: appointmentFeedback?.message || "Your latest request was sent to staff for review.",
     });
   }
-<<<<<<< HEAD
   const visitorDestinationInfo = getVisitorDestinationInfo(visitor);
   const visitorRouteSteps = buildVisitorRouteSteps(visitorDestinationInfo);
   const visitorDestinationMarker = {
@@ -1884,7 +1883,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     icon: "navigate",
     position: visitorDestinationInfo.position,
   };
-=======
   const recentAppointmentEntries = appointmentHistoryEntries.slice(0, 3);
   const approvedAppointmentCount = appointmentHistoryEntries.filter((entry) =>
     String(entry.statusLabel || "").toLowerCase().includes("approved"),
@@ -1893,7 +1891,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const normalizedStatus = String(entry.statusLabel || "").toLowerCase();
     return normalizedStatus.includes("pending") || normalizedStatus.includes("review");
   }).length;
->>>>>>> 9b1ded16fb13d3085747540cb7da5ad004c32302
   const displayName =
     visitor?.fullName ||
     [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") ||
