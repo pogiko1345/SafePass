@@ -369,6 +369,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const isVisitorAccessApproved = (visitorRecord = visitor) => {
     const approvalPending =
       visitorRecord?.status === "pending" || visitorRecord?.approvalStatus === "pending";
+    const normalizedStatus = String(visitorRecord?.status || "").toLowerCase();
     const pendingStaffReview =
       !approvalPending &&
       visitorRecord?.approvalFlow === "staff" &&
@@ -377,7 +378,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return (
       !approvalPending &&
       !pendingStaffReview &&
-      (visitorRecord?.status === "approved" || visitorRecord?.status === "checked_in")
+      (normalizedStatus === "approved" || normalizedStatus === "checked_in")
     );
   };
   const appointmentTimeOptions = useMemo(() => {
@@ -413,11 +414,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }, [isVisitorHomeSection, dashboardHeroAnim, dashboardContentAnim]);
   const dashboardShellResponsiveStyle = {
     paddingHorizontal: dashboardHorizontalGutter,
-    paddingBottom: isCompactVisitorDashboard ? 24 : 16,
+    paddingBottom: isCompactVisitorDashboard ? 10 : 16,
   };
   const dashboardCardResponsiveStyle = {
     marginHorizontal: 0,
-    padding: dashboardCardPadding,
+    padding: isCompactVisitorDashboard && isVisitorHomeSection ? 14 : dashboardCardPadding,
   };
   const dashboardHeroCardResponsiveStyle = {
     marginHorizontal: 0,
@@ -427,6 +428,21 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
   const commandActionRowResponsiveStyle = viewportWidth <= 560 ? { gap: 10 } : null;
   const commandActionButtonResponsiveStyle = viewportWidth <= 560 ? { width: "100%" } : null;
+  const compactHomeHeaderStyle = isCompactVisitorDashboard && isVisitorHomeSection
+    ? visitorDashboardStyles.headerCompactHome
+    : null;
+  const compactHomeSupportStyle = isCompactVisitorDashboard && isVisitorHomeSection
+    ? visitorDashboardStyles.headerSupportTextCompact
+    : null;
+  const compactCommandDeckStyle = isCompactVisitorDashboard && isVisitorHomeSection
+    ? visitorDashboardStyles.commandDeckCardCompactHome
+    : null;
+  const compactApprovedHeroStyle = isCompactVisitorDashboard
+    ? visitorDashboardStyles.approvedHeroCardCompact
+    : null;
+  const compactApprovedGradientStyle = isCompactVisitorDashboard
+    ? visitorDashboardStyles.approvedHeroGradientCompact
+    : null;
   const approvedSectionHeaderResponsiveStyle = viewportWidth <= 560
     ? { marginBottom: 12 }
     : null;
@@ -987,6 +1003,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             [{ text: "OK", onPress: () => loadVisitorData() }]
           );
         } else if (response.action === 'check_out') {
+          setShowVirtualNfcModal(false);
+          setShowVirtualNfcSuccessModal(false);
+          setSelectedVisitorSection("home");
           Alert.alert(
             "✓ Checked Out Successfully",
             `Goodbye ${visitor.fullName}! Thank you for visiting.`,
@@ -1501,6 +1520,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
+    if (String(visitor?.status || "").toLowerCase() === "checked_out") {
+      Alert.alert(
+        "Visit Completed",
+        "This SafePass card has already been checked out and can no longer be used.",
+      );
+      return;
+    }
+
     setIsVirtualTapLoading(true);
 
     try {
@@ -1646,7 +1673,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
       if (response?.success) {
         setShowCheckOutModal(false);
+        setShowVirtualNfcModal(false);
+        setShowVirtualNfcSuccessModal(false);
         setShowCheckOutSuccessModal(true);
+        setSelectedVisitorSection("home");
         await loadVisitorData();
         return;
       }
@@ -1872,9 +1902,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     visitor?.appointmentStatus === "adjusted" &&
     visitor?.status === "approved";
   const isApprovedVisitor =
-    !isPendingApproval && !isPendingStaffReview && visitor?.status === "approved";
-  const canUseVisitorAccessTools =
     isVisitorAccessApproved(visitor);
+  const isCheckedOutVisitor = String(visitor?.status || "").toLowerCase() === "checked_out";
+  const canUseVisitorAccessTools =
+    isApprovedVisitor && !isCheckedOutVisitor;
   const canRequestNewAppointment =
     visitor?.approvalStatus === "approved" &&
     !isApprovedVisitor &&
@@ -1968,22 +1999,26 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       ? "Staff Review In Progress"
       : isApprovedVisitor
         ? "Access Ready"
-        : canRequestNewAppointment
-          ? "Schedule Your Next Visit"
-          : canCreateFreshAppointment
-            ? "Visitor Account Active"
-            : "Start Your SafePass";
+        : isCheckedOutVisitor
+          ? "Visit Completed"
+          : canRequestNewAppointment
+            ? "Schedule Your Next Visit"
+            : canCreateFreshAppointment
+              ? "Visitor Account Active"
+              : "Start Your SafePass";
   const journeySubtitle = isPendingApproval
     ? "An admin is reviewing your first visitor request."
     : isPendingStaffReview
       ? "Staff is evaluating your preferred schedule."
       : isApprovedVisitor
         ? "Your pass and NFC tools are active."
-        : canRequestNewAppointment
-          ? "Use this site to request another appointment without registering again."
-          : canCreateFreshAppointment
-            ? "Submit a new preferred date, time, and purpose from this dashboard."
-            : "Create your first visitor registration to unlock access tools.";
+        : isCheckedOutVisitor
+          ? "Your last pass is closed. Review approval history or request your next visit from the appointment module."
+          : canRequestNewAppointment
+            ? "Use this site to request another appointment without registering again."
+            : canCreateFreshAppointment
+              ? "Submit a new preferred date, time, and purpose from this dashboard."
+              : "Create your first visitor registration to unlock access tools.";
   const commandMetrics = visitor
     ? [
         {
@@ -2701,28 +2736,38 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
       ) : null}
       <Text style={visitorDashboardStyles.emptyTitle}>
-        {canCreateFreshAppointment ? "Request Your Next Visit" : "No Active Visit Yet"}
+        {isCheckedOutVisitor
+          ? "Your Visit Is Complete"
+          : canCreateFreshAppointment
+            ? "Request Your Next Visit"
+            : "No Active Visit Yet"}
       </Text>
       <Text style={visitorDashboardStyles.emptyText}>
-        {canCreateFreshAppointment
-          ? "Your visitor account is already active. Submit a new preferred date, time, and purpose here instead of registering again."
-          : "Your visitor account is active. Submit an appointment request so your approved pass can appear here."}
+        {isCheckedOutVisitor
+          ? "The NFC pass for that visit is now disabled. You can review your approval trail or request another appointment when you need to return."
+          : canCreateFreshAppointment
+            ? "Your visitor account is already active. Submit a new preferred date, time, and purpose here instead of registering again."
+            : "Your visitor account is active. Submit an appointment request so your approved pass can appear here."}
       </Text>
       <TouchableOpacity
         style={visitorDashboardStyles.registerButton}
-        onPress={canCreateFreshAppointment ? openAppointmentRequestScreen : () => navigation.navigate("VisitorRegister")}
+        onPress={
+          canRequestNewAppointment || canCreateFreshAppointment
+            ? openAppointmentRequestScreen
+            : () => navigation.navigate("VisitorRegister")
+        }
       >
         <LinearGradient
           colors={["#0A3D91", "#1C6DD0"]}
           style={visitorDashboardStyles.registerGradient}
         >
           <Ionicons
-            name={canCreateFreshAppointment ? "calendar-outline" : "person-add"}
+            name={canRequestNewAppointment || canCreateFreshAppointment ? "calendar-outline" : "person-add"}
             size={20}
             color="#FFFFFF"
           />
           <Text style={visitorDashboardStyles.registerButtonText}>
-            {canCreateFreshAppointment ? "Request Appointment" : "Register as Visitor"}
+            {canRequestNewAppointment || canCreateFreshAppointment ? "Request Appointment" : "Register as Visitor"}
           </Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -2734,6 +2779,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       <View
         style={[
           visitorDashboardStyles.approvedHeroCard,
+          compactApprovedHeroStyle,
           dashboardSectionResponsiveStyle,
           dashboardHeroCardResponsiveStyle,
         ]}
@@ -2742,7 +2788,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           colors={["#0A3D91", "#1C6DD0", "#0A3D91"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={visitorDashboardStyles.approvedHeroGradient}
+          style={[visitorDashboardStyles.approvedHeroGradient, compactApprovedGradientStyle]}
         >
           <View style={visitorDashboardStyles.approvedHeroBadge}>
             <Ionicons name="shield-checkmark" size={16} color="#0A3D91" />
@@ -3954,7 +4000,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           colors={["#061A2E", "#0F3A5F", "#0A3D91"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={visitorDashboardStyles.header}
+          style={[visitorDashboardStyles.header, compactHomeHeaderStyle]}
         >
           <View style={visitorDashboardStyles.headerTop}>
             <View>
@@ -3975,7 +4021,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <Text style={visitorDashboardStyles.userName}>
                 {displayName.split(' ')[0] || 'Visitor'}!
               </Text>
-              <Text style={visitorDashboardStyles.headerSupportText}>
+              <Text style={[visitorDashboardStyles.headerSupportText, compactHomeSupportStyle]}>
                 Visitor access, appointments, and campus guidance
               </Text>
             </View>
@@ -4116,6 +4162,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             style={[
               visitorDashboardStyles.commandDeckCard,
               !isVisitorHomeSection && visitorDashboardStyles.commandDeckCardInline,
+              compactCommandDeckStyle,
               dashboardCardResponsiveStyle,
             ]}
           >
@@ -4445,7 +4492,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </Text>
             </LinearGradient>
 
-            <View style={visitorDashboardStyles.accessFlowBody}>
+            <ScrollView
+              style={visitorDashboardStyles.accessFlowScroll}
+              contentContainerStyle={visitorDashboardStyles.accessFlowBody}
+              showsVerticalScrollIndicator={false}
+            >
               <View style={visitorDashboardStyles.checkInArrivalCard}>
                 <View style={visitorDashboardStyles.checkInArrivalTopRow}>
                   <View style={visitorDashboardStyles.checkInArrivalIdentity}>
@@ -4531,7 +4582,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   )}
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

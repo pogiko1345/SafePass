@@ -54,13 +54,20 @@ export default StyleSheet.create({
     borderBottomRightRadius: 24,
   },
 
+  headerCompactHome: {
+    paddingTop: Platform.select({ ios: 36, android: 18, web: 10 }),
+    paddingBottom: 10,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     flexWrap: "wrap",
     gap: 10,
-    marginBottom: 8,
+    marginBottom: width <= 390 ? 4 : 8,
   },
 
   greeting: {
@@ -75,13 +82,13 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: width <= 390 ? 10 : 12,
+    paddingVertical: width <= 390 ? 5 : 7,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.13)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
-    marginBottom: 8,
+    marginBottom: width <= 390 ? 5 : 8,
   },
 
   homeBrandLogoWrap: {
@@ -130,6 +137,12 @@ export default StyleSheet.create({
     color: "rgba(255,255,255,0.82)",
     marginTop: 4,
     maxWidth: width <= 390 ? 210 : 250,
+  },
+
+  headerSupportTextCompact: {
+    maxWidth: 190,
+    fontSize: 10.5,
+    lineHeight: 14,
   },
 
   headerActions: {
@@ -342,6 +355,13 @@ export default StyleSheet.create({
     marginTop: 4,
   },
 
+  commandDeckCardCompactHome: {
+    marginTop: 4,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 20,
+  },
+
   commandDeckAnimatedWrap: {
     zIndex: 2,
   },
@@ -551,8 +571,8 @@ export default StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
+    paddingVertical: width <= 390 ? 10 : 12,
+    borderRadius: width <= 390 ? 14 : 16,
     backgroundColor: "#0A3D91",
     ...Platform.select({
       ios: {
@@ -567,7 +587,7 @@ export default StyleSheet.create({
   },
 
   commandPrimaryButtonText: {
-    fontSize: 13,
+    fontSize: width <= 390 ? 12.5 : 13,
     fontWeight: "800",
     color: "#FFFFFF",
   },
@@ -1475,8 +1495,17 @@ export default StyleSheet.create({
     }),
   },
 
+  approvedHeroCardCompact: {
+    marginTop: 8,
+    borderRadius: 22,
+  },
+
   approvedHeroGradient: {
-    padding: 22,
+    padding: width <= 390 ? 16 : 22,
+  },
+
+  approvedHeroGradientCompact: {
+    padding: 16,
   },
 
   approvedHeroBadge: {
@@ -1484,15 +1513,15 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: width <= 390 ? 10 : 12,
+    paddingVertical: width <= 390 ? 6 : 8,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.92)",
-    marginBottom: 18,
+    marginBottom: width <= 390 ? 14 : 18,
   },
 
   approvedHeroBadgeText: {
-    fontSize: 12,
+    fontSize: width <= 390 ? 11 : 12,
     fontWeight: "700",
     color: "#0A3D91",
   },
@@ -1500,21 +1529,21 @@ export default StyleSheet.create({
   approvedHeroHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 22,
+    marginBottom: width <= 390 ? 16 : 22,
   },
 
   approvedHeroAvatar: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: width <= 390 ? 58 : 68,
+    height: width <= 390 ? 58 : 68,
+    borderRadius: width <= 390 ? 29 : 34,
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16,
+    marginRight: width <= 390 ? 12 : 16,
   },
 
   approvedHeroInitials: {
-    fontSize: 24,
+    fontSize: width <= 390 ? 20 : 24,
     fontWeight: "800",
     color: "#FFFFFF",
   },
@@ -1524,16 +1553,16 @@ export default StyleSheet.create({
   },
 
   approvedHeroTitle: {
-    fontSize: 28,
+    fontSize: width <= 390 ? 24 : 28,
     fontWeight: "800",
-    lineHeight: 32,
+    lineHeight: width <= 390 ? 28 : 32,
     color: "#FFFFFF",
-    marginBottom: 6,
+    marginBottom: width <= 390 ? 4 : 6,
   },
 
   approvedHeroSubtitle: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: width <= 390 ? 12 : 13,
+    lineHeight: width <= 390 ? 17 : 20,
     color: "rgba(255,255,255,0.88)",
   },
 
@@ -1541,18 +1570,18 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "stretch",
-    gap: 12,
+    gap: width <= 390 ? 10 : 12,
   },
 
   approvedHeroFactCard: {
     backgroundColor: "rgba(255,255,255,0.14)",
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: width <= 390 ? 16 : 18,
+    padding: width <= 390 ? 12 : 14,
     minWidth: 0,
   },
 
   approvedHeroFactLabel: {
-    fontSize: 11,
+    fontSize: width <= 390 ? 10 : 11,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.7,
@@ -1561,7 +1590,7 @@ export default StyleSheet.create({
   },
 
   approvedHeroFactValue: {
-    fontSize: 15,
+    fontSize: width <= 390 ? 14 : 15,
     fontWeight: "700",
     color: "#FFFFFF",
   },
@@ -2489,14 +2518,15 @@ export default StyleSheet.create({
   accessFlowModalContent: {
     width: "88%",
     maxWidth: 388,
+    maxHeight: "92%",
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
     overflow: "hidden",
   },
 
   accessFlowHero: {
-    padding: 18,
-    gap: 10,
+    padding: width <= 390 ? 14 : 18,
+    gap: width <= 390 ? 8 : 10,
   },
 
   accessFlowHeroTop: {
@@ -2533,27 +2563,32 @@ export default StyleSheet.create({
   },
 
   accessFlowTitle: {
-    fontSize: 21,
+    fontSize: width <= 390 ? 19 : 21,
     fontWeight: "800",
     color: "#FFFFFF",
   },
 
   accessFlowSubtitle: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: width <= 390 ? 12.5 : 13,
+    lineHeight: width <= 390 ? 18 : 20,
     color: "rgba(255,255,255,0.86)",
   },
 
+  accessFlowScroll: {
+    maxHeight: Platform.select({ web: 560, default: 620 }),
+  },
+
   accessFlowBody: {
-    padding: 16,
-    gap: 14,
+    padding: width <= 390 ? 12 : 16,
+    paddingBottom: width <= 390 ? 14 : 16,
+    gap: width <= 390 ? 10 : 14,
   },
 
   checkInArrivalCard: {
     backgroundColor: "#F8FBFE",
-    borderRadius: 22,
-    padding: 18,
-    gap: 16,
+    borderRadius: 20,
+    padding: width <= 390 ? 14 : 18,
+    gap: width <= 390 ? 12 : 16,
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
@@ -2573,16 +2608,16 @@ export default StyleSheet.create({
   },
 
   checkInArrivalAvatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: width <= 390 ? 46 : 54,
+    height: width <= 390 ? 46 : 54,
+    borderRadius: width <= 390 ? 23 : 27,
     backgroundColor: "#CCFBF1",
     justifyContent: "center",
     alignItems: "center",
   },
 
   checkInArrivalInitials: {
-    fontSize: 18,
+    fontSize: width <= 390 ? 15 : 18,
     fontWeight: "800",
     color: "#0A3D91",
   },
@@ -2593,7 +2628,7 @@ export default StyleSheet.create({
   },
 
   checkInArrivalName: {
-    fontSize: 18,
+    fontSize: width <= 390 ? 16 : 18,
     fontWeight: "800",
     color: "#0F172A",
   },
@@ -2625,17 +2660,17 @@ export default StyleSheet.create({
   },
 
   checkInArrivalMetaGrid: {
-    flexDirection: "row",
+    flexDirection: width <= 390 ? "column" : "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: width <= 390 ? 9 : 12,
   },
 
   checkInArrivalMetaCard: {
     flex: 1,
-    minWidth: 130,
+    minWidth: width <= 390 ? "100%" : 130,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 14,
+    padding: width <= 390 ? 12 : 14,
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
@@ -2644,7 +2679,7 @@ export default StyleSheet.create({
     width: "100%",
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 14,
+    padding: width <= 390 ? 12 : 14,
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
@@ -2659,7 +2694,7 @@ export default StyleSheet.create({
   },
 
   checkInArrivalMetaValue: {
-    fontSize: 14,
+    fontSize: width <= 390 ? 13 : 14,
     fontWeight: "700",
     color: "#0F172A",
     lineHeight: 20,
@@ -2667,15 +2702,15 @@ export default StyleSheet.create({
 
   checkInArrivalGuideCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 16,
-    gap: 12,
+    borderRadius: 18,
+    padding: width <= 390 ? 13 : 16,
+    gap: width <= 390 ? 10 : 12,
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
 
   checkInArrivalGuideTitle: {
-    fontSize: 16,
+    fontSize: width <= 390 ? 14.5 : 16,
     fontWeight: "800",
     color: "#0F172A",
   },
@@ -2773,7 +2808,8 @@ export default StyleSheet.create({
 
   accessFlowFooter: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
+    paddingTop: 2,
   },
 
   accessFlowSecondaryButton: {
@@ -2781,14 +2817,15 @@ export default StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#CBD5E1",
-    paddingVertical: 14,
+    paddingVertical: width <= 390 ? 12 : 14,
+    minHeight: 48,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
 
   accessFlowSecondaryButtonText: {
-    fontSize: 15,
+    fontSize: width <= 390 ? 13.5 : 15,
     fontWeight: "700",
     color: "#475569",
   },
@@ -2797,7 +2834,8 @@ export default StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     backgroundColor: "#041E42",
-    paddingVertical: 14,
+    paddingVertical: width <= 390 ? 12 : 14,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -2816,7 +2854,8 @@ export default StyleSheet.create({
   },
 
   accessFlowPrimaryButtonText: {
-    fontSize: 15,
+    flexShrink: 1,
+    fontSize: width <= 390 ? 13 : 15,
     fontWeight: "800",
     color: "#FFFFFF",
   },
