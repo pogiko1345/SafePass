@@ -9,6 +9,8 @@ if (Platform.OS === 'web') {
 }
 import * as ImageManipulator from 'expo-image-manipulator';
 
+const DEPLOYED_API_BASE_URL = "https://safepass-052h.onrender.com/api";
+
 const WEB_FALLBACK_API_BASE_URL = (() => {
   if (
     typeof window === "undefined" ||
@@ -16,25 +18,17 @@ const WEB_FALLBACK_API_BASE_URL = (() => {
     !window.location.protocol ||
     !window.location.hostname
   ) {
-    return "http://localhost:5000/api";
+    return DEPLOYED_API_BASE_URL;
   }
 
-  const { protocol, hostname } = window.location;
-  const isLocalHost =
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "0.0.0.0";
-
-  return isLocalHost
-    ? `${protocol}//${hostname}:5000/api`
-    : "https://safepass-052h.onrender.com/api";
+  return DEPLOYED_API_BASE_URL;
 })();
 
 const DEFAULT_API_BASE_URL = Platform.select({
-  ios: "http://localhost:5000/api",            // iOS simulator
-  android: "http://10.0.2.2:5000/api",         // Android emulator
-  web: WEB_FALLBACK_API_BASE_URL,              // Browser on same host as backend
-  default: "http://localhost:5000/api",        // Default
+  ios: DEPLOYED_API_BASE_URL,
+  android: DEPLOYED_API_BASE_URL,
+  web: WEB_FALLBACK_API_BASE_URL,              // Browser uses deployed backend by default
+  default: DEPLOYED_API_BASE_URL,
 });
 
 const API_BASE_URL = (
@@ -42,10 +36,7 @@ const API_BASE_URL = (
   DEFAULT_API_BASE_URL
 ).replace(/\/$/, "");
 
-const API_BASE_URL_CANDIDATES =
-  process.env.EXPO_PUBLIC_API_BASE_URL || Platform.OS !== "android"
-    ? [API_BASE_URL]
-    : ["http://10.0.2.2:5000/api", "http://localhost:5000/api"];
+const API_BASE_URL_CANDIDATES = [API_BASE_URL];
 
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";

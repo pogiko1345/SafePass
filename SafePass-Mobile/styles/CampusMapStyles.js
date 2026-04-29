@@ -362,6 +362,33 @@ export default StyleSheet.create({
     flexShrink: 1,
   },
 
+  mapTextLabel: {
+    position: "absolute",
+    minWidth: 34,
+    minHeight: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 6,
+  },
+
+  mapTextLabelEmphasis: {
+    minHeight: 20,
+  },
+
+  mapTextLabelText: {
+    width: "100%",
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: "900",
+    color: "#111827",
+    textAlign: "center",
+    textTransform: "uppercase",
+    includeFontPadding: false,
+    textShadowColor: "rgba(255, 255, 255, 0.95)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
   mapControls: {
     position: "absolute",
     bottom: 16,
