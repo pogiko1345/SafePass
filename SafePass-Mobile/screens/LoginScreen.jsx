@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import loginStyles from "../styles/LoginStyles";
 import { Ionicons } from "@expo/vector-icons";
+import * as LocalAuthentication from "expo-local-authentication";
 import ApiService from "../utils/ApiService";
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
 import {
@@ -33,6 +34,8 @@ const isWeb = Platform.OS === "web";
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
   : require("@react-native-async-storage/async-storage").default;
+const BIOMETRIC_LOGIN_EMAIL_KEY = "biometricLoginEmail";
+const BIOMETRIC_LOGIN_PASSWORD_KEY = "biometricLoginPassword";
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
@@ -129,6 +132,8 @@ export default function LoginScreen({ navigation, route }) {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [loginError, setLoginError] = useState("");
   const [loginSuccessMessage, setLoginSuccessMessage] = useState("");
+  const [biometricLoginReady, setBiometricLoginReady] = useState(false);
+  const [isBiometricLoading, setIsBiometricLoading] = useState(false);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -236,6 +241,28 @@ export default function LoginScreen({ navigation, route }) {
   // ============ AUTH CHECK ============
   useEffect(() => {
     checkAuthAndConnection();
+  }, []);
+
+  useEffect(() => {
+    const loadBiometricState = async () => {
+      if (Platform.OS === "web") return;
+      try {
+        const [enabled, storedEmail, storedPassword, hasHardware, enrolled] = await Promise.all([
+          Storage.getItem("biometricEnabled"),
+          Storage.getItem(BIOMETRIC_LOGIN_EMAIL_KEY),
+          Storage.getItem(BIOMETRIC_LOGIN_PASSWORD_KEY),
+          LocalAuthentication.hasHardwareAsync(),
+          LocalAuthentication.isEnrolledAsync(),
+        ]);
+        setBiometricLoginReady(
+          enabled === "true" && Boolean(storedEmail) && Boolean(storedPassword) && hasHardware && enrolled,
+        );
+      } catch {
+        setBiometricLoginReady(false);
+      }
+    };
+
+    loadBiometricState();
   }, []);
 
   // Timer for Reset OTP
@@ -394,6 +421,20 @@ export default function LoginScreen({ navigation, route }) {
 
     await Storage.removeItem("isNewRegistration");
     return normalizedUser;
+  };
+
+  const saveBiometricCredentialsIfEnabled = async (loginIdentifier, loginPassword) => {
+    if (Platform.OS === "web") return;
+    try {
+      const enabled = await Storage.getItem("biometricEnabled");
+      if (enabled === "true" && loginIdentifier && loginPassword) {
+        await Storage.setItem(BIOMETRIC_LOGIN_EMAIL_KEY, loginIdentifier);
+        await Storage.setItem(BIOMETRIC_LOGIN_PASSWORD_KEY, loginPassword);
+        setBiometricLoginReady(true);
+      }
+    } catch (error) {
+      console.log("Save biometric login credentials error:", error);
+    }
   };
 
   // ============ FORGOT PASSWORD VALIDATION ============
@@ -672,6 +713,79 @@ export default function LoginScreen({ navigation, route }) {
   };
 
   // ============ LOGIN HANDLER - 2FA FOR EVERYONE ============
+  const handleBiometricLogin = async () => {
+    if (Platform.OS === "web" || isLoading || isBiometricLoading) return;
+
+    setIsBiometricLoading(true);
+    setLoginError("");
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Sign in to SafePass",
+        fallbackLabel: "Use passcode",
+      });
+
+      if (!result.success) {
+        setLoginError("Biometric authentication was cancelled or failed.");
+        return;
+      }
+
+      const storedEmail = await Storage.getItem(BIOMETRIC_LOGIN_EMAIL_KEY);
+      const storedPassword = await Storage.getItem(BIOMETRIC_LOGIN_PASSWORD_KEY);
+
+      if (!storedEmail || !storedPassword) {
+        setBiometricLoginReady(false);
+        setLoginError("Please log in with your password once to activate biometric login.");
+        return;
+      }
+
+      setEmail(storedEmail);
+      setPassword(storedPassword);
+      setRememberMe(true);
+
+      const verifyResponse = await ApiService.verifyCredentials(storedEmail, storedPassword);
+      if (!verifyResponse?.success) {
+        setLoginError("Biometric login failed. Please sign in with your password.");
+        return;
+      }
+
+      const normalizedUser = {
+        ...verifyResponse.user,
+        role: normalizeRole(verifyResponse.user?.role) || "visitor",
+      };
+
+      if (!isRoleAllowedInCurrentVariant(normalizedUser.role)) {
+        await ApiService.clearAuth();
+        setLoginError(getVariantBlockedRoleMessage(normalizedUser.role));
+        return;
+      }
+
+      if (verifyResponse.requires2FA === false) {
+        await persistAuthenticatedSession({
+          token: verifyResponse.tempToken,
+          user: normalizedUser,
+          rememberEmail: true,
+        });
+        navigation.reset({
+          index: 0,
+          routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(normalizedUser) }],
+        });
+        return;
+      }
+
+      navigation.navigate("Verification", {
+        email: storedEmail,
+        password: storedPassword,
+        rememberMe: true,
+        tempToken: verifyResponse.tempToken,
+        user: normalizedUser,
+      });
+    } catch (error) {
+      setLoginError(error?.message || "Biometric login failed. Please try your password.");
+    } finally {
+      setIsBiometricLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
     if (!validateForm()) return;
     if (!apiConnected) {
@@ -718,6 +832,7 @@ export default function LoginScreen({ navigation, route }) {
             user: normalizedUser,
             rememberEmail: rememberMe,
           });
+          await saveBiometricCredentialsIfEnabled(normalizedIdentifier, password);
 
           navigation.reset({
             index: 0,
@@ -733,6 +848,7 @@ export default function LoginScreen({ navigation, route }) {
           tempToken: verifyResponse.tempToken,
           user: normalizedUser
         });
+        await saveBiometricCredentialsIfEnabled(normalizedIdentifier, password);
       }
     } catch (error) {
       const errorMessage = String(error?.message || "");
@@ -1063,6 +1179,24 @@ export default function LoginScreen({ navigation, route }) {
                       <Text style={loginStyles.forgotText}>Forgot Password?</Text>
                     </TouchableOpacity>
                   </View>
+
+                  {biometricLoginReady ? (
+                    <TouchableOpacity
+                      style={loginStyles.biometricLoginButton}
+                      onPress={handleBiometricLogin}
+                      disabled={isLoading || isBiometricLoading}
+                      activeOpacity={0.86}
+                    >
+                      {isBiometricLoading ? (
+                        <ActivityIndicator size="small" color="#0A3D91" />
+                      ) : (
+                        <>
+                          <Ionicons name="finger-print-outline" size={20} color="#0A3D91" />
+                          <Text style={loginStyles.biometricLoginText}>Use phone biometric</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  ) : null}
 
                   {/* Login Button */}
                   <TouchableOpacity

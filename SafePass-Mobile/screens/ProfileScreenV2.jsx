@@ -50,7 +50,9 @@ const DEFAULT_PROFILE = {
   profilePhoto: null,
 };
 
-const LANGUAGES = ["English", "Spanish", "French", "German", "Chinese"];
+const LANGUAGES = ["English", "Filipino / Tagalog"];
+const BIOMETRIC_LOGIN_EMAIL_KEY = "biometricLoginEmail";
+const BIOMETRIC_LOGIN_PASSWORD_KEY = "biometricLoginPassword";
 
 export default function ProfileScreenV2({ navigation, onLogout }) {
   const { width } = useWindowDimensions();
@@ -77,6 +79,11 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
+  });
+  const [visiblePasswordFields, setVisiblePasswordFields] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
   });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
@@ -135,6 +142,10 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   }, [profile]);
 
   const currentProfile = editMode ? editedProfile : profile;
+  const isDarkProfile = darkModeEnabled;
+  const themedCardStyle = [styles.card, isDarkProfile && styles.darkCard];
+  const themedTitleStyle = [styles.cardTitle, isDarkProfile && styles.darkText];
+  const themedMutedStyle = [styles.muted, isDarkProfile && styles.darkMuted];
   const infoRows = [
     ["First Name", "firstName", true],
     ["Last Name", "lastName", true],
@@ -363,6 +374,10 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         newPassword: "",
         confirmPassword: "",
       });
+      if (biometricEnabled && currentProfile?.email) {
+        await Storage.setItem(BIOMETRIC_LOGIN_EMAIL_KEY, currentProfile.email);
+        await Storage.setItem(BIOMETRIC_LOGIN_PASSWORD_KEY, newPassword);
+      }
       Alert.alert("Password Updated", response?.message || "Your password was changed successfully.");
     } catch (e) {
       Alert.alert("Unable To Change Password", e.message || "Please check your current password and try again.");
@@ -370,6 +385,37 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       setIsChangingPassword(false);
     }
   };
+
+  const renderPasswordInput = (field, placeholder) => (
+    <View style={[styles.passwordInputWrap, isDarkProfile && styles.darkInputWrap]}>
+      <TextInput
+        style={[styles.passwordInput, isDarkProfile && styles.darkInput]}
+        value={passwordForm[field]}
+        onChangeText={(text) => updatePasswordField(field, text)}
+        secureTextEntry={!visiblePasswordFields[field]}
+        autoCapitalize="none"
+        autoCorrect={false}
+        placeholder={placeholder}
+        placeholderTextColor={isDarkProfile ? "#94A3B8" : "#94A3B8"}
+      />
+      <TouchableOpacity
+        style={styles.passwordEyeButton}
+        onPress={() =>
+          setVisiblePasswordFields((current) => ({
+            ...current,
+            [field]: !current[field],
+          }))
+        }
+        activeOpacity={0.8}
+      >
+        <Ionicons
+          name={visiblePasswordFields[field] ? "eye-off-outline" : "eye-outline"}
+          size={19}
+          color={isDarkProfile ? "#CBD5E1" : "#64748B"}
+        />
+      </TouchableOpacity>
+    </View>
+  );
 
   const shareProfile = async () => {
     if (!profile) return;
@@ -385,13 +431,24 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
 
   const toggleBiometric = async (value) => {
     if (Platform.OS === "web") return setBiometricEnabled(false);
-    if (!value) return setBiometricEnabled(false);
+    if (!value) {
+      await Storage.removeItem(BIOMETRIC_LOGIN_EMAIL_KEY);
+      await Storage.removeItem(BIOMETRIC_LOGIN_PASSWORD_KEY);
+      return setBiometricEnabled(false);
+    }
     try {
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: "Authenticate to enable biometric login",
         fallbackLabel: "Use passcode",
       });
-      if (result.success) setBiometricEnabled(true);
+      if (result.success) {
+        await Storage.setItem("biometricUserEmail", currentProfile?.email || "");
+        setBiometricEnabled(true);
+        Alert.alert(
+          "Biometric Login Enabled",
+          "After your next successful password login, SafePass will let you sign in using your phone biometrics.",
+        );
+      }
       else {
         setBiometricEnabled(false);
         Alert.alert(
@@ -562,53 +619,26 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
 
   const renderSecurity = () => (
     <View style={styles.stack}>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Change Password</Text>
-        <Text style={styles.muted}>
+      <View style={themedCardStyle}>
+        <Text style={themedTitleStyle}>Change Password</Text>
+        <Text style={themedMutedStyle}>
           Use a strong password that you do not use on other accounts. Your current password is required before saving.
         </Text>
 
         <View style={styles.passwordForm}>
           <View style={styles.field}>
-            <Text style={styles.kicker}>Current Password</Text>
-            <TextInput
-              style={styles.input}
-              value={passwordForm.currentPassword}
-              onChangeText={(text) => updatePasswordField("currentPassword", text)}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="Enter current password"
-              placeholderTextColor="#94A3B8"
-            />
+            <Text style={[styles.kicker, isDarkProfile && styles.darkKicker]}>Current Password</Text>
+            {renderPasswordInput("currentPassword", "Enter current password")}
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.kicker}>New Password</Text>
-            <TextInput
-              style={styles.input}
-              value={passwordForm.newPassword}
-              onChangeText={(text) => updatePasswordField("newPassword", text)}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="Enter new password"
-              placeholderTextColor="#94A3B8"
-            />
+            <Text style={[styles.kicker, isDarkProfile && styles.darkKicker]}>New Password</Text>
+            {renderPasswordInput("newPassword", "Enter new password")}
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.kicker}>Confirm New Password</Text>
-            <TextInput
-              style={styles.input}
-              value={passwordForm.confirmPassword}
-              onChangeText={(text) => updatePasswordField("confirmPassword", text)}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="Re-enter new password"
-              placeholderTextColor="#94A3B8"
-            />
+            <Text style={[styles.kicker, isDarkProfile && styles.darkKicker]}>Confirm New Password</Text>
+            {renderPasswordInput("confirmPassword", "Re-enter new password")}
           </View>
 
           <TouchableOpacity
@@ -628,11 +658,11 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         </View>
       </View>
 
-      <View style={styles.securityNoteCard}>
+      <View style={[styles.securityNoteCard, isDarkProfile && styles.darkInfoCard]}>
         <Ionicons name="shield-checkmark-outline" size={22} color="#0A3D91" />
         <View style={styles.securityNoteCopy}>
-          <Text style={styles.securityNoteTitle}>Account Safety</Text>
-          <Text style={styles.securityNoteText}>
+          <Text style={[styles.securityNoteTitle, isDarkProfile && styles.darkText]}>Account Safety</Text>
+          <Text style={[styles.securityNoteText, isDarkProfile && styles.darkMuted]}>
             If you change your email or username, use the updated value the next time you sign in.
           </Text>
         </View>
@@ -641,11 +671,11 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   );
 
   const renderPreferences = () => (
-    <View style={styles.card}>
+    <View style={themedCardStyle}>
       <View style={styles.prefRow}>
         <View style={styles.prefText}>
-          <Text style={styles.prefTitle}>Push Notifications</Text>
-          <Text style={styles.muted}>
+          <Text style={[styles.prefTitle, isDarkProfile && styles.darkText]}>Push Notifications</Text>
+          <Text style={themedMutedStyle}>
             Receive alerts about activity and account updates.
           </Text>
         </View>
@@ -658,8 +688,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       </View>
       <View style={styles.prefRow}>
         <View style={styles.prefText}>
-          <Text style={styles.prefTitle}>Biometric Login</Text>
-          <Text style={styles.muted}>
+          <Text style={[styles.prefTitle, isDarkProfile && styles.darkText]}>Biometric Login</Text>
+          <Text style={themedMutedStyle}>
             Use your device biometrics for faster sign in.
           </Text>
         </View>
@@ -672,9 +702,9 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       </View>
       <View style={styles.prefRow}>
         <View style={styles.prefText}>
-          <Text style={styles.prefTitle}>Dark Mode</Text>
-          <Text style={styles.muted}>
-            Save this preference for future theme support.
+          <Text style={[styles.prefTitle, isDarkProfile && styles.darkText]}>Dark Mode</Text>
+          <Text style={themedMutedStyle}>
+            Switch this profile module to a darker interface.
           </Text>
         </View>
         <Switch
@@ -686,8 +716,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       </View>
       <TouchableOpacity style={styles.prefRow} onPress={showLanguagePicker}>
         <View style={styles.prefText}>
-          <Text style={styles.prefTitle}>Language</Text>
-          <Text style={styles.muted}>
+          <Text style={[styles.prefTitle, isDarkProfile && styles.darkText]}>Language</Text>
+          <Text style={themedMutedStyle}>
             Current selection: {selectedLanguage}
           </Text>
         </View>
@@ -698,9 +728,9 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
 
   return (
     <>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, isDarkProfile && styles.darkSafeArea]}>
         <StatusBar barStyle="light-content" backgroundColor="#041E42" />
-        <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+        <Animated.View style={[styles.container, isDarkProfile && styles.darkContainer, { opacity: fadeAnim }]}>
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
@@ -1269,9 +1299,49 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#0F172A",
   },
+  passwordInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 16,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 14,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#0F172A",
+  },
+  passwordEyeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   passwordForm: {
     gap: 4,
     marginTop: 18,
+  },
+  darkSafeArea: { backgroundColor: "#07111F" },
+  darkContainer: { backgroundColor: "#07111F" },
+  darkCard: {
+    backgroundColor: "#0F172A",
+    borderColor: "#1F2A3A",
+  },
+  darkText: { color: "#F8FAFC" },
+  darkMuted: { color: "#CBD5E1" },
+  darkKicker: { color: "#94A3B8" },
+  darkInputWrap: {
+    backgroundColor: "#111827",
+    borderColor: "#334155",
+  },
+  darkInput: { color: "#F8FAFC" },
+  darkInfoCard: {
+    backgroundColor: "#111827",
+    borderColor: "#334155",
   },
   securityNoteCard: {
     flexDirection: "row",

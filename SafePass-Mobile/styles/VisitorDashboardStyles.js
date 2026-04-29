@@ -34,6 +34,64 @@ export default StyleSheet.create({
     paddingBottom: 164,
   },
 
+  visitorPushNotice: {
+    position: "absolute",
+    top: Platform.select({ ios: 58, android: 34, web: 18 }),
+    left: width <= 390 ? 14 : 20,
+    right: width <= 390 ? 14 : 20,
+    zIndex: 40,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D8E6F5",
+    padding: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+      android: { elevation: 8 },
+      web: { boxShadow: "0px 14px 30px rgba(15,23,42,0.14)" },
+    }),
+  },
+
+  visitorPushNoticeSuccess: {
+    borderColor: "#B7D5F6",
+    backgroundColor: "#F8FBFE",
+  },
+
+  visitorPushNoticeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+
+  visitorPushNoticeCopy: {
+    flex: 1,
+    gap: 2,
+  },
+
+  visitorPushNoticeTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  visitorPushNoticeText: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: "#475569",
+    fontWeight: "600",
+  },
+
   dashboardShell: {
     width: "100%",
     maxWidth: 1120,

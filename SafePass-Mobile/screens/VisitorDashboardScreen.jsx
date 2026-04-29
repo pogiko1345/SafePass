@@ -261,6 +261,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [showCheckInSuccessModal, setShowCheckInSuccessModal] = useState(false);
   const [showCheckOutModal, setShowCheckOutModal] = useState(false);
   const [showCheckOutSuccessModal, setShowCheckOutSuccessModal] = useState(false);
+  const [visitorPushNotice, setVisitorPushNotice] = useState(null);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
   const [isVirtualTapLoading, setIsVirtualTapLoading] = useState(false);
   const [isCheckInLoading, setIsCheckInLoading] = useState(false);
@@ -297,6 +298,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const nfcListenerRef = useRef(null);
   const phoneLocationSubscriptionRef = useRef(null);
   const appointmentTransitionTimeoutRef = useRef(null);
+  const visitorPushNoticeTimeoutRef = useRef(null);
   const appointmentWebDateInputRef = useRef(null);
   const shownVisitorWarningIdsRef = useRef(new Set());
   const visitorWarningCheckInFlightRef = useRef(false);
@@ -492,7 +494,28 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (appointmentTransitionTimeoutRef.current) {
       clearTimeout(appointmentTransitionTimeoutRef.current);
     }
+    if (visitorPushNoticeTimeoutRef.current) {
+      clearTimeout(visitorPushNoticeTimeoutRef.current);
+    }
   }, []);
+
+  const showVisitorPushNotice = ({ title, message, type = "info" }) => {
+    if (visitorPushNoticeTimeoutRef.current) {
+      clearTimeout(visitorPushNoticeTimeoutRef.current);
+    }
+
+    setVisitorPushNotice({
+      id: `${type}-${Date.now()}`,
+      title,
+      message,
+      type,
+    });
+
+    visitorPushNoticeTimeoutRef.current = setTimeout(() => {
+      setVisitorPushNotice(null);
+      visitorPushNoticeTimeoutRef.current = null;
+    }, 6000);
+  };
 
   useEffect(() => {
     if (visitor?.status === "checked_in") {
@@ -522,11 +545,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
       await AsyncStorage.setItem(VISITOR_CONNECTIVITY_REMINDER_KEY, reminderToken);
 
-      Alert.alert(
-        "Before You Visit Campus",
-        "Please take note: turn on Wi-Fi or cellular data before visiting the campus so SafePass check-in, notifications, and live visitor tracking can work properly.",
-        [{ text: "Understood" }],
-      );
+      showVisitorPushNotice({
+        type: "success",
+        title: "Appointment Approved",
+        message:
+          "Before visiting, please turn on Wi-Fi or cellular data so check-in, notifications, and live visitor tracking can work properly.",
+      });
     };
 
     maybeShowConnectivityReminder();
@@ -542,7 +566,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setShowCheckInModal(false);
     setShowCheckInSuccessModal(false);
     setShowCheckOutModal(false);
-    setShowCheckOutSuccessModal(false);
   }, [visitor?.status, visitor?.approvalStatus, visitor?.approvalFlow, visitor?.appointmentStatus]);
 
   const stopPhoneLocationTracking = async () => {
@@ -3894,7 +3917,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <View style={visitorDashboardStyles.mapSummaryCopy}>
             <Text style={visitorDashboardStyles.mapSummaryTitle}>Arrival Guide</Text>
             <Text style={visitorDashboardStyles.mapSummaryText}>
-              Review your assigned floor and route steps before arrival so you know exactly where to go.
+              {isCheckedOutVisitor
+                ? "Your completed visit is no longer shown on the live map. Request another appointment to see a new route."
+                : "Review your assigned floor and route steps before arrival so you know exactly where to go."}
             </Text>
           </View>
         </View>
@@ -3928,7 +3953,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           </View>
         </View>
         <View style={visitorDashboardStyles.visitorRouteSteps}>
-          {visitorRouteSteps.map((step, index) => (
+          {(isCheckedOutVisitor
+            ? ["Thank you for visiting. Your previous route has been closed after checkout."]
+            : visitorRouteSteps
+          ).map((step, index) => (
             <View key={`visitor-route-${index}`} style={visitorDashboardStyles.visitorRouteStepRow}>
               <View style={visitorDashboardStyles.visitorRouteStepIndex}>
                 <Text style={visitorDashboardStyles.visitorRouteStepIndexText}>{index + 1}</Text>
@@ -3985,7 +4013,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         offices={MONITORING_MAP_OFFICES}
         selectedFloor={visitorDestinationInfo.floorId || selectedVisitorMapFloor}
         selectedOffice="all"
-        destinationMarkers={[visitorDestinationMarker]}
+        destinationMarkers={isCheckedOutVisitor ? [] : [visitorDestinationMarker]}
         showVisitorMarkers={false}
         showActiveVisitorsBadge={false}
         mapBlueprints={MONITORING_MAP_BLUEPRINTS}
@@ -4286,6 +4314,34 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           {renderActiveVisitorPanel()}
         </View>
       </ScrollView>
+
+      {visitorPushNotice ? (
+        <TouchableOpacity
+          style={[
+            visitorDashboardStyles.visitorPushNotice,
+            visitorPushNotice.type === "success" && visitorDashboardStyles.visitorPushNoticeSuccess,
+          ]}
+          activeOpacity={0.92}
+          onPress={() => setVisitorPushNotice(null)}
+        >
+          <View style={visitorDashboardStyles.visitorPushNoticeIcon}>
+            <Ionicons
+              name={visitorPushNotice.type === "success" ? "checkmark-circle" : "notifications-outline"}
+              size={18}
+              color="#0A3D91"
+            />
+          </View>
+          <View style={visitorDashboardStyles.visitorPushNoticeCopy}>
+            <Text style={visitorDashboardStyles.visitorPushNoticeTitle}>
+              {visitorPushNotice.title}
+            </Text>
+            <Text style={visitorDashboardStyles.visitorPushNoticeText}>
+              {visitorPushNotice.message}
+            </Text>
+          </View>
+          <Ionicons name="close" size={16} color="#64748B" />
+        </TouchableOpacity>
+      ) : null}
 
       {renderBottomNavigation()}
 
@@ -4822,7 +4878,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </View>
             <Text style={visitorDashboardStyles.accessFlowSuccessTitle}>Checked Out Successfully</Text>
             <Text style={visitorDashboardStyles.accessFlowSuccessText}>
-              Your visit has been completed. The monitoring system can now see that you have checked out.
+              Thank you for visiting. Your visit has been completed and you have been removed from active monitoring.
             </Text>
 
             <View style={visitorDashboardStyles.accessFlowSuccessMetaCard}>

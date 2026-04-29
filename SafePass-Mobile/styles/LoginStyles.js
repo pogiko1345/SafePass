@@ -509,6 +509,25 @@ export default StyleSheet.create({
     fontWeight: "700",
   },
 
+  biometricLoginButton: {
+    minHeight: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#B7D5F6",
+    backgroundColor: "#EEF5FF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  biometricLoginText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
   loginButton: {
     backgroundColor: "#0A3D91",
     paddingVertical: 16,
