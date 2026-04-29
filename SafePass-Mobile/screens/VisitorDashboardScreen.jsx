@@ -1375,39 +1375,27 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     setIsVirtualTapLoading(true);
-    setNfcStatus({
-      type: "processing",
-      message: "Processing your virtual NFC tap and notifying the operations team...",
-    });
 
     try {
-      const response = await ApiService.visitorCheckIn(visitor._id, {
-        source: "virtual_nfc_card",
-      });
-
-      if (response?.success) {
-        setShowVirtualNfcModal(false);
-        setShowVirtualNfcSuccessModal(true);
-        setNfcStatus({
-          type: "success",
-          message: "Virtual NFC card accepted. Security and admin have been notified of your check-in.",
-        });
-        await loadVisitorData();
+      const started = await startNfcReading();
+      if (!started) {
         return;
       }
 
       setNfcStatus({
-        type: "error",
-        message: response?.message || "Your virtual NFC tap could not be completed.",
+        type: "info",
+        message:
+          visitor?.status === "checked_in"
+            ? "Tap your phone to the NFC hardware reader to check out."
+            : "Tap your phone to the NFC hardware reader to check in.",
       });
-      Alert.alert("Check-In Failed", response?.message || "Unable to check in right now.");
     } catch (error) {
       console.error("Virtual NFC card tap error:", error);
       setNfcStatus({
         type: "error",
-        message: error?.message || "Virtual NFC card tap failed. Please try again.",
+        message: error?.message || "Unable to start the NFC tap flow. Please try again.",
       });
-      Alert.alert("Check-In Failed", error?.message || "Unable to check in right now.");
+      Alert.alert("NFC Unavailable", error?.message || "Unable to start the NFC tap flow right now.");
     } finally {
       setIsVirtualTapLoading(false);
     }
@@ -2691,7 +2679,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </View>
                   <Text style={visitorDashboardStyles.approvedVirtualNfcTitle}>View Access Card</Text>
                   <Text style={visitorDashboardStyles.approvedVirtualNfcSubtitle}>
-                    Open your digital SafePass card before you head to campus.
+                    Open your digital SafePass card and tap your phone to the hardware reader for check-in or check-out.
                   </Text>
                 </View>
                 <View style={visitorDashboardStyles.approvedVirtualNfcIconWrap}>
@@ -4083,7 +4071,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View>
                 <Text style={visitorDashboardStyles.virtualNfcModalTitle}>Virtual NFC Card</Text>
                 <Text style={visitorDashboardStyles.virtualNfcModalSubtitle}>
-                  Rotate your phone sideways, present the pass to the reader, then confirm check-in when ready.
+                  Present your phone to the NFC hardware reader so the same card can handle both check-in and check-out.
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setShowVirtualNfcModal(false)}>
@@ -4189,10 +4177,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       </View>
                       <View style={visitorDashboardStyles.virtualNfcTapHintCopy}>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintTitle}>
-                          Tap This Card To Check In
+                          Tap This Card To The Hardware Reader
                         </Text>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintText}>
-                          Present this digital pass and tap once you are ready to enter campus.
+                          Use this digital pass at the NFC hardware reader. The system will check you in or out based on your current visit status.
                         </Text>
                       </View>
                     </View>
@@ -4207,9 +4195,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ]}
               >
                 {[
-                  "Use the card view above to verify your approved access details.",
-                  "Security will receive the visitor check-in notification.",
-                  "Admin monitoring will also record this check-in event.",
+                  "Use the card view above to confirm your approved visitor details before tapping.",
+                  "Tap your phone to the NFC hardware reader to process campus entry or exit.",
+                  "Security and admin monitoring will record the hardware tap event automatically.",
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.virtualNfcInfoRow}>
                     <Ionicons name="checkmark-circle-outline" size={18} color="#0A3D91" />
@@ -4243,7 +4231,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     <>
                       <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
                       <Text style={visitorDashboardStyles.virtualNfcPrimaryButtonText}>
-                        Check In With Card
+                        Start NFC Tap
                       </Text>
                     </>
                   )}
