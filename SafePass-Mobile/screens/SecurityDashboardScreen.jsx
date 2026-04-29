@@ -2740,10 +2740,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     
     return (
       <Animated.View style={[styles.sidebar, { width: sidebarWidth }]}>
-        <LinearGradient
-          colors={['#041E42', '#0A3D91', '#1C6DD0']}
-          style={styles.sidebarHeader}
-        >
+        <View style={styles.sidebarHeader}>
           <View style={styles.sidebarLogo}>
             <Image source={Logo} style={styles.sidebarLogoImage} resizeMode="contain" />
             <View>
@@ -2753,10 +2750,10 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
           {!isDesktop && (
             <TouchableOpacity onPress={toggleSidebar} style={styles.sidebarClose}>
-              <Ionicons name="close" size={24} color="#FFFFFF" />
+              <Ionicons name="close" size={22} color="#64748B" />
             </TouchableOpacity>
           )}
-        </LinearGradient>
+        </View>
         
         <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
           {/* User Profile Section */}
@@ -3095,7 +3092,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#041E42" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F4F8FC" />
       
       <View style={styles.mainContainer}>
         {/* Sidebar */}
@@ -3104,19 +3101,18 @@ export default function SecurityDashboardScreen({ navigation }) {
         {/* Main Content */}
         <Animated.View style={[styles.mainContent, { opacity: fadeAnim }]}>
           {/* Header with Burger Menu */}
-          <LinearGradient
-            colors={['#041E42', '#0A3D91', '#1C6DD0']}
-            style={styles.header}
-          >
-            <View style={styles.headerTop}>
+          <View style={styles.pageHeaderWrap}>
+            <View style={styles.pageHeaderCard}>
+              <View style={styles.headerTop}>
               <View style={styles.headerLeft}>
                 <TouchableOpacity 
                   style={styles.burgerButton}
                   onPress={toggleSidebar}
                 >
-                  <Ionicons name="menu-outline" size={28} color="#FFFFFF" />
+                  <Ionicons name="menu-outline" size={24} color="#0A3D91" />
                 </TouchableOpacity>
                 <View>
+                  <Text style={styles.pageEyebrow}>Security Module</Text>
                   <Text style={styles.headerTitle}>
                     {selectedSubmoduleMeta.title}
                   </Text>
@@ -3130,7 +3126,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                   style={styles.notificationBell}
                   onPress={() => setShowNotificationModal(true)}
                 >
-                  <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+                  <Ionicons name="notifications-outline" size={22} color="#0A3D91" />
                   {unreadCount > 0 && (
                     <View style={styles.notificationBadge}>
                       <Text style={styles.notificationBadgeText}>
@@ -3173,7 +3169,8 @@ export default function SecurityDashboardScreen({ navigation }) {
                 </Text>
               </View>
             </View>
-          </LinearGradient>
+            </View>
+          </View>
 
           {/* Tab Content */}
           {selectedSubmodule === 'home-main' && renderDashboardTab()}
