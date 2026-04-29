@@ -1594,6 +1594,61 @@ export default StyleSheet.create({
     gap: 14,
   },
 
+  approvedCompactActionsColumn: {
+    flex: 1,
+    minWidth: width <= 560 ? "100%" : 260,
+    gap: 12,
+  },
+
+  approvedCompactActionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: width <= 390 ? 14 : 16,
+    borderWidth: 1,
+    borderColor: "#DDEBFA",
+    minHeight: 92,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 14,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 8px 18px rgba(15,23,42,0.08)" },
+    }),
+  },
+
+  approvedCompactActionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  approvedCompactActionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  approvedCompactActionTitle: {
+    fontSize: width <= 390 ? 15 : 16,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  approvedCompactActionText: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+
   approvedActionCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 22,
@@ -1765,6 +1820,58 @@ export default StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "#0A3D91",
+  },
+
+  approvedTimelineSection: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#DDEBFA",
+    padding: width <= 390 ? 16 : 18,
+    marginTop: 18,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+      },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.06)" },
+    }),
+  },
+
+  approvedSnapshotGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  approvedSnapshotCard: {
+    flexGrow: 1,
+    flexBasis: width <= 560 ? "100%" : "30%",
+    minWidth: width <= 560 ? "100%" : 160,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  approvedSnapshotLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+
+  approvedSnapshotValue: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "800",
+    color: "#0F172A",
   },
 
   approvedInfoCard: {

@@ -666,11 +666,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         const notificationId = String(notification?._id || "");
         const notificationType = String(notification?.type || "").toLowerCase();
         const severity = String(notification?.severity || "").toLowerCase();
+        const notificationText = `${notification?.title || ""} ${notification?.message || ""}`.toLowerCase();
 
         return (
           notificationId &&
           !shownVisitorWarningIdsRef.current.has(notificationId) &&
-          (notificationType === "warning" || notificationType === "alert" || severity === "high")
+          (
+            notificationType === "warning" ||
+            notificationType === "alert" ||
+            severity === "high" ||
+            notificationText.includes("reported")
+          )
         );
       });
 
@@ -682,7 +688,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       shownVisitorWarningIdsRef.current.add(warningId);
 
       Alert.alert(
-        latestWarning.title || "Security Warning",
+        latestWarning.title || "Security Report Warning",
         latestWarning.message || "A new notice has been added to your visitor account.",
         [
           {
@@ -2695,12 +2701,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
       ) : null}
       <Text style={visitorDashboardStyles.emptyTitle}>
-        {canCreateFreshAppointment ? "Request Your Next Visit" : "No Visitor Pass Found"}
+        {canCreateFreshAppointment ? "Request Your Next Visit" : "No Active Visit Yet"}
       </Text>
       <Text style={visitorDashboardStyles.emptyText}>
         {canCreateFreshAppointment
           ? "Your visitor account is already active. Submit a new preferred date, time, and purpose here instead of registering again."
-          : "You don't have an active visitor pass yet. Please register as a visitor first."}
+          : "Your visitor account is active. Submit an appointment request so your approved pass can appear here."}
       </Text>
       <TouchableOpacity
         style={visitorDashboardStyles.registerButton}
