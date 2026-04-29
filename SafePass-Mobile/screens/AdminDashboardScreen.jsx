@@ -1626,6 +1626,15 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
             { label: "Completed", value: stats.completedVisits, icon: "checkmark-done-outline", color: "#10B981" },
           ],
         };
+      case "security-report-records":
+        return {
+          title: "Security Reports",
+          subtitle: "Review visitor incident reports submitted by security and guard accounts.",
+          highlights: [
+            { label: "Reports", value: securityReportRecords.length, icon: "shield-alert-outline", color: "#DC2626" },
+            { label: "Unresolved", value: securityReportRecords.filter((item) => !item.resolved).length, icon: "alert-circle-outline", color: "#F59E0B" },
+          ],
+        };
       case "settings":
         return {
           title: "Settings",
@@ -1666,6 +1675,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     stats.pendingRequests,
     totalFilteredUsers,
     visitorHistory.length,
+    securityReportRecords,
   ]);
 
   const adminModules = useMemo(
@@ -1708,10 +1718,13 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         label: "Reports",
         icon: "document-text-outline",
         color: "#1C6DD0",
-        submodules: [{ key: "report-records", label: "Report Records", badge: visitorHistory.length }],
+        submodules: [
+          { key: "report-records", label: "Report Records", badge: visitorHistory.length },
+          { key: "security-report-records", label: "Security Reports", badge: securityReportRecords.length },
+        ],
       },
     ],
-    [allUsers.length, appointmentRecords.length, dataCollectionFields.length, managedRooms, pendingAppointmentRequests.length, visitorHistory.length],
+    [allUsers.length, appointmentRecords.length, dataCollectionFields.length, managedRooms, pendingAppointmentRequests.length, securityReportRecords.length, visitorHistory.length],
   );
 
   const getFilteredHistory = useCallback(() => {
@@ -1838,6 +1851,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     );
     setVisitorHistory(sortedVisitors);
   }, [visitRequests]);
+
+  const securityReportRecords = useMemo(
+    () => visitorHistory.filter((visitor) => visitor.reportType === "security_report"),
+    [visitorHistory],
+  );
 
   const handleSaveAppointmentOffice = async () => {
     const visitorId = selectedRequest?._id || selectedRequest?.id || selectedRequest?.sourceVisitorId;
@@ -2671,7 +2689,7 @@ const loadDashboardData = useCallback(async () => {
             ? "webmap"
             : submoduleKey === "appointment-records" || submoduleKey === "appointment-management"
               ? "requests"
-              : submoduleKey === "report-records"
+              : submoduleKey === "report-records" || submoduleKey === "security-report-records"
                 ? "analytics"
                 : submoduleKey === "settings"
                   ? "settings"
@@ -6808,6 +6826,154 @@ const loadDashboardData = useCallback(async () => {
     );
   };
 
+  const renderSecurityReportRecordsContent = () => (
+    <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+      <View style={styles.pageContainer}>
+        <AdminSectionShell
+          title="Security Reports"
+          subtitle="Reports filed by security and guard users are separated here for review and follow-up."
+          badge={`${securityReportRecords.length} reports`}
+          isDarkMode={isDarkMode}
+          theme={theme}
+          actions={
+            <View style={styles.adminSectionShellActions}>
+              <TouchableOpacity style={styles.pageRefreshButton} onPress={loadVisitorHistory}>
+                <Ionicons name="refresh-outline" size={22} color="#DC2626" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pageRefreshButton}
+                onPress={() =>
+                  printRecordsTable({
+                    title: "Security Reports",
+                    subtitle: "Visitor incident reports submitted by security personnel.",
+                    columns: ["Visitor", "Email", "Reason", "Office", "Reporter", "Reported At", "Resolved"],
+                    rows: securityReportRecords.map((record) => [
+                      record.fullName || "Visitor",
+                      record.email || "-",
+                      record.reportReason || "-",
+                      record.assignedOffice || record.appointmentDepartment || record.host || "-",
+                      record.reporterName || "Security",
+                      formatDateTime(record.reportedAt || record.createdAt),
+                      record.resolved ? "Resolved" : "Open",
+                    ]),
+                  })
+                }
+              >
+                <Ionicons name="print-outline" size={20} color="#DC2626" />
+              </TouchableOpacity>
+            </View>
+          }
+        >
+          <View style={styles.modularCardGrid}>
+            {[
+              { label: "Total Reports", value: securityReportRecords.length, color: "#DC2626" },
+              { label: "Open", value: securityReportRecords.filter((item) => !item.resolved).length, color: "#F59E0B" },
+              { label: "Resolved", value: securityReportRecords.filter((item) => item.resolved).length, color: "#10B981" },
+            ].map((item) => (
+              <View
+                key={item.label}
+                style={[
+                  styles.modularStatCard,
+                  {
+                    backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
+                    borderColor: theme.borderColor,
+                  },
+                ]}
+              >
+                <Text style={[styles.modularStatValue, { color: item.color }]}>{item.value}</Text>
+                <Text style={[styles.modularStatLabel, isDarkMode && styles.darkTextSecondary]}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {renderAdminTable({
+            rows: securityReportRecords,
+            keyExtractor: (record) => record._id || `${record.email}-${record.reportedAt}-${record.reportReason}`,
+            emptyTitle: "No security reports",
+            emptySubtitle: "Reports submitted by security or guard accounts will appear here.",
+            columns: [
+              {
+                key: "visitor",
+                label: "Visitor",
+                width: 220,
+                render: (record) => (
+                  <View>
+                    <Text style={[styles.adminTablePrimaryText, isDarkMode && styles.darkText]}>
+                      {record.fullName || "Visitor"}
+                    </Text>
+                    <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
+                      {record.email || "-"}
+                    </Text>
+                  </View>
+                ),
+              },
+              {
+                key: "reason",
+                label: "Reason",
+                width: 280,
+                render: (record) => (
+                  <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                    {record.reportReason || "-"}
+                  </Text>
+                ),
+              },
+              {
+                key: "office",
+                label: "Office",
+                width: 170,
+                render: (record) => (
+                  <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                    {record.assignedOffice || record.appointmentDepartment || record.host || "-"}
+                  </Text>
+                ),
+              },
+              {
+                key: "reporter",
+                label: "Reported By",
+                width: 180,
+                render: (record) => (
+                  <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                    {record.reporterName || "Security"}
+                  </Text>
+                ),
+              },
+              {
+                key: "reportedAt",
+                label: "Reported At",
+                width: 170,
+                render: (record) => (
+                  <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                    {formatDateTime(record.reportedAt || record.createdAt)}
+                  </Text>
+                ),
+              },
+              {
+                key: "status",
+                label: "Status",
+                width: 130,
+                render: (record) => (
+                  <View
+                    style={[
+                      styles.dashboardStatusBadge,
+                      {
+                        backgroundColor: record.resolved ? "rgba(16,185,129,0.12)" : "rgba(220,38,38,0.12)",
+                        alignSelf: "flex-start",
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.dashboardStatusText, { color: record.resolved ? "#10B981" : "#DC2626" }]}>
+                      {record.resolved ? "Resolved" : "Open"}
+                    </Text>
+                  </View>
+                ),
+              },
+            ],
+          })}
+        </AdminSectionShell>
+      </View>
+    </ScrollView>
+  );
+
   const renderAnalyticsContent = () => {
     const chart = getCurrentChartData();
     const historyStats = getHistoryStats();
@@ -7856,6 +8022,8 @@ const loadDashboardData = useCallback(async () => {
         return renderAppointmentManagementContent();
       case "report-records":
         return renderReportRecordsContent();
+      case "security-report-records":
+        return renderSecurityReportRecordsContent();
       case "settings":
         return renderSettingsContent();
       default:
@@ -7898,6 +8066,26 @@ const loadDashboardData = useCallback(async () => {
           label: "Print Report Records",
           color: "#1C6DD0",
           onPress: handlePrintReports,
+        };
+      case "security-report-records":
+        return {
+          label: "Print Security Reports",
+          color: "#DC2626",
+          onPress: () =>
+            printRecordsTable({
+              title: "Security Reports",
+              subtitle: "Visitor incident reports submitted by security personnel.",
+              columns: ["Visitor", "Email", "Reason", "Office", "Reporter", "Reported At", "Resolved"],
+              rows: securityReportRecords.map((record) => [
+                record.fullName || "Visitor",
+                record.email || "-",
+                record.reportReason || "-",
+                record.assignedOffice || record.appointmentDepartment || record.host || "-",
+                record.reporterName || "Security",
+                formatDateTime(record.reportedAt || record.createdAt),
+                record.resolved ? "Resolved" : "Open",
+              ]),
+            }),
         };
       default:
         return null;
