@@ -13,7 +13,11 @@ const Counter = require("./models/Counter");
 const { createRateLimiter, getRateLimitKey } = require("./utils/securityUtils");
 const {
   DEFAULT_SYSTEM_SETTINGS,
+  DEFAULT_APPOINTMENT_OPTIONS,
+  DEFAULT_APPOINTMENT_PURPOSE_OPTIONS,
+  DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS,
   sanitizeSystemSettings,
+  sanitizeAppointmentOptions,
 } = require("./utils/settingsUtils");
 const timestamp = Date.now();
 const randomString = Math.random().toString(36).substr(2, 10).toUpperCase();
@@ -282,9 +286,20 @@ const applyRateLimit = (res, limiterResult, retryMessage) => {
 const getSystemSettingsRecord = async () =>
   AppSettings.findOneAndUpdate(
     { key: "system" },
-    { $setOnInsert: { key: "system", ...DEFAULT_SYSTEM_SETTINGS } },
+    { $setOnInsert: { key: "system", ...DEFAULT_SYSTEM_SETTINGS, appointmentOptions: DEFAULT_APPOINTMENT_OPTIONS } },
     { new: true, upsert: true, setDefaultsOnInsert: true },
   );
+
+const getAppointmentOptions = async ({ activeOnly = false } = {}) => {
+  const settingsRecord = await getSystemSettingsRecord();
+  const options = sanitizeAppointmentOptions(settingsRecord?.appointmentOptions || {});
+  if (!activeOnly) return options;
+  return {
+    offices: options.offices.filter((option) => option.enabled !== false),
+    purposes: options.purposes.filter((option) => option.enabled !== false),
+    timeSlots: options.timeSlots.filter((slot) => slot.enabled !== false),
+  };
+};
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -1226,31 +1241,8 @@ const formatDepartmentLabel = (value = "") =>
 
 const APPOINTMENT_SLOT_LIMIT = 3;
 const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted"];
-const APPOINTMENT_PURPOSE_OPTIONS = [
-  "Enrollment",
-  "Payment",
-  "Inquiry",
-  "Document Request",
-  "Other",
-];
-const APPOINTMENT_DEPARTMENT_OPTIONS = [
-  "Registrar",
-  "Accounting",
-  "Information Desk",
-  "Guidance",
-  "Administration",
-  "Cashier",
-  "Flight Operations",
-  "Training",
-  "I.T Room",
-  "Faculty Room",
-  "Laboratory",
-  "TESDA",
-  "Workshop",
-  "Library",
-  "Student Services",
-  "STO",
-];
+const APPOINTMENT_PURPOSE_OPTIONS = DEFAULT_APPOINTMENT_PURPOSE_OPTIONS;
+const APPOINTMENT_DEPARTMENT_OPTIONS = DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS;
 const ACCOUNT_ROLE_OPTIONS = ["admin", "staff", "security", "guard", "visitor"];
 const ACCOUNT_STATUS_OPTIONS = ["active", "inactive", "pending", "suspended"];
 
@@ -4684,16 +4676,107 @@ app.get("/api/visitors/:id/logs", authMiddleware, async (req, res) => {
   }
 });
 
+// Appointment request form options
+app.get("/api/appointments/options", authMiddleware, async (req, res) => {
+  try {
+    const options = await getAppointmentOptions({ activeOnly: true });
+    res.json({
+      success: true,
+      options,
+    });
+  } catch (error) {
+    console.error("Get appointment options error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load appointment options.",
+    });
+  }
+});
+
+app.get("/api/admin/appointments/options", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const options = await getAppointmentOptions();
+    res.json({
+      success: true,
+      options,
+    });
+  } catch (error) {
+    console.error("Get admin appointment options error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load appointment management options.",
+    });
+  }
+});
+
+app.put("/api/admin/appointments/options", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const options = sanitizeAppointmentOptions(req.body?.options || req.body || {});
+    await AppSettings.findOneAndUpdate(
+      { key: "system" },
+      {
+        $set: {
+          appointmentOptions: options,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: { key: "system", ...DEFAULT_SYSTEM_SETTINGS },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+
+    await createSystemActivity({
+      actorUser: req.user,
+      activityType: "admin_updated_appointment_options",
+      status: "granted",
+      location: "Appointment Management",
+      notes: "Appointment request form options updated.",
+      metadata: {
+        officeCount: options.offices.length,
+        purposeCount: options.purposes.length,
+        timeSlotCount: options.timeSlots.length,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Appointment options updated successfully.",
+      options,
+    });
+  } catch (error) {
+    console.error("Update appointment options error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update appointment management options.",
+    });
+  }
+});
+
 // Visitor appointment slot availability
 app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
   try {
     const { date, department } = req.query || {};
     const requestedDepartment = String(department || "").trim();
+    const activeAppointmentOptions = await getAppointmentOptions({ activeOnly: true });
 
     if (!date || !requestedDepartment) {
       return res.status(400).json({
         success: false,
         message: "Date and office or department are required.",
+      });
+    }
+
+    if (!isAllowedOption(requestedDepartment, activeAppointmentOptions.offices.map((option) => option.label))) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select an enabled office to visit.",
       });
     }
 
@@ -4742,26 +4825,29 @@ app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
     }
 
     const slots = [];
-    for (let hour = 7; hour <= 18; hour += 1) {
-      for (const minute of [0, 30]) {
-        const slotTime = new Date(selectedDate);
-        slotTime.setHours(hour, minute, 0, 0);
-        const count = await countStaffAppointmentsForSlot({
-          assignedStaff: routedStaff._id,
-          visitDate: selectedDate,
-          visitTime: slotTime,
-        });
+    for (const configuredSlot of activeAppointmentOptions.timeSlots) {
+      const hour = Number(configuredSlot.hour);
+      const minute = Number(configuredSlot.minute);
+      if (!Number.isInteger(hour) || !Number.isInteger(minute)) continue;
 
-        slots.push({
-          value: slotTime.toISOString(),
-          hour,
-          minute,
-          count,
-          limit: APPOINTMENT_SLOT_LIMIT,
-          available: Math.max(APPOINTMENT_SLOT_LIMIT - count, 0),
-          isFull: count >= APPOINTMENT_SLOT_LIMIT,
-        });
-      }
+      const slotTime = new Date(selectedDate);
+      slotTime.setHours(hour, minute, 0, 0);
+      const count = await countStaffAppointmentsForSlot({
+        assignedStaff: routedStaff._id,
+        visitDate: selectedDate,
+        visitTime: slotTime,
+      });
+
+      slots.push({
+        value: slotTime.toISOString(),
+        label: configuredSlot.label,
+        hour,
+        minute,
+        count,
+        limit: APPOINTMENT_SLOT_LIMIT,
+        available: Math.max(APPOINTMENT_SLOT_LIMIT - count, 0),
+        isFull: count >= APPOINTMENT_SLOT_LIMIT,
+      });
     }
 
     res.json({
@@ -4826,6 +4912,7 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     const finalVisitTime = visitTime || preferredTime;
     const normalizedPurposeCategory = String(purposeCategory || "").trim();
     const normalizedCustomPurpose = String(customPurposeOfVisit || "").trim();
+    const activeAppointmentOptions = await getAppointmentOptions({ activeOnly: true });
     const requestedDepartment = String(
       appointmentDepartment || department || officeToVisit || assignedOffice || "",
     ).trim();
@@ -4841,7 +4928,7 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    if (!isAllowedOption(normalizedPurposeCategory, APPOINTMENT_PURPOSE_OPTIONS)) {
+    if (!isAllowedOption(normalizedPurposeCategory, activeAppointmentOptions.purposes.map((option) => option.label))) {
       return res.status(400).json({
         success: false,
         message: "Please select a valid purpose of visit.",
@@ -4862,7 +4949,7 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    if (!isAllowedOption(requestedDepartment, APPOINTMENT_DEPARTMENT_OPTIONS)) {
+    if (!isAllowedOption(requestedDepartment, activeAppointmentOptions.offices.map((option) => option.label))) {
       return res.status(400).json({
         success: false,
         message: "Please select a valid office to visit.",
@@ -4874,6 +4961,18 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Please choose a valid appointment date and time.",
+      });
+    }
+
+    const selectedSlotEnabled = activeAppointmentOptions.timeSlots.some(
+      (slot) =>
+        Number(slot.hour) === appointmentDateTime.getHours() &&
+        Number(slot.minute) === appointmentDateTime.getMinutes(),
+    );
+    if (!selectedSlotEnabled) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select an enabled appointment time slot.",
       });
     }
 

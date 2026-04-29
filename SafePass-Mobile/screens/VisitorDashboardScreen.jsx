@@ -75,6 +75,20 @@ const APPOINTMENT_DEPARTMENT_OPTIONS = [
   "STO",
 ];
 
+const DEFAULT_APPOINTMENT_TIME_SLOTS = [];
+for (let hour = 7; hour <= 18; hour += 1) {
+  for (const minute of [0, 30]) {
+    DEFAULT_APPOINTMENT_TIME_SLOTS.push({
+      id: `slot-${String(hour).padStart(2, "0")}-${String(minute).padStart(2, "0")}`,
+      label: "",
+      value: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+      hour,
+      minute,
+      enabled: true,
+    });
+  }
+}
+
 const APPOINTMENT_ID_TYPE_OPTIONS = [
   "School ID",
   "National ID",
@@ -152,6 +166,21 @@ const VISITOR_SELECTED_SECTION_KEY = "visitorDashboardSelectedSection";
 const VISITOR_APPOINTMENT_SCREEN_KEY = "visitorDashboardAppointmentScreen";
 const VISITOR_MAP_FLOOR_KEY = "visitorDashboardMapFloor";
 const VISITOR_APPOINTMENT_SCREENS = ["menu", "request", "history", "status"];
+
+const getEnabledAppointmentOptionLabels = (items = [], fallback = []) => {
+  if (!Array.isArray(items) || items.length === 0) return fallback;
+  const labels = items
+    .filter((item) => item?.enabled !== false)
+    .map((item) => String(item?.label || item?.value || "").trim())
+    .filter(Boolean);
+  return labels;
+};
+
+const getDateFromTimeSlot = (slot = {}) => {
+  const option = new Date();
+  option.setHours(Number(slot.hour), Number(slot.minute), 0, 0);
+  return option;
+};
 
 const VISITOR_OFFICE_MAP_ALIASES = {
   Registrar: "ground-registrar",
@@ -270,6 +299,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [isCheckOutLoading, setIsCheckOutLoading] = useState(false);
   const [appointmentAvailability, setAppointmentAvailability] = useState(null);
   const [isLoadingAppointmentSlots, setIsLoadingAppointmentSlots] = useState(false);
+  const [appointmentOptions, setAppointmentOptions] = useState({
+    offices: APPOINTMENT_DEPARTMENT_OPTIONS.map((label) => ({ label, enabled: true })),
+    purposes: APPOINTMENT_PURPOSE_OPTIONS.map((label) => ({ label, enabled: true })),
+    timeSlots: DEFAULT_APPOINTMENT_TIME_SLOTS,
+  });
   const [appointmentForm, setAppointmentForm] = useState({
     preferredDate: null,
     preferredTime: null,
@@ -321,6 +355,35 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       : "100%";
   const approvedActionCardWidth = isTabletVisitorDashboard ? "48.5%" : "100%";
   const compactApprovedActionCardWidth = viewportWidth <= 560 ? "100%" : approvedActionCardWidth;
+
+  const loadManagedAppointmentOptions = async () => {
+    try {
+      const response = await ApiService.getAppointmentOptions();
+      if (response?.success && response?.options) {
+        setAppointmentOptions(response.options);
+      }
+    } catch (error) {
+      console.log("Load appointment options error:", error);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    ApiService.getAppointmentOptions()
+      .then((response) => {
+        if (isMounted && response?.success && response?.options) {
+          setAppointmentOptions(response.options);
+        }
+      })
+      .catch((error) => {
+        console.log("Load appointment options error:", error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -387,17 +450,51 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       (normalizedStatus === "approved" || normalizedStatus === "checked_in")
     );
   };
+  const activeAppointmentPurposeOptions = useMemo(
+    () => getEnabledAppointmentOptionLabels(appointmentOptions.purposes, APPOINTMENT_PURPOSE_OPTIONS),
+    [appointmentOptions.purposes],
+  );
+  const activeAppointmentDepartmentOptions = useMemo(
+    () => getEnabledAppointmentOptionLabels(appointmentOptions.offices, APPOINTMENT_DEPARTMENT_OPTIONS),
+    [appointmentOptions.offices],
+  );
   const appointmentTimeOptions = useMemo(() => {
-    const options = [];
-    for (let hour = 7; hour <= 18; hour += 1) {
-      for (const minute of [0, 30]) {
-        const option = new Date();
-        option.setHours(hour, minute, 0, 0);
-        options.push(option);
+    const configuredSlots = Array.isArray(appointmentOptions.timeSlots) ? appointmentOptions.timeSlots : [];
+    const activeSlots = configuredSlots.filter((slot) => slot?.enabled !== false);
+    const slots = configuredSlots.length ? activeSlots : DEFAULT_APPOINTMENT_TIME_SLOTS;
+    return slots.map(getDateFromTimeSlot).filter((option) => !Number.isNaN(option.getTime()));
+  }, [appointmentOptions.timeSlots]);
+
+  useEffect(() => {
+    setAppointmentForm((prev) => {
+      const selectedTime = getValidDate(prev.preferredTime);
+      const timeStillEnabled =
+        !selectedTime ||
+        appointmentTimeOptions.some(
+          (option) =>
+            option.getHours() === selectedTime.getHours() &&
+            option.getMinutes() === selectedTime.getMinutes(),
+        );
+      const nextDepartment = activeAppointmentDepartmentOptions.includes(prev.department)
+        ? prev.department
+        : "";
+      const nextPurpose = activeAppointmentPurposeOptions.includes(prev.purposeSelection)
+        ? prev.purposeSelection
+        : "";
+
+      if (nextDepartment === prev.department && nextPurpose === prev.purposeSelection && timeStillEnabled) {
+        return prev;
       }
-    }
-    return options;
-  }, []);
+
+      return {
+        ...prev,
+        department: nextDepartment,
+        purposeSelection: nextPurpose,
+        customPurpose: nextPurpose === "Other" ? prev.customPurpose : "",
+        preferredTime: timeStillEnabled ? prev.preferredTime : appointmentTimeOptions[0] || null,
+      };
+    });
+  }, [activeAppointmentDepartmentOptions, activeAppointmentPurposeOptions, appointmentTimeOptions]);
 
   useEffect(() => {
     const isAppointmentSection = selectedVisitorSection === "appointment";
@@ -1419,6 +1516,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const openAppointmentRequestScreen = () => {
+    loadManagedAppointmentOptions();
     if (!hasAppointmentDraft) {
       populateAppointmentForm();
     }
@@ -3625,7 +3723,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
             {showDepartmentDropdown ? (
               <View style={visitorDashboardStyles.purposeDropdownMenu}>
-                {APPOINTMENT_DEPARTMENT_OPTIONS.map((option) => {
+                {activeAppointmentDepartmentOptions.map((option) => {
                   const isSelected = appointmentForm.department === option;
                   return (
                     <TouchableOpacity
@@ -3695,7 +3793,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
             {showPurposeDropdown ? (
               <View style={visitorDashboardStyles.purposeDropdownMenu}>
-                {APPOINTMENT_PURPOSE_OPTIONS.map((option) => {
+                {activeAppointmentPurposeOptions.map((option) => {
                   const isSelected = appointmentForm.purposeSelection === option;
                   return (
                     <TouchableOpacity
