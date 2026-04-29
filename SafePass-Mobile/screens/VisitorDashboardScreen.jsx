@@ -395,25 +395,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }, [visitor?._id, visitor?.appointmentStatus, visitor?.approvalFlow, visitor?.visitTime]);
 
   useEffect(() => {
-<<<<<<< HEAD
     if (isVisitorAccessApproved(visitor)) {
-=======
-    const pendingApproval =
-      visitor?.status === "pending" || visitor?.approvalStatus === "pending";
-    const pendingStaffReview =
-      !pendingApproval &&
-      visitor?.approvalFlow === "staff" &&
-      visitor?.appointmentStatus === "pending";
-    const accessReady =
-      !(
-        visitor?.status === "approved" ||
-        visitor?.status === "checked_in"
-      ) ||
-      pendingApproval ||
-      pendingStaffReview;
-
-    if (!accessReady) {
->>>>>>> e845a9365692adbbdb25601857c044eb37c4e517
       return;
     }
 
@@ -423,16 +405,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setShowCheckInSuccessModal(false);
     setShowCheckOutModal(false);
     setShowCheckOutSuccessModal(false);
-<<<<<<< HEAD
   }, [visitor?.status, visitor?.approvalStatus, visitor?.approvalFlow, visitor?.appointmentStatus]);
-=======
-  }, [
-    visitor?.approvalStatus,
-    visitor?.appointmentStatus,
-    visitor?.approvalFlow,
-    visitor?.status,
-  ]);
->>>>>>> e845a9365692adbbdb25601857c044eb37c4e517
 
   const stopPhoneLocationTracking = async () => {
     if (phoneLocationSubscriptionRef.current) {
@@ -1785,6 +1758,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     !visitor &&
     String(currentUser?.role || "").toLowerCase() === "visitor" &&
     String(currentUser?.status || "").toLowerCase() === "active";
+  const isCompactHistoryLayout = viewportWidth <= 760;
   const approvedActionLabel = isNfcReading ? "Stop NFC" : "Start NFC";
   const approvedActionIcon = isNfcReading ? "pause-circle" : "radio";
   const appointmentSourceRecords = [
@@ -1840,6 +1814,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       description: appointmentFeedback?.message || "Your latest request was sent to staff for review.",
     });
   }
+  const recentAppointmentEntries = appointmentHistoryEntries.slice(0, 3);
+  const approvedAppointmentCount = appointmentHistoryEntries.filter((entry) =>
+    String(entry.statusLabel || "").toLowerCase().includes("approved"),
+  ).length;
+  const pendingAppointmentCount = appointmentHistoryEntries.filter((entry) => {
+    const normalizedStatus = String(entry.statusLabel || "").toLowerCase();
+    return normalizedStatus.includes("pending") || normalizedStatus.includes("review");
+  }).length;
   const displayName =
     visitor?.fullName ||
     [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") ||
@@ -2067,6 +2049,125 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       })}
     </View>
   );
+
+  const renderAppointmentInsightsCard = () => (
+    <View style={[visitorDashboardStyles.appointmentInsightsCard, dashboardSectionResponsiveStyle]}>
+      <View style={visitorDashboardStyles.appointmentInsightsHeader}>
+        <View>
+          <Text style={visitorDashboardStyles.appointmentInsightsEyebrow}>Visitor Summary</Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsTitle}>Appointment Snapshot</Text>
+        </View>
+        <TouchableOpacity
+          style={visitorDashboardStyles.appointmentInsightsAction}
+          activeOpacity={0.86}
+          onPress={() => handleVisitorSectionChange("appointment")}
+        >
+          <Text style={visitorDashboardStyles.appointmentInsightsActionText}>Open Module</Text>
+          <Ionicons name="arrow-forward-outline" size={16} color="#0A3D91" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={visitorDashboardStyles.appointmentInsightsGrid}>
+        <View style={visitorDashboardStyles.appointmentInsightsMetricCard}>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>Requests</Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricValue}>
+            {appointmentHistoryEntries.length || 0}
+          </Text>
+        </View>
+        <View style={visitorDashboardStyles.appointmentInsightsMetricCard}>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>Approved</Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricValue}>
+            {approvedAppointmentCount}
+          </Text>
+        </View>
+        <View style={visitorDashboardStyles.appointmentInsightsMetricCard}>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>In Review</Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsMetricValue}>
+            {pendingAppointmentCount}
+          </Text>
+        </View>
+      </View>
+
+      <View style={visitorDashboardStyles.appointmentInsightsStatusCard}>
+        <View style={visitorDashboardStyles.appointmentInsightsStatusIcon}>
+          <Ionicons name="sparkles-outline" size={18} color="#0A3D91" />
+        </View>
+        <View style={visitorDashboardStyles.appointmentInsightsStatusCopy}>
+          <Text style={visitorDashboardStyles.appointmentInsightsStatusTitle}>
+            {recentAppointmentEntries[0]?.statusLabel || journeyTitle}
+          </Text>
+          <Text style={visitorDashboardStyles.appointmentInsightsStatusText}>
+            {recentAppointmentEntries[0]?.description || journeySubtitle}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderRecentAppointmentRail = () => {
+    if (!recentAppointmentEntries.length) {
+      return null;
+    }
+
+    return (
+      <View style={[visitorDashboardStyles.recentActivityCard, dashboardSectionResponsiveStyle]}>
+        <View style={visitorDashboardStyles.recentActivityHeader}>
+          <View>
+            <Text style={visitorDashboardStyles.recentActivityEyebrow}>Recent Activity</Text>
+            <Text style={visitorDashboardStyles.recentActivityTitle}>Latest Appointment Trail</Text>
+          </View>
+          <TouchableOpacity
+            style={visitorDashboardStyles.recentActivityAction}
+            activeOpacity={0.86}
+            onPress={() => {
+              setSelectedVisitorSection("appointment");
+              handleAppointmentScreenNavigation("history", "Loading appointment history...");
+            }}
+          >
+            <Text style={visitorDashboardStyles.recentActivityActionText}>View all</Text>
+            <Ionicons name="arrow-forward-outline" size={16} color="#0A3D91" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={visitorDashboardStyles.recentActivityList}>
+          {recentAppointmentEntries.map((entry) => (
+            <View key={entry.id} style={visitorDashboardStyles.recentActivityItem}>
+              <View
+                style={[
+                  visitorDashboardStyles.recentActivityStatusDot,
+                  { backgroundColor: entry.statusColor },
+                ]}
+              />
+              <View style={visitorDashboardStyles.recentActivityCopy}>
+                <Text style={visitorDashboardStyles.recentActivityItemTitle} numberOfLines={1}>
+                  {entry.title}
+                </Text>
+                <Text style={visitorDashboardStyles.recentActivityItemMeta} numberOfLines={2}>
+                  {entry.office} · {entry.dateLabel} · {entry.timeLabel}
+                </Text>
+              </View>
+              <View
+                style={[
+                  visitorDashboardStyles.recentActivityPill,
+                  { backgroundColor: `${entry.statusColor}14` },
+                ]}
+              >
+                <Text
+                  style={[
+                    visitorDashboardStyles.recentActivityPillText,
+                    { color: entry.statusColor },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {entry.statusLabel}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
 
   const renderVisitorModuleNavigation = () => (
     <View style={[visitorDashboardStyles.visitorModuleCard, dashboardSectionResponsiveStyle]}>
@@ -2691,6 +2792,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           </View>
         </View>
       </View>
+
+      {renderRecentAppointmentRail()}
     </>
   );
 
@@ -2751,18 +2854,23 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     </Text>
                   </TouchableOpacity>
                 </View>
+                {renderAppointmentInsightsCard()}
                 {renderVisitorModuleNavigation()}
+                {renderRecentAppointmentRail()}
               </>
             ) : isApprovedVisitor ? (
               renderApprovedVisitorDashboard()
             ) : (
               <>
+                {renderAppointmentInsightsCard()}
                 {renderVisitorModuleNavigation()}
+                {renderRecentAppointmentRail()}
                 {renderVisitorEmptyState()}
               </>
             )
           ) : (
             <>
+              {renderAppointmentInsightsCard()}
               {renderVisitorModuleNavigation()}
               {renderVisitorEmptyState()}
             </>
@@ -3463,37 +3571,89 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           {renderAppointmentSegmentBar("history")}
 
           {appointmentHistoryEntries.length ? (
-            <View style={visitorDashboardStyles.appointmentHistoryTable}>
-              <View style={visitorDashboardStyles.appointmentHistoryTableHeader}>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryPurposeCell]}>Purpose</Text>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryOfficeCell]}>Office</Text>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryDateCell]}>Date</Text>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryTimeCell]}>Time</Text>
-                <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryStatusCell]}>Status</Text>
-              </View>
-              {appointmentHistoryEntries.map((entry) => (
-                <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryTableRow}>
-                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryPurposeCell]} numberOfLines={2}>
-                    {entry.title}
-                  </Text>
-                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryOfficeCell]} numberOfLines={2}>
-                    {entry.office}
-                  </Text>
-                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryDateCell]} numberOfLines={2}>
-                    {entry.dateLabel}
-                  </Text>
-                  <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryTimeCell]} numberOfLines={1}>
-                    {entry.timeLabel}
-                  </Text>
-                  <View style={[visitorDashboardStyles.appointmentHistoryStatusCell, visitorDashboardStyles.appointmentHistoryStatusPillWrap]}>
-                    <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
-                    <Text style={[visitorDashboardStyles.appointmentHistoryStatusPillText, { color: entry.statusColor }]} numberOfLines={2}>
-                      {entry.statusLabel}
+            isCompactHistoryLayout ? (
+              <View style={visitorDashboardStyles.appointmentHistoryCards}>
+                {appointmentHistoryEntries.map((entry) => (
+                  <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryCardItem}>
+                    <View style={visitorDashboardStyles.appointmentHistoryCardTop}>
+                      <View style={visitorDashboardStyles.appointmentHistoryCardCopy}>
+                        <Text style={visitorDashboardStyles.appointmentHistoryCardTitle} numberOfLines={2}>
+                          {entry.title}
+                        </Text>
+                        <Text style={visitorDashboardStyles.appointmentHistoryCardOffice} numberOfLines={2}>
+                          {entry.office}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          visitorDashboardStyles.appointmentHistoryCardPill,
+                          { backgroundColor: `${entry.statusColor}14` },
+                        ]}
+                      >
+                        <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
+                        <Text
+                          style={[visitorDashboardStyles.appointmentHistoryCardPillText, { color: entry.statusColor }]}
+                          numberOfLines={1}
+                        >
+                          {entry.statusLabel}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={visitorDashboardStyles.appointmentHistoryCardMetaRow}>
+                      <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+                        <Ionicons name="calendar-outline" size={15} color="#0A3D91" />
+                        <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
+                          {entry.dateLabel}
+                        </Text>
+                      </View>
+                      <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+                        <Ionicons name="time-outline" size={15} color="#0A3D91" />
+                        <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
+                          {entry.timeLabel}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={visitorDashboardStyles.appointmentHistoryCardDescription} numberOfLines={3}>
+                      {entry.description}
                     </Text>
                   </View>
+                ))}
+              </View>
+            ) : (
+              <View style={visitorDashboardStyles.appointmentHistoryTable}>
+                <View style={visitorDashboardStyles.appointmentHistoryTableHeader}>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryPurposeCell]}>Purpose</Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryOfficeCell]}>Office</Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryDateCell]}>Date</Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryTimeCell]}>Time</Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryStatusCell]}>Status</Text>
                 </View>
-              ))}
-            </View>
+                {appointmentHistoryEntries.map((entry) => (
+                  <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryTableRow}>
+                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryPurposeCell]} numberOfLines={2}>
+                      {entry.title}
+                    </Text>
+                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryOfficeCell]} numberOfLines={2}>
+                      {entry.office}
+                    </Text>
+                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryDateCell]} numberOfLines={2}>
+                      {entry.dateLabel}
+                    </Text>
+                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryTimeCell]} numberOfLines={1}>
+                      {entry.timeLabel}
+                    </Text>
+                    <View style={[visitorDashboardStyles.appointmentHistoryStatusCell, visitorDashboardStyles.appointmentHistoryStatusPillWrap]}>
+                      <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
+                      <Text style={[visitorDashboardStyles.appointmentHistoryStatusPillText, { color: entry.statusColor }]} numberOfLines={2}>
+                        {entry.statusLabel}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )
           ) : (
             <View style={visitorDashboardStyles.appointmentHistoryEmpty}>
               <Ionicons name="calendar-clear-outline" size={34} color="#94A3B8" />
