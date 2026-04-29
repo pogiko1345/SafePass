@@ -1,7 +1,7 @@
-const GROUND_FLOOR_BLUEPRINT = require("../assets/maps/GroundFloor2.jpg");
-const MEZZANINE_BLUEPRINT = require("../assets/maps/Mezzanine2.jpg");
-const SECOND_FLOOR_BLUEPRINT = require("../assets/maps/SecondFloor2.jpg");
-const THIRD_FLOOR_BLUEPRINT = require("../assets/maps/ThirdFloor2.jpg");
+const GROUND_FLOOR_BLUEPRINT = require("../assets/maps/GroundFloor3.png");
+const MEZZANINE_BLUEPRINT = require("../assets/maps/Mezzanine3.png");
+const SECOND_FLOOR_BLUEPRINT = require("../assets/maps/SecondFloor3.png");
+const THIRD_FLOOR_BLUEPRINT = require("../assets/maps/ThirdFloor3.png");
 
 export const MONITORING_MAP_FLOORS = [
   { id: "ground", name: "Ground Floor", icon: "home-outline" },
