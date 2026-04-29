@@ -421,6 +421,7 @@ export default StyleSheet.create({
   formGrid: {
     gap: spacing.base,
     marginBottom: spacing.xl,
+    width: "100%",
   },
 
   stepInsightCard: {
@@ -545,6 +546,7 @@ export default StyleSheet.create({
     padding: spacing.base,
     borderWidth: 1,
     borderColor: "#E4EDF7",
+    minHeight: 148,
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
