@@ -1966,7 +1966,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     </ScrollView>
   );
 
-  const renderCampusActivityCard = (visitor, mode = 'checked_in') => {
+  const renderCampusActivityRow = (visitor, mode = 'checked_in') => {
     const assignedDestination = getVisitorAssignedDestination(visitor);
     const isCheckedIn = mode === 'checked_in';
     const eventTime = isCheckedIn ? visitor?.checkedInAt : visitor?.checkedOutAt;
@@ -1974,36 +1974,60 @@ export default function SecurityDashboardScreen({ navigation }) {
     return (
       <TouchableOpacity
         key={`${mode}-${visitor._id}`}
-        style={styles.visitorCard}
+        style={styles.appointmentRecordsTableRow}
         onPress={() => handleViewDetails(visitor)}
         activeOpacity={0.75}
       >
-        <View style={styles.visitorCardHeader}>
-          {visitor.idImage ? (
-            <Image source={{ uri: visitor.idImage }} style={styles.visitorIdImage} />
-          ) : (
-            <View style={styles.visitorIdPlaceholder}>
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsVisitorCell]}>
+          <View style={styles.appointmentRecordsAvatar}>
+            {visitor.idImage ? (
+              <Image source={{ uri: visitor.idImage }} style={styles.appointmentRecordsAvatarImage} />
+            ) : (
               <Ionicons
                 name={isCheckedIn ? "log-in-outline" : "log-out-outline"}
-                size={30}
-                color="#9CA3AF"
+                size={16}
+                color="#64748B"
               />
-            </View>
-          )}
-          <View style={styles.visitorCardInfo}>
-            <Text style={styles.visitorCardName} numberOfLines={1}>
+            )}
+          </View>
+          <View style={styles.appointmentRecordsVisitorInfo}>
+            <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={1}>
               {visitor.fullName}
             </Text>
-            <Text style={styles.visitorCardPurpose} numberOfLines={1}>
+            <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
               {visitor.purposeOfVisit || 'No purpose recorded'}
             </Text>
-            <View style={styles.visitorCardMeta}>
-              <Ionicons name="business-outline" size={12} color="#6B7280" />
-              <Text style={styles.visitorCardMetaText}>
-                Going to: {assignedDestination.officeName}
-              </Text>
-            </View>
           </View>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsOfficeCell]}>
+          <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={1}>
+            {assignedDestination.officeName}
+          </Text>
+          <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
+            Floor: {assignedDestination.floorLabel}
+          </Text>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsScheduleCell]}>
+          <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={1}>
+            {formatDate(eventTime)}
+          </Text>
+          <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
+            {formatTime(eventTime)}
+          </Text>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsContactCell]}>
+          <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={1}>
+            {visitor.phoneNumber || 'No phone'}
+          </Text>
+          <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
+            {visitor.host || visitor.assignedStaffName || 'No host assigned'}
+          </Text>
+        </View>
+
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsStatusCell]}>
           <View
             style={[
               styles.statusBadge,
@@ -2021,29 +2045,12 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={styles.visitorCardFooter}>
-          <View style={styles.visitorCardFooterItem}>
-            <Ionicons name="time-outline" size={14} color="#6B7280" />
-            <Text style={styles.visitorCardFooterText}>
-              {isCheckedIn ? 'Checked in' : 'Checked out'}: {formatDateTime(eventTime)}
-            </Text>
+        <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsActionCell]}>
+          <View style={styles.readonlyRecordActions}>
+            <TouchableOpacity onPress={() => handleViewDetails(visitor)}>
+              <Text style={styles.readonlyRecordActionText}>View Record</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.visitorCardFooterItem}>
-            <Ionicons name="layers-outline" size={14} color="#6B7280" />
-            <Text style={styles.visitorCardFooterText}>{assignedDestination.floorLabel}</Text>
-          </View>
-          <View style={styles.visitorCardFooterItem}>
-            <Ionicons name="location-outline" size={14} color="#6B7280" />
-            <Text style={styles.visitorCardFooterText}>
-              {assignedDestination.officeName}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.readonlyRecordActions}>
-          <TouchableOpacity onPress={() => handleViewDetails(visitor)}>
-            <Text style={styles.readonlyRecordActionText}>View Record</Text>
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -2080,7 +2087,19 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
 
         {checkedInVisitors.length > 0 ? (
-          checkedInVisitors.map((visitor) => renderCampusActivityCard(visitor, 'checked_in'))
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.appointmentRecordsTable}>
+              <View style={[styles.appointmentRecordsTableRow, styles.appointmentRecordsTableHeader]}>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsVisitorCell]}>Visitor</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsOfficeCell]}>Destination</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsScheduleCell]}>Check-In Time</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsContactCell]}>Contact / Host</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsStatusCell]}>Status</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsActionCell]}>Action</Text>
+              </View>
+              {checkedInVisitors.map((visitor) => renderCampusActivityRow(visitor, 'checked_in'))}
+            </View>
+          </ScrollView>
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="walk-outline" size={64} color="#D1D5DB" />
@@ -2098,7 +2117,19 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
 
         {recentlyCheckedOutVisitors.length > 0 ? (
-          recentlyCheckedOutVisitors.map((visitor) => renderCampusActivityCard(visitor, 'checked_out'))
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.appointmentRecordsTable}>
+              <View style={[styles.appointmentRecordsTableRow, styles.appointmentRecordsTableHeader]}>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsVisitorCell]}>Visitor</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsOfficeCell]}>Last Destination</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsScheduleCell]}>Check-Out Time</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsContactCell]}>Contact / Host</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsStatusCell]}>Status</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsActionCell]}>Action</Text>
+              </View>
+              {recentlyCheckedOutVisitors.map((visitor) => renderCampusActivityRow(visitor, 'checked_out'))}
+            </View>
+          </ScrollView>
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="exit-outline" size={64} color="#D1D5DB" />
