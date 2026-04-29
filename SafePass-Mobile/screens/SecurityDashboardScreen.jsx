@@ -167,6 +167,59 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const officePositions = MONITORING_MAP_OFFICE_POSITIONS;
 
+  const normalizeMapText = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/['".,]/g, "")
+      .replace(/\s+/g, " ");
+
+  const getFloorLabel = (floorId) => {
+    const matchedFloor = floors.find(
+      (floor) => normalizeFloorId(floor.id) === normalizeFloorId(floorId),
+    );
+    return matchedFloor?.name || "Unassigned floor";
+  };
+
+  const getOfficeConfigForLabel = (officeLabel) => {
+    const normalizedLabel = normalizeMapText(officeLabel);
+    if (!normalizedLabel) {
+      return null;
+    }
+
+    return (
+      offices.find(
+        (office) =>
+          normalizeMapText(office.name) === normalizedLabel ||
+          normalizeMapText(office.id) === normalizedLabel,
+      ) ||
+      offices.find((office) => normalizeMapText(office.name).includes(normalizedLabel)) ||
+      offices.find((office) => normalizedLabel.includes(normalizeMapText(office.name))) ||
+      null
+    );
+  };
+
+  const getVisitorAssignedDestination = (visitor) => {
+    const officeLabel =
+      visitor?.assignedOffice ||
+      visitor?.appointmentDepartment ||
+      visitor?.host ||
+      "";
+    const matchedOffice = getOfficeConfigForLabel(officeLabel);
+    const mappedPosition = matchedOffice ? officePositions?.[matchedOffice.id] : null;
+
+    return {
+      officeName: matchedOffice?.name || officeLabel || "Campus access",
+      floorId: matchedOffice?.floor || "",
+      floorLabel: matchedOffice?.floor ? getFloorLabel(matchedOffice.floor) : "Unassigned floor",
+      coordinates:
+        matchedOffice && mappedPosition
+          ? { x: Number(mappedPosition.x), y: Number(mappedPosition.y) }
+          : null,
+      officeId: matchedOffice?.id || "",
+    };
+  };
+
   // ============ LOGOUT FUNCTIONS ============
   const handleLogoutPress = () => {
     setShowLogoutModal(true);
@@ -463,6 +516,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     activeVisitors
       .filter((visitor) => visitor?.status === 'checked_in')
       .map((visitor, index) => {
+        const assignedDestination = getVisitorAssignedDestination(visitor);
         const liveLocation = visitor.currentLocation?.isActive
           ? visitor.currentLocation
           : null;
@@ -470,6 +524,9 @@ export default function SecurityDashboardScreen({ navigation }) {
         const hasLiveCoordinates =
           Number.isFinite(Number(liveCoordinates.x)) &&
           Number.isFinite(Number(liveCoordinates.y));
+        const hasAssignedCoordinates =
+          Number.isFinite(Number(assignedDestination?.coordinates?.x)) &&
+          Number.isFinite(Number(assignedDestination?.coordinates?.y));
 
         return {
           id: visitor._id,
@@ -481,19 +538,26 @@ export default function SecurityDashboardScreen({ navigation }) {
           status: visitor.status,
           idPhoto: visitor.idImage,
           location: {
-            floor: liveLocation?.floor || 'ground',
-            office: liveLocation?.office || visitor.assignedOffice || getRandomOffice(),
+            floor: liveLocation?.floor || assignedDestination.floorId || 'ground',
+            office: liveLocation?.office || assignedDestination.officeName || getRandomOffice(),
             coordinates: hasLiveCoordinates
               ? {
                   x: Number(liveCoordinates.x),
                   y: Number(liveCoordinates.y),
                 }
+              : hasAssignedCoordinates
+                ? {
+                    x: Number(assignedDestination.coordinates.x),
+                    y: Number(assignedDestination.coordinates.y),
+                  }
               : {
                   x: 15 + ((index * 17) % 70),
                   y: 15 + ((index * 23) % 70),
                 },
             timestamp: liveLocation?.lastSeenAt || new Date(),
-            source: liveLocation?.source || 'system_estimate',
+            source:
+              liveLocation?.source ||
+              (hasAssignedCoordinates ? 'assigned_office' : 'system_estimate'),
           },
           movement: visitor.locationHistory || [],
         };
@@ -712,6 +776,15 @@ export default function SecurityDashboardScreen({ navigation }) {
       ],
     },
     {
+      key: 'campus-activity',
+      label: 'Campus Activity',
+      icon: 'walk-outline',
+      color: '#0A3D91',
+      submodules: [
+        { key: 'checked-in-visitors', label: 'Checked-In Visitors', badge: visitors.active.length || 0 },
+      ],
+    },
+    {
       key: 'reports',
       label: 'Reports',
       icon: 'document-text-outline',
@@ -736,6 +809,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (submoduleKey === 'home-main') return 'dashboard';
     if (submoduleKey.startsWith('map-')) return 'map';
     if (submoduleKey === 'appointment-records') return 'visitors';
+    if (submoduleKey === 'checked-in-visitors') return 'presence';
     if (submoduleKey === 'report-file') return 'reports';
     return 'dashboard';
   };
@@ -752,6 +826,11 @@ export default function SecurityDashboardScreen({ navigation }) {
         return { title: 'Third Floor Map', subtitle: 'View-only monitoring of the third floor layout and active visitor positions.' };
       case 'appointment-records':
         return { title: 'Appointment Records', subtitle: 'Review appointment records in a read-only security view.' };
+      case 'checked-in-visitors':
+        return {
+          title: 'Checked-In Visitors',
+          subtitle: 'See who is currently inside campus, where they are expected to go, and who has just checked out.',
+        };
       case 'report-file':
         return { title: 'File a Report', subtitle: 'Submit a security report and review recently filed incidents.' };
       case 'home-main':
@@ -1156,7 +1235,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     try {
       await ApiService.reportVisitor(visitor._id, { reason, reportedBy: user._id });
       await refreshData();
-      Alert.alert("Report Submitted", "Security team has been notified");
+      Alert.alert("Report Submitted", "The report has been sent to admin for review.");
     } catch (error) {
       Alert.alert("Error", "Failed to submit report");
     }
@@ -1189,7 +1268,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         category: 'suspicious',
         details: '',
       });
-      Alert.alert("Report Submitted", "The security report has been filed successfully.");
+      Alert.alert("Report Submitted", "The security report has been sent to admin for review.");
     } catch (error) {
       Alert.alert("Error", error?.message || "Failed to submit security report");
     } finally {
@@ -1288,6 +1367,25 @@ export default function SecurityDashboardScreen({ navigation }) {
   }, [visitorFilter, visitors, searchQuery]);
 
   const appointmentRecordsItemsPerPage = 6;
+  const checkedInVisitors = useMemo(
+    () =>
+      [...(visitors.active || [])].sort(
+        (left, right) =>
+          new Date(right?.checkedInAt || 0).getTime() - new Date(left?.checkedInAt || 0).getTime(),
+      ),
+    [visitors.active],
+  );
+  const recentlyCheckedOutVisitors = useMemo(
+    () =>
+      [...(visitors.completed || [])]
+        .sort(
+          (left, right) =>
+            new Date(right?.checkedOutAt || right?.updatedAt || 0).getTime() -
+            new Date(left?.checkedOutAt || left?.updatedAt || 0).getTime(),
+        )
+        .slice(0, 8),
+    [visitors.completed],
+  );
   const appointmentRecordsPageCount = Math.max(
     1,
     Math.ceil(filteredVisitors.length / appointmentRecordsItemsPerPage),
@@ -1864,6 +1962,150 @@ export default function SecurityDashboardScreen({ navigation }) {
         )}
 
         {filteredVisitors.length > 0 ? renderAppointmentPagination() : null}
+      </View>
+    </ScrollView>
+  );
+
+  const renderCampusActivityCard = (visitor, mode = 'checked_in') => {
+    const assignedDestination = getVisitorAssignedDestination(visitor);
+    const isCheckedIn = mode === 'checked_in';
+    const eventTime = isCheckedIn ? visitor?.checkedInAt : visitor?.checkedOutAt;
+
+    return (
+      <TouchableOpacity
+        key={`${mode}-${visitor._id}`}
+        style={styles.visitorCard}
+        onPress={() => handleViewDetails(visitor)}
+        activeOpacity={0.75}
+      >
+        <View style={styles.visitorCardHeader}>
+          {visitor.idImage ? (
+            <Image source={{ uri: visitor.idImage }} style={styles.visitorIdImage} />
+          ) : (
+            <View style={styles.visitorIdPlaceholder}>
+              <Ionicons
+                name={isCheckedIn ? "log-in-outline" : "log-out-outline"}
+                size={30}
+                color="#9CA3AF"
+              />
+            </View>
+          )}
+          <View style={styles.visitorCardInfo}>
+            <Text style={styles.visitorCardName} numberOfLines={1}>
+              {visitor.fullName}
+            </Text>
+            <Text style={styles.visitorCardPurpose} numberOfLines={1}>
+              {visitor.purposeOfVisit || 'No purpose recorded'}
+            </Text>
+            <View style={styles.visitorCardMeta}>
+              <Ionicons name="business-outline" size={12} color="#6B7280" />
+              <Text style={styles.visitorCardMetaText}>
+                Going to: {assignedDestination.officeName}
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: isCheckedIn ? '#DCFCE7' : '#F3F4F6' },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusBadgeText,
+                { color: isCheckedIn ? '#166534' : '#475569' },
+              ]}
+            >
+              {isCheckedIn ? 'Inside Campus' : 'Checked Out'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.visitorCardFooter}>
+          <View style={styles.visitorCardFooterItem}>
+            <Ionicons name="time-outline" size={14} color="#6B7280" />
+            <Text style={styles.visitorCardFooterText}>
+              {isCheckedIn ? 'Checked in' : 'Checked out'}: {formatDateTime(eventTime)}
+            </Text>
+          </View>
+          <View style={styles.visitorCardFooterItem}>
+            <Ionicons name="layers-outline" size={14} color="#6B7280" />
+            <Text style={styles.visitorCardFooterText}>{assignedDestination.floorLabel}</Text>
+          </View>
+          <View style={styles.visitorCardFooterItem}>
+            <Ionicons name="location-outline" size={14} color="#6B7280" />
+            <Text style={styles.visitorCardFooterText}>
+              {assignedDestination.officeName}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.readonlyRecordActions}>
+          <TouchableOpacity onPress={() => handleViewDetails(visitor)}>
+            <Text style={styles.readonlyRecordActionText}>View Record</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderCampusActivityTab = () => (
+    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <View style={styles.visitorsContainer}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="walk-outline" size={20} color="#0A3D91" />
+            <View>
+              <Text style={styles.sectionTitle}>Checked-In Visitors</Text>
+              <Text style={styles.securitySectionSubtitle}>
+                Track who is inside campus, their assigned destination, and the latest visitor exits.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.readonlyInfoBanner}>
+          <Ionicons name="navigate-outline" size={18} color="#0A3D91" />
+          <Text style={styles.readonlyInfoBannerText}>
+            Assigned office and floor are used as the starting map destination immediately after security check-in.
+          </Text>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="log-in-outline" size={18} color="#166534" />
+            <Text style={styles.sectionTitle}>Currently Inside Campus</Text>
+          </View>
+          <Text style={styles.securitySectionSubtitle}>{checkedInVisitors.length} active visitor{checkedInVisitors.length === 1 ? '' : 's'}</Text>
+        </View>
+
+        {checkedInVisitors.length > 0 ? (
+          checkedInVisitors.map((visitor) => renderCampusActivityCard(visitor, 'checked_in'))
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="walk-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateTitle}>No visitors inside campus</Text>
+            <Text style={styles.emptyStateSubtitle}>Checked-in visitors will appear here with their assigned floor and office.</Text>
+          </View>
+        )}
+
+        <View style={[styles.sectionHeader, { marginTop: 12 }]}>
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="log-out-outline" size={18} color="#475569" />
+            <Text style={styles.sectionTitle}>Recently Checked Out</Text>
+          </View>
+          <Text style={styles.securitySectionSubtitle}>Latest completed campus exits</Text>
+        </View>
+
+        {recentlyCheckedOutVisitors.length > 0 ? (
+          recentlyCheckedOutVisitors.map((visitor) => renderCampusActivityCard(visitor, 'checked_out'))
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="exit-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateTitle}>No recent check-outs</Text>
+            <Text style={styles.emptyStateSubtitle}>Visitors that just left campus will appear here.</Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -2720,6 +2962,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     const statusBadge = getStatusBadge(visitor);
     const scheduleDate = formatDate(visitor.visitDate);
     const scheduleTime = visitor.visitTime ? formatTime(visitor.visitTime) : 'No time';
+    const assignedDestination = getVisitorAssignedDestination(visitor);
 
     return (
       <TouchableOpacity
@@ -2754,7 +2997,10 @@ export default function SecurityDashboardScreen({ navigation }) {
 
         <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsOfficeCell]}>
           <Text style={styles.appointmentRecordsPrimaryText} numberOfLines={1}>
-            {visitor.assignedOffice || visitor.appointmentDepartment || 'Campus access'}
+            {assignedDestination.officeName}
+          </Text>
+          <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
+            Floor: {assignedDestination.floorLabel}
           </Text>
           <Text style={styles.appointmentRecordsMutedText} numberOfLines={1}>
             Host: {visitor.host || visitor.assignedStaffName || 'N/A'}
@@ -2902,6 +3148,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           {selectedSubmodule === 'home-main' && renderDashboardTab()}
           {selectedSubmodule.startsWith('map-') && renderMapTab()}
           {selectedSubmodule === 'appointment-records' && renderVisitorsTab()}
+          {selectedSubmodule === 'checked-in-visitors' && renderCampusActivityTab()}
           {selectedSubmodule === 'report-file' && renderReportsTab()}
           
         </Animated.View>
@@ -3319,7 +3566,11 @@ export default function SecurityDashboardScreen({ navigation }) {
                     </View>
                     <View style={styles.visitorDetailInfoCard}>
                       <Text style={styles.visitorDetailInfoLabel}>Assigned Office</Text>
-                      <Text style={styles.visitorDetailInfoValue}>{selectedVisitor.assignedOffice || 'Not assigned'}</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{getVisitorAssignedDestination(selectedVisitor).officeName}</Text>
+                    </View>
+                    <View style={styles.visitorDetailInfoCard}>
+                      <Text style={styles.visitorDetailInfoLabel}>Assigned Floor</Text>
+                      <Text style={styles.visitorDetailInfoValue}>{getVisitorAssignedDestination(selectedVisitor).floorLabel}</Text>
                     </View>
                   </View>
                 </View>
