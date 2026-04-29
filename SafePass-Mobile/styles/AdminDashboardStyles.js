@@ -9,27 +9,27 @@ export default StyleSheet.create({
   
   safeArea: {
     flex: 1,
-    backgroundColor: "#EEF4FA",
+    backgroundColor: "#F4F8FC",
   },
 
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#EEF4FA",
+    backgroundColor: "#F8FBFE",
   },
 
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: "#1C6DD0",
-    fontWeight: "500",
+    color: "#475569",
+    fontWeight: "600",
   },
 
   mainContainer: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: "#EEF4FA",
+    backgroundColor: "#F4F8FC",
   },
 
   // ============================================
@@ -38,30 +38,43 @@ export default StyleSheet.create({
 
   sidebar: {
     width: sidebarWidth,
-    backgroundColor: "#0B1F33",
+    backgroundColor: "#F8FBFE",
     height: "100%",
-    borderTopRightRadius: 34,
-    borderBottomRightRadius: 34,
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
     overflow: "hidden",
     borderRightWidth: 1,
-    borderRightColor: "rgba(148,163,184,0.16)",
+    borderRightColor: "#E2E8F0",
+    padding: 18,
     ...Platform.select({
       web: {
-        boxShadow: "18px 0px 48px rgba(11,31,51,0.18)",
+        boxShadow: "8px 0px 24px rgba(15, 23, 42, 0.04)",
       },
     }),
   },
 
   sidebarContent: {
-    paddingBottom: 36,
+    paddingBottom: 18,
   },
 
   sidebarHeader: {
-    paddingHorizontal: 22,
-    paddingVertical: 28,
+    padding: 14,
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.10)",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#D8E6F5",
+    backgroundColor: "#FFFFFF",
+    marginBottom: 18,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 12px 22px rgba(15, 23, 42, 0.06)" },
+    }),
   },
 
   sidebarLogoImage: {
@@ -69,8 +82,8 @@ export default StyleSheet.create({
     height: 56,
     borderRadius: 28,
     marginBottom: 14,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "#D8E6F5",
   },
 
   sidebarLogo: {
@@ -87,7 +100,7 @@ export default StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     fontWeight: "800",
-    color: "#FFF",
+    color: "#0F172A",
     marginBottom: 10,
     textAlign: "center",
   },
@@ -96,27 +109,27 @@ export default StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: "rgba(56,189,248,0.16)",
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
-    borderColor: "rgba(125,211,252,0.28)",
+    borderColor: "#B7D5F6",
     marginBottom: 18,
   },
 
   sidebarRoleText: {
     fontSize: 10,
     fontWeight: "800",
-    color: "#BAE6FD",
+    color: "#0A3D91",
     letterSpacing: 0.8,
   },
 
   sidebarStats: {
     flexDirection: "row",
-    backgroundColor: "rgba(15,23,42,0.42)",
+    backgroundColor: "#F8FBFE",
     borderRadius: 18,
     padding: 14,
     width: "100%",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "#E2E8F0",
   },
 
   sidebarStat: {
@@ -127,19 +140,19 @@ export default StyleSheet.create({
   sidebarStatNumber: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#FFF",
+    color: "#0F172A",
   },
 
   sidebarStatLabel: {
     fontSize: 10,
-    color: "rgba(226,232,240,0.76)",
+    color: "#64748B",
     marginTop: 4,
   },
 
   sidebarStatDivider: {
     width: 1,
     height: 30,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "#E2E8F0",
   },
 
   sidebarMenuItem: {
@@ -153,9 +166,9 @@ export default StyleSheet.create({
   },
 
   sidebarMenuItemActive: {
-    backgroundColor: "rgba(56,189,248,0.18)",
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
-    borderColor: "rgba(125,211,252,0.35)",
+    borderColor: "#9EC5F8",
   },
 
   sidebarMenuIcon: {
@@ -171,11 +184,11 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: "600",
-    color: "rgba(241,245,249,0.88)",
+    color: "#334155",
   },
 
   sidebarMenuLabelActive: {
-    color: "#FFF",
+    color: "#0F172A",
     fontWeight: "600",
   },
 
@@ -207,26 +220,26 @@ export default StyleSheet.create({
     marginTop: 14,
     borderRadius: 18,
     marginBottom: 12,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.9)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
+    borderColor: "#D9E4F0",
   },
 
   sidebarOverviewButtonActive: {
-    backgroundColor: "rgba(56,189,248,0.18)",
-    borderColor: "rgba(125,211,252,0.35)",
+    backgroundColor: "#EEF5FF",
+    borderColor: "#9EC5F8",
   },
 
   sidebarModuleGroup: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 0,
     gap: 12,
   },
 
   sidebarModuleCard: {
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.9)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "#D9E4F0",
     overflow: "hidden",
   },
 
@@ -238,8 +251,8 @@ export default StyleSheet.create({
   },
 
   sidebarModuleButtonActive: {
-    backgroundColor: "rgba(56,189,248,0.12)",
-    borderColor: "rgba(125,211,252,0.35)",
+    backgroundColor: "#EEF5FF",
+    borderColor: "#9EC5F8",
   },
 
   sidebarModuleCopy: {
@@ -248,7 +261,7 @@ export default StyleSheet.create({
 
   sidebarModuleHint: {
     fontSize: 11,
-    color: "rgba(203,213,225,0.60)",
+    color: "#64748B",
     marginTop: 3,
     lineHeight: 16,
   },
@@ -266,22 +279,22 @@ export default StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    backgroundColor: "rgba(15,23,42,0.48)",
+    backgroundColor: "#FFFFFF",
   },
 
   sidebarSubmoduleButtonActive: {
-    backgroundColor: "#ECFEFF",
+    backgroundColor: "#EEF5FF",
   },
 
   sidebarSubmoduleLabel: {
     flex: 1,
     fontSize: 13,
     fontWeight: "600",
-    color: "rgba(255,255,255,0.84)",
+    color: "#475569",
   },
 
   sidebarSubmoduleLabelActive: {
-    color: "#0F172A",
+    color: "#041E42",
   },
 
   sidebarSubmoduleBadge: {
@@ -289,7 +302,7 @@ export default StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "#E2E8F0",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -297,7 +310,7 @@ export default StyleSheet.create({
   sidebarSubmoduleBadgeText: {
     fontSize: 10,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: "#475569",
   },
 
   sidebarUtilityButton: {
@@ -308,22 +321,23 @@ export default StyleSheet.create({
     marginHorizontal: 14,
     marginTop: 14,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.9)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
+    borderColor: "#D9E4F0",
   },
 
   sidebarUtilityButtonActive: {
-    backgroundColor: "rgba(148,163,184,0.18)",
-    borderColor: "rgba(203,213,225,0.28)",
+    backgroundColor: "#EEF5FF",
+    borderColor: "#9EC5F8",
   },
 
   sidebarUserSection: {
-    marginTop: 24,
-    marginHorizontal: 18,
-    paddingTop: 18,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.1)",
+    marginTop: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#D9E4F0",
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
   },
 
   sidebarUserInfo: {
@@ -350,13 +364,13 @@ export default StyleSheet.create({
   sidebarUserName: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#FFF",
+    color: "#0F172A",
     marginBottom: 2,
   },
 
   sidebarUserEmail: {
     fontSize: 10,
-    color: "rgba(255,255,255,0.6)",
+    color: "#64748B",
   },
 
   sidebarLogoutButton: {
@@ -364,19 +378,19 @@ export default StyleSheet.create({
     alignItems: "center",
     paddingVertical: 13,
     paddingHorizontal: 16,
-    marginHorizontal: 18,
+    marginHorizontal: 0,
     marginTop: 16,
     borderRadius: 16,
-    backgroundColor: "rgba(239,68,68,0.13)",
+    backgroundColor: "#FEE2E2",
     borderWidth: 1,
-    borderColor: "rgba(248,113,113,0.14)",
+    borderColor: "#FECACA",
     gap: 12,
   },
 
   sidebarLogoutText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#FDA4AF",
+    color: "#DC2626",
   },
 
   sidebarFooter: {
@@ -387,14 +401,14 @@ export default StyleSheet.create({
 
   sidebarFooterText: {
     fontSize: 10,
-    color: "rgba(255,255,255,0.4)",
+    color: "#94A3B8",
     marginBottom: 2,
     textAlign: "center",
   },
 
   sidebarFooterVersion: {
     fontSize: 9,
-    color: "rgba(255,255,255,0.3)",
+    color: "#CBD5E1",
   },
 
   // ============================================
@@ -403,7 +417,7 @@ export default StyleSheet.create({
 
   contentArea: {
     flex: 1,
-    backgroundColor: "#EEF4FA",
+    backgroundColor: "#F4F8FC",
   },
 
   adminContentShell: {
@@ -1021,6 +1035,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 14,
   },
 
   headerTitle: {
@@ -1065,6 +1080,33 @@ export default StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#334155",
+  },
+
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexShrink: 0,
+  },
+
+  headerPrintButton: {
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    ...Platform.select({
+      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.08)" },
+    }),
+  },
+
+  headerPrintButtonText: {
+    fontSize: 13,
+    fontWeight: "800",
   },
 
   profileButton: {

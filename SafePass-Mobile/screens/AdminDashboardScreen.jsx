@@ -6328,20 +6328,6 @@ const loadDashboardData = useCallback(async () => {
           badge={`${appointmentRecords.length} records`}
           isDarkMode={isDarkMode}
           theme={theme}
-          actions={
-            <TouchableOpacity
-              style={styles.pageRefreshButton}
-              onPress={() =>
-                handlePrintRequests(
-                  "Appointment Records",
-                  appointmentRecords,
-                  "Generated from the appointment records table in the admin dashboard.",
-                )
-              }
-            >
-              <Ionicons name="print-outline" size={20} color="#EC4899" />
-            </TouchableOpacity>
-          }
         >
           <View style={styles.modularCardGrid}>
             {[
@@ -6468,18 +6454,6 @@ const loadDashboardData = useCallback(async () => {
             <View style={styles.adminSectionShellActions}>
               <TouchableOpacity style={styles.pageRefreshButton} onPress={loadAllVisitRequests}>
                 <Ionicons name="refresh-outline" size={22} color="#F59E0B" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.pageRefreshButton}
-                onPress={() =>
-                  handlePrintRequests(
-                    "Appointment Management Queue",
-                    getFilteredRequests(),
-                    "Generated from the active appointment management table in the admin dashboard.",
-                  )
-                }
-              >
-                <Ionicons name="print-outline" size={20} color="#F59E0B" />
               </TouchableOpacity>
             </View>
           }
@@ -6718,9 +6692,6 @@ const loadDashboardData = useCallback(async () => {
             <View style={styles.adminSectionShellActions}>
               <TouchableOpacity style={styles.pageRefreshButton} onPress={loadVisitorHistory}>
                 <Ionicons name="refresh-outline" size={22} color="#1C6DD0" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.pageRefreshButton} onPress={handlePrintReports}>
-                <Ionicons name="print-outline" size={20} color="#1C6DD0" />
               </TouchableOpacity>
             </View>
           }
@@ -7525,18 +7496,6 @@ const loadDashboardData = useCallback(async () => {
               </TouchableOpacity>
             ) : null}
 
-            <TouchableOpacity
-              style={[
-                styles.managementSecondaryButton,
-                isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
-              ]}
-              onPress={handlePrintUsers}
-            >
-              <Ionicons name="print-outline" size={18} color={userManagementConfig.accent} />
-              <Text style={[styles.managementSecondaryButtonText, { color: userManagementConfig.accent }]}>
-                Print List
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -7904,6 +7863,47 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
+  const getHeaderPrintAction = () => {
+    switch (selectedSubmodule) {
+      case "account-records":
+        return {
+          label: "Print Account Records",
+          color: userManagementConfig.accent,
+          onPress: handlePrintUsers,
+        };
+      case "appointment-records":
+        return {
+          label: "Print Appointment Records",
+          color: "#EC4899",
+          onPress: () =>
+            handlePrintRequests(
+              "Appointment Records",
+              appointmentRecords,
+              "Generated from the appointment records table in the admin dashboard.",
+            ),
+        };
+      case "appointment-management":
+        return {
+          label: "Print Appointment Queue",
+          color: "#F59E0B",
+          onPress: () =>
+            handlePrintRequests(
+              "Appointment Management Queue",
+              getFilteredRequests(),
+              "Generated from the active appointment management table in the admin dashboard.",
+            ),
+        };
+      case "report-records":
+        return {
+          label: "Print Report Records",
+          color: "#1C6DD0",
+          onPress: handlePrintReports,
+        };
+      default:
+        return null;
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -7913,9 +7913,11 @@ const loadDashboardData = useCallback(async () => {
     );
   }
 
+  const headerPrintAction = getHeaderPrintAction();
+
   return (
     <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? "#0F172A" : "#1E3A5F"} />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? "#0F172A" : "#F4F8FC"} />
       <View style={[styles.mainContainer, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
         {/* Sidebar */}
         <View style={[styles.sidebar, isDarkMode && { backgroundColor: theme.sidebarBackground }]}>
@@ -7942,7 +7944,7 @@ const loadDashboardData = useCallback(async () => {
               activeOpacity={0.85}
             >
               <View style={[styles.sidebarMenuIcon, { backgroundColor: "rgba(37,99,235,0.16)" }]}>
-                <Ionicons name="grid-outline" size={20} color="#8EC5FF" />
+                <Ionicons name="grid-outline" size={20} color="#0A3D91" />
               </View>
               <Text style={[styles.sidebarMenuLabel, selectedSubmodule === "dashboard" && styles.sidebarMenuLabelActive, isDarkMode && styles.darkText]}>
                 Dashboard Overview
@@ -7979,7 +7981,7 @@ const loadDashboardData = useCallback(async () => {
                       <Ionicons
                         name={isExpanded ? "chevron-up-outline" : "chevron-down-outline"}
                         size={18}
-                        color="rgba(255,255,255,0.82)"
+                        color={hasSelectedChild ? module.color : "#64748B"}
                       />
                     </TouchableOpacity>
 
@@ -8030,7 +8032,7 @@ const loadDashboardData = useCallback(async () => {
               activeOpacity={0.84}
             >
               <View style={[styles.sidebarMenuIcon, { backgroundColor: "rgba(148,163,184,0.14)" }]}>
-                <Ionicons name="settings-outline" size={20} color="#CBD5E1" />
+                <Ionicons name="settings-outline" size={20} color="#64748B" />
               </View>
               <Text style={[styles.sidebarMenuLabel, selectedSubmodule === "settings" && styles.sidebarMenuLabelActive, isDarkMode && styles.darkText]}>
                 Settings
@@ -8043,7 +8045,7 @@ const loadDashboardData = useCallback(async () => {
                 <View><Text style={[styles.sidebarUserName, isDarkMode && styles.darkText]}>{user?.firstName} {user?.lastName}</Text><Text style={[styles.sidebarUserEmail, isDarkMode && { color: "rgba(255,255,255,0.5)" }]}>{user?.email}</Text></View>
               </View>
               <TouchableOpacity style={[styles.sidebarLogoutButton, isDarkMode && { backgroundColor: "rgba(239,68,68,0.2)" }]} onPress={handleLogout}>
-                <Ionicons name="log-out-outline" size={20} color="#FDA4AF" /><Text style={[styles.sidebarLogoutText, isDarkMode && { color: "#FCA5A5" }]}>Logout</Text>
+                <Ionicons name="log-out-outline" size={20} color="#DC2626" /><Text style={[styles.sidebarLogoutText, isDarkMode && { color: "#FCA5A5" }]}>Logout</Text>
               </TouchableOpacity>
             </View>
 
@@ -8086,7 +8088,22 @@ const loadDashboardData = useCallback(async () => {
                 ))}
               </View>
             </View>
-              <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.profileButton}><View style={[styles.profileIcon, isDarkMode && { backgroundColor: "#1C6DD0" }]}><Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View></TouchableOpacity>
+              <View style={styles.headerActions}>
+                {headerPrintAction ? (
+                  <TouchableOpacity
+                    onPress={headerPrintAction.onPress}
+                    style={[styles.headerPrintButton, { borderColor: `${headerPrintAction.color}33` }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={headerPrintAction.label}
+                  >
+                    <Ionicons name="print-outline" size={20} color={headerPrintAction.color} />
+                    <Text style={[styles.headerPrintButtonText, { color: headerPrintAction.color }]}>
+                      Print
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.profileButton}><View style={[styles.profileIcon, isDarkMode && { backgroundColor: "#1C6DD0" }]}><Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View></TouchableOpacity>
+              </View>
             </View>
           </Animated.View>
 
