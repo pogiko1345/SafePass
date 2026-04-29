@@ -1585,6 +1585,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     setAppointmentRecordsPage((currentPageValue) => Math.min(currentPageValue, appointmentRecordsPageCount));
   }, [appointmentRecordsPageCount]);
 
+  const securityReportRecords = useMemo(
+    () => visitorHistory.filter((visitor) => visitor.reportType === "security_report"),
+    [visitorHistory],
+  );
+
   const selectedMapModuleFloor = FLOOR_VIEW_TO_ID[selectedSubmodule] || "ground";
   const selectedFloorRooms = useMemo(
     () => managedRooms.filter((room) => room.floor === selectedMapModuleFloor),
@@ -1901,11 +1906,6 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     );
     setVisitorHistory(sortedVisitors);
   }, [visitRequests]);
-
-  const securityReportRecords = useMemo(
-    () => visitorHistory.filter((visitor) => visitor.reportType === "security_report"),
-    [visitorHistory],
-  );
 
   const handleSaveAppointmentOffice = async () => {
     const visitorId = selectedRequest?._id || selectedRequest?.id || selectedRequest?.sourceVisitorId;
