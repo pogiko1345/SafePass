@@ -1,0 +1,12 @@
+Error: spawn EPERM
+Error: spawn EPERM
+    at ChildProcess.spawn (node:internal/child_process:420:11)
+    at Object.spawn (node:child_process:786:9)
+    at spawn (C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile\node_modules\cross-spawn\index.js:12:24)
+    at C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile\node_modules\@expo\spawn-async\src\spawnAsync.ts:35:18
+    at new Promise (<anonymous>)
+    at spawnAsync (C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile\node_modules\@expo\spawn-async\src\spawnAsync.ts:32:17)
+    at ADBServer.startAsync (C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile\node_modules\expo\node_modules\@expo\cli\src\start\platforms\android\ADBServer.ts:49:59)
+    at ADBServer.runAsync (C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile\node_modules\expo\node_modules\@expo\cli\src\start\platforms\android\ADBServer.ts:82:16)
+    at getAttachedDevicesAsync (C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile\node_modules\expo\node_modules\@expo\cli\src\start\platforms\android\adb.ts:214:36)
+    at startAdbReverseAsync (C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile\node_modules\expo\node_modules\@expo\cli\src\start\platforms\android\adbReverse.ts:25:48)

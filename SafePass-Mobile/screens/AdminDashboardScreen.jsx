@@ -3396,6 +3396,13 @@ const loadDashboardData = useCallback(async () => {
         }));
 
         setShowAddUserModal(false);
+        const emailDelivery = response.emailDelivery || {};
+        const deliveryNote = emailDelivery.delivered
+          ? `A temporary password and login details have been sent to ${newUserData.email}.`
+          : emailDelivery.simulated
+            ? `Account created. Credential email was simulated by the backend, so check the backend logs for delivery details.`
+          : `Account created, but the credential email could not be sent. Check the backend mail logs before giving this account to the user.`;
+
         setCreatedUserSummary({
           name: createdName,
           email: newUserData.email,
@@ -3403,7 +3410,7 @@ const loadDashboardData = useCallback(async () => {
           role: roleDisplay,
           employeeId: response.user?.employeeId || "Generated automatically",
           status: userPayload.status,
-          deliveryNote: `A temporary password and login details have been sent to ${newUserData.email}.`,
+          deliveryNote,
         });
         setShowCreateSuccessModal(true);
         setCreateUserErrors({});

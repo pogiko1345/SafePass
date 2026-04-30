@@ -3415,29 +3415,40 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
     });
     await accessLog.save();
 
-    sendEmail(
+    const credentialEmail = await sendEmail(
       user.email,
-      `Welcome to Sapphire Aviation - Staff Account`,
+      "Welcome to Sapphire SafePass - Staff Account Credentials",
       `Dear ${user.firstName} ${user.lastName},\n\n` +
         `Your staff account has been created by the administrator.\n\n` +
+        `Login Credentials\n` +
         `Username: ${user.username}\n` +
         `Email: ${user.email}\n` +
         `Temporary Password: ${temporaryPassword}\n` +
         `Staff ID: ${user.employeeId}\n` +
         `Department: ${user.department}\n` +
         `Status: ${user.status.toUpperCase()}\n\n` +
-        `Please sign in and change your password when convenient.\n\n` +
-        `Thank you,\n` +
-        `Sapphire Aviation Security Team`,
+        `Please sign in and change your password after your first login.\n\n` +
+        getSupportEmailSignature(),
     );
 
     const userResponse = user.toObject();
     delete userResponse.password;
+    const credentialEmailDelivered = Boolean(credentialEmail?.delivered);
 
     res.status(201).json({
       success: true,
-      message: "Staff account created successfully",
+      message: credentialEmailDelivered
+        ? "Staff account created successfully and credentials were emailed"
+        : credentialEmail?.simulated
+          ? "Staff account created successfully and credential email was simulated"
+        : "Staff account created, but credential email could not be sent",
       user: userResponse,
+      emailDelivery: {
+        success: Boolean(credentialEmail?.success),
+        delivered: credentialEmailDelivered,
+        simulated: Boolean(credentialEmail?.simulated),
+        error: credentialEmail?.error || "",
+      },
     });
   } catch (error) {
     console.error("Create staff account error:", error);

@@ -1,0 +1,8 @@
+env: load .env.local
+env: export VERCEL_OIDC_TOKEN
+Starting project at C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile
+Starting Metro Bundler
+
+ ERROR  An unknown error occurred while installing React Native DevTools. Details:
+
+spawn EPERM
