@@ -1,24 +1,4 @@
-(node:12380) [DEP_WEBPACK_DEV_SERVER_CONSTRUCTOR] DeprecationWarning: Using 'compiler' as the first argument is deprecated. Please use 'options' as the first argument and 'compiler' as the second argument.
+  --non-interactive is not supported, use $CI=1 instead
+(node:18312) [DEP_WEBPACK_DEV_SERVER_CONSTRUCTOR] DeprecationWarning: Using 'compiler' as the first argument is deprecated. Please use 'options' as the first argument and 'compiler' as the second argument.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:12380) [DEP_WEBPACK_DEV_SERVER_LISTEN] DeprecationWarning: 'listen' is deprecated. Please use the async 'start' or 'startCallback' method.
-The following packages should be updated for best compatibility with the installed expo version:
-  @react-native-async-storage/async-storage@1.21.0 - expected version: 2.2.0
-  expo@55.0.6 - expected version: ~55.0.18
-  expo-application@55.0.9 - expected version: ~55.0.14
-  expo-blur@55.0.9 - expected version: ~55.0.14
-  expo-camera@55.0.11 - expected version: ~55.0.16
-  expo-constants@55.0.7 - expected version: ~55.0.15
-  expo-crypto@55.0.9 - expected version: ~55.0.14
-  expo-haptics@55.0.11 - expected version: ~55.0.14
-  expo-image-manipulator@55.0.11 - expected version: ~55.0.15
-  expo-image-picker@55.0.16 - expected version: ~55.0.19
-  expo-linear-gradient@55.0.8 - expected version: ~55.0.13
-  expo-local-authentication@55.0.9 - expected version: ~55.0.13
-  expo-location@55.1.2 - expected version: ~55.1.8
-  expo-print@55.0.9 - expected version: ~55.0.13
-  expo-secure-store@55.0.8 - expected version: ~55.0.13
-  expo-sharing@55.0.14 - expected version: ~55.0.18
-  expo-status-bar@55.0.4 - expected version: ~55.0.5
-  react-native@0.83.2 - expected version: 0.83.6
-  react-native-maps@1.26.20 - expected version: 1.27.2
-Your project may not work correctly until you install the expected versions of the packages.
+(node:18312) [DEP_WEBPACK_DEV_SERVER_LISTEN] DeprecationWarning: 'listen' is deprecated. Please use the async 'start' or 'startCallback' method.

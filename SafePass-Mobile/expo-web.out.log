@@ -1,16 +1,15 @@
-
-> safepass-mobile@1.0.0 web
-> expo start --web
-
-Starting project at C:\Users\jnvnc\OneDrive\Documents\SafePass\SafePass-Mobile
+env: load .env.local
+env: export VERCEL_OIDC_TOKEN
+Starting project at C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile
 Starting Metro Bundler
 
+ ERROR  An unknown error occurred while installing React Native DevTools. Details:
+
+spawn EPERM
+env: export VERCEL_OIDC_TOKEN
 Starting Webpack on port 19006 in development mode.
-Waiting on http://localhost:8081
+Waiting on http://localhost:8082
 Logs for your project will appear below.
-[1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
-[1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
-[1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
 [1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
 [1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
 [1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
