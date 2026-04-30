@@ -6842,6 +6842,14 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       });
     }
 
+    if (updates.status !== undefined) {
+      updates.status = String(updates.status || "").toLowerCase().trim();
+      updates.isActive = updates.status === "active";
+    } else if (updates.isActive !== undefined) {
+      updates.isActive = updates.isActive === true;
+      updates.status = updates.isActive ? "active" : "inactive";
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { ...updates, updatedAt: new Date() },
@@ -6931,7 +6939,7 @@ app.put("/api/admin/users/:id/deactivate", authMiddleware, async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { status: "inactive", updatedAt: new Date() },
+      { status: "inactive", isActive: false, updatedAt: new Date() },
       { new: true },
     ).select("-password");
 
@@ -6971,7 +6979,7 @@ app.put("/api/admin/users/:id/activate", authMiddleware, async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { status: "active", updatedAt: new Date() },
+      { status: "active", isActive: true, updatedAt: new Date() },
       { new: true },
     ).select("-password");
 

@@ -4,6 +4,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
@@ -20,6 +21,7 @@ import {
   UIManager,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import ApiService from "../utils/ApiService";
 import SharedMonitoringMap from "../components/SharedMonitoringMap";
@@ -38,9 +40,42 @@ import {
 import styles from "../styles/AdminDashboardStyles";
 
 const { width, height } = Dimensions.get("window");
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
   : require("@react-native-async-storage/async-storage").default;
+
+const HoverBubble = ({ children, style, hoverScale = 1.05, onPress, ...props }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const animateScale = useCallback((toValue) => {
+    if (Platform.OS !== "web") return;
+    Animated.spring(scale, {
+      toValue,
+      useNativeDriver: true,
+      tension: 180,
+      friction: 12,
+    }).start();
+  }, [scale]);
+
+  return (
+    <AnimatedPressable
+      {...props}
+      onPress={onPress}
+      onHoverIn={() => animateScale(hoverScale)}
+      onHoverOut={() => animateScale(1)}
+      onMouseEnter={() => animateScale(hoverScale)}
+      onMouseLeave={() => animateScale(1)}
+      style={[
+        style,
+        Platform.OS === "web" && styles.hoverBubble,
+        { transform: [{ scale }] },
+      ]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+};
 
 const STAFF_DEPARTMENT_OPTIONS = [
   { value: "Admissions", label: "Admissions", area: "Ground Floor" },
@@ -429,7 +464,11 @@ const getRoleIcon = (role) => {
 
 const isSecurityRole = (role) => role === "security" || role === "guard";
 
-const isUserActive = (user) => user?.status === "active" || user?.isActive === true;
+const isUserActive = (user) => {
+  if (!user) return false;
+  if (user.status) return user.status === "active";
+  return user.isActive === true;
+};
 
 const formatRoleLabel = (role) => {
   if (isSecurityRole(role)) return "Security";
@@ -3454,8 +3493,8 @@ const loadDashboardData = useCallback(async () => {
       employeeId: userItem.employeeId || "",
       shift: userItem.shift || "",
       position: userItem.position || "",
-      status: userItem.status || "active",
-      isActive: userItem.isActive !== false,
+      status: isUserActive(userItem) ? "active" : "inactive",
+      isActive: isUserActive(userItem),
     });
     if (selectedSubmodule === "data-management") {
       setUserDataPanelMode("edit");
@@ -3629,7 +3668,7 @@ const loadDashboardData = useCallback(async () => {
   };
 
   // FIXED: Handle Delete User
-  const handleDeleteUser = () => {
+  const handleDeleteUser = async () => {
     if (!ensureAdminAccess()) return;
     const selectedId = selectedUser?._id || selectedUser?.id;
     if (!selectedId) {
@@ -3637,50 +3676,48 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
 
-    Alert.alert("Delete User", `Delete ${selectedUser?.firstName} ${selectedUser?.lastName}? This action cannot be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const response = await ApiService.deleteUser(selectedId);
-            if (response?.success) {
-              // Update local state immediately
-              const updatedUsers = allUsers.filter(user => user._id !== selectedId && user.id !== selectedId);
+    if (String(selectedId) === String(user?._id || user?.id)) {
+      Alert.alert("Cannot Delete", "You cannot delete your own admin account.");
+      return;
+    }
 
-              setAllUsers(updatedUsers);
-              setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
-              setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
-              
-              setStats(prev => ({
-                ...prev,
-                totalUsers: updatedUsers.length,
-                totalStaff: updatedUsers.filter(u => u.role === "staff").length,
-                totalGuards: updatedUsers.filter(u => u.role === "security" || u.role === "guard").length,
-                activeUsers: updatedUsers.filter(u => u.status === "active" || u.isActive).length,
-              }));
-              
-              publishAdminNotice(
-                "success",
-                "User deleted",
-                `${selectedUser?.firstName || "The selected user"} was removed from the directory.`,
-              );
-              Alert.alert("Success", "User deleted successfully");
-              setShowDeleteUserModal(false);
-              setSelectedUser(null);
-              await loadDashboardData();
-            } else {
-              Alert.alert("Error", response?.message || "Failed to delete user");
-            }
-          } catch (error) {
-            console.error("Delete user error:", error);
-            publishAdminNotice("error", "Delete failed", "Unable to delete the selected user.");
-            Alert.alert("Error", "Failed to delete user. Please try again.");
-          }
-        },
-      },
-    ]);
+    setProcessingId(`delete-user-${selectedId}`);
+    try {
+      const response = await ApiService.deleteUser(selectedId);
+      if (response?.success) {
+        const updatedUsers = allUsers.filter((entry) => entry._id !== selectedId && entry.id !== selectedId);
+
+        setAllUsers(updatedUsers);
+        setStaffUsers(updatedUsers.filter((entry) => entry.role === "staff"));
+        setGuardUsers(updatedUsers.filter((entry) => entry.role === "security" || entry.role === "guard"));
+        setStats((prev) => ({
+          ...prev,
+          totalUsers: updatedUsers.length,
+          totalStaff: updatedUsers.filter((entry) => entry.role === "staff").length,
+          totalGuards: updatedUsers.filter((entry) => entry.role === "security" || entry.role === "guard").length,
+          activeUsers: updatedUsers.filter((entry) => entry.status === "active" || entry.isActive).length,
+        }));
+
+        publishAdminNotice(
+          "success",
+          "User deleted",
+          `${selectedUser?.firstName || "The selected user"} was removed from the directory.`,
+        );
+        setShowDeleteUserModal(false);
+        setShowViewUserModal(false);
+        setShowEditUserModal(false);
+        setSelectedUser(null);
+        await loadDashboardData();
+      } else {
+        Alert.alert("Error", response?.message || "Failed to delete user");
+      }
+    } catch (error) {
+      console.error("Delete user error:", error);
+      publishAdminNotice("error", "Delete failed", error?.message || "Unable to delete the selected user.");
+      Alert.alert("Error", error?.message || "Failed to delete user. Please try again.");
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleToggleUserStatus = async (userItem) => {
@@ -3711,15 +3748,20 @@ const loadDashboardData = useCallback(async () => {
 
               if (response?.success) {
                 const nextStatus = nextAction === "deactivate" ? "inactive" : "active";
+                const savedUser = response.user || {};
                 const updatedUsers = allUsers.map((entry) =>
                   (entry._id === userId || entry.id === userId)
-                    ? { ...entry, status: nextStatus, isActive: nextStatus === "active" }
+                    ? { ...entry, ...savedUser, status: nextStatus, isActive: nextStatus === "active" }
                     : entry,
                 );
 
                 setAllUsers(updatedUsers);
                 setStaffUsers(updatedUsers.filter((entry) => entry.role === "staff"));
                 setGuardUsers(updatedUsers.filter((entry) => entry.role === "security" || entry.role === "guard"));
+                setSelectedUser((currentValue) => {
+                  if (!currentValue || (currentValue._id !== userId && currentValue.id !== userId)) return currentValue;
+                  return { ...currentValue, ...savedUser, status: nextStatus, isActive: nextStatus === "active" };
+                });
                 setStats((prev) => ({
                   ...prev,
                   activeUsers: updatedUsers.filter((entry) => entry.status === "active" || entry.isActive).length,
@@ -3730,6 +3772,7 @@ const loadDashboardData = useCallback(async () => {
                   `User ${nextAction}d`,
                   `${userItem.firstName} ${userItem.lastName} is now ${nextStatus}.`,
                 );
+                await loadDashboardData();
               } else {
                 Alert.alert("Error", response?.message || `Failed to ${nextAction} user`);
               }
@@ -4858,37 +4901,71 @@ const loadDashboardData = useCallback(async () => {
           </TouchableOpacity>
         </View>
 
-        <View
+        <LinearGradient
+          colors={isDarkMode ? ["#0F172A", "#1E293B"] : ["#0A3D91", "#1C6DD0"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={[
             styles.dashboardHeroCard,
-            isDarkMode && { backgroundColor: "#1E293B", borderColor: "#334155" },
+            isDarkMode && { borderColor: "#334155" },
           ]}
         >
           <View style={styles.dashboardHeroLeft}>
-            <Text style={[styles.dashboardHeroTitle, isDarkMode && styles.darkText]}>
+            <Text style={styles.dashboardHeroEyebrow}>Admin Dashboard</Text>
+            <Text style={styles.dashboardHeroTitle}>
               Welcome back, {user?.firstName || "Admin"}
             </Text>
-            <Text style={[styles.dashboardHeroSubtitle, isDarkMode && styles.darkTextSecondary]}>
-              Here are the essentials for today: requests, visits, and active accounts.
+            <Text style={styles.dashboardHeroSubtitle}>
+              Track campus activity, account operations, appointments, and live visitor movement from one command view.
             </Text>
           </View>
-          <TouchableOpacity
-            style={[styles.dashboardHeroBadge, isDarkMode && { backgroundColor: "#334155" }]}
+          <HoverBubble
+            style={styles.dashboardHeroBadge}
             onPress={() => setShowPendingRequestsModal(true)}
-            activeOpacity={0.85}
+            hoverScale={1.07}
           >
-            <Ionicons name="time-outline" size={16} color="#F59E0B" />
-            <Text style={[styles.dashboardHeroBadgeText, isDarkMode && styles.darkTextSecondary]}>
+            <Ionicons name="time-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.dashboardHeroBadgeText}>
               {pendingRequests.length || stats.pendingRequests || 0} request alerts
             </Text>
-          </TouchableOpacity>
+          </HoverBubble>
+        </LinearGradient>
+
+        <View style={styles.dashboardStatsGrid}>
+          {[
+            { label: "Pending Requests", value: stats.pendingRequests || 0, icon: "time-outline", color: "#F59E0B" },
+            { label: "Today Visits", value: stats.todayVisits || 0, icon: "calendar-outline", color: "#1C6DD0" },
+            { label: "Live Visitors", value: monitoredMapVisitors.length || stats.activeVisitors || stats.checkedInVisitors || 0, icon: "locate-outline", color: "#10B981" },
+            { label: "Total Accounts", value: allUsers.length || stats.totalUsers || 0, icon: "people-outline", color: "#7C3AED" },
+          ].map((item) => (
+            <HoverBubble
+              key={item.label}
+              hoverScale={1.045}
+              style={[
+                styles.dashboardStatCard,
+                {
+                  width: width > 1100 ? "24%" : width > 760 ? "48%" : "100%",
+                  backgroundColor: theme.cardBackground,
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={styles.dashboardStatHeader}>
+                <Text style={[styles.dashboardStatLabel, { color: theme.textSecondary }]}>{item.label}</Text>
+                <View style={[styles.dashboardStatIcon, { backgroundColor: `${item.color}16` }]}>
+                  <Ionicons name={item.icon} size={18} color={item.color} />
+                </View>
+              </View>
+              <Text style={[styles.dashboardStatValue, { color: theme.textPrimary }]}>{item.value}</Text>
+            </HoverBubble>
+          ))}
         </View>
 
         <View style={styles.quickActionsGrid}>
           {dashboardQuickActions.slice(0, 4).map((item) => (
-            <TouchableOpacity
+            <HoverBubble
               key={item.key}
-              activeOpacity={0.86}
+              hoverScale={1.055}
               style={[
                 styles.quickActionCard,
                 {
@@ -4909,12 +4986,12 @@ const loadDashboardData = useCallback(async () => {
               <View style={[styles.quickActionBadge, { backgroundColor: `${item.color}14` }]}>
                 <Text style={[styles.quickActionBadgeText, { color: item.color }]}>{item.badge}</Text>
               </View>
-            </TouchableOpacity>
+            </HoverBubble>
           ))}
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.88}
+        <HoverBubble
+          hoverScale={1.04}
           style={[
             styles.dashboardNotificationCard,
             { backgroundColor: theme.cardBackground, borderColor: theme.borderColor },
@@ -4939,7 +5016,7 @@ const loadDashboardData = useCallback(async () => {
           <View style={styles.dashboardNotificationBadge}>
             <Text style={styles.dashboardNotificationBadgeText}>Open</Text>
           </View>
-        </TouchableOpacity>
+        </HoverBubble>
 
         {renderAdminMapWorkspace()}
       </View>
@@ -6660,108 +6737,145 @@ const loadDashboardData = useCallback(async () => {
     </ScrollView>
   );
 
-  const renderAppointmentOptionManager = ({ title, subtitle, groupKey, placeholder }) => {
+  const renderAppointmentOptionManager = ({ title, subtitle, groupKey, placeholder, icon }) => {
     const options = appointmentManagementOptions[groupKey] || [];
     const editingId =
       editingAppointmentOption?.groupKey === groupKey ? editingAppointmentOption.optionId : null;
+    const enabledCount = options.filter((option) => option.enabled !== false).length;
 
     return (
       <View
         style={[
-          styles.modularEditorCard,
+          styles.appointmentOptionCard,
           {
-            backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
+            backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
             borderColor: theme.borderColor,
           },
         ]}
       >
-        <Text style={[styles.modularEditorTitle, isDarkMode && styles.darkText]}>{title}</Text>
-        <Text style={[styles.modularEditorHint, isDarkMode && styles.darkTextSecondary]}>
-          {subtitle}
-        </Text>
-        <View style={styles.adminTableActionRow}>
+        <View style={styles.appointmentOptionHeader}>
+          <View style={styles.appointmentOptionIcon}>
+            <Ionicons name={icon} size={20} color="#0A3D91" />
+          </View>
+          <View style={styles.appointmentOptionTitleBlock}>
+            <Text style={[styles.appointmentOptionTitle, isDarkMode && styles.darkText]}>{title}</Text>
+            <Text style={[styles.appointmentOptionSubtitle, isDarkMode && styles.darkTextSecondary]}>
+              {subtitle}
+            </Text>
+          </View>
+          <View style={styles.appointmentOptionCountBadge}>
+            <Text style={styles.appointmentOptionCountText}>
+              {enabledCount}/{options.length || 0}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.appointmentOptionAddRow}>
           <TextInput
-            style={[styles.modularTextInput, { flex: 1, marginBottom: 0 }, isDarkMode && styles.darkInput]}
+            style={[styles.appointmentOptionInput, isDarkMode && styles.darkInput]}
             placeholder={placeholder}
             placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
             value={appointmentOptionDrafts[groupKey]}
             onChangeText={(value) => setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: value }))}
           />
-          <TouchableOpacity
-            style={[styles.adminTableActionButton, { backgroundColor: "#EEF5FF", borderColor: "#B7D5F6" }]}
+          <HoverBubble
+            style={styles.appointmentOptionAddButton}
             disabled={isSavingAppointmentOptions}
             onPress={() => handleAddAppointmentOption(groupKey)}
+            hoverScale={1.04}
           >
-            <Ionicons name="add-outline" size={16} color="#0A3D91" />
-            <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>Add</Text>
-          </TouchableOpacity>
+            <Ionicons name="add-outline" size={17} color="#FFFFFF" />
+            <Text style={styles.appointmentOptionAddText}>Add</Text>
+          </HoverBubble>
         </View>
 
-        <View style={[styles.modularListStack, { marginTop: 12 }]}>
-          {options.map((option) => {
+        <View style={styles.appointmentOptionList}>
+          {options.length ? options.map((option) => {
             const isEditing = editingId === option.id;
             return (
               <View
                 key={option.id || option.label}
                 style={[
-                  styles.modularRoomTableHeader,
+                  styles.appointmentOptionItem,
                   {
-                    borderWidth: 1,
-                    borderRadius: 14,
                     borderColor: theme.borderColor,
-                    backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
+                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                   },
                 ]}
               >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.adminTablePrimaryText, isDarkMode && styles.darkText]}>
-                    {option.label || option.value}
-                  </Text>
-                  <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
-                    {option.enabled === false ? "Disabled" : "Enabled"}
-                  </Text>
+                <View style={styles.appointmentOptionItemMain}>
+                  {isEditing ? (
+                    <TextInput
+                      style={[styles.appointmentOptionEditInput, isDarkMode && styles.darkInput]}
+                      placeholder={placeholder}
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                      value={appointmentOptionDrafts[groupKey]}
+                      onChangeText={(value) => setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: value }))}
+                    />
+                  ) : (
+                    <>
+                      <Text style={[styles.appointmentOptionItemTitle, isDarkMode && styles.darkText]}>
+                        {option.label || option.value}
+                      </Text>
+                      <View style={styles.appointmentOptionMetaRow}>
+                        <Ionicons
+                          name={option.enabled === false ? "eye-off-outline" : "eye-outline"}
+                          size={13}
+                          color="#64748B"
+                        />
+                        <Text style={[styles.appointmentOptionStatusText, isDarkMode && styles.darkTextSecondary]}>
+                          {option.enabled === false ? "Hidden" : "Visible"}
+                        </Text>
+                      </View>
+                    </>
+                  )}
                 </View>
-                <View style={styles.adminTableActionRow}>
+                <View style={styles.appointmentOptionActions}>
                   {isEditing ? (
                     <TouchableOpacity
-                      style={[styles.adminTableActionButton, { backgroundColor: "rgba(16,185,129,0.12)", borderColor: "rgba(16,185,129,0.24)" }]}
+                      style={styles.appointmentOptionMiniButton}
                       disabled={isSavingAppointmentOptions}
                       onPress={() => handleSaveEditedAppointmentOption(groupKey, option)}
                     >
-                      <Text style={[styles.adminTableActionText, { color: "#10B981" }]}>Save</Text>
+                      <Ionicons name="checkmark-outline" size={15} color="#0A3D91" />
+                      <Text style={styles.appointmentOptionMiniText}>Save</Text>
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      style={[styles.adminTableActionButton, { backgroundColor: "rgba(59,130,246,0.12)", borderColor: "rgba(59,130,246,0.24)" }]}
+                      style={styles.appointmentOptionMiniButton}
                       disabled={isSavingAppointmentOptions}
                       onPress={() => {
                         setEditingAppointmentOption({ groupKey, optionId: option.id });
                         setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: option.value || option.label || "" }));
                       }}
                     >
-                      <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>Edit</Text>
+                      <Ionicons name="create-outline" size={15} color="#475569" />
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
-                    style={[styles.adminTableActionButton, { backgroundColor: "rgba(245,158,11,0.12)", borderColor: "rgba(245,158,11,0.24)" }]}
+                    style={styles.appointmentOptionMiniButton}
                     disabled={isSavingAppointmentOptions}
                     onPress={() => handleToggleAppointmentOption(groupKey, option)}
                   >
-                    <Text style={[styles.adminTableActionText, { color: "#B45309" }]}>
-                      {option.enabled === false ? "Enable" : "Disable"}
-                    </Text>
+                    <Ionicons name={option.enabled === false ? "eye-outline" : "eye-off-outline"} size={15} color="#475569" />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.adminTableActionButton, { backgroundColor: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.22)" }]}
+                    style={styles.appointmentOptionMiniButton}
                     disabled={isSavingAppointmentOptions}
                     onPress={() => handleDeleteAppointmentOption(groupKey, option)}
                   >
-                    <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Delete</Text>
+                    <Ionicons name="trash-outline" size={15} color="#475569" />
                   </TouchableOpacity>
                 </View>
               </View>
             );
-          })}
+          }) : (
+            <View style={[styles.appointmentOptionEmpty, { borderColor: theme.borderColor }]}>
+              <Text style={[styles.appointmentOptionEmptyText, isDarkMode && styles.darkTextSecondary]}>
+                No options yet. Add one above.
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -6772,8 +6886,8 @@ const loadDashboardData = useCallback(async () => {
       <View style={styles.pageContainer}>
         <AdminSectionShell
           title="Appointment Management"
-          subtitle="Manage the active approval queue for visitor registrations and appointment-driven requests from one place."
-          badge={`${getFilteredRequests().length} visible`}
+          subtitle="Update the choices visitors see when booking an appointment."
+          badge="Visitor form"
           isDarkMode={isDarkMode}
           theme={theme}
           actions={
@@ -6784,239 +6898,29 @@ const loadDashboardData = useCallback(async () => {
             </View>
           }
         >
-          <View style={[styles.modularCardGrid, { marginBottom: 18 }]}>
+          <View style={styles.appointmentOptionsGrid}>
             {renderAppointmentOptionManager({
               title: "Office to Visit",
-              subtitle: "These enabled offices appear in the visitor appointment request dropdown.",
+              subtitle: "Where visitors can book.",
               groupKey: "offices",
               placeholder: "Add office, e.g. Admissions",
+              icon: "business-outline",
             })}
             {renderAppointmentOptionManager({
-              title: "Purpose of Visit",
-              subtitle: "These enabled purposes appear in the visitor purpose picker.",
+              title: "Purpose to Visit",
+              subtitle: "Why they are visiting.",
               groupKey: "purposes",
               placeholder: "Add purpose, e.g. Consultation",
+              icon: "clipboard-outline",
             })}
             {renderAppointmentOptionManager({
               title: "Available Time Slots",
-              subtitle: "Enabled time slots control the visitor time picker and availability checks.",
+              subtitle: "Times visitors can choose.",
               groupKey: "timeSlots",
               placeholder: "Add time, e.g. 09:00 or 2:30 PM",
+              icon: "time-outline",
             })}
           </View>
-
-          {renderRecordsSearchPanel({
-            title: "Search Appointment Records",
-            subtitle: "Manual lookup for a visitor name, office, purpose, phone, email, or exact date.",
-            value: requestSearchTerm,
-            onChangeText: (value) => {
-              setRequestSearchTerm(value);
-              setSearchQuery(value.trim());
-            },
-            onApply: () => setSearchQuery(requestSearchTerm.trim()),
-            onClear: () => {
-              setRequestSearchTerm("");
-              setSearchQuery("");
-            },
-            placeholder: "Example: April 18, 2026 or Registrar",
-            accent: "#F59E0B",
-          })}
-
-          {renderRecordsFilterPanel({
-            title: "Filter Appointment Records",
-            subtitle: "Quick shortcuts for status, month, exact date range, office, and time order.",
-            panelKey: "appointment-records",
-            accent: "#F59E0B",
-            onReset: () => {
-              setRequestFilter("all");
-              setRequestDateFilter("all");
-              setRequestOfficeFilter("all");
-              setRequestDateRange({ startDate: null, endDate: null });
-              setRequestSortOrder("newest");
-            },
-            groups: [
-              {
-                key: "status",
-                label: "Status",
-                activeValue: requestFilter,
-                onSelect: setRequestFilter,
-                filters: [
-                  { key: "all", label: "All Status", count: visitRequests.length, icon: "apps-outline" },
-                  { key: "pending", label: "Pending", count: pendingRequests.length, icon: "time-outline" },
-                  { key: "approved", label: "Approved", count: approvedRequests.length, icon: "checkmark-circle-outline" },
-                  { key: "rejected", label: "Rejected", count: rejectedRequests.length, icon: "close-circle-outline" },
-                ],
-              },
-              {
-                key: "date",
-                label: "Date Range",
-                activeValue: requestDateFilter,
-                onSelect: setRequestDateFilter,
-                filters: dateShortcutFilters,
-              },
-              {
-                key: "office",
-                label: "Office",
-                activeValue: requestOfficeFilter,
-                onSelect: setRequestOfficeFilter,
-                filters: requestOfficeFilterOptions,
-              },
-              {
-                key: "order",
-                label: "Time Order",
-                activeValue: requestSortOrder,
-                onSelect: setRequestSortOrder,
-                filters: [
-                  { key: "newest", label: "Newest First", icon: "arrow-down-outline" },
-                  { key: "oldest", label: "Oldest First", icon: "arrow-up-outline" },
-                  { key: "status", label: "Pending First", icon: "time-outline" },
-                ],
-              },
-            ],
-            footerContent: renderDateRangeControls({
-              accent: "#F59E0B",
-              startDate: requestDateRange.startDate,
-              endDate: requestDateRange.endDate,
-              onPickStart: () => setActiveFilterDateField("request-start"),
-              onPickEnd: () => setActiveFilterDateField("request-end"),
-              onClear: () => setRequestDateRange({ startDate: null, endDate: null }),
-            }),
-          })}
-
-          {renderAdminTable({
-            rows: getFilteredRequests(),
-            keyExtractor: (request) => request._id || request.id || `${request.email}-${request.createdAt}`,
-            emptyTitle: "No approval requests",
-            emptySubtitle: searchQuery
-              ? "No requests match your current search."
-              : requestFilter === "pending"
-                ? "All approval requests are cleared for now."
-                : requestFilter === "approved"
-                  ? "No approved requests are available in this filter."
-                  : "No rejected requests are available in this filter.",
-            columns: [
-              {
-                key: "visitor",
-                label: "Visitor",
-                width: 210,
-                render: (request) => (
-                  <View>
-                    <Text style={[styles.adminTablePrimaryText, isDarkMode && styles.darkText]}>
-                      {request.fullName || "Visitor"}
-                    </Text>
-                    <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
-                      {request.email || "-"}
-                    </Text>
-                  </View>
-                ),
-              },
-              {
-                key: "purpose",
-                label: "Purpose",
-                width: 210,
-                render: (request) => (
-                  <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
-                    {request.purposeOfVisit || request.visitType || "-"}
-                  </Text>
-                ),
-              },
-              {
-                key: "office",
-                label: "Office",
-                width: 170,
-                render: (request) => (
-                  <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
-                    {request.assignedOffice || request.appointmentDepartment || request.host || "-"}
-                  </Text>
-                ),
-              },
-              {
-                key: "schedule",
-                label: "Schedule",
-                width: 170,
-                render: (request) => (
-                  <View>
-                    <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
-                      {request.visitDate ? formatDateTime(request.visitDate) : "-"}
-                    </Text>
-                    <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
-                      {request.visitTime ? formatTime(request.visitTime) : "No time"}
-                    </Text>
-                  </View>
-                ),
-              },
-              {
-                key: "status",
-                label: "Status",
-                width: 120,
-                render: (request) => {
-                  const statusInfo = getStatusColor(getRequestStatus(request));
-                  return (
-                    <View style={[styles.dashboardStatusBadge, { backgroundColor: statusInfo.bg, alignSelf: "flex-start" }]}>
-                      <Text style={[styles.dashboardStatusText, { color: statusInfo.text }]}>
-                        {statusInfo.label}
-                      </Text>
-                    </View>
-                  );
-                },
-              },
-              {
-                key: "actions",
-                label: "Actions",
-                width: 260,
-                render: (request) => (
-                  <View style={styles.adminTableActionRow}>
-                    <TouchableOpacity
-                      style={[styles.adminTableActionButton, { borderColor: "rgba(59,130,246,0.24)", backgroundColor: "rgba(59,130,246,0.12)" }]}
-                      onPress={() => {
-                        setSelectedRequest(request);
-                        setOfficeEditValue(request.assignedOffice || request.appointmentDepartment || request.host || "");
-                        setAppointmentEditDateValue(formatDateInputValue(request.visitDate));
-                        setAppointmentEditTimeValue(formatTimeInputValue(request.visitTime));
-                        setShowRequestDetailsModal(true);
-                      }}
-                    >
-                      <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>View</Text>
-                    </TouchableOpacity>
-                    {getRequestStatus(request) === "pending" ? (
-                      <>
-                        <TouchableOpacity
-                          style={[styles.adminTableActionButton, { borderColor: "rgba(16,185,129,0.24)", backgroundColor: "rgba(16,185,129,0.12)" }]}
-                          onPress={() => {
-                            setSelectedRequest(request);
-                            handleApproveRequest(request);
-                          }}
-                        >
-                          <Text style={[styles.adminTableActionText, { color: "#10B981" }]}>Approve</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.adminTableActionButton, { borderColor: "rgba(239,68,68,0.22)", backgroundColor: "rgba(239,68,68,0.12)" }]}
-                          onPress={() => {
-                            setSelectedRequest(request);
-                            setShowRejectModal(true);
-                          }}
-                        >
-                          <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Reject</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : null}
-                    <TouchableOpacity
-                      style={[styles.adminTableActionButton, { borderColor: "rgba(245,158,11,0.24)", backgroundColor: "rgba(245,158,11,0.12)" }]}
-                      onPress={() => {
-                        setSelectedRequest(request);
-                        setOfficeEditValue(request.assignedOffice || request.appointmentDepartment || request.host || "");
-                        setAppointmentEditDateValue(formatDateInputValue(request.visitDate));
-                        setAppointmentEditTimeValue(formatTimeInputValue(request.visitTime));
-                        setShowRequestDetailsModal(true);
-                      }}
-                    >
-                      <Text style={[styles.adminTableActionText, { color: "#B45309" }]}>Update</Text>
-                    </TouchableOpacity>
-                  </View>
-                ),
-              },
-            ],
-          })}
         </AdminSectionShell>
       </View>
     </ScrollView>
@@ -7168,27 +7072,6 @@ const loadDashboardData = useCallback(async () => {
             <View style={styles.adminSectionShellActions}>
               <TouchableOpacity style={styles.pageRefreshButton} onPress={loadVisitorHistory}>
                 <Ionicons name="refresh-outline" size={22} color="#DC2626" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.pageRefreshButton}
-                onPress={() =>
-                  printRecordsTable({
-                    title: "Security Reports",
-                    subtitle: "Visitor incident reports submitted by security personnel.",
-                    columns: ["Visitor", "Email", "Reason", "Office", "Reporter", "Reported At", "Resolved"],
-                    rows: securityReportRecords.map((record) => [
-                      record.fullName || "Visitor",
-                      record.email || "-",
-                      record.reportReason || "-",
-                      record.assignedOffice || record.appointmentDepartment || record.host || "-",
-                      record.reporterName || "Security",
-                      formatDateTime(record.reportedAt || record.createdAt),
-                      record.resolved ? "Resolved" : "Open",
-                    ]),
-                  })
-                }
-              >
-                <Ionicons name="print-outline" size={20} color="#DC2626" />
               </TouchableOpacity>
             </View>
           }
@@ -8360,67 +8243,6 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
-  const getHeaderPrintAction = () => {
-    switch (selectedSubmodule) {
-      case "account-records":
-        return {
-          label: "Print Account Records",
-          color: userManagementConfig.accent,
-          onPress: handlePrintUsers,
-        };
-      case "appointment-records":
-        return {
-          label: "Print Appointment Records",
-          color: "#EC4899",
-          onPress: () =>
-            handlePrintRequests(
-              "Appointment Records",
-              appointmentRecords,
-              "Generated from the appointment records table in the admin dashboard.",
-            ),
-        };
-      case "appointment-management":
-        return {
-          label: "Print Appointment Queue",
-          color: "#F59E0B",
-          onPress: () =>
-            handlePrintRequests(
-              "Appointment Management Queue",
-              getFilteredRequests(),
-              "Generated from the active appointment management table in the admin dashboard.",
-            ),
-        };
-      case "report-records":
-        return {
-          label: "Print Report Records",
-          color: "#1C6DD0",
-          onPress: handlePrintReports,
-        };
-      case "security-report-records":
-        return {
-          label: "Print Security Reports",
-          color: "#DC2626",
-          onPress: () =>
-            printRecordsTable({
-              title: "Security Reports",
-              subtitle: "Visitor incident reports submitted by security personnel.",
-              columns: ["Visitor", "Email", "Reason", "Office", "Reporter", "Reported At", "Resolved"],
-              rows: securityReportRecords.map((record) => [
-                record.fullName || "Visitor",
-                record.email || "-",
-                record.reportReason || "-",
-                record.assignedOffice || record.appointmentDepartment || record.host || "-",
-                record.reporterName || "Security",
-                formatDateTime(record.reportedAt || record.createdAt),
-                record.resolved ? "Resolved" : "Open",
-              ]),
-            }),
-        };
-      default:
-        return null;
-    }
-  };
-
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -8429,8 +8251,6 @@ const loadDashboardData = useCallback(async () => {
       </SafeAreaView>
     );
   }
-
-  const headerPrintAction = getHeaderPrintAction();
 
   return (
     <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
@@ -8452,13 +8272,13 @@ const loadDashboardData = useCallback(async () => {
               </View>
             </View>
 
-            <TouchableOpacity
+            <HoverBubble
               style={[
                 styles.sidebarOverviewButton,
                 selectedSubmodule === "dashboard" && styles.sidebarOverviewButtonActive,
               ]}
               onPress={() => handleMenuAction("dashboard")}
-              activeOpacity={0.85}
+              hoverScale={1.035}
             >
               <View style={[styles.sidebarMenuIcon, { backgroundColor: "rgba(37,99,235,0.16)" }]}>
                 <Ionicons name="grid-outline" size={20} color="#0A3D91" />
@@ -8466,7 +8286,7 @@ const loadDashboardData = useCallback(async () => {
               <Text style={[styles.sidebarMenuLabel, selectedSubmodule === "dashboard" && styles.sidebarMenuLabelActive, isDarkMode && styles.darkText]}>
                 Dashboard Overview
               </Text>
-            </TouchableOpacity>
+            </HoverBubble>
 
             <View style={styles.sidebarModuleGroup}>
               {adminModules.map((module) => {
@@ -8475,14 +8295,14 @@ const loadDashboardData = useCallback(async () => {
 
                 return (
                   <View key={module.key} style={styles.sidebarModuleCard}>
-                    <TouchableOpacity
+                    <HoverBubble
                       style={[
                         styles.sidebarModuleButton,
                         hasSelectedChild && styles.sidebarModuleButtonActive,
                         isDarkMode && hasSelectedChild && { backgroundColor: "rgba(139,92,246,0.18)", borderColor: "rgba(196,181,253,0.24)" },
                       ]}
                       onPress={() => handleModuleToggle(module.key)}
-                      activeOpacity={0.86}
+                      hoverScale={1.025}
                     >
                       <View style={[styles.sidebarMenuIcon, { backgroundColor: `${module.color}16` }]}>
                         <Ionicons name={module.icon} size={20} color={module.color} />
@@ -8500,7 +8320,7 @@ const loadDashboardData = useCallback(async () => {
                         size={18}
                         color={hasSelectedChild ? module.color : "#64748B"}
                       />
-                    </TouchableOpacity>
+                    </HoverBubble>
 
                     {isExpanded ? (
                       <View style={styles.sidebarSubmoduleList}>
@@ -8508,14 +8328,14 @@ const loadDashboardData = useCallback(async () => {
                           const isSubmoduleActive = selectedSubmodule === submodule.key;
 
                           return (
-                            <TouchableOpacity
+                            <HoverBubble
                               key={submodule.key}
                               style={[
                                 styles.sidebarSubmoduleButton,
                                 isSubmoduleActive && styles.sidebarSubmoduleButtonActive,
                               ]}
                               onPress={() => selectAdminSubmodule(submodule.key)}
-                              activeOpacity={0.84}
+                              hoverScale={1.025}
                             >
                               <Text
                                 style={[
@@ -8530,7 +8350,7 @@ const loadDashboardData = useCallback(async () => {
                                   <Text style={styles.sidebarSubmoduleBadgeText}>{submodule.badge}</Text>
                                 </View>
                               ) : null}
-                            </TouchableOpacity>
+                            </HoverBubble>
                           );
                         })}
                       </View>
@@ -8540,13 +8360,13 @@ const loadDashboardData = useCallback(async () => {
               })}
             </View>
 
-            <TouchableOpacity
+            <HoverBubble
               style={[
                 styles.sidebarUtilityButton,
                 selectedSubmodule === "settings" && styles.sidebarUtilityButtonActive,
               ]}
               onPress={() => handleMenuAction("settings")}
-              activeOpacity={0.84}
+              hoverScale={1.035}
             >
               <View style={[styles.sidebarMenuIcon, { backgroundColor: "rgba(148,163,184,0.14)" }]}>
                 <Ionicons name="settings-outline" size={20} color="#64748B" />
@@ -8554,16 +8374,16 @@ const loadDashboardData = useCallback(async () => {
               <Text style={[styles.sidebarMenuLabel, selectedSubmodule === "settings" && styles.sidebarMenuLabelActive, isDarkMode && styles.darkText]}>
                 Settings
               </Text>
-            </TouchableOpacity>
+            </HoverBubble>
 
             <View style={[styles.sidebarUserSection, isDarkMode && { borderTopColor: "#334155" }]}>
               <View style={styles.sidebarUserInfo}>
                 <View style={[styles.sidebarUserAvatar, isDarkMode && { backgroundColor: "#334155" }]}><Text style={[styles.sidebarUserAvatarText, isDarkMode && { color: "#1C6DD0" }]}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View>
                 <View><Text style={[styles.sidebarUserName, isDarkMode && styles.darkText]}>{user?.firstName} {user?.lastName}</Text><Text style={[styles.sidebarUserEmail, isDarkMode && { color: "rgba(255,255,255,0.5)" }]}>{user?.email}</Text></View>
               </View>
-              <TouchableOpacity style={[styles.sidebarLogoutButton, isDarkMode && { backgroundColor: "rgba(239,68,68,0.2)" }]} onPress={handleLogout}>
+              <HoverBubble style={[styles.sidebarLogoutButton, isDarkMode && { backgroundColor: "rgba(239,68,68,0.2)" }]} onPress={handleLogout} hoverScale={1.035}>
                 <Ionicons name="log-out-outline" size={20} color="#DC2626" /><Text style={[styles.sidebarLogoutText, isDarkMode && { color: "#FCA5A5" }]}>Logout</Text>
-              </TouchableOpacity>
+              </HoverBubble>
             </View>
 
             <View style={styles.sidebarFooter}>
@@ -8606,19 +8426,6 @@ const loadDashboardData = useCallback(async () => {
               </View>
             </View>
               <View style={styles.headerActions}>
-                {headerPrintAction ? (
-                  <TouchableOpacity
-                    onPress={headerPrintAction.onPress}
-                    style={[styles.headerPrintButton, { borderColor: `${headerPrintAction.color}33` }]}
-                    accessibilityRole="button"
-                    accessibilityLabel={headerPrintAction.label}
-                  >
-                    <Ionicons name="print-outline" size={20} color={headerPrintAction.color} />
-                    <Text style={[styles.headerPrintButtonText, { color: headerPrintAction.color }]}>
-                      Print
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
                 <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.profileButton}><View style={[styles.profileIcon, isDarkMode && { backgroundColor: "#1C6DD0" }]}><Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View></TouchableOpacity>
               </View>
             </View>
@@ -10109,8 +9916,16 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity style={[styles.confirmCancel, isDarkMode && { backgroundColor: "#334155" }]} onPress={() => setShowDeleteUserModal(false)}>
                 <Text style={[styles.confirmCancelText, isDarkMode && styles.darkTextSecondary]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.confirmButton, { backgroundColor: "#EF4444" }]} onPress={handleDeleteUser}>
-                <Text style={styles.confirmButtonText}>Delete</Text>
+              <TouchableOpacity
+                style={[styles.confirmButton, { backgroundColor: "#EF4444" }]}
+                onPress={handleDeleteUser}
+                disabled={processingId === `delete-user-${selectedUser?._id || selectedUser?.id}`}
+              >
+                {processingId === `delete-user-${selectedUser?._id || selectedUser?.id}` ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Delete</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

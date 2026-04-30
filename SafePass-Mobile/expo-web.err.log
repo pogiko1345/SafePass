@@ -2,3 +2,15 @@
 (node:18312) [DEP_WEBPACK_DEV_SERVER_CONSTRUCTOR] DeprecationWarning: Using 'compiler' as the first argument is deprecated. Please use 'options' as the first argument and 'compiler' as the second argument.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 (node:18312) [DEP_WEBPACK_DEV_SERVER_LISTEN] DeprecationWarning: 'listen' is deprecated. Please use the async 'start' or 'startCallback' method.
+Exception in PromiseRejectCallback:
+C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile\node_modules\dnssd-advertise\dist\dnssd-advertise.js:2628
+        return next();
+
+RangeError: Maximum call stack size exceeded
+
+Exception in PromiseRejectCallback:
+C:\Users\Sean\OneDrive\Desktop\SafePass\SafePass-Mobile\node_modules\dnssd-advertise\dist\dnssd-advertise.js:2628
+        return next();
+
+RangeError: Maximum call stack size exceeded
+
