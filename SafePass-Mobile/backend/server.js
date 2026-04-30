@@ -1322,6 +1322,78 @@ const findVisitorsForUser = async (user) => {
   });
 };
 
+const buildUserCleanupTargets = async (user) => {
+  const userId = user?._id;
+  const visitorFilters = [];
+
+  if (user?.visitorId) {
+    visitorFilters.push({ _id: user.visitorId });
+  }
+
+  if (user?.email) {
+    visitorFilters.push({ email: String(user.email).trim().toLowerCase() });
+  }
+
+  const visitorIds = visitorFilters.length
+    ? await Visitor.distinct("_id", { $or: visitorFilters })
+    : [];
+
+  return {
+    visitorIds,
+    accessLogQuery: {
+      $or: [
+        { userId },
+        { relatedUser: userId },
+        { relatedVisitor: { $in: visitorIds } },
+      ],
+    },
+    notificationQuery: {
+      $or: [
+        { userId },
+        { targetUser: userId },
+        { relatedUser: userId },
+        { relatedVisitor: { $in: visitorIds } },
+      ],
+    },
+  };
+};
+
+const syncVisitorRecordsForUserUpdate = async (existingUser, updatedUser) => {
+  const wasVisitor = String(existingUser?.role || "").toLowerCase() === "visitor";
+  const isVisitor = String(updatedUser?.role || "").toLowerCase() === "visitor";
+
+  if (!wasVisitor && !isVisitor) {
+    return { matchedCount: 0, modifiedCount: 0 };
+  }
+
+  const filters = [];
+  if (existingUser?.visitorId) {
+    filters.push({ _id: existingUser.visitorId });
+  }
+  if (existingUser?.email) {
+    filters.push({ email: String(existingUser.email).trim().toLowerCase() });
+  }
+  if (updatedUser?.email) {
+    filters.push({ email: String(updatedUser.email).trim().toLowerCase() });
+  }
+
+  if (!filters.length) {
+    return { matchedCount: 0, modifiedCount: 0 };
+  }
+
+  return Visitor.updateMany(
+    { $or: filters },
+    {
+      $set: {
+        fullName: `${updatedUser.firstName || ""} ${updatedUser.lastName || ""}`.trim(),
+        email: String(updatedUser.email || "").trim().toLowerCase(),
+        phoneNumber: updatedUser.phone || "",
+        updatedAt: new Date(),
+      },
+    },
+  );
+};
+
 const attachSafePassIdsToVisitors = async (visitors = []) => {
   if (!Array.isArray(visitors) || !visitors.length) return [];
 
@@ -6776,6 +6848,8 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       { new: true, runValidators: true },
     ).select("-password");
 
+    const visitorSync = await syncVisitorRecordsForUserUpdate(existingUser, user);
+
     // Create access log for the update
     const accessLog = new AccessLog({
       userId: req.user._id,
@@ -6788,7 +6862,14 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
     });
     await accessLog.save();
 
-    res.json({ success: true, message: "User updated successfully", user });
+    res.json({
+      success: true,
+      message: "User updated successfully",
+      user,
+      synced: {
+        visitors: visitorSync?.modifiedCount || 0,
+      },
+    });
   } catch (error) {
     console.error("Update user error:", error);
     res.status(500).json({ success: false, message: "Failed to update user" });
@@ -6943,6 +7024,16 @@ app.delete("/api/admin/users/:id", authMiddleware, async (req, res) => {
         .json({ success: false, message: "Cannot delete your own account" });
     }
 
+    const cleanupTargets = await buildUserCleanupTargets(user);
+    const deletedVisitors = cleanupTargets.visitorIds.length
+      ? await Visitor.deleteMany({ _id: { $in: cleanupTargets.visitorIds } })
+      : { deletedCount: 0 };
+    const deletedAccessLogs = await AccessLog.deleteMany(cleanupTargets.accessLogQuery);
+    const deletedNotifications = await Notification.deleteMany(cleanupTargets.notificationQuery);
+    const updatedNotifications = await Notification.updateMany(
+      { "readBy.user": user._id },
+      { $pull: { readBy: { user: user._id } } },
+    );
     await User.findByIdAndDelete(req.params.id);
 
     // Create access log
@@ -6957,7 +7048,17 @@ app.delete("/api/admin/users/:id", authMiddleware, async (req, res) => {
     });
     await accessLog.save();
 
-    res.json({ success: true, message: "User deleted successfully" });
+    res.json({
+      success: true,
+      message: "User deleted successfully",
+      deleted: {
+        users: 1,
+        visitors: deletedVisitors.deletedCount || 0,
+        accessLogs: deletedAccessLogs.deletedCount || 0,
+        notifications: deletedNotifications.deletedCount || 0,
+        notificationReadReceipts: updatedNotifications.modifiedCount || 0,
+      },
+    });
   } catch (error) {
     console.error("Delete user error:", error);
     res.status(500).json({ success: false, message: "Failed to delete user" });

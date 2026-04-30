@@ -3579,9 +3579,10 @@ const loadDashboardData = useCallback(async () => {
       
       const response = await ApiService.updateUser(editUserData.id, updatePayload);
       if (response && (response.success || response.user)) {
+        const savedUser = response.user || updatePayload;
         const updatedUsers = allUsers.map(user => {
           if ((user._id === editUserData.id || user.id === editUserData.id)) {
-            return { ...user, ...updatePayload };
+            return { ...user, ...savedUser };
           }
           return user;
         });
@@ -3589,7 +3590,7 @@ const loadDashboardData = useCallback(async () => {
         const updatedSelectedUser = selectedUser && (
           selectedUser._id === editUserData.id || selectedUser.id === editUserData.id
         )
-          ? { ...selectedUser, ...updatePayload }
+          ? { ...selectedUser, ...savedUser }
           : selectedUser;
         
         setAllUsers(updatedUsers);
@@ -3607,6 +3608,7 @@ const loadDashboardData = useCallback(async () => {
         if (userDataPanelMode === "edit") {
           setUserDataPanelMode("view");
         }
+        await loadDashboardData();
       } else {
         Alert.alert("Error", response?.message || "Failed to update user");
       }
@@ -3666,6 +3668,8 @@ const loadDashboardData = useCallback(async () => {
               );
               Alert.alert("Success", "User deleted successfully");
               setShowDeleteUserModal(false);
+              setSelectedUser(null);
+              await loadDashboardData();
             } else {
               Alert.alert("Error", response?.message || "Failed to delete user");
             }
