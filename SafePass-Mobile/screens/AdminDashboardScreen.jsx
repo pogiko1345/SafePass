@@ -10277,7 +10277,7 @@ const loadDashboardData = useCallback(async () => {
       {/* User Management Modal */}
       <Modal visible={showUserManagementModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "90%" }, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+          <View style={[styles.userManagementModalContent, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
             <View style={[styles.modalHeader, isDarkMode && { borderBottomColor: theme.borderColor }]}>
               <Text style={[styles.modalTitle, isDarkMode && styles.darkText]}>User Management</Text>
               <TouchableOpacity onPress={() => setShowUserManagementModal(false)}>
@@ -10285,7 +10285,7 @@ const loadDashboardData = useCallback(async () => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <View style={styles.userManagementModalBody}>
               {createUserMessage ? (
                 <View
                   style={{
@@ -10338,7 +10338,7 @@ const loadDashboardData = useCallback(async () => {
                         <View style={[styles.userAvatar, { backgroundColor: `${getRoleColor(userItem.role)}20` }]}>
                           <Ionicons name={getRoleIcon(userItem.role)} size={22} color={getRoleColor(userItem.role)} />
                         </View>
-                        <View>
+                        <View style={styles.userManagementTextBlock}>
                           <Text style={[styles.userName, isDarkMode && styles.darkText]}>{userItem.firstName} {userItem.lastName}</Text>
                           <Text style={[styles.userEmail, isDarkMode && styles.darkTextSecondary]}>{userItem.email}</Text>
                           <View style={styles.userMeta}>

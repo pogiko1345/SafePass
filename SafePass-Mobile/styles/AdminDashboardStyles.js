@@ -2261,6 +2261,7 @@ export default StyleSheet.create({
     alignItems: "center",
     flex: 1,
     gap: 12,
+    minWidth: 0,
   },
 
   userAvatar: {
@@ -2323,7 +2324,29 @@ export default StyleSheet.create({
 
   userManagementList: {
     marginTop: 10,
-    maxHeight: 400,
+    flex: 1,
+  },
+
+  userManagementModalContent: {
+    backgroundColor: "#FFF",
+    borderRadius: 24,
+    width: "100%",
+    maxWidth: 500,
+    height: Math.min(height * 0.86, 720),
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  userManagementModalBody: {
+    flex: 1,
+    padding: 20,
+    minHeight: 0,
+  },
+
+  userManagementTextBlock: {
+    flex: 1,
+    minWidth: 0,
   },
 
   userStatusBadgeActive: {
