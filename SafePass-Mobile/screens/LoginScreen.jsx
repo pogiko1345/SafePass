@@ -37,6 +37,29 @@ const Storage = Platform.OS === "web"
 const BIOMETRIC_LOGIN_EMAIL_KEY = "biometricLoginEmail";
 const BIOMETRIC_LOGIN_PASSWORD_KEY = "biometricLoginPassword";
 
+const requireBiometricSessionUnlock = async () => {
+  if (Platform.OS === "web") {
+    return true;
+  }
+
+  const [hasHardware, enrolled] = await Promise.all([
+    LocalAuthentication.hasHardwareAsync(),
+    LocalAuthentication.isEnrolledAsync(),
+  ]);
+
+  if (!hasHardware || !enrolled) {
+    return false;
+  }
+
+  const result = await LocalAuthentication.authenticateAsync({
+    promptMessage: "Unlock SafePass",
+    fallbackLabel: "Use passcode",
+    cancelLabel: "Cancel",
+  });
+
+  return Boolean(result.success);
+};
+
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
   const { role, initialEmail = "", initialPassword = "" } = route?.params || { role: "visitor" };
@@ -328,6 +351,14 @@ export default function LoginScreen({ navigation, route }) {
           setLoginError(getVariantBlockedRoleMessage(normalizedRole));
           return;
         }
+
+        const biometricUnlocked = await requireBiometricSessionUnlock();
+        if (!biometricUnlocked) {
+          await ApiService.clearAuth();
+          setLoginError("Use your password to sign in, or enable device biometrics to open remembered sessions.");
+          return;
+        }
+
         const route = getDashboardRoute({ ...user, role: normalizedRole });
         navigation.reset({
           index: 0,

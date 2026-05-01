@@ -1322,6 +1322,78 @@ const findVisitorsForUser = async (user) => {
   });
 };
 
+const buildUserCleanupTargets = async (user) => {
+  const userId = user?._id;
+  const visitorFilters = [];
+
+  if (user?.visitorId) {
+    visitorFilters.push({ _id: user.visitorId });
+  }
+
+  if (user?.email) {
+    visitorFilters.push({ email: String(user.email).trim().toLowerCase() });
+  }
+
+  const visitorIds = visitorFilters.length
+    ? await Visitor.distinct("_id", { $or: visitorFilters })
+    : [];
+
+  return {
+    visitorIds,
+    accessLogQuery: {
+      $or: [
+        { userId },
+        { relatedUser: userId },
+        { relatedVisitor: { $in: visitorIds } },
+      ],
+    },
+    notificationQuery: {
+      $or: [
+        { userId },
+        { targetUser: userId },
+        { relatedUser: userId },
+        { relatedVisitor: { $in: visitorIds } },
+      ],
+    },
+  };
+};
+
+const syncVisitorRecordsForUserUpdate = async (existingUser, updatedUser) => {
+  const wasVisitor = String(existingUser?.role || "").toLowerCase() === "visitor";
+  const isVisitor = String(updatedUser?.role || "").toLowerCase() === "visitor";
+
+  if (!wasVisitor && !isVisitor) {
+    return { matchedCount: 0, modifiedCount: 0 };
+  }
+
+  const filters = [];
+  if (existingUser?.visitorId) {
+    filters.push({ _id: existingUser.visitorId });
+  }
+  if (existingUser?.email) {
+    filters.push({ email: String(existingUser.email).trim().toLowerCase() });
+  }
+  if (updatedUser?.email) {
+    filters.push({ email: String(updatedUser.email).trim().toLowerCase() });
+  }
+
+  if (!filters.length) {
+    return { matchedCount: 0, modifiedCount: 0 };
+  }
+
+  return Visitor.updateMany(
+    { $or: filters },
+    {
+      $set: {
+        fullName: `${updatedUser.firstName || ""} ${updatedUser.lastName || ""}`.trim(),
+        email: String(updatedUser.email || "").trim().toLowerCase(),
+        phoneNumber: updatedUser.phone || "",
+        updatedAt: new Date(),
+      },
+    },
+  );
+};
+
 const attachSafePassIdsToVisitors = async (visitors = []) => {
   if (!Array.isArray(visitors) || !visitors.length) return [];
 
@@ -3415,29 +3487,40 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
     });
     await accessLog.save();
 
-    sendEmail(
+    const credentialEmail = await sendEmail(
       user.email,
-      `Welcome to Sapphire Aviation - Staff Account`,
+      "Welcome to Sapphire SafePass - Staff Account Credentials",
       `Dear ${user.firstName} ${user.lastName},\n\n` +
         `Your staff account has been created by the administrator.\n\n` +
+        `Login Credentials\n` +
         `Username: ${user.username}\n` +
         `Email: ${user.email}\n` +
         `Temporary Password: ${temporaryPassword}\n` +
         `Staff ID: ${user.employeeId}\n` +
         `Department: ${user.department}\n` +
         `Status: ${user.status.toUpperCase()}\n\n` +
-        `Please sign in and change your password when convenient.\n\n` +
-        `Thank you,\n` +
-        `Sapphire Aviation Security Team`,
+        `Please sign in and change your password after your first login.\n\n` +
+        getSupportEmailSignature(),
     );
 
     const userResponse = user.toObject();
     delete userResponse.password;
+    const credentialEmailDelivered = Boolean(credentialEmail?.delivered);
 
     res.status(201).json({
       success: true,
-      message: "Staff account created successfully",
+      message: credentialEmailDelivered
+        ? "Staff account created successfully and credentials were emailed"
+        : credentialEmail?.simulated
+          ? "Staff account created successfully and credential email was simulated"
+        : "Staff account created, but credential email could not be sent",
       user: userResponse,
+      emailDelivery: {
+        success: Boolean(credentialEmail?.success),
+        delivered: credentialEmailDelivered,
+        simulated: Boolean(credentialEmail?.simulated),
+        error: credentialEmail?.error || "",
+      },
     });
   } catch (error) {
     console.error("Create staff account error:", error);
@@ -6759,11 +6842,21 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       });
     }
 
+    if (updates.status !== undefined) {
+      updates.status = String(updates.status || "").toLowerCase().trim();
+      updates.isActive = updates.status === "active";
+    } else if (updates.isActive !== undefined) {
+      updates.isActive = updates.isActive === true;
+      updates.status = updates.isActive ? "active" : "inactive";
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { ...updates, updatedAt: new Date() },
       { new: true, runValidators: true },
     ).select("-password");
+
+    const visitorSync = await syncVisitorRecordsForUserUpdate(existingUser, user);
 
     // Create access log for the update
     const accessLog = new AccessLog({
@@ -6777,7 +6870,14 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
     });
     await accessLog.save();
 
-    res.json({ success: true, message: "User updated successfully", user });
+    res.json({
+      success: true,
+      message: "User updated successfully",
+      user,
+      synced: {
+        visitors: visitorSync?.modifiedCount || 0,
+      },
+    });
   } catch (error) {
     console.error("Update user error:", error);
     res.status(500).json({ success: false, message: "Failed to update user" });
@@ -6839,7 +6939,7 @@ app.put("/api/admin/users/:id/deactivate", authMiddleware, async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { status: "inactive", updatedAt: new Date() },
+      { status: "inactive", isActive: false, updatedAt: new Date() },
       { new: true },
     ).select("-password");
 
@@ -6879,7 +6979,7 @@ app.put("/api/admin/users/:id/activate", authMiddleware, async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { status: "active", updatedAt: new Date() },
+      { status: "active", isActive: true, updatedAt: new Date() },
       { new: true },
     ).select("-password");
 
@@ -6932,6 +7032,16 @@ app.delete("/api/admin/users/:id", authMiddleware, async (req, res) => {
         .json({ success: false, message: "Cannot delete your own account" });
     }
 
+    const cleanupTargets = await buildUserCleanupTargets(user);
+    const deletedVisitors = cleanupTargets.visitorIds.length
+      ? await Visitor.deleteMany({ _id: { $in: cleanupTargets.visitorIds } })
+      : { deletedCount: 0 };
+    const deletedAccessLogs = await AccessLog.deleteMany(cleanupTargets.accessLogQuery);
+    const deletedNotifications = await Notification.deleteMany(cleanupTargets.notificationQuery);
+    const updatedNotifications = await Notification.updateMany(
+      { "readBy.user": user._id },
+      { $pull: { readBy: { user: user._id } } },
+    );
     await User.findByIdAndDelete(req.params.id);
 
     // Create access log
@@ -6946,7 +7056,17 @@ app.delete("/api/admin/users/:id", authMiddleware, async (req, res) => {
     });
     await accessLog.save();
 
-    res.json({ success: true, message: "User deleted successfully" });
+    res.json({
+      success: true,
+      message: "User deleted successfully",
+      deleted: {
+        users: 1,
+        visitors: deletedVisitors.deletedCount || 0,
+        accessLogs: deletedAccessLogs.deletedCount || 0,
+        notifications: deletedNotifications.deletedCount || 0,
+        notificationReadReceipts: updatedNotifications.modifiedCount || 0,
+      },
+    });
   } catch (error) {
     console.error("Delete user error:", error);
     res.status(500).json({ success: false, message: "Failed to delete user" });

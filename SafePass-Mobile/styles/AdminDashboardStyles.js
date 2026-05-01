@@ -38,14 +38,14 @@ export default StyleSheet.create({
 
   sidebar: {
     width: sidebarWidth,
-    backgroundColor: "#F8FBFE",
+    backgroundColor: "#FFFFFF",
     height: "100%",
     borderTopRightRadius: 0,
     borderBottomRightRadius: 0,
     overflow: "hidden",
     borderRightWidth: 1,
     borderRightColor: "#E2E8F0",
-    padding: 18,
+    padding: 16,
     ...Platform.select({
       web: {
         boxShadow: "8px 0px 24px rgba(15, 23, 42, 0.04)",
@@ -60,7 +60,7 @@ export default StyleSheet.create({
   sidebarHeader: {
     padding: 14,
     alignItems: "center",
-    borderRadius: 22,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "#D8E6F5",
     backgroundColor: "#FFFFFF",
@@ -236,7 +236,7 @@ export default StyleSheet.create({
   },
 
   sidebarModuleCard: {
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.9)",
     borderWidth: 1,
     borderColor: "#D9E4F0",
@@ -247,7 +247,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
   },
 
   sidebarModuleButtonActive: {
@@ -276,7 +276,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderRadius: 14,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
     backgroundColor: "#FFFFFF",
@@ -478,8 +478,8 @@ export default StyleSheet.create({
   },
 
   pageContainer: {
-    paddingHorizontal: 26,
-    paddingTop: 22,
+    paddingHorizontal: 24,
+    paddingTop: 20,
     paddingBottom: 26,
   },
 
@@ -491,9 +491,9 @@ export default StyleSheet.create({
   },
 
   adminSectionShell: {
-    borderRadius: 28,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 22,
+    padding: 20,
     marginBottom: 20,
     backgroundColor: "rgba(255,255,255,0.88)",
     ...Platform.select({
@@ -602,6 +602,202 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 14,
+  },
+
+  appointmentOptionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    gap: 14,
+    marginBottom: 18,
+  },
+
+  appointmentOptionCard: {
+    flex: 1,
+    flexBasis: 320,
+    minWidth: width < 760 ? "100%" : 300,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 18,
+    elevation: 2,
+  },
+
+  appointmentOptionHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  appointmentOptionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+
+  appointmentOptionTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  appointmentOptionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  appointmentOptionSubtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+  },
+
+  appointmentOptionCountBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#F1F5F9",
+  },
+
+  appointmentOptionCountText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#475569",
+  },
+
+  appointmentOptionAddRow: {
+    flexDirection: width < 760 ? "column" : "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  appointmentOptionInput: {
+    flex: 1,
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    paddingHorizontal: 13,
+    paddingVertical: Platform.OS === "web" ? 9 : 10,
+    fontSize: 13,
+    color: "#0F172A",
+    backgroundColor: "#F8FBFE",
+  },
+
+  appointmentOptionAddButton: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: "#0A3D91",
+  },
+
+  appointmentOptionAddText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  appointmentOptionList: {
+    gap: 9,
+  },
+
+  appointmentOptionItem: {
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "stretch" : "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 11,
+  },
+
+  appointmentOptionItemMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  appointmentOptionItemTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 5,
+  },
+
+  appointmentOptionMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  appointmentOptionStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  appointmentOptionEditInput: {
+    minHeight: 38,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: Platform.OS === "web" ? 7 : 8,
+    fontSize: 13,
+    color: "#0F172A",
+    backgroundColor: "#FFFFFF",
+  },
+
+  appointmentOptionActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: width < 760 ? "flex-start" : "flex-end",
+    gap: 6,
+  },
+
+  appointmentOptionMiniButton: {
+    minHeight: 32,
+    minWidth: 34,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: "#FFFFFF",
+  },
+
+  appointmentOptionMiniText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
+  appointmentOptionEmpty: {
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderRadius: 12,
+    padding: 14,
+    alignItems: "center",
+  },
+
+  appointmentOptionEmptyText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
   },
 
   modularActionCard: {
@@ -919,7 +1115,7 @@ export default StyleSheet.create({
     alignSelf: "stretch",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 18,
+    borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
   },
@@ -1042,12 +1238,17 @@ export default StyleSheet.create({
   // ============================================
 
   header: {
+<<<<<<< HEAD
     backgroundColor: "#0A3D91",
     paddingHorizontal: 28,
+=======
+    backgroundColor: "rgba(255,255,255,0.94)",
+    paddingHorizontal: 24,
+>>>>>>> 1900747baa350e6bde5fb7eb1082e647f59aebd4
     paddingTop: Platform.select({ ios: 50, android: 20, web: 20 }),
     paddingBottom: 18,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#B7D5F6",
     ...Platform.select({
@@ -1070,7 +1271,7 @@ export default StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800",
     color: "#FFFFFF",
     letterSpacing: -0.4,
@@ -1143,7 +1344,7 @@ export default StyleSheet.create({
   profileButton: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 12,
     backgroundColor: "rgba(14,165,233,0.08)",
     justifyContent: "center",
     alignItems: "center",
@@ -1163,7 +1364,7 @@ export default StyleSheet.create({
   pageRefreshButton: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 10,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
@@ -1175,11 +1376,10 @@ export default StyleSheet.create({
   },
 
   dashboardHeroCard: {
-    marginBottom: 18,
-    borderRadius: 28,
+    marginBottom: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#D9E5F3",
-    backgroundColor: "#F8FBFF",
+    borderColor: "rgba(255,255,255,0.18)",
     padding: 22,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1202,17 +1402,27 @@ export default StyleSheet.create({
   },
 
   dashboardHeroTitle: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: "800",
-    color: "#0F172A",
+    color: "#FFFFFF",
     marginBottom: 7,
     letterSpacing: -0.3,
   },
 
+  dashboardHeroEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: "rgba(255,255,255,0.78)",
+    marginBottom: 8,
+  },
+
   dashboardHeroSubtitle: {
     fontSize: 13,
-    color: "#526277",
+    color: "rgba(255,255,255,0.82)",
     lineHeight: 20,
+    maxWidth: 680,
   },
 
   dashboardHeroBadge: {
@@ -1221,16 +1431,26 @@ export default StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    backgroundColor: "#EAF4FF",
+    backgroundColor: "rgba(255,255,255,0.14)",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#CFE0F5",
+    borderColor: "rgba(255,255,255,0.22)",
   },
 
   dashboardHeroBadgeText: {
     fontSize: 11,
-    color: "#0369A1",
-    fontWeight: "600",
+    color: "#FFFFFF",
+    fontWeight: "800",
+  },
+
+  hoverBubble: {
+    ...Platform.select({
+      web: {
+        cursor: "pointer",
+        transitionProperty: "box-shadow, filter",
+        transitionDuration: "180ms",
+      },
+    }),
   },
 
   dashboardStatsGrid: {
@@ -1242,7 +1462,7 @@ export default StyleSheet.create({
 
   dashboardStatCard: {
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 12,
     padding: 18,
     shadowColor: "#0F172A",
     shadowOpacity: 0.07,
@@ -1281,7 +1501,7 @@ export default StyleSheet.create({
   dashboardNotificationCard: {
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 24,
+    borderRadius: 14,
     padding: 18,
     marginBottom: 18,
     flexDirection: "row",
@@ -1305,7 +1525,7 @@ export default StyleSheet.create({
   dashboardNotificationIcon: {
     width: 52,
     height: 52,
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: "#FEF3C7",
     justifyContent: "center",
     alignItems: "center",
@@ -1345,7 +1565,7 @@ export default StyleSheet.create({
 
   dashboardSectionCard: {
     marginTop: 14,
-    borderRadius: 22,
+    borderRadius: 14,
     borderWidth: 1,
     padding: 18,
     shadowColor: "#0F172A",
@@ -1959,7 +2179,7 @@ export default StyleSheet.create({
   quickActionCard: {
     minWidth: 220,
     backgroundColor: "#FFF",
-    borderRadius: 18,
+    borderRadius: 12,
     padding: 16,
     minHeight: 132,
     justifyContent: "space-between",
@@ -2292,6 +2512,7 @@ export default StyleSheet.create({
     alignItems: "center",
     flex: 1,
     gap: 12,
+    minWidth: 0,
   },
 
   userAvatar: {
@@ -2354,7 +2575,29 @@ export default StyleSheet.create({
 
   userManagementList: {
     marginTop: 10,
-    maxHeight: 400,
+    flex: 1,
+  },
+
+  userManagementModalContent: {
+    backgroundColor: "#FFF",
+    borderRadius: 14,
+    width: "100%",
+    maxWidth: 500,
+    height: Math.min(height * 0.86, 720),
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  userManagementModalBody: {
+    flex: 1,
+    padding: 20,
+    minHeight: 0,
+  },
+
+  userManagementTextBlock: {
+    flex: 1,
+    minWidth: 0,
   },
 
   userStatusBadgeActive: {
@@ -2375,7 +2618,7 @@ export default StyleSheet.create({
 
   managementHeroCard: {
     borderWidth: 1,
-    borderRadius: 24,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 18,
     gap: 18,
@@ -2390,7 +2633,7 @@ export default StyleSheet.create({
   managementIconBadge: {
     width: 56,
     height: 56,
-    borderRadius: 18,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2426,7 +2669,7 @@ export default StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 16,
+    borderRadius: 10,
   },
 
   managementPrimaryButtonText: {
@@ -2442,7 +2685,7 @@ export default StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#EEF5FF",
     backgroundColor: "#EFF6FF",
@@ -2467,7 +2710,7 @@ export default StyleSheet.create({
     flexBasis: 150,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 20,
+    borderRadius: 12,
     padding: 16,
     gap: 10,
   },
@@ -2494,7 +2737,7 @@ export default StyleSheet.create({
   userWorkspaceCard: {
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 24,
+    borderRadius: 16,
     padding: 20,
   },
 
@@ -3246,7 +3489,7 @@ export default StyleSheet.create({
 
   modalContent: {
     backgroundColor: "#FFF",
-    borderRadius: 24,
+    borderRadius: 16,
     width: "100%",
     maxWidth: 500,
     maxHeight: "85%",
@@ -3291,7 +3534,7 @@ export default StyleSheet.create({
 
   pendingRequestsModal: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    borderRadius: 16,
     width: "100%",
     maxWidth: 760,
     maxHeight: "86%",
@@ -3339,7 +3582,7 @@ export default StyleSheet.create({
 
   userProfileModal: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 28,
+    borderRadius: 16,
     width: "100%",
     maxWidth: 620,
     maxHeight: "86%",
@@ -3750,7 +3993,7 @@ export default StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 30,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 14,
@@ -3762,7 +4005,7 @@ export default StyleSheet.create({
   cancelButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 30,
+    borderRadius: 12,
     alignItems: "center",
     backgroundColor: "#F1F5F9",
   },
@@ -3776,7 +4019,7 @@ export default StyleSheet.create({
   submitButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 30,
+    borderRadius: 12,
     alignItems: "center",
     backgroundColor: "#1C6DD0",
   },
@@ -3789,7 +4032,7 @@ export default StyleSheet.create({
 
   confirmModal: {
     backgroundColor: "#FFF",
-    borderRadius: 24,
+    borderRadius: 16,
     padding: 24,
     width: "90%",
     maxWidth: 400,
@@ -3821,7 +4064,7 @@ export default StyleSheet.create({
   confirmCancel: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 30,
+    borderRadius: 12,
     alignItems: "center",
     backgroundColor: "#F1F5F9",
   },
@@ -3835,7 +4078,7 @@ export default StyleSheet.create({
   confirmButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 30,
+    borderRadius: 12,
     alignItems: "center",
   },
 

@@ -368,6 +368,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   useEffect(() => {
+    if (!currentUser?._id) return;
+
     let isMounted = true;
 
     ApiService.getAppointmentOptions()
@@ -383,7 +385,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentUser?._id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -391,9 +393,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const restoreVisitorScreen = async () => {
       try {
         const [savedSection, savedAppointmentScreen, savedMapFloor] = await Promise.all([
-          AsyncStorage.getItem(VISITOR_SELECTED_SECTION_KEY),
-          AsyncStorage.getItem(VISITOR_APPOINTMENT_SCREEN_KEY),
-          AsyncStorage.getItem(VISITOR_MAP_FLOOR_KEY),
+          Storage.getItem(VISITOR_SELECTED_SECTION_KEY),
+          Storage.getItem(VISITOR_APPOINTMENT_SCREEN_KEY),
+          Storage.getItem(VISITOR_MAP_FLOOR_KEY),
         ]);
 
         if (!isMounted) return;
@@ -426,7 +428,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   useEffect(() => {
     if (!visitorScreenRestoreReadyRef.current) return;
 
-    AsyncStorage.multiSet([
+    Storage.multiSet([
       [VISITOR_SELECTED_SECTION_KEY, selectedVisitorSection],
       [VISITOR_APPOINTMENT_SCREEN_KEY, selectedAppointmentScreen],
       [VISITOR_MAP_FLOOR_KEY, selectedVisitorMapFloor],
@@ -700,13 +702,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       }
 
       const reminderToken = `${visitor._id}:${appointmentStatus}:${new Date(visitor.visitTime).toISOString()}`;
-      const shownReminderToken = await AsyncStorage.getItem(VISITOR_CONNECTIVITY_REMINDER_KEY);
+      const shownReminderToken = await Storage.getItem(VISITOR_CONNECTIVITY_REMINDER_KEY);
 
       if (shownReminderToken === reminderToken) {
         return;
       }
 
-      await AsyncStorage.setItem(VISITOR_CONNECTIVITY_REMINDER_KEY, reminderToken);
+      await Storage.setItem(VISITOR_CONNECTIVITY_REMINDER_KEY, reminderToken);
 
       showVisitorPushNotice({
         type: "success",
@@ -2064,7 +2066,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               console.log("Visitor logout API error ignored:", error);
               await ApiService.clearAuth();
             } finally {
-              await AsyncStorage.multiRemove([
+              await Storage.multiRemove([
                 VISITOR_SELECTED_SECTION_KEY,
                 VISITOR_APPOINTMENT_SCREEN_KEY,
                 VISITOR_MAP_FLOOR_KEY,
