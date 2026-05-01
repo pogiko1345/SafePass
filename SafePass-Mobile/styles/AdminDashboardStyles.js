@@ -199,7 +199,7 @@ export default StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: "#F59E0B",
+    backgroundColor: "#1C6DD0",
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 4,
@@ -546,6 +546,8 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
 
   adminFeedbackBanner: {
@@ -1202,28 +1204,62 @@ export default StyleSheet.create({
     fontWeight: "700",
   },
 
+  recordListActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+
+  recordListPrintButton: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+
+  recordListPrintButtonDisabled: {
+    opacity: 0.58,
+  },
+
+  recordListPrintButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
   // ============================================
   // 4. HEADER - Top bar with title and profile
   // ============================================
 
   header: {
+<<<<<<< HEAD
+    backgroundColor: "#0A3D91",
+    paddingHorizontal: 28,
+=======
     backgroundColor: "rgba(255,255,255,0.94)",
     paddingHorizontal: 24,
+>>>>>>> 1900747baa350e6bde5fb7eb1082e647f59aebd4
     paddingTop: Platform.select({ ios: 50, android: 20, web: 20 }),
     paddingBottom: 18,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(148,163,184,0.18)",
+    borderBottomColor: "#B7D5F6",
     ...Platform.select({
       ios: {
-        shadowColor: "#0F172A",
+        shadowColor: "#0A3D91",
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.08,
         shadowRadius: 24,
       },
       android: { elevation: 4 },
-      web: { boxShadow: "0px 12px 30px rgba(15,23,42,0.08)" },
+      web: { boxShadow: "0px 12px 30px rgba(10,61,145,0.18)" },
     }),
   },
 
@@ -1237,7 +1273,7 @@ export default StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#0F172A",
+    color: "#FFFFFF",
     letterSpacing: -0.4,
   },
 
@@ -1248,7 +1284,7 @@ export default StyleSheet.create({
 
   headerSubtitle: {
     fontSize: 13,
-    color: "#526277",
+    color: "#DCEBFF",
     marginTop: 6,
     lineHeight: 20,
   },
@@ -1267,15 +1303,15 @@ export default StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#DCE6F2",
+    borderColor: "#B7D5F6",
   },
 
   headerMetaText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#334155",
+    color: "#0A3D91",
   },
 
   headerActions: {
@@ -1522,7 +1558,7 @@ export default StyleSheet.create({
   dashboardNotificationBadgeText: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#F59E0B",
+    color: "#1C6DD0",
     textTransform: "uppercase",
     letterSpacing: 0.3,
   },
@@ -1616,8 +1652,8 @@ export default StyleSheet.create({
   },
 
   adminMapFilterChipActive: {
-    backgroundColor: "#10B981",
-    borderColor: "#10B981",
+    backgroundColor: "#1C6DD0",
+    borderColor: "#1C6DD0",
   },
 
   adminMapFilterChipText: {
@@ -2405,7 +2441,7 @@ export default StyleSheet.create({
   visitorAvatarText: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#F59E0B",
+    color: "#1C6DD0",
   },
 
   visitorInfo: {
@@ -2529,7 +2565,7 @@ export default StyleSheet.create({
   deptBadgeText: {
     fontSize: 9,
     fontWeight: "700",
-    color: "#F59E0B",
+    color: "#1C6DD0",
   },
 
   userActions: {
@@ -2573,7 +2609,7 @@ export default StyleSheet.create({
   },
 
   userStatusTextActive: {
-    color: "#10B981",
+    color: "#1C6DD0",
   },
 
   userStatusTextInactive: {
@@ -3835,8 +3871,8 @@ export default StyleSheet.create({
   },
 
   staffDropdownOptionActive: {
-    backgroundColor: "#10B981",
-    borderBottomColor: "#10B981",
+    backgroundColor: "#1C6DD0",
+    borderBottomColor: "#1C6DD0",
   },
 
   staffDropdownOptionText: {
@@ -4155,7 +4191,7 @@ export default StyleSheet.create({
   detailAvatarText: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#F59E0B",
+    color: "#1C6DD0",
   },
 
   detailSection: {
@@ -4316,7 +4352,7 @@ export default StyleSheet.create({
   },
 
   approveButton: {
-    backgroundColor: "#10B981",
+    backgroundColor: "#1C6DD0",
     flex: 1,
   },
 
@@ -4872,7 +4908,7 @@ export default StyleSheet.create({
   trendBadgeText: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#10B981",
+    color: "#1C6DD0",
   },
 
   todayStatsRow: {
@@ -5376,7 +5412,7 @@ export default StyleSheet.create({
   },
 
   historyTodayBadge: {
-    color: "#10B981",
+    color: "#1C6DD0",
     fontWeight: "600",
   },
 

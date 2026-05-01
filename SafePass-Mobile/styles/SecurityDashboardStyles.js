@@ -125,27 +125,27 @@ export default StyleSheet.create({
   },
 
   pageHeaderCard: {
-    backgroundColor: "#FCFEFF",
+    backgroundColor: "#0A3D91",
     borderRadius: 24,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: "#DCE8F4",
+    borderColor: "#B7D5F6",
     ...Platform.select({
       ios: {
-        shadowColor: "#0F172A",
+        shadowColor: "#0A3D91",
         shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.18,
         shadowRadius: 24,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 16px 30px rgba(15, 23, 42, 0.05)" },
+      web: { boxShadow: "0px 12px 30px rgba(10,61,145,0.18)" },
     }),
   },
 
   pageEyebrow: {
     fontSize: fontSize.sm,
     fontWeight: "800",
-    color: "#64748B",
+    color: "#DCEBFF",
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: spacing.xs,
@@ -211,12 +211,12 @@ export default StyleSheet.create({
   headerTitle: {
     fontSize: isSmallPhone ? 22 : isTablet ? 28 : 28,
     fontWeight: "800",
-    color: "#0F172A",
+    color: "#FFFFFF",
   },
 
   headerSubtitle: {
     fontSize: fontSize.base,
-    color: "#64748B",
+    color: "#DCEBFF",
     marginTop: spacing.xs,
     fontWeight: "500",
     lineHeight: 21,
@@ -284,7 +284,7 @@ export default StyleSheet.create({
     position: "absolute",
     top: -4,
     right: -4,
-    backgroundColor: colors.warning,
+    backgroundColor: colors.primaryLight,
     borderRadius: 12,
     minWidth: isSmallPhone ? 20 : 22,
     height: isSmallPhone ? 20 : 22,

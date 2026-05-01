@@ -777,11 +777,11 @@ export default function SecurityDashboardScreen({ navigation }) {
     },
     {
       key: 'campus-activity',
-      label: 'Campus Activity',
+      label: 'Visitor Arrival / Departure',
       icon: 'walk-outline',
       color: '#0A3D91',
       submodules: [
-        { key: 'checked-in-visitors', label: 'Checked-In Visitors', badge: visitors.active.length || 0 },
+        { key: 'checked-in-visitors', label: 'Visitor Arrival / Departure', badge: visitors.active.length || 0 },
       ],
     },
     {
@@ -828,8 +828,8 @@ export default function SecurityDashboardScreen({ navigation }) {
         return { title: 'Appointment Records', subtitle: 'Review appointment records in a read-only security view.' };
       case 'checked-in-visitors':
         return {
-          title: 'Checked-In Visitors',
-          subtitle: 'See who is currently inside campus, where they are expected to go, and who has just checked out.',
+          title: 'Visitor Arrival / Departure',
+          subtitle: 'See visitor arrivals, current campus presence, and recent departures in one security view.',
         };
       case 'report-file':
         return { title: 'File a Report', subtitle: 'Submit a security report and review recently filed incidents.' };
@@ -2063,9 +2063,9 @@ export default function SecurityDashboardScreen({ navigation }) {
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="walk-outline" size={20} color="#0A3D91" />
             <View>
-              <Text style={styles.sectionTitle}>Checked-In Visitors</Text>
+              <Text style={styles.sectionTitle}>Visitor Arrival / Departure</Text>
               <Text style={styles.securitySectionSubtitle}>
-                Track who is inside campus, their assigned destination, and the latest visitor exits.
+                Track visitor arrivals, assigned destinations, and the latest visitor departures.
               </Text>
             </View>
           </View>
