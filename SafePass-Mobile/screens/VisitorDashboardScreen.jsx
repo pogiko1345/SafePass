@@ -16,6 +16,7 @@ import {
   useWindowDimensions,
   Animated,
   Easing,
+  AppState,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -161,6 +162,7 @@ const getStoredVisitorIdType = (visitorRecord = {}) => {
 
 const PHONE_TRACKING_INTERVAL_MS = 15000;
 const PHONE_TRACKING_DISTANCE_METERS = 8;
+const VISITOR_PENDING_REFRESH_INTERVAL_MS = 30000;
 const VISITOR_CONNECTIVITY_REMINDER_KEY = "visitorConnectivityReminderShown";
 const VISITOR_SELECTED_SECTION_KEY = "visitorDashboardSelectedSection";
 const VISITOR_APPOINTMENT_SCREEN_KEY = "visitorDashboardAppointmentScreen";
@@ -255,7 +257,7 @@ let NfcEvents = null;
 if (Platform.OS !== 'web') {
   try {
     const nfcModule = require('react-native-nfc-manager');
-    NfcManager = nfcModule.default;
+    NfcManager = nfcModule.default || nfcModule;
     NfcEvents = nfcModule.NfcEvents;
   } catch (e) {
     console.log('NFC module not available:', e);
@@ -332,6 +334,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [lastTapTime, setLastTapTime] = useState(0);
   const isVisitorHomeSection = selectedVisitorSection === "home";
   const nfcListenerRef = useRef(null);
+  const nfcTapProcessingRef = useRef(false);
   const dashboardScrollRef = useRef(null);
   const phoneLocationSubscriptionRef = useRef(null);
   const appointmentTransitionTimeoutRef = useRef(null);
@@ -451,6 +454,33 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       !pendingStaffReview &&
       (normalizedStatus === "approved" || normalizedStatus === "checked_in")
     );
+  };
+
+  const isSafePassCardActive = (visitorRecord = visitor, accountRecord = currentUser) => {
+    const safePassId = String(
+      visitorRecord?.nfcCardId ||
+        accountRecord?.nfcCardId ||
+        "",
+    ).trim();
+    const accountStatus = String(accountRecord?.status || "").toLowerCase();
+    const cardActive =
+      accountRecord?.cardActive ??
+      accountRecord?.accessPermissions?.cardActive ??
+      true;
+
+    return Boolean(safePassId) && accountStatus === "active" && cardActive !== false;
+  };
+
+  const getVisitorAccessBlockedMessage = (visitorRecord = visitor, accountRecord = currentUser) => {
+    if (!isSafePassCardActive(visitorRecord, accountRecord)) {
+      return "Your SafePass card is not active yet. Please contact admin or security.";
+    }
+
+    if (!isVisitorAccessApproved(visitorRecord)) {
+      return "This visit must be approved before check-in and check-out are available.";
+    }
+
+    return "";
   };
   const activeAppointmentPurposeOptions = useMemo(
     () => getEnabledAppointmentOptionLabels(appointmentOptions.purposes, APPOINTMENT_PURPOSE_OPTIONS),
@@ -654,6 +684,40 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       stopPhoneLocationTracking();
     };
   }, []);
+
+  useEffect(() => {
+    const appStateSubscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        loadVisitorData({ silent: true });
+        checkNfcSupport();
+      }
+    });
+
+    return () => {
+      appStateSubscription?.remove?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    const status = String(visitor?.status || "").toLowerCase();
+    const approvalStatus = String(visitor?.approvalStatus || "").toLowerCase();
+    const appointmentStatus = String(visitor?.appointmentStatus || "").toLowerCase();
+    const isWaitingForVisitUpdate =
+      !visitor?._id ||
+      status === "pending" ||
+      approvalStatus === "pending" ||
+      appointmentStatus === "pending";
+
+    if (!isWaitingForVisitUpdate) {
+      return undefined;
+    }
+
+    const refreshTimer = setInterval(() => {
+      loadVisitorData({ silent: true });
+    }, VISITOR_PENDING_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(refreshTimer);
+  }, [visitor?._id, visitor?.status, visitor?.approvalStatus, visitor?.appointmentStatus]);
 
   useEffect(() => () => {
     if (appointmentTransitionTimeoutRef.current) {
@@ -915,8 +979,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
   };
 
-  const loadVisitorData = async () => {
-    setIsLoading(true);
+  const loadVisitorData = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setIsLoading(true);
+    }
     try {
       const currentUser = await ApiService.getCurrentUser();
       if (!currentUser) {
@@ -930,6 +996,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         setCurrentUser((previousUser) => ({
           ...(previousUser || currentUser || {}),
           ...profileResponse.account,
+          accessPermissions: {
+            ...((previousUser || currentUser || {}).accessPermissions || {}),
+            ...(profileResponse.account.accessPermissions || {}),
+          },
         }));
       }
       if (profileResponse.success && profileResponse.visitor) {
@@ -963,60 +1033,122 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         Alert.alert("Error", "Failed to load visitor data");
       }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const refreshNfcAvailability = async ({ showDisabledAlert = false } = {}) => {
+    if (Platform.OS === 'web') {
+      const webSupported =
+        typeof window !== "undefined" && ("NDEFReader" in window || "nfc" in navigator);
+      setIsNfcSupported(webSupported);
+      setIsNfcEnabled(webSupported);
+      return {
+        moduleAvailable: webSupported,
+        supported: webSupported,
+        enabled: webSupported,
+      };
+    }
+
+    const hasNativeNfcApi =
+      NfcManager &&
+      typeof NfcManager.isSupported === "function" &&
+      typeof NfcManager.isEnabled === "function" &&
+      typeof NfcManager.start === "function";
+
+    if (!hasNativeNfcApi) {
+      setIsNfcSupported(false);
+      setIsNfcEnabled(false);
+      return {
+        moduleAvailable: false,
+        supported: false,
+        enabled: false,
+      };
+    }
+
+    try {
+      const isSupported = Boolean(await NfcManager.isSupported());
+      setIsNfcSupported(isSupported);
+
+      if (!isSupported) {
+        setIsNfcEnabled(false);
+        return {
+          moduleAvailable: true,
+          supported: false,
+          enabled: false,
+        };
+      }
+
+      await NfcManager.start();
+      const isEnabled = Boolean(await NfcManager.isEnabled());
+      setIsNfcEnabled(isEnabled);
+
+      if (showDisabledAlert && !isEnabled) {
+        Alert.alert(
+          "NFC Disabled",
+          "Please enable NFC in your device settings.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Open Settings",
+              onPress: () => {
+                if (Platform.OS === 'android') {
+                  NfcManager?.goToNfcSetting?.();
+                }
+              },
+            },
+          ],
+        );
+      }
+
+      return {
+        moduleAvailable: true,
+        supported: true,
+        enabled: isEnabled,
+      };
+    } catch (error) {
+      const errorMessage = String(error?.message || error || "");
+      console.log("NFC check unavailable:", errorMessage);
+      setIsNfcSupported(false);
+      setIsNfcEnabled(false);
+      return {
+        moduleAvailable: false,
+        supported: false,
+        enabled: false,
+        error,
+      };
     }
   };
 
   // NFC Support Check
   const checkNfcSupport = async () => {
-    if (Platform.OS === 'web') {
-      // Check for Web NFC API
-      if ('NDEFReader' in window || 'nfc' in navigator) {
-        setIsNfcSupported(true);
-        try {
-          // @ts-ignore
-          const ndef = new window.NDEFReader();
-          if (ndef) setIsNfcSupported(true);
-        } catch (e) {
-          setIsNfcSupported(false);
-        }
-      } else {
-        setIsNfcSupported(false);
-      }
-    } else if (NfcManager) {
-      try {
-        await NfcManager.start();
-        const isSupported = await NfcManager.isSupported();
-        setIsNfcSupported(isSupported);
-        if (isSupported) {
-          const isEnabled = await NfcManager.isEnabled();
-          setIsNfcEnabled(isEnabled);
-          if (!isEnabled) {
-            Alert.alert(
-              "NFC Disabled",
-              "Please enable NFC in your device settings to use tap-to-check-in feature.",
-              [{ text: "OK" }]
-            );
-          }
-        }
-      } catch (error) {
-        console.log("NFC check error:", error);
-        setIsNfcSupported(false);
-      }
-    }
+    await refreshNfcAvailability();
   };
 
   // Start NFC Reading
   const startNfcReading = async () => {
-    if (!isVisitorAccessApproved(visitor)) {
+    const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
+    if (blockedMessage) {
       Alert.alert(
-        "Approval Required",
-        "Your NFC access tools will only be available after your visit is approved.",
+        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        blockedMessage,
       );
       return false;
     }
 
-    if (!isNfcSupported) {
+    const nfcAvailability = await refreshNfcAvailability({ showDisabledAlert: true });
+
+    if (!nfcAvailability.moduleAvailable) {
+      Alert.alert(
+        "NFC Module Unavailable",
+        "This app build does not include the native NFC module. Install the SafePass development or release APK, then try again.",
+      );
+      return false;
+    }
+
+    if (!nfcAvailability.supported) {
       Alert.alert(
         "NFC Not Supported",
         "Your device doesn't support NFC. Please use the digital access card or manual check-in."
@@ -1024,23 +1156,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return false;
     }
 
-    if (Platform.OS !== 'web' && !isNfcEnabled) {
-      Alert.alert(
-        "NFC Disabled",
-        "Please enable NFC in your device settings.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Open Settings", 
-            onPress: () => {
-              if (Platform.OS === 'android') {
-                // @ts-ignore
-                NfcManager?.goToNfcSetting();
-              }
-            }
-          }
-        ]
-      );
+    if (Platform.OS !== 'web' && !nfcAvailability.enabled) {
       return false;
     }
 
@@ -1095,12 +1211,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   // Mobile NFC Implementation
   const startMobileNfc = async () => {
+    if (!NfcManager || !NfcEvents) {
+      setNfcStatus({
+        type: "error",
+        message: "Native NFC is not available in this app build.",
+      });
+      return false;
+    }
+
     try {
-      await NfcManager.setEventListener(NfcEvents.DiscoverTag, (tag) => {
+      NfcManager.setEventListener(NfcEvents.DiscoverTag, (tag) => {
         handleNfcTagRead(tag);
       });
       
-      await NfcManager.setEventListener(NfcEvents.SessionClosed, () => {
+      NfcManager.setEventListener(NfcEvents.SessionClosed, () => {
         console.log('NFC session closed');
         setIsNfcReading(false);
         setNfcStatus(null);
@@ -1117,6 +1241,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   // Handle NFC Tag Read
   const handleNfcTagRead = async (tagData, serialNumber = null) => {
+    if (nfcTapProcessingRef.current) {
+      return;
+    }
+
+    nfcTapProcessingRef.current = true;
+
     // Provide haptic feedback
     if (Platform.OS !== 'web') {
       Vibration.vibrate(100);
@@ -1162,8 +1292,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       }
     }
     
-    // Process the tap - send to server
-    await processNfcTap(readerId, gateId);
+    try {
+      // Process the tap - send to server
+      await processNfcTap(readerId, gateId);
+    } finally {
+      setTimeout(() => {
+        nfcTapProcessingRef.current = false;
+      }, 1200);
+    }
   };
 
   // Process NFC Tap (Send to Arduino via API)
@@ -1186,6 +1322,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         readerId: readerId,
         gateId: gateId,
         status: visitor.status,
+        source: "virtual_nfc_card",
       });
 
       if (response.success) {
@@ -1265,9 +1402,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         nfcListenerRef.current.removeEventListener?.('reading', handleNfcTagRead);
         nfcListenerRef.current = null;
       } else if (NfcManager && NfcEvents) {
-        await NfcManager.unregisterTagEvent();
-        await NfcManager.setEventListener(NfcEvents.DiscoverTag, null);
-        await NfcManager.setEventListener(NfcEvents.SessionClosed, null);
+        try {
+          await NfcManager.unregisterTagEvent();
+        } catch (error) {
+          console.log("NFC unregister skipped:", error?.message || error);
+        }
+
+        NfcManager.setEventListener(NfcEvents.DiscoverTag, () => {});
+        NfcManager.setEventListener(NfcEvents.SessionClosed, () => {});
       }
     } catch (error) {
       console.error("Stop NFC error:", error);
@@ -1710,10 +1852,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleVirtualNfcCardTap = async () => {
     if (!visitor || isVirtualTapLoading) return;
 
-    if (!isVisitorAccessApproved(visitor)) {
+    if (isNfcReading) {
+      await stopNfcReading();
+      return;
+    }
+
+    const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
+    if (blockedMessage) {
       Alert.alert(
-        "Approval Required",
-        "Your virtual NFC card becomes available only after your visit is approved.",
+        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        blockedMessage,
       );
       return;
     }
@@ -1729,6 +1877,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setIsVirtualTapLoading(true);
 
     try {
+      const nfcAvailability = await refreshNfcAvailability();
+      if (!nfcAvailability.moduleAvailable || !nfcAvailability.supported) {
+        setNfcStatus({
+          type: "processing",
+          message: "Confirming your virtual SafePass card...",
+        });
+        await processNfcTap("virtual-card", "visitor-app");
+        return;
+      }
+
       const started = await startNfcReading();
       if (!started) {
         return;
@@ -1738,8 +1896,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         type: "info",
         message:
           visitor?.status === "checked_in"
-            ? "Tap your phone to the NFC hardware reader to check out."
-            : "Tap your phone to the NFC hardware reader to check in.",
+            ? "Confirm departure from this phone to check out."
+            : "Confirm arrival from this phone to check in.",
       });
     } catch (error) {
       console.error("Virtual NFC card tap error:", error);
@@ -1810,10 +1968,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleCheckInAction = () => {
-    if (!isVisitorAccessApproved(visitor)) {
+    const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
+    if (blockedMessage) {
       Alert.alert(
-        "Approval Required",
-        "Check-in becomes available only after your visit is approved.",
+        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        blockedMessage,
       );
       return;
     }
@@ -1848,10 +2007,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleCheckOutAction = (targetVisitor = visitor) => {
-    if (!isVisitorAccessApproved(targetVisitor)) {
+    const blockedMessage = getVisitorAccessBlockedMessage(targetVisitor, currentUser);
+    if (blockedMessage) {
       Alert.alert(
-        "Approval Required",
-        "Check-out becomes available only after your visit is approved.",
+        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        blockedMessage,
       );
       return;
     }
@@ -2110,8 +2270,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const isApprovedVisitor =
     isVisitorAccessApproved(visitor);
   const isCheckedOutVisitor = String(visitor?.status || "").toLowerCase() === "checked_out";
-  const canUseVisitorAccessTools =
-    isApprovedVisitor && !isCheckedOutVisitor;
   const canRequestNewAppointment =
     visitor?.approvalStatus === "approved" &&
     !isApprovedVisitor &&
@@ -3150,7 +3308,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             style={visitorDashboardStyles.approvedVirtualNfcCard}
             onPress={() => setShowVirtualNfcModal(true)}
             activeOpacity={0.9}
-            disabled={isVirtualTapLoading || !canUseVisitorAccessTools}
+            disabled={isVirtualTapLoading}
           >
             <LinearGradient
               colors={["#0F172A", "#041E42", "#0A3D91"]}
@@ -3168,7 +3326,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </View>
                   <Text style={visitorDashboardStyles.approvedVirtualNfcTitle}>View Access Card</Text>
                   <Text style={visitorDashboardStyles.approvedVirtualNfcSubtitle}>
-                    Open your digital SafePass card and tap your phone to the hardware reader for check-in or check-out.
+                    Open your digital SafePass card and confirm check-in or check-out from this phone.
                   </Text>
                 </View>
                 <View style={visitorDashboardStyles.approvedVirtualNfcIconWrap}>
@@ -3194,7 +3352,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
               onPress={handleCheckInAction}
               activeOpacity={0.9}
-              disabled={!canUseVisitorAccessTools || isCheckInLoading || visitor?.status === "checked_in"}
+              disabled={isCheckInLoading || visitor?.status === "checked_in"}
             >
               <View style={[visitorDashboardStyles.approvedCompactActionIcon, { backgroundColor: "#DCFCE7" }]}>
                 {isCheckInLoading ? (
@@ -3217,7 +3375,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
               onPress={() => handleCheckOutAction()}
               activeOpacity={0.9}
-              disabled={!canUseVisitorAccessTools || isCheckOutLoading || visitor?.status !== "checked_in"}
+              disabled={isCheckOutLoading || visitor?.status !== "checked_in"}
             >
               <View style={[visitorDashboardStyles.approvedCompactActionIcon, { backgroundColor: "#FEE2E2" }]}>
                 {isCheckOutLoading ? (
@@ -4645,7 +4803,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View>
                 <Text style={visitorDashboardStyles.virtualNfcModalTitle}>Virtual NFC Card</Text>
                 <Text style={visitorDashboardStyles.virtualNfcModalSubtitle}>
-                  Present your phone to the NFC hardware reader so the same card can handle both check-in and check-out.
+                  Use this phone as your virtual SafePass card for check-in and check-out.
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setShowVirtualNfcModal(false)}>
@@ -4753,10 +4911,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       </View>
                       <View style={visitorDashboardStyles.virtualNfcTapHintCopy}>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintTitle}>
-                          Tap This Card To The Hardware Reader
+                          Use This Virtual Card
                         </Text>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintText}>
-                          Use this digital pass at the NFC hardware reader. The system will check you in or out based on your current visit status.
+                          The system will check you in or out from this phone based on your current visit status.
                         </Text>
                       </View>
                     </View>
@@ -4771,9 +4929,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ]}
               >
                 {[
-                  "Use the card view above to confirm your approved visitor details before tapping.",
-                  "Tap your phone to the NFC hardware reader to process campus entry or exit.",
-                  "Security and admin monitoring will record the hardware tap event automatically.",
+                  "Use the card view above to confirm your approved visitor details before continuing.",
+                  "Confirm from this phone to process campus entry or exit.",
+                  "Security and admin monitoring will record the virtual card event automatically.",
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.virtualNfcInfoRow}>
                     <Ionicons name="checkmark-circle-outline" size={18} color="#0A3D91" />
@@ -4806,9 +4964,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
+                    <Ionicons name={isNfcReading ? "pause-circle-outline" : "log-in-outline"} size={18} color="#FFFFFF" />
                     <Text style={visitorDashboardStyles.virtualNfcPrimaryButtonText}>
-                      Start NFC Tap
+                      {isNfcReading ? "Stop NFC" : "Use Virtual Card"}
                     </Text>
                   </>
                 )}

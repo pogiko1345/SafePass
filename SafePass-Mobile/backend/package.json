@@ -8,7 +8,8 @@
     "test": "node tests/securityUtils.test.js && node tests/settingsUtils.test.js && node tests/routes.integration.test.js",
     "seed": "node seed.js",
     "seed:demo-staff": "node scripts/seedDemoStaff.js",
-    "clear:visitors": "node scripts/clearVisitors.js"
+    "clear:visitors": "node scripts/clearVisitors.js",
+    "assign:nfc": "node scripts/assignNfcCard.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

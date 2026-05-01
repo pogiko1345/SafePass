@@ -1,0 +1,129 @@
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <SPI.h>
+#include <MFRC522.h>
+
+// Install the "MFRC522" library from the Arduino Library Manager.
+// Wiring for many ESP32 dev boards:
+// SDA/SS -> GPIO 5, SCK -> GPIO 18, MOSI -> GPIO 23, MISO -> GPIO 19, RST -> GPIO 22.
+
+#define SS_PIN 5
+#define RST_PIN 22
+
+const char* wifiSsid = "PLDTHOMEFIBRUh5BN";
+const char* wifiPassword = "PLDTWIFIuGK7M";
+
+const char* apiUrl = "https://safepass-052h.onrender.com/api/device/location-tap";
+const char* deviceKey = "71eb2b8fbdfa47b2b2334fde89cc99b583a39709997d4434859ad645dbce89e4";
+
+const char* deviceId = "main-gate-reader-01";
+const char* checkpointId = "main_gate";
+const char* floorName = "ground";
+const char* officeName = "Main Gate";
+const float coordinateX = 50.0;
+const float coordinateY = 92.0;
+
+MFRC522 rfid(SS_PIN, RST_PIN);
+
+String lastUid = "";
+unsigned long lastTapAt = 0;
+const unsigned long duplicateCooldownMs = 3000;
+
+void connectToWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
+  Serial.print("Connecting to Wi-Fi");
+  WiFi.begin(wifiSsid, wifiPassword);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+  Serial.print("Connected. IP: ");
+  Serial.println(WiFi.localIP());
+}
+
+String readUid() {
+  String uid = "";
+
+  for (byte i = 0; i < rfid.uid.size; i++) {
+    if (rfid.uid.uidByte[i] < 0x10) {
+      uid += "0";
+    }
+    uid += String(rfid.uid.uidByte[i], HEX);
+  }
+
+  uid.toUpperCase();
+  return uid;
+}
+
+String buildJsonPayload(const String& uid) {
+  String payload = "{";
+  payload += "\"nfcCardId\":\"" + uid + "\",";
+  payload += "\"deviceId\":\"" + String(deviceId) + "\",";
+  payload += "\"checkpointId\":\"" + String(checkpointId) + "\",";
+  payload += "\"floor\":\"" + String(floorName) + "\",";
+  payload += "\"office\":\"" + String(officeName) + "\",";
+  payload += "\"coordinates\":{\"x\":" + String(coordinateX, 2) + ",\"y\":" + String(coordinateY, 2) + "},";
+  payload += "\"action\":\"auto\",";
+  payload += "\"tapAction\":\"auto\",";
+  payload += "\"source\":\"arduino_tap\"";
+  payload += "}";
+  return payload;
+}
+
+void postTap(const String& uid) {
+  connectToWifi();
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  http.begin(client, apiUrl);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("x-device-key", deviceKey);
+
+  String payload = buildJsonPayload(uid);
+  int statusCode = http.POST(payload);
+  String response = http.getString();
+
+  Serial.print("UID: ");
+  Serial.println(uid);
+  Serial.print("HTTP ");
+  Serial.println(statusCode);
+  Serial.println(response);
+
+  http.end();
+}
+
+void setup() {
+  Serial.begin(115200);
+  SPI.begin();
+  rfid.PCD_Init();
+  connectToWifi();
+  Serial.println("SafePass RFID reader is ready.");
+}
+
+void loop() {
+  if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
+    delay(50);
+    return;
+  }
+
+  String uid = readUid();
+  unsigned long now = millis();
+
+  if (uid != lastUid || now - lastTapAt > duplicateCooldownMs) {
+    lastUid = uid;
+    lastTapAt = now;
+    postTap(uid);
+  }
+
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+}

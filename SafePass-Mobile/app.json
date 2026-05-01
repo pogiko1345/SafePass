@@ -31,6 +31,7 @@
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.NFC",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
@@ -42,6 +43,7 @@
       }
     },
     "plugins": [
+      "react-native-nfc-manager",
       [
         "expo-image-picker",
         {

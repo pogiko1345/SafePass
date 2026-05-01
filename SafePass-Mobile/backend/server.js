@@ -63,6 +63,12 @@ const formatSafePassAccountId = (year, sequence) =>
 
 const isSafePassAccountId = (value = "") => /^\d{4}-\d{6}$/.test(String(value || "").trim());
 
+const normalizeNfcCardId = (value = "") =>
+  String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^0-9A-F]/g, "");
+
 const generateSafePassAccountId = async (createdAt = new Date()) => {
   const createdDate = new Date(createdAt);
   const year = Number.isNaN(createdDate.getTime())
@@ -91,7 +97,7 @@ const ensureSafePassAccountId = async (user) => {
     return user?.nfcCardId || "";
   }
 
-  if (isSafePassAccountId(user.nfcCardId)) return user.nfcCardId;
+  if (String(user.nfcCardId || "").trim()) return user.nfcCardId;
 
   user.nfcCardId = await generateSafePassAccountId(user.createdAt || new Date());
   await user.save();
@@ -642,8 +648,15 @@ const getTapLocationFromRequest = (body = {}) => {
 };
 
 const validateDeviceKey = (req, res, next) => {
-  const expectedKey = getRequiredEnvValue("ARDUINO_DEVICE_KEY");
+  const expectedKey = String(process.env.ARDUINO_DEVICE_KEY || "").trim();
   const providedKey = req.header("x-device-key") || req.body?.deviceKey;
+
+  if (!expectedKey) {
+    return res.status(503).json({
+      success: false,
+      message: "Arduino device access is not configured",
+    });
+  }
 
   if (!providedKey || providedKey !== expectedKey) {
     return res.status(401).json({
@@ -981,11 +994,17 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         req.body?.uid ||
         req.body?.tagId ||
         "",
-    ).trim();
+    )
+      .trim()
+      .toUpperCase();
+    const normalizedCardId = normalizeNfcCardId(cardId);
     const deviceId = String(req.body?.deviceId || "arduino-reader").trim();
     const tapLocation = getTapLocationFromRequest(req.body || {});
+    const tapAction = String(req.body?.action || req.body?.tapAction || "auto")
+      .trim()
+      .toLowerCase();
 
-    if (!cardId) {
+    if (!normalizedCardId) {
       return res.status(400).json({
         success: false,
         message: "Missing NFC card ID",
@@ -1000,9 +1019,9 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     }
 
     const visitorUser = await User.findOne({
-      nfcCardId: cardId,
       role: "visitor",
-    }).select("_id email firstName lastName nfcCardId role");
+      nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
+    }).select("_id email firstName lastName nfcCardId role status accessPermissions");
 
     if (!visitorUser) {
       await AccessLog.create({
@@ -1013,7 +1032,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         accessType: "system",
         activityType: "arduino_location_tap",
         status: "denied",
-        nfcCardId: cardId,
+        nfcCardId: normalizedCardId,
         metadata: {
           deviceId,
           tapLocation,
@@ -1027,12 +1046,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       });
     }
 
-    const visitor = await Visitor.findOne({
-      email: visitorUser.email,
-      status: "checked_in",
-    }).sort({ checkedInAt: -1 });
-
-    if (!visitor) {
+    if (!isUserSafePassCardActive(visitorUser)) {
       await AccessLog.create({
         userId: visitorUser._id,
         userEmail: visitorUser.email,
@@ -1042,22 +1056,161 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         accessType: "system",
         activityType: "arduino_location_tap",
         status: "denied",
-        nfcCardId: cardId,
+        nfcCardId: normalizedCardId,
+        relatedUser: visitorUser._id,
+        metadata: {
+          deviceId,
+          tapLocation,
+          accountStatus: visitorUser.status,
+        },
+        notes: `Inactive NFC card tapped at ${tapLocation.office}`,
+      });
+
+      return res.status(403).json({
+        success: false,
+        message: "NFC card is not active",
+      });
+    }
+
+    const checkedInVisitor = await Visitor.findOne({
+      email: visitorUser.email,
+      status: "checked_in",
+    }).sort({ checkedInAt: -1 });
+
+    const latestVisitor =
+      checkedInVisitor ||
+      (await Visitor.findOne({
+        email: visitorUser.email,
+        status: { $ne: "checked_out" },
+      }).sort({ visitDate: -1, registeredAt: -1 }));
+
+    if (!latestVisitor) {
+      await AccessLog.create({
+        userId: visitorUser._id,
+        userEmail: visitorUser.email,
+        userName: `${visitorUser.firstName || ""} ${visitorUser.lastName || ""}`.trim(),
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "arduino_location_tap",
+        status: "denied",
+        nfcCardId: normalizedCardId,
         relatedUser: visitorUser._id,
         metadata: {
           deviceId,
           tapLocation,
         },
-        notes: `Card tapped at ${tapLocation.office}, but visitor is not checked in`,
+        notes: `Card tapped at ${tapLocation.office}, but no active visit was found`,
       });
 
       return res.status(409).json({
         success: false,
-        message: "Visitor must be checked in before tracking can start",
+        message: "No active visit found for this NFC card",
       });
     }
 
-    visitor.updateCurrentLocation(tapLocation, { deviceId });
+    const normalizedCheckpoint = normalizeCheckpointId(tapLocation.checkpointId || tapLocation.office);
+    const isMainGateTap =
+      normalizedCheckpoint === "main_gate" ||
+      normalizedCheckpoint === "gate" ||
+      normalizedCheckpoint === "campus_entry" ||
+      normalizedCheckpoint === "campus_exit";
+    const isAutoGateTap =
+      tapAction === "auto" ||
+      tapAction === "gate" ||
+      tapAction === "entry" ||
+      tapAction === "exit" ||
+      isMainGateTap;
+    const shouldCheckOut =
+      checkedInVisitor &&
+      tapAction !== "location" &&
+      tapAction !== "track" &&
+      (tapAction === "checkout" || tapAction === "check_out" || isAutoGateTap);
+    const shouldCheckIn =
+      !checkedInVisitor &&
+      tapAction !== "location" &&
+      tapAction !== "track" &&
+      (tapAction === "checkin" || tapAction === "check_in" || isAutoGateTap);
+
+    const visitor = latestVisitor;
+    let action = "location_update";
+    let accessType = "system";
+    let activityType = "arduino_location_tap";
+    let responseMessage = "Visitor location updated";
+
+    if (shouldCheckOut) {
+      visitor.markCheckedOut(null);
+      action = "check_out";
+      accessType = "exit";
+      activityType = "nfc_card_checkout";
+      responseMessage = "Visitor checked out automatically by NFC card";
+    } else if (shouldCheckIn) {
+      if (!visitor.hasApprovedVisitWindow()) {
+        await AccessLog.create({
+          userId: visitorUser._id,
+          userEmail: visitorUser.email,
+          userName: visitor.fullName,
+          actorRole: "device",
+          location: tapLocation.office,
+          accessType: "entry",
+          activityType: "nfc_card_checkin",
+          status: "denied",
+          nfcCardId: normalizedCardId,
+          relatedVisitor: visitor._id,
+          relatedUser: visitorUser._id,
+          metadata: {
+            deviceId,
+            tapLocation,
+            visitorStatus: visitor.status,
+            approvalStatus: visitor.approvalStatus,
+            appointmentStatus: visitor.appointmentStatus,
+          },
+          notes: `${visitor.fullName} tapped at ${tapLocation.office}, but the visit is not approved`,
+        });
+
+        return res.status(403).json({
+          success: false,
+          message: "Visit is not approved for check-in",
+        });
+      }
+
+      visitor.markCheckedIn(null);
+      visitor.updateCurrentLocation(tapLocation, { deviceId });
+      action = "check_in";
+      accessType = "entry";
+      activityType = "nfc_card_checkin";
+      responseMessage = "Visitor checked in automatically by NFC card";
+    } else {
+      if (visitor.status !== "checked_in") {
+        await AccessLog.create({
+          userId: visitorUser._id,
+          userEmail: visitorUser.email,
+          userName: visitor.fullName,
+          actorRole: "device",
+          location: tapLocation.office,
+          accessType: "system",
+          activityType: "arduino_location_tap",
+          status: "denied",
+          nfcCardId: normalizedCardId,
+          relatedVisitor: visitor._id,
+          relatedUser: visitorUser._id,
+          metadata: {
+            deviceId,
+            tapLocation,
+            visitorStatus: visitor.status,
+          },
+          notes: `${visitor.fullName} tapped at ${tapLocation.office}, but visitor is not checked in`,
+        });
+
+        return res.status(409).json({
+          success: false,
+          message: "Visitor must be checked in before location tracking can start",
+        });
+      }
+
+      visitor.updateCurrentLocation(tapLocation, { deviceId });
+    }
+
     await visitor.save();
 
     await AccessLog.create({
@@ -1066,22 +1219,61 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       userName: visitor.fullName,
       actorRole: "device",
       location: tapLocation.office,
-      accessType: "system",
-      activityType: "arduino_location_tap",
+      accessType,
+      activityType,
       status: "granted",
-      nfcCardId: cardId,
+      nfcCardId: normalizedCardId,
       relatedVisitor: visitor._id,
       relatedUser: visitorUser._id,
       metadata: {
         deviceId,
+        action,
+        tapLocation,
         currentLocation: visitor.currentLocation,
       },
-      notes: `${visitor.fullName} tapped at ${tapLocation.office}`,
+      notes: `${visitor.fullName} ${action.replace("_", " ")} by NFC card at ${tapLocation.office}`,
     });
+
+    if (action === "check_in" || action === "check_out") {
+      const isCheckIn = action === "check_in";
+      await Promise.all([
+        createRoleNotification({
+          title: isCheckIn ? "Visitor Checked In" : "Visitor Checked Out",
+          message: `${visitor.fullName} ${isCheckIn ? "checked in" : "checked out"} automatically using the NFC card at ${tapLocation.office}.`,
+          targetRole: "security",
+          relatedVisitor: visitor._id,
+          relatedUser: visitorUser._id,
+          type: "info",
+          severity: "low",
+          metadata: {
+            activityType,
+            source: "nfc_card_tap",
+            deviceId,
+            action,
+          },
+        }),
+        createRoleNotification({
+          title: isCheckIn ? "Visitor Checked In" : "Visitor Checked Out",
+          message: `${visitor.fullName} ${isCheckIn ? "checked in" : "checked out"} automatically using the NFC card at ${tapLocation.office}.`,
+          targetRole: "admin",
+          relatedVisitor: visitor._id,
+          relatedUser: visitorUser._id,
+          type: "info",
+          severity: "low",
+          metadata: {
+            activityType,
+            source: "nfc_card_tap",
+            deviceId,
+            action,
+          },
+        }),
+      ]);
+    }
 
     res.json({
       success: true,
-      message: "Visitor location updated",
+      message: responseMessage,
+      action,
       visitorId: visitor._id,
       currentLocation: visitor.currentLocation,
       visitor: {
@@ -1282,6 +1474,51 @@ const isVisitorOwner = (user = {}, visitor = {}) => {
     String(visitor.email || "").trim().toLowerCase();
 
   return sameVisitorId || sameEmail;
+};
+
+const isUserSafePassCardActive = (user = {}) =>
+  Boolean(user?.nfcCardId) &&
+  String(user?.status || "").toLowerCase() === "active" &&
+  user?.accessPermissions?.cardActive !== false;
+
+const getVisitorAccountPayload = (user = {}) => ({
+  _id: user._id,
+  fullName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+  email: user.email,
+  phoneNumber: user.phone,
+  status: user.status,
+  nfcCardId: user.nfcCardId || "",
+  cardActive: isUserSafePassCardActive(user),
+  accessPermissions: {
+    canAccess: user.accessPermissions?.canAccess || [],
+    restrictedAreas: user.accessPermissions?.restrictedAreas || [],
+    cardActive: user.accessPermissions?.cardActive !== false,
+  },
+  registeredAt: user.createdAt,
+});
+
+const activateVisitorSafePassCardForUser = async (user, visitor = {}) => {
+  if (!user) return "";
+
+  if (!String(user.nfcCardId || "").trim()) {
+    user.nfcCardId = await generateSafePassAccountId(user.createdAt || new Date());
+  }
+
+  user.role = "visitor";
+  user.status = "active";
+  user.isActive = true;
+  if (visitor?._id) {
+    user.visitorId = visitor._id;
+  }
+  user.accessPermissions = {
+    canAccess: user.accessPermissions?.canAccess || [],
+    restrictedAreas: user.accessPermissions?.restrictedAreas || [],
+    timeRestrictions: user.accessPermissions?.timeRestrictions || [],
+    cardActive: true,
+  };
+
+  await user.save();
+  return user.nfcCardId || "";
 };
 
 const findVisitorForUser = async (user) => {
@@ -1761,15 +1998,7 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
           success: true,
           visitor: visitorPayload,
           appointments: visitors,
-          account: {
-            _id: req.user._id,
-            fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
-            email: req.user.email,
-            phoneNumber: req.user.phone,
-            status: req.user.status,
-            nfcCardId: req.user.nfcCardId || "",
-            registeredAt: req.user.createdAt,
-          },
+          account: getVisitorAccountPayload(req.user),
         });
       }
 
@@ -1777,15 +2006,7 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
         success: true,
         visitor: null,
         appointments: [],
-        account: {
-          _id: req.user._id,
-          fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
-          email: req.user.email,
-          phoneNumber: req.user.phone,
-          status: req.user.status,
-          nfcCardId: req.user.nfcCardId || "",
-          registeredAt: req.user.createdAt,
-        },
+        account: getVisitorAccountPayload(req.user),
       });
     }
 
@@ -3187,7 +3408,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     console.log(`   User exists: ${user ? "Yes" : "No"}`);
     realNfcCardId =
       user
-        ? await ensureSafePassAccountId(user)
+        ? await activateVisitorSafePassCardForUser(user, visitor)
         : await generateSafePassAccountId(new Date());
     console.log("SafePass Account ID:", realNfcCardId);
 
@@ -3205,6 +3426,12 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
         isActive: true,
         visitorId: visitor._id,
         nfcCardId: realNfcCardId,
+        accessPermissions: {
+          canAccess: [],
+          restrictedAreas: [],
+          timeRestrictions: [],
+          cardActive: true,
+        },
       };
 
       user = new User(userData);
@@ -3228,6 +3455,12 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       user.status = "active";
       user.isActive = true;
       user.nfcCardId = realNfcCardId;
+      user.accessPermissions = {
+        canAccess: user.accessPermissions?.canAccess || [],
+        restrictedAreas: user.accessPermissions?.restrictedAreas || [],
+        timeRestrictions: user.accessPermissions?.timeRestrictions || [],
+        cardActive: true,
+      };
       await user.save();
       console.log(
         "✅ User account activated with real NFC card:",
@@ -3288,6 +3521,9 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
         status: visitor.status,
         approvalStatus: visitor.approvalStatus,
         temporaryPassword: tempPassword,
+        nfcCardId: user.nfcCardId,
+        safePassId: user.nfcCardId,
+        cardActive: user.accessPermissions?.cardActive !== false,
       },
     });
   } catch (error) {
@@ -4312,6 +4548,9 @@ app.get("/api/health", (req, res) => {
         nfcScan: "POST /api/nfc-scan",
         create: "POST /api/access-log",
       },
+      device: {
+        locationTap: "POST /api/device/location-tap",
+      },
     },
   });
 });
@@ -4519,6 +4758,13 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       });
     }
 
+    if (!isUserSafePassCardActive(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "Your SafePass card is not active. Please contact admin or security.",
+      });
+    }
+
     if (!visitor.hasApprovedVisitWindow()) {
       return res.status(400).json({
         success: false,
@@ -4617,7 +4863,11 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       .trim()
       .toLowerCase();
     const sourceLabel =
-      checkOutSource === "visitor_dashboard" ? "visitor dashboard" : "mobile app";
+      checkOutSource === "virtual_nfc_card"
+        ? "virtual NFC card"
+        : checkOutSource === "visitor_dashboard"
+          ? "visitor dashboard"
+          : "mobile app";
 
     if (!visitor) {
       return res.status(404).json({
@@ -4630,6 +4880,13 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "You can only check out using your own visitor appointment.",
+      });
+    }
+
+    if (!isUserSafePassCardActive(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "Your SafePass card is not active. Please contact admin or security.",
       });
     }
 
@@ -4654,7 +4911,12 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
     const accessLog = new AccessLog({
       userEmail: visitor.email,
       userName: visitor.fullName,
-      location: checkOutSource === "visitor_dashboard" ? "Visitor Dashboard" : "Mobile App",
+      location:
+        checkOutSource === "virtual_nfc_card"
+          ? "Virtual NFC Card"
+          : checkOutSource === "visitor_dashboard"
+            ? "Visitor Dashboard"
+            : "Mobile App",
       accessType: "exit",
       activityType: "visitor_self_checkout",
       status: "granted",
@@ -5396,11 +5658,15 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
     visitor.approveAppointment(req.user, req.body?.note || "");
     await visitor.save();
 
-    const visitorUser = await User.findOne({ email: visitor.email });
+    let visitorUser = await User.findOne({ email: visitor.email });
+    if (visitorUser) {
+      await activateVisitorSafePassCardForUser(visitorUser, visitor);
+    }
     const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     const updatedVisitor = await Visitor.findById(visitor._id)
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
+    const [updatedVisitorPayload] = await attachSafePassIdsToVisitors([updatedVisitor]);
 
     await createRoleNotification({
       title: "Appointment Approved",
@@ -5466,7 +5732,7 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
     res.json({
       success: true,
       message: "Appointment approved successfully",
-      visitor: updatedVisitor,
+      visitor: updatedVisitorPayload,
     });
   } catch (error) {
     console.error("Staff approve appointment error:", error);
@@ -5562,11 +5828,15 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     });
     await visitor.save();
 
-    const visitorUser = await User.findOne({ email: visitor.email });
+    let visitorUser = await User.findOne({ email: visitor.email });
+    if (visitorUser) {
+      await activateVisitorSafePassCardForUser(visitorUser, visitor);
+    }
     const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     const updatedVisitor = await Visitor.findById(visitor._id)
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
+    const [updatedVisitorPayload] = await attachSafePassIdsToVisitors([updatedVisitor]);
 
     await createRoleNotification({
       title: "Appointment Time Adjusted",
@@ -5636,7 +5906,7 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     res.json({
       success: true,
       message: "Appointment adjusted successfully",
-      visitor: updatedVisitor,
+      visitor: updatedVisitorPayload,
     });
   } catch (error) {
     console.error("Staff adjust appointment error:", error);
@@ -6342,30 +6612,14 @@ app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
         return res.json({
           success: true,
           visitor: visitorPayload,
-          account: {
-            _id: req.user._id,
-            fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
-            email: req.user.email,
-            phoneNumber: req.user.phone,
-            status: req.user.status,
-            nfcCardId: req.user.nfcCardId || "",
-            registeredAt: req.user.createdAt,
-          },
+          account: getVisitorAccountPayload(req.user),
         });
       }
 
       return res.json({
         success: true,
         visitor: null,
-        account: {
-          _id: req.user._id,
-          fullName: `${req.user.firstName} ${req.user.lastName}`.trim(),
-          email: req.user.email,
-          phoneNumber: req.user.phone,
-          status: req.user.status,
-          nfcCardId: req.user.nfcCardId || "",
-          registeredAt: req.user.createdAt,
-        },
+        account: getVisitorAccountPayload(req.user),
       });
     }
 
@@ -7140,6 +7394,11 @@ app.post("/api/admin/nfc-cards/issue", authMiddleware, async (req, res) => {
     const nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
 
     user.nfcCardId = nfcCardId;
+    user.accessPermissions = {
+      canAccess: user.accessPermissions?.canAccess || [],
+      restrictedAreas: user.accessPermissions?.restrictedAreas || [],
+      cardActive: true,
+    };
     await user.save();
 
     // Create access log
@@ -7174,6 +7433,97 @@ app.post("/api/admin/nfc-cards/issue", authMiddleware, async (req, res) => {
   }
 });
 
+// Assign a physical NFC/RFID card UID to a visitor account
+app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const { userId, email, cardId, nfcCardId, uid } = req.body || {};
+    const normalizedCardId = normalizeNfcCardId(cardId || nfcCardId || uid);
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+
+    if (!normalizedCardId) {
+      return res.status(400).json({
+        success: false,
+        message: "Card UID is required.",
+      });
+    }
+
+    const existingCardOwner = await User.findOne({
+      nfcCardId: normalizedCardId,
+    }).select("_id email role nfcCardId");
+
+    if (existingCardOwner && String(existingCardOwner._id) !== String(userId || "")) {
+      return res.status(409).json({
+        success: false,
+        message: `Card ${normalizedCardId} is already assigned to ${existingCardOwner.email}.`,
+      });
+    }
+
+    const user = userId
+      ? await User.findById(userId)
+      : await User.findOne({ email: normalizedEmail, role: "visitor" });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor account not found.",
+      });
+    }
+
+    const previousCardId = user.nfcCardId || "";
+    user.nfcCardId = normalizedCardId;
+    user.role = "visitor";
+    user.status = "active";
+    user.isActive = true;
+    user.accessPermissions = {
+      canAccess: user.accessPermissions?.canAccess || [],
+      restrictedAreas: user.accessPermissions?.restrictedAreas || [],
+      timeRestrictions: user.accessPermissions?.timeRestrictions || [],
+      cardActive: true,
+    };
+    await user.save();
+
+    await AccessLog.create({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      userName: `${req.user.firstName} ${req.user.lastName}`,
+      location: "Admin Panel",
+      accessType: "system",
+      status: "granted",
+      nfcCardId: normalizedCardId,
+      relatedUser: user._id,
+      metadata: {
+        previousCardId,
+        assignedCardId: normalizedCardId,
+      },
+      notes: `Assigned NFC card ${normalizedCardId} to ${user.email}`,
+    });
+
+    res.json({
+      success: true,
+      message: "NFC card assigned successfully",
+      card: {
+        id: user._id,
+        cardNumber: user.nfcCardId,
+        previousCardNumber: previousCardId,
+        userName: `${user.firstName} ${user.lastName}`.trim(),
+        status: "active",
+        issuedDate: new Date(),
+        userId: user._id,
+      },
+    });
+  } catch (error) {
+    console.error("Assign NFC card error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign NFC card",
+    });
+  }
+});
+
 // Revoke NFC card
 app.put("/api/admin/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
   try {
@@ -7191,6 +7541,11 @@ app.put("/api/admin/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
 
     const oldCardId = user.nfcCardId;
     user.nfcCardId = null;
+    user.accessPermissions = {
+      canAccess: user.accessPermissions?.canAccess || [],
+      restrictedAreas: user.accessPermissions?.restrictedAreas || [],
+      cardActive: false,
+    };
     await user.save();
 
     // Create access log

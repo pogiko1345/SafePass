@@ -10,6 +10,8 @@ if (Platform.OS === 'web') {
 import * as ImageManipulator from 'expo-image-manipulator';
 
 const DEPLOYED_API_BASE_URL = "https://safepass-052h.onrender.com/api";
+const ANDROID_EMULATOR_API_BASE_URL = "http://10.0.2.2:5000/api";
+const ANDROID_ADB_REVERSE_API_BASE_URL = "http://127.0.0.1:5000/api";
 
 const WEB_FALLBACK_API_BASE_URL = (() => {
   if (
@@ -36,7 +38,15 @@ const API_BASE_URL = (
   DEFAULT_API_BASE_URL
 ).replace(/\/$/, "");
 
-const API_BASE_URL_CANDIDATES = [API_BASE_URL];
+const API_BASE_URL_CANDIDATES = [
+  API_BASE_URL,
+  ...(Platform.OS === "android"
+    ? [ANDROID_EMULATOR_API_BASE_URL, ANDROID_ADB_REVERSE_API_BASE_URL]
+    : []),
+  process.env.EXPO_PUBLIC_API_LAN_BASE_URL,
+]
+  .filter(Boolean)
+  .map((baseUrl) => String(baseUrl).replace(/\/$/, ""));
 
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
@@ -238,6 +248,7 @@ class ApiService {
       if (visitor.status === "checked_in") {
         const response = await this.fetch(`/visitors/${visitorId}/self-checkout`, {
           method: "PUT",
+          body: { source: tapData?.source || "virtual_nfc_card" },
         });
         return { ...response, action: "check_out" };
       }
@@ -252,6 +263,7 @@ class ApiService {
 
       const response = await this.fetch(`/visitors/${visitorId}/self-checkin`, {
         method: "PUT",
+        body: { source: tapData?.source || "virtual_nfc_card" },
       });
       return { ...response, action: "check_in" };
     } catch (error) {
@@ -1365,6 +1377,19 @@ async rejectVisitor(visitorId, reason) {
       return response;
     } catch (error) {
       console.error("Issue NFC card error:", error);
+      throw error;
+    }
+  }
+
+  async assignNfcCard({ userId, email, cardId, nfcCardId, uid } = {}) {
+    try {
+      const response = await this.fetch("/admin/nfc-cards/assign", {
+        method: "POST",
+        body: { userId, email, cardId, nfcCardId, uid },
+      });
+      return response;
+    } catch (error) {
+      console.error("Assign NFC card error:", error);
       throw error;
     }
   }

@@ -10,6 +10,11 @@ module.exports = ({ config }) => {
   const appName = isVisitorBuild
     ? "SafePass Visitor"
     : expoConfig.name || "Sapphire International Aviation Academy";
+  const usesLocalHttpApi = String(
+    process.env.EXPO_PUBLIC_API_BASE_URL ||
+      process.env.EXPO_PUBLIC_API_LAN_BASE_URL ||
+      "",
+  ).startsWith("http://");
 
   return {
     ...config,
@@ -24,6 +29,7 @@ module.exports = ({ config }) => {
     },
     android: {
       ...(expoConfig.android || {}),
+      ...(usesLocalHttpApi ? { usesCleartextTraffic: true } : {}),
       package: isVisitorBuild
         ? "com.anonymous.SafePassMobile.visitor"
         : "com.anonymous.SafePassMobile",
