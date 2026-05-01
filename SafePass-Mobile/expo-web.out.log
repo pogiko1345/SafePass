@@ -62,3 +62,28 @@ Logs for your project will appear below.
 [1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
 [1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
 [1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
+[1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
+[1m[31mERROR[39m[22m in [1m./screens/AdminDashboardScreen.jsx:43:1[39m[22m
+Syntax error: Unexpected token
+
+[0m [90m 41 |[39m
+ [90m 42 |[39m [36mconst[39m { width[33m,[39m height } [33m=[39m [33mDimensions[39m[33m.[39m[36mget[39m([32m"window"[39m)[33m;[39m
+[31m[1m>[22m[39m[90m 43 |[39m [33m<<[39m[33m<<[39m[33m<<[39m[33m<[39m [33mHEAD[39m
+ [90m    |[39m  [31m[1m^[22m[39m
+ [90m 44 |[39m [36mconst[39m [33mADMIN_BLUE[39m [33m=[39m [32m"#1C6DD0"[39m[33m;[39m
+ [90m 45 |[39m [36mconst[39m [33mADMIN_BLUE_DARK[39m [33m=[39m [32m"#0A3D91"[39m[33m;[39m
+ [90m 46 |[39m [33m===[39m[33m===[39m[33m=[39m[0m
+
+[1mweb[39m[22m compiled with [1m[31m1 error[39m[22m
+[1m[31mERROR[39m[22m in [1m./screens/AdminDashboardScreen.jsx:43:1[39m[22m
+Syntax error: Unexpected token
+
+[0m [90m 41 |[39m
+ [90m 42 |[39m [36mconst[39m { width[33m,[39m height } [33m=[39m [33mDimensions[39m[33m.[39m[36mget[39m([32m"window"[39m)[33m;[39m
+[31m[1m>[22m[39m[90m 43 |[39m [33m<<[39m[33m<<[39m[33m<<[39m[33m<[39m [33mHEAD[39m
+ [90m    |[39m  [31m[1m^[22m[39m
+ [90m 44 |[39m [36mconst[39m [33mADMIN_BLUE[39m [33m=[39m [32m"#1C6DD0"[39m[33m;[39m
+ [90m 45 |[39m [36mconst[39m [33mADMIN_BLUE_DARK[39m [33m=[39m [32m"#0A3D91"[39m[33m;[39m
+ [90m 46 |[39m [33m===[39m[33m===[39m[33m=[39m[0m
+
+[1mweb[39m[22m compiled with [1m[31m1 error[39m[22m
