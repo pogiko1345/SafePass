@@ -1238,13 +1238,8 @@ export default StyleSheet.create({
   // ============================================
 
   header: {
-<<<<<<< HEAD
     backgroundColor: "#0A3D91",
     paddingHorizontal: 28,
-=======
-    backgroundColor: "rgba(255,255,255,0.94)",
-    paddingHorizontal: 24,
->>>>>>> 1900747baa350e6bde5fb7eb1082e647f59aebd4
     paddingTop: Platform.select({ ios: 50, android: 20, web: 20 }),
     paddingBottom: 18,
     borderBottomLeftRadius: 16,

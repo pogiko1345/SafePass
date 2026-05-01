@@ -87,3 +87,64 @@ Syntax error: Unexpected token
  [90m 46 |[39m [33m===[39m[33m===[39m[33m=[39m[0m
 
 [1mweb[39m[22m compiled with [1m[31m1 error[39m[22m
+[1m[31mERROR[39m[22m in [1m./screens/AdminDashboardScreen.jsx:4986:1[39m[22m
+Syntax error: Unexpected token
+
+[0m [90m 4984 |[39m             hoverScale[33m=[39m{[35m1.07[39m}
+ [90m 4985 |[39m           [33m>[39m
+[31m[1m>[22m[39m[90m 4986 |[39m [33m<<[39m[33m<<[39m[33m<<[39m[33m<[39m [33mHEAD[39m
+ [90m      |[39m  [31m[1m^[22m[39m
+ [90m 4987 |[39m             [33m<[39m[33mIonicons[39m name[33m=[39m[32m"time-outline"[39m size[33m=[39m{[35m16[39m} color[33m=[39m{[33mADMIN_BLUE[39m} [33m/[39m[33m>[39m
+ [90m 4988 |[39m             [33m<[39m[33mText[39m style[33m=[39m{[styles[33m.[39mdashboardHeroBadgeText[33m,[39m isDarkMode [33m&&[39m styles[33m.[39mdarkTextSecondary]}[33m>[39m
+ [90m 4989 |[39m [33m===[39m[33m===[39m[33m=[39m[0m
+
+[1mweb[39m[22m compiled with [1m[31m1 error[39m[22m
+[1m[31mERROR[39m[22m in [1m./screens/AdminDashboardScreen.jsx:7005:1[39m[22m
+Syntax error: Unexpected token
+
+[0m [90m 7003 |[39m             })}
+ [90m 7004 |[39m           [33m<[39m[33m/[39m[33mView[39m[33m>[39m
+[31m[1m>[22m[39m[90m 7005 |[39m [33m<<[39m[33m<<[39m[33m<<[39m[33m<[39m [33mHEAD[39m
+ [90m      |[39m  [31m[1m^[22m[39m
+ [90m 7006 |[39m
+ [90m 7007 |[39m           {renderRecordsSearchPanel({
+ [90m 7008 |[39m             title[33m:[39m [32m"Search Appointment Records"[39m[33m,[39m[0m
+
+[1mweb[39m[22m compiled with [1m[31m1 error[39m[22m
+[1m[31mERROR[39m[22m in [1m./screens/AdminDashboardScreen.jsx:7373:1[39m[22m
+Syntax error: Unexpected token
+
+[0m [90m 7371 |[39m             [33m<[39m[33mView[39m style[33m=[39m{styles[33m.[39madminSectionShellActions}[33m>[39m
+ [90m 7372 |[39m               [33m<[39m[33mTouchableOpacity[39m style[33m=[39m{styles[33m.[39mpageRefreshButton} onPress[33m=[39m{loadVisitorHistory}[33m>[39m
+[31m[1m>[22m[39m[90m 7373 |[39m [33m<<[39m[33m<<[39m[33m<<[39m[33m<[39m [33mHEAD[39m
+ [90m      |[39m  [31m[1m^[22m[39m
+ [90m 7374 |[39m                 [33m<[39m[33mIonicons[39m name[33m=[39m[32m"refresh-outline"[39m size[33m=[39m{[35m22[39m} color[33m=[39m{[33mADMIN_BLUE[39m} [33m/[39m[33m>[39m
+ [90m 7375 |[39m               [33m<[39m[33m/[39m[33mTouchableOpacity[39m[33m>[39m
+ [90m 7376 |[39m               {renderRecordListPrintButton({[0m
+
+[1mweb[39m[22m compiled with [1m[31m1 error[39m[22m
+[1m[31mERROR[39m[22m in [1m./screens/AdminDashboardScreen.jsx:8559:1[39m[22m
+Syntax error: Unexpected token
+
+[0m [90m 8557 |[39m   }[33m;[39m
+ [90m 8558 |[39m
+[31m[1m>[22m[39m[90m 8559 |[39m [33m<<[39m[33m<<[39m[33m<<[39m[33m<[39m [33mHEAD[39m
+ [90m      |[39m  [31m[1m^[22m[39m
+ [90m 8560 |[39m   [36mconst[39m getHeaderPrintAction [33m=[39m () [33m=>[39m {
+ [90m 8561 |[39m     [36mswitch[39m (selectedSubmodule) {
+ [90m 8562 |[39m       [36mcase[39m [32m"account-records"[39m[33m:[39m[0m
+
+[1mweb[39m[22m compiled with [1m[31m1 error[39m[22m
+[1m[31mERROR[39m[22m in [1m./styles/AdminDashboardStyles.js:1241:1[39m[22m
+Syntax error: Unexpected token (1241:0)
+
+[0m [90m 1239 |[39m
+ [90m 1240 |[39m   header[33m:[39m {
+[31m[1m>[22m[39m[90m 1241 |[39m [33m<<[39m[33m<<[39m[33m<<[39m[33m<[39m [33mHEAD[39m
+ [90m      |[39m [31m[1m^[22m[39m
+ [90m 1242 |[39m     backgroundColor[33m:[39m [32m"#0A3D91"[39m[33m,[39m
+ [90m 1243 |[39m     paddingHorizontal[33m:[39m [35m28[39m[33m,[39m
+ [90m 1244 |[39m [33m===[39m[33m===[39m[33m=[39m[0m
+
+[1mweb[39m[22m compiled with [1m[31m1 error[39m[22m
+[1mweb[39m[22m compiled [1m[32msuccessfully[39m[22m
