@@ -10,8 +10,6 @@ if (Platform.OS === 'web') {
 import * as ImageManipulator from 'expo-image-manipulator';
 
 const DEPLOYED_API_BASE_URL = "https://safepass-052h.onrender.com/api";
-const ANDROID_EMULATOR_API_BASE_URL = "http://10.0.2.2:5000/api";
-const ANDROID_ADB_REVERSE_API_BASE_URL = "http://127.0.0.1:5000/api";
 
 const WEB_FALLBACK_API_BASE_URL = (() => {
   if (
@@ -40,9 +38,6 @@ const API_BASE_URL = (
 
 const API_BASE_URL_CANDIDATES = [
   API_BASE_URL,
-  ...(Platform.OS === "android"
-    ? [ANDROID_EMULATOR_API_BASE_URL, ANDROID_ADB_REVERSE_API_BASE_URL]
-    : []),
   process.env.EXPO_PUBLIC_API_LAN_BASE_URL,
 ]
   .filter(Boolean)
@@ -344,7 +339,7 @@ async fetch(url, options = {}) {
     console.error(`❌ FETCH ERROR for ${url}:`, error);
     if (error.message.includes("Network request failed")) {
       throw new Error(
-        "Cannot connect to backend. Make sure server is running on port 5000."
+        "Cannot connect to the SafePass server. Please check your internet connection and try again."
       );
     }
     throw error;
@@ -1821,7 +1816,7 @@ ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, option
 
   if (String(lastError?.message || "").includes("Network request failed")) {
     throw new Error(
-      "Cannot connect to backend. Make sure server is running on port 5000. On a real Android device, run adb reverse for ports 8081 and 5000."
+      "Cannot connect to the SafePass server. Please check your internet connection and try again."
     );
   }
 

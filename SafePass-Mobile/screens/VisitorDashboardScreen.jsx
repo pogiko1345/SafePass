@@ -163,6 +163,7 @@ const getStoredVisitorIdType = (visitorRecord = {}) => {
 const PHONE_TRACKING_INTERVAL_MS = 15000;
 const PHONE_TRACKING_DISTANCE_METERS = 8;
 const VISITOR_PENDING_REFRESH_INTERVAL_MS = 30000;
+const VISITOR_LIVE_REFRESH_INTERVAL_MS = 10000;
 const VISITOR_CONNECTIVITY_REMINDER_KEY = "visitorConnectivityReminderShown";
 const VISITOR_SELECTED_SECTION_KEY = "visitorDashboardSelectedSection";
 const VISITOR_APPOINTMENT_SCREEN_KEY = "visitorDashboardAppointmentScreen";
@@ -335,6 +336,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const isVisitorHomeSection = selectedVisitorSection === "home";
   const nfcListenerRef = useRef(null);
   const nfcTapProcessingRef = useRef(false);
+  const lastVisitorStatusRef = useRef(null);
+  const hasLoadedVisitorRef = useRef(false);
+  const visitorProfileSignatureRef = useRef("");
+  const currentUserSignatureRef = useRef("");
   const dashboardScrollRef = useRef(null);
   const phoneLocationSubscriptionRef = useRef(null);
   const appointmentTransitionTimeoutRef = useRef(null);
@@ -719,6 +724,32 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return () => clearInterval(refreshTimer);
   }, [visitor?._id, visitor?.status, visitor?.approvalStatus, visitor?.appointmentStatus]);
 
+  useEffect(() => {
+    const status = String(visitor?.status || "").toLowerCase();
+    const approvalStatus = String(visitor?.approvalStatus || "").toLowerCase();
+    const appointmentStatus = String(visitor?.appointmentStatus || "").toLowerCase();
+    const isApprovedForLiveRefresh =
+      visitor?._id &&
+      (status === "approved" ||
+        status === "checked_in" ||
+        approvalStatus === "approved" ||
+        appointmentStatus === "approved" ||
+        appointmentStatus === "adjusted") &&
+      status !== "checked_out" &&
+      status !== "completed" &&
+      appointmentStatus !== "completed";
+
+    if (!isApprovedForLiveRefresh) {
+      return undefined;
+    }
+
+    const refreshTimer = setInterval(() => {
+      loadVisitorData({ silent: true });
+    }, VISITOR_LIVE_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(refreshTimer);
+  }, [visitor?._id, visitor?.status, visitor?.approvalStatus, visitor?.appointmentStatus]);
+
   useEffect(() => () => {
     if (appointmentTransitionTimeoutRef.current) {
       clearTimeout(appointmentTransitionTimeoutRef.current);
@@ -979,7 +1010,61 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
   };
 
-  const loadVisitorData = async ({ silent = false } = {}) => {
+  const buildVisitorProfileSignature = (profileResponse = {}, accountSafePassId = "") => {
+    const visitorRecord = profileResponse?.visitor || null;
+    const accountRecord = profileResponse?.account || null;
+    const currentLocation = visitorRecord?.currentLocation || {};
+    const coordinates = currentLocation?.coordinates || {};
+    const appointments = Array.isArray(profileResponse?.appointments)
+      ? profileResponse.appointments
+      : [];
+
+    return JSON.stringify({
+      account: accountRecord
+        ? {
+            id: accountRecord._id,
+            email: accountRecord.email,
+            nfcCardId: accountRecord.nfcCardId,
+            status: accountRecord.status,
+            updatedAt: accountRecord.updatedAt,
+          }
+        : null,
+      visitor: visitorRecord
+        ? {
+            id: visitorRecord._id,
+            status: visitorRecord.status,
+            approvalStatus: visitorRecord.approvalStatus,
+            appointmentStatus: visitorRecord.appointmentStatus,
+            nfcCardId: accountSafePassId || visitorRecord.nfcCardId,
+            checkedInAt: visitorRecord.checkedInAt,
+            checkedOutAt: visitorRecord.checkedOutAt,
+            updatedAt: visitorRecord.updatedAt,
+            currentLocation: {
+              floor: currentLocation.floor,
+              office: currentLocation.office,
+              checkpointId: currentLocation.checkpointId,
+              isActive: currentLocation.isActive,
+              lastSeenAt: currentLocation.lastSeenAt,
+              x: coordinates.x,
+              y: coordinates.y,
+            },
+          }
+        : null,
+      appointments: appointments.map((appointment) => ({
+        id: appointment?._id,
+        status: appointment?.status,
+        approvalStatus: appointment?.approvalStatus,
+        appointmentStatus: appointment?.appointmentStatus,
+        visitDate: appointment?.visitDate,
+        visitTime: appointment?.visitTime,
+        checkedInAt: appointment?.checkedInAt,
+        checkedOutAt: appointment?.checkedOutAt,
+        updatedAt: appointment?.updatedAt,
+      })),
+    });
+  };
+
+  const loadVisitorData = async ({ silent = false, force = false } = {}) => {
     if (!silent) {
       setIsLoading(true);
     }
@@ -989,9 +1074,36 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         navigation.replace("Login");
         return;
       }
-      setCurrentUser(currentUser);
+      const currentUserSignature = JSON.stringify({
+        id: currentUser?._id,
+        email: currentUser?.email,
+        role: currentUser?.role,
+        status: currentUser?.status,
+        nfcCardId: currentUser?.nfcCardId,
+        updatedAt: currentUser?.updatedAt,
+      });
+
+      if (force || !silent || currentUserSignatureRef.current !== currentUserSignature) {
+        currentUserSignatureRef.current = currentUserSignature;
+        setCurrentUser(currentUser);
+      }
 
       const profileResponse = await ApiService.getVisitorProfile();
+      const accountSafePassId =
+        profileResponse?.account?.nfcCardId ||
+        currentUser?.nfcCardId ||
+        profileResponse?.visitor?.nfcCardId ||
+        "";
+      const nextProfileSignature = buildVisitorProfileSignature(profileResponse, accountSafePassId);
+      const profileChanged = visitorProfileSignatureRef.current !== nextProfileSignature;
+
+      if (!force && silent && !profileChanged) {
+        await maybeShowVisitorWarning(currentUser);
+        return;
+      }
+
+      visitorProfileSignatureRef.current = nextProfileSignature;
+
       if (profileResponse?.account) {
         setCurrentUser((previousUser) => ({
           ...(previousUser || currentUser || {}),
@@ -1003,19 +1115,41 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         }));
       }
       if (profileResponse.success && profileResponse.visitor) {
-        const accountSafePassId =
-          profileResponse?.account?.nfcCardId ||
-          currentUser?.nfcCardId ||
-          profileResponse.visitor?.nfcCardId ||
-          "";
-        setVisitor({
+        const nextVisitor = {
           ...profileResponse.visitor,
           nfcCardId: accountSafePassId || profileResponse.visitor?.nfcCardId,
-        });
+        };
+        const previousStatus = lastVisitorStatusRef.current;
+        const nextStatus = String(nextVisitor.status || "").toLowerCase();
+
+        setVisitor(nextVisitor);
         setAppointmentHistory(Array.isArray(profileResponse.appointments) ? profileResponse.appointments : []);
+
+        if (hasLoadedVisitorRef.current && previousStatus && previousStatus !== nextStatus) {
+          if (nextStatus === "checked_in") {
+            setSelectedVisitorSection("home");
+            showVisitorPushNotice({
+              title: "Checked In",
+              message: "Your NFC card tap was approved. Your visitor pass is now active.",
+              type: "success",
+            });
+          } else if (nextStatus === "checked_out") {
+            setSelectedVisitorSection("home");
+            showVisitorPushNotice({
+              title: "Checked Out",
+              message: "Your NFC card tap closed this visit.",
+              type: "success",
+            });
+          }
+        }
+
+        lastVisitorStatusRef.current = nextStatus;
+        hasLoadedVisitorRef.current = true;
       } else {
         setVisitor(null);
         setAppointmentHistory(Array.isArray(profileResponse.appointments) ? profileResponse.appointments : []);
+        lastVisitorStatusRef.current = null;
+        hasLoadedVisitorRef.current = true;
       }
 
       await maybeShowVisitorWarning(currentUser);

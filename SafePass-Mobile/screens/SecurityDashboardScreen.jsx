@@ -18,6 +18,7 @@ import {
   Dimensions,
   LayoutAnimation,
   UIManager,
+  AppState,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
@@ -45,6 +46,8 @@ import {
 const { width, height } = Dimensions.get("window");
 const isDesktop = width >= 1024;
 const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
+const SECURITY_LIVE_REFRESH_INTERVAL_MS = 10000;
+const SECURITY_NOTIFICATION_REFRESH_INTERVAL_MS = 30000;
 
 export default function SecurityDashboardScreen({ navigation }) {
   // ============ STATE MANAGEMENT ============
@@ -62,6 +65,9 @@ export default function SecurityDashboardScreen({ navigation }) {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const sidebarAnim = useRef(new Animated.Value(isDesktop ? 1 : 0)).current;
   const liveMapRefreshRef = useRef(false);
+  const securityLiveRefreshRef = useRef(false);
+  const operationalDataSignatureRef = useRef("");
+  const notificationDataSignatureRef = useRef("");
   
   // Dashboard Data
   const [dashboardStats, setDashboardStats] = useState({
@@ -251,11 +257,30 @@ export default function SecurityDashboardScreen({ navigation }) {
     initializeScreen();
     requestPermissions();
     
-    const interval = setInterval(() => {
-      refreshData();
-    }, 30000);
+    const liveRefreshInterval = setInterval(() => {
+      refreshSecurityLiveData();
+    }, SECURITY_LIVE_REFRESH_INTERVAL_MS);
+    const notificationRefreshInterval = setInterval(() => {
+      loadNotifications();
+    }, SECURITY_NOTIFICATION_REFRESH_INTERVAL_MS);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(liveRefreshInterval);
+      clearInterval(notificationRefreshInterval);
+    };
+  }, []);
+
+  useEffect(() => {
+    const appStateSubscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        refreshSecurityLiveData();
+        loadNotifications();
+      }
+    });
+
+    return () => {
+      appStateSubscription?.remove?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -272,8 +297,8 @@ export default function SecurityDashboardScreen({ navigation }) {
       }
 
       await Promise.all([
-        loadOperationalData(),
-        loadNotifications(currentUser),
+        loadOperationalData({ force: true }),
+        loadNotifications(currentUser, { force: true }),
       ]);
 
       Animated.parallel([
@@ -624,6 +649,46 @@ export default function SecurityDashboardScreen({ navigation }) {
       )
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+  const buildOperationalDataSignature = (all = []) =>
+    all
+      .map((visitor) => {
+        const currentLocation = visitor?.currentLocation || {};
+        const coordinates = currentLocation?.coordinates || {};
+        return [
+          visitor?._id,
+          visitor?.status,
+          visitor?.approvalStatus,
+          visitor?.appointmentStatus,
+          visitor?.checkedInAt,
+          visitor?.checkedOutAt,
+          visitor?.updatedAt,
+          currentLocation?.checkpointId,
+          currentLocation?.office,
+          currentLocation?.floor,
+          currentLocation?.isActive,
+          currentLocation?.lastSeenAt,
+          coordinates?.x,
+          coordinates?.y,
+        ].map((value) => value ?? "").join(":");
+      })
+      .sort()
+      .join("|");
+
+  const buildNotificationDataSignature = (items = []) =>
+    items
+      .map((notification) =>
+        [
+          notification?._id,
+          notification?.read,
+          notification?.updatedAt,
+          notification?.createdAt,
+          notification?.severity,
+          notification?.type,
+        ].map((value) => value ?? "").join(":"),
+      )
+      .sort()
+      .join("|");
+
   // ============ DATA LOADING FUNCTIONS ============
   const loadUserData = async () => {
     try {
@@ -653,10 +718,17 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
   };
 
-  const loadOperationalData = async () => {
+  const loadOperationalData = async ({ force = false } = {}) => {
     try {
       const allVisitorsRes = await ApiService.getVisitors({});
       const allVisitors = allVisitorsRes.visitors || [];
+      const nextSignature = buildOperationalDataSignature(allVisitors);
+
+      if (!force && operationalDataSignatureRef.current === nextSignature) {
+        return false;
+      }
+
+      operationalDataSignatureRef.current = nextSignature;
       const collections = deriveVisitorCollections(allVisitors);
       const stats = deriveVisitorStats(
         collections.all,
@@ -683,8 +755,10 @@ export default function SecurityDashboardScreen({ navigation }) {
         recentAccess: derivedLogs.length,
         occupancyRate: 0,
       }));
+      return true;
     } catch (error) {
       console.error("Load operational data error:", error);
+      return false;
     }
   };
 
@@ -692,14 +766,14 @@ export default function SecurityDashboardScreen({ navigation }) {
   const loadVisitors = loadOperationalData;
 
   const loadAccessLogs = async () => {
-    await loadOperationalData();
+    await loadOperationalData({ force: true });
   };
 
   const loadReports = async () => {
-    await loadOperationalData();
+    await loadOperationalData({ force: true });
   };
 
-  const loadNotifications = async (currentUser = user) => {
+  const loadNotifications = async (currentUser = user, { force = false } = {}) => {
     try {
       const response = await ApiService.getNotifications({ limit: 100 });
       const normalizedNotifications = normalizeNotifications(
@@ -717,6 +791,13 @@ export default function SecurityDashboardScreen({ navigation }) {
         );
       const unreadNotifications = normalizedNotifications.filter((notification) => !notification.read);
       const alertNotifications = unreadNotifications.filter(isActiveAlertNotification);
+      const nextSignature = buildNotificationDataSignature(normalizedNotifications);
+
+      if (!force && notificationDataSignatureRef.current === nextSignature) {
+        return false;
+      }
+
+      notificationDataSignatureRef.current = nextSignature;
       const normalizedUnreadCount = Number.isFinite(Number(response?.unreadCount))
         ? Number(response.unreadCount)
         : unreadNotifications.length;
@@ -728,17 +809,19 @@ export default function SecurityDashboardScreen({ navigation }) {
         ...current,
         activeAlerts: alertNotifications.length,
       }));
+      return true;
     } catch (error) {
       console.error("Load notifications error:", error);
+      return false;
     }
   };
 
   const loadAnalytics = async () => {
-    await loadOperationalData();
+    await loadOperationalData({ force: true });
   };
 
   const loadVisitorLocations = async () => {
-    await loadOperationalData();
+    await loadOperationalData({ force: true });
   };
 
   const getRandomFloor = () => {
@@ -902,11 +985,21 @@ export default function SecurityDashboardScreen({ navigation }) {
     setRefreshing(true);
     try {
       await Promise.all([
-        loadOperationalData(),
-        loadNotifications(),
+        loadOperationalData({ force: true }),
+        loadNotifications(user, { force: true }),
       ]);
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const refreshSecurityLiveData = async () => {
+    if (securityLiveRefreshRef.current) return;
+    securityLiveRefreshRef.current = true;
+    try {
+      await loadOperationalData();
+    } finally {
+      securityLiveRefreshRef.current = false;
     }
   };
 
@@ -929,6 +1022,18 @@ export default function SecurityDashboardScreen({ navigation }) {
 
     return () => clearInterval(interval);
   }, [activeTab, showMapModal]);
+
+  useEffect(() => {
+    if (!selectedVisitor?._id) return;
+
+    const updatedVisitor = visitors.all.find(
+      (visitor) => String(visitor?._id) === String(selectedVisitor._id),
+    );
+
+    if (updatedVisitor && updatedVisitor !== selectedVisitor) {
+      setSelectedVisitor(updatedVisitor);
+    }
+  }, [visitors.all, selectedVisitor?._id]);
 
   const formatDate = (date) => {
     if (!date) return 'N/A';
