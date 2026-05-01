@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, View, Text, ActivityIndicator, Platform } from "react-native";
 import { CommonActions, NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import * as LocalAuthentication from "expo-local-authentication";
 
 // ============ ONLY VISITOR, SECURITY, ADMIN SCREENS ============
 import LoginScreen from "./screens/LoginScreen";
@@ -82,6 +83,29 @@ const WEB_ROUTE_TITLES = {
 };
 
 let logoutCallback = null;
+
+const requireBiometricSessionUnlock = async () => {
+  if (Platform.OS === "web") {
+    return true;
+  }
+
+  const [hasHardware, enrolled] = await Promise.all([
+    LocalAuthentication.hasHardwareAsync(),
+    LocalAuthentication.isEnrolledAsync(),
+  ]);
+
+  if (!hasHardware || !enrolled) {
+    return false;
+  }
+
+  const result = await LocalAuthentication.authenticateAsync({
+    promptMessage: "Unlock SafePass",
+    fallbackLabel: "Use passcode",
+    cancelLabel: "Cancel",
+  });
+
+  return Boolean(result.success);
+};
 
 export default function App() {
   const navigationRef = useNavigationContainerRef();
@@ -228,6 +252,14 @@ export default function App() {
         const rememberedSessionActive = await ApiService.isRememberedSessionActive();
         if (!rememberedSessionActive) {
           console.log("Remembered login expired. Asking user to sign in again.");
+          await ApiService.clearAuth();
+          setCurrentUser(null);
+          return;
+        }
+
+        const biometricUnlocked = await requireBiometricSessionUnlock();
+        if (!biometricUnlocked) {
+          console.log("Remembered session requires biometric unlock.");
           await ApiService.clearAuth();
           setCurrentUser(null);
           return;
