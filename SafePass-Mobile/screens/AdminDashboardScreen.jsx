@@ -38,6 +38,8 @@ import {
 import styles from "../styles/AdminDashboardStyles";
 
 const { width, height } = Dimensions.get("window");
+const ADMIN_BLUE = "#1C6DD0";
+const ADMIN_BLUE_DARK = "#0A3D91";
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
   : require("@react-native-async-storage/async-storage").default;
@@ -1281,7 +1283,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         eyebrow: "Team Administration",
         description: "Review staff accounts, keep assignments organized, and manage who can respond to visitor appointments.",
         icon: "briefcase-outline",
-        accent: "#10B981",
+        accent: ADMIN_BLUE,
         primaryActionLabel: "Create Staff",
         searchPlaceholder: "Search staff by name, email, phone, or department...",
         stats: [
@@ -1304,7 +1306,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         eyebrow: "Operations Access",
         description: "Manage guards and security personnel who verify arrivals, monitor visits, and handle gate operations.",
         icon: "shield-checkmark-outline",
-        accent: "#1C6DD0",
+        accent: ADMIN_BLUE,
         primaryActionLabel: "Create Security",
         searchPlaceholder: "Search security personnel by name, email, or phone...",
         stats: [
@@ -1326,7 +1328,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       eyebrow: "Account Control Center",
       description: "Monitor every account in one place, move between roles quickly, and keep only the right users active in the system.",
       icon: "people-circle-outline",
-      accent: "#1C6DD0",
+      accent: ADMIN_BLUE,
       primaryActionLabel: null,
       searchPlaceholder: "Search all users by name, email, phone, or department...",
       stats: [
@@ -1620,8 +1622,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Creation of Account",
           subtitle: "Create staff, security, and admin accounts from a cleaner modular control center.",
           highlights: [
-            { label: "Staff", value: staffUsers.length, icon: "briefcase-outline", color: "#10B981" },
-            { label: "Security", value: guardUsers.length, icon: "shield-checkmark-outline", color: "#1C6DD0" },
+            { label: "Staff", value: staffUsers.length, icon: "briefcase-outline", color: ADMIN_BLUE },
+            { label: "Security", value: guardUsers.length, icon: "shield-checkmark-outline", color: ADMIN_BLUE },
           ],
         };
       case "account-records":
@@ -1629,8 +1631,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Account Records",
           subtitle: "Browse accounts by role, review status, and keep your directory organized from one workspace.",
           highlights: [
-            { label: "Mode", value: accountRecordsMode === "all" ? "All Users" : formatRoleLabel(accountRecordsMode), icon: "funnel-outline", color: "#0A3D91" },
-            { label: "Visible", value: totalFilteredUsers, icon: "people-outline", color: "#10B981" },
+            { label: "Mode", value: accountRecordsMode === "all" ? "All Users" : formatRoleLabel(accountRecordsMode), icon: "funnel-outline", color: ADMIN_BLUE },
+            { label: "Visible", value: totalFilteredUsers, icon: "people-outline", color: ADMIN_BLUE },
           ],
         };
       case "data-management":
@@ -1638,8 +1640,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "User Data Management",
           subtitle: "Select an account, review its details, and edit the user data that drives role-based access.",
           highlights: [
-            { label: "Users", value: allUsers.length, icon: "people-outline", color: "#1C6DD0" },
-            { label: "Active", value: allUsers.filter((userItem) => isUserActive(userItem)).length, icon: "checkmark-circle-outline", color: "#10B981" },
+            { label: "Users", value: allUsers.length, icon: "people-outline", color: ADMIN_BLUE },
+            { label: "Active", value: allUsers.filter((userItem) => isUserActive(userItem)).length, icon: "checkmark-circle-outline", color: ADMIN_BLUE },
           ],
         };
       case "map-ground":
@@ -1650,8 +1652,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: ADMIN_MODULE_FLOORS.find((floor) => floor.id === selectedMapModuleFloor)?.name || "Floor Map",
           subtitle: "Review the active map layer for this floor and manage the room registry directly beside it.",
           highlights: [
-            { label: "Rooms", value: selectedFloorRooms.length, icon: "business-outline", color: "#10B981" },
-            { label: "Active", value: stats.activeVisitors || stats.checkedInVisitors || 0, icon: "locate-outline", color: "#0A3D91" },
+            { label: "Rooms", value: selectedFloorRooms.length, icon: "business-outline", color: ADMIN_BLUE },
+            { label: "Active", value: stats.activeVisitors || stats.checkedInVisitors || 0, icon: "locate-outline", color: ADMIN_BLUE },
           ],
         };
       case "appointment-records":
@@ -1659,8 +1661,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Appointment Records",
           subtitle: "See approved appointment history and completed staff-linked visitor visits.",
           highlights: [
-            { label: "Records", value: appointmentRecords.length, icon: "calendar-outline", color: "#EC4899" },
-            { label: "Approved", value: appointmentRecords.length, icon: "checkmark-circle-outline", color: "#10B981" },
+            { label: "Records", value: appointmentRecords.length, icon: "calendar-outline", color: ADMIN_BLUE },
+            { label: "Approved", value: appointmentRecords.length, icon: "checkmark-circle-outline", color: ADMIN_BLUE },
           ],
         };
       case "appointment-management":
@@ -1668,8 +1670,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Appointment Management",
           subtitle: "Review approval-ready appointments and move the queue forward without leaving the dashboard.",
           highlights: [
-            { label: "Pending", value: pendingAppointmentRequests.length, icon: "time-outline", color: "#F59E0B" },
-            { label: "Approved", value: approvedRequests.length, icon: "checkmark-circle-outline", color: "#10B981" },
+            { label: "Pending", value: pendingAppointmentRequests.length, icon: "time-outline", color: ADMIN_BLUE },
+            { label: "Approved", value: approvedRequests.length, icon: "checkmark-circle-outline", color: ADMIN_BLUE },
           ],
         };
       case "report-records":
@@ -1677,8 +1679,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Report Records",
           subtitle: "Review generated report-ready activity summaries, visitor history, and approval outcomes.",
           highlights: [
-            { label: "History", value: visitorHistory.length, icon: "document-text-outline", color: "#0A3D91" },
-            { label: "Completed", value: stats.completedVisits, icon: "checkmark-done-outline", color: "#10B981" },
+            { label: "History", value: visitorHistory.length, icon: "document-text-outline", color: ADMIN_BLUE },
+            { label: "Completed", value: stats.completedVisits, icon: "checkmark-done-outline", color: ADMIN_BLUE },
           ],
         };
       case "security-report-records":
@@ -1686,8 +1688,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Security Reports",
           subtitle: "Review visitor incident reports submitted by security and guard accounts.",
           highlights: [
-            { label: "Reports", value: securityReportRecords.length, icon: "shield-alert-outline", color: "#DC2626" },
-            { label: "Unresolved", value: securityReportRecords.filter((item) => !item.resolved).length, icon: "alert-circle-outline", color: "#F59E0B" },
+            { label: "Reports", value: securityReportRecords.length, icon: "shield-alert-outline", color: ADMIN_BLUE },
+            { label: "Unresolved", value: securityReportRecords.filter((item) => !item.resolved).length, icon: "alert-circle-outline", color: ADMIN_BLUE },
           ],
         };
       case "settings":
@@ -1695,8 +1697,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Settings",
           subtitle: "Control dashboard preferences and communication settings for the admin experience.",
           highlights: [
-            { label: "Dark Mode", value: settings.darkMode ? "On" : "Off", icon: "moon-outline", color: "#6B7280" },
-            { label: "Email", value: settings.emailNotifications ? "On" : "Off", icon: "mail-outline", color: "#0A3D91" },
+            { label: "Dark Mode", value: settings.darkMode ? "On" : "Off", icon: "moon-outline", color: ADMIN_BLUE },
+            { label: "Email", value: settings.emailNotifications ? "On" : "Off", icon: "mail-outline", color: ADMIN_BLUE },
           ],
         };
       default:
@@ -1704,8 +1706,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           title: "Dashboard Overview",
           subtitle: "Review the visitor pipeline, move into the right section quickly, and keep the whole campus flow on track.",
           highlights: [
-            { label: "Pending", value: stats.pendingRequests, icon: "time-outline", color: "#F59E0B" },
-            { label: "Live Map", value: stats.activeVisitors || stats.checkedInVisitors || 0, icon: "map-outline", color: "#10B981" },
+            { label: "Pending", value: stats.pendingRequests, icon: "time-outline", color: ADMIN_BLUE },
+            { label: "Live Map", value: stats.activeVisitors || stats.checkedInVisitors || 0, icon: "map-outline", color: ADMIN_BLUE },
           ],
         };
     }
@@ -1739,7 +1741,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         key: "account-management",
         label: "Account Management",
         icon: "people-circle-outline",
-        color: "#0A3D91",
+        color: ADMIN_BLUE,
         submodules: [
           { key: "account-create", label: "Creation of Account", badge: 3 },
           { key: "account-records", label: "Account Records", badge: allUsers.length },
@@ -1750,7 +1752,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         key: "maps",
         label: "Maps",
         icon: "map-outline",
-        color: "#10B981",
+        color: ADMIN_BLUE,
         submodules: [
           { key: "map-ground", label: "Ground Floor", badge: managedRooms.filter((room) => room.floor === "ground").length },
           { key: "map-mezzanine", label: "Mezzanine", badge: managedRooms.filter((room) => room.floor === "first").length },
@@ -1762,7 +1764,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         key: "appointment",
         label: "Appointment",
         icon: "calendar-outline",
-        color: "#F59E0B",
+        color: ADMIN_BLUE,
         submodules: [
           { key: "appointment-records", label: "Appointment Records", badge: appointmentRecords.length },
           { key: "appointment-management", label: "Appointment Management", badge: pendingAppointmentRequests.length },
@@ -1772,7 +1774,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         key: "reports",
         label: "Reports",
         icon: "document-text-outline",
-        color: "#1C6DD0",
+        color: ADMIN_BLUE,
         submodules: [
           { key: "report-records", label: "Report Records", badge: visitorHistory.length },
           { key: "security-report-records", label: "Security Reports", badge: securityReportRecords.length },
@@ -2649,56 +2651,56 @@ const loadDashboardData = useCallback(async () => {
         return {
           subtitle: "Review visitor requests, approve them quickly, and keep upcoming arrivals organized.",
           highlights: [
-            { label: "Pending", value: stats.pendingRequests, icon: "time-outline", color: "#F59E0B" },
-            { label: "Approved", value: approvedRequests.length, icon: "checkmark-circle-outline", color: "#10B981" },
+            { label: "Pending", value: stats.pendingRequests, icon: "time-outline", color: ADMIN_BLUE },
+            { label: "Approved", value: approvedRequests.length, icon: "checkmark-circle-outline", color: ADMIN_BLUE },
           ],
         };
       case "staff":
         return {
           subtitle: "Manage staff accounts, assignments, and who can respond to incoming appointments.",
           highlights: [
-            { label: "Staff", value: staffUsers.length, icon: "briefcase-outline", color: "#10B981" },
-            { label: "Departments", value: new Set(staffUsers.map((item) => item.department).filter(Boolean)).size, icon: "business-outline", color: "#1C6DD0" },
+            { label: "Staff", value: staffUsers.length, icon: "briefcase-outline", color: ADMIN_BLUE },
+            { label: "Departments", value: new Set(staffUsers.map((item) => item.department).filter(Boolean)).size, icon: "business-outline", color: ADMIN_BLUE },
           ],
         };
       case "security":
         return {
           subtitle: "Keep your gate team ready, track active personnel, and support visitor check-ins in real time.",
           highlights: [
-            { label: "Security", value: guardUsers.length, icon: "shield-outline", color: "#1C6DD0" },
-            { label: "Active", value: guardUsers.filter((item) => isUserActive(item)).length, icon: "pulse-outline", color: "#0A3D91" },
+            { label: "Security", value: guardUsers.length, icon: "shield-outline", color: ADMIN_BLUE },
+            { label: "Active", value: guardUsers.filter((item) => isUserActive(item)).length, icon: "pulse-outline", color: ADMIN_BLUE },
           ],
         };
       case "users":
         return {
           subtitle: "Monitor the full account directory and move between roles without losing control of the admin workflow.",
           highlights: [
-            { label: "Users", value: allUsers.length, icon: "people-outline", color: "#1C6DD0" },
-            { label: "Active", value: activeUsersList.length, icon: "checkmark-done-outline", color: "#10B981" },
+            { label: "Users", value: allUsers.length, icon: "people-outline", color: ADMIN_BLUE },
+            { label: "Active", value: activeUsersList.length, icon: "checkmark-done-outline", color: ADMIN_BLUE },
           ],
         };
       case "analytics":
         return {
           subtitle: "Track daily trends, visitor outcomes, and operational patterns across the system.",
           highlights: [
-            { label: "Today", value: stats.todayVisits, icon: "calendar-outline", color: "#EF4444" },
-            { label: "Tomorrow", value: stats.tomorrowVisits, icon: "calendar-clear-outline", color: "#1C6DD0" },
+            { label: "Today", value: stats.todayVisits, icon: "calendar-outline", color: ADMIN_BLUE },
+            { label: "Tomorrow", value: stats.tomorrowVisits, icon: "calendar-clear-outline", color: ADMIN_BLUE },
           ],
         };
       case "settings":
         return {
           subtitle: "Control dashboard preferences and communication settings for the admin experience.",
           highlights: [
-            { label: "Dark Mode", value: settings.darkMode ? "On" : "Off", icon: "moon-outline", color: "#6B7280" },
-            { label: "Email", value: settings.emailNotifications ? "On" : "Off", icon: "mail-outline", color: "#0A3D91" },
+            { label: "Dark Mode", value: settings.darkMode ? "On" : "Off", icon: "moon-outline", color: ADMIN_BLUE },
+            { label: "Email", value: settings.emailNotifications ? "On" : "Off", icon: "mail-outline", color: ADMIN_BLUE },
           ],
         };
       default:
         return {
           subtitle: "Review the visitor pipeline, move into the right section quickly, and keep the whole campus flow on track.",
           highlights: [
-            { label: "Pending", value: stats.pendingRequests, icon: "time-outline", color: "#F59E0B" },
-            { label: "Live Map", value: monitoredMapVisitors.length, icon: "map-outline", color: "#10B981" },
+            { label: "Pending", value: stats.pendingRequests, icon: "time-outline", color: ADMIN_BLUE },
+            { label: "Live Map", value: monitoredMapVisitors.length, icon: "map-outline", color: ADMIN_BLUE },
           ],
         };
     }
@@ -2723,7 +2725,7 @@ const loadDashboardData = useCallback(async () => {
       title: "Review Requests",
       subtitle: "Approve or reject visitor requests waiting today.",
       icon: "time-outline",
-      color: "#F59E0B",
+      color: ADMIN_BLUE,
       badge: `${stats.pendingRequests || 0} pending`,
       action: "requests",
     },
@@ -2732,7 +2734,7 @@ const loadDashboardData = useCallback(async () => {
       title: "Staff Directory",
       subtitle: "Manage staff responders and appointment owners.",
       icon: "briefcase-outline",
-      color: "#10B981",
+      color: ADMIN_BLUE,
       badge: `${staffUsers.length || 0} staff`,
       action: "staff",
     },
@@ -2741,7 +2743,7 @@ const loadDashboardData = useCallback(async () => {
       title: "Security Team",
       subtitle: "Check the operational team covering arrivals.",
       icon: "shield-checkmark-outline",
-      color: "#1C6DD0",
+      color: ADMIN_BLUE,
       badge: `${guardUsers.length || 0} security`,
       action: "security",
     },
@@ -2750,7 +2752,7 @@ const loadDashboardData = useCallback(async () => {
       title: "All Users",
       subtitle: "Audit account access across every role.",
       icon: "people-circle-outline",
-      color: "#1C6DD0",
+      color: ADMIN_BLUE,
       badge: `${allUsers.length || 0} total`,
       action: "users",
     },
@@ -2759,7 +2761,7 @@ const loadDashboardData = useCallback(async () => {
       title: "Analytics",
       subtitle: "See daily trends and completed visit outcomes.",
       icon: "stats-chart-outline",
-      color: "#EC4899",
+      color: ADMIN_BLUE,
       badge: `${stats.todayVisits || 0} today`,
       action: "analytics",
     },
@@ -2768,7 +2770,7 @@ const loadDashboardData = useCallback(async () => {
       title: "Campus Map",
       subtitle: "Open live monitoring on the campus map view.",
       icon: "map-outline",
-      color: "#1C6DD0",
+      color: ADMIN_BLUE,
       badge: `${monitoredMapVisitors.length || 0} live`,
       action: "webmap",
     },
@@ -2806,9 +2808,9 @@ const loadDashboardData = useCallback(async () => {
   ]), [mapActivities]);
 
   const adminMapSummaryItems = useMemo(() => ([
-    { label: "Tracked", value: visibleAdminMapVisitors.length || 0, color: "#10B981" },
+    { label: "Tracked", value: visibleAdminMapVisitors.length || 0, color: ADMIN_BLUE },
     { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: "#0A3D91" },
-    { label: "Issues", value: adminMapFilters.find((item) => item.key === "issues")?.count || 0, color: "#DC2626" },
+    { label: "Issues", value: adminMapFilters.find((item) => item.key === "issues")?.count || 0, color: ADMIN_BLUE },
   ]), [adminMapFilters, visibleAdminMapVisitors.length]);
 
   const applySidebarAnimation = () => {
@@ -3953,6 +3955,63 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
+  const handlePrintSecurityReports = async () => {
+    if (!securityReportRecords.length) {
+      Alert.alert("No Data", "There are no security reports to print.");
+      return;
+    }
+
+    try {
+      const generatedAt = new Date();
+      const printedBy =
+        `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
+        user?.email ||
+        "Admin User";
+      await printRecordsTable({
+        title: "Security Reports",
+        subtitle: "Visitor incident reports submitted by security personnel.",
+        totalLabel: "security reports",
+        dialogTitle: "Print Security Reports",
+        printedBy,
+        generatedAt,
+        columns: ["Visitor", "Email", "Reason", "Office", "Reporter", "Reported At", "Resolved"],
+        rows: securityReportRecords.map((record) => [
+          record.fullName || "Visitor",
+          record.email || "-",
+          record.reportReason || "-",
+          record.assignedOffice || record.appointmentDepartment || record.host || "-",
+          record.reporterName || "Security",
+          formatDateTime(record.reportedAt || record.createdAt),
+          record.resolved ? "Resolved" : "Open",
+        ]),
+      });
+    } catch (error) {
+      console.error("Print security reports error:", error);
+      Alert.alert("Error", "Failed to generate the printable security reports.");
+    }
+  };
+
+  const renderRecordListPrintButton = ({ label = "Print Records", color = "#1C6DD0", onPress, disabled = false }) => (
+    <TouchableOpacity
+      style={[
+        styles.recordListPrintButton,
+        { borderColor: `${color}33`, backgroundColor: `${color}12` },
+        disabled && styles.recordListPrintButtonDisabled,
+        isDarkMode && { backgroundColor: "#0F172A", borderColor: `${color}55` },
+      ]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.86}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Ionicons name="print-outline" size={18} color={disabled ? "#94A3B8" : color} />
+      <Text style={[styles.recordListPrintButtonText, { color: disabled ? "#94A3B8" : color }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
   const renderAdminTable = ({
     columns = [],
     rows = [],
@@ -4328,7 +4387,7 @@ const loadDashboardData = useCallback(async () => {
 
   const renderBarChart = (labels, data) => {
     const max = Math.max(...(data || [0]), 1);
-    const chartColors = ["#1C6DD0", "#1C6DD0", "#1C6DD0", "#1C6DD0", "#F59E0B", "#EF4444"];
+    const chartColors = [ADMIN_BLUE, ADMIN_BLUE, ADMIN_BLUE, ADMIN_BLUE, ADMIN_BLUE, ADMIN_BLUE];
     return (
       <View style={styles.analyticsBarChart}>
         {(labels || []).map((label, index) => {
@@ -4519,10 +4578,10 @@ const loadDashboardData = useCallback(async () => {
 
       <View style={styles.adminMapLegend}>
         {[
-          { label: "Approvals", color: "#10B981" },
-          { label: "Requests", color: "#F59E0B" },
-          { label: "Issues", color: "#DC2626" },
-          { label: "Movement", color: "#0A3D91" },
+          { label: "Approvals", color: ADMIN_BLUE },
+          { label: "Requests", color: ADMIN_BLUE },
+          { label: "Issues", color: ADMIN_BLUE },
+          { label: "Movement", color: ADMIN_BLUE },
         ].map((item) => (
           <View key={item.label} style={styles.adminMapLegendItem}>
             <View style={[styles.adminMapLegendDot, { backgroundColor: item.color }]} />
@@ -4594,7 +4653,7 @@ const loadDashboardData = useCallback(async () => {
           title="Live Monitoring Map"
           subtitle="Dashboard monitoring panel for admin and security."
           iconName="radio-outline"
-          iconColor="#10B981"
+          iconColor={ADMIN_BLUE}
           actionLabel="Expand"
           onActionPress={() => setShowAdminMapModal(true)}
           controls={renderAdminMapFilters()}
@@ -4699,7 +4758,7 @@ const loadDashboardData = useCallback(async () => {
             title="Live Monitoring Map"
             subtitle="Track approvals, appointment requests, and gate activity with the same shared monitoring map used by security."
             iconName="map-outline"
-            iconColor="#10B981"
+            iconColor={ADMIN_BLUE}
             actionLabel="Full Screen"
             onActionPress={() => setShowAdminMapModal(true)}
             controls={renderAdminMapFilters()}
@@ -4746,10 +4805,10 @@ const loadDashboardData = useCallback(async () => {
 
           <View style={styles.adminMapSummaryGrid}>
             {[
-              { label: "Requests", value: adminMapFilters.find((item) => item.key === "requests")?.count || 0, color: "#F59E0B" },
-              { label: "Approvals", value: adminMapFilters.find((item) => item.key === "approvals")?.count || 0, color: "#10B981" },
-              { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: "#0A3D91" },
-              { label: "Issues", value: adminMapFilters.find((item) => item.key === "issues")?.count || 0, color: "#DC2626" },
+              { label: "Requests", value: adminMapFilters.find((item) => item.key === "requests")?.count || 0, color: ADMIN_BLUE },
+              { label: "Approvals", value: adminMapFilters.find((item) => item.key === "approvals")?.count || 0, color: ADMIN_BLUE },
+              { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: ADMIN_BLUE },
+              { label: "Issues", value: adminMapFilters.find((item) => item.key === "issues")?.count || 0, color: ADMIN_BLUE },
             ].map((item) => (
               <View
                 key={item.label}
@@ -4866,7 +4925,7 @@ const loadDashboardData = useCallback(async () => {
             onPress={() => setShowPendingRequestsModal(true)}
             activeOpacity={0.85}
           >
-            <Ionicons name="time-outline" size={16} color="#F59E0B" />
+            <Ionicons name="time-outline" size={16} color={ADMIN_BLUE} />
             <Text style={[styles.dashboardHeroBadgeText, isDarkMode && styles.darkTextSecondary]}>
               {pendingRequests.length || stats.pendingRequests || 0} request alerts
             </Text>
@@ -4912,7 +4971,7 @@ const loadDashboardData = useCallback(async () => {
         >
           <View style={styles.dashboardNotificationLeft}>
             <View style={styles.dashboardNotificationIcon}>
-              <Ionicons name="notifications-outline" size={22} color="#F59E0B" />
+              <Ionicons name="notifications-outline" size={22} color={ADMIN_BLUE} />
             </View>
             <View style={styles.dashboardNotificationTextWrap}>
               <Text style={[styles.dashboardNotificationTitle, { color: theme.textPrimary }]}>
@@ -5094,7 +5153,7 @@ const loadDashboardData = useCallback(async () => {
 
   const renderAccountCreationContent = () => {
     const isCreatingSecurity = isSecurityRole(newUserData.role);
-    const creationRoleColor = isCreatingSecurity ? "#1C6DD0" : "#10B981";
+    const creationRoleColor = ADMIN_BLUE;
     const creationRoleIcon = isCreatingSecurity ? "shield-checkmark-outline" : "briefcase-outline";
     const creationRoleLabel = isCreatingSecurity ? "Security" : "Staff";
     const creationRoleInitials = isCreatingSecurity ? "SE" : "ST";
@@ -5132,16 +5191,16 @@ const loadDashboardData = useCallback(async () => {
                   styles.managementQuickStatCard,
                   {
                     backgroundColor: isDarkMode ? "#111827" : "#FFFFFF",
-                    borderColor: newUserData.role === "staff" ? "#10B981" : theme.borderColor,
+                    borderColor: newUserData.role === "staff" ? ADMIN_BLUE : theme.borderColor,
                     flex: 1,
                   },
                 ]}
                 onPress={() => resetCreateUserForm("staff")}
               >
                 <View style={[styles.managementQuickStatIcon, { backgroundColor: "rgba(16,185,129,0.14)" }]}>
-                  <Ionicons name="briefcase-outline" size={18} color="#10B981" />
+                  <Ionicons name="briefcase-outline" size={18} color={ADMIN_BLUE} />
                 </View>
-                <Text style={[styles.managementQuickStatValue, { color: "#10B981" }]}>Create Staff</Text>
+                <Text style={[styles.managementQuickStatValue, { color: ADMIN_BLUE }]}>Create Staff</Text>
                 <Text style={[styles.managementQuickStatLabel, isDarkMode && styles.darkTextSecondary]}>
                   Staff Account
                 </Text>
@@ -5493,13 +5552,13 @@ const loadDashboardData = useCallback(async () => {
                 </Text>
                 <View style={styles.modularInfoStats}>
                   {(isCreatingSecurity ? [
-                    { label: "Security", value: guardUsers.length, color: "#1C6DD0" },
-                    { label: "Active", value: guardUsers.filter((item) => isUserActive(item)).length, color: "#0A3D91" },
-                    { label: "Inactive", value: guardUsers.filter((item) => !isUserActive(item)).length, color: "#EF4444" },
+                    { label: "Security", value: guardUsers.length, color: ADMIN_BLUE },
+                    { label: "Active", value: guardUsers.filter((item) => isUserActive(item)).length, color: ADMIN_BLUE },
+                    { label: "Inactive", value: guardUsers.filter((item) => !isUserActive(item)).length, color: ADMIN_BLUE },
                   ] : [
-                    { label: "Staff", value: staffUsers.length, color: "#10B981" },
-                    { label: "Active", value: staffUsers.filter((item) => isUserActive(item)).length, color: "#0A3D91" },
-                    { label: "Inactive", value: staffUsers.filter((item) => !isUserActive(item)).length, color: "#EF4444" },
+                    { label: "Staff", value: staffUsers.length, color: ADMIN_BLUE },
+                    { label: "Active", value: staffUsers.filter((item) => isUserActive(item)).length, color: ADMIN_BLUE },
+                    { label: "Inactive", value: staffUsers.filter((item) => !isUserActive(item)).length, color: ADMIN_BLUE },
                   ]).map((item) => (
                     <View
                       key={item.label}
@@ -6347,7 +6406,7 @@ const loadDashboardData = useCallback(async () => {
                 loadRecentActivities();
               }}
             >
-              <Ionicons name="refresh-outline" size={22} color="#10B981" />
+              <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
             </TouchableOpacity>
           }
         >
@@ -6357,7 +6416,7 @@ const loadDashboardData = useCallback(async () => {
                 title={ADMIN_MODULE_FLOORS.find((floor) => floor.id === selectedMapModuleFloor)?.name || "Floor Map"}
                 subtitle="Tracked visitors appear here while admin-managed rooms stay editable in the adjacent panel."
                 iconName="map-outline"
-                iconColor="#10B981"
+                iconColor={ADMIN_BLUE}
                 visitors={visibleAdminMapVisitors}
                 floors={ADMIN_MODULE_FLOORS}
                 offices={managedRooms}
@@ -6536,12 +6595,23 @@ const loadDashboardData = useCallback(async () => {
           badge={`${appointmentRecords.length} records`}
           isDarkMode={isDarkMode}
           theme={theme}
+          actions={renderRecordListPrintButton({
+            label: "Print Records",
+            color: ADMIN_BLUE,
+            disabled: !appointmentRecords.length,
+            onPress: () =>
+              handlePrintRequests(
+                "Appointment Records",
+                appointmentRecords,
+                "Generated from the appointment records table in the admin dashboard.",
+              ),
+          })}
         >
           <View style={styles.modularCardGrid}>
             {[
-              { label: "Total Records", value: appointmentRecords.length, color: "#EC4899" },
-              { label: "Pending Queue", value: pendingAppointmentRequests.length, color: "#F59E0B" },
-              { label: "Approved", value: appointmentRecords.length, color: "#10B981" },
+              { label: "Total Records", value: appointmentRecords.length, color: ADMIN_BLUE },
+              { label: "Pending Queue", value: pendingAppointmentRequests.length, color: ADMIN_BLUE },
+              { label: "Approved", value: appointmentRecords.length, color: ADMIN_BLUE },
             ].map((item) => (
               <View
                 key={item.label}
@@ -6768,8 +6838,19 @@ const loadDashboardData = useCallback(async () => {
           actions={
             <View style={styles.adminSectionShellActions}>
               <TouchableOpacity style={styles.pageRefreshButton} onPress={loadAllVisitRequests}>
-                <Ionicons name="refresh-outline" size={22} color="#F59E0B" />
+                <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
               </TouchableOpacity>
+              {renderRecordListPrintButton({
+                label: "Print Queue",
+                color: ADMIN_BLUE,
+                disabled: !getFilteredRequests().length,
+                onPress: () =>
+                  handlePrintRequests(
+                    "Appointment Management Queue",
+                    getFilteredRequests(),
+                    "Generated from the active appointment management table in the admin dashboard.",
+                  ),
+              })}
             </View>
           }
         >
@@ -6808,14 +6889,14 @@ const loadDashboardData = useCallback(async () => {
               setSearchQuery("");
             },
             placeholder: "Example: April 18, 2026 or Registrar",
-            accent: "#F59E0B",
+            accent: ADMIN_BLUE,
           })}
 
           {renderRecordsFilterPanel({
             title: "Filter Appointment Records",
             subtitle: "Quick shortcuts for status, month, exact date range, office, and time order.",
             panelKey: "appointment-records",
-            accent: "#F59E0B",
+            accent: ADMIN_BLUE,
             onReset: () => {
               setRequestFilter("all");
               setRequestDateFilter("all");
@@ -6863,7 +6944,7 @@ const loadDashboardData = useCallback(async () => {
               },
             ],
             footerContent: renderDateRangeControls({
-              accent: "#F59E0B",
+              accent: ADMIN_BLUE,
               startDate: requestDateRange.startDate,
               endDate: requestDateRange.endDate,
               onPickStart: () => setActiveFilterDateField("request-start"),
@@ -7027,18 +7108,24 @@ const loadDashboardData = useCallback(async () => {
           actions={
             <View style={styles.adminSectionShellActions}>
               <TouchableOpacity style={styles.pageRefreshButton} onPress={loadVisitorHistory}>
-                <Ionicons name="refresh-outline" size={22} color="#1C6DD0" />
+                <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
               </TouchableOpacity>
+              {renderRecordListPrintButton({
+                label: "Print Records",
+                color: ADMIN_BLUE,
+                disabled: !filteredHistory.length,
+                onPress: handlePrintReports,
+              })}
             </View>
           }
         >
             <View style={styles.modularCardGrid}>
               {[
-                { label: "Total History", value: historyStats.totalVisits, color: "#0A3D91" },
-                { label: "Completed", value: historyStats.completedVisits, color: "#10B981" },
-                { label: "Pending", value: historyStats.pendingVisits, color: "#F59E0B" },
-                { label: "Rejected", value: historyStats.rejected, color: "#EF4444" },
-                { label: "Security Reports", value: historyStats.reported, color: "#DC2626" },
+                { label: "Total History", value: historyStats.totalVisits, color: ADMIN_BLUE },
+                { label: "Completed", value: historyStats.completedVisits, color: ADMIN_BLUE },
+                { label: "Pending", value: historyStats.pendingVisits, color: ADMIN_BLUE },
+                { label: "Rejected", value: historyStats.rejected, color: ADMIN_BLUE },
+                { label: "Security Reports", value: historyStats.reported, color: ADMIN_BLUE },
               ].map((item) => (
                 <View
                   key={item.label}
@@ -7156,37 +7243,22 @@ const loadDashboardData = useCallback(async () => {
           actions={
             <View style={styles.adminSectionShellActions}>
               <TouchableOpacity style={styles.pageRefreshButton} onPress={loadVisitorHistory}>
-                <Ionicons name="refresh-outline" size={22} color="#DC2626" />
+                <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.pageRefreshButton}
-                onPress={() =>
-                  printRecordsTable({
-                    title: "Security Reports",
-                    subtitle: "Visitor incident reports submitted by security personnel.",
-                    columns: ["Visitor", "Email", "Reason", "Office", "Reporter", "Reported At", "Resolved"],
-                    rows: securityReportRecords.map((record) => [
-                      record.fullName || "Visitor",
-                      record.email || "-",
-                      record.reportReason || "-",
-                      record.assignedOffice || record.appointmentDepartment || record.host || "-",
-                      record.reporterName || "Security",
-                      formatDateTime(record.reportedAt || record.createdAt),
-                      record.resolved ? "Resolved" : "Open",
-                    ]),
-                  })
-                }
-              >
-                <Ionicons name="print-outline" size={20} color="#DC2626" />
-              </TouchableOpacity>
+              {renderRecordListPrintButton({
+                label: "Print Reports",
+                color: ADMIN_BLUE,
+                disabled: !securityReportRecords.length,
+                onPress: handlePrintSecurityReports,
+              })}
             </View>
           }
         >
           <View style={styles.modularCardGrid}>
             {[
-              { label: "Total Reports", value: securityReportRecords.length, color: "#DC2626" },
-              { label: "Open", value: securityReportRecords.filter((item) => !item.resolved).length, color: "#F59E0B" },
-              { label: "Resolved", value: securityReportRecords.filter((item) => item.resolved).length, color: "#10B981" },
+              { label: "Total Reports", value: securityReportRecords.length, color: ADMIN_BLUE },
+              { label: "Open", value: securityReportRecords.filter((item) => !item.resolved).length, color: ADMIN_BLUE },
+              { label: "Resolved", value: securityReportRecords.filter((item) => item.resolved).length, color: ADMIN_BLUE },
             ].map((item) => (
               <View
                 key={item.label}
@@ -7323,9 +7395,9 @@ const loadDashboardData = useCallback(async () => {
       return new Date(visitor.visitDate).toDateString() === new Date().toDateString();
     }).length;
     const distributionItems = [
-      { key: "approved", label: "Approved", value: stats.approvedRequests || 0, color: "#10B981" },
-      { key: "pending", label: "Pending", value: stats.pendingRequests || 0, color: "#F59E0B" },
-      { key: "rejected", label: "Rejected", value: stats.rejectedRequests || 0, color: "#EF4444" },
+      { key: "approved", label: "Approved", value: stats.approvedRequests || 0, color: ADMIN_BLUE },
+      { key: "pending", label: "Pending", value: stats.pendingRequests || 0, color: ADMIN_BLUE },
+      { key: "rejected", label: "Rejected", value: stats.rejectedRequests || 0, color: ADMIN_BLUE },
     ];
     const topDistributionItem = [...distributionItems].sort((a, b) => b.value - a.value)[0];
     const metricCards = [
@@ -7342,7 +7414,7 @@ const loadDashboardData = useCallback(async () => {
         icon: "checkmark-done-outline",
         label: "Approval Rate",
         value: `${approvalRate}%`,
-        accent: "#10B981",
+        accent: ADMIN_BLUE,
         helper: `${stats.approvedRequests || 0} approved requests`,
       },
       {
@@ -7724,7 +7796,7 @@ const loadDashboardData = useCallback(async () => {
                           </Text>
                         </View>
                         <View style={styles.historyDetailItem}>
-                          <Ionicons name="swap-horizontal-outline" size={14} color={isToday ? "#10B981" : theme.textSecondary} />
+                          <Ionicons name="swap-horizontal-outline" size={14} color={isToday ? ADMIN_BLUE : theme.textSecondary} />
                           <Text
                             style={[
                               styles.historyDetailText,
@@ -8024,18 +8096,26 @@ const loadDashboardData = useCallback(async () => {
                 Showing {visibleStartIndex}-{visibleEndIndex} of {totalFilteredUsers} matching accounts
               </Text>
             </View>
-            <TouchableOpacity
-              style={[
-                styles.userRefreshButton,
-                isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
-              ]}
-              onPress={loadAllUsers}
-            >
-              <Ionicons name="refresh-outline" size={18} color={userManagementConfig.accent} />
-              <Text style={[styles.userRefreshButtonText, { color: userManagementConfig.accent }]}>
-                Refresh
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.recordListActionRow}>
+              {renderRecordListPrintButton({
+                label: "Print Records",
+                color: userManagementConfig.accent,
+                disabled: totalFilteredUsers === 0,
+                onPress: handlePrintUsers,
+              })}
+              <TouchableOpacity
+                style={[
+                  styles.userRefreshButton,
+                  isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+                ]}
+                onPress={loadAllUsers}
+              >
+                <Ionicons name="refresh-outline" size={18} color={userManagementConfig.accent} />
+                <Text style={[styles.userRefreshButtonText, { color: userManagementConfig.accent }]}>
+                  Refresh
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {renderRecordsSearchPanel({
@@ -8311,7 +8391,7 @@ const loadDashboardData = useCallback(async () => {
           theme={theme}
           actions={
             <TouchableOpacity style={styles.pageRefreshButton} onPress={loadRecentActivities}>
-              <Ionicons name="refresh-outline" size={22} color="#10B981" />
+              <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
             </TouchableOpacity>
           }
         >
@@ -8354,13 +8434,13 @@ const loadDashboardData = useCallback(async () => {
       case "account-records":
         return {
           label: "Print Account Records",
-          color: userManagementConfig.accent,
+          color: ADMIN_BLUE,
           onPress: handlePrintUsers,
         };
       case "appointment-records":
         return {
           label: "Print Appointment Records",
-          color: "#EC4899",
+          color: ADMIN_BLUE,
           onPress: () =>
             handlePrintRequests(
               "Appointment Records",
@@ -8371,7 +8451,7 @@ const loadDashboardData = useCallback(async () => {
       case "appointment-management":
         return {
           label: "Print Appointment Queue",
-          color: "#F59E0B",
+          color: ADMIN_BLUE,
           onPress: () =>
             handlePrintRequests(
               "Appointment Management Queue",
@@ -8382,28 +8462,14 @@ const loadDashboardData = useCallback(async () => {
       case "report-records":
         return {
           label: "Print Report Records",
-          color: "#1C6DD0",
+          color: ADMIN_BLUE,
           onPress: handlePrintReports,
         };
       case "security-report-records":
         return {
           label: "Print Security Reports",
-          color: "#DC2626",
-          onPress: () =>
-            printRecordsTable({
-              title: "Security Reports",
-              subtitle: "Visitor incident reports submitted by security personnel.",
-              columns: ["Visitor", "Email", "Reason", "Office", "Reporter", "Reported At", "Resolved"],
-              rows: securityReportRecords.map((record) => [
-                record.fullName || "Visitor",
-                record.email || "-",
-                record.reportReason || "-",
-                record.assignedOffice || record.appointmentDepartment || record.host || "-",
-                record.reporterName || "Security",
-                formatDateTime(record.reportedAt || record.createdAt),
-                record.resolved ? "Resolved" : "Open",
-              ]),
-            }),
+          color: ADMIN_BLUE,
+          onPress: handlePrintSecurityReports,
         };
       default:
         return null;
@@ -8473,7 +8539,7 @@ const loadDashboardData = useCallback(async () => {
                       onPress={() => handleModuleToggle(module.key)}
                       activeOpacity={0.86}
                     >
-                      <View style={[styles.sidebarMenuIcon, { backgroundColor: `${module.color}16` }]}>
+                      <View style={[styles.sidebarMenuIcon, { backgroundColor: `${ADMIN_BLUE}16` }]}>
                         <Ionicons name={module.icon} size={20} color={module.color} />
                       </View>
                       <View style={styles.sidebarModuleCopy}>
@@ -8565,29 +8631,29 @@ const loadDashboardData = useCallback(async () => {
         {/* Main Content */}
         <View style={styles.adminContentShell}>
         <View style={[styles.contentArea, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
-          <Animated.View style={[styles.header, { opacity: headerOpacity }, isDarkMode && { backgroundColor: theme.headerBackground, borderBottomColor: "#334155" }]}>
+          <Animated.View style={[styles.header, { opacity: headerOpacity }, isDarkMode && { backgroundColor: ADMIN_BLUE_DARK, borderBottomColor: "#B7D5F6" }]}>
             <View style={styles.headerTop}>
             <View style={styles.headerCopy}>
-              <Text style={[styles.headerTitle, isDarkMode && styles.darkText]}>
+              <Text style={styles.headerTitle}>
                 {selectedSubmoduleMeta.title}
               </Text>
-              <Text style={[styles.headerSubtitle, isDarkMode && styles.darkTextSecondary]}>
+              <Text style={styles.headerSubtitle}>
                 {selectedSubmoduleMeta.subtitle}
               </Text>
               <View style={styles.headerMetaRow}>
-                <View style={[styles.headerMetaBadge, isDarkMode && { backgroundColor: "#0F172A", borderColor: "#334155" }]}>
-                  <Ionicons name="calendar-outline" size={14} color="#0A3D91" />
-                  <Text style={[styles.headerMetaText, isDarkMode && styles.darkTextSecondary]}>
+                <View style={[styles.headerMetaBadge, isDarkMode && { backgroundColor: "#FFFFFF", borderColor: "#B7D5F6" }]}>
+                  <Ionicons name="calendar-outline" size={14} color={ADMIN_BLUE_DARK} />
+                  <Text style={styles.headerMetaText}>
                     {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </Text>
                 </View>
                 {selectedSubmoduleMeta.highlights.map((item) => (
                   <View
                     key={item.label}
-                    style={[styles.headerMetaBadge, isDarkMode && { backgroundColor: "#0F172A", borderColor: "#334155" }]}
+                    style={[styles.headerMetaBadge, isDarkMode && { backgroundColor: "#FFFFFF", borderColor: "#B7D5F6" }]}
                   >
                     <Ionicons name={item.icon} size={14} color={item.color} />
-                    <Text style={[styles.headerMetaText, isDarkMode && styles.darkTextSecondary]}>
+                    <Text style={styles.headerMetaText}>
                       {item.label}: {item.value}
                     </Text>
                   </View>
@@ -10143,7 +10209,7 @@ const loadDashboardData = useCallback(async () => {
                 pendingRequests.slice(0, 10).map((request) => renderRequestCard(request))
               ) : (
                 <View style={styles.pendingRequestsModalEmpty}>
-                  <Ionicons name="checkmark-circle-outline" size={42} color="#10B981" />
+                  <Ionicons name="checkmark-circle-outline" size={42} color={ADMIN_BLUE} />
                   <Text style={[styles.pendingRequestsModalEmptyTitle, isDarkMode && styles.darkText]}>
                     No pending requests
                   </Text>
@@ -10213,7 +10279,7 @@ const loadDashboardData = useCallback(async () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.confirmModal, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
             <View style={[styles.createSuccessIcon, isDarkMode && { backgroundColor: "#064E3B" }]}>
-              <Ionicons name="checkmark-circle" size={52} color="#10B981" />
+              <Ionicons name="checkmark-circle" size={52} color={ADMIN_BLUE} />
             </View>
             <Text style={[styles.confirmTitle, isDarkMode && styles.darkText]}>Account Created</Text>
             <Text style={[styles.confirmMessage, isDarkMode && styles.darkTextSecondary]}>
@@ -10375,7 +10441,7 @@ const loadDashboardData = useCallback(async () => {
                 title="Live Monitoring Map"
                 subtitle="Shared monitoring map for approved visitors, check-ins, and real-time administrative activity."
                 iconName="map-outline"
-                iconColor="#10B981"
+                iconColor={ADMIN_BLUE}
                 controls={renderAdminMapFilters()}
                 visitors={visibleAdminMapVisitors}
                 floors={ADMIN_MAP_FLOORS}
@@ -10404,7 +10470,7 @@ const loadDashboardData = useCallback(async () => {
               <View style={[styles.adminMapSideCard, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionTitleContainer}>
-                    <Ionicons name="pulse-outline" size={20} color="#10B981" />
+                    <Ionicons name="pulse-outline" size={20} color={ADMIN_BLUE} />
                     <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>Live Activity Feed</Text>
                   </View>
                 </View>
