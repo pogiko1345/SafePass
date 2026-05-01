@@ -40,12 +40,9 @@ import {
 import styles from "../styles/AdminDashboardStyles";
 
 const { width, height } = Dimensions.get("window");
-<<<<<<< HEAD
 const ADMIN_BLUE = "#1C6DD0";
 const ADMIN_BLUE_DARK = "#0A3D91";
-=======
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
->>>>>>> 1900747baa350e6bde5fb7eb1082e647f59aebd4
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
   : require("@react-native-async-storage/async-storage").default;
@@ -4986,13 +4983,8 @@ const loadDashboardData = useCallback(async () => {
             onPress={() => setShowPendingRequestsModal(true)}
             hoverScale={1.07}
           >
-<<<<<<< HEAD
             <Ionicons name="time-outline" size={16} color={ADMIN_BLUE} />
             <Text style={[styles.dashboardHeroBadgeText, isDarkMode && styles.darkTextSecondary]}>
-=======
-            <Ionicons name="time-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.dashboardHeroBadgeText}>
->>>>>>> 1900747baa350e6bde5fb7eb1082e647f59aebd4
               {pendingRequests.length || stats.pendingRequests || 0} request alerts
             </Text>
           </HoverBubble>
@@ -7010,8 +7002,6 @@ const loadDashboardData = useCallback(async () => {
               icon: "time-outline",
             })}
           </View>
-<<<<<<< HEAD
-
           {renderRecordsSearchPanel({
             title: "Search Appointment Records",
             subtitle: "Manual lookup for a visitor name, office, purpose, phone, email, or exact date.",
@@ -7224,8 +7214,6 @@ const loadDashboardData = useCallback(async () => {
               },
             ],
           })}
-=======
->>>>>>> 1900747baa350e6bde5fb7eb1082e647f59aebd4
         </AdminSectionShell>
       </View>
     </ScrollView>
@@ -7382,7 +7370,6 @@ const loadDashboardData = useCallback(async () => {
           actions={
             <View style={styles.adminSectionShellActions}>
               <TouchableOpacity style={styles.pageRefreshButton} onPress={loadVisitorHistory}>
-<<<<<<< HEAD
                 <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
               </TouchableOpacity>
               {renderRecordListPrintButton({
@@ -7391,10 +7378,6 @@ const loadDashboardData = useCallback(async () => {
                 disabled: !securityReportRecords.length,
                 onPress: handlePrintSecurityReports,
               })}
-=======
-                <Ionicons name="refresh-outline" size={22} color="#DC2626" />
-              </TouchableOpacity>
->>>>>>> 1900747baa350e6bde5fb7eb1082e647f59aebd4
             </View>
           }
         >
@@ -8573,7 +8556,6 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
-<<<<<<< HEAD
   const getHeaderPrintAction = () => {
     switch (selectedSubmodule) {
       case "account-records":
@@ -8621,8 +8603,6 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
-=======
->>>>>>> 1900747baa350e6bde5fb7eb1082e647f59aebd4
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
