@@ -17,12 +17,15 @@ const char* wifiPassword = "hmhR4fFe";
 const char* apiUrl = "https://safepass-052h.onrender.com/api/device/location-tap";
 const char* deviceKey = "71eb2b8fbdfa47b2b2334fde89cc99b583a39709997d4434859ad645dbce89e4";
 
-const char* deviceId = "main-gate-reader-01";
+// Reader identity. The backend maps these IDs to the exact Floor3 map position.
+// For the entrance/lobby reader, keep this as reader_1/main_gate.
+// For room readers, change readerId/checkpointId to values like registrar,
+// accounting, conference_room, it_room, faculty_room, etc.
+const char* deviceId = "arduino-reader-01";
+const char* readerId = "reader_1";
+const char* gateId = "gate_1";
 const char* checkpointId = "main_gate";
-const char* floorName = "ground";
-const char* officeName = "Main Gate";
-const float coordinateX = 50.0;
-const float coordinateY = 92.0;
+const char* locationName = "Entrance / Lobby";
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 
@@ -66,10 +69,11 @@ String buildJsonPayload(const String& uid) {
   String payload = "{";
   payload += "\"nfcCardId\":\"" + uid + "\",";
   payload += "\"deviceId\":\"" + String(deviceId) + "\",";
+  payload += "\"readerId\":\"" + String(readerId) + "\",";
+  payload += "\"gateId\":\"" + String(gateId) + "\",";
   payload += "\"checkpointId\":\"" + String(checkpointId) + "\",";
-  payload += "\"floor\":\"" + String(floorName) + "\",";
-  payload += "\"office\":\"" + String(officeName) + "\",";
-  payload += "\"coordinates\":{\"x\":" + String(coordinateX, 2) + ",\"y\":" + String(coordinateY, 2) + "},";
+  payload += "\"location\":\"" + String(locationName) + "\",";
+  payload += "\"deviceKey\":\"" + String(deviceKey) + "\",";
   payload += "\"action\":\"auto\",";
   payload += "\"tapAction\":\"auto\",";
   payload += "\"source\":\"arduino_tap\"";
@@ -94,6 +98,10 @@ void postTap(const String& uid) {
 
   Serial.print("UID: ");
   Serial.println(uid);
+  Serial.print("Reader: ");
+  Serial.print(readerId);
+  Serial.print(" / Checkpoint: ");
+  Serial.println(checkpointId);
   Serial.print("HTTP ");
   Serial.println(statusCode);
   Serial.println(response);

@@ -95,6 +95,15 @@ export default StyleSheet.create({
     right: 0,
     bottom: 0,
     minHeight: 500,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  floorPlanStage: {
+    position: "relative",
+    width: "100%",
+    maxHeight: "100%",
+    overflow: "visible",
   },
 
   floorPlanImage: {
@@ -368,6 +377,7 @@ export default StyleSheet.create({
     minHeight: 14,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
     zIndex: 6,
   },
 
@@ -377,8 +387,8 @@ export default StyleSheet.create({
 
   mapTextLabelText: {
     width: "100%",
-    fontSize: 11,
-    lineHeight: 13,
+    fontSize: 8,
+    lineHeight: 10,
     fontWeight: "900",
     color: "#111827",
     textAlign: "center",

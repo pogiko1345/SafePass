@@ -47,15 +47,29 @@ The Arduino sends:
 ```json
 {
   "nfcCardId": "04A1B2C3D4",
-  "deviceId": "main-gate-reader-01",
+  "deviceId": "arduino-reader-01",
+  "readerId": "reader_1",
+  "gateId": "gate_1",
   "checkpointId": "main_gate",
-  "floor": "ground",
-  "office": "Main Gate",
-  "coordinates": { "x": 50, "y": 92 },
+  "location": "Entrance / Lobby",
+  "deviceKey": "change-this-to-a-long-random-secret",
   "action": "auto",
+  "tapAction": "auto",
   "source": "arduino_tap"
 }
 ```
+
+The backend owns the map coordinates. For each physical reader, send a stable
+`readerId` or `checkpointId`; SafePass maps that ID to the correct Floor3 map
+position. The included sketch uses `reader_1` / `main_gate` for the entrance
+or lobby reader.
+
+Known checkpoint IDs include:
+
+- `main_gate`, `reader_1`, `gate_1`, `entrance`, `lobby`
+- `registrar`, `accounting`, `cashier`, `staff`, `file_room`, `storage`
+- `conference_room`, `chairman`, `flight_operations`, `head_of_training_room`
+- `it_room`, `faculty_room`, `academy_director`, `cr`, `sto`
 
 SafePass will:
 
@@ -93,5 +107,5 @@ Invoke-RestMethod `
   -Method Post `
   -Headers @{ "x-device-key" = "change-this-to-a-long-random-secret" } `
   -ContentType "application/json" `
-  -Body '{"nfcCardId":"2026-000001","deviceId":"test-reader","checkpointId":"main_gate","floor":"ground","office":"Main Gate","coordinates":{"x":50,"y":92},"action":"auto","source":"arduino_tap"}'
+  -Body '{"nfcCardId":"2026-000001","deviceId":"test-reader","readerId":"reader_1","checkpointId":"main_gate","location":"Entrance / Lobby","deviceKey":"change-this-to-a-long-random-secret","action":"auto","tapAction":"auto","source":"arduino_tap"}'
 ```

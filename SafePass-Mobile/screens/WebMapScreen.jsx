@@ -27,7 +27,7 @@ const CAMPUS_LOCATIONS = [
     description: "Visitor entrance and primary security checkpoint.",
     icon: "business",
     coordinates: { lat: 14.5995, lng: 120.9842 },
-    mapPosition: { x: 18, y: 78 },
+    mapPosition: MONITORING_MAP_OFFICE_POSITIONS["ground-lobby"],
     arrivalNote: "Present your visitor approval and valid ID at the gate.",
     steps: [
       "Enter through the main gate and proceed to the visitor lane.",
@@ -41,7 +41,7 @@ const CAMPUS_LOCATIONS = [
     description: "Visitor registration, approvals, and admin office support.",
     icon: "business",
     coordinates: { lat: 14.6001, lng: 120.985 },
-    mapPosition: { x: 78, y: 22 },
+    mapPosition: MONITORING_MAP_OFFICE_POSITIONS["ground-offices"],
     arrivalNote: "Recommended destination for registration, approvals, and admin meetings.",
     steps: [
       "From the main gate, continue straight through the central walkway.",
@@ -55,7 +55,7 @@ const CAMPUS_LOCATIONS = [
     description: "Records, enrollment help, and visitor document routing.",
     icon: "document-text",
     coordinates: { lat: 14.5998, lng: 120.9849 },
-    mapPosition: { x: 45, y: 44 },
+    mapPosition: MONITORING_MAP_OFFICE_POSITIONS["ground-registrar"],
     arrivalNote: "Best for document-related appointments and records assistance.",
     steps: [
       "Enter through the main gate and proceed toward the administration corridor.",
@@ -69,7 +69,7 @@ const CAMPUS_LOCATIONS = [
     description: "Payment, billing, and finance-related visitor assistance.",
     icon: "calculator",
     coordinates: { lat: 14.5999, lng: 120.9851 },
-    mapPosition: { x: 66, y: 42 },
+    mapPosition: MONITORING_MAP_OFFICE_POSITIONS["ground-accounting"],
     arrivalNote: "Use this stop for official payments and billing concerns.",
     steps: [
       "Proceed from the main gate to the ground-floor office row.",
@@ -83,7 +83,7 @@ const CAMPUS_LOCATIONS = [
     description: "Mezzanine meeting space for scheduled visitor appointments.",
     icon: "people",
     coordinates: { lat: 14.6005, lng: 120.9825 },
-    mapPosition: { x: 10, y: 36 },
+    mapPosition: MONITORING_MAP_OFFICE_POSITIONS["conference-room"],
     arrivalNote: "Proceed here only for scheduled meetings or escorted visits.",
     steps: [
       "Complete check-in at the ground-floor security point first.",
@@ -97,7 +97,7 @@ const CAMPUS_LOCATIONS = [
     description: "Mezzanine technology support and IT coordination room.",
     icon: "desktop",
     coordinates: { lat: 14.5978, lng: 120.9855 },
-    mapPosition: { x: 57, y: 42 },
+    mapPosition: MONITORING_MAP_OFFICE_POSITIONS["it-room"],
     arrivalNote: "Best for approved IT-related appointments and support visits.",
     steps: [
       "Check in at the ground floor before moving upstairs.",
@@ -111,7 +111,7 @@ const CAMPUS_LOCATIONS = [
     description: "Main security office and manual assistance point.",
     icon: "shield",
     coordinates: { lat: 14.599, lng: 120.9838 },
-    mapPosition: { x: 24, y: 30 },
+    mapPosition: MONITORING_MAP_OFFICE_POSITIONS["ground-lobby"],
     arrivalNote: "Go here if you need access help, visitor guidance, or manual verification.",
     steps: [
       "After entering the gate, move to the left-hand operations lane.",
@@ -125,7 +125,7 @@ const CAMPUS_LOCATIONS = [
     description: "Visitor and staff parking zone near the entrance lane.",
     icon: "car",
     coordinates: { lat: 14.5985, lng: 120.9828 },
-    mapPosition: { x: 24, y: 64 },
+    mapPosition: MONITORING_MAP_OFFICE_POSITIONS["ground-lobby"],
     arrivalNote: "Recommended drop-off and parking zone before proceeding to your destination.",
     steps: [
       "Enter through the main gate and follow the parking guidance signs.",
@@ -223,7 +223,7 @@ export default function WebMapScreen({ navigation, route }) {
           </View>
 
           <Text style={MapStyles.heroTitle}>
-            Find the right campus destination before you arrive.
+            Find the right campus destination for your visit.
           </Text>
           <Text style={MapStyles.heroSubtitle}>
             Choose a destination and review the route steps inside SafePass.
@@ -297,8 +297,8 @@ export default function WebMapScreen({ navigation, route }) {
             </View>
 
             <Text style={MapStyles.sectionSubtitle}>
-              The highlighted destination shows your current selected stop inside
-              the school grounds.
+              The highlighted pin shows where you should go inside the school
+              grounds. It does not show your live location.
             </Text>
 
             <CampusMap

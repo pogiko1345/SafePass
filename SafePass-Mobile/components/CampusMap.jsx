@@ -23,6 +23,14 @@ const TRACKING_FRESHNESS = {
   STALE: "stale",
 };
 
+const FLOOR_BLUEPRINT_ASPECT_RATIOS = {
+  ground: 940 / 280,
+  first: 940 / 280,
+  mezzanine: 940 / 280,
+  second: 940 / 280,
+  third: 940 / 280,
+};
+
 const getCompactOfficeLabel = (label, maxLength = 16) => {
   const normalizedLabel = String(label || "").trim();
   if (normalizedLabel.length <= maxLength) {
@@ -89,7 +97,7 @@ const CampusMap = ({
     if (animated) {
       Animated.spring(panAnim, {
         toValue: clampedPan,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       }).start();
       return;
     }
@@ -389,6 +397,7 @@ const CampusMap = ({
     if (!labels.length) return null;
 
     return labels.map((label) => {
+      const fontSize = Math.min(Number(label.size) || 8, 11);
       const left =
         typeof label.x === "number" && typeof label.width === "number"
           ? `${label.x - label.width / 2}%`
@@ -416,13 +425,13 @@ const CampusMap = ({
           <Text
             style={[
               styles.mapTextLabelText,
-              label.size ? { fontSize: label.size } : null,
+              { fontSize, lineHeight: fontSize + 2 },
               label.color ? { color: label.color } : null,
               label.textStyle,
             ]}
             numberOfLines={label.numberOfLines || 2}
             adjustsFontSizeToFit
-            minimumFontScale={0.72}
+            minimumFontScale={0.5}
           >
             {label.text}
           </Text>
@@ -527,7 +536,7 @@ const CampusMap = ({
     setMapScale(newScale);
     Animated.spring(scaleAnim, {
       toValue: newScale,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== "web",
     }).start();
   };
 
@@ -541,11 +550,11 @@ const CampusMap = ({
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: newScale,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       }),
       Animated.spring(panAnim, {
         toValue: nextPan,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       }),
     ]).start();
   };
@@ -558,11 +567,11 @@ const CampusMap = ({
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       }),
       Animated.spring(panAnim, {
         toValue: { x: 0, y: 0 },
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       }),
     ]).start();
   };
@@ -576,6 +585,14 @@ const CampusMap = ({
   const shouldShowOfficeLabels = !hasBlueprint;
   const shouldShowMapLabels = hasBlueprint && getFloorLabels().length > 0;
   const visibleVisitors = getVisibleVisitors();
+  const normalizedActiveFloor = normalizeFloorId(activeFloor);
+  const blueprintAspectRatio =
+    FLOOR_BLUEPRINT_ASPECT_RATIOS[activeFloor] ||
+    FLOOR_BLUEPRINT_ASPECT_RATIOS[normalizedActiveFloor] ||
+    (normalizedActiveFloor === "first"
+      ? FLOOR_BLUEPRINT_ASPECT_RATIOS.mezzanine
+      : null) ||
+    940 / 280;
 
   return (
     <View style={[styles.mapContainer, fullscreen && styles.mapContainerFullscreen]}>
@@ -603,57 +620,59 @@ const CampusMap = ({
         >
           {/* Floor Plan Image or Placeholder */}
           {hasBlueprint ? (
-            <Image
-              source={floorPlanImage}
-              style={styles.floorPlanImage}
-              resizeMode="contain"
-              onError={() => setImageError(true)}
-            />
+            <View style={[styles.floorPlanStage, { aspectRatio: blueprintAspectRatio }]}>
+              <Image
+                source={floorPlanImage}
+                style={styles.floorPlanImage}
+                resizeMode="stretch"
+                onError={() => setImageError(true)}
+              />
+
+              {/* Text labels, visitors, and destinations share the blueprint coordinate space. */}
+              {shouldShowMapLabels ? renderMapLabels() : null}
+              {renderVisitorMarkers(visibleVisitors)}
+              {renderDestinationMarkers()}
+            </View>
           ) : (
-            <View style={styles.floorPlanPlaceholder}>
-              <View style={styles.floorPlanContent}>
-                <Ionicons 
-                  name="map-outline" 
-                  size={64} 
-                  color="#9CA3AF" 
-                />
-                <Text style={styles.floorPlanTitle}>
-                  {getDisplayFloorName(activeFloor)}
-                </Text>
-                <Text style={styles.floorPlanSubtitle}>
-                  {!mapBlueprints
-                    ? "Upload map blueprints to start tracking"
-                    : "Floor blueprint not uploaded yet."}
-                </Text>
-                <View style={styles.floorPlanFeatures}>
-                  <View style={styles.featureItem}>
-                    <Ionicons name="people-outline" size={14} color="#6B7280" />
-                    <Text style={styles.featureText}>
-                      {visitors.length} Active Visitors
-                    </Text>
-                  </View>
-                  <View style={styles.featureItem}>
-                    <Ionicons name="layers-outline" size={14} color="#6B7280" />
-                    <Text style={styles.featureText}>
-                      {floors.length} Floors
-                    </Text>
+            <>
+              <View style={styles.floorPlanPlaceholder}>
+                <View style={styles.floorPlanContent}>
+                  <Ionicons
+                    name="map-outline"
+                    size={64}
+                    color="#9CA3AF"
+                  />
+                  <Text style={styles.floorPlanTitle}>
+                    {getDisplayFloorName(activeFloor)}
+                  </Text>
+                  <Text style={styles.floorPlanSubtitle}>
+                    {!mapBlueprints
+                      ? "Upload map blueprints to start tracking"
+                      : "Floor blueprint not uploaded yet."}
+                  </Text>
+                  <View style={styles.floorPlanFeatures}>
+                    <View style={styles.featureItem}>
+                      <Ionicons name="people-outline" size={14} color="#6B7280" />
+                      <Text style={styles.featureText}>
+                        {visitors.length} Active Visitors
+                      </Text>
+                    </View>
+                    <View style={styles.featureItem}>
+                      <Ionicons name="layers-outline" size={14} color="#6B7280" />
+                      <Text style={styles.featureText}>
+                        {floors.length} Floors
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
+
+              {/* Office pills are still used only when there is no real blueprint image. */}
+              {shouldShowOfficeLabels ? renderOfficeLabels() : null}
+              {renderVisitorMarkers(visibleVisitors)}
+              {renderDestinationMarkers()}
+            </>
           )}
-          
-          {/* Editable text labels sit above the imported blueprint images. */}
-          {shouldShowMapLabels ? renderMapLabels() : null}
-
-          {/* Office pills are still used only when there is no real blueprint image. */}
-          {shouldShowOfficeLabels ? renderOfficeLabels() : null}
-          
-          {/* Visitor Markers */}
-          {renderVisitorMarkers(visibleVisitors)}
-
-          {/* Destination markers for visitor wayfinding */}
-          {renderDestinationMarkers()}
         </Animated.View>
 
         {renderMapEmptyState(visibleVisitors)}

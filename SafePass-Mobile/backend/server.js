@@ -639,67 +639,167 @@ const CHECKPOINT_LOCATIONS = {
   main_gate: {
     floor: "ground",
     office: "Main Gate",
-    coordinates: { x: 18, y: 78 },
+    coordinates: { x: 6.8, y: 40 },
+  },
+  gate: {
+    floor: "ground",
+    office: "Main Gate",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  gate_1: {
+    floor: "ground",
+    office: "Main Gate",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  reader_1: {
+    floor: "ground",
+    office: "Main Gate",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  entrance: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  entry: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  campus_entry: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  campus_exit: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  arduino_reader: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  arduino_reader_1: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  lobby: {
+    floor: "ground",
+    office: "Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  cashier: {
+    floor: "ground",
+    office: "Cashier",
+    coordinates: { x: 15.2, y: 28.5 },
+  },
+  staff: {
+    floor: "ground",
+    office: "Staff",
+    coordinates: { x: 15.2, y: 46.8 },
   },
   administration: {
     floor: "ground",
     office: "Administration",
-    coordinates: { x: 18, y: 36 },
+    coordinates: { x: 62, y: 40 },
   },
   registrar: {
     floor: "ground",
     office: "Registrar's Office",
-    coordinates: { x: 45, y: 44 },
+    coordinates: { x: 26.9, y: 46.8 },
+  },
+  registrar_office: {
+    floor: "ground",
+    office: "Registrar's Office",
+    coordinates: { x: 26.9, y: 46.8 },
   },
   accounting: {
     floor: "ground",
     office: "Accounting Office",
-    coordinates: { x: 66, y: 42 },
+    coordinates: { x: 21.8, y: 46.8 },
+  },
+  accounting_office: {
+    floor: "ground",
+    office: "Accounting Office",
+    coordinates: { x: 21.8, y: 46.8 },
+  },
+  file_room: {
+    floor: "ground",
+    office: "File Room",
+    coordinates: { x: 32.4, y: 28.5 },
+  },
+  storage: {
+    floor: "ground",
+    office: "Storage",
+    coordinates: { x: 33.1, y: 46.8 },
+  },
+  offices: {
+    floor: "ground",
+    office: "Offices",
+    coordinates: { x: 62, y: 40 },
+  },
+  pwd_cr: {
+    floor: "ground",
+    office: "PWD CR",
+    coordinates: { x: 78.6, y: 32.5 },
+  },
+  he_she: {
+    floor: "ground",
+    office: "HE, SHE",
+    coordinates: { x: 78.9, y: 41.8 },
+  },
+  kitchen: {
+    floor: "ground",
+    office: "Kitchen",
+    coordinates: { x: 88.4, y: 33 },
   },
   conference_room: {
     floor: "first",
     office: "Conference Room",
-    coordinates: { x: 10, y: 36 },
+    coordinates: { x: 7.6, y: 41 },
   },
   chairman: {
     floor: "first",
     office: "Chairman",
-    coordinates: { x: 21, y: 40 },
+    coordinates: { x: 16.8, y: 45 },
   },
   flight_operations: {
     floor: "first",
     office: "Flight Operations",
-    coordinates: { x: 33, y: 43 },
+    coordinates: { x: 27.2, y: 47 },
   },
   head_of_training_room: {
     floor: "first",
     office: "Head Of Training Room",
-    coordinates: { x: 45, y: 42 },
+    coordinates: { x: 36, y: 44 },
   },
   it_room: {
     floor: "first",
     office: "I.T Room",
-    coordinates: { x: 57, y: 42 },
+    coordinates: { x: 47, y: 45 },
   },
   faculty_room: {
     floor: "first",
     office: "Faculty Room",
-    coordinates: { x: 69, y: 36 },
+    coordinates: { x: 61.8, y: 38 },
   },
   academy_director: {
     floor: "first",
     office: "Academy Director",
-    coordinates: { x: 82, y: 37 },
+    coordinates: { x: 77.4, y: 39 },
   },
   cr: {
     floor: "first",
     office: "CR",
-    coordinates: { x: 94, y: 25 },
+    coordinates: { x: 86.8, y: 27.5 },
   },
   sto: {
     floor: "first",
     office: "STO",
-    coordinates: { x: 94, y: 44 },
+    coordinates: { x: 86.8, y: 47 },
   },
 };
 
@@ -736,12 +836,30 @@ const mapGpsToCampusCoordinates = (latitude, longitude) => {
 };
 
 const getTapLocationFromRequest = (body = {}) => {
-  const checkpointId = normalizeCheckpointId(body.checkpointId || body.checkpoint || body.office);
-  const knownCheckpoint = CHECKPOINT_LOCATIONS[checkpointId] || null;
+  const checkpointCandidates = [
+    body.checkpointId,
+    body.checkpoint,
+    body.readerId,
+    body.gateId,
+    body.location,
+    body.office,
+    body.deviceId,
+  ];
+  const checkpointId =
+    checkpointCandidates.map(normalizeCheckpointId).find(Boolean) || "";
+  const knownCheckpoint =
+    checkpointCandidates
+      .map(normalizeCheckpointId)
+      .map((candidate) => CHECKPOINT_LOCATIONS[candidate])
+      .find(Boolean) || null;
   const coordinates = body.coordinates || {};
 
   return {
-    checkpointId,
+    checkpointId: knownCheckpoint
+      ? Object.keys(CHECKPOINT_LOCATIONS).find(
+          (key) => CHECKPOINT_LOCATIONS[key] === knownCheckpoint,
+        ) || checkpointId
+      : checkpointId,
     floor: String(body.floor || knownCheckpoint?.floor || "").trim(),
     office: String(body.office || knownCheckpoint?.office || checkpointId || "Unknown Checkpoint").trim(),
     coordinates: {
@@ -753,6 +871,39 @@ const getTapLocationFromRequest = (body = {}) => {
         : null,
     },
     source: String(body.source || "arduino_tap").trim(),
+  };
+};
+
+const getVisitorCheckInLocation = (visitor, source = "mobile_app") => {
+  const sourceValue = String(source || "").trim();
+  const candidates = [
+    visitor?.assignedOffice,
+    visitor?.appointmentDepartment,
+    visitor?.host,
+    sourceValue === "virtual_nfc_card" ? "main_gate" : "",
+  ];
+
+  for (const candidate of candidates) {
+    const checkpointId = normalizeCheckpointId(candidate);
+    const knownCheckpoint = CHECKPOINT_LOCATIONS[checkpointId];
+    if (knownCheckpoint) {
+      return {
+        checkpointId,
+        floor: knownCheckpoint.floor,
+        office: knownCheckpoint.office,
+        coordinates: knownCheckpoint.coordinates,
+        source: sourceValue || "mobile_app",
+      };
+    }
+  }
+
+  const fallback = CHECKPOINT_LOCATIONS.main_gate;
+  return {
+    checkpointId: "main_gate",
+    floor: fallback.floor,
+    office: fallback.office,
+    coordinates: fallback.coordinates,
+    source: sourceValue || "mobile_app",
   };
 };
 
@@ -1248,6 +1399,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     let responseMessage = "Visitor location updated";
 
     if (shouldCheckOut) {
+      visitor.updateCurrentLocation(tapLocation, { deviceId });
       visitor.markCheckedOut(null);
       action = "check_out";
       accessType = "exit";
@@ -4911,6 +5063,9 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
     }
 
     visitor.markCheckedIn(req.user._id);
+    visitor.updateCurrentLocation(getVisitorCheckInLocation(visitor, checkInSource), {
+      deviceId: checkInSource === "virtual_nfc_card" ? "visitor-app" : "mobile-app",
+    });
     await visitor.save();
 
     // Create access log
