@@ -187,6 +187,23 @@ const getPhoneOtpDeliveryProvider = () => {
   return "backend_log";
 };
 
+const shouldFallbackPhoneOtpToBackendLog = () =>
+  sensitiveDebugLoggingEnabled ||
+  String(process.env.SEMAPHORE_ALLOW_BACKEND_LOG_FALLBACK || "")
+    .trim()
+    .toLowerCase() === "true";
+
+const logPhoneOtpBackendFallback = ({ phoneNumber, otpCode, method, reason }) => {
+  console.warn(`Semaphore OTP fallback enabled: ${reason || "SMS delivery unavailable"}`);
+  console.log("");
+  console.log("========== PHONE OTP BACKEND FALLBACK ==========");
+  console.log(`Number : ${phoneNumber}`);
+  console.log(`Method : ${method || "sms"}`);
+  console.log(`OTP    : ${otpCode}`);
+  console.log("================================================");
+  console.log("");
+};
+
 const sendSemaphoreOtp = async ({ phoneNumber, otpCode }) => {
   const apiKey = getSemaphoreApiKey();
   if (!apiKey) {
@@ -211,14 +228,16 @@ const sendSemaphoreOtp = async ({ phoneNumber, otpCode }) => {
     payload.set("sendername", senderName);
   }
 
-  const response = await fetch("https://api.semaphore.co/api/v4/otp", {
+  const sendRequest = (requestPayload) => fetch("https://api.semaphore.co/api/v4/otp", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },
-    body: payload.toString(),
+    body: requestPayload.toString(),
   });
+
+  let response = await sendRequest(payload);
 
   const responseText = await response.text();
   let data = null;
@@ -226,6 +245,21 @@ const sendSemaphoreOtp = async ({ phoneNumber, otpCode }) => {
     data = responseText ? JSON.parse(responseText) : null;
   } catch {
     data = responseText;
+  }
+
+  const hasInvalidSenderNameError = (value) =>
+    JSON.stringify(value || {}).toLowerCase().includes("sendername");
+
+  if (!response.ok && senderName && hasInvalidSenderNameError(data)) {
+    console.warn("Semaphore sender name rejected. Retrying OTP SMS with default sender.");
+    payload.delete("sendername");
+    response = await sendRequest(payload);
+    const retryResponseText = await response.text();
+    try {
+      data = retryResponseText ? JSON.parse(retryResponseText) : null;
+    } catch {
+      data = retryResponseText;
+    }
   }
 
   if (!response.ok) {
@@ -4247,20 +4281,30 @@ app.post("/api/auth/request-otp", async (req, res) => {
     // Generate a temporary token
     const tempToken =
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
-    const deliveryProvider = getPhoneOtpDeliveryProvider();
+    let deliveryProvider = getPhoneOtpDeliveryProvider();
 
     if (deliveryProvider === "semaphore") {
       try {
         await sendSemaphoreOtp({ phoneNumber: cleanPhone, otpCode });
       } catch (smsError) {
-        otpStore.delete(cleanPhone);
         console.error("Semaphore OTP SMS error:", smsError?.data || smsError);
-        return res.status(502).json({
-          success: false,
-          message:
-            "Unable to send SMS OTP right now. Please check Semaphore credits, API key, and phone number.",
-          deliveryMode: "semaphore",
-        });
+        if (shouldFallbackPhoneOtpToBackendLog()) {
+          deliveryProvider = "backend_log";
+          logPhoneOtpBackendFallback({
+            phoneNumber: cleanPhone,
+            otpCode,
+            method: method || "sms",
+            reason: "Semaphore account is not ready for SMS sending.",
+          });
+        } else {
+          otpStore.delete(cleanPhone);
+          return res.status(502).json({
+            success: false,
+            message:
+              "Unable to send SMS OTP right now. Please check Semaphore credits, API key, and active sender name.",
+            deliveryMode: "semaphore",
+          });
+        }
       }
     }
 
@@ -6982,11 +7026,6 @@ app.get("/api/admin/users", authMiddleware, async (req, res) => {
       .sort({ createdAt: -1 });
 
     const total = await User.countDocuments(query);
-
-    // Debug log to see what's being returned
-    console.log(`\n📊 ADMIN USERS API - Role filter: ${role || "all"}`);
-    console.log(`Found ${users.length} users`);
-    console.log(`User roles:`, [...new Set(users.map(u => u.role))]);
 
     res.json({
       success: true,
