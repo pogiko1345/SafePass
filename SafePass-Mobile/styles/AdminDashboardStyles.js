@@ -3,6 +3,7 @@ import { Dimensions, Platform, StyleSheet } from "react-native";
 const { width, height } = Dimensions.get("window");
 const sidebarWidth = 284;
 const isWeb = Platform.OS === "web";
+const webHover = (styles) => (isWeb ? styles : {});
 
 export default StyleSheet.create({
   // 1. CONTAINERS - Main layout containers
@@ -24,6 +25,15 @@ export default StyleSheet.create({
     fontSize: 16,
     color: "#475569",
     fontWeight: "600",
+  },
+
+  loadingSubtext: {
+    marginTop: 6,
+    paddingHorizontal: 24,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    textAlign: "center",
   },
 
   mainContainer: {
@@ -163,6 +173,14 @@ export default StyleSheet.create({
     marginHorizontal: 14,
     borderRadius: 16,
     marginBottom: 8,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        transform: "translateX(3px)",
+      },
+    }),
   },
 
   sidebarMenuItemActive: {
@@ -223,6 +241,15 @@ export default StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.9)",
     borderWidth: 1,
     borderColor: "#D9E4F0",
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        borderColor: "#9EC5F8",
+        transform: "translateX(3px)",
+      },
+    }),
   },
 
   sidebarOverviewButtonActive: {
@@ -241,6 +268,13 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D9E4F0",
     overflow: "hidden",
+    ...webHover({
+      transition: "all 0.18s ease",
+      ":hover": {
+        borderColor: "#B7D5F6",
+        boxShadow: "0px 10px 22px rgba(15, 23, 42, 0.07)",
+      },
+    }),
   },
 
   sidebarModuleButton: {
@@ -248,6 +282,14 @@ export default StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 13,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        transform: "translateX(3px)",
+      },
+    }),
   },
 
   sidebarModuleButtonActive: {
@@ -280,6 +322,14 @@ export default StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
     backgroundColor: "#FFFFFF",
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        transform: "translateX(3px)",
+      },
+    }),
   },
 
   sidebarSubmoduleButtonActive: {
@@ -324,6 +374,15 @@ export default StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.9)",
     borderWidth: 1,
     borderColor: "#D9E4F0",
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        borderColor: "#9EC5F8",
+        transform: "translateX(3px)",
+      },
+    }),
   },
 
   sidebarUtilityButtonActive: {
@@ -385,6 +444,15 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FECACA",
     gap: 12,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#FCA5A5",
+        borderColor: "#EF4444",
+        transform: "translateY(-1px)",
+      },
+    }),
   },
 
   sidebarLogoutText: {
@@ -1385,9 +1453,9 @@ export default StyleSheet.create({
 
   header: {
     backgroundColor: "#0A3D91",
-    paddingHorizontal: 28,
-    paddingTop: Platform.select({ ios: 50, android: 20, web: 20 }),
-    paddingBottom: 18,
+    paddingHorizontal: width <= 420 ? 18 : 28,
+    paddingTop: Platform.select({ ios: width <= 420 ? 38 : 50, android: 18, web: 16 }),
+    paddingBottom: width <= 420 ? 14 : 18,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
     borderBottomWidth: 1,
@@ -1412,7 +1480,7 @@ export default StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 24,
+    fontSize: width <= 420 ? 20 : 24,
     fontWeight: "800",
     color: "#FFFFFF",
     letterSpacing: -0.4,
@@ -1424,7 +1492,7 @@ export default StyleSheet.create({
   },
 
   headerSubtitle: {
-    fontSize: 13,
+    fontSize: width <= 420 ? 12 : 13,
     color: "#DCEBFF",
     marginTop: 6,
     lineHeight: 20,

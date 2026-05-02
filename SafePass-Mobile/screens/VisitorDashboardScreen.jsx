@@ -2396,7 +2396,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       <SafeAreaView style={visitorDashboardStyles.loadingContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
         <ActivityIndicator size="large" color="#0A3D91" />
-        <Text style={visitorDashboardStyles.loadingText}>Loading your pass...</Text>
+        <Text style={visitorDashboardStyles.loadingText}>Loading your visitor dashboard...</Text>
+        <Text style={visitorDashboardStyles.loadingSubtext}>Restoring your pass, appointment, and campus map.</Text>
       </SafeAreaView>
     );
   }

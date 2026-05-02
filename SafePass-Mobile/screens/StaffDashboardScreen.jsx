@@ -13,6 +13,8 @@ import {
   Platform,
   LayoutAnimation,
   UIManager,
+  Animated,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -20,6 +22,42 @@ import { LinearGradient } from "expo-linear-gradient";
 import ApiService from "../utils/ApiService";
 import { printRecordsTable } from "../utils/printUtils";
 import styles from "../styles/StaffDashboardStyles";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const SidebarHoverPressable = ({ children, style, hoverScale = 1.035, onPress, disabled, ...props }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const animateScale = useCallback((toValue) => {
+    if (Platform.OS !== "web") return;
+    Animated.spring(scale, {
+      toValue,
+      useNativeDriver: true,
+      tension: 180,
+      friction: 12,
+    }).start();
+  }, [scale]);
+
+  return (
+    <AnimatedPressable
+      {...props}
+      disabled={disabled}
+      onPress={onPress}
+      onHoverIn={() => animateScale(hoverScale)}
+      onHoverOut={() => animateScale(1)}
+      onMouseEnter={() => animateScale(hoverScale)}
+      onMouseLeave={() => animateScale(1)}
+      style={[
+        style,
+        Platform.OS === "web" && styles.sidebarHoverSurface,
+        { transform: [{ scale }] },
+        disabled && { opacity: 0.7 },
+      ]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+};
 
 const formatDate = (value) =>
   value
@@ -184,6 +222,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [detailAppointment, setDetailAppointment] = useState(null);
   const itemsPerPage = 5;
 
@@ -919,9 +958,35 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleLogout = async () => {
-    await ApiService.logout();
-    if (typeof onLogout === "function") onLogout();
-    navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+    const performLogout = async () => {
+      if (isSigningOut) return;
+      setIsSigningOut(true);
+      try {
+        await ApiService.logout();
+      } finally {
+        if (typeof onLogout === "function") onLogout();
+        navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmed = globalThis?.window?.confirm?.(
+        "Are you sure you want to sign out?",
+      );
+      if (confirmed) {
+        await performLogout();
+      }
+      return;
+    }
+
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Sign Out", style: "destructive", onPress: performLogout },
+      ],
+    );
   };
 
   const buildAppointmentPrintRows = (records) =>
@@ -1405,6 +1470,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Text style={styles.emptySubtitle}>
               Approved or adjusted appointments for today will appear here automatically.
             </Text>
+            <TouchableOpacity style={styles.emptyRefreshButton} onPress={onRefresh}>
+              <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
+              <Text style={styles.emptyRefreshButtonText}>Refresh dashboard</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.todayScheduleList}>
@@ -1517,6 +1586,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Ionicons name="notifications-off-outline" size={42} color="#94A3B8" />
             <Text style={styles.emptyTitle}>No notifications yet</Text>
             <Text style={styles.emptySubtitle}>Updates from admin and visitor appointment activity will appear here.</Text>
+            <TouchableOpacity style={styles.emptyRefreshButton} onPress={loadData}>
+              <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
+              <Text style={styles.emptyRefreshButtonText}>Check again</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           (notifications || []).slice(0, 5).map((notification) => (
@@ -1997,10 +2070,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const renderSidebar = () => (
     <View style={styles.sidebar}>
-        <TouchableOpacity
+        <SidebarHoverPressable
           style={styles.sidebarHeader}
           onPress={() => selectSubmodule("account-info")}
-          activeOpacity={0.85}
+          hoverScale={1.025}
         >
           <View style={styles.sidebarAvatar}>
             <Text style={styles.sidebarAvatarText}>{profileInitials}</Text>
@@ -2010,7 +2083,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Text style={styles.sidebarUserRole}>Staff Panel</Text>
           </View>
           <Ionicons name="chevron-forward-outline" size={18} color="#64748B" />
-        </TouchableOpacity>
+        </SidebarHoverPressable>
 
       <ScrollView style={styles.sidebarScroll} showsVerticalScrollIndicator={false}>
         {staffModules.map((module) => {
@@ -2022,13 +2095,13 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
           return (
             <View key={module.key} style={styles.sidebarModuleCard}>
-              <TouchableOpacity
+              <SidebarHoverPressable
                 style={[
                   styles.sidebarModuleButton,
                   hasSelectedChild && styles.sidebarModuleButtonActive,
                 ]}
                 onPress={() => toggleModule(module.key)}
-                activeOpacity={0.85}
+                hoverScale={1.03}
               >
                 <View style={[styles.sidebarModuleIcon, { backgroundColor: `${module.color}18` }]}>
                   <Ionicons name={module.icon} size={20} color={module.color} />
@@ -2052,21 +2125,21 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                   size={18}
                   color={hasSelectedChild ? module.color : "#64748B"}
                 />
-              </TouchableOpacity>
+              </SidebarHoverPressable>
 
               {!isHomeModule && isExpanded ? (
                 <View style={styles.sidebarSubmoduleList}>
                   {module.submodules.map((submodule) => {
                     const isActive = selectedSubmodule === submodule.key;
                     return (
-                      <TouchableOpacity
+                      <SidebarHoverPressable
                         key={submodule.key}
                         style={[
                           styles.sidebarSubmoduleButton,
                           isActive && styles.sidebarSubmoduleButtonActive,
                         ]}
                         onPress={() => selectSubmodule(submodule.key)}
-                        activeOpacity={0.85}
+                        hoverScale={1.035}
                       >
                         <Text
                           style={[
@@ -2081,7 +2154,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                             <Text style={styles.sidebarSubmoduleBadgeText}>{submodule.badge}</Text>
                           </View>
                         ) : null}
-                      </TouchableOpacity>
+                      </SidebarHoverPressable>
                     );
                   })}
                 </View>
@@ -2091,10 +2164,21 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         })}
       </ScrollView>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-        <Text style={styles.logoutButtonText}>Sign Out</Text>
-      </TouchableOpacity>
+      <SidebarHoverPressable
+        style={styles.logoutButton}
+        onPress={handleLogout}
+        hoverScale={1.035}
+        disabled={isSigningOut}
+      >
+        {isSigningOut ? (
+          <ActivityIndicator size="small" color="#DC2626" />
+        ) : (
+          <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+        )}
+        <Text style={styles.logoutButtonText}>
+          {isSigningOut ? "Signing Out..." : "Sign Out"}
+        </Text>
+      </SidebarHoverPressable>
     </View>
   );
 
@@ -2118,7 +2202,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0A3D91" />
-        <Text style={styles.loadingText}>Loading staff dashboard...</Text>
+        <Text style={styles.loadingText}>Loading staff appointments...</Text>
+        <Text style={styles.loadingSubtext}>Restoring requests, records, and notifications.</Text>
       </SafeAreaView>
     );
   }
@@ -2133,7 +2218,16 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         <View style={styles.contentArea}>
           <ScrollView
             style={styles.contentScroll}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#0A3D91"
+                colors={["#0A3D91"]}
+                title="Refreshing dashboard..."
+                titleColor="#0A3D91"
+              />
+            }
             contentContainerStyle={styles.scrollContent}
           >
             <View style={styles.pageHeaderCard}>

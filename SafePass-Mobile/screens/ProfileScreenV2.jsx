@@ -73,6 +73,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   const [showSavedBanner, setShowSavedBanner] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("English");
   const [passwordForm, setPasswordForm] = useState({
@@ -201,12 +202,18 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   };
 
   const checkBiometricAvailability = async () => {
-    if (Platform.OS === "web") return setBiometricEnabled(false);
+    if (Platform.OS === "web") {
+      setIsBiometricAvailable(false);
+      return setBiometricEnabled(false);
+    }
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!hasHardware || !enrolled) setBiometricEnabled(false);
+      const available = Boolean(hasHardware && enrolled);
+      setIsBiometricAvailable(available);
+      if (!available) setBiometricEnabled(false);
     } catch (e) {
+      setIsBiometricAvailable(false);
       setBiometricEnabled(false);
     }
   };
@@ -296,7 +303,28 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   };
   const handleSave = async () => {
     if (!editedProfile) return;
-    if (editedProfile.phone && !isValidPhilippineMobileNumber(editedProfile.phone)) {
+    const firstName = String(editedProfile.firstName || "").trim();
+    const lastName = String(editedProfile.lastName || "").trim();
+    const email = String(editedProfile.email || "").trim().toLowerCase();
+    const username = String(editedProfile.username || "").trim().toLowerCase();
+    const phone = String(editedProfile.phone || "").trim();
+
+    if (!firstName || !lastName) {
+      Alert.alert("Missing Name", "Please enter your first and last name.");
+      return;
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
+    if (!username) {
+      Alert.alert("Missing Username", "Please enter your username.");
+      return;
+    }
+
+    if (phone && !isValidPhilippineMobileNumber(phone)) {
       Alert.alert("Invalid Contact Number", PHILIPPINE_MOBILE_NUMBER_MESSAGE);
       return;
     }
@@ -304,17 +332,14 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
     setIsSaving(true);
     try {
       const updates = {
-        firstName: editedProfile.firstName || "",
-        lastName: editedProfile.lastName || "",
-        email: editedProfile.email || "",
-        phone: editedProfile.phone ? normalizePhilippineMobileNumber(editedProfile.phone) : "",
-        emergencyContact: editedProfile.emergencyContact || "",
+        firstName,
+        lastName,
+        email,
+        phone: phone ? normalizePhilippineMobileNumber(phone) : "",
+        emergencyContact: String(editedProfile.emergencyContact || "").trim(),
         profilePhoto: editedProfile.profilePhoto || null,
+        username,
       };
-
-      if (editedProfile.username || profile?.username) {
-        updates.username = editedProfile.username || "";
-      }
 
       const response = await ApiService.updateProfile(updates);
       if (!response?.user)
@@ -419,22 +444,52 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
 
   const shareProfile = async () => {
     if (!profile) return;
+    const message = `SafePass Profile\n\nName: ${profile.firstName} ${profile.lastName}\nRole: ${roleConfig.label}\nEmail: ${profile.email}\nPhone: ${profile.phone || "Not set"}`;
+
     try {
-      await Share.share({
-        title: "SafePass Profile",
-        message: `SafePass Profile\n\nName: ${profile.firstName} ${profile.lastName}\nRole: ${roleConfig.label}\nEmail: ${profile.email}\nPhone: ${profile.phone || "Not set"}`,
-      });
+      if (Platform.OS === "web") {
+        if (typeof globalThis?.navigator?.share === "function") {
+          await globalThis.navigator.share({
+            title: "SafePass Profile",
+            text: message,
+          });
+          return;
+        }
+
+        const clipboard = globalThis?.navigator?.clipboard;
+        if (clipboard?.writeText) {
+          await clipboard.writeText(message);
+          Alert.alert("Profile Copied", "Your profile summary was copied.");
+          return;
+        }
+      }
+
+      await Share.share({ title: "SafePass Profile", message });
     } catch (e) {
       console.error("Share error:", e);
+      Alert.alert("Unable To Share", "Please try again.");
     }
   };
 
   const toggleBiometric = async (value) => {
-    if (Platform.OS === "web") return setBiometricEnabled(false);
+    if (Platform.OS === "web") {
+      setBiometricEnabled(false);
+      Alert.alert("Unavailable On Web", "Biometric login is available in the mobile app.");
+      return;
+    }
     if (!value) {
       await Storage.removeItem(BIOMETRIC_LOGIN_EMAIL_KEY);
       await Storage.removeItem(BIOMETRIC_LOGIN_PASSWORD_KEY);
+      await Storage.removeItem("biometricUserEmail");
       return setBiometricEnabled(false);
+    }
+    if (!isBiometricAvailable) {
+      setBiometricEnabled(false);
+      Alert.alert(
+        "Biometrics Unavailable",
+        "Set up Face ID, fingerprint, or device biometrics first.",
+      );
+      return;
     }
     try {
       const result = await LocalAuthentication.authenticateAsync({
@@ -442,6 +497,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         fallbackLabel: "Use passcode",
       });
       if (result.success) {
+        await Storage.setItem(BIOMETRIC_LOGIN_EMAIL_KEY, currentProfile?.email || "");
         await Storage.setItem("biometricUserEmail", currentProfile?.email || "");
         setBiometricEnabled(true);
         Alert.alert(
@@ -462,6 +518,23 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   };
 
   const showLanguagePicker = () => {
+    if (Platform.OS === "web") {
+      const nextLanguage = globalThis?.window?.prompt?.(
+        `Choose language: ${LANGUAGES.join(" or ")}`,
+        selectedLanguage,
+      );
+      if (!nextLanguage) return;
+      const match = LANGUAGES.find(
+        (language) => language.toLowerCase() === nextLanguage.trim().toLowerCase(),
+      );
+      if (match) {
+        setSelectedLanguage(match);
+      } else {
+        Alert.alert("Language Not Available", "Please choose English or Filipino / Tagalog.");
+      }
+      return;
+    }
+
     Alert.alert("Select Language", "Choose your preferred language", [
       ...LANGUAGES.map((language) => ({
         text: language,
@@ -690,12 +763,15 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         <View style={styles.prefText}>
           <Text style={[styles.prefTitle, isDarkProfile && styles.darkText]}>Biometric Login</Text>
           <Text style={themedMutedStyle}>
-            Use your device biometrics for faster sign in.
+            {isBiometricAvailable
+              ? "Use your device biometrics for faster sign in."
+              : "Available after biometrics are set up in the mobile app."}
           </Text>
         </View>
         <Switch
           value={biometricEnabled}
           onValueChange={toggleBiometric}
+          disabled={!isBiometricAvailable}
           trackColor={{ false: "#CBD5E1", true: "#0A3D91" }}
           thumbColor="#FFFFFF"
         />

@@ -23,6 +23,15 @@ export default StyleSheet.create({
     fontWeight: "500",
   },
 
+  loadingSubtext: {
+    marginTop: 6,
+    paddingHorizontal: 24,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    textAlign: "center",
+  },
+
   mainScrollView: {
     flex: 1,
     backgroundColor: "#F4F7FB",
@@ -106,8 +115,8 @@ export default StyleSheet.create({
   // ============ HEADER ============
   header: {
     paddingHorizontal: width <= 390 ? 16 : 20,
-    paddingTop: Platform.select({ ios: 50, android: 24, web: 14 }),
-    paddingBottom: 16,
+    paddingTop: Platform.select({ ios: width <= 390 ? 38 : 46, android: 20, web: 12 }),
+    paddingBottom: width <= 390 ? 12 : 14,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },

@@ -37,6 +37,8 @@ const Storage = Platform.OS === "web"
 const BIOMETRIC_LOGIN_EMAIL_KEY = "biometricLoginEmail";
 const BIOMETRIC_LOGIN_PASSWORD_KEY = "biometricLoginPassword";
 const LAST_ACTIVITY_AT_KEY = "lastActivityAt";
+const AUTH_NOTICE_KEY = "authNotice";
+const SESSION_EXPIRED_MESSAGE = "Your session expired. Please sign in again.";
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
@@ -284,6 +286,12 @@ export default function LoginScreen({ navigation, route }) {
       const connected = await ApiService.testConnection();
       setApiConnected(connected);
 
+      const authNotice = await Storage.getItem(AUTH_NOTICE_KEY);
+      if (authNotice) {
+        setLoginError(authNotice);
+        await Storage.removeItem(AUTH_NOTICE_KEY);
+      }
+
       if (!initialEmail) {
         const rememberedEmail = await Storage.getItem("rememberedEmail");
         if (rememberedEmail) {
@@ -312,6 +320,7 @@ export default function LoginScreen({ navigation, route }) {
             setEmail(rememberedEmail);
             setRememberMe(true);
           }
+          setLoginError(SESSION_EXPIRED_MESSAGE);
           return;
         }
 
@@ -330,9 +339,19 @@ export default function LoginScreen({ navigation, route }) {
         });
       } else if (token || (await Storage.getItem("currentUser"))) {
         await ApiService.clearAuth();
+        setLoginError(SESSION_EXPIRED_MESSAGE);
       }
     } catch (error) {
       console.error("Auth check error:", error);
+      const message = String(error?.message || "").toLowerCase();
+      if (
+        error?.status === 401 ||
+        message.includes("401") ||
+        message.includes("authenticate")
+      ) {
+        await ApiService.clearAuth();
+        setLoginError(SESSION_EXPIRED_MESSAGE);
+      }
     } finally {
       setIsCheckingAuth(false);
     }
@@ -947,7 +966,7 @@ export default function LoginScreen({ navigation, route }) {
       <View style={loginStyles.splashContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#1A2A6C" />
         <ActivityIndicator size="large" color="#FFFFFF" />
-        <Text style={loginStyles.splashText}>Loading...</Text>
+        <Text style={loginStyles.splashText}>Restoring your session...</Text>
       </View>
     );
   }

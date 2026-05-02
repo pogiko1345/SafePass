@@ -15,10 +15,11 @@ import {
   Platform,
   Animated,
   StatusBar,
-  Dimensions,
   LayoutAnimation,
   UIManager,
   AppState,
+  useWindowDimensions,
+  Pressable,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
@@ -43,13 +44,50 @@ import {
   MONITORING_MAP_OFFICE_POSITIONS,
 } from "../utils/monitoringMapConfig";
 
-const { width, height } = Dimensions.get("window");
-const isDesktop = width >= 1024;
 const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
 const SECURITY_LIVE_REFRESH_INTERVAL_MS = 10000;
 const SECURITY_NOTIFICATION_REFRESH_INTERVAL_MS = 30000;
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const SidebarHoverPressable = ({ children, style, hoverScale = 1.035, onPress, disabled, ...props }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const animateScale = (toValue) => {
+    if (Platform.OS !== "web") return;
+    Animated.spring(scale, {
+      toValue,
+      useNativeDriver: true,
+      tension: 180,
+      friction: 12,
+    }).start();
+  };
+
+  return (
+    <AnimatedPressable
+      {...props}
+      disabled={disabled}
+      onPress={onPress}
+      onHoverIn={() => animateScale(hoverScale)}
+      onHoverOut={() => animateScale(1)}
+      onMouseEnter={() => animateScale(hoverScale)}
+      onMouseLeave={() => animateScale(1)}
+      style={[
+        style,
+        Platform.OS === "web" && styles.sidebarHoverSurface,
+        { transform: [{ scale }] },
+        disabled && { opacity: 0.7 },
+      ]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+};
 
 export default function SecurityDashboardScreen({ navigation }) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const isDesktop = viewportWidth >= 1024;
+  const sidebarTargetWidth = isDesktop ? 280 : 260;
+
   // ============ STATE MANAGEMENT ============
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -326,6 +364,17 @@ export default function SecurityDashboardScreen({ navigation }) {
       }
     }
   };
+
+  useEffect(() => {
+    const nextSidebarOpen = isDesktop;
+    setSidebarOpen(nextSidebarOpen);
+    Animated.spring(sidebarAnim, {
+      toValue: nextSidebarOpen ? 1 : 0,
+      useNativeDriver: false,
+      tension: 260,
+      friction: 28,
+    }).start();
+  }, [isDesktop, sidebarAnim]);
 
   const toggleSidebar = () => {
     const toValue = sidebarOpen ? 0 : 1;
@@ -1646,7 +1695,14 @@ export default function SecurityDashboardScreen({ navigation }) {
       style={styles.scrollView}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={refreshData} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refreshData}
+          tintColor="#0A3D91"
+          colors={["#0A3D91"]}
+          title="Refreshing dashboard..."
+          titleColor="#0A3D91"
+        />
       }
     >
       <View style={styles.dashboardShell}>
@@ -1773,6 +1829,10 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Ionicons name="pulse-outline" size={44} color="#D1D5DB" />
                 <Text style={styles.emptyStateTitle}>No live visitor activity</Text>
                 <Text style={styles.emptyStateSubtitle}>Approved arrivals and active check-ins will appear here automatically.</Text>
+                <TouchableOpacity style={styles.emptyRefreshButton} onPress={refreshData}>
+                  <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
+                  <Text style={styles.emptyRefreshButtonText}>Refresh dashboard</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -1830,6 +1890,10 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Ionicons name="business-outline" size={48} color="#D1D5DB" />
                 <Text style={styles.emptyStateTitle}>No Office Traffic Yet</Text>
                 <Text style={styles.emptyStateSubtitle}>Visitor assignments will appear here once registrations come in</Text>
+                <TouchableOpacity style={styles.emptyRefreshButton} onPress={refreshData}>
+                  <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
+                  <Text style={styles.emptyRefreshButtonText}>Check again</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -2840,7 +2904,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderSidebar = () => {
     const sidebarWidth = sidebarAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, isDesktop ? 280 : 260],
+      outputRange: [0, sidebarTargetWidth],
     });
     
     return (
@@ -2854,9 +2918,9 @@ export default function SecurityDashboardScreen({ navigation }) {
             </View>
           </View>
           {!isDesktop && (
-            <TouchableOpacity onPress={toggleSidebar} style={styles.sidebarClose}>
+            <SidebarHoverPressable onPress={toggleSidebar} style={styles.sidebarClose} hoverScale={1.08}>
               <Ionicons name="close" size={22} color="#64748B" />
-            </TouchableOpacity>
+            </SidebarHoverPressable>
           )}
         </View>
         
@@ -2889,7 +2953,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
               return (
                 <View key={module.key} style={styles.sidebarModuleCard}>
-                  <TouchableOpacity
+                  <SidebarHoverPressable
                     style={[
                       styles.sidebarNavItem,
                       hasSelectedChild && styles.sidebarNavItemActive,
@@ -2899,6 +2963,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                         ? selectGuardSubmodule('home-main')
                         : toggleGuardModule(module.key)
                     }
+                    hoverScale={1.03}
                   >
                     <View style={[styles.sidebarNavIcon, hasSelectedChild && { backgroundColor: `${module.color}20` }]}>
                       <Ionicons
@@ -2923,20 +2988,21 @@ export default function SecurityDashboardScreen({ navigation }) {
                       />
                     ) : null}
                     {hasSelectedChild && <View style={[styles.sidebarNavIndicator, { backgroundColor: module.color }]} />}
-                  </TouchableOpacity>
+                  </SidebarHoverPressable>
 
                   {isExpanded && !isDirectHomeModule ? (
                     <View style={styles.sidebarSubmoduleList}>
                       {module.submodules.map((submodule) => {
                         const isActive = selectedSubmodule === submodule.key;
                         return (
-                          <TouchableOpacity
+                          <SidebarHoverPressable
                             key={submodule.key}
                             style={[
                               styles.sidebarSubmoduleButton,
                               isActive && styles.sidebarSubmoduleButtonActive,
                             ]}
                             onPress={() => selectGuardSubmodule(submodule.key)}
+                            hoverScale={1.035}
                           >
                             <Text
                               style={[
@@ -2951,7 +3017,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                                 <Text style={styles.sidebarSubmoduleBadgeText}>{submodule.badge}</Text>
                               </View>
                             ) : null}
-                          </TouchableOpacity>
+                          </SidebarHoverPressable>
                         );
                       })}
                     </View>
@@ -2995,11 +3061,11 @@ export default function SecurityDashboardScreen({ navigation }) {
           )}
 
           {/* Logout Button */}
-          <TouchableOpacity 
+          <SidebarHoverPressable
             style={styles.sidebarLogout}
             onPress={handleLogoutPress}
             disabled={isLoggingOut}
-            activeOpacity={0.8}
+            hoverScale={1.035}
           >
             {isLoggingOut ? (
               <ActivityIndicator size="small" color="#DC2626" />
@@ -3009,7 +3075,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Text style={styles.sidebarLogoutText}>Sign Out</Text>
               </>
             )}
-          </TouchableOpacity>
+          </SidebarHoverPressable>
 
           {/* Version */}
           <Text style={styles.sidebarVersion}>SafePass v2.1.0</Text>
@@ -3184,7 +3250,8 @@ export default function SecurityDashboardScreen({ navigation }) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0A3D91" />
-        <Text style={styles.loadingText}>Loading security dashboard...</Text>
+        <Text style={styles.loadingText}>Loading security operations...</Text>
+        <Text style={styles.loadingSubtext}>Restoring live visitors, alerts, and access logs.</Text>
       </SafeAreaView>
     );
   }

@@ -4950,7 +4950,16 @@ const loadDashboardData = useCallback(async () => {
     <ScrollView
       style={styles.contentScrollView}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#1C6DD0"
+          colors={["#1C6DD0"]}
+          title="Refreshing dashboard..."
+          titleColor="#1C6DD0"
+        />
+      }
     >
         <View style={styles.pageContainer}>
           <View style={styles.pageHeader}>
@@ -8666,7 +8675,8 @@ const loadDashboardData = useCallback(async () => {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#1C6DD0" />
-        <Text style={styles.loadingText}>Loading Dashboard...</Text>
+        <Text style={styles.loadingText}>Loading admin dashboard...</Text>
+        <Text style={styles.loadingSubtext}>Restoring requests, users, reports, and live campus data.</Text>
       </SafeAreaView>
     );
   }

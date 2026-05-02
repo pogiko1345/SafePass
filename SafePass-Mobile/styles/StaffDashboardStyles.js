@@ -1,6 +1,8 @@
 import { Dimensions, Platform, StyleSheet } from "react-native";
 
 const { width } = Dimensions.get("window");
+const isWeb = Platform.OS === "web";
+const webHover = (styles) => (isWeb ? styles : {});
 
 export default StyleSheet.create({
   safeArea: {
@@ -51,7 +53,14 @@ export default StyleSheet.create({
         shadowRadius: 18,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 12px 22px rgba(15, 23, 42, 0.06)" },
+      web: {
+        boxShadow: "0px 12px 22px rgba(15, 23, 42, 0.06)",
+        transition: "box-shadow 0.2s ease, border-color 0.2s ease",
+        ":hover": {
+          borderColor: "#B7D5F6",
+          boxShadow: "0px 16px 28px rgba(15, 23, 42, 0.08)",
+        },
+      },
     }),
   },
 
@@ -93,6 +102,11 @@ export default StyleSheet.create({
     flexGrow: 0,
   },
 
+  sidebarHoverSurface: {
+    cursor: "pointer",
+    transformOrigin: "center",
+  },
+
   sidebarModuleCard: {
     marginBottom: 10,
   },
@@ -106,6 +120,15 @@ export default StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.9)",
     borderWidth: 1,
     borderColor: "#D9E4F0",
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        borderColor: "#9EC5F8",
+        transform: "translateX(3px)",
+      },
+    }),
   },
 
   sidebarModuleButtonActive: {
@@ -120,6 +143,12 @@ export default StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
+    ...webHover({
+      transition: "transform 0.18s ease",
+      ":hover": {
+        transform: "scale(1.05)",
+      },
+    }),
   },
 
   sidebarModuleLabel: {
@@ -150,6 +179,14 @@ export default StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     backgroundColor: "#FFFFFF",
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        transform: "translateX(3px)",
+      },
+    }),
   },
 
   sidebarSubmoduleButtonActive: {
@@ -205,6 +242,15 @@ export default StyleSheet.create({
     color: "#475569",
   },
 
+  loadingSubtext: {
+    marginTop: 6,
+    paddingHorizontal: 24,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    textAlign: "center",
+  },
+
   scrollContent: {
     padding: 18,
     paddingBottom: 40,
@@ -253,8 +299,8 @@ export default StyleSheet.create({
   },
 
   heroCard: {
-    borderRadius: 24,
-    padding: 22,
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
     ...Platform.select({
@@ -288,7 +334,7 @@ export default StyleSheet.create({
   },
 
   heroTitle: {
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: "800",
     color: "#FFFFFF",
     marginTop: 6,
@@ -310,8 +356,8 @@ export default StyleSheet.create({
 
   statsRow: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 20,
+    gap: 10,
+    marginTop: 16,
     flexWrap: "wrap",
   },
 
@@ -337,7 +383,16 @@ export default StyleSheet.create({
         shadowRadius: 18,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 14px 28px rgba(15, 23, 42, 0.05)" },
+      web: {
+        boxShadow: "0px 14px 28px rgba(15, 23, 42, 0.05)",
+        cursor: "default",
+        transition: "all 0.2s ease",
+        ":hover": {
+          transform: "translateY(-3px)",
+          boxShadow: "0px 18px 34px rgba(15, 23, 42, 0.09)",
+          borderColor: "#B7D5F6",
+        },
+      },
     }),
   },
 
@@ -392,6 +447,16 @@ export default StyleSheet.create({
     borderColor: "#DCE8F4",
     backgroundColor: "#F8FBFE",
     padding: 16,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#FFFFFF",
+        borderColor: "#B7D5F6",
+        transform: "translateY(-2px)",
+        boxShadow: "0px 10px 24px rgba(15, 23, 42, 0.08)",
+      },
+    }),
   },
 
   todayScheduleTopRow: {
@@ -490,7 +555,16 @@ export default StyleSheet.create({
         shadowRadius: 18,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 14px 26px rgba(15, 23, 42, 0.05)" },
+      web: {
+        boxShadow: "0px 14px 26px rgba(15, 23, 42, 0.05)",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        ":hover": {
+          transform: "translateY(-4px)",
+          boxShadow: "0px 20px 38px rgba(15, 23, 42, 0.10)",
+          borderColor: "#B7D5F6",
+        },
+      },
     }),
   },
 
@@ -616,7 +690,14 @@ export default StyleSheet.create({
         shadowRadius: 22,
       },
       android: { elevation: 3 },
-      web: { boxShadow: "0px 16px 32px rgba(15, 23, 42, 0.06)" },
+      web: {
+        boxShadow: "0px 16px 32px rgba(15, 23, 42, 0.06)",
+        transition: "box-shadow 0.2s ease, border-color 0.2s ease",
+        ":hover": {
+          boxShadow: "0px 20px 38px rgba(15, 23, 42, 0.08)",
+          borderColor: "#CFE0F2",
+        },
+      },
     }),
   },
 
@@ -659,6 +740,14 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#BFDBFE",
     backgroundColor: "#EEF5FF",
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#DCEBFF",
+        transform: "translateY(-1px)",
+      },
+    }),
   },
 
   sectionActionButtonText: {
@@ -676,6 +765,15 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#DCE8F4",
     backgroundColor: "#F8FBFE",
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        borderColor: "#B7D5F6",
+        transform: "translateY(-1px)",
+      },
+    }),
   },
 
   emptyState: {
@@ -696,6 +794,25 @@ export default StyleSheet.create({
     color: "#64748B",
     textAlign: "center",
     lineHeight: 19,
+  },
+
+  emptyRefreshButton: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#D8E6F5",
+  },
+
+  emptyRefreshButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0A3D91",
   },
 
   appointmentCard: {
@@ -894,6 +1011,16 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5EDF5",
     marginBottom: 10,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#FFFFFF",
+        borderColor: "#B7D5F6",
+        transform: "translateX(3px)",
+        boxShadow: "0px 10px 22px rgba(15, 23, 42, 0.07)",
+      },
+    }),
   },
 
   notificationItemUnread: {
@@ -1740,6 +1867,15 @@ export default StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#FECACA",
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#FEF2F2",
+        borderColor: "#FCA5A5",
+        transform: "translateY(-1px)",
+      },
+    }),
   },
 
   logoutButtonText: {

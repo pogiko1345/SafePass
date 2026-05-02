@@ -60,6 +60,8 @@ const APP_NAME = APP_DISPLAY_NAME;
 const APP_ORGANIZATION = APP_ORGANIZATION_NAME;
 const IDLE_LOGOUT_MS = 15 * 60 * 1000;
 const LAST_ACTIVITY_AT_KEY = "lastActivityAt";
+const AUTH_NOTICE_KEY = "authNotice";
+const SESSION_EXPIRED_MESSAGE = "Your session expired. Please sign in again.";
 const WEB_ROUTE_TITLES = {
   RoleSelect: `Access Portal | ${APP_ORGANIZATION}`,
   Login: `Login | ${APP_ORGANIZATION}`,
@@ -224,6 +226,7 @@ export default function App() {
         if (!rememberedSessionActive) {
           console.log("Remembered login expired. Asking user to sign in again.");
           await ApiService.clearAuth();
+          await Storage.setItem(AUTH_NOTICE_KEY, SESSION_EXPIRED_MESSAGE);
           setCurrentUser(null);
           return;
         }
@@ -262,6 +265,15 @@ export default function App() {
       }
     } catch (error) {
       console.error("Auth check error:", error);
+      const message = String(error?.message || "").toLowerCase();
+      if (
+        error?.status === 401 ||
+        message.includes("401") ||
+        message.includes("authenticate")
+      ) {
+        await ApiService.clearAuth();
+        await Storage.setItem(AUTH_NOTICE_KEY, SESSION_EXPIRED_MESSAGE);
+      }
       setCurrentUser(null);
     } finally {
       setIsLoading(false);
@@ -336,7 +348,7 @@ export default function App() {
               textAlign: "center",
             }}
           >
-            Preparing your secure access portal
+            Restoring your session
           </Text>
           <Text
             style={{
@@ -347,7 +359,7 @@ export default function App() {
               textAlign: "center",
             }}
           >
-            Verifying your session and loading the appropriate dashboard.
+            Keeping you signed in and opening the right dashboard.
           </Text>
         </View>
       </View>

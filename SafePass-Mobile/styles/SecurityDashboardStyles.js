@@ -100,6 +100,15 @@ export default StyleSheet.create({
     marginTop: spacing.md,
   },
 
+  loadingSubtext: {
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xl,
+    fontSize: fontSize.sm,
+    lineHeight: 18,
+    color: "#64748B",
+    textAlign: "center",
+  },
+
   scrollView: {
     flex: 1,
   },
@@ -126,8 +135,8 @@ export default StyleSheet.create({
 
   pageHeaderCard: {
     backgroundColor: "#0A3D91",
-    borderRadius: 24,
-    padding: spacing.lg,
+    borderRadius: isSmallPhone ? 18 : 24,
+    padding: isSmallPhone ? spacing.md : spacing.lg,
     borderWidth: 1,
     borderColor: "#B7D5F6",
     ...Platform.select({
@@ -177,7 +186,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: spacing.md,
+    marginBottom: isSmallPhone ? spacing.sm : spacing.md,
     gap: spacing.md,
     flexWrap: "wrap",
   },
@@ -209,13 +218,13 @@ export default StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: isSmallPhone ? 22 : isTablet ? 28 : 28,
+    fontSize: isSmallPhone ? 20 : isMediumPhone ? 22 : isTablet ? 28 : 28,
     fontWeight: "800",
     color: "#FFFFFF",
   },
 
   headerSubtitle: {
-    fontSize: fontSize.base,
+    fontSize: isSmallPhone ? fontSize.sm : fontSize.base,
     color: "#DCEBFF",
     marginTop: spacing.xs,
     fontWeight: "500",
@@ -362,8 +371,8 @@ export default StyleSheet.create({
   },
 
   securityHeroCard: {
-    borderRadius: 28,
-    padding: spacing.xl,
+    borderRadius: isSmallPhone ? 20 : 28,
+    padding: isSmallPhone ? spacing.md : spacing.xl,
     ...Platform.select({
       ios: {
         shadowColor: colors.primary,
@@ -417,8 +426,8 @@ export default StyleSheet.create({
   },
 
   securityHeroTitle: {
-    fontSize: isSmallPhone ? 24 : isTablet ? 32 : 28,
-    lineHeight: isSmallPhone ? 30 : 36,
+    fontSize: isSmallPhone ? 21 : isMediumPhone ? 23 : isTablet ? 32 : 28,
+    lineHeight: isSmallPhone ? 27 : isMediumPhone ? 29 : 36,
     fontWeight: "800",
     color: colors.white,
     letterSpacing: -0.6,
@@ -435,7 +444,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
-    marginTop: spacing.lg,
+    marginTop: isSmallPhone ? spacing.md : spacing.lg,
   },
 
   securityHeroStatCard: {
@@ -443,8 +452,8 @@ export default StyleSheet.create({
     flexGrow: 1,
     flexBasis: 120,
     backgroundColor: "rgba(255,255,255,0.14)",
-    borderRadius: 18,
-    paddingHorizontal: spacing.md,
+    borderRadius: isSmallPhone ? 14 : 18,
+    paddingHorizontal: isSmallPhone ? spacing.sm : spacing.md,
     paddingVertical: spacing.sm,
   },
 
@@ -482,7 +491,15 @@ export default StyleSheet.create({
         shadowRadius: 8,
       },
       android: { elevation: 3 },
-      web: { boxShadow: "0px 4px 14px rgba(15,23,42,0.06)" },
+      web: {
+        boxShadow: "0px 4px 14px rgba(15,23,42,0.06)",
+        transition: "all 0.2s ease",
+        ":hover": {
+          transform: "translateY(-3px)",
+          boxShadow: "0px 12px 28px rgba(15,23,42,0.10)",
+          borderColor: "#B7D5F6",
+        },
+      },
     }),
   },
 
@@ -1381,7 +1398,14 @@ export default StyleSheet.create({
         shadowRadius: 8,
       },
       android: { elevation: 3 },
-      web: { boxShadow: "0px 4px 12px rgba(15,23,42,0.06)" },
+      web: {
+        boxShadow: "0px 4px 12px rgba(15,23,42,0.06)",
+        transition: "box-shadow 0.2s ease, border-color 0.2s ease",
+        ":hover": {
+          boxShadow: "0px 12px 28px rgba(15,23,42,0.08)",
+          borderColor: "#CFE0F2",
+        },
+      },
     }),
   },
 
@@ -1430,7 +1454,15 @@ export default StyleSheet.create({
         shadowRadius: 8,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.05)" },
+      web: {
+        boxShadow: "0px 4px 12px rgba(0,0,0,0.05)",
+        transition: "all 0.2s ease",
+        ":hover": {
+          transform: "translateY(-2px)",
+          boxShadow: "0px 10px 24px rgba(15,23,42,0.09)",
+          borderColor: "#B7D5F6",
+        },
+      },
     }),
   },
 
@@ -1440,6 +1472,14 @@ export default StyleSheet.create({
     padding: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#F8FBFE",
+        transform: "translateX(3px)",
+      },
+    }),
   },
 
   activityIcon: {
@@ -1637,6 +1677,13 @@ export default StyleSheet.create({
     padding: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
+    ...webHover({
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#F8FBFE",
+        transform: "translateX(3px)",
+      },
+    }),
   },
 
   logIcon: {
@@ -2270,6 +2317,25 @@ export default StyleSheet.create({
     textAlign: "center",
   },
 
+  emptyRefreshButton: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#D8E6F5",
+  },
+
+  emptyRefreshButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+
   // ============ QUICK ACTIONS SECTION ============
   quickActionsSection: {
     paddingHorizontal: spacing.md,
@@ -2475,11 +2541,25 @@ export default StyleSheet.create({
     backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        borderColor: "#B7D5F6",
+        transform: "scale(1.04)",
+      },
+    }),
   },
 
   sidebarContent: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+
+  sidebarHoverSurface: {
+    cursor: "pointer",
+    transformOrigin: "center",
   },
 
   sidebarUser: {
@@ -2492,6 +2572,13 @@ export default StyleSheet.create({
     gap: spacing.md,
     backgroundColor: colors.white,
     marginBottom: spacing.md,
+    ...webHover({
+      transition: "all 0.2s ease",
+      ":hover": {
+        borderColor: "#B7D5F6",
+        boxShadow: "0px 10px 22px rgba(15, 23, 42, 0.07)",
+      },
+    }),
   },
 
   sidebarAvatar: {
@@ -2546,7 +2633,10 @@ export default StyleSheet.create({
     ...webHover({
       cursor: "pointer",
       transition: "all 0.2s ease",
-      ":hover": { backgroundColor: "#EEF5FF" },
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        transform: "translateX(3px)",
+      },
     }),
   },
 
@@ -2562,6 +2652,12 @@ export default StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: spacing.md,
+    ...webHover({
+      transition: "transform 0.18s ease",
+      ":hover": {
+        transform: "scale(1.05)",
+      },
+    }),
   },
 
   sidebarNavLabel: {
@@ -2609,7 +2705,10 @@ export default StyleSheet.create({
     ...webHover({
       cursor: "pointer",
       transition: "all 0.2s ease",
-      ":hover": { backgroundColor: "#EEF5FF" },
+      ":hover": {
+        backgroundColor: "#EEF5FF",
+        transform: "translateX(3px)",
+      },
     }),
   },
 
