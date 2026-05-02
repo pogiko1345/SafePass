@@ -3252,7 +3252,7 @@ app.post("/api/visitors/register", async (req, res) => {
 
 // ============ ADMIN VISITOR APPROVAL ROUTES ============
 
-// Get pending visitors (admin only) - WITH DEBUG LOGS
+// Get pending visitors (admin only)
 app.get("/api/admin/visitors/pending", authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== "admin") {
@@ -3264,13 +3264,6 @@ app.get("/api/admin/visitors/pending", authMiddleware, async (req, res) => {
       approvalFlow: "admin",
       approvalStatus: "pending",
     }).sort({ registeredAt: -1 });
-
-    console.log(`\n📋 Found ${visitors.length} pending visitors:`);
-    visitors.forEach((v) => {
-      console.log(
-        `   - ${v.fullName} (${v.email}): status=${v.status}, approvalStatus=${v.approvalStatus}`,
-      );
-    });
 
     const visitorsWithSafePassIds = await attachSafePassIdsToVisitors(visitors);
 
@@ -3334,10 +3327,6 @@ app.get("/api/admin/visitors", authMiddleware, async (req, res) => {
 
     const total = await Visitor.countDocuments(query);
     const visitorsWithSafePassIds = await attachSafePassIdsToVisitors(visitors);
-
-    console.log(
-      `📋 Found ${visitors.length} visitors with status: ${status || "all"}`,
-    );
 
     res.json({
       success: true,
@@ -6965,8 +6954,6 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
         status: "denied",
         timestamp: { $gte: today },
       }));
-
-    console.log(`📊 Stats - Staff: ${totalStaff}, Security/Guard: ${totalSecurity}`);
 
     res.json({
       success: true,

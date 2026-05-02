@@ -6698,7 +6698,7 @@ const loadDashboardData = useCallback(async () => {
           <View style={styles.modularCardGrid}>
             {[
               { label: "Total Records", value: appointmentRecords.length, color: ADMIN_BLUE },
-              { label: "Pending Queue", value: pendingAppointmentRequests.length, color: ADMIN_BLUE },
+              { label: "Pending Requests", value: pendingAppointmentRequests.length, color: ADMIN_BLUE },
               { label: "Approved", value: appointmentRecords.length, color: ADMIN_BLUE },
             ].map((item) => (
               <View
@@ -6965,17 +6965,6 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity style={styles.pageRefreshButton} onPress={loadAllVisitRequests}>
                 <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
               </TouchableOpacity>
-              {renderRecordListPrintButton({
-                label: "Print Queue",
-                color: ADMIN_BLUE,
-                disabled: !getFilteredRequests().length,
-                onPress: () =>
-                  handlePrintRequests(
-                    "Appointment Management Queue",
-                    getFilteredRequests(),
-                    "Generated from the active appointment management table in the admin dashboard.",
-                  ),
-              })}
             </View>
           }
         >
@@ -6989,7 +6978,7 @@ const loadDashboardData = useCallback(async () => {
                   Manage visitor appointment flow
                 </Text>
                 <Text style={[styles.appointmentManagementIntroText, isDarkMode && styles.darkTextSecondary]}>
-                  Set the choices visitors can use, then review the live appointment queue below.
+                  Set the offices, purposes, and time slots visitors can choose before booking.
                 </Text>
               </View>
             </View>
@@ -7058,6 +7047,7 @@ const loadDashboardData = useCallback(async () => {
             })}
           </View>
 
+          {/*
           <View style={styles.appointmentManagementQueueHeader}>
             <View>
               <Text style={[styles.appointmentManagementSectionTitle, isDarkMode && styles.darkText]}>
@@ -7293,6 +7283,7 @@ const loadDashboardData = useCallback(async () => {
               },
             ],
           })}
+          */}
         </AdminSectionShell>
       </View>
     </ScrollView>
@@ -8652,17 +8643,6 @@ const loadDashboardData = useCallback(async () => {
               "Appointment Records",
               appointmentRecords,
               "Generated from the appointment records table in the admin dashboard.",
-            ),
-        };
-      case "appointment-management":
-        return {
-          label: "Print Appointment Queue",
-          color: ADMIN_BLUE,
-          onPress: () =>
-            handlePrintRequests(
-              "Appointment Management Queue",
-              getFilteredRequests(),
-              "Generated from the active appointment management table in the admin dashboard.",
             ),
         };
       case "report-records":
