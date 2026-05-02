@@ -6979,6 +6979,61 @@ const loadDashboardData = useCallback(async () => {
             </View>
           }
         >
+          <View style={styles.appointmentManagementOverview}>
+            <View style={styles.appointmentManagementIntroCard}>
+              <View style={styles.appointmentManagementIntroIcon}>
+                <Ionicons name="calendar-outline" size={22} color={ADMIN_BLUE} />
+              </View>
+              <View style={styles.appointmentManagementIntroCopy}>
+                <Text style={[styles.appointmentManagementIntroTitle, isDarkMode && styles.darkText]}>
+                  Manage visitor appointment flow
+                </Text>
+                <Text style={[styles.appointmentManagementIntroText, isDarkMode && styles.darkTextSecondary]}>
+                  Set the choices visitors can use, then review the live appointment queue below.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.appointmentManagementStatsGrid}>
+              {[
+                { label: "Total", value: visitRequests.length, icon: "albums-outline" },
+                { label: "Pending", value: pendingRequests.length, icon: "time-outline" },
+                { label: "Approved", value: approvedRequests.length, icon: "checkmark-circle-outline" },
+                { label: "Rejected", value: rejectedRequests.length, icon: "close-circle-outline" },
+              ].map((item) => (
+                <View
+                  key={item.label}
+                  style={[
+                    styles.appointmentManagementStatCard,
+                    {
+                      backgroundColor: isDarkMode ? theme.cardBackground : "#F8FBFE",
+                      borderColor: theme.borderColor,
+                    },
+                  ]}
+                >
+                  <View style={styles.appointmentManagementStatIcon}>
+                    <Ionicons name={item.icon} size={16} color={ADMIN_BLUE} />
+                  </View>
+                  <View>
+                    <Text style={[styles.appointmentManagementStatValue, isDarkMode && styles.darkText]}>
+                      {item.value}
+                    </Text>
+                    <Text style={[styles.appointmentManagementStatLabel, isDarkMode && styles.darkTextSecondary]}>
+                      {item.label}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.appointmentManagementSectionHeading}>
+            <Text style={[styles.appointmentManagementSectionTitle, isDarkMode && styles.darkText]}>
+              Visitor Form Choices
+            </Text>
+            <Text style={[styles.appointmentManagementSectionText, isDarkMode && styles.darkTextSecondary]}>
+              These controls update the fields visitors see before submitting an appointment.
+            </Text>
+          </View>
           <View style={styles.appointmentOptionsGrid}>
             {renderAppointmentOptionManager({
               title: "Office to Visit",
@@ -7002,83 +7057,107 @@ const loadDashboardData = useCallback(async () => {
               icon: "time-outline",
             })}
           </View>
-          {renderRecordsSearchPanel({
-            title: "Search Appointment Records",
-            subtitle: "Manual lookup for a visitor name, office, purpose, phone, email, or exact date.",
-            value: requestSearchTerm,
-            onChangeText: (value) => {
-              setRequestSearchTerm(value);
-              setSearchQuery(value.trim());
-            },
-            onApply: () => setSearchQuery(requestSearchTerm.trim()),
-            onClear: () => {
-              setRequestSearchTerm("");
-              setSearchQuery("");
-            },
-            placeholder: "Example: April 18, 2026 or Registrar",
-            accent: ADMIN_BLUE,
-          })}
 
-          {renderRecordsFilterPanel({
-            title: "Filter Appointment Records",
-            subtitle: "Quick shortcuts for status, month, exact date range, office, and time order.",
-            panelKey: "appointment-records",
-            accent: ADMIN_BLUE,
-            onReset: () => {
-              setRequestFilter("all");
-              setRequestDateFilter("all");
-              setRequestOfficeFilter("all");
-              setRequestDateRange({ startDate: null, endDate: null });
-              setRequestSortOrder("newest");
-            },
-            groups: [
-              {
-                key: "status",
-                label: "Status",
-                activeValue: requestFilter,
-                onSelect: setRequestFilter,
-                filters: [
-                  { key: "all", label: "All Status", count: visitRequests.length, icon: "apps-outline" },
-                  { key: "pending", label: "Pending", count: pendingRequests.length, icon: "time-outline" },
-                  { key: "approved", label: "Approved", count: approvedRequests.length, icon: "checkmark-circle-outline" },
-                  { key: "rejected", label: "Rejected", count: rejectedRequests.length, icon: "close-circle-outline" },
+          <View style={styles.appointmentManagementQueueHeader}>
+            <View>
+              <Text style={[styles.appointmentManagementSectionTitle, isDarkMode && styles.darkText]}>
+                Appointment Queue
+              </Text>
+              <Text style={[styles.appointmentManagementSectionText, isDarkMode && styles.darkTextSecondary]}>
+                Search, filter, and print the current set of appointment records.
+              </Text>
+            </View>
+            <View style={styles.appointmentManagementQueueBadge}>
+              <Ionicons name="funnel-outline" size={14} color={ADMIN_BLUE} />
+              <Text style={styles.appointmentManagementQueueBadgeText}>
+                {getFilteredRequests().length} shown
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.appointmentManagementToolsGrid}>
+            <View style={styles.appointmentManagementToolCard}>
+              {renderRecordsSearchPanel({
+                title: "Search Records",
+                subtitle: "Find by visitor, office, purpose, phone, email, or exact date.",
+                value: requestSearchTerm,
+                onChangeText: (value) => {
+                  setRequestSearchTerm(value);
+                  setSearchQuery(value.trim());
+                },
+                onApply: () => setSearchQuery(requestSearchTerm.trim()),
+                onClear: () => {
+                  setRequestSearchTerm("");
+                  setSearchQuery("");
+                },
+                placeholder: "Example: April 18, 2026 or Registrar",
+                accent: ADMIN_BLUE,
+              })}
+            </View>
+
+            <View style={styles.appointmentManagementToolCard}>
+              {renderRecordsFilterPanel({
+                title: "Filter Records",
+                subtitle: "Use shortcuts for status, date range, office, and time order.",
+                panelKey: "appointment-records",
+                accent: ADMIN_BLUE,
+                onReset: () => {
+                  setRequestFilter("all");
+                  setRequestDateFilter("all");
+                  setRequestOfficeFilter("all");
+                  setRequestDateRange({ startDate: null, endDate: null });
+                  setRequestSortOrder("newest");
+                },
+                groups: [
+                  {
+                    key: "status",
+                    label: "Status",
+                    activeValue: requestFilter,
+                    onSelect: setRequestFilter,
+                    filters: [
+                      { key: "all", label: "All Status", count: visitRequests.length, icon: "apps-outline" },
+                      { key: "pending", label: "Pending", count: pendingRequests.length, icon: "time-outline" },
+                      { key: "approved", label: "Approved", count: approvedRequests.length, icon: "checkmark-circle-outline" },
+                      { key: "rejected", label: "Rejected", count: rejectedRequests.length, icon: "close-circle-outline" },
+                    ],
+                  },
+                  {
+                    key: "date",
+                    label: "Date Range",
+                    activeValue: requestDateFilter,
+                    onSelect: setRequestDateFilter,
+                    filters: dateShortcutFilters,
+                  },
+                  {
+                    key: "office",
+                    label: "Office",
+                    activeValue: requestOfficeFilter,
+                    onSelect: setRequestOfficeFilter,
+                    filters: requestOfficeFilterOptions,
+                  },
+                  {
+                    key: "order",
+                    label: "Time Order",
+                    activeValue: requestSortOrder,
+                    onSelect: setRequestSortOrder,
+                    filters: [
+                      { key: "newest", label: "Newest First", icon: "arrow-down-outline" },
+                      { key: "oldest", label: "Oldest First", icon: "arrow-up-outline" },
+                      { key: "status", label: "Pending First", icon: "time-outline" },
+                    ],
+                  },
                 ],
-              },
-              {
-                key: "date",
-                label: "Date Range",
-                activeValue: requestDateFilter,
-                onSelect: setRequestDateFilter,
-                filters: dateShortcutFilters,
-              },
-              {
-                key: "office",
-                label: "Office",
-                activeValue: requestOfficeFilter,
-                onSelect: setRequestOfficeFilter,
-                filters: requestOfficeFilterOptions,
-              },
-              {
-                key: "order",
-                label: "Time Order",
-                activeValue: requestSortOrder,
-                onSelect: setRequestSortOrder,
-                filters: [
-                  { key: "newest", label: "Newest First", icon: "arrow-down-outline" },
-                  { key: "oldest", label: "Oldest First", icon: "arrow-up-outline" },
-                  { key: "status", label: "Pending First", icon: "time-outline" },
-                ],
-              },
-            ],
-            footerContent: renderDateRangeControls({
-              accent: ADMIN_BLUE,
-              startDate: requestDateRange.startDate,
-              endDate: requestDateRange.endDate,
-              onPickStart: () => setActiveFilterDateField("request-start"),
-              onPickEnd: () => setActiveFilterDateField("request-end"),
-              onClear: () => setRequestDateRange({ startDate: null, endDate: null }),
-            }),
-          })}
+                footerContent: renderDateRangeControls({
+                  accent: ADMIN_BLUE,
+                  startDate: requestDateRange.startDate,
+                  endDate: requestDateRange.endDate,
+                  onPickStart: () => setActiveFilterDateField("request-start"),
+                  onPickEnd: () => setActiveFilterDateField("request-end"),
+                  onClear: () => setRequestDateRange({ startDate: null, endDate: null }),
+                }),
+              })}
+            </View>
+          </View>
 
           {renderAdminTable({
             rows: getFilteredRequests(),

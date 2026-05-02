@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, View, Text, ActivityIndicator, Platform } from "react-native";
 import { CommonActions, NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import * as LocalAuthentication from "expo-local-authentication";
 
 // ============ ONLY VISITOR, SECURITY, ADMIN SCREENS ============
 import LoginScreen from "./screens/LoginScreen";
@@ -60,6 +59,7 @@ const Stack = createNativeStackNavigator();
 const APP_NAME = APP_DISPLAY_NAME;
 const APP_ORGANIZATION = APP_ORGANIZATION_NAME;
 const IDLE_LOGOUT_MS = 15 * 60 * 1000;
+const LAST_ACTIVITY_AT_KEY = "lastActivityAt";
 const WEB_ROUTE_TITLES = {
   RoleSelect: `Access Portal | ${APP_ORGANIZATION}`,
   Login: `Login | ${APP_ORGANIZATION}`,
@@ -83,29 +83,6 @@ const WEB_ROUTE_TITLES = {
 };
 
 let logoutCallback = null;
-
-const requireBiometricSessionUnlock = async () => {
-  if (Platform.OS === "web") {
-    return true;
-  }
-
-  const [hasHardware, enrolled] = await Promise.all([
-    LocalAuthentication.hasHardwareAsync(),
-    LocalAuthentication.isEnrolledAsync(),
-  ]);
-
-  if (!hasHardware || !enrolled) {
-    return false;
-  }
-
-  const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: "Unlock SafePass",
-    fallbackLabel: "Use passcode",
-    cancelLabel: "Cancel",
-  });
-
-  return Boolean(result.success);
-};
 
 export default function App() {
   const navigationRef = useNavigationContainerRef();
@@ -134,6 +111,7 @@ export default function App() {
       console.log("App logout API error ignored:", error);
       await ApiService.clearAuth();
     } finally {
+      await Storage.removeItem(LAST_ACTIVITY_AT_KEY);
       setCurrentUser(null);
       setIsLoading(false);
       if (resetNavigation) {
@@ -149,6 +127,10 @@ export default function App() {
     }
 
     if (!currentUser) return;
+
+    Storage.setItem(LAST_ACTIVITY_AT_KEY, String(Date.now())).catch((error) => {
+      console.log("Persist last activity error:", error);
+    });
 
     idleTimerRef.current = setTimeout(() => {
       performAppLogout({ resetNavigation: true });
@@ -257,10 +239,11 @@ export default function App() {
           return;
         }
 
-        const biometricUnlocked = await requireBiometricSessionUnlock();
-        if (!biometricUnlocked) {
-          console.log("Remembered session requires biometric unlock.");
+        const lastActivityAt = Number(await Storage.getItem(LAST_ACTIVITY_AT_KEY));
+        if (Number.isFinite(lastActivityAt) && Date.now() - lastActivityAt >= IDLE_LOGOUT_MS) {
+          console.log("Session expired because of inactivity.");
           await ApiService.clearAuth();
+          await Storage.removeItem(LAST_ACTIVITY_AT_KEY);
           setCurrentUser(null);
           return;
         }

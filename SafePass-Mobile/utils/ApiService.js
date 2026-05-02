@@ -218,7 +218,8 @@ class ApiService {
     await removeSensitiveItems(SENSITIVE_STORAGE_KEYS);
     await AsyncStorage.multiRemove([
       "currentUser",
-      "isNewRegistration"
+      "isNewRegistration",
+      "lastActivityAt"
     ]);
   }
 

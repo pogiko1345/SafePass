@@ -2133,6 +2133,182 @@ export default StyleSheet.create({
     padding: 16,
   },
 
+  visitorWarningModalContent: {
+    width: "100%",
+    maxWidth: 430,
+    maxHeight: "88%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#7F1D1D",
+        shadowOffset: { width: 0, height: 18 },
+        shadowOpacity: 0.24,
+        shadowRadius: 28,
+      },
+      android: { elevation: 18 },
+      web: { boxShadow: "0px 24px 54px rgba(127,29,29,0.24)" },
+    }),
+  },
+
+  visitorWarningModalHeader: {
+    paddingHorizontal: width <= 390 ? 18 : 22,
+    paddingTop: width <= 390 ? 18 : 22,
+    paddingBottom: 22,
+  },
+
+  visitorWarningModalTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+
+  visitorWarningModalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+
+  visitorWarningModalClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+
+  visitorWarningModalEyebrow: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.78)",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 7,
+  },
+
+  visitorWarningModalTitle: {
+    fontSize: width <= 390 ? 22 : 25,
+    lineHeight: width <= 390 ? 28 : 31,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: 0,
+    marginBottom: 8,
+  },
+
+  visitorWarningModalSubtitle: {
+    fontSize: 13.5,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.84)",
+    fontWeight: "600",
+  },
+
+  visitorWarningModalBody: {
+    paddingHorizontal: width <= 390 ? 18 : 22,
+    paddingTop: 20,
+    paddingBottom: 18,
+    gap: 16,
+  },
+
+  visitorWarningSeverityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+
+  visitorWarningSeverityPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+
+  visitorWarningSeverityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#DC2626",
+  },
+
+  visitorWarningSeverityText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#991B1B",
+    letterSpacing: 0.4,
+  },
+
+  visitorWarningTimeText: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "700",
+  },
+
+  visitorWarningMessage: {
+    fontSize: 15,
+    lineHeight: 23,
+    color: "#1E293B",
+    fontWeight: "600",
+  },
+
+  visitorWarningInfoStrip: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 16,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+  },
+
+  visitorWarningInfoText: {
+    flex: 1,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "#475569",
+    fontWeight: "700",
+  },
+
+  visitorWarningModalFooter: {
+    paddingHorizontal: width <= 390 ? 18 : 22,
+    paddingBottom: 22,
+  },
+
+  visitorWarningPrimaryButton: {
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: "#0F172A",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+  },
+
+  visitorWarningPrimaryButtonText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
   qrModalContent: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,

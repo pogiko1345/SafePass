@@ -174,6 +174,81 @@ const logPhoneOtpForDemo = ({ phoneNumber, otpCode, method }) => {
   console.log("");
 };
 
+const getSemaphoreApiKey = () =>
+  String(
+    process.env.SEMAPHORE_API_KEY ||
+      process.env.SEMAPHORE_API_TOKEN ||
+      process.env.SMS_API_KEY ||
+      "",
+  ).trim();
+
+const getPhoneOtpDeliveryProvider = () => {
+  if (getSemaphoreApiKey()) return "semaphore";
+  return "backend_log";
+};
+
+const sendSemaphoreOtp = async ({ phoneNumber, otpCode }) => {
+  const apiKey = getSemaphoreApiKey();
+  if (!apiKey) {
+    return { success: false, skipped: true, provider: "backend_log" };
+  }
+
+  const senderName = String(process.env.SEMAPHORE_SENDER_NAME || "").trim();
+  const messageTemplate = String(
+    process.env.SEMAPHORE_OTP_MESSAGE ||
+      "Your SafePass login OTP is {otp}. It expires in 5 minutes.",
+  );
+  const payload = new URLSearchParams({
+    apikey: apiKey,
+    number: phoneNumber,
+    message: messageTemplate.includes("{otp}")
+      ? messageTemplate
+      : `${messageTemplate} {otp}`,
+    code: otpCode,
+  });
+
+  if (senderName) {
+    payload.set("sendername", senderName);
+  }
+
+  const response = await fetch("https://api.semaphore.co/api/v4/otp", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: payload.toString(),
+  });
+
+  const responseText = await response.text();
+  let data = null;
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    data = responseText;
+  }
+
+  if (!response.ok) {
+    const error = new Error(`Semaphore OTP request failed with HTTP ${response.status}`);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  const messages = Array.isArray(data) ? data : data ? [data] : [];
+  const failedMessage = messages.find((item) =>
+    String(item?.status || "").toLowerCase().includes("failed"),
+  );
+
+  if (failedMessage) {
+    const error = new Error("Semaphore rejected the OTP SMS.");
+    error.data = failedMessage;
+    throw error;
+  }
+
+  return { success: true, provider: "semaphore", data };
+};
+
 // ========== ENHANCED CORS CONFIGURATION ==========
 app.use(
   cors({
@@ -4172,6 +4247,22 @@ app.post("/api/auth/request-otp", async (req, res) => {
     // Generate a temporary token
     const tempToken =
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
+    const deliveryProvider = getPhoneOtpDeliveryProvider();
+
+    if (deliveryProvider === "semaphore") {
+      try {
+        await sendSemaphoreOtp({ phoneNumber: cleanPhone, otpCode });
+      } catch (smsError) {
+        otpStore.delete(cleanPhone);
+        console.error("Semaphore OTP SMS error:", smsError?.data || smsError);
+        return res.status(502).json({
+          success: false,
+          message:
+            "Unable to send SMS OTP right now. Please check Semaphore credits, API key, and phone number.",
+          deliveryMode: "semaphore",
+        });
+      }
+    }
 
     console.log(`Phone OTP generated for ${cleanPhone}.`);
     logPhoneOtpForDemo({
@@ -4187,7 +4278,7 @@ app.post("/api/auth/request-otp", async (req, res) => {
       expiresIn: 300,
       method: method || "sms",
       phoneNumber: cleanPhone,
-      deliveryMode: phoneOtpSmsProviderConfigured ? "sms" : "backend_log",
+      deliveryMode: deliveryProvider,
     });
   } catch (error) {
     console.error("OTP request error:", error);

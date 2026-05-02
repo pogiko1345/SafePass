@@ -612,6 +612,152 @@ export default StyleSheet.create({
     marginBottom: 18,
   },
 
+  appointmentManagementOverview: {
+    gap: 14,
+    marginBottom: 18,
+  },
+
+  appointmentManagementIntroCard: {
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "flex-start" : "center",
+    gap: 14,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    borderRadius: 18,
+    backgroundColor: "#F8FBFE",
+    padding: 16,
+  },
+
+  appointmentManagementIntroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+
+  appointmentManagementIntroCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  appointmentManagementIntroTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 5,
+  },
+
+  appointmentManagementIntroText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+
+  appointmentManagementStatsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  appointmentManagementStatCard: {
+    flexGrow: 1,
+    flexBasis: width < 760 ? "47%" : 140,
+    minWidth: width < 420 ? "100%" : 130,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+  },
+
+  appointmentManagementStatIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+
+  appointmentManagementStatValue: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#0F172A",
+    lineHeight: 22,
+  },
+
+  appointmentManagementStatLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  appointmentManagementSectionHeading: {
+    marginBottom: 12,
+  },
+
+  appointmentManagementSectionTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  appointmentManagementSectionText: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+
+  appointmentManagementQueueHeader: {
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "stretch" : "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+
+  appointmentManagementQueueBadge: {
+    alignSelf: width < 760 ? "flex-start" : "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    borderRadius: 999,
+    backgroundColor: "#EEF5FF",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  appointmentManagementQueueBadgeText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+
+  appointmentManagementToolsGrid: {
+    flexDirection: width < 1024 ? "column" : "row",
+    alignItems: "flex-start",
+    gap: 14,
+    marginBottom: 14,
+  },
+
+  appointmentManagementToolCard: {
+    flex: 1,
+    width: width < 1024 ? "100%" : undefined,
+    minWidth: 0,
+  },
+
   appointmentOptionCard: {
     flex: 1,
     flexBasis: 320,

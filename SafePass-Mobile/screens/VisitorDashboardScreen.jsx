@@ -295,6 +295,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [showCheckOutSuccessModal, setShowCheckOutSuccessModal] = useState(false);
   const [checkOutTargetVisitor, setCheckOutTargetVisitor] = useState(null);
   const [visitorPushNotice, setVisitorPushNotice] = useState(null);
+  const [visitorWarningNotice, setVisitorWarningNotice] = useState(null);
   const [isVisitorDarkMode, setIsVisitorDarkMode] = useState(false);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
   const [isVirtualTapLoading, setIsVirtualTapLoading] = useState(false);
@@ -987,26 +988,39 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       const warningId = String(latestWarning._id);
       shownVisitorWarningIdsRef.current.add(warningId);
 
-      Alert.alert(
-        latestWarning.title || "Security Report Warning",
-        latestWarning.message || "A new notice has been added to your visitor account.",
-        [
-          {
-            text: "I Understand",
-            onPress: async () => {
-              try {
-                await ApiService.markNotificationAsRead(warningId);
-              } catch (error) {
-                console.error("Mark visitor warning as read error:", error);
-              }
-            },
-          },
-        ],
-      );
+      if (Platform.OS !== "web") {
+        Vibration.vibrate([0, 120, 80, 120]);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch((error) => {
+          console.log("Visitor warning haptic error:", error);
+        });
+      }
+
+      setVisitorWarningNotice({
+        id: warningId,
+        title: latestWarning.title || "Security Report Warning",
+        message: latestWarning.message || "A new notice has been added to your visitor account.",
+        severity: severity || "warning",
+        createdAt: latestWarning.createdAt || latestWarning.timestamp || new Date().toISOString(),
+      });
     } catch (error) {
       console.error("Load visitor warning error:", error);
     } finally {
       visitorWarningCheckInFlightRef.current = false;
+    }
+  };
+
+  const dismissVisitorWarningNotice = async () => {
+    const warningId = visitorWarningNotice?.id;
+    setVisitorWarningNotice(null);
+
+    if (!warningId) {
+      return;
+    }
+
+    try {
+      await ApiService.markNotificationAsRead(warningId);
+    } catch (error) {
+      console.error("Mark visitor warning as read error:", error);
     }
   };
 
@@ -4909,6 +4923,86 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <Ionicons name="close" size={16} color="#64748B" />
         </TouchableOpacity>
       ) : null}
+
+      <Modal
+        visible={!!visitorWarningNotice}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={dismissVisitorWarningNotice}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.visitorWarningModalContent}>
+            <LinearGradient
+              colors={["#7F1D1D", "#B91C1C", "#DC2626"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={visitorDashboardStyles.visitorWarningModalHeader}
+            >
+              <View style={visitorDashboardStyles.visitorWarningModalTopRow}>
+                <View style={visitorDashboardStyles.visitorWarningModalIcon}>
+                  <Ionicons name="shield-checkmark-outline" size={24} color="#FFFFFF" />
+                </View>
+                <TouchableOpacity
+                  style={visitorDashboardStyles.visitorWarningModalClose}
+                  onPress={dismissVisitorWarningNotice}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="close" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+              <Text style={visitorDashboardStyles.visitorWarningModalEyebrow}>
+                Security Notice
+              </Text>
+              <Text style={visitorDashboardStyles.visitorWarningModalTitle}>
+                {visitorWarningNotice?.title || "Security Report Warning"}
+              </Text>
+              <Text style={visitorDashboardStyles.visitorWarningModalSubtitle}>
+                Please review this notice before continuing your visit.
+              </Text>
+            </LinearGradient>
+
+            <View style={visitorDashboardStyles.visitorWarningModalBody}>
+              <View style={visitorDashboardStyles.visitorWarningSeverityRow}>
+                <View style={visitorDashboardStyles.visitorWarningSeverityPill}>
+                  <View style={visitorDashboardStyles.visitorWarningSeverityDot} />
+                  <Text style={visitorDashboardStyles.visitorWarningSeverityText}>
+                    {(visitorWarningNotice?.severity || "warning").toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={visitorDashboardStyles.visitorWarningTimeText}>
+                  {visitorWarningNotice?.createdAt
+                    ? formatDateTime(visitorWarningNotice.createdAt)
+                    : "Just now"}
+                </Text>
+              </View>
+
+              <Text style={visitorDashboardStyles.visitorWarningMessage}>
+                {visitorWarningNotice?.message || "A new notice has been added to your visitor account."}
+              </Text>
+
+              <View style={visitorDashboardStyles.visitorWarningInfoStrip}>
+                <Ionicons name="information-circle-outline" size={18} color="#0A3D91" />
+                <Text style={visitorDashboardStyles.visitorWarningInfoText}>
+                  This notice will be marked as read after you acknowledge it.
+                </Text>
+              </View>
+            </View>
+
+            <View style={visitorDashboardStyles.visitorWarningModalFooter}>
+              <TouchableOpacity
+                style={visitorDashboardStyles.visitorWarningPrimaryButton}
+                onPress={dismissVisitorWarningNotice}
+                activeOpacity={0.9}
+              >
+                <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
+                <Text style={visitorDashboardStyles.visitorWarningPrimaryButtonText}>
+                  I Understand
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {renderBottomNavigation()}
 
