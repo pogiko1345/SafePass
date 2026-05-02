@@ -215,35 +215,15 @@ export default function App() {
         return;
       }
 
-      const [user, token] = await Promise.all([
-        ApiService.getCurrentUser(),
-        ApiService.getToken(),
-      ]);
+      const token = await ApiService.getToken();
+      const user = token ? await ApiService.restoreCurrentUserFromToken() : null;
       console.log("App.js checkAuthStatus - User found:", user ? "Yes" : "No");
 
       if (user) {
-        if (!token) {
-          console.log(
-            "User cache exists but auth token is missing. Clearing stale auth state.",
-          );
-          await ApiService.clearAuth();
-          setCurrentUser(null);
-          return;
-        }
-
         const rememberedSessionActive = await ApiService.isRememberedSessionActive();
         if (!rememberedSessionActive) {
           console.log("Remembered login expired. Asking user to sign in again.");
           await ApiService.clearAuth();
-          setCurrentUser(null);
-          return;
-        }
-
-        const lastActivityAt = Number(await Storage.getItem(LAST_ACTIVITY_AT_KEY));
-        if (Number.isFinite(lastActivityAt) && Date.now() - lastActivityAt >= IDLE_LOGOUT_MS) {
-          console.log("Session expired because of inactivity.");
-          await ApiService.clearAuth();
-          await Storage.removeItem(LAST_ACTIVITY_AT_KEY);
           setCurrentUser(null);
           return;
         }
@@ -254,6 +234,7 @@ export default function App() {
           isRecognizedRole(normalizedRole) &&
           isRoleAllowedInCurrentVariant(normalizedRole)
         ) {
+          await Storage.setItem(LAST_ACTIVITY_AT_KEY, String(Date.now()));
           setCurrentUser(normalizedUser);
         } else {
           console.log(
@@ -270,6 +251,13 @@ export default function App() {
           setCurrentUser(null);
         }
       } else {
+        const cachedUser = await ApiService.getCurrentUser();
+        if (cachedUser && !token) {
+          console.log(
+            "User cache exists but auth token is missing. Clearing stale auth state.",
+          );
+          await ApiService.clearAuth();
+        }
         setCurrentUser(null);
       }
     } catch (error) {

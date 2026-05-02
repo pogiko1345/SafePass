@@ -482,7 +482,26 @@ async register(userData) {
 
   async getCurrentUser() {
     const json = await AsyncStorage.getItem("currentUser");
-    return json ? JSON.parse(json) : null;
+    if (!json) return null;
+
+    try {
+      return JSON.parse(json);
+    } catch (error) {
+      console.log("Invalid cached user data. Removing currentUser cache.", error);
+      await AsyncStorage.removeItem("currentUser");
+      return null;
+    }
+  }
+
+  async restoreCurrentUserFromToken() {
+    const token = await this.getToken();
+    if (!token) return null;
+
+    const cachedUser = await this.getCurrentUser();
+    if (cachedUser) return cachedUser;
+
+    const profile = await this.getProfile();
+    return profile?.user || null;
   }
 
   // ================= 2FA / OTP METHODS =================

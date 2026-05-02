@@ -36,7 +36,6 @@ const Storage = Platform.OS === "web"
   : require("@react-native-async-storage/async-storage").default;
 const BIOMETRIC_LOGIN_EMAIL_KEY = "biometricLoginEmail";
 const BIOMETRIC_LOGIN_PASSWORD_KEY = "biometricLoginPassword";
-const IDLE_LOGOUT_MS = 15 * 60 * 1000;
 const LAST_ACTIVITY_AT_KEY = "lastActivityAt";
 
 export default function LoginScreen({ navigation, route }) {
@@ -302,9 +301,9 @@ export default function LoginScreen({ navigation, route }) {
       }
       
       const token = await ApiService.getToken();
-      const userJson = await Storage.getItem('currentUser');
+      const user = token ? await ApiService.restoreCurrentUserFromToken() : null;
       
-      if (token && userJson) {
+      if (token && user) {
         const rememberedSessionActive = await ApiService.isRememberedSessionActive();
         if (!rememberedSessionActive) {
           const rememberedEmail = await Storage.getItem("rememberedEmail");
@@ -316,26 +315,10 @@ export default function LoginScreen({ navigation, route }) {
           return;
         }
 
-        let user;
-        try {
-          user = JSON.parse(userJson);
-        } catch {
-          await ApiService.clearAuth();
-          setLoginError("Your saved session was invalid. Please sign in again.");
-          return;
-        }
         const normalizedRole = normalizeRole(user.role);
         if (!isRoleAllowedInCurrentVariant(normalizedRole)) {
           await ApiService.clearAuth();
           setLoginError(getVariantBlockedRoleMessage(normalizedRole));
-          return;
-        }
-
-        const lastActivityAt = Number(await Storage.getItem(LAST_ACTIVITY_AT_KEY));
-        if (Number.isFinite(lastActivityAt) && Date.now() - lastActivityAt >= IDLE_LOGOUT_MS) {
-          await ApiService.clearAuth();
-          await Storage.removeItem(LAST_ACTIVITY_AT_KEY);
-          setLoginError("Your session expired because of inactivity. Please sign in again.");
           return;
         }
 
@@ -345,7 +328,7 @@ export default function LoginScreen({ navigation, route }) {
           index: 0,
           routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : route }],
         });
-      } else if (token || userJson) {
+      } else if (token || (await Storage.getItem("currentUser"))) {
         await ApiService.clearAuth();
       }
     } catch (error) {
