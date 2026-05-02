@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import ApiService from "../utils/ApiService";
+import { printRecordsTable } from "../utils/printUtils";
 import styles from "../styles/StaffDashboardStyles";
 
 const formatDate = (value) =>
@@ -923,6 +924,71 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     navigation.reset({ index: 0, routes: [{ name: "Login" }] });
   };
 
+  const buildAppointmentPrintRows = (records) =>
+    (records || []).map((appointment) => ({
+      visitor: appointment?.fullName || "Visitor",
+      email: appointment?.email || "-",
+      purpose: appointment?.purposeOfVisit || "No visit purpose provided",
+      schedule: `${formatDate(appointment?.visitDate)} ${formatTime(appointment?.visitTime)}`,
+      office: appointment?.appointmentDepartment || appointment?.assignedOffice || "Assigned department",
+      staff: appointment?.assignedStaffName || profileName,
+      status: getStatusMeta(getAppointmentStatus(appointment)).label,
+    }));
+
+  const handlePrintAppointmentTable = async ({
+    title,
+    subtitle,
+    records,
+    emptyMessage,
+  }) => {
+    const rows = buildAppointmentPrintRows(records);
+    if (rows.length === 0) {
+      Alert.alert("No Data", emptyMessage || "There are no appointment records to print.");
+      return;
+    }
+
+    try {
+      const printedBy =
+        `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
+        user?.email ||
+        profileName ||
+        "Staff User";
+
+      await printRecordsTable({
+        title,
+        subtitle,
+        columns: [
+          { key: "visitor", label: "Visitor" },
+          { key: "email", label: "Email" },
+          { key: "purpose", label: "Purpose" },
+          { key: "schedule", label: "Schedule" },
+          { key: "office", label: "Office" },
+          { key: "staff", label: "Staff" },
+          { key: "status", label: "Status" },
+        ],
+        rows,
+        totalLabel: "appointments",
+        dialogTitle: title,
+        printedBy,
+        generatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("Print staff appointment table error:", error);
+      Alert.alert("Error", "Failed to generate the printable table.");
+    }
+  };
+
+  const renderTablePrintButton = ({ label = "Print Table", records, title, subtitle, emptyMessage }) => (
+    <TouchableOpacity
+      style={[styles.sectionActionButton, (!records || records.length === 0) && styles.disabledAction]}
+      onPress={() => handlePrintAppointmentTable({ title, subtitle, records, emptyMessage })}
+      disabled={!records || records.length === 0}
+    >
+      <Ionicons name="print-outline" size={16} color="#0A3D91" />
+      <Text style={styles.sectionActionButtonText}>{label}</Text>
+    </TouchableOpacity>
+  );
+
   const renderAppointmentTable = (
     appointmentsToRender,
     { mode = "requests", emptyTitle, emptySubtitle },
@@ -1505,9 +1571,18 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Pending Appointment Requests</Text>
-        <TouchableOpacity onPress={loadData}>
-          <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
-        </TouchableOpacity>
+        <View style={styles.sectionActionRow}>
+          {renderTablePrintButton({
+            label: "Print Requests",
+            records: filteredRequestAppointments,
+            title: "Pending Appointment Requests",
+            subtitle: "Generated from the staff dashboard pending appointment request table.",
+            emptyMessage: "There are no pending appointment requests to print.",
+          })}
+          <TouchableOpacity style={styles.sectionActionIconButton} onPress={loadData}>
+            <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchBar}>
@@ -1607,9 +1682,18 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Appointment Records</Text>
-          <TouchableOpacity onPress={loadData}>
-            <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
-          </TouchableOpacity>
+          <View style={styles.sectionActionRow}>
+            {renderTablePrintButton({
+              label: "Print Records",
+              records: filteredAppointments,
+              title: "Appointment Records",
+              subtitle: "Generated from the staff dashboard appointment records table.",
+              emptyMessage: "There are no appointment records to print.",
+            })}
+            <TouchableOpacity style={styles.sectionActionIconButton} onPress={loadData}>
+              <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {renderAppointmentTable(paginatedRecordAppointments, {
