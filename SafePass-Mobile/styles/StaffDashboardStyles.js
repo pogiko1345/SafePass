@@ -532,6 +532,54 @@ export default StyleSheet.create({
     gap: 10,
   },
 
+  recordToolbar: {
+    flexDirection: width > 980 ? "row" : "column",
+    alignItems: "stretch",
+    gap: 14,
+    marginBottom: 16,
+  },
+
+  recordToolbarCard: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: "#DCE8F4",
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+  },
+
+  recordToolbarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 10,
+  },
+
+  recordToolbarTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0F172A",
+    textTransform: "uppercase",
+    letterSpacing: 0.45,
+  },
+
+  recordToolbarClear: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#F8FBFE",
+  },
+
+  recordToolbarClearText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+
   quickActionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -666,7 +714,7 @@ export default StyleSheet.create({
     backgroundColor: "#F8FBFE",
     paddingHorizontal: 14,
     paddingVertical: 12,
-    marginBottom: 14,
+    marginBottom: 0,
   },
 
   searchBarInput: {

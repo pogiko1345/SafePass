@@ -29,6 +29,7 @@ import { printRecordsTable, printUserList } from "../utils/printUtils";
 import {
   MONITORING_MAP_BLUEPRINTS,
   MONITORING_MAP_FLOORS,
+  MONITORING_MAP_LABELS,
   MONITORING_MAP_OFFICES,
   MONITORING_MAP_OFFICE_POSITIONS,
 } from "../utils/monitoringMapConfig";
@@ -227,6 +228,13 @@ const normalizeTextToId = (value = "") =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || `item-${Date.now()}`;
 
+const normalizeMapText = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 const DEFAULT_APPOINTMENT_MANAGEMENT_OPTIONS = {
   offices: [
     "Registrar",
@@ -264,6 +272,7 @@ for (let hour = 7; hour <= 18; hour += 1) {
       value: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
       hour,
       minute,
+      capacity: 2,
       enabled: true,
     });
   }
@@ -297,6 +306,44 @@ const createFieldDraft = () => ({
   enabled: true,
   scope: "visitor",
 });
+
+const createAppointmentFilterDraft = () => ({
+  date: "",
+  time: "all",
+  office: "all",
+  status: "all",
+  purpose: "all",
+});
+
+const DEFAULT_ADMIN_SETTINGS = {
+  emailNotifications: true,
+  smsAlerts: true,
+  autoApprove: false,
+  maintenanceMode: false,
+  darkMode: false,
+  twoFactorAuth: false,
+  sessionTimeout: "30",
+  maxLoginAttempts: "5",
+  dateFormat: "MM/DD/YYYY",
+  timeFormat: "12h",
+  language: "en",
+};
+
+const ALL_ADMIN_SUBMODULES = [
+  "dashboard",
+  "account-create",
+  "account-records",
+  "data-management",
+  "map-ground",
+  "map-mezzanine",
+  "map-second",
+  "map-third",
+  "appointment-records",
+  "appointment-management",
+  "report-records",
+  "security-report-records",
+  "settings",
+];
 
 const storageGetItem = async (key) => {
   if (Storage && typeof Storage.getItem === "function") {
@@ -411,8 +458,6 @@ const formatFilterDateLabel = (date) => {
   });
 };
 
-const getGeneratedEmployeeIdPreview = () => `${new Date().getFullYear()}-******`;
-
 const getStatusColor = (status) => {
   switch (status) {
     case "pending":
@@ -476,6 +521,66 @@ const formatRoleLabel = (role) => {
   if (isSecurityRole(role)) return "Security";
   if (!role) return "User";
   return role.charAt(0).toUpperCase() + role.slice(1);
+};
+
+const sanitizeAccountEmailPart = (value = "") =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+const getAccountEmailRolePart = (form = {}) => {
+  if (isSecurityRole(form.role)) return "security";
+  return sanitizeAccountEmailPart(form.department || form.position || "staff") || "staff";
+};
+
+const generateAccountEmail = (form = {}, users = []) => {
+  const firstNamePart = sanitizeAccountEmailPart(form.firstName);
+  const rolePart = getAccountEmailRolePart(form);
+  if (!firstNamePart) return "";
+
+  const baseLocalPart = `${firstNamePart}${rolePart}`;
+  const existingEmails = new Set(
+    (users || [])
+      .map((userItem) => String(userItem?.email || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  let suffix = 1;
+  let candidate = `${baseLocalPart}@sapphire.edu`;
+  while (existingEmails.has(candidate)) {
+    suffix += 1;
+    candidate = `${baseLocalPart}${suffix}@sapphire.edu`;
+  }
+
+  return candidate;
+};
+
+const generateAccountEmployeeId = (form = {}, users = []) => {
+  const prefix = isSecurityRole(form.role) ? "SEC" : "STF";
+  const year = new Date().getFullYear();
+  const base = `${prefix}-${year}`;
+  const existingIds = new Set(
+    (users || [])
+      .map((userItem) => String(userItem?.employeeId || "").trim().toUpperCase())
+      .filter(Boolean),
+  );
+  let highestSequence = 0;
+
+  existingIds.forEach((employeeId) => {
+    const match = employeeId.match(new RegExp(`^${base}-(\\d+)$`));
+    if (match) {
+      highestSequence = Math.max(highestSequence, Number(match[1]) || 0);
+    }
+  });
+
+  let sequence = highestSequence + 1;
+  let candidate = `${base}-${String(sequence).padStart(3, "0")}`;
+  while (existingIds.has(candidate)) {
+    sequence += 1;
+    candidate = `${base}-${String(sequence).padStart(3, "0")}`;
+  }
+
+  return candidate;
 };
 
 const getUserInitials = (user) => {
@@ -863,6 +968,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [historySortOrder, setHistorySortOrder] = useState("newest");
   const [historySearchQuery, setHistorySearchQuery] = useState("");
   const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [reportSearchTerm, setReportSearchTerm] = useState("");
+  const [reportStatusFilter, setReportStatusFilter] = useState("all");
+  const [securityReportSearchTerm, setSecurityReportSearchTerm] = useState("");
+  const [securityReportStatusFilter, setSecurityReportStatusFilter] = useState("all");
   const [historyDateRange, setHistoryDateRange] = useState({
     startDate: null,
     endDate: null,
@@ -871,21 +980,13 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [expandedFilterSections, setExpandedFilterSections] = useState({});
 
   // Settings States
-  const [settings, setSettings] = useState({
-    emailNotifications: true,
-    smsAlerts: true,
-    autoApprove: false,
-    maintenanceMode: false,
-    darkMode: false,
-    twoFactorAuth: false,
-    sessionTimeout: "30",
-    maxLoginAttempts: "5",
-    dateFormat: "MM/DD/YYYY",
-    timeFormat: "12h",
-  });
+  const [settings, setSettings] = useState(DEFAULT_ADMIN_SETTINGS);
 
   const [activeSettingsTab, setActiveSettingsTab] = useState("account");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isRunningSystemAction, setIsRunningSystemAction] = useState(false);
+  const [systemHealth, setSystemHealth] = useState(null);
+  const [lastBackupSummary, setLastBackupSummary] = useState(null);
   const [changePasswordData, setChangePasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -961,15 +1062,23 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [dataManagementFieldPage, setDataManagementFieldPage] = useState(1);
   const [dataManagementItemsPerPage] = useState(6);
   const [appointmentRecordsPage, setAppointmentRecordsPage] = useState(1);
+  const [reportRecordsPage, setReportRecordsPage] = useState(1);
+  const [securityReportRecordsPage, setSecurityReportRecordsPage] = useState(1);
   const [roomManagementPage, setRoomManagementPage] = useState(1);
+  const [appointmentSearchDraft, setAppointmentSearchDraft] = useState("");
+  const [appointmentSearchTerm, setAppointmentSearchTerm] = useState("");
+  const [appointmentFilterDraft, setAppointmentFilterDraft] = useState(createAppointmentFilterDraft);
+  const [appointmentAppliedFilters, setAppointmentAppliedFilters] = useState(createAppointmentFilterDraft);
   const [appointmentManagementOptions, setAppointmentManagementOptions] = useState(DEFAULT_APPOINTMENT_MANAGEMENT_OPTIONS);
   const [appointmentOptionDrafts, setAppointmentOptionDrafts] = useState({
     offices: "",
     purposes: "",
     timeSlots: "",
   });
+  const [appointmentSlotCapacityDrafts, setAppointmentSlotCapacityDrafts] = useState({});
   const [editingAppointmentOption, setEditingAppointmentOption] = useState(null);
   const [isSavingAppointmentOptions, setIsSavingAppointmentOptions] = useState(false);
+  const [activeAppointmentConfigTab, setActiveAppointmentConfigTab] = useState("offices");
 
   // Modal States
   const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
@@ -996,6 +1105,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     approvals: 0,
   });
   const [selectedMapActivity, setSelectedMapActivity] = useState(null);
+  const [hoveredMapVisitor, setHoveredMapVisitor] = useState(null);
   const [showAdminMapModal, setShowAdminMapModal] = useState(false);
   const [adminMapFilter, setAdminMapFilter] = useState("all");
   const [selectedAdminMapFloor, setSelectedAdminMapFloor] = useState("ground");
@@ -1041,7 +1151,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     department: role === "security" ? "Security Department" : "Admissions",
     position: role === "security" ? "Security Personnel" : "Admissions Officer",
     shift: "",
-    status: "active",
+    employeeId: "",
+    status: "inactive",
   });
 
   // Form States
@@ -1063,6 +1174,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [newUserData, setNewUserData] = useState(createEmptyUserForm("staff"));
   const [createUserErrors, setCreateUserErrors] = useState({});
   const [staffDropdownOpen, setStaffDropdownOpen] = useState(null);
+  const [isCreateEmailManuallyEdited, setIsCreateEmailManuallyEdited] = useState(false);
+  const [isCreateEmployeeIdManuallyEdited, setIsCreateEmployeeIdManuallyEdited] = useState(false);
 
   // Stats
   const [stats, setStats] = useState({
@@ -1086,6 +1199,42 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     completedVisits: 0,
   });
   const [adminNotice, setAdminNotice] = useState(null);
+
+  const generatedCreateUserEmail = useMemo(
+    () => generateAccountEmail(newUserData, allUsers),
+    [newUserData.firstName, newUserData.role, newUserData.department, newUserData.position, allUsers],
+  );
+  const generatedCreateUserEmployeeId = useMemo(
+    () => generateAccountEmployeeId(newUserData, allUsers),
+    [newUserData.role, allUsers],
+  );
+
+  useEffect(() => {
+    if (isCreateEmailManuallyEdited) return;
+
+    setNewUserData((currentValue) => {
+      const nextEmail = generateAccountEmail(currentValue, allUsers);
+      if (!nextEmail || currentValue.email === nextEmail) return currentValue;
+      return { ...currentValue, email: nextEmail };
+    });
+  }, [
+    allUsers,
+    isCreateEmailManuallyEdited,
+    newUserData.firstName,
+    newUserData.role,
+    newUserData.department,
+    newUserData.position,
+  ]);
+
+  useEffect(() => {
+    if (isCreateEmployeeIdManuallyEdited) return;
+
+    setNewUserData((currentValue) => {
+      const nextEmployeeId = generateAccountEmployeeId(currentValue, allUsers);
+      if (!nextEmployeeId || currentValue.employeeId === nextEmployeeId) return currentValue;
+      return { ...currentValue, employeeId: nextEmployeeId };
+    });
+  }, [allUsers, isCreateEmployeeIdManuallyEdited, newUserData.role]);
 
   useEffect(() => {
     if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -1611,16 +1760,114 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     () => appointmentRequests.filter((request) => getRequestStatus(request) === "approved"),
     [appointmentRequests],
   );
+  const appointmentRecordFilterOptions = useMemo(() => {
+    const buildOptionList = (values) => {
+      const seen = new Set();
+      return values
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .filter((value) => {
+          const key = normalizeFilterValue(value);
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .sort((left, right) => left.localeCompare(right))
+        .map((label) => ({ label, value: normalizeFilterValue(label) }));
+    };
+
+    const configuredOffices = appointmentManagementOptions.offices || [];
+    const configuredPurposes = appointmentManagementOptions.purposes || [];
+    const configuredTimeSlots = appointmentManagementOptions.timeSlots || [];
+    const recordTimeOptions = appointmentRecords
+      .map((record) => {
+        const value = formatTimeInputValue(record.visitTime);
+        return value ? { value, label: formatTime(record.visitTime) } : null;
+      })
+      .filter(Boolean);
+
+    const timeSeen = new Set();
+    const timeOptions = [
+      ...configuredTimeSlots
+        .map((slot) => ({
+          value: String(slot?.value || "").trim(),
+          label: String(slot?.label || slot?.value || "").trim(),
+        }))
+        .filter((slot) => slot.value && slot.label),
+      ...recordTimeOptions,
+    ]
+      .filter((slot) => {
+        if (timeSeen.has(slot.value)) return false;
+        timeSeen.add(slot.value);
+        return true;
+      })
+      .sort((left, right) => left.value.localeCompare(right.value));
+
+    return {
+      offices: buildOptionList([
+        ...configuredOffices.map((option) => option.label || option.value),
+        ...appointmentRecords.map((record) => record.assignedOffice || record.appointmentDepartment || record.host),
+      ]),
+      purposes: buildOptionList([
+        ...configuredPurposes.map((option) => option.label || option.value),
+        ...appointmentRecords.map((record) => record.purposeOfVisit || record.visitType),
+      ]),
+      statuses: buildOptionList(appointmentRecords.map((record) => getRequestStatus(record))),
+      timeSlots: timeOptions,
+    };
+  }, [appointmentManagementOptions, appointmentRecords]);
+
+  const filteredAppointmentRecords = useMemo(() => {
+    const filters = appointmentAppliedFilters || createAppointmentFilterDraft();
+    return appointmentRecords.filter((record) => {
+      const office = normalizeFilterValue(record.assignedOffice || record.appointmentDepartment || record.host);
+      const purpose = normalizeFilterValue(record.purposeOfVisit || record.visitType);
+      const status = normalizeFilterValue(getRequestStatus(record));
+      const visitDate = formatDateInputValue(record.visitDate || record.scheduledVisitStart || record.createdAt);
+      const visitTime = formatTimeInputValue(record.visitTime || record.scheduledVisitStart);
+
+      if (filters.date && visitDate !== filters.date) return false;
+      if (filters.time !== "all" && visitTime !== filters.time) return false;
+      if (filters.office !== "all" && office !== filters.office) return false;
+      if (filters.status !== "all" && status !== filters.status) return false;
+      if (filters.purpose !== "all" && purpose !== filters.purpose) return false;
+
+      return recordMatchesSearch(record, appointmentSearchTerm, [
+        "fullName",
+        "email",
+        "purposeOfVisit",
+        "purposeCategory",
+        "customPurposeOfVisit",
+        "visitType",
+        "assignedOffice",
+        "appointmentDepartment",
+        "host",
+        "approvalStatus",
+        "appointmentStatus",
+        "status",
+        (item) => getRequestStatus(item),
+        (item) => getVisitorSafePassId(item),
+        (item) => [
+          formatDateInputValue(item.visitDate || item.scheduledVisitStart || item.createdAt),
+          formatTimeInputValue(item.visitTime || item.scheduledVisitStart),
+          formatDateTime(item.visitDate || item.scheduledVisitStart || item.createdAt),
+          item.visitTime ? formatTime(item.visitTime) : "",
+        ],
+      ]);
+    });
+  }, [appointmentAppliedFilters, appointmentRecords, appointmentSearchTerm]);
 
   const appointmentRecordsItemsPerPage = 6;
+  const reportRecordsItemsPerPage = 8;
+  const securityReportRecordsItemsPerPage = 8;
   const appointmentRecordsPageCount = Math.max(
     1,
-    Math.ceil(appointmentRecords.length / appointmentRecordsItemsPerPage),
+    Math.ceil(filteredAppointmentRecords.length / appointmentRecordsItemsPerPage),
   );
   const paginatedAppointmentRecords = useMemo(() => {
     const startIndex = (appointmentRecordsPage - 1) * appointmentRecordsItemsPerPage;
-    return appointmentRecords.slice(startIndex, startIndex + appointmentRecordsItemsPerPage);
-  }, [appointmentRecords, appointmentRecordsPage]);
+    return filteredAppointmentRecords.slice(startIndex, startIndex + appointmentRecordsItemsPerPage);
+  }, [appointmentRecordsPage, filteredAppointmentRecords]);
 
   useEffect(() => {
     setAppointmentRecordsPage((currentPageValue) => Math.min(currentPageValue, appointmentRecordsPageCount));
@@ -1632,6 +1879,32 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   );
 
   const selectedMapModuleFloor = FLOOR_VIEW_TO_ID[selectedSubmodule] || "ground";
+  const managedMapLabels = useMemo(() => {
+    const roomNameById = managedRooms.reduce((lookup, room) => {
+      if (room?.id && room?.name) {
+        lookup[room.id] = room.name;
+      }
+      return lookup;
+    }, {});
+
+    return Object.entries(MONITORING_MAP_LABELS).reduce((nextLabels, [floorId, labels]) => {
+      nextLabels[floorId] = labels.map((label) => {
+        const renamedText = roomNameById[label.id];
+        const position = managedRoomPositions?.[label.id];
+        return {
+          ...label,
+          ...(renamedText ? { text: renamedText } : null),
+          ...(position
+            ? {
+                x: Number(position.x),
+                y: Number(position.y),
+              }
+            : null),
+        };
+      });
+      return nextLabels;
+    }, {});
+  }, [managedRoomPositions, managedRooms]);
   const selectedFloorRooms = useMemo(
     () => managedRooms.filter((room) => room.floor === selectedMapModuleFloor),
     [managedRooms, selectedMapModuleFloor],
@@ -2170,7 +2443,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     enabled: existing.enabled !== false,
   });
 
-  const buildAppointmentTimeSlotOption = (value, existing = {}) => {
+  const buildAppointmentTimeSlotOption = (value, existing = {}, capacityValue = existing.capacity ?? existing.limit ?? 2) => {
     const normalized = String(value || "").trim();
     const match = normalized.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
     if (!match) return null;
@@ -2182,6 +2455,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
       return null;
     }
+    const capacity = Number(capacityValue);
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 50) {
+      return null;
+    }
     const timeValue = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
     const hour12 = hour % 12 || 12;
     const label = `${hour12}:${String(minute).padStart(2, "0")} ${hour >= 12 ? "PM" : "AM"}`;
@@ -2191,6 +2468,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       value: timeValue,
       hour,
       minute,
+      capacity,
       enabled: existing.enabled !== false,
     };
   };
@@ -2237,11 +2515,15 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
 
     const updatedOption =
       groupKey === "timeSlots"
-        ? buildAppointmentTimeSlotOption(draft, option)
+        ? buildAppointmentTimeSlotOption(
+            draft,
+            option,
+            appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 2,
+          )
         : buildAppointmentTextOption(groupKey, draft, option);
 
     if (!updatedOption) {
-      Alert.alert("Invalid Time Slot", "Use HH:MM, such as 09:00 or 2:30 PM.");
+      Alert.alert("Invalid Time Slot", "Use HH:MM, such as 09:00 or 2:30 PM, and set slots from 1 to 50.");
       return;
     }
 
@@ -2251,6 +2533,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       `${updatedOption.label} was updated in the visitor appointment form.`,
     );
     setEditingAppointmentOption(null);
+    setAppointmentSlotCapacityDrafts((prev) => {
+      const next = { ...prev };
+      delete next[option.id];
+      return next;
+    });
     setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: "" }));
   };
 
@@ -2268,6 +2555,31 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       (items) => items.filter((item) => item.id !== option.id),
       `${option.label} was removed from the visitor appointment form.`,
     );
+  };
+
+  const applyAppointmentSearch = () => {
+    setAppointmentSearchTerm(appointmentSearchDraft.trim());
+    setAppointmentRecordsPage(1);
+  };
+
+  const clearAppointmentSearch = () => {
+    setAppointmentSearchDraft("");
+    setAppointmentSearchTerm("");
+    setAppointmentRecordsPage(1);
+  };
+
+  const applyAppointmentFilters = () => {
+    setAppointmentAppliedFilters({ ...appointmentFilterDraft });
+    setAppointmentRecordsPage(1);
+    setStaffDropdownOpen(null);
+  };
+
+  const resetAppointmentFilters = () => {
+    const resetFilters = createAppointmentFilterDraft();
+    setAppointmentFilterDraft(resetFilters);
+    setAppointmentAppliedFilters(resetFilters);
+    setAppointmentRecordsPage(1);
+    setStaffDropdownOpen(null);
   };
 
   // FIXED: Load All Visit Requests
@@ -2465,17 +2777,26 @@ const loadDashboardData = useCallback(async () => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
+        let nextSettings = DEFAULT_ADMIN_SETTINGS;
         const savedSettings = await storageGetItem("adminSettings");
         if (savedSettings) {
           const parsedSettings = JSON.parse(savedSettings);
-          setSettings(parsedSettings);
-          setIsDarkMode(parsedSettings.darkMode || false);
+          nextSettings = { ...nextSettings, ...parsedSettings };
         }
         const darkModePref = await storageGetItem("isDarkMode");
         if (darkModePref !== null) {
-          const isDark = JSON.parse(darkModePref);
-          setIsDarkMode(isDark);
-          setSettings((prev) => ({ ...prev, darkMode: isDark }));
+          nextSettings = { ...nextSettings, darkMode: JSON.parse(darkModePref) };
+        }
+        setSettings(nextSettings);
+        setIsDarkMode(!!nextSettings.darkMode);
+
+        const response = await ApiService.getSystemSettings();
+        if (response?.success && response?.settings) {
+          const serverSettings = { ...DEFAULT_ADMIN_SETTINGS, ...response.settings };
+          setSettings(serverSettings);
+          setIsDarkMode(!!serverSettings.darkMode);
+          await storageSetItem("adminSettings", JSON.stringify(serverSettings));
+          await storageSetItem("isDarkMode", JSON.stringify(!!serverSettings.darkMode));
         }
       } catch (error) {
         console.error("Load settings error:", error);
@@ -2611,46 +2932,107 @@ const loadDashboardData = useCallback(async () => {
     return mapActivities.filter((activity) => getAdminMapFilterKey(activity?.activityType) === adminMapFilter);
   }, [adminMapFilter, mapActivities]);
 
+  const findManagedRoomForVisitor = useCallback(
+    (visitor) => {
+      const location = visitor?.currentLocation || {};
+      const candidates = [
+        location.checkpointId,
+        location.office,
+        visitor?.assignedOffice,
+        visitor?.appointmentDepartment,
+        visitor?.host,
+      ]
+        .map((value) => normalizeMapText(value))
+        .filter(Boolean);
+
+      if (candidates.length === 0) return null;
+
+      return (
+        managedRooms.find((room) => {
+          const roomId = normalizeMapText(room.id);
+          const roomName = normalizeMapText(room.name);
+          return candidates.some(
+            (candidate) =>
+              candidate === roomId ||
+              candidate === roomName ||
+              roomId.includes(candidate) ||
+              candidate.includes(roomName),
+          );
+        }) || null
+      );
+    },
+    [managedRooms],
+  );
+
+  const getManagedVisitorMapLocation = useCallback(
+    (visitor, index = 0) => {
+      const matchedRoom = findManagedRoomForVisitor(visitor);
+      const position = matchedRoom ? managedRoomPositions?.[matchedRoom.id] : null;
+
+      if (
+        matchedRoom &&
+        position &&
+        Number.isFinite(Number(position.x)) &&
+        Number.isFinite(Number(position.y))
+      ) {
+        return {
+          floor: matchedRoom.floor || getVisitorMonitorFloor(visitor),
+          office: matchedRoom.name,
+          coordinates: {
+            x: Number(position.x),
+            y: Number(position.y),
+          },
+        };
+      }
+
+      return {
+        floor: getVisitorMonitorFloor(visitor),
+        office:
+          visitor?.currentLocation?.office ||
+          visitor?.assignedOffice ||
+          visitor?.host ||
+          "On-site visitor",
+        coordinates: getVisitorMonitorCoordinates(visitor, index),
+      };
+    },
+    [findManagedRoomForVisitor, managedRoomPositions],
+  );
+
   const monitoredMapVisitors = useMemo(
     () =>
       visitRequests
         .filter((visitor) => visitor?.status === "checked_in")
         .slice(0, 18)
-        .map((visitor, index) => ({
-          id: visitor?._id || `checked-in-visitor-${index}`,
-          name: visitor?.fullName || "Checked-In Visitor",
-          purpose: visitor?.purposeOfVisit || "On-site visit",
-          status: "checked_in",
-          location: {
-            floor: getVisitorMonitorFloor(visitor),
-            office:
-              visitor?.currentLocation?.office ||
-              visitor?.assignedOffice ||
-              visitor?.host ||
-              "On-site visitor",
-            source: visitor?.currentLocation?.source || "system_estimate",
-            timestamp:
+        .map((visitor, index) => {
+          const managedLocation = getManagedVisitorMapLocation(visitor, index);
+          return {
+            id: visitor?._id || `checked-in-visitor-${index}`,
+            name: visitor?.fullName || "Checked-In Visitor",
+            purpose: visitor?.purposeOfVisit || "On-site visit",
+            status: "checked_in",
+            location: {
+              floor: managedLocation.floor,
+              office: managedLocation.office,
+              source: visitor?.currentLocation?.source || "system_estimate",
+              timestamp:
+                visitor?.currentLocation?.lastSeenAt ||
+                visitor?.checkedInAt ||
+                visitor?.updatedAt ||
+                visitor?.createdAt,
+              coordinates: managedLocation.coordinates,
+            },
+            activityType: "security_checkin",
+            eventLabel: "Checked In",
+            lastUpdate:
               visitor?.currentLocation?.lastSeenAt ||
               visitor?.checkedInAt ||
               visitor?.updatedAt ||
               visitor?.createdAt,
-            coordinates: getVisitorMonitorCoordinates(visitor, index),
-          },
-          activityType: "security_checkin",
-          eventLabel: "Checked In",
-          lastUpdate:
-            visitor?.currentLocation?.lastSeenAt ||
-            visitor?.checkedInAt ||
-            visitor?.updatedAt ||
-            visitor?.createdAt,
-          detail:
-            visitor?.currentLocation?.office ||
-            visitor?.assignedOffice ||
-            visitor?.host ||
-            "Visitor is currently on site.",
-          sourceVisitor: visitor,
-        })),
-    [visitRequests],
+            detail: managedLocation.office || "Visitor is currently on site.",
+            sourceVisitor: visitor,
+          };
+        }),
+    [getManagedVisitorMapLocation, visitRequests],
   );
 
   const visibleAdminMapVisitors = useMemo(
@@ -2676,12 +3058,8 @@ const loadDashboardData = useCallback(async () => {
   );
 
   const activeMapActivity = useMemo(() => {
-    if (!selectedMapActivity) return visibleAdminMapVisitors[0] || null;
-    return (
-      visibleAdminMapVisitors.find((item) => item.id === selectedMapActivity.id) ||
-      visibleAdminMapVisitors[0] ||
-      null
-    );
+    if (!selectedMapActivity) return null;
+    return visibleAdminMapVisitors.find((item) => item.id === selectedMapActivity.id) || null;
   }, [visibleAdminMapVisitors, selectedMapActivity]);
 
   const activeMenuMeta = useMemo(() => {
@@ -2992,7 +3370,11 @@ const loadDashboardData = useCallback(async () => {
         syncLegacyMenuState("settings");
         break;
       default:
-        Alert.alert("Coming Soon", `${action} is under development`);
+        if (ALL_ADMIN_SUBMODULES.includes(action)) {
+          selectAdminSubmodule(action);
+          break;
+        }
+        selectAdminSubmodule("dashboard");
     }
   };
 
@@ -3166,14 +3548,8 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const openCreateUserModal = (role = accountRecordsMode === "security" ? "security" : "staff") => {
-    if (role === "staff") {
-      resetCreateUserForm("staff");
-      selectAdminSubmodule("account-create");
-      return;
-    }
-
     resetCreateUserForm(role);
-    setShowAddUserModal(true);
+    selectAdminSubmodule("account-create");
   };
 
   const getStaffDepartmentOption = (department) =>
@@ -3213,24 +3589,28 @@ const loadDashboardData = useCallback(async () => {
 
   const validateCreateUserForm = () => {
     const nextErrors = {};
-    const normalizedEmail = String(newUserData.email || "").trim().toLowerCase();
+    const generatedEmail = generateAccountEmail(newUserData, allUsers);
+    const normalizedEmail = String(newUserData.email || generatedEmail || "").trim().toLowerCase();
     const normalizedUsername = normalizeUsernameInput(newUserData.username);
+    const generatedEmployeeId = generateAccountEmployeeId(newUserData, allUsers);
+    const normalizedEmployeeId = String(newUserData.employeeId || generatedEmployeeId || "").trim();
 
     if (!String(newUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(newUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
+    if (!["staff", "security", "guard"].includes(String(newUserData.role || "").toLowerCase())) {
+      nextErrors.role = "Admin can only create staff or security accounts here.";
+    }
+    if (!normalizedEmployeeId) nextErrors.employeeId = "Staff/Security number is required.";
     if (!normalizedEmail) nextErrors.email = "Email address is required.";
     if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       nextErrors.email = "Enter a valid email address.";
     }
-    const normalizedPhone = normalizePhilippineMobileNumber(newUserData.phone);
-    if (!String(newUserData.phone || "").trim()) {
-      nextErrors.phone = "Contact number is required.";
-    } else if (!isValidPhilippineMobileNumber(newUserData.phone)) {
+    const normalizedPhone = newUserData.phone ? normalizePhilippineMobileNumber(newUserData.phone) : "";
+    if (String(newUserData.phone || "").trim() && !isValidPhilippineMobileNumber(newUserData.phone)) {
       nextErrors.phone = PHILIPPINE_MOBILE_NUMBER_MESSAGE;
     }
 
     if (!isSecurityRole(newUserData.role)) {
-      if (!normalizedUsername) nextErrors.username = "Username is required.";
       if (!String(newUserData.department || "").trim()) nextErrors.department = "Department is required.";
     }
 
@@ -3249,6 +3629,14 @@ const loadDashboardData = useCallback(async () => {
         nextErrors.username = "This username is already in use.";
       }
     }
+    if (normalizedEmployeeId) {
+      const existingEmployeeId = allUsers.find(
+        (userItem) => String(userItem?.employeeId || "").trim().toLowerCase() === normalizedEmployeeId.toLowerCase(),
+      );
+      if (existingEmployeeId) {
+        nextErrors.employeeId = "This Staff/Security number is already registered.";
+      }
+    }
 
     setCreateUserErrors(nextErrors);
     return {
@@ -3256,11 +3644,28 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmail,
       normalizedUsername,
       normalizedPhone,
+      normalizedEmployeeId,
     };
   };
 
   const resetCreateUserForm = (role = "staff") => {
+    setIsCreateEmailManuallyEdited(false);
+    setIsCreateEmployeeIdManuallyEdited(false);
     setNewUserData(createEmptyUserForm(role));
+    setCreateUserErrors({});
+    setStaffDropdownOpen(null);
+  };
+
+  const switchCreateUserRole = (role = "staff") => {
+    setNewUserData((currentValue) => ({
+      ...createEmptyUserForm(role),
+      firstName: currentValue.firstName,
+      lastName: currentValue.lastName,
+      username: currentValue.username,
+      email: isCreateEmailManuallyEdited ? currentValue.email : "",
+      phone: currentValue.phone,
+      employeeId: isCreateEmployeeIdManuallyEdited ? currentValue.employeeId : "",
+    }));
     setCreateUserErrors({});
     setStaffDropdownOpen(null);
   };
@@ -3362,6 +3767,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmail,
       normalizedUsername,
       normalizedPhone,
+      normalizedEmployeeId,
     } = validateCreateUserForm();
     if (!isValid) {
       Alert.alert("Validation Error", "Please review the highlighted fields before creating the account.");
@@ -3380,8 +3786,9 @@ const loadDashboardData = useCallback(async () => {
         email: normalizedEmail,
         phone: normalizedPhone,
         role: newUserData.role,
-        status: newUserData.status || "active",
-        isActive: (newUserData.status || "active") === "active",
+        employeeId: normalizedEmployeeId,
+        status: "inactive",
+        isActive: false,
       };
 
       if (newUserData.role === "staff") {
@@ -3399,6 +3806,7 @@ const loadDashboardData = useCallback(async () => {
             lastName: userPayload.lastName,
             email: userPayload.email,
             phone: userPayload.phone,
+            employeeId: userPayload.employeeId,
             position: userPayload.position,
             shift: userPayload.shift,
           })
@@ -3417,7 +3825,7 @@ const loadDashboardData = useCallback(async () => {
           isActive: response.user?.isActive ?? userPayload.isActive,
           _id: response.user?._id || response.user?.id || Date.now().toString(),
           createdAt: new Date().toISOString(),
-          employeeId: response.user?.employeeId || "Pending assignment",
+          employeeId: response.user?.employeeId || userPayload.employeeId,
         };
         
         setAllUsers(prev => [...prev, newUser]);
@@ -3433,24 +3841,24 @@ const loadDashboardData = useCallback(async () => {
           totalUsers: prev.totalUsers + 1,
           totalStaff: newUserData.role === "staff" ? prev.totalStaff + 1 : prev.totalStaff,
           totalGuards: (newUserData.role === "security" || newUserData.role === "guard") ? prev.totalGuards + 1 : prev.totalGuards,
-          activeUsers: userPayload.status === "active" ? prev.activeUsers + 1 : prev.activeUsers,
+          activeUsers: prev.activeUsers,
         }));
 
         setShowAddUserModal(false);
         const emailDelivery = response.emailDelivery || {};
         const deliveryNote = emailDelivery.delivered
-          ? `A temporary password and login details have been sent to ${newUserData.email}.`
+          ? `A secure activation and password setup link has been sent to ${normalizedEmail}.`
           : emailDelivery.simulated
-            ? `Account created. Credential email was simulated by the backend, so check the backend logs for delivery details.`
-          : `Account created, but the credential email could not be sent. Check the backend mail logs before giving this account to the user.`;
+            ? `Account created. Activation email was simulated by the backend, so check the backend logs for the setup link.`
+          : `Account created, but the activation email could not be sent. Check the backend mail logs before giving this account to the user.`;
 
         setCreatedUserSummary({
           name: createdName,
-          email: newUserData.email,
+          email: normalizedEmail,
           username: newUser.username || "N/A",
           role: roleDisplay,
-          employeeId: response.user?.employeeId || "Generated automatically",
-          status: userPayload.status,
+          employeeId: response.user?.employeeId || userPayload.employeeId,
+          status: "Pending activation",
           deliveryNote,
         });
         setShowCreateSuccessModal(true);
@@ -3819,18 +4227,67 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
+  const refreshSystemHealth = async () => {
+    if (!ensureAdminAccess()) return;
+    setIsRunningSystemAction(true);
+    try {
+      const response = await ApiService.getSystemHealth();
+      if (response?.success) {
+        setSystemHealth(response.health || null);
+        publishAdminNotice("success", "System health refreshed", "Database, API, and NFC service statuses are up to date.");
+      } else {
+        publishAdminNotice("error", "Health check failed", response?.message || "Unable to refresh system health.");
+      }
+    } catch (error) {
+      console.error("System health error:", error);
+      publishAdminNotice("error", "Health check failed", error?.message || "Unable to refresh system health.");
+    } finally {
+      setIsRunningSystemAction(false);
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    if (!ensureAdminAccess()) return;
+    setIsRunningSystemAction(true);
+    try {
+      const response = await ApiService.createBackup();
+      if (response?.success) {
+        const backupSummary = {
+          message: response.message || "Backup created successfully.",
+          createdAt: new Date().toISOString(),
+        };
+        setLastBackupSummary(backupSummary);
+        publishAdminNotice("success", "Backup created", backupSummary.message);
+        Alert.alert("Backup Created", backupSummary.message);
+      } else {
+        publishAdminNotice("error", "Backup failed", response?.message || "Unable to create backup.");
+      }
+    } catch (error) {
+      console.error("Create backup error:", error);
+      publishAdminNotice("error", "Backup failed", error?.message || "Unable to create backup.");
+      Alert.alert("Backup Failed", error?.message || "Unable to create backup.");
+    } finally {
+      setIsRunningSystemAction(false);
+    }
+  };
+
   const resetSettings = () => {
     Alert.alert("Reset Settings", "Are you sure you want to reset all settings to default?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Reset",
         style: "destructive",
-        onPress: () => {
-          setSettings({
-            emailNotifications: true, smsAlerts: true, autoApprove: false, maintenanceMode: false,
-            darkMode: false, twoFactorAuth: false, sessionTimeout: "30", maxLoginAttempts: "5",
-            dateFormat: "MM/DD/YYYY", timeFormat: "12h", language: "en",
-          });
+        onPress: async () => {
+          const defaultSettings = { ...DEFAULT_ADMIN_SETTINGS };
+          setSettings(defaultSettings);
+          setIsDarkMode(false);
+          await storageSetItem("adminSettings", JSON.stringify(defaultSettings));
+          await storageSetItem("isDarkMode", JSON.stringify(false));
+          try {
+            await ApiService.updateSystemSettings(defaultSettings);
+          } catch (error) {
+            console.error("Reset settings sync error:", error);
+          }
           Alert.alert("Success", "Settings reset to default");
         },
       },
@@ -3865,18 +4322,31 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const clearSystemData = () => {
-    Alert.alert("Clear System Data", "WARNING: This will delete all system data. This action cannot be undone!", [
+    Alert.alert("Clear Dashboard Cache", "This clears saved admin dashboard preferences on this device only. Accounts, visitors, and your login session will stay intact.", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Clear All Data",
+        text: "Clear Cache",
         style: "destructive",
         onPress: async () => {
           try {
-            await storageClear();
-            Alert.alert("Success", "All system data has been cleared");
-            navigation.replace("Login");
+            await storageMultiRemove([
+              "adminSettings",
+              "isDarkMode",
+              ROOM_STORAGE_KEY,
+              ROOM_POSITION_STORAGE_KEY,
+              DATA_FIELDS_STORAGE_KEY,
+            ]);
+            setSettings(DEFAULT_ADMIN_SETTINGS);
+            setIsDarkMode(false);
+            setManagedRooms(MONITORING_MAP_OFFICES);
+            setManagedRoomPositions(MONITORING_MAP_OFFICE_POSITIONS);
+            setDataCollectionFields(DEFAULT_DATA_COLLECTION_FIELDS);
+            resetRoomEditor("ground");
+            resetFieldEditor();
+            publishAdminNotice("success", "Dashboard cache cleared", "Local admin preferences and map customizations were reset.");
+            Alert.alert("Success", "Dashboard cache has been cleared.");
           } catch (error) {
-            Alert.alert("Error", "Failed to clear data");
+            Alert.alert("Error", "Failed to clear dashboard cache");
           }
         },
       },
@@ -3973,8 +4443,8 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
-  const handlePrintReports = async () => {
-    const rows = buildReportPrintRows(getFilteredHistory());
+  const handlePrintReports = async (recordsToPrint = getFilteredHistory()) => {
+    const rows = buildReportPrintRows(recordsToPrint);
     if (rows.length === 0) {
       Alert.alert("No Data", "There are no report rows to print.");
       return;
@@ -4009,8 +4479,8 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
-  const handlePrintSecurityReports = async () => {
-    if (!securityReportRecords.length) {
+  const handlePrintSecurityReports = async (recordsToPrint = securityReportRecords) => {
+    if (!recordsToPrint.length) {
       Alert.alert("No Data", "There are no security reports to print.");
       return;
     }
@@ -4029,7 +4499,7 @@ const loadDashboardData = useCallback(async () => {
         printedBy,
         generatedAt,
         columns: ["Visitor", "Email", "Reason", "Office", "Reporter", "Reported At", "Resolved"],
-        rows: securityReportRecords.map((record) => [
+        rows: recordsToPrint.map((record) => [
           record.fullName || "Visitor",
           record.email || "-",
           record.reportReason || "-",
@@ -4717,13 +5187,16 @@ const loadDashboardData = useCallback(async () => {
           selectedFloor={selectedAdminMapFloor}
           selectedOffice={selectedAdminMapOffice}
           mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+          mapLabels={managedMapLabels}
           officePositions={managedRoomPositions}
           onFloorChange={(floorId) => {
             setSelectedAdminMapFloor(floorId);
             setSelectedAdminMapOffice("all");
           }}
+          onVisitorHover={(item) => setHoveredMapVisitor(item)}
+          onVisitorLeave={() => setHoveredMapVisitor(null)}
           onVisitorSelect={(item) => setSelectedMapActivity(item)}
-          hoveredVisitor={activeMapActivity}
+          hoveredVisitor={hoveredMapVisitor}
           backgroundColor={isDarkMode ? "#0F172A" : "#F8FBFE"}
           borderColor={theme.borderColor}
           mapBackgroundColor={isDarkMode ? "#111827" : "#FFFFFF"}
@@ -4822,13 +5295,16 @@ const loadDashboardData = useCallback(async () => {
             selectedFloor={selectedAdminMapFloor}
             selectedOffice={selectedAdminMapOffice}
             mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+            mapLabels={managedMapLabels}
             officePositions={managedRoomPositions}
             onFloorChange={(floorId) => {
               setSelectedAdminMapFloor(floorId);
               setSelectedAdminMapOffice("all");
             }}
+            onVisitorHover={(item) => setHoveredMapVisitor(item)}
+            onVisitorLeave={() => setHoveredMapVisitor(null)}
             onVisitorSelect={(item) => setSelectedMapActivity(item)}
-            hoveredVisitor={activeMapActivity}
+            hoveredVisitor={hoveredMapVisitor}
             backgroundColor={theme.cardBackground}
             borderColor={theme.borderColor}
             mapBackgroundColor={isDarkMode ? "#0F172A" : "#FFFFFF"}
@@ -5152,6 +5628,13 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
 
+    const nextX = Number(roomDraft.x);
+    const nextY = Number(roomDraft.y);
+    if (!Number.isFinite(nextX) || !Number.isFinite(nextY) || nextX < 0 || nextX > 100 || nextY < 0 || nextY > 100) {
+      Alert.alert("Invalid coordinates", "Map X and Map Y must be numbers from 0 to 100.");
+      return;
+    }
+
     const currentRoom = managedRooms.find((room) => room.id === editingRoomId);
     if (!currentRoom) {
       Alert.alert("Room not found", "Please choose the room again before renaming it.");
@@ -5169,6 +5652,22 @@ const loadDashboardData = useCallback(async () => {
       return currentRooms.map((room) => (room.id === roomId ? nextRoom : room));
     });
 
+    setManagedRoomPositions((currentPositions) => ({
+      ...currentPositions,
+      [roomId]: {
+        x: Math.round(nextX * 10) / 10,
+        y: Math.round(nextY * 10) / 10,
+      },
+    }));
+
+    setSelectedAdminMapFloor(nextRoom.floor);
+    setSelectedAdminMapOffice("all");
+
+    publishAdminNotice(
+      "success",
+      "Room updated",
+      `${currentRoom.name} is now ${trimmedName} at X ${Math.round(nextX * 10) / 10}, Y ${Math.round(nextY * 10) / 10}. NFC markers that match this room use this position on the map.`,
+    );
     resetRoomEditor(roomDraft.floor);
   };
 
@@ -5292,7 +5791,7 @@ const loadDashboardData = useCallback(async () => {
                     flex: 1,
                   },
                 ]}
-                onPress={() => resetCreateUserForm("staff")}
+                onPress={() => switchCreateUserRole("staff")}
               >
                 <View style={[styles.managementQuickStatIcon, { backgroundColor: "rgba(16,185,129,0.14)" }]}>
                   <Ionicons name="briefcase-outline" size={18} color={ADMIN_BLUE} />
@@ -5316,7 +5815,7 @@ const loadDashboardData = useCallback(async () => {
                     flex: 1,
                   },
                 ]}
-                onPress={() => resetCreateUserForm("security")}
+                onPress={() => switchCreateUserRole("security")}
               >
                 <View style={[styles.managementQuickStatIcon, { backgroundColor: "rgba(139,92,246,0.14)" }]}>
                   <Ionicons name="shield-checkmark-outline" size={18} color="#1C6DD0" />
@@ -5356,7 +5855,7 @@ const loadDashboardData = useCallback(async () => {
               </View>
 
               <View style={styles.userEditorSection}>
-                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Identity</Text>
+                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Basic Information</Text>
                 <View style={styles.userEditorGrid}>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>First Name *</Text>
@@ -5398,10 +5897,10 @@ const loadDashboardData = useCallback(async () => {
               </View>
 
               <View style={styles.userEditorSection}>
-                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Account Details</Text>
+                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Account Credentials</Text>
                 <View style={styles.userEditorGrid}>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Username *</Text>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Username</Text>
                     <TextInput
                       style={[
                         styles.input,
@@ -5429,14 +5928,18 @@ const loadDashboardData = useCallback(async () => {
                       ]}
                       value={newUserData.email}
                       onChangeText={(text) => {
+                        setIsCreateEmailManuallyEdited(true);
                         setNewUserData((currentValue) => ({ ...currentValue, email: text }));
                         setCreateUserErrors((currentValue) => ({ ...currentValue, email: null }));
                       }}
-                      placeholder="staff@sapphire.edu"
+                      placeholder={generatedCreateUserEmail || "staff@sapphire.edu"}
                       autoCapitalize="none"
                       keyboardType="email-address"
                       placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                     />
+                    <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                      Auto-generated from first name and role. Admin can edit it when needed.
+                    </Text>
                     {renderCreateUserFieldError("email")}
                   </View>
                 </View>
@@ -5444,25 +5947,41 @@ const loadDashboardData = useCallback(async () => {
                 <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
                   <Ionicons name="mail-outline" size={16} color="#0A3D91" />
                   <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
-                    A temporary password will be sent to the user's Gmail after account creation.
+                    A secure activation email will be sent. The user creates their password from that link before the account becomes active.
                   </Text>
                 </View>
               </View>
 
               <View style={styles.userEditorSection}>
-                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Work Profile</Text>
+                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Role & Department</Text>
                 <View style={styles.userEditorGrid}>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>{isCreatingSecurity ? "Generated Security ID" : "Generated Staff ID"}</Text>
-                    <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                      <Ionicons name="card-outline" size={16} color="#0A3D91" />
-                      <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
-                        {getGeneratedEmployeeIdPreview()}
-                      </Text>
-                    </View>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                      {isCreatingSecurity ? "Security Number *" : "Staff Number *"}
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        createUserErrors.employeeId && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
+                      value={newUserData.employeeId}
+                      onChangeText={(text) => {
+                        setIsCreateEmployeeIdManuallyEdited(true);
+                        setNewUserData((currentValue) => ({ ...currentValue, employeeId: text }));
+                        setCreateUserErrors((currentValue) => ({ ...currentValue, employeeId: null }));
+                      }}
+                      placeholder={generatedCreateUserEmployeeId || (isCreatingSecurity ? "SEC-2026-001" : "STF-2026-001")}
+                      autoCapitalize="characters"
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    />
+                    <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                      Auto-generated and checked for duplicates. Admin can edit it when needed.
+                    </Text>
+                    {renderCreateUserFieldError("employeeId")}
                   </View>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Contact Number *</Text>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Contact Number</Text>
                     <TextInput
                       style={[
                         styles.input,
@@ -5539,6 +6058,10 @@ const loadDashboardData = useCallback(async () => {
                 </View>
                 {renderCreateUserFieldError("department")}
 
+              </View>
+
+              <View style={styles.userEditorSection}>
+                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Account Status / Activation</Text>
                 <View style={styles.userEditorGrid}>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Assigned Area</Text>
@@ -5550,32 +6073,12 @@ const loadDashboardData = useCallback(async () => {
                     </View>
                   </View>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Status</Text>
-                    <View style={styles.roleSelector}>
-                      {[
-                        { key: "active", label: "Active" },
-                        { key: "inactive", label: "Inactive" },
-                      ].map((option) => (
-                        <TouchableOpacity
-                          key={option.key}
-                          style={[
-                            styles.roleOption,
-                            newUserData.status === option.key && styles.roleOptionActive,
-                            isDarkMode && newUserData.status !== option.key && { backgroundColor: "#334155", borderColor: "#475569" },
-                          ]}
-                          onPress={() => setNewUserData((currentValue) => ({ ...currentValue, status: option.key }))}
-                        >
-                          <Text
-                            style={[
-                              styles.roleText,
-                              newUserData.status === option.key && styles.roleTextActive,
-                              isDarkMode && newUserData.status !== option.key && { color: "#CBD5E1" },
-                            ]}
-                          >
-                            {option.label}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Initial Status</Text>
+                    <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                      <Ionicons name="lock-closed-outline" size={16} color="#0A3D91" />
+                      <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                        Pending activation by secure email link
+                      </Text>
                     </View>
                   </View>
                 </View>
@@ -6520,6 +7023,7 @@ const loadDashboardData = useCallback(async () => {
                 selectedFloor={selectedMapModuleFloor}
                 selectedOffice={selectedAdminMapOffice}
                 mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+                mapLabels={managedMapLabels}
                 officePositions={managedRoomPositions}
                 onFloorChange={(floorId) => {
                   const floorViewKey = Object.entries(FLOOR_VIEW_TO_ID).find(([, floorValue]) => floorValue === floorId)?.[0];
@@ -6527,8 +7031,10 @@ const loadDashboardData = useCallback(async () => {
                     selectAdminSubmodule(floorViewKey);
                   }
                 }}
+                onVisitorHover={(item) => setHoveredMapVisitor(item)}
+                onVisitorLeave={() => setHoveredMapVisitor(null)}
                 onVisitorSelect={(item) => setSelectedMapActivity(item)}
-                hoveredVisitor={activeMapActivity}
+                hoveredVisitor={hoveredMapVisitor}
                 backgroundColor="transparent"
                 borderColor={theme.borderColor}
                 mapBackgroundColor={isDarkMode ? "#0F172A" : "#FFFFFF"}
@@ -6564,9 +7070,37 @@ const loadDashboardData = useCallback(async () => {
                 onChangeText={(value) => handleRoomDraftChange("name", value)}
               />
 
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Map X</Text>
+                  <TextInput
+                    style={[styles.modularTextInput, isDarkMode && styles.darkInput]}
+                    placeholder="0-100"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                    keyboardType="numeric"
+                    value={roomDraft.x}
+                    onChangeText={(value) => handleRoomDraftChange("x", value)}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Map Y</Text>
+                  <TextInput
+                    style={[styles.modularTextInput, isDarkMode && styles.darkInput]}
+                    placeholder="0-100"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                    keyboardType="numeric"
+                    value={roomDraft.y}
+                    onChangeText={(value) => handleRoomDraftChange("y", value)}
+                  />
+                </View>
+              </View>
+              <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                X moves left/right and Y moves up/down on the blueprint. Matching NFC visitor markers follow this room position.
+              </Text>
+
               <View style={styles.modularEditorActions}>
                 <TouchableOpacity style={styles.submitButton} onPress={submitRoomDraft}>
-                  <Text style={styles.submitButtonText}>Save Name</Text>
+                  <Text style={styles.submitButtonText}>Save Room</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cancelButton} onPress={() => resetRoomEditor(selectedMapModuleFloor)}>
                   <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -6683,23 +7217,334 @@ const loadDashboardData = useCallback(async () => {
     </ScrollView>
   );
 
+  const renderAppointmentFilterDropdown = ({ label, value, options, onSelect, icon }) => {
+    const dropdownKey = `appointment-filter-${label}`;
+    const isOpen = staffDropdownOpen === dropdownKey;
+    const selectedOption = options.find((option) => option.value === value);
+
+    return (
+      <View style={styles.appointmentToolbarField}>
+        <Text style={[styles.appointmentToolbarLabel, isDarkMode && styles.darkTextSecondary]}>{label}</Text>
+        <TouchableOpacity
+          style={[
+            styles.appointmentToolbarSelect,
+            isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+          ]}
+          onPress={() => setStaffDropdownOpen(isOpen ? null : dropdownKey)}
+          activeOpacity={0.85}
+        >
+          <View style={styles.appointmentToolbarSelectValue}>
+            <Ionicons name={icon} size={15} color="#64748B" />
+            <Text
+              style={[styles.appointmentToolbarSelectText, isDarkMode && styles.darkText]}
+              numberOfLines={1}
+            >
+              {selectedOption?.label || "All"}
+            </Text>
+          </View>
+          <Ionicons name={isOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color="#64748B" />
+        </TouchableOpacity>
+        {isOpen ? (
+          <View
+            style={[
+              styles.appointmentToolbarDropdownMenu,
+              isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+            ]}
+          >
+            <ScrollView style={styles.appointmentToolbarDropdownScroll} nestedScrollEnabled>
+              {options.map((option) => {
+                const isSelected = option.value === value;
+                return (
+                  <TouchableOpacity
+                    key={`${label}-${option.value}`}
+                    style={[
+                      styles.appointmentToolbarDropdownOption,
+                      isSelected && styles.appointmentToolbarDropdownOptionActive,
+                    ]}
+                    onPress={() => {
+                      onSelect(option.value);
+                      setStaffDropdownOpen(null);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.appointmentToolbarDropdownText,
+                        isSelected && styles.appointmentToolbarDropdownTextActive,
+                        isDarkMode && !isSelected && styles.darkText,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {option.label}
+                    </Text>
+                    {isSelected ? <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderAppointmentRecordsToolbar = () => {
+    const allOption = { label: "All", value: "all" };
+    const hasSearch = Boolean(appointmentSearchTerm);
+    const hasFilters = Object.entries(appointmentAppliedFilters).some(([key, value]) =>
+      key === "date" ? Boolean(value) : value !== "all",
+    );
+
+    return (
+      <View style={styles.appointmentRecordsToolbar}>
+        <View
+          style={[
+            styles.appointmentToolbarCard,
+            isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+          ]}
+        >
+          <View style={styles.appointmentToolbarHeader}>
+            <View style={styles.appointmentToolbarHeaderCopy}>
+              <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>Search Appointments</Text>
+              <Text style={[styles.appointmentToolbarSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                Search by visitor, date, time, office, or purpose.
+              </Text>
+            </View>
+            {hasSearch ? (
+              <TouchableOpacity style={styles.appointmentToolbarClearButton} onPress={clearAppointmentSearch}>
+                <Ionicons name="close-outline" size={14} color="#64748B" />
+                <Text style={styles.appointmentToolbarClearText}>Clear</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <View style={styles.appointmentToolbarSearchRow}>
+            <View
+              style={[
+                styles.appointmentToolbarSearchInputWrap,
+                isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+              ]}
+            >
+              <Ionicons name="search-outline" size={17} color="#64748B" />
+              <TextInput
+                style={[styles.appointmentToolbarSearchInput, isDarkMode && styles.darkText]}
+                placeholder="Name, YYYY-MM-DD, 3:30 PM, office, purpose"
+                placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                value={appointmentSearchDraft}
+                onChangeText={setAppointmentSearchDraft}
+                returnKeyType="search"
+                onSubmitEditing={applyAppointmentSearch}
+              />
+            </View>
+            <TouchableOpacity style={styles.appointmentToolbarPrimaryButton} onPress={applyAppointmentSearch}>
+              <Ionicons name="search-outline" size={16} color="#FFFFFF" />
+              <Text style={styles.appointmentToolbarPrimaryText}>Search</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.appointmentToolbarCard,
+            isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+          ]}
+        >
+          <View style={styles.appointmentToolbarHeader}>
+            <View style={styles.appointmentToolbarHeaderCopy}>
+              <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>Filters</Text>
+              <Text style={[styles.appointmentToolbarSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                Narrow results by schedule, office, status, and purpose.
+              </Text>
+            </View>
+            {hasFilters ? (
+              <TouchableOpacity style={styles.appointmentToolbarClearButton} onPress={resetAppointmentFilters}>
+                <Ionicons name="refresh-outline" size={14} color="#64748B" />
+                <Text style={styles.appointmentToolbarClearText}>Reset</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <View style={styles.appointmentToolbarFilterGrid}>
+            <View style={styles.appointmentToolbarField}>
+              <Text style={[styles.appointmentToolbarLabel, isDarkMode && styles.darkTextSecondary]}>Date</Text>
+              <View
+                style={[
+                  styles.appointmentToolbarInputWrap,
+                  isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+                ]}
+              >
+                <Ionicons name="calendar-outline" size={15} color="#64748B" />
+                <TextInput
+                  style={[styles.appointmentToolbarInput, isDarkMode && styles.darkText]}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                  value={appointmentFilterDraft.date}
+                  onChangeText={(value) =>
+                    setAppointmentFilterDraft((current) => ({ ...current, date: value.trim() }))
+                  }
+                />
+              </View>
+            </View>
+
+            {renderAppointmentFilterDropdown({
+              label: "Time",
+              value: appointmentFilterDraft.time,
+              icon: "time-outline",
+              options: [allOption, ...appointmentRecordFilterOptions.timeSlots],
+              onSelect: (value) => setAppointmentFilterDraft((current) => ({ ...current, time: value })),
+            })}
+            {renderAppointmentFilterDropdown({
+              label: "Office",
+              value: appointmentFilterDraft.office,
+              icon: "business-outline",
+              options: [allOption, ...appointmentRecordFilterOptions.offices],
+              onSelect: (value) => setAppointmentFilterDraft((current) => ({ ...current, office: value })),
+            })}
+            {renderAppointmentFilterDropdown({
+              label: "Status",
+              value: appointmentFilterDraft.status,
+              icon: "flag-outline",
+              options: [allOption, ...appointmentRecordFilterOptions.statuses],
+              onSelect: (value) => setAppointmentFilterDraft((current) => ({ ...current, status: value })),
+            })}
+            {renderAppointmentFilterDropdown({
+              label: "Purpose",
+              value: appointmentFilterDraft.purpose,
+              icon: "clipboard-outline",
+              options: [allOption, ...appointmentRecordFilterOptions.purposes],
+              onSelect: (value) => setAppointmentFilterDraft((current) => ({ ...current, purpose: value })),
+            })}
+          </View>
+          <View style={styles.appointmentToolbarActionRow}>
+            <TouchableOpacity style={styles.appointmentToolbarSecondaryButton} onPress={resetAppointmentFilters}>
+              <Text style={styles.appointmentToolbarSecondaryText}>Reset</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.appointmentToolbarPrimaryButton} onPress={applyAppointmentFilters}>
+              <Ionicons name="funnel-outline" size={16} color="#FFFFFF" />
+              <Text style={styles.appointmentToolbarPrimaryText}>Apply Filter</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderAdminRecordToolbar = ({
+    searchValue,
+    onSearchChange,
+    searchPlaceholder,
+    searchSubtitle = "Find records by visitor, office, purpose, date, reporter, or status.",
+    hasSearch,
+    onClearSearch,
+    filters = [],
+    filterSubtitle = "Keep the table focused without a long filter form.",
+    hasFilters,
+    onResetFilters,
+  }) => (
+    <View style={styles.appointmentRecordsToolbar}>
+      <View
+        style={[
+          styles.appointmentToolbarCard,
+          isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+        ]}
+      >
+        <View style={styles.appointmentToolbarHeader}>
+          <View style={styles.appointmentToolbarHeaderCopy}>
+            <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>Search</Text>
+            <Text style={[styles.appointmentToolbarSubtitle, isDarkMode && styles.darkTextSecondary]}>
+              {searchSubtitle}
+            </Text>
+          </View>
+          {hasSearch ? (
+            <TouchableOpacity style={styles.appointmentToolbarClearButton} onPress={onClearSearch}>
+              <Ionicons name="close-outline" size={14} color="#64748B" />
+              <Text style={styles.appointmentToolbarClearText}>Clear</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.appointmentToolbarSearchRow}>
+          <View
+            style={[
+              styles.appointmentToolbarSearchInputWrap,
+              isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+            ]}
+          >
+            <Ionicons name="search-outline" size={17} color="#64748B" />
+            <TextInput
+              style={[styles.appointmentToolbarSearchInput, isDarkMode && styles.darkText]}
+              placeholder={searchPlaceholder}
+              placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+              value={searchValue}
+              onChangeText={onSearchChange}
+            />
+          </View>
+        </View>
+      </View>
+
+      <View
+        style={[
+          styles.appointmentToolbarCard,
+          isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+        ]}
+      >
+        <View style={styles.appointmentToolbarHeader}>
+          <View style={styles.appointmentToolbarHeaderCopy}>
+            <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>Filters</Text>
+            <Text style={[styles.appointmentToolbarSubtitle, isDarkMode && styles.darkTextSecondary]}>
+              {filterSubtitle}
+            </Text>
+          </View>
+          {hasFilters ? (
+            <TouchableOpacity style={styles.appointmentToolbarClearButton} onPress={onResetFilters}>
+              <Ionicons name="refresh-outline" size={14} color="#64748B" />
+              <Text style={styles.appointmentToolbarClearText}>Reset</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.appointmentToolbarFilterGrid}>
+          {filters.map((filter) => (
+            <TouchableOpacity
+              key={filter.key}
+              style={[
+                styles.recordsFilterChip,
+                filter.active && { backgroundColor: ADMIN_BLUE, borderColor: ADMIN_BLUE },
+                isDarkMode && !filter.active && { backgroundColor: "#111827", borderColor: theme.borderColor },
+              ]}
+              onPress={filter.onPress}
+            >
+              {filter.icon ? (
+                <Ionicons name={filter.icon} size={14} color={filter.active ? "#FFFFFF" : ADMIN_BLUE} />
+              ) : null}
+              <Text
+                style={[
+                  styles.recordsFilterChipText,
+                  filter.active && styles.recordsFilterChipTextActive,
+                  isDarkMode && !filter.active && styles.darkTextSecondary,
+                ]}
+              >
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+
   const renderAppointmentRecordsContent = () => (
     <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.pageContainer}>
         <AdminSectionShell
           title="Appointment Records"
           subtitle="Read through approved appointment records after staff approval."
-          badge={`${appointmentRecords.length} records`}
+          badge={`${filteredAppointmentRecords.length} visible`}
           isDarkMode={isDarkMode}
           theme={theme}
           actions={renderRecordListPrintButton({
             label: "Print Records",
             color: ADMIN_BLUE,
-            disabled: !appointmentRecords.length,
+            disabled: !filteredAppointmentRecords.length,
             onPress: () =>
               handlePrintRequests(
                 "Appointment Records",
-                appointmentRecords,
+                filteredAppointmentRecords,
                 "Generated from the appointment records table in the admin dashboard.",
               ),
           })}
@@ -6708,7 +7553,7 @@ const loadDashboardData = useCallback(async () => {
             {[
               { label: "Total Records", value: appointmentRecords.length, color: ADMIN_BLUE },
               { label: "Pending Requests", value: pendingAppointmentRequests.length, color: ADMIN_BLUE },
-              { label: "Approved", value: appointmentRecords.length, color: ADMIN_BLUE },
+              { label: "Visible", value: filteredAppointmentRecords.length, color: ADMIN_BLUE },
             ].map((item) => (
               <View
                 key={item.label}
@@ -6725,6 +7570,8 @@ const loadDashboardData = useCallback(async () => {
               </View>
             ))}
           </View>
+
+          {renderAppointmentRecordsToolbar()}
 
           {renderAdminTable({
             rows: paginatedAppointmentRecords,
@@ -6798,11 +7645,11 @@ const loadDashboardData = useCallback(async () => {
             ],
           })}
 
-          {appointmentRecords.length ? (
+          {filteredAppointmentRecords.length ? (
             renderCompactPagination({
               currentPage: appointmentRecordsPage,
               totalPages: appointmentRecordsPageCount,
-              itemCount: appointmentRecords.length,
+              itemCount: filteredAppointmentRecords.length,
               itemLabel: "records",
               onPrevious: () => setAppointmentRecordsPage((currentValue) => Math.max(1, currentValue - 1)),
               onNext: () =>
@@ -6868,7 +7715,12 @@ const loadDashboardData = useCallback(async () => {
           </HoverBubble>
         </View>
 
-        <View style={styles.appointmentOptionList}>
+        <ScrollView
+          style={styles.appointmentOptionListScroll}
+          contentContainerStyle={styles.appointmentOptionList}
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+        >
           {options.length ? options.map((option) => {
             const isEditing = editingId === option.id;
             return (
@@ -6884,13 +7736,27 @@ const loadDashboardData = useCallback(async () => {
               >
                 <View style={styles.appointmentOptionItemMain}>
                   {isEditing ? (
-                    <TextInput
-                      style={[styles.appointmentOptionEditInput, isDarkMode && styles.darkInput]}
-                      placeholder={placeholder}
-                      placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
-                      value={appointmentOptionDrafts[groupKey]}
-                      onChangeText={(value) => setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: value }))}
-                    />
+                    <View style={styles.appointmentOptionEditFields}>
+                      <TextInput
+                        style={[styles.appointmentOptionEditInput, isDarkMode && styles.darkInput]}
+                        placeholder={placeholder}
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                        value={appointmentOptionDrafts[groupKey]}
+                        onChangeText={(value) => setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: value }))}
+                      />
+                      {groupKey === "timeSlots" ? (
+                        <TextInput
+                          style={[styles.appointmentOptionCapacityInput, isDarkMode && styles.darkInput]}
+                          placeholder="Slots"
+                          placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                          value={String(appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 2)}
+                          keyboardType="number-pad"
+                          onChangeText={(value) =>
+                            setAppointmentSlotCapacityDrafts((prev) => ({ ...prev, [option.id]: value }))
+                          }
+                        />
+                      ) : null}
+                    </View>
                   ) : (
                     <>
                       <Text style={[styles.appointmentOptionItemTitle, isDarkMode && styles.darkText]}>
@@ -6905,6 +7771,14 @@ const loadDashboardData = useCallback(async () => {
                         <Text style={[styles.appointmentOptionStatusText, isDarkMode && styles.darkTextSecondary]}>
                           {option.enabled === false ? "Hidden" : "Visible"}
                         </Text>
+                        {groupKey === "timeSlots" ? (
+                          <>
+                            <Ionicons name="people-outline" size={13} color="#64748B" />
+                            <Text style={[styles.appointmentOptionStatusText, isDarkMode && styles.darkTextSecondary]}>
+                              {option.capacity || option.limit || 2} slots
+                            </Text>
+                          </>
+                        ) : null}
                       </View>
                     </>
                   )}
@@ -6926,6 +7800,12 @@ const loadDashboardData = useCallback(async () => {
                       onPress={() => {
                         setEditingAppointmentOption({ groupKey, optionId: option.id });
                         setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: option.value || option.label || "" }));
+                        if (groupKey === "timeSlots") {
+                          setAppointmentSlotCapacityDrafts((prev) => ({
+                            ...prev,
+                            [option.id]: String(option.capacity || option.limit || 2),
+                          }));
+                        }
                       }}
                     >
                       <Ionicons name="create-outline" size={15} color="#475569" />
@@ -6955,352 +7835,226 @@ const loadDashboardData = useCallback(async () => {
               </Text>
             </View>
           )}
-        </View>
+        </ScrollView>
       </View>
     );
   };
 
-  const renderAppointmentManagementContent = () => (
-    <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
-      <View style={styles.pageContainer}>
-        <AdminSectionShell
-          title="Appointment Management"
-          subtitle="Update the choices visitors see when booking an appointment."
-          badge="Visitor form"
-          isDarkMode={isDarkMode}
-          theme={theme}
-          actions={
-            <View style={styles.adminSectionShellActions}>
-              <TouchableOpacity style={styles.pageRefreshButton} onPress={loadAllVisitRequests}>
-                <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
-              </TouchableOpacity>
-            </View>
-          }
-        >
-          <View style={styles.appointmentManagementOverview}>
-            <View style={styles.appointmentManagementIntroCard}>
-              <View style={styles.appointmentManagementIntroIcon}>
-                <Ionicons name="calendar-outline" size={22} color={ADMIN_BLUE} />
+  const renderAppointmentManagementContent = () => {
+    const configSections = [
+      {
+        key: "offices",
+        title: "Office",
+        managerTitle: "Office To Visit",
+        subtitle: "Add, edit, hide, or delete the offices visitors can select.",
+        placeholder: "Add office, e.g. Registrar",
+        icon: "business-outline",
+      },
+      {
+        key: "timeSlots",
+        title: "Time Slots",
+        managerTitle: "Available Time Slots",
+        subtitle: "Control the appointment times shown in the visitor request form.",
+        placeholder: "Add time, e.g. 09:00 or 2:30 PM",
+        icon: "time-outline",
+      },
+      {
+        key: "purposes",
+        title: "Purpose",
+        managerTitle: "Purpose Of Visit",
+        subtitle: "Maintain the reasons visitors can choose when requesting an appointment.",
+        placeholder: "Add purpose, e.g. Consultation",
+        icon: "clipboard-outline",
+      },
+    ];
+    const activeConfig = configSections.find((section) => section.key === activeAppointmentConfigTab) || configSections[0];
+    const totalOptions = configSections.reduce(
+      (sum, section) => sum + (appointmentManagementOptions[section.key]?.length || 0),
+      0,
+    );
+    const enabledOptions = configSections.reduce(
+      (sum, section) =>
+        sum + (appointmentManagementOptions[section.key] || []).filter((option) => option.enabled !== false).length,
+      0,
+    );
+
+    return (
+      <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.pageContainer}>
+          <AdminSectionShell
+            title="Appointment Management"
+            subtitle="Central configuration for the visitor Appointment Request form."
+            badge="Configuration"
+            isDarkMode={isDarkMode}
+            theme={theme}
+            actions={
+              <View style={styles.adminSectionShellActions}>
+                <TouchableOpacity style={styles.pageRefreshButton} onPress={loadAppointmentManagementOptions}>
+                  <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
+                </TouchableOpacity>
               </View>
-              <View style={styles.appointmentManagementIntroCopy}>
-                <Text style={[styles.appointmentManagementIntroTitle, isDarkMode && styles.darkText]}>
-                  Manage visitor appointment flow
-                </Text>
-                <Text style={[styles.appointmentManagementIntroText, isDarkMode && styles.darkTextSecondary]}>
-                  Set the offices, purposes, and time slots visitors can choose before booking.
-                </Text>
+            }
+          >
+            <View style={styles.appointmentManagementOverview}>
+              <View style={styles.appointmentManagementIntroCard}>
+                <View style={styles.appointmentManagementIntroIcon}>
+                  <Ionicons name="options-outline" size={22} color={ADMIN_BLUE} />
+                </View>
+                <View style={styles.appointmentManagementIntroCopy}>
+                  <Text style={[styles.appointmentManagementIntroTitle, isDarkMode && styles.darkText]}>
+                    Visitor appointment request settings
+                  </Text>
+                  <Text style={[styles.appointmentManagementIntroText, isDarkMode && styles.darkTextSecondary]}>
+                    Edit offices, time slots, and purpose choices here. Changes save to the same configuration used by the visitor Appointment Request module.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.appointmentManagementStatsGrid}>
+                {[
+                  { label: "Enabled", value: enabledOptions, icon: "eye-outline" },
+                  { label: "Total Options", value: totalOptions, icon: "layers-outline" },
+                  { label: "Slot Limit", value: "2", icon: "people-outline" },
+                ].map((item) => (
+                  <View
+                    key={item.label}
+                    style={[
+                      styles.appointmentManagementStatCard,
+                      {
+                        backgroundColor: isDarkMode ? theme.cardBackground : "#F8FBFE",
+                        borderColor: theme.borderColor,
+                      },
+                    ]}
+                  >
+                    <View style={styles.appointmentManagementStatIcon}>
+                      <Ionicons name={item.icon} size={16} color={ADMIN_BLUE} />
+                    </View>
+                    <View>
+                      <Text style={[styles.appointmentManagementStatValue, isDarkMode && styles.darkText]}>
+                        {item.value}
+                      </Text>
+                      <Text style={[styles.appointmentManagementStatLabel, isDarkMode && styles.darkTextSecondary]}>
+                        {item.label}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             </View>
-            <View style={styles.appointmentManagementStatsGrid}>
-              {[
-                { label: "Total", value: visitRequests.length, icon: "albums-outline" },
-                { label: "Pending", value: pendingRequests.length, icon: "time-outline" },
-                { label: "Approved", value: approvedRequests.length, icon: "checkmark-circle-outline" },
-                { label: "Rejected", value: rejectedRequests.length, icon: "close-circle-outline" },
-              ].map((item) => (
+
+            <View style={styles.appointmentConfigWorkspace}>
+              <View style={[styles.appointmentConfigTabs, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                {configSections.map((section) => {
+                  const isActive = activeAppointmentConfigTab === section.key;
+                  const count = appointmentManagementOptions[section.key]?.length || 0;
+                  return (
+                    <TouchableOpacity
+                      key={section.key}
+                      style={[
+                        styles.appointmentConfigTab,
+                        isActive && styles.appointmentConfigTabActive,
+                        isDarkMode && !isActive && { backgroundColor: "#111827", borderColor: theme.borderColor },
+                      ]}
+                      onPress={() => {
+                        setActiveAppointmentConfigTab(section.key);
+                        setEditingAppointmentOption(null);
+                      }}
+                    >
+                      <Ionicons name={section.icon} size={16} color={isActive ? "#FFFFFF" : ADMIN_BLUE} />
+                      <Text style={[styles.appointmentConfigTabText, isActive && styles.appointmentConfigTabTextActive]}>
+                        {section.title}
+                      </Text>
+                      <View style={[styles.appointmentConfigTabBadge, isActive && styles.appointmentConfigTabBadgeActive]}>
+                        <Text style={[styles.appointmentConfigTabBadgeText, isActive && styles.appointmentConfigTabBadgeTextActive]}>
+                          {count}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.appointmentConfigEditorGrid}>
+                <View style={styles.appointmentConfigPrimary}>
+                  {renderAppointmentOptionManager({
+                    title: activeConfig.managerTitle,
+                    subtitle: activeConfig.subtitle,
+                    groupKey: activeConfig.key,
+                    placeholder: activeConfig.placeholder,
+                    icon: activeConfig.icon,
+                  })}
+                </View>
+
                 <View
-                  key={item.label}
                   style={[
-                    styles.appointmentManagementStatCard,
+                    styles.appointmentConfigSideCard,
                     {
-                      backgroundColor: isDarkMode ? theme.cardBackground : "#F8FBFE",
+                      backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                       borderColor: theme.borderColor,
                     },
                   ]}
                 >
-                  <View style={styles.appointmentManagementStatIcon}>
-                    <Ionicons name={item.icon} size={16} color={ADMIN_BLUE} />
-                  </View>
-                  <View>
-                    <Text style={[styles.appointmentManagementStatValue, isDarkMode && styles.darkText]}>
-                      {item.value}
-                    </Text>
-                    <Text style={[styles.appointmentManagementStatLabel, isDarkMode && styles.darkTextSecondary]}>
-                      {item.label}
-                    </Text>
+                  <Text style={[styles.appointmentManagementSectionTitle, isDarkMode && styles.darkText]}>
+                    Live Form Connection
+                  </Text>
+                  <Text style={[styles.appointmentManagementSectionText, isDarkMode && styles.darkTextSecondary]}>
+                    This panel controls the existing visitor Appointment Request screen. There is no separate queue or duplicate data source.
+                  </Text>
+                  <View style={styles.appointmentConfigConnectionList}>
+                    {configSections.map((section) => {
+                      const options = appointmentManagementOptions[section.key] || [];
+                      const enabledCount = options.filter((option) => option.enabled !== false).length;
+                      return (
+                        <View key={section.key} style={styles.appointmentConfigConnectionItem}>
+                          <Ionicons name={section.icon} size={16} color={ADMIN_BLUE} />
+                          <Text style={[styles.appointmentConfigConnectionText, isDarkMode && styles.darkTextSecondary]}>
+                            {section.title}: {enabledCount} visible / {options.length} total
+                          </Text>
+                        </View>
+                      );
+                    })}
                   </View>
                 </View>
-              ))}
+              </View>
             </View>
-          </View>
-
-          <View style={styles.appointmentManagementSectionHeading}>
-            <Text style={[styles.appointmentManagementSectionTitle, isDarkMode && styles.darkText]}>
-              Visitor Form Choices
-            </Text>
-            <Text style={[styles.appointmentManagementSectionText, isDarkMode && styles.darkTextSecondary]}>
-              These controls update the fields visitors see before submitting an appointment.
-            </Text>
-          </View>
-          <View style={styles.appointmentOptionsGrid}>
-            {renderAppointmentOptionManager({
-              title: "Office to Visit",
-              subtitle: "Where visitors can book.",
-              groupKey: "offices",
-              placeholder: "Add office, e.g. Admissions",
-              icon: "business-outline",
-            })}
-            {renderAppointmentOptionManager({
-              title: "Purpose to Visit",
-              subtitle: "Why they are visiting.",
-              groupKey: "purposes",
-              placeholder: "Add purpose, e.g. Consultation",
-              icon: "clipboard-outline",
-            })}
-            {renderAppointmentOptionManager({
-              title: "Available Time Slots",
-              subtitle: "Times visitors can choose.",
-              groupKey: "timeSlots",
-              placeholder: "Add time, e.g. 09:00 or 2:30 PM",
-              icon: "time-outline",
-            })}
-          </View>
-
-          {/*
-          <View style={styles.appointmentManagementQueueHeader}>
-            <View>
-              <Text style={[styles.appointmentManagementSectionTitle, isDarkMode && styles.darkText]}>
-                Appointment Queue
-              </Text>
-              <Text style={[styles.appointmentManagementSectionText, isDarkMode && styles.darkTextSecondary]}>
-                Search, filter, and print the current set of appointment records.
-              </Text>
-            </View>
-            <View style={styles.appointmentManagementQueueBadge}>
-              <Ionicons name="funnel-outline" size={14} color={ADMIN_BLUE} />
-              <Text style={styles.appointmentManagementQueueBadgeText}>
-                {getFilteredRequests().length} shown
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.appointmentManagementToolsGrid}>
-            <View style={styles.appointmentManagementToolCard}>
-              {renderRecordsSearchPanel({
-                title: "Search Records",
-                subtitle: "Find by visitor, office, purpose, phone, email, or exact date.",
-                value: requestSearchTerm,
-                onChangeText: (value) => {
-                  setRequestSearchTerm(value);
-                  setSearchQuery(value.trim());
-                },
-                onApply: () => setSearchQuery(requestSearchTerm.trim()),
-                onClear: () => {
-                  setRequestSearchTerm("");
-                  setSearchQuery("");
-                },
-                placeholder: "Example: April 18, 2026 or Registrar",
-                accent: ADMIN_BLUE,
-              })}
-            </View>
-
-            <View style={styles.appointmentManagementToolCard}>
-              {renderRecordsFilterPanel({
-                title: "Filter Records",
-                subtitle: "Use shortcuts for status, date range, office, and time order.",
-                panelKey: "appointment-records",
-                accent: ADMIN_BLUE,
-                onReset: () => {
-                  setRequestFilter("all");
-                  setRequestDateFilter("all");
-                  setRequestOfficeFilter("all");
-                  setRequestDateRange({ startDate: null, endDate: null });
-                  setRequestSortOrder("newest");
-                },
-                groups: [
-                  {
-                    key: "status",
-                    label: "Status",
-                    activeValue: requestFilter,
-                    onSelect: setRequestFilter,
-                    filters: [
-                      { key: "all", label: "All Status", count: visitRequests.length, icon: "apps-outline" },
-                      { key: "pending", label: "Pending", count: pendingRequests.length, icon: "time-outline" },
-                      { key: "approved", label: "Approved", count: approvedRequests.length, icon: "checkmark-circle-outline" },
-                      { key: "rejected", label: "Rejected", count: rejectedRequests.length, icon: "close-circle-outline" },
-                    ],
-                  },
-                  {
-                    key: "date",
-                    label: "Date Range",
-                    activeValue: requestDateFilter,
-                    onSelect: setRequestDateFilter,
-                    filters: dateShortcutFilters,
-                  },
-                  {
-                    key: "office",
-                    label: "Office",
-                    activeValue: requestOfficeFilter,
-                    onSelect: setRequestOfficeFilter,
-                    filters: requestOfficeFilterOptions,
-                  },
-                  {
-                    key: "order",
-                    label: "Time Order",
-                    activeValue: requestSortOrder,
-                    onSelect: setRequestSortOrder,
-                    filters: [
-                      { key: "newest", label: "Newest First", icon: "arrow-down-outline" },
-                      { key: "oldest", label: "Oldest First", icon: "arrow-up-outline" },
-                      { key: "status", label: "Pending First", icon: "time-outline" },
-                    ],
-                  },
-                ],
-                footerContent: renderDateRangeControls({
-                  accent: ADMIN_BLUE,
-                  startDate: requestDateRange.startDate,
-                  endDate: requestDateRange.endDate,
-                  onPickStart: () => setActiveFilterDateField("request-start"),
-                  onPickEnd: () => setActiveFilterDateField("request-end"),
-                  onClear: () => setRequestDateRange({ startDate: null, endDate: null }),
-                }),
-              })}
-            </View>
-          </View>
-
-          {renderAdminTable({
-            rows: getFilteredRequests(),
-            keyExtractor: (request) => request._id || request.id || `${request.email}-${request.createdAt}`,
-            emptyTitle: "No approval requests",
-            emptySubtitle: searchQuery
-              ? "No requests match your current search."
-              : requestFilter === "pending"
-                ? "All approval requests are cleared for now."
-                : requestFilter === "approved"
-                  ? "No approved requests are available in this filter."
-                  : "No rejected requests are available in this filter.",
-            columns: [
-              {
-                key: "visitor",
-                label: "Visitor",
-                width: 210,
-                render: (request) => (
-                  <View>
-                    <Text style={[styles.adminTablePrimaryText, isDarkMode && styles.darkText]}>
-                      {request.fullName || "Visitor"}
-                    </Text>
-                    <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
-                      {request.email || "-"}
-                    </Text>
-                  </View>
-                ),
-              },
-              {
-                key: "purpose",
-                label: "Purpose",
-                width: 210,
-                render: (request) => (
-                  <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
-                    {request.purposeOfVisit || request.visitType || "-"}
-                  </Text>
-                ),
-              },
-              {
-                key: "office",
-                label: "Office",
-                width: 170,
-                render: (request) => (
-                  <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
-                    {request.assignedOffice || request.appointmentDepartment || request.host || "-"}
-                  </Text>
-                ),
-              },
-              {
-                key: "schedule",
-                label: "Schedule",
-                width: 170,
-                render: (request) => (
-                  <View>
-                    <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
-                      {request.visitDate ? formatDateTime(request.visitDate) : "-"}
-                    </Text>
-                    <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
-                      {request.visitTime ? formatTime(request.visitTime) : "No time"}
-                    </Text>
-                  </View>
-                ),
-              },
-              {
-                key: "status",
-                label: "Status",
-                width: 120,
-                render: (request) => {
-                  const statusInfo = getStatusColor(getRequestStatus(request));
-                  return (
-                    <View style={[styles.dashboardStatusBadge, { backgroundColor: statusInfo.bg, alignSelf: "flex-start" }]}>
-                      <Text style={[styles.dashboardStatusText, { color: statusInfo.text }]}>
-                        {statusInfo.label}
-                      </Text>
-                    </View>
-                  );
-                },
-              },
-              {
-                key: "actions",
-                label: "Actions",
-                width: 260,
-                render: (request) => (
-                  <View style={styles.adminTableActionRow}>
-                    <TouchableOpacity
-                      style={[styles.adminTableActionButton, { borderColor: "rgba(59,130,246,0.24)", backgroundColor: "rgba(59,130,246,0.12)" }]}
-                      onPress={() => {
-                        setSelectedRequest(request);
-                        setOfficeEditValue(request.assignedOffice || request.appointmentDepartment || request.host || "");
-                        setAppointmentEditDateValue(formatDateInputValue(request.visitDate));
-                        setAppointmentEditTimeValue(formatTimeInputValue(request.visitTime));
-                        setShowRequestDetailsModal(true);
-                      }}
-                    >
-                      <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>View</Text>
-                    </TouchableOpacity>
-                    {getRequestStatus(request) === "pending" ? (
-                      <>
-                        <TouchableOpacity
-                          style={[styles.adminTableActionButton, { borderColor: "rgba(16,185,129,0.24)", backgroundColor: "rgba(16,185,129,0.12)" }]}
-                          onPress={() => {
-                            setSelectedRequest(request);
-                            handleApproveRequest(request);
-                          }}
-                        >
-                          <Text style={[styles.adminTableActionText, { color: "#10B981" }]}>Approve</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.adminTableActionButton, { borderColor: "rgba(239,68,68,0.22)", backgroundColor: "rgba(239,68,68,0.12)" }]}
-                          onPress={() => {
-                            setSelectedRequest(request);
-                            setShowRejectModal(true);
-                          }}
-                        >
-                          <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Reject</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : null}
-                    <TouchableOpacity
-                      style={[styles.adminTableActionButton, { borderColor: "rgba(245,158,11,0.24)", backgroundColor: "rgba(245,158,11,0.12)" }]}
-                      onPress={() => {
-                        setSelectedRequest(request);
-                        setOfficeEditValue(request.assignedOffice || request.appointmentDepartment || request.host || "");
-                        setAppointmentEditDateValue(formatDateInputValue(request.visitDate));
-                        setAppointmentEditTimeValue(formatTimeInputValue(request.visitTime));
-                        setShowRequestDetailsModal(true);
-                      }}
-                    >
-                      <Text style={[styles.adminTableActionText, { color: "#B45309" }]}>Update</Text>
-                    </TouchableOpacity>
-                  </View>
-                ),
-              },
-            ],
-          })}
-          */}
-        </AdminSectionShell>
-      </View>
-    </ScrollView>
-  );
+          </AdminSectionShell>
+        </View>
+      </ScrollView>
+    );
+  };
 
   const renderReportRecordsContent = () => {
     const historyStats = getHistoryStats();
-    const filteredHistory = getFilteredHistory();
+    const filteredHistory = getFilteredHistory().filter((record) => {
+      if (reportStatusFilter !== "all") {
+        const recordStatus = record.reportType === "security_report" ? "reported" : getRequestStatus(record);
+        if (recordStatus !== reportStatusFilter && record.status !== reportStatusFilter) return false;
+      }
+      return recordMatchesSearch(record, reportSearchTerm, [
+        "fullName",
+        "email",
+        "purposeOfVisit",
+        "reportReason",
+        "assignedOffice",
+        "appointmentDepartment",
+        "host",
+        "status",
+        "approvalStatus",
+        "appointmentStatus",
+        "reporterName",
+        (item) => getRequestStatus(item),
+        (item) => [item.reportedAt, item.visitDate, item.createdAt].filter(Boolean).map(formatDateTime),
+      ]);
+    });
+    const reportRecordsPageCount = Math.max(
+      1,
+      Math.ceil(filteredHistory.length / reportRecordsItemsPerPage),
+    );
+    const activeReportRecordsPage = Math.min(reportRecordsPage, reportRecordsPageCount);
+    const paginatedReportRecords = filteredHistory.slice(
+      (activeReportRecordsPage - 1) * reportRecordsItemsPerPage,
+      activeReportRecordsPage * reportRecordsItemsPerPage,
+    );
 
     return (
       <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
@@ -7320,7 +8074,7 @@ const loadDashboardData = useCallback(async () => {
                 label: "Print Records",
                 color: ADMIN_BLUE,
                 disabled: !filteredHistory.length,
-                onPress: handlePrintReports,
+                onPress: () => handlePrintReports(filteredHistory),
               })}
             </View>
           }
@@ -7349,8 +8103,31 @@ const loadDashboardData = useCallback(async () => {
               ))}
             </View>
 
+            {renderAdminRecordToolbar({
+              searchValue: reportSearchTerm,
+              onSearchChange: setReportSearchTerm,
+              searchPlaceholder: "Search visitor, office, purpose, date, or status",
+              hasSearch: Boolean(reportSearchTerm),
+              onClearSearch: () => {
+                setReportSearchTerm("");
+                setReportRecordsPage(1);
+              },
+              hasFilters: reportStatusFilter !== "all",
+              onResetFilters: () => {
+                setReportStatusFilter("all");
+                setReportRecordsPage(1);
+              },
+              filters: [
+                { key: "all", label: "All", icon: "layers-outline", active: reportStatusFilter === "all", onPress: () => { setReportStatusFilter("all"); setReportRecordsPage(1); } },
+                { key: "completed", label: "Completed", icon: "checkmark-circle-outline", active: reportStatusFilter === "completed", onPress: () => { setReportStatusFilter("completed"); setReportRecordsPage(1); } },
+                { key: "pending", label: "Pending", icon: "time-outline", active: reportStatusFilter === "pending", onPress: () => { setReportStatusFilter("pending"); setReportRecordsPage(1); } },
+                { key: "rejected", label: "Rejected", icon: "close-circle-outline", active: reportStatusFilter === "rejected", onPress: () => { setReportStatusFilter("rejected"); setReportRecordsPage(1); } },
+                { key: "reported", label: "Security Reports", icon: "shield-alert-outline", active: reportStatusFilter === "reported", onPress: () => { setReportStatusFilter("reported"); setReportRecordsPage(1); } },
+              ],
+            })}
+
             {renderAdminTable({
-              rows: filteredHistory,
+              rows: paginatedReportRecords,
               keyExtractor: (visitor) => visitor._id || visitor.id || `${visitor.email}-${visitor.visitDate}`,
               emptyTitle: "No report records",
               emptySubtitle: "There are no report rows to display with the current filters.",
@@ -7431,35 +8208,75 @@ const loadDashboardData = useCallback(async () => {
                 },
               ],
             })}
+
+            {filteredHistory.length ? (
+              renderCompactPagination({
+                currentPage: activeReportRecordsPage,
+                totalPages: reportRecordsPageCount,
+                itemCount: filteredHistory.length,
+                itemLabel: "records",
+                onPrevious: () => setReportRecordsPage((currentValue) => Math.max(1, currentValue - 1)),
+                onNext: () =>
+                  setReportRecordsPage((currentValue) =>
+                    Math.min(reportRecordsPageCount, currentValue + 1),
+                  ),
+              })
+            ) : null}
           </AdminSectionShell>
         </View>
       </ScrollView>
     );
   };
 
-  const renderSecurityReportRecordsContent = () => (
-    <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
-      <View style={styles.pageContainer}>
-        <AdminSectionShell
-          title="Security Reports"
-          subtitle="Reports filed by security and guard users are separated here for review and follow-up."
-          badge={`${securityReportRecords.length} reports`}
-          isDarkMode={isDarkMode}
-          theme={theme}
-          actions={
-            <View style={styles.adminSectionShellActions}>
-              <TouchableOpacity style={styles.pageRefreshButton} onPress={loadVisitorHistory}>
-                <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
-              </TouchableOpacity>
-              {renderRecordListPrintButton({
-                label: "Print Reports",
-                color: ADMIN_BLUE,
-                disabled: !securityReportRecords.length,
-                onPress: handlePrintSecurityReports,
-              })}
-            </View>
-          }
-        >
+  const renderSecurityReportRecordsContent = () => {
+    const filteredSecurityReportRecords = securityReportRecords.filter((record) => {
+      if (securityReportStatusFilter === "open" && record.resolved) return false;
+      if (securityReportStatusFilter === "resolved" && !record.resolved) return false;
+      return recordMatchesSearch(record, securityReportSearchTerm, [
+        "fullName",
+        "email",
+        "reportReason",
+        "assignedOffice",
+        "appointmentDepartment",
+        "host",
+        "reporterName",
+        (item) => (item.resolved ? "resolved" : "open"),
+        (item) => [item.reportedAt, item.createdAt].filter(Boolean).map(formatDateTime),
+      ]);
+    });
+    const securityReportRecordsPageCount = Math.max(
+      1,
+      Math.ceil(filteredSecurityReportRecords.length / securityReportRecordsItemsPerPage),
+    );
+    const activeSecurityReportRecordsPage = Math.min(securityReportRecordsPage, securityReportRecordsPageCount);
+    const paginatedSecurityReportRecords = filteredSecurityReportRecords.slice(
+      (activeSecurityReportRecordsPage - 1) * securityReportRecordsItemsPerPage,
+      activeSecurityReportRecordsPage * securityReportRecordsItemsPerPage,
+    );
+
+    return (
+      <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.pageContainer}>
+          <AdminSectionShell
+            title="Security Reports"
+            subtitle="Reports filed by security and guard users are separated here for review and follow-up."
+            badge={`${filteredSecurityReportRecords.length} visible`}
+            isDarkMode={isDarkMode}
+            theme={theme}
+            actions={
+              <View style={styles.adminSectionShellActions}>
+                <TouchableOpacity style={styles.pageRefreshButton} onPress={loadVisitorHistory}>
+                  <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
+                </TouchableOpacity>
+                {renderRecordListPrintButton({
+                  label: "Print Reports",
+                  color: ADMIN_BLUE,
+                  disabled: !filteredSecurityReportRecords.length,
+                  onPress: () => handlePrintSecurityReports(filteredSecurityReportRecords),
+                })}
+              </View>
+            }
+          >
           <View style={styles.modularCardGrid}>
             {[
               { label: "Total Reports", value: securityReportRecords.length, color: ADMIN_BLUE },
@@ -7482,8 +8299,29 @@ const loadDashboardData = useCallback(async () => {
             ))}
           </View>
 
+          {renderAdminRecordToolbar({
+            searchValue: securityReportSearchTerm,
+            onSearchChange: setSecurityReportSearchTerm,
+            searchPlaceholder: "Search visitor, incident, office, reporter, or date",
+            hasSearch: Boolean(securityReportSearchTerm),
+            onClearSearch: () => {
+              setSecurityReportSearchTerm("");
+              setSecurityReportRecordsPage(1);
+            },
+            hasFilters: securityReportStatusFilter !== "all",
+            onResetFilters: () => {
+              setSecurityReportStatusFilter("all");
+              setSecurityReportRecordsPage(1);
+            },
+            filters: [
+              { key: "all", label: "All", icon: "layers-outline", active: securityReportStatusFilter === "all", onPress: () => { setSecurityReportStatusFilter("all"); setSecurityReportRecordsPage(1); } },
+              { key: "open", label: "Open", icon: "alert-circle-outline", active: securityReportStatusFilter === "open", onPress: () => { setSecurityReportStatusFilter("open"); setSecurityReportRecordsPage(1); } },
+              { key: "resolved", label: "Resolved", icon: "checkmark-circle-outline", active: securityReportStatusFilter === "resolved", onPress: () => { setSecurityReportStatusFilter("resolved"); setSecurityReportRecordsPage(1); } },
+            ],
+          })}
+
           {renderAdminTable({
-            rows: securityReportRecords,
+            rows: paginatedSecurityReportRecords,
             keyExtractor: (record) => record._id || `${record.email}-${record.reportedAt}-${record.reportReason}`,
             emptyTitle: "No security reports",
             emptySubtitle: "Reports submitted by security or guard accounts will appear here.",
@@ -7565,10 +8403,25 @@ const loadDashboardData = useCallback(async () => {
               },
             ],
           })}
-        </AdminSectionShell>
-      </View>
-    </ScrollView>
-  );
+
+          {filteredSecurityReportRecords.length ? (
+            renderCompactPagination({
+              currentPage: activeSecurityReportRecordsPage,
+              totalPages: securityReportRecordsPageCount,
+              itemCount: filteredSecurityReportRecords.length,
+              itemLabel: "reports",
+              onPrevious: () => setSecurityReportRecordsPage((currentValue) => Math.max(1, currentValue - 1)),
+              onNext: () =>
+                setSecurityReportRecordsPage((currentValue) =>
+                  Math.min(securityReportRecordsPageCount, currentValue + 1),
+                ),
+            })
+          ) : null}
+          </AdminSectionShell>
+        </View>
+      </ScrollView>
+    );
+  };
 
   const renderAnalyticsContent = () => {
     const chart = getCurrentChartData();
@@ -8176,45 +9029,136 @@ const loadDashboardData = useCallback(async () => {
     );
   };
 
-  const renderSettingsContent = () => (
-    <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
-      <View style={styles.pageContainer}>
-        <View style={styles.pageHeader}>
-          <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Settings</Text>
-        </View>
+  const renderSettingsContent = () => {
+    const settingTabs = [
+      { key: "account", label: "Account", icon: "person-circle-outline" },
+      { key: "notifications", label: "Notifications", icon: "notifications-outline" },
+      { key: "system", label: "System", icon: "server-outline" },
+    ];
+    const healthItems = [
+      { label: "Database", value: systemHealth?.database || "Not checked" },
+      { label: "API", value: systemHealth?.api || "Not checked" },
+      { label: "NFC Service", value: systemHealth?.nfcService || "Not checked" },
+    ];
 
-        <View style={{ backgroundColor: theme.cardBackground, borderColor: theme.borderColor, borderWidth: 1, borderRadius: 14, padding: 14, gap: 14 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={{ color: theme.textPrimary }}>Dark Mode</Text>
-            <Switch value={!!settings.darkMode} onValueChange={(value) => updateSetting("darkMode", value)} />
+    return (
+      <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.settingsContainer}>
+          <View style={styles.settingsHeader}>
+            <View>
+              <Text style={[styles.settingsHeaderTitle, isDarkMode && styles.darkText]}>Settings</Text>
+              <Text style={[styles.settingsHeaderSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                Manage admin preferences, account security, and system tools.
+              </Text>
+            </View>
+            <View style={styles.settingsHeaderActions}>
+              <TouchableOpacity style={[styles.settingsResetButton, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]} onPress={resetSettings}>
+                <Ionicons name="refresh-outline" size={16} color={isDarkMode ? "#CBD5E1" : "#64748B"} />
+                <Text style={[styles.settingsResetButtonText, isDarkMode && styles.darkTextSecondary]}>Reset</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.settingsSaveButton, isSavingSettings && styles.settingsSaveButtonDisabled]} onPress={saveSettings} disabled={isSavingSettings}>
+                {isSavingSettings ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="save-outline" size={16} color="#FFFFFF" />}
+                <Text style={styles.settingsSaveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={{ color: theme.textPrimary }}>Email Notifications</Text>
-            <Switch value={!!settings.emailNotifications} onValueChange={(value) => updateSetting("emailNotifications", value)} />
-          </View>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={{ color: theme.textPrimary }}>SMS Alerts</Text>
-            <Switch value={!!settings.smsAlerts} onValueChange={(value) => updateSetting("smsAlerts", value)} />
-          </View>
-        </View>
 
-        <View style={{ marginTop: 14, flexDirection: "row", gap: 10 }}>
-          <TouchableOpacity style={[styles.submitButton, { flex: 1 }]} onPress={saveSettings} disabled={isSavingSettings}>
-            {isSavingSettings ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Save</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={resetSettings}>
-            <Text style={styles.cancelButtonText}>Reset</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={[styles.settingsTabs, isDarkMode && { backgroundColor: "#111827" }]}>
+            {settingTabs.map((tab) => {
+              const isActive = activeSettingsTab === tab.key;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[styles.settingsTab, isActive && styles.settingsTabActive, isDarkMode && isActive && { backgroundColor: "#1E293B" }]}
+                  onPress={() => setActiveSettingsTab(tab.key)}
+                >
+                  <Ionicons name={tab.icon} size={16} color={isActive ? ADMIN_BLUE : theme.textSecondary} />
+                  <Text style={[styles.settingsTabText, isActive && styles.settingsTabTextActive, isDarkMode && !isActive && styles.darkTextSecondary]}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
-        <View style={{ marginTop: 10 }}>
-          <TouchableOpacity style={[styles.cancelButton, { backgroundColor: "#FEE2E2" }]} onPress={clearSystemData}>
-            <Text style={[styles.cancelButtonText, { color: "#B91C1C" }]}>Clear System Data</Text>
-          </TouchableOpacity>
+          {activeSettingsTab === "account" && (
+            <View style={[styles.settingsCard, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <View style={styles.settingsCardHeader}>
+                <View>
+                  <Text style={[styles.settingsCardTitle, isDarkMode && styles.darkText]}>Account Security</Text>
+                  <Text style={[styles.settingsHeaderSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                    Update your admin password without leaving the dashboard.
+                  </Text>
+                </View>
+                <Ionicons name="lock-closed-outline" size={22} color={ADMIN_BLUE} />
+              </View>
+              <TouchableOpacity style={styles.submitButton} onPress={() => setShowChangePasswordModal(true)}>
+                <Text style={styles.submitButtonText}>Change Password</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {activeSettingsTab === "notifications" && (
+            <View style={[styles.settingsCard, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              {[
+                { key: "darkMode", label: "Dark Mode" },
+                { key: "emailNotifications", label: "Email Notifications" },
+                { key: "smsAlerts", label: "SMS Alerts" },
+                { key: "autoApprove", label: "Auto Approve" },
+                { key: "maintenanceMode", label: "Maintenance Mode" },
+              ].map((item) => (
+                <View key={item.key} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10 }}>
+                  <Text style={{ color: theme.textPrimary, fontWeight: "600" }}>{item.label}</Text>
+                  <Switch value={!!settings[item.key]} onValueChange={(value) => updateSetting(item.key, value)} />
+                </View>
+              ))}
+            </View>
+          )}
+
+          {activeSettingsTab === "system" && (
+            <View style={[styles.settingsCard, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+              <View style={styles.settingsCardHeader}>
+                <View>
+                  <Text style={[styles.settingsCardTitle, isDarkMode && styles.darkText]}>System Tools</Text>
+                  <Text style={[styles.settingsHeaderSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                    Check service status, create a backup log, or reset local dashboard customizations.
+                  </Text>
+                </View>
+                <Ionicons name="hardware-chip-outline" size={22} color={ADMIN_BLUE} />
+              </View>
+
+              <View style={{ gap: 10, marginBottom: 14 }}>
+                {healthItems.map((item) => (
+                  <View key={item.label} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ color: theme.textSecondary }}>{item.label}</Text>
+                    <Text style={{ color: theme.textPrimary, fontWeight: "700" }}>{item.value}</Text>
+                  </View>
+                ))}
+                {lastBackupSummary && (
+                  <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                    Last backup: {formatDateTime(lastBackupSummary.createdAt)}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                <TouchableOpacity style={[styles.submitButton, { flex: 1, minWidth: 180 }]} onPress={refreshSystemHealth} disabled={isRunningSystemAction}>
+                  <Text style={styles.submitButtonText}>Check Health</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.submitButton, { flex: 1, minWidth: 180, backgroundColor: "#10B981" }]} onPress={handleCreateBackup} disabled={isRunningSystemAction}>
+                  <Text style={styles.submitButtonText}>Create Backup</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={[styles.cancelButton, { marginTop: 10, backgroundColor: "#FEE2E2" }]} onPress={clearSystemData}>
+                <Text style={[styles.cancelButtonText, { color: "#B91C1C" }]}>Clear Dashboard Cache</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-      </View>
-    </ScrollView>
-  );
+      </ScrollView>
+    );
+  };
 
   const renderUserManagementContent = () => (
     <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
@@ -8324,70 +9268,119 @@ const loadDashboardData = useCallback(async () => {
             </View>
           </View>
 
-          {renderRecordsSearchPanel({
-            title: "Search Account Records",
-            subtitle: "Manual lookup for account name, username, email, department, role, phone, or staff ID.",
-            value: userSearchTerm,
-            onChangeText: setUserSearchTerm,
-            onApply: () => {
-              setUserSearchQuery(userSearchTerm.trim());
-              setCurrentPage(1);
-            },
-            onClear: () => {
-              setUserSearchTerm("");
-              setUserSearchQuery("");
-              setCurrentPage(1);
-            },
-            placeholder: userManagementConfig.searchPlaceholder,
-            accent: userManagementConfig.accent,
-          })}
+          <View style={styles.appointmentRecordsToolbar}>
+            <View
+              style={[
+                styles.appointmentToolbarCard,
+                isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+              ]}
+            >
+              <View style={styles.appointmentToolbarHeader}>
+                <View style={styles.appointmentToolbarHeaderCopy}>
+                  <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>
+                    Search Accounts
+                  </Text>
+                  <Text style={[styles.appointmentToolbarSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                    Find by name, username, email, department, role, phone, or staff ID.
+                  </Text>
+                </View>
+                {userSearchTerm || userSearchQuery ? (
+                  <TouchableOpacity
+                    style={styles.appointmentToolbarClearButton}
+                    onPress={() => {
+                      setUserSearchTerm("");
+                      setUserSearchQuery("");
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <Ionicons name="close-outline" size={14} color="#64748B" />
+                    <Text style={styles.appointmentToolbarClearText}>Clear</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <View style={styles.appointmentToolbarSearchRow}>
+                <View
+                  style={[
+                    styles.appointmentToolbarSearchInputWrap,
+                    isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
+                  ]}
+                >
+                  <Ionicons name="search-outline" size={17} color="#64748B" />
+                  <TextInput
+                    style={[styles.appointmentToolbarSearchInput, isDarkMode && styles.darkText]}
+                    placeholder={userManagementConfig.searchPlaceholder}
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                    value={userSearchTerm}
+                    onChangeText={(value) => {
+                      setUserSearchTerm(value);
+                      setUserSearchQuery(value.trim());
+                      setCurrentPage(1);
+                    }}
+                    returnKeyType="search"
+                  />
+                </View>
+              </View>
+            </View>
 
-          {renderRecordsFilterPanel({
-            title: "Filter Account Records",
-            subtitle: "Quick role, status, and department shortcuts. These filters work together.",
-            panelKey: "account-records",
-            accent: userManagementConfig.accent,
-            onReset: () => {
-              setUserFilter("all");
-              setUserDepartmentFilter("all");
-              setCurrentPage(1);
-            },
-            groups: [
-              {
-                key: "role-status",
-                label: accountRecordsMode === "all" ? "Role / Status" : "Status",
-                activeValue: userFilter,
-                onSelect: (filterKey) => {
-                  setUserFilter(filterKey);
-                  setCurrentPage(1);
-                },
-                filters: userManagementConfig.filters.map((filterItem) => ({
-                  ...filterItem,
-                  icon: filterItem.key === "active"
-                    ? "checkmark-circle-outline"
-                    : filterItem.key === "inactive"
-                      ? "pause-circle-outline"
-                      : filterItem.key === "security"
-                        ? "shield-outline"
-                        : filterItem.key === "staff"
-                          ? "briefcase-outline"
-                          : filterItem.key === "admin"
-                            ? "person-circle-outline"
-                            : "apps-outline",
-                })),
-              },
-              {
-                key: "department",
-                label: "Department",
-                activeValue: userDepartmentFilter,
-                onSelect: (filterKey) => {
-                  setUserDepartmentFilter(filterKey);
-                  setCurrentPage(1);
-                },
-                filters: userDepartmentFilterOptions,
-              },
-            ],
-          })}
+            <View
+              style={[
+                styles.appointmentToolbarCard,
+                isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor },
+              ]}
+            >
+              <View style={styles.appointmentToolbarHeader}>
+                <View style={styles.appointmentToolbarHeaderCopy}>
+                  <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>
+                    Filters
+                  </Text>
+                  <Text style={[styles.appointmentToolbarSubtitle, isDarkMode && styles.darkTextSecondary]}>
+                    Narrow accounts by role/status and department.
+                  </Text>
+                </View>
+                {userFilter !== "all" || userDepartmentFilter !== "all" ? (
+                  <TouchableOpacity
+                    style={styles.appointmentToolbarClearButton}
+                    onPress={() => {
+                      setUserFilter("all");
+                      setUserDepartmentFilter("all");
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <Ionicons name="refresh-outline" size={14} color="#64748B" />
+                    <Text style={styles.appointmentToolbarClearText}>Reset</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <View style={styles.appointmentToolbarFilterGrid}>
+                {renderAppointmentFilterDropdown({
+                  label: accountRecordsMode === "all" ? "Role / Status" : "Status",
+                  value: userFilter,
+                  icon: "people-outline",
+                  options: userManagementConfig.filters.map((filterItem) => ({
+                    label: `${filterItem.label}${typeof filterItem.count === "number" ? ` (${filterItem.count})` : ""}`,
+                    value: filterItem.key,
+                  })),
+                  onSelect: (value) => {
+                    setUserFilter(value);
+                    setCurrentPage(1);
+                  },
+                })}
+                {renderAppointmentFilterDropdown({
+                  label: "Department",
+                  value: userDepartmentFilter,
+                  icon: "business-outline",
+                  options: userDepartmentFilterOptions.map((filterItem) => ({
+                    label: `${filterItem.label}${typeof filterItem.count === "number" ? ` (${filterItem.count})` : ""}`,
+                    value: filterItem.key,
+                  })),
+                  onSelect: (value) => {
+                    setUserDepartmentFilter(value);
+                    setCurrentPage(1);
+                  },
+                })}
+              </View>
+            </View>
+          </View>
 
           {paginatedUsers.length > 0 ? (
             <>
@@ -9033,6 +10026,53 @@ const loadDashboardData = useCallback(async () => {
         </View>
       </Modal>
 
+      <Modal visible={showChangePasswordModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModal, { alignItems: "stretch", maxWidth: 460 }, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+            <View style={{ alignItems: "center", marginBottom: 12 }}>
+              <Ionicons name="lock-closed-outline" size={42} color={ADMIN_BLUE} />
+              <Text style={[styles.confirmTitle, isDarkMode && styles.darkText]}>Change Password</Text>
+              <Text style={[styles.confirmMessage, isDarkMode && styles.darkTextSecondary]}>
+                Enter your current password and choose a new one.
+              </Text>
+            </View>
+
+            {[
+              { key: "currentPassword", label: "Current Password" },
+              { key: "newPassword", label: "New Password" },
+              { key: "confirmPassword", label: "Confirm New Password" },
+            ].map((field) => (
+              <View key={field.key} style={[styles.inputGroup, { marginBottom: 12 }]}>
+                <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>{field.label}</Text>
+                <TextInput
+                  style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
+                  placeholder={field.label}
+                  placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                  secureTextEntry
+                  value={changePasswordData[field.key]}
+                  onChangeText={(value) => setChangePasswordData((currentValue) => ({ ...currentValue, [field.key]: value }))}
+                />
+              </View>
+            ))}
+
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity
+                style={[styles.confirmCancel, isDarkMode && { backgroundColor: "#334155" }]}
+                onPress={() => {
+                  setShowChangePasswordModal(false);
+                  setChangePasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                }}
+              >
+                <Text style={[styles.confirmCancelText, isDarkMode && styles.darkTextSecondary]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.confirmButton, { backgroundColor: ADMIN_BLUE }]} onPress={handleChangePassword}>
+                <Text style={styles.confirmButtonText}>Update</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
 {/* Add User Modal */}
 <Modal visible={showAddUserModal} transparent animationType="slide">
   <View style={styles.modalOverlay}>
@@ -9164,7 +10204,7 @@ const loadDashboardData = useCallback(async () => {
                         },
                       ]}
                       onPress={() => {
-                        resetCreateUserForm(role);
+                        switchCreateUserRole(role);
                       }}
                     >
                       <View
@@ -9310,10 +10350,14 @@ const loadDashboardData = useCallback(async () => {
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={newUserData.email}
-                    onChangeText={(text) =>
-                      setNewUserData((prev) => ({ ...prev, email: text }))
-                    }
+                    onChangeText={(text) => {
+                      setIsCreateEmailManuallyEdited(true);
+                      setNewUserData((prev) => ({ ...prev, email: text }));
+                    }}
                   />
+                  <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                    Auto-generated from first name and role. Admin can edit it when needed.
+                  </Text>
                   {renderCreateUserFieldError("email")}
                 </View>
 
@@ -9447,7 +10491,7 @@ const loadDashboardData = useCallback(async () => {
                       <Text
                         style={[styles.inputLabel, isDarkMode && styles.darkText]}
                       >
-                        Generated Staff ID
+                        {newUserData.role === "staff" ? "Generated Staff ID" : "Generated Security ID"}
                       </Text>
                       <View
                         style={[
@@ -9460,7 +10504,7 @@ const loadDashboardData = useCallback(async () => {
                         ]}
                       >
                         <Text style={[styles.createAccountStatusText, { color: "#0A3D91" }]}>
-                          {getGeneratedEmployeeIdPreview()}
+                          {newUserData.employeeId || generatedCreateUserEmployeeId}
                         </Text>
                       </View>
                     </View>
@@ -9552,7 +10596,7 @@ const loadDashboardData = useCallback(async () => {
                       <Text
                         style={[styles.inputLabel, isDarkMode && styles.darkText]}
                       >
-                        Generated Staff ID
+                        Generated Security ID
                       </Text>
                       <View
                         style={[
@@ -9565,7 +10609,7 @@ const loadDashboardData = useCallback(async () => {
                         ]}
                       >
                         <Text style={[styles.createAccountStatusText, { color: "#0A3D91" }]}>
-                          {getGeneratedEmployeeIdPreview()}
+                          {newUserData.employeeId || generatedCreateUserEmployeeId}
                         </Text>
                       </View>
                     </View>
@@ -9841,7 +10885,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && styles.darkText,
                     ]}
                   >
-                    {getGeneratedEmployeeIdPreview()}
+                    {newUserData.employeeId || generatedCreateUserEmployeeId}
                   </Text>
                 </View>
 
@@ -10638,13 +11682,16 @@ const loadDashboardData = useCallback(async () => {
                 selectedFloor={selectedAdminMapFloor}
                 selectedOffice={selectedAdminMapOffice}
                 mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+                mapLabels={managedMapLabels}
                 officePositions={managedRoomPositions}
                 onFloorChange={(floorId) => {
                   setSelectedAdminMapFloor(floorId);
                   setSelectedAdminMapOffice("all");
                 }}
+                onVisitorHover={(item) => setHoveredMapVisitor(item)}
+                onVisitorLeave={() => setHoveredMapVisitor(null)}
                 onVisitorSelect={(item) => setSelectedMapActivity(item)}
-                hoveredVisitor={activeMapActivity}
+                hoveredVisitor={hoveredMapVisitor}
                 fullscreen
                 backgroundColor="transparent"
                 borderColor={theme.borderColor}

@@ -196,6 +196,8 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [reportDateRange, setReportDateRange] = useState({ start: null, end: null });
   const [reportType, setReportType] = useState('daily');
   const [reportsPage, setReportsPage] = useState(1);
+  const [reportSearchQuery, setReportSearchQuery] = useState('');
+  const [reportStatusFilter, setReportStatusFilter] = useState('all');
   const [reportForm, setReportForm] = useState({
     visitorId: '',
     category: 'suspicious',
@@ -1549,12 +1551,29 @@ export default function SecurityDashboardScreen({ navigation }) {
     return filteredVisitors.slice(startIndex, startIndex + appointmentRecordsItemsPerPage);
   }, [filteredVisitors, appointmentRecordsPage]);
 
+  const filteredReports = useMemo(() => {
+    const normalizedSearch = String(reportSearchQuery || '').trim().toLowerCase();
+    return reports.filter((report) => {
+      const status = String(report.status || 'Open').toLowerCase();
+      if (reportStatusFilter !== 'all' && status !== reportStatusFilter) return false;
+      if (!normalizedSearch) return true;
+      return [
+        report.reason,
+        report.visitorName,
+        report.status,
+        report.createdAt ? formatDate(report.createdAt) : '',
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedSearch));
+    });
+  }, [reportSearchQuery, reportStatusFilter, reports]);
+
   const reportsItemsPerPage = 6;
-  const reportsPageCount = Math.max(1, Math.ceil(reports.length / reportsItemsPerPage));
+  const reportsPageCount = Math.max(1, Math.ceil(filteredReports.length / reportsItemsPerPage));
   const paginatedReports = useMemo(() => {
     const startIndex = (reportsPage - 1) * reportsItemsPerPage;
-    return reports.slice(startIndex, startIndex + reportsItemsPerPage);
-  }, [reports, reportsPage]);
+    return filteredReports.slice(startIndex, startIndex + reportsItemsPerPage);
+  }, [filteredReports, reportsPage]);
 
   useEffect(() => {
     setAppointmentRecordsPage(1);
@@ -1567,6 +1586,10 @@ export default function SecurityDashboardScreen({ navigation }) {
   useEffect(() => {
     setReportsPage((currentPageValue) => Math.min(currentPageValue, reportsPageCount));
   }, [reportsPageCount]);
+
+  useEffect(() => {
+    setReportsPage(1);
+  }, [reportSearchQuery, reportStatusFilter]);
 
   const renderAppointmentPagination = () => (
     <View style={styles.appointmentRecordsPaginationRow}>
@@ -2054,43 +2077,55 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Filter Tabs */}
-        <View style={styles.filterTabs}>
-          {['all', 'active', 'approved', 'completed'].map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              style={[styles.filterTab, visitorFilter === filter && styles.filterTabActive]}
-              onPress={() => {
-                setVisitorFilter(filter);
-                setSearchQuery('');
-              }}
-            >
-              <Text style={[styles.filterTabText, visitorFilter === filter && styles.filterTabTextActive]}>
-                {filter === 'completed' ? 'Completed' : filter.charAt(0).toUpperCase() + filter.slice(1)}
-                {filter === 'active' && ` (${visitors.active.length})`}
-                {filter === 'approved' && ` (${visitors.approved.length})`}
-                {filter === 'completed' && ` (${visitors.completed.length})`}
-                {filter === 'all' && ` (${visitors.all.length})`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <View style={styles.recordToolbar}>
+          <View style={styles.recordToolbarCard}>
+            <View style={styles.recordToolbarHeader}>
+              <Text style={styles.recordToolbarTitle}>Search</Text>
+              {searchQuery !== '' ? (
+                <TouchableOpacity style={styles.recordToolbarClear} onPress={() => setSearchQuery('')}>
+                  <Text style={styles.recordToolbarClearText}>Clear</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={styles.searchContainer}>
+              <Ionicons name="search-outline" size={20} color="#9CA3AF" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Name, phone, email, purpose, or host"
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color="#9CA3AF" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search visitors by name, phone, email, purpose, or host..."
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery !== '' && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-            </TouchableOpacity>
-          )}
+          <View style={styles.recordToolbarCard}>
+            <View style={styles.recordToolbarHeader}>
+              <Text style={styles.recordToolbarTitle}>Filters</Text>
+              {visitorFilter !== 'all' ? (
+                <TouchableOpacity style={styles.recordToolbarClear} onPress={() => setVisitorFilter('all')}>
+                  <Text style={styles.recordToolbarClearText}>Reset</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={styles.filterTabs}>
+              {['all', 'active', 'approved', 'completed'].map((filter) => (
+                <TouchableOpacity
+                  key={filter}
+                  style={[styles.filterTab, visitorFilter === filter && styles.filterTabActive]}
+                  onPress={() => setVisitorFilter(filter)}
+                >
+                  <Text style={[styles.filterTabText, visitorFilter === filter && styles.filterTabTextActive]}>
+                    {filter === 'completed' ? 'Completed' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                    {filter === 'active' && ` (${visitors.active.length})`}
+                    {filter === 'approved' && ` (${visitors.approved.length})`}
+                    {filter === 'completed' && ` (${visitors.completed.length})`}
+                    {filter === 'all' && ` (${visitors.all.length})`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
 
         <View style={styles.readonlyInfoBanner}>
@@ -2623,6 +2658,51 @@ export default function SecurityDashboardScreen({ navigation }) {
         {reports.length > 0 && (
           <View style={styles.reportSection}>
             <Text style={styles.reportSectionTitle}>Recent Reports</Text>
+            <View style={styles.recordToolbar}>
+              <View style={styles.recordToolbarCard}>
+                <View style={styles.recordToolbarHeader}>
+                  <Text style={styles.recordToolbarTitle}>Search</Text>
+                  {reportSearchQuery ? (
+                    <TouchableOpacity style={styles.recordToolbarClear} onPress={() => setReportSearchQuery('')}>
+                      <Text style={styles.recordToolbarClearText}>Clear</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+                <View style={styles.searchContainer}>
+                  <Ionicons name="search-outline" size={20} color="#9CA3AF" />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Incident, visitor, status, or date"
+                    placeholderTextColor="#9CA3AF"
+                    value={reportSearchQuery}
+                    onChangeText={setReportSearchQuery}
+                  />
+                </View>
+              </View>
+              <View style={styles.recordToolbarCard}>
+                <View style={styles.recordToolbarHeader}>
+                  <Text style={styles.recordToolbarTitle}>Filters</Text>
+                  {reportStatusFilter !== 'all' ? (
+                    <TouchableOpacity style={styles.recordToolbarClear} onPress={() => setReportStatusFilter('all')}>
+                      <Text style={styles.recordToolbarClearText}>Reset</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+                <View style={styles.filterTabs}>
+                  {['all', 'open', 'resolved'].map((status) => (
+                    <TouchableOpacity
+                      key={status}
+                      style={[styles.filterTab, reportStatusFilter === status && styles.filterTabActive]}
+                      onPress={() => setReportStatusFilter(status)}
+                    >
+                      <Text style={[styles.filterTabText, reportStatusFilter === status && styles.filterTabTextActive]}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.securityReportsTable}>
                 <View style={[styles.securityReportsTableRow, styles.securityReportsTableHeader]}>
@@ -2682,7 +2762,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             {renderSecurityTablePagination({
               currentPage: reportsPage,
               totalPages: reportsPageCount,
-              totalItems: reports.length,
+              totalItems: filteredReports.length,
               itemLabel: "reports",
               onPrevious: () => setReportsPage((currentValue) => Math.max(1, currentValue - 1)),
               onNext: () => setReportsPage((currentValue) => Math.min(reportsPageCount, currentValue + 1)),
@@ -2728,52 +2808,59 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   // Render Hover Card
-  const renderHoverCard = () => {
-    if (!hoveredVisitor) return null;
+  const renderHoverCard = (groupVisitors = null) => {
+    const hoverVisitors = Array.isArray(groupVisitors) && groupVisitors.length > 0
+      ? groupVisitors
+      : hoveredVisitor
+        ? [hoveredVisitor]
+        : [];
+
+    if (hoverVisitors.length === 0) return null;
     
     return (
-      <View style={styles.hoverCard}>
-        <View style={styles.hoverCardHeader}>
-          {hoveredVisitor.idPhoto ? (
-            <Image source={{ uri: hoveredVisitor.idPhoto }} style={styles.hoverCardImage} />
-          ) : (
-            <View style={styles.hoverCardImagePlaceholder}>
-              <Ionicons name="person" size={24} color="#9CA3AF" />
-            </View>
-          )}
-          <View style={styles.hoverCardInfo}>
-            <Text style={styles.hoverCardName}>{hoveredVisitor.name}</Text>
-            <Text style={styles.hoverCardPurpose}>{hoveredVisitor.purpose}</Text>
-          </View>
+      <View style={[styles.hoverCard, hoverVisitors.length > 1 && styles.hoverCardWide]}>
+        <Text style={styles.hoverCardGroupTitle}>
+          {hoverVisitors.length > 1 ? `${hoverVisitors.length} visitors here` : "Visitor details"}
+        </Text>
+        <View style={styles.hoverVisitorGrid}>
+          {hoverVisitors.slice(0, 3).map((visitor) => (
+            <TouchableOpacity
+              key={visitor.id}
+              style={styles.hoverVisitorTile}
+              onPress={() => handleVisitorSelect(visitor)}
+            >
+              <View style={styles.hoverCardHeader}>
+                {visitor.idPhoto ? (
+                  <Image source={{ uri: visitor.idPhoto }} style={styles.hoverCardImage} />
+                ) : (
+                  <View style={styles.hoverCardImagePlaceholder}>
+                    <Ionicons name="person" size={20} color="#9CA3AF" />
+                  </View>
+                )}
+                <View style={styles.hoverCardInfo}>
+                  <Text style={styles.hoverCardName} numberOfLines={1}>{visitor.name}</Text>
+                  <Text style={styles.hoverCardPurpose} numberOfLines={1}>{visitor.purpose}</Text>
+                </View>
+              </View>
+              <View style={styles.hoverCardDetails}>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="call-outline" size={13} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>{visitor.phone}</Text>
+                </View>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="location-outline" size={13} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>{visitor.location.office}</Text>
+                </View>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="time-outline" size={13} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>
+                    {getFreshnessLabel(visitor.location.timestamp)}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
         </View>
-        <View style={styles.hoverCardDetails}>
-          <View style={styles.hoverCardDetail}>
-            <Ionicons name="call-outline" size={14} color="#6B7280" />
-            <Text style={styles.hoverCardDetailText}>{hoveredVisitor.phone}</Text>
-          </View>
-          <View style={styles.hoverCardDetail}>
-            <Ionicons name="location-outline" size={14} color="#6B7280" />
-            <Text style={styles.hoverCardDetailText}>{hoveredVisitor.location.office}</Text>
-          </View>
-          <View style={styles.hoverCardDetail}>
-            <Ionicons name="navigate-outline" size={14} color="#6B7280" />
-            <Text style={styles.hoverCardDetailText}>
-              {getTrackingSourceLabel(hoveredVisitor.location.source)}
-            </Text>
-          </View>
-          <View style={styles.hoverCardDetail}>
-            <Ionicons name="time-outline" size={14} color="#6B7280" />
-            <Text style={styles.hoverCardDetailText}>
-              Last seen: {getFreshnessLabel(hoveredVisitor.location.timestamp)}
-            </Text>
-          </View>
-        </View>
-        <TouchableOpacity 
-          style={styles.hoverCardButton}
-          onPress={() => handleVisitorSelect(hoveredVisitor)}
-        >
-          <Text style={styles.hoverCardButtonText}>View Details</Text>
-        </TouchableOpacity>
       </View>
     );
   };

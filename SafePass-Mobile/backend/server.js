@@ -14,6 +14,7 @@ const { createRateLimiter, getRateLimitKey } = require("./utils/securityUtils");
 const {
   DEFAULT_SYSTEM_SETTINGS,
   DEFAULT_APPOINTMENT_OPTIONS,
+  DEFAULT_APPOINTMENT_SLOT_LIMIT,
   DEFAULT_APPOINTMENT_PURPOSE_OPTIONS,
   DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS,
   sanitizeSystemSettings,
@@ -995,16 +996,22 @@ const generateTemporaryPassword = (length = 10) => {
   return password;
 };
 
-const generateYearEmployeeIdCandidate = () => {
-  const currentYear = new Date().getFullYear();
-  const numericPart = crypto.randomInt(0, 1000000).toString().padStart(6, "0");
-  return `${currentYear}-${numericPart}`;
+const getEmployeeIdPrefix = (role = "staff") => {
+  const normalizedRole = String(role || "").toLowerCase();
+  return normalizedRole === "security" || normalizedRole === "guard" ? "SEC" : "STF";
 };
 
-const generateUniqueEmployeeId = async () => {
-  let candidate = generateYearEmployeeIdCandidate();
+const generateYearEmployeeIdCandidate = (role = "staff") => {
+  const prefix = getEmployeeIdPrefix(role);
+  const currentYear = new Date().getFullYear();
+  const numericPart = crypto.randomInt(0, 1000000).toString().padStart(6, "0");
+  return `${prefix}-${currentYear}-${numericPart}`;
+};
+
+const generateUniqueEmployeeId = async (role = "staff") => {
+  let candidate = generateYearEmployeeIdCandidate(role);
   while (await User.exists({ employeeId: candidate })) {
-    candidate = generateYearEmployeeIdCandidate();
+    candidate = generateYearEmployeeIdCandidate(role);
   }
   return candidate;
 };
@@ -1075,6 +1082,13 @@ const createVerificationToken = () => {
   return { token, tokenHash, expiresAt };
 };
 
+const createPasswordSetupToken = (hours = 48) => {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * hours);
+  return { token, tokenHash, expiresAt };
+};
+
 const getApiBaseUrl = (req) => {
   if (process.env.API_PUBLIC_URL) {
     return process.env.API_PUBLIC_URL.replace(/\/$/, "");
@@ -1086,36 +1100,12 @@ const getApiBaseUrl = (req) => {
 };
 
 const sendVerificationEmailSimulation = async (req, user) => {
-  const { token, tokenHash, expiresAt } = createVerificationToken();
-  user.verificationTokenHash = tokenHash;
-  user.verificationExpiresAt = expiresAt;
-
-  const verificationUrl = `${getApiBaseUrl(req)}/api/auth/verify-email?token=${token}`;
-
-  const emailResult = await sendEmail(
-    user.email,
-    "Verify your Sapphire SafePass account",
-    [
-      `Good day, ${getEmailGreetingName(user)}.`,
-      "",
-      "Welcome to Sapphire SafePass.",
-      "Please verify your visitor account by opening the secure link below:",
-      verificationUrl,
-      "",
-      "This verification link will expire in 24 hours.",
-      "",
-      `After verifying, return to ${FRONTEND_URL} and sign in to continue your visitor access request.`,
-      "",
-      "If you did not create this account, you may safely ignore this email.",
-      "",
-      getSupportEmailSignature(),
-    ].join("\n"),
-  );
-
-  console.log(`Email verification link generated for ${user.email}.`);
-  logSensitiveDebug(`Verification URL for ${user.email}: ${verificationUrl}`);
-
-  return { verificationUrl, expiresAt, emailResult };
+  const otp = await createRegistrationOtp(user);
+  return {
+    expiresAt: otp.expiresAt,
+    otpExpiresAt: otp.expiresAt,
+    emailResult: otp.emailResult,
+  };
 };
 
 const createRegistrationOtp = async (user) => {
@@ -1135,12 +1125,13 @@ const createRegistrationOtp = async (user) => {
     [
       `Good day, ${getEmailGreetingName(user)}.`,
       "",
-      "Use the verification code below to confirm your visitor account:",
+      "Thank you for creating your Sapphire SafePass visitor account.",
+      "Enter the one-time password below in the SafePass app to verify your account:",
       "",
-      `Verification code: ${otpCode}`,
+      `OTP Code: ${otpCode}`,
       "",
       "This code will expire in 10 minutes.",
-      "For your security, please do not share this code with anyone.",
+      "For your security, do not share this code with anyone. SafePass will never ask for your OTP outside the app.",
       "",
       "If you did not request this code, you may safely ignore this email.",
       "",
@@ -1639,6 +1630,33 @@ app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => 
 const normalizeEmailValue = (value = "") => String(value || "").toLowerCase().trim();
 const normalizeUsernameValue = (value = "") => String(value || "").toLowerCase().trim();
 const isValidEmailValue = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+const sanitizeAccountEmailPart = (value = "") =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+const getGeneratedAccountEmailRolePart = ({ role, department, position } = {}) => {
+  const normalizedRole = String(role || "").toLowerCase();
+  if (normalizedRole === "security" || normalizedRole === "guard") return "security";
+  return sanitizeAccountEmailPart(department || position || "staff") || "staff";
+};
+
+const generateUniqueAccountEmail = async ({ firstName, role, department, position } = {}) => {
+  const firstNamePart = sanitizeAccountEmailPart(firstName);
+  if (!firstNamePart) return "";
+
+  const rolePart = getGeneratedAccountEmailRolePart({ role, department, position });
+  const baseLocalPart = `${firstNamePart}${rolePart}`;
+  let suffix = 1;
+  let candidate = `${baseLocalPart}@sapphire.edu`;
+
+  while (await User.exists({ email: candidate })) {
+    suffix += 1;
+    candidate = `${baseLocalPart}${suffix}@sapphire.edu`;
+  }
+
+  return candidate;
+};
 const normalizeDepartmentValue = (value = "") => {
   const normalized = String(value || "")
     .trim()
@@ -1692,7 +1710,7 @@ const formatDepartmentLabel = (value = "") =>
     .replace(/\s+/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
-const APPOINTMENT_SLOT_LIMIT = 3;
+const APPOINTMENT_SLOT_LIMIT = DEFAULT_APPOINTMENT_SLOT_LIMIT || 2;
 const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted"];
 const APPOINTMENT_PURPOSE_OPTIONS = DEFAULT_APPOINTMENT_PURPOSE_OPTIONS;
 const APPOINTMENT_DEPARTMENT_OPTIONS = DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS;
@@ -1705,6 +1723,20 @@ const normalizeOptionValue = (value = "") =>
 const isAllowedOption = (value, options) => {
   const normalizedValue = normalizeOptionValue(value);
   return options.some((option) => normalizeOptionValue(option) === normalizedValue);
+};
+
+const getAppointmentSlotLimit = (slot = {}) => {
+  const parsedLimit = Number(slot?.capacity ?? slot?.limit ?? APPOINTMENT_SLOT_LIMIT);
+  return Number.isInteger(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 50) : APPOINTMENT_SLOT_LIMIT;
+};
+
+const findAppointmentConfiguredSlot = (timeSlots = [], appointmentDateTime) => {
+  if (!appointmentDateTime) return null;
+  return timeSlots.find(
+    (slot) =>
+      Number(slot.hour) === appointmentDateTime.getHours() &&
+      Number(slot.minute) === appointmentDateTime.getMinutes(),
+  ) || null;
 };
 
 const normalizePhoneValue = (value = "") => {
@@ -2136,10 +2168,7 @@ app.post("/api/register", async (req, res) => {
       ? String(req.body.employeeId).trim()
       : undefined;
     if (!employeeId && (role === "staff" || role === "guard")) {
-      const prefix = role === "staff" ? "STF" : "GRD";
-      const timestamp = Date.now().toString().slice(-6);
-      const random = Math.random().toString(36).substr(2, 3).toUpperCase();
-      employeeId = `${prefix}-${timestamp}-${random}`;
+      employeeId = await generateUniqueEmployeeId(role);
     }
 
 const userData = {
@@ -2322,7 +2351,15 @@ app.post("/api/login", async (req, res) => {
 
     // Only disclose account state after the password is valid.
     if (user.status === "inactive" || user.status === "suspended") {
-      return res.status(401).json({ error: "Account is deactivated" });
+      const isActivationPending = ["staff", "security", "guard"].includes(String(user.role || "").toLowerCase()) &&
+        user.passwordResetTokenHash &&
+        user.passwordResetExpiresAt &&
+        user.passwordResetExpiresAt > new Date();
+      return res.status(401).json({
+        error: isActivationPending
+          ? "Account activation required. Please open the setup link sent to your email."
+          : "Account is deactivated",
+      });
     }
 
     if (user.role === "visitor" && user.isVerified === false) {
@@ -2331,7 +2368,6 @@ app.post("/api/login", async (req, res) => {
         error: "Your account is not yet verified",
         message:
           "Please verify your account using the OTP sent during registration before logging in.",
-        requiresEmailVerification: true,
         requiresOtpVerification: true,
       });
     }
@@ -2807,6 +2843,16 @@ app.post("/api/auth/reset-password", async (req, res) => {
     }
 
     user.password = newPassword;
+    if (
+      hasValidResetToken &&
+      ["staff", "security", "guard"].includes(String(user.role || "").toLowerCase()) &&
+      (user.status === "inactive" || user.isActive === false)
+    ) {
+      user.status = "active";
+      user.isActive = true;
+      user.isVerified = true;
+      user.verifiedAt = new Date();
+    }
     clearPasswordResetState(user);
     user.updatedAt = new Date();
     await user.save();
@@ -2849,7 +2895,7 @@ app.get("/api/auth/verify-email", async (req, res) => {
 
     if (!user) {
       return res.status(400).send(
-        "This verification link is invalid or expired. Please request a new verification email.",
+        "This verification request is invalid or expired. Please request a new OTP code.",
       );
     }
 
@@ -2914,7 +2960,7 @@ app.post("/api/auth/verify-email", async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "This verification link is invalid or expired. Please request a new verification email.",
+          "This verification request is invalid or expired. Please request a new OTP code.",
       });
     }
 
@@ -2965,7 +3011,7 @@ app.post("/api/auth/resend-verification", async (req, res) => {
     if (!user) {
       return res.json({
         success: true,
-        message: "A verification link has been sent if the account is eligible.",
+        message: "A verification OTP has been sent if the account is eligible.",
       });
     }
 
@@ -2976,11 +3022,11 @@ app.post("/api/auth/resend-verification", async (req, res) => {
       });
     }
 
-    const verification = await sendVerificationEmailSimulation(req, user);
-    if (!verification.emailResult?.success) {
+    const otp = await createRegistrationOtp(user);
+    if (!isOtpDeliveryUsable(otp.emailResult)) {
       return res.status(500).json({
         success: false,
-        message: "Failed to resend verification link.",
+        message: "Failed to resend verification OTP.",
       });
     }
     await user.save();
@@ -2988,14 +3034,16 @@ app.post("/api/auth/resend-verification", async (req, res) => {
     res.json({
       success: true,
       message:
-        "A verification link has been sent if the account is eligible.",
-      verificationExpiresAt: verification.expiresAt,
+        "A verification OTP has been sent if the account is eligible.",
+      requiresOtpVerification: true,
+      otpExpiresAt: otp.expiresAt,
+      otpDeliveryMode: getOtpDeliveryMode(otp.emailResult),
     });
   } catch (error) {
     console.error("Resend verification error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to resend verification link.",
+      message: "Failed to resend verification OTP.",
     });
   }
 });
@@ -3872,30 +3920,44 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       phone,
       department,
       position,
-      status,
+      employeeId,
     } = req.body;
 
     const normalizedFirstName = String(firstName || "").trim();
     const normalizedLastName = String(lastName || "").trim();
-    const normalizedEmail = normalizeEmailValue(email);
+    let normalizedEmail = normalizeEmailValue(email);
     const normalizedUsername = normalizeUsernameValue(username);
     const normalizedPhone = normalizePhoneValue(phone);
     const normalizedDepartment = String(department || "").trim();
     const normalizedPosition = String(position || "Staff Member").trim();
-    const normalizedStatus = status === "inactive" ? "inactive" : "active";
+    let normalizedEmployeeId = String(employeeId || "").trim();
+
+    if (!normalizedEmail) {
+      normalizedEmail = await generateUniqueAccountEmail({
+        firstName: normalizedFirstName,
+        role: "staff",
+        department: normalizedDepartment,
+        position: normalizedPosition,
+      });
+    }
+
+    if (!normalizedEmployeeId) {
+      normalizedEmployeeId = await generateUniqueEmployeeId("staff");
+    }
+
+    const resolvedUsername = normalizedUsername || normalizeUsernameValue(normalizedEmployeeId || normalizedEmail.split("@")[0]);
 
     if (
       !normalizedFirstName ||
       !normalizedLastName ||
-      !normalizedUsername ||
       !normalizedEmail ||
-      !normalizedPhone ||
+      !normalizedEmployeeId ||
       !normalizedDepartment
     ) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
-        required: ["firstName", "lastName", "username", "email", "phone", "department"],
+        required: ["firstName", "lastName", "employeeId", "email", "department"],
       });
     }
 
@@ -3907,7 +3969,7 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       });
     }
 
-    if (!isValidPhoneValue(normalizedPhone)) {
+    if (normalizedPhone && !isValidPhoneValue(normalizedPhone)) {
       return res.status(400).json({
         success: false,
         message: PHONE_VALIDATION_MESSAGE,
@@ -3917,7 +3979,8 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
 
     const duplicateChecks = [
       { email: normalizedEmail },
-      { username: normalizedUsername },
+      { username: resolvedUsername },
+      { employeeId: normalizedEmployeeId },
     ];
 
     const existingUser = await User.findOne({ $or: duplicateChecks });
@@ -3925,8 +3988,10 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       const duplicateField =
         existingUser.email === normalizedEmail
           ? "email"
-          : existingUser.username === normalizedUsername
+          : existingUser.username === resolvedUsername
             ? "username"
+            : existingUser.employeeId === normalizedEmployeeId
+              ? "employeeId"
             : "email";
 
       return res.status(400).json({
@@ -3934,30 +3999,36 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
         message:
           duplicateField === "username"
             ? "Username already registered"
+            : duplicateField === "employeeId"
+              ? "Staff/Security number already registered"
             : "Email already registered",
         field: duplicateField,
       });
     }
 
-    const finalEmployeeId = await generateUniqueEmployeeId();
     const temporaryPassword = generateTemporaryPassword();
+    const setupToken = createPasswordSetupToken(48);
+    const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
 
     const nfcCardId = `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
     const user = new User({
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
-      username: normalizedUsername,
+      username: resolvedUsername,
       email: normalizedEmail,
       password: temporaryPassword,
-      phone: normalizedPhone,
+      phone: normalizedPhone || "",
       role: "staff",
-      status: normalizedStatus,
-      isActive: normalizedStatus === "active",
-      employeeId: finalEmployeeId,
+      status: "inactive",
+      isActive: false,
+      isVerified: false,
+      employeeId: normalizedEmployeeId,
       department: normalizedDepartment,
       position: normalizedPosition,
       nfcCardId,
+      passwordResetTokenHash: setupToken.tokenHash,
+      passwordResetExpiresAt: setupToken.expiresAt,
     });
 
     await user.save();
@@ -3975,18 +4046,27 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
 
     const credentialEmail = await sendEmail(
       user.email,
-      "Welcome to Sapphire SafePass - Staff Account Credentials",
-      `Dear ${user.firstName} ${user.lastName},\n\n` +
-        `Your staff account has been created by the administrator.\n\n` +
-        `Login Credentials\n` +
-        `Username: ${user.username}\n` +
-        `Email: ${user.email}\n` +
-        `Temporary Password: ${temporaryPassword}\n` +
-        `Staff ID: ${user.employeeId}\n` +
-        `Department: ${user.department}\n` +
-        `Status: ${user.status.toUpperCase()}\n\n` +
-        `Please sign in and change your password after your first login.\n\n` +
+      "Activate Your Sapphire SafePass Staff Account",
+      [
+        `Good day, ${user.firstName} ${user.lastName}.`,
+        "",
+        "An administrator created your Sapphire SafePass staff account.",
+        "",
+        "Account details:",
+        `Name: ${user.firstName} ${user.lastName}`,
+        "Assigned role: Staff",
+        `Login email: ${user.email}`,
+        `Staff/Security number: ${user.employeeId}`,
+        `Department: ${user.department}`,
+        "",
+        "To activate your account, open the secure setup link below and create your password:",
+        setupLink,
+        "",
+        "This secure link expires in 48 hours. Your account remains inactive until you complete this step.",
+        "If you did not expect this account, please ignore this email and contact the SafePass administrator.",
+        "",
         getSupportEmailSignature(),
+      ].join("\n"),
     );
 
     const userResponse = user.toObject();
@@ -4006,6 +4086,7 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
         delivered: credentialEmailDelivered,
         simulated: Boolean(credentialEmail?.simulated),
         error: credentialEmail?.error || "",
+        setupLink: credentialEmail?.simulated ? setupLink : undefined,
       },
     });
   } catch (error) {
@@ -4018,6 +4099,8 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
         message:
           duplicateField === "username"
             ? "Username already registered"
+            : duplicateField === "employeeId"
+              ? "Staff/Security number already registered"
             : "Email already registered",
         field: duplicateField,
       });
@@ -4038,80 +4121,143 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const { firstName, lastName, email, phone, shift, position } = req.body;
+    const { firstName, lastName, email, phone, shift, position, employeeId } = req.body;
 
     const normalizedFirstName = String(firstName || "").trim();
     const normalizedLastName = String(lastName || "").trim();
-    const normalizedEmail = normalizeEmailValue(email);
+    let normalizedEmail = normalizeEmailValue(email);
     const normalizedPhone = normalizePhoneValue(phone);
     const normalizedPosition = String(position || "Security Guard").trim();
+    let normalizedEmployeeId = String(employeeId || "").trim();
 
-    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedPhone) {
-      return res.status(400).json({ success: false, message: "Missing required fields" });
+    if (!normalizedEmail) {
+      normalizedEmail = await generateUniqueAccountEmail({
+        firstName: normalizedFirstName,
+        role: "security",
+        department: "Security Department",
+        position: normalizedPosition,
+      });
+    }
+
+    if (!normalizedEmployeeId) {
+      normalizedEmployeeId = await generateUniqueEmployeeId("security");
+    }
+
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedEmployeeId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+        required: ["firstName", "lastName", "employeeId", "email"],
+      });
     }
 
     if (!isValidEmailValue(normalizedEmail)) {
       return res.status(400).json({ success: false, message: "Invalid email format", field: "email" });
     }
 
-    if (!isValidPhoneValue(normalizedPhone)) {
+    if (normalizedPhone && !isValidPhoneValue(normalizedPhone)) {
       return res.status(400).json({ success: false, message: PHONE_VALIDATION_MESSAGE, field: "phone" });
     }
 
-    const existingUser = await User.findOne({ email: normalizedEmail });
+    const existingUser = await User.findOne({
+      $or: [{ email: normalizedEmail }, { employeeId: normalizedEmployeeId }],
+    });
     if (existingUser) {
-      return res.status(400).json({ success: false, message: "Email already registered", field: "email" });
+      const field = existingUser.email === normalizedEmail ? "email" : "employeeId";
+      return res.status(400).json({
+        success: false,
+        message: field === "employeeId" ? "Staff/Security number already registered" : "Email already registered",
+        field,
+      });
     }
 
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substr(2, 6).toUpperCase();
     const nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
-    const finalEmployeeId = await generateUniqueEmployeeId();
     const temporaryPassword = generateTemporaryPassword();
+    const setupToken = createPasswordSetupToken(48);
+    const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
 
     const user = new User({
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
+      username: normalizeUsernameValue(normalizedEmployeeId || normalizedEmail.split("@")[0]),
       email: normalizedEmail,
       password: temporaryPassword,
-      phone: normalizedPhone,
+      phone: normalizedPhone || "",
       role: "guard",
       nfcCardId,
-      employeeId: finalEmployeeId,
+      employeeId: normalizedEmployeeId,
       position: normalizedPosition,
       shift: String(shift || "").trim(),
-      status: "active",
-      isActive: true,
+      department: "Security Department",
+      status: "inactive",
+      isActive: false,
+      isVerified: false,
+      passwordResetTokenHash: setupToken.tokenHash,
+      passwordResetExpiresAt: setupToken.expiresAt,
     });
 
     await user.save();
 
-    sendEmail(
+    const credentialEmail = await sendEmail(
       user.email,
-      "Welcome to Sapphire Aviation - Security Guard Account",
-      `Dear ${user.firstName} ${user.lastName},\n\n` +
-        `Your security account has been created by the administrator.\n\n` +
-        `Email: ${user.email}\n` +
-        `Temporary Password: ${temporaryPassword}\n` +
-        `Employee ID: ${user.employeeId}\n` +
-        `Phone: ${user.phone}\n` +
-        `Position: ${user.position}\n` +
-        `Shift: ${user.shift || "To be assigned"}\n\n` +
-        `Please sign in and change your password when convenient.\n\n` +
-        `Thank you,\n` +
-        `Sapphire Aviation Security Team`,
+      "Activate Your Sapphire SafePass Security Account",
+      [
+        `Good day, ${user.firstName} ${user.lastName}.`,
+        "",
+        "An administrator created your Sapphire SafePass security account.",
+        "",
+        "Account details:",
+        `Name: ${user.firstName} ${user.lastName}`,
+        "Assigned role: Security",
+        `Login email: ${user.email}`,
+        `Staff/Security number: ${user.employeeId}`,
+        `Position: ${user.position}`,
+        `Shift: ${user.shift || "To be assigned"}`,
+        "",
+        "To activate your account, open the secure setup link below and create your password:",
+        setupLink,
+        "",
+        "This secure link expires in 48 hours. Your account remains inactive until you complete this step.",
+        "If you did not expect this account, please ignore this email and contact the SafePass administrator.",
+        "",
+        getSupportEmailSignature(),
+      ].join("\n"),
     );
 
     const userResponse = user.toObject();
     delete userResponse.password;
 
-    res.status(201).json({ success: true, message: "Security guard created successfully", user: userResponse });
+    const credentialEmailDelivered = Boolean(credentialEmail?.delivered);
+    res.status(201).json({
+      success: true,
+      message: credentialEmailDelivered
+        ? "Security account created successfully and activation email was sent"
+        : credentialEmail?.simulated
+          ? "Security account created successfully and activation email was simulated"
+          : "Security account created, but activation email could not be sent",
+      user: userResponse,
+      emailDelivery: {
+        success: Boolean(credentialEmail?.success),
+        delivered: credentialEmailDelivered,
+        simulated: Boolean(credentialEmail?.simulated),
+        error: credentialEmail?.error || "",
+        setupLink: credentialEmail?.simulated ? setupLink : undefined,
+      },
+    });
   } catch (error) {
     console.error("Create security guard error:", error);
 
     if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
-      return res.status(400).json({ success: false, message: "Email already registered", field: duplicateField });
+      return res.status(400).json({
+        success: false,
+        message: duplicateField === "employeeId"
+          ? "Staff/Security number already registered"
+          : "Email already registered",
+        field: duplicateField,
+      });
     }
 
     res.status(500).json({ success: false, message: "Failed to create security guard", error: error.message });
@@ -5386,41 +5532,59 @@ app.put("/api/admin/appointments/options", authMiddleware, async (req, res) => {
 // Visitor appointment slot availability
 app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
   try {
-    const { date, department } = req.query || {};
-    const requestedDepartment = String(department || "").trim();
+    const { date, department, departments } = req.query || {};
+    const requestedDepartments = [
+      ...new Set(
+        String(departments || department || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
+    ];
     const activeAppointmentOptions = await getAppointmentOptions({ activeOnly: true });
 
-    if (!date || !requestedDepartment) {
+    if (!date || !requestedDepartments.length) {
       return res.status(400).json({
         success: false,
         message: "Date and office or department are required.",
       });
     }
 
-    if (!isAllowedOption(requestedDepartment, activeAppointmentOptions.offices.map((option) => option.label))) {
+    const enabledOfficeLabels = activeAppointmentOptions.offices.map((option) => option.label);
+    const invalidDepartment = requestedDepartments.find(
+      (requestedDepartment) => !isAllowedOption(requestedDepartment, enabledOfficeLabels),
+    );
+    if (invalidDepartment) {
       return res.status(400).json({
         success: false,
         message: "Please select an enabled office to visit.",
       });
     }
 
-    const routedStaff = await User.findOne({
-      role: "staff",
-      isActive: true,
-      status: "active",
-      department: getStaffDepartmentQuery(requestedDepartment),
-    }).sort({ lastLogin: -1, createdAt: 1 });
+    const staffRoutes = [];
+    for (const requestedDepartment of requestedDepartments) {
+      const routedStaff = await User.findOne({
+        role: "staff",
+        isActive: true,
+        status: "active",
+        department: getStaffDepartmentQuery(requestedDepartment),
+      }).sort({ lastLogin: -1, createdAt: 1 });
 
-    if (!routedStaff) {
-      return res.json({
-        success: true,
-        limit: APPOINTMENT_SLOT_LIMIT,
-        department: formatDepartmentLabel(requestedDepartment),
-        assignedStaff: null,
-        slots: [],
-        message: `No active staff account is assigned to ${requestedDepartment}.`,
-      });
+      if (!routedStaff) {
+        return res.json({
+          success: true,
+          limit: APPOINTMENT_SLOT_LIMIT,
+          department: formatDepartmentLabel(requestedDepartment),
+          departments: requestedDepartments.map(formatDepartmentLabel),
+          assignedStaff: null,
+          slots: [],
+          message: `No active staff account is assigned to ${requestedDepartment}.`,
+        });
+      }
+
+      staffRoutes.push({ department: requestedDepartment, routedStaff });
     }
+
 
     const selectedDate = new Date(date);
     if (Number.isNaN(selectedDate.getTime())) {
@@ -5453,35 +5617,66 @@ app.get("/api/appointments/availability", authMiddleware, async (req, res) => {
       const hour = Number(configuredSlot.hour);
       const minute = Number(configuredSlot.minute);
       if (!Number.isInteger(hour) || !Number.isInteger(minute)) continue;
+      const slotLimit = getAppointmentSlotLimit(configuredSlot);
 
       const slotTime = new Date(selectedDate);
       slotTime.setHours(hour, minute, 0, 0);
-      const count = await countStaffAppointmentsForSlot({
-        assignedStaff: routedStaff._id,
-        visitDate: selectedDate,
-        visitTime: slotTime,
-      });
+      const routeCounts = await Promise.all(
+        staffRoutes.map(async ({ department: routedDepartment, routedStaff }, routeIndex) => {
+          const count = await countStaffAppointmentsForSlot({
+            assignedStaff: routedStaff._id,
+            visitDate: selectedDate,
+            visitTime: slotTime,
+          });
+          const selectedOfficeLoadForStaff = staffRoutes.filter((route, compareIndex) =>
+            compareIndex <= routeIndex && isSameObjectId(route.routedStaff._id, routedStaff._id),
+          ).length;
+          const effectiveCount = count + selectedOfficeLoadForStaff - 1;
+          return {
+            department: formatDepartmentLabel(routedDepartment),
+            assignedStaff: {
+              id: routedStaff._id,
+              name: getFullName(routedStaff),
+            },
+            count: effectiveCount,
+            limit: slotLimit,
+            available: Math.max(slotLimit - effectiveCount, 0),
+            isFull: effectiveCount >= slotLimit,
+          };
+        }),
+      );
+      const maxCount = Math.max(...routeCounts.map((route) => route.count), 0);
+      const minAvailable = Math.min(...routeCounts.map((route) => route.available));
 
       slots.push({
         value: slotTime.toISOString(),
         label: configuredSlot.label,
         hour,
         minute,
-        count,
-        limit: APPOINTMENT_SLOT_LIMIT,
-        available: Math.max(APPOINTMENT_SLOT_LIMIT - count, 0),
-        isFull: count >= APPOINTMENT_SLOT_LIMIT,
+        count: maxCount,
+        limit: slotLimit,
+        capacity: slotLimit,
+        available: Math.max(minAvailable, 0),
+        isFull: routeCounts.some((route) => route.isFull),
+        departments: routeCounts,
       });
     }
 
     res.json({
       success: true,
-      limit: APPOINTMENT_SLOT_LIMIT,
-      department: formatDepartmentLabel(requestedDepartment),
-      assignedStaff: {
-        id: routedStaff._id,
-        name: getFullName(routedStaff),
-      },
+      limit: Math.max(...activeAppointmentOptions.timeSlots.map(getAppointmentSlotLimit), APPOINTMENT_SLOT_LIMIT),
+      department: requestedDepartments.map(formatDepartmentLabel).join(", "),
+      departments: requestedDepartments.map(formatDepartmentLabel),
+      assignedStaff:
+        staffRoutes.length === 1
+          ? {
+              id: staffRoutes[0].routedStaff._id,
+              name: getFullName(staffRoutes[0].routedStaff),
+            }
+          : {
+              id: "multiple",
+              name: `${staffRoutes.length} staff offices`,
+            },
       slots,
     });
   } catch (error) {
@@ -5522,6 +5717,7 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       purposeCategory,
       customPurposeOfVisit,
       department,
+      departments,
       officeToVisit,
       assignedOffice,
       appointmentDepartment,
@@ -5537,9 +5733,19 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     const normalizedPurposeCategory = String(purposeCategory || "").trim();
     const normalizedCustomPurpose = String(customPurposeOfVisit || "").trim();
     const activeAppointmentOptions = await getAppointmentOptions({ activeOnly: true });
-    const requestedDepartment = String(
-      appointmentDepartment || department || officeToVisit || assignedOffice || "",
-    ).trim();
+    const requestedDepartments = [
+      ...new Set(
+        (Array.isArray(departments)
+          ? departments
+          : String(
+              appointmentDepartment || department || officeToVisit || assignedOffice || "",
+            ).split(",")
+        )
+          .map((item) => String(item || "").trim())
+          .filter(Boolean),
+      ),
+    ];
+    const requestedDepartment = requestedDepartments[0] || "";
     const resolvedPurpose =
       normalizedPurposeCategory === "Other" && normalizedCustomPurpose
         ? normalizedCustomPurpose
@@ -5566,14 +5772,18 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    if (!requestedDepartment) {
+    if (!requestedDepartments.length) {
       return res.status(400).json({
         success: false,
         message: "Office or department is required for this appointment.",
       });
     }
 
-    if (!isAllowedOption(requestedDepartment, activeAppointmentOptions.offices.map((option) => option.label))) {
+    const enabledOfficeLabels = activeAppointmentOptions.offices.map((option) => option.label);
+    const invalidDepartment = requestedDepartments.find(
+      (departmentLabel) => !isAllowedOption(departmentLabel, enabledOfficeLabels),
+    );
+    if (invalidDepartment) {
       return res.status(400).json({
         success: false,
         message: "Please select a valid office to visit.",
@@ -5588,17 +5798,14 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    const selectedSlotEnabled = activeAppointmentOptions.timeSlots.some(
-      (slot) =>
-        Number(slot.hour) === appointmentDateTime.getHours() &&
-        Number(slot.minute) === appointmentDateTime.getMinutes(),
-    );
-    if (!selectedSlotEnabled) {
+    const selectedConfiguredSlot = findAppointmentConfiguredSlot(activeAppointmentOptions.timeSlots, appointmentDateTime);
+    if (!selectedConfiguredSlot) {
       return res.status(400).json({
         success: false,
         message: "Please select an enabled appointment time slot.",
       });
     }
+    const selectedSlotLimit = getAppointmentSlotLimit(selectedConfiguredSlot);
 
     const minimumScheduleTime = new Date(Date.now() - 60 * 1000);
     if (appointmentDateTime < minimumScheduleTime) {
@@ -5660,20 +5867,6 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    const routedStaff = await User.findOne({
-      role: "staff",
-      isActive: true,
-      status: "active",
-      department: getStaffDepartmentQuery(requestedDepartment),
-    }).sort({ lastLogin: -1, createdAt: 1 });
-
-    if (!routedStaff) {
-      return res.status(400).json({
-        success: false,
-        message: `No active staff account is assigned to ${requestedDepartment}. Please choose another office or contact admin.`,
-      });
-    }
-
     const user = await User.findById(requestedUserId);
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
@@ -5690,7 +5883,6 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Please verify your visitor account with OTP before requesting an appointment.",
-        requiresEmailVerification: true,
         requiresOtpVerification: true,
       });
     }
@@ -5703,47 +5895,74 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     }
 
     const visitorFullName = `${user.firstName} ${user.lastName}`.trim();
-    const slotCount = await countStaffAppointmentsForSlot({
-      assignedStaff: routedStaff._id,
-      visitDate: finalVisitDate,
-      visitTime: finalVisitTime,
-    });
+    const staffRoutes = [];
+    for (const departmentLabel of requestedDepartments) {
+      const routedStaff = await User.findOne({
+        role: "staff",
+        isActive: true,
+        status: "active",
+        department: getStaffDepartmentQuery(departmentLabel),
+      }).sort({ lastLogin: -1, createdAt: 1 });
 
-    if (slotCount >= APPOINTMENT_SLOT_LIMIT) {
-      return res.status(409).json({
-        success: false,
-        code: "APPOINTMENT_SLOT_FULL",
-        message: `${formatDepartmentLabel(requestedDepartment)} is already full for that time. Please choose another time slot.`,
-        limit: APPOINTMENT_SLOT_LIMIT,
-        currentCount: slotCount,
+      if (!routedStaff) {
+        return res.status(400).json({
+          success: false,
+          message: `No active staff account is assigned to ${departmentLabel}. Please choose another office or contact admin.`,
+        });
+      }
+
+      const slotCount = await countStaffAppointmentsForSlot({
+        assignedStaff: routedStaff._id,
+        visitDate: finalVisitDate,
+        visitTime: finalVisitTime,
       });
+
+      const plannedForStaff = staffRoutes.filter((route) =>
+        isSameObjectId(route.routedStaff._id, routedStaff._id),
+      ).length;
+
+      if (slotCount + plannedForStaff >= selectedSlotLimit) {
+        return res.status(409).json({
+          success: false,
+          code: "APPOINTMENT_SLOT_FULL",
+          message: `${formatDepartmentLabel(departmentLabel)} is already full for that time. Slots are full please select another time or date.`,
+          limit: selectedSlotLimit,
+          currentCount: slotCount + plannedForStaff,
+        });
+      }
+
+      staffRoutes.push({ department: departmentLabel, routedStaff });
     }
 
-    const visitor = new Visitor({
-      fullName: visitorFullName,
-      email: user.email,
-      phoneNumber: user.phone || "Not provided",
-      idType: normalizedIdType,
-      idNumber: normalizedIdType,
-      idImage: normalizedIdImage,
-      idValidationStatus: idReview.status,
-      idValidationNotes: idReview.message,
-      dataPrivacyAccepted: true,
-      dataPrivacyAcceptedAt: dataPrivacyAcceptedAt
-        ? new Date(dataPrivacyAcceptedAt)
-        : new Date(),
-    });
-    visitor.queueAppointmentRequest({
-      purposeOfVisit: resolvedPurpose,
-      purposeCategory: normalizedPurposeCategory || undefined,
-      customPurposeOfVisit: normalizedCustomPurpose || undefined,
-      visitDate: new Date(finalVisitDate),
-      visitTime: new Date(finalVisitTime),
-      department: formatDepartmentLabel(requestedDepartment),
-      assignedStaff: routedStaff._id,
-      assignedStaffName: getFullName(routedStaff),
-    });
-    await visitor.save();
+    const createdVisitors = [];
+    for (const { department: departmentLabel, routedStaff } of staffRoutes) {
+      const visitor = new Visitor({
+        fullName: visitorFullName,
+        email: user.email,
+        phoneNumber: user.phone || "Not provided",
+        idType: normalizedIdType,
+        idNumber: normalizedIdType,
+        idImage: normalizedIdImage,
+        idValidationStatus: idReview.status,
+        idValidationNotes: idReview.message,
+        dataPrivacyAccepted: true,
+        dataPrivacyAcceptedAt: dataPrivacyAcceptedAt
+          ? new Date(dataPrivacyAcceptedAt)
+          : new Date(),
+      });
+      visitor.queueAppointmentRequest({
+        purposeOfVisit: resolvedPurpose,
+        purposeCategory: normalizedPurposeCategory || undefined,
+        customPurposeOfVisit: normalizedCustomPurpose || undefined,
+        visitDate: new Date(finalVisitDate),
+        visitTime: new Date(finalVisitTime),
+        department: formatDepartmentLabel(departmentLabel),
+        assignedStaff: routedStaff._id,
+        assignedStaffName: getFullName(routedStaff),
+      });
+      await visitor.save();
+      createdVisitors.push({ visitor, routedStaff, departmentLabel });
+    }
 
     const prioritizedVisitor = getPrioritizedVisitor(await findVisitorsForUser(user));
     if (prioritizedVisitor) {
@@ -5751,86 +5970,91 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       await user.save();
     }
 
-    await createRoleNotification({
-      title: "New Department Appointment Request",
-      message: `${visitor.fullName} requested ${visitor.appointmentDepartment || visitor.assignedOffice} on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}. Purpose: ${visitor.purposeOfVisit}`,
-      type: "visitor",
-      severity: "medium",
-      targetRole: "staff",
-      targetUser: routedStaff._id,
-      relatedVisitor: visitor._id,
-      relatedUser: user._id,
-      metadata: {
-        activityType: "visitor_appointment_request",
-        visitDate: visitor.visitDate,
-        visitTime: visitor.visitTime,
-        purposeOfVisit: visitor.purposeOfVisit,
-        purposeCategory: visitor.purposeCategory,
-        customPurposeOfVisit: visitor.customPurposeOfVisit,
-        department: visitor.appointmentDepartment || visitor.assignedOffice,
-      },
-    });
+    for (const { visitor, routedStaff } of createdVisitors) {
+      await createRoleNotification({
+        title: "New Department Appointment Request",
+        message: `${visitor.fullName} requested ${visitor.appointmentDepartment || visitor.assignedOffice} on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}. Purpose: ${visitor.purposeOfVisit}`,
+        type: "visitor",
+        severity: "medium",
+        targetRole: "staff",
+        targetUser: routedStaff._id,
+        relatedVisitor: visitor._id,
+        relatedUser: user._id,
+        metadata: {
+          activityType: "visitor_appointment_request",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          purposeOfVisit: visitor.purposeOfVisit,
+          purposeCategory: visitor.purposeCategory,
+          customPurposeOfVisit: visitor.customPurposeOfVisit,
+          department: visitor.appointmentDepartment || visitor.assignedOffice,
+        },
+      });
 
-    await createRoleNotification({
-      title: "Visitor Appointment Requested",
-      message: `${visitor.fullName} submitted a new appointment request for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
-      type: "info",
-      severity: "medium",
-      targetRole: "admin",
-      relatedVisitor: visitor._id,
-      relatedUser: user._id,
-      metadata: {
-        activityType: "visitor_appointment_request",
-        visitDate: visitor.visitDate,
-        visitTime: visitor.visitTime,
-        purposeOfVisit: visitor.purposeOfVisit,
-        department: visitor.appointmentDepartment || visitor.assignedOffice,
-        assignedStaff: routedStaff._id,
-      },
-    });
+      await createRoleNotification({
+        title: "Visitor Appointment Requested",
+        message: `${visitor.fullName} submitted a new appointment request for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
+        type: "info",
+        severity: "medium",
+        targetRole: "admin",
+        relatedVisitor: visitor._id,
+        relatedUser: user._id,
+        metadata: {
+          activityType: "visitor_appointment_request",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          purposeOfVisit: visitor.purposeOfVisit,
+          department: visitor.appointmentDepartment || visitor.assignedOffice,
+          assignedStaff: routedStaff._id,
+        },
+      });
 
-    await createRoleNotification({
-      title: "Appointment Request Queued",
-      message: `${visitor.fullName} requested an appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}. Security will handle gate entry after staff approval.`,
-      type: "info",
-      severity: "low",
-      targetRole: "security",
-      relatedVisitor: visitor._id,
-      relatedUser: user._id,
-      metadata: {
-        activityType: "visitor_appointment_request",
-        visitDate: visitor.visitDate,
-        visitTime: visitor.visitTime,
-        purposeOfVisit: visitor.purposeOfVisit,
-        department: visitor.appointmentDepartment || visitor.assignedOffice,
-        assignedStaff: routedStaff._id,
-        pendingStaffApproval: true,
-      },
-    });
+      await createRoleNotification({
+        title: "Appointment Request Queued",
+        message: `${visitor.fullName} requested an appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}. Security will handle gate entry after staff approval.`,
+        type: "info",
+        severity: "low",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: user._id,
+        metadata: {
+          activityType: "visitor_appointment_request",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          purposeOfVisit: visitor.purposeOfVisit,
+          department: visitor.appointmentDepartment || visitor.assignedOffice,
+          assignedStaff: routedStaff._id,
+          pendingStaffApproval: true,
+        },
+      });
 
-    await createSystemActivity({
-      actorUser: user,
-      relatedVisitor: visitor,
-      relatedUser: user,
-      activityType: "visitor_appointment_request",
-      status: "pending",
-      location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment Request",
-      notes: `${visitor.fullName} requested a new appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
-      metadata: {
-        requestCategory: "appointment",
-        approvalFlow: "staff",
-        visitDate: visitor.visitDate,
-        visitTime: visitor.visitTime,
-        purposeOfVisit: visitor.purposeOfVisit,
-        department: visitor.appointmentDepartment || visitor.assignedOffice,
-        assignedStaff: routedStaff._id,
-      },
-    });
+      await createSystemActivity({
+        actorUser: user,
+        relatedVisitor: visitor,
+        relatedUser: user,
+        activityType: "visitor_appointment_request",
+        status: "pending",
+        location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment Request",
+        notes: `${visitor.fullName} requested a new appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}.`,
+        metadata: {
+          requestCategory: "appointment",
+          approvalFlow: "staff",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          purposeOfVisit: visitor.purposeOfVisit,
+          department: visitor.appointmentDepartment || visitor.assignedOffice,
+          assignedStaff: routedStaff._id,
+        },
+      });
+    }
 
     res.json({
       success: true,
-      message: "Appointment request submitted successfully",
-      visitor,
+      message: createdVisitors.length > 1
+        ? "Appointment requests submitted successfully"
+        : "Appointment request submitted successfully",
+      visitor: createdVisitors[0]?.visitor,
+      visitors: createdVisitors.map(({ visitor }) => visitor),
       idValidationStatus: idReview.status,
       idValidationMessage: idReview.message,
     });
@@ -6082,6 +6306,16 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       });
     }
 
+    const activeAppointmentOptions = await getAppointmentOptions({ activeOnly: true });
+    const adjustedConfiguredSlot = findAppointmentConfiguredSlot(activeAppointmentOptions.timeSlots, adjustedDateTime);
+    if (!adjustedConfiguredSlot) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select an enabled appointment time slot.",
+      });
+    }
+    const adjustedSlotLimit = getAppointmentSlotLimit(adjustedConfiguredSlot);
+
     const slotStaffId = visitor.assignedStaff || req.user._id;
     const adjustedSlotCount = await countStaffAppointmentsForSlot({
       assignedStaff: slotStaffId,
@@ -6090,12 +6324,12 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       excludeVisitorId: visitor._id,
     });
 
-    if (adjustedSlotCount >= APPOINTMENT_SLOT_LIMIT) {
+    if (adjustedSlotCount >= adjustedSlotLimit) {
       return res.status(409).json({
         success: false,
         code: "APPOINTMENT_SLOT_FULL",
         message: "That adjusted time slot is already full. Please choose another time.",
-        limit: APPOINTMENT_SLOT_LIMIT,
+        limit: adjustedSlotLimit,
         currentCount: adjustedSlotCount,
       });
     }

@@ -672,14 +672,6 @@ export default StyleSheet.create({
     gap: 14,
   },
 
-  appointmentOptionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "flex-start",
-    gap: 14,
-    marginBottom: 18,
-  },
-
   appointmentManagementOverview: {
     gap: 14,
     marginBottom: 18,
@@ -785,51 +777,376 @@ export default StyleSheet.create({
     fontWeight: "600",
   },
 
-  appointmentManagementQueueHeader: {
-    flexDirection: width < 760 ? "column" : "row",
-    alignItems: width < 760 ? "stretch" : "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginTop: 4,
-    marginBottom: 12,
+  appointmentConfigWorkspace: {
+    gap: 14,
   },
 
-  appointmentManagementQueueBadge: {
-    alignSelf: width < 760 ? "flex-start" : "center",
+  appointmentConfigTabs: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
+    flexWrap: "wrap",
     borderWidth: 1,
     borderColor: "#D8E8FF",
-    borderRadius: 999,
-    backgroundColor: "#EEF5FF",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: "#F8FBFE",
+    padding: 6,
   },
 
-  appointmentManagementQueueBadgeText: {
+  appointmentConfigTab: {
+    flexGrow: 1,
+    minWidth: width < 760 ? "100%" : 180,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "transparent",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#FFFFFF",
+  },
+
+  appointmentConfigTabActive: {
+    borderColor: "#0A3D91",
+    backgroundColor: "#0A3D91",
+  },
+
+  appointmentConfigTabText: {
     fontSize: 12,
     fontWeight: "900",
     color: "#0A3D91",
   },
 
-  appointmentManagementToolsGrid: {
+  appointmentConfigTabTextActive: {
+    color: "#FFFFFF",
+  },
+
+  appointmentConfigTabBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+    paddingHorizontal: 7,
+  },
+
+  appointmentConfigTabBadgeActive: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  appointmentConfigTabBadgeText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+
+  appointmentConfigTabBadgeTextActive: {
+    color: "#FFFFFF",
+  },
+
+  appointmentConfigEditorGrid: {
     flexDirection: width < 1024 ? "column" : "row",
     alignItems: "flex-start",
     gap: 14,
-    marginBottom: 14,
   },
 
-  appointmentManagementToolCard: {
+  appointmentConfigPrimary: {
     flex: 1,
     width: width < 1024 ? "100%" : undefined,
     minWidth: 0,
   },
 
+  appointmentConfigSideCard: {
+    width: width < 1024 ? "100%" : 300,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+  },
+
+  appointmentConfigConnectionList: {
+    gap: 10,
+    marginTop: 14,
+  },
+
+  appointmentConfigConnectionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+  },
+
+  appointmentConfigConnectionText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+    color: "#475569",
+  },
+
+  appointmentRecordsToolbar: {
+    flexDirection: width < 1180 ? "column" : "row",
+    alignItems: "flex-start",
+    gap: 14,
+    marginTop: 14,
+    marginBottom: 14,
+  },
+
+  appointmentToolbarCard: {
+    flex: 1,
+    width: width < 1180 ? "100%" : undefined,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+  },
+
+  appointmentToolbarHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  appointmentToolbarHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  appointmentToolbarTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+
+  appointmentToolbarSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  appointmentToolbarClearButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 999,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+
+  appointmentToolbarClearText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+
+  appointmentToolbarSearchRow: {
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: width < 760 ? "stretch" : "center",
+    gap: 10,
+  },
+
+  appointmentToolbarSearchInputWrap: {
+    flex: 1,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+  },
+
+  appointmentToolbarSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    color: "#0F172A",
+    paddingVertical: Platform.OS === "web" ? 10 : 8,
+  },
+
+  appointmentToolbarFilterGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  appointmentToolbarField: {
+    flexGrow: 1,
+    flexBasis: width < 760 ? "100%" : 150,
+    minWidth: width < 760 ? "100%" : 140,
+    position: "relative",
+    zIndex: 2,
+  },
+
+  appointmentToolbarLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#64748B",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  appointmentToolbarInputWrap: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 13,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 11,
+  },
+
+  appointmentToolbarInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    color: "#0F172A",
+    paddingVertical: Platform.OS === "web" ? 9 : 8,
+  },
+
+  appointmentToolbarSelect: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 13,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 11,
+  },
+
+  appointmentToolbarSelectValue: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  appointmentToolbarSelectText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  appointmentToolbarDropdownMenu: {
+    position: Platform.OS === "web" ? "absolute" : "relative",
+    top: Platform.OS === "web" ? 68 : undefined,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    maxHeight: 210,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    padding: 6,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 12 },
+    shadowRadius: 20,
+    elevation: 6,
+  },
+
+  appointmentToolbarDropdownScroll: {
+    maxHeight: 190,
+  },
+
+  appointmentToolbarDropdownOption: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+
+  appointmentToolbarDropdownOptionActive: {
+    backgroundColor: "#0A3D91",
+  },
+
+  appointmentToolbarDropdownText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#334155",
+  },
+
+  appointmentToolbarDropdownTextActive: {
+    color: "#FFFFFF",
+  },
+
+  appointmentToolbarActionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 12,
+  },
+
+  appointmentToolbarPrimaryButton: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 13,
+    backgroundColor: "#0A3D91",
+    paddingHorizontal: 16,
+  },
+
+  appointmentToolbarPrimaryText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  appointmentToolbarSecondaryButton: {
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 13,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+  },
+
+  appointmentToolbarSecondaryText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#475569",
+  },
+
   appointmentOptionCard: {
     flex: 1,
-    flexBasis: 320,
+    width: "100%",
     minWidth: width < 760 ? "100%" : 300,
+    maxHeight: width < 760 ? undefined : 500,
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,
@@ -925,6 +1242,11 @@ export default StyleSheet.create({
 
   appointmentOptionList: {
     gap: 9,
+    paddingBottom: 4,
+  },
+
+  appointmentOptionListScroll: {
+    maxHeight: 270,
   },
 
   appointmentOptionItem: {
@@ -960,7 +1282,14 @@ export default StyleSheet.create({
     color: "#64748B",
   },
 
+  appointmentOptionEditFields: {
+    flexDirection: width < 760 ? "column" : "row",
+    alignItems: "stretch",
+    gap: 8,
+  },
+
   appointmentOptionEditInput: {
+    flex: 1,
     minHeight: 38,
     borderWidth: 1,
     borderColor: "#BFDBFE",
@@ -968,6 +1297,20 @@ export default StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: Platform.OS === "web" ? 7 : 8,
     fontSize: 13,
+    color: "#0F172A",
+    backgroundColor: "#FFFFFF",
+  },
+
+  appointmentOptionCapacityInput: {
+    width: width < 760 ? "100%" : 82,
+    minHeight: 38,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: Platform.OS === "web" ? 7 : 8,
+    fontSize: 13,
+    fontWeight: "800",
     color: "#0F172A",
     backgroundColor: "#FFFFFF",
   },

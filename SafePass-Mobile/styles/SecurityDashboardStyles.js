@@ -871,7 +871,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
-    marginBottom: spacing.lg,
+    marginBottom: 0,
   },
 
   filterTab: {
@@ -911,7 +911,7 @@ export default StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: spacing.md,
     paddingVertical: Platform.select({ ios: 12, android: 10, web: 12 }),
-    marginBottom: spacing.lg,
+    marginBottom: 0,
     gap: spacing.sm,
   },
 
@@ -921,6 +921,54 @@ export default StyleSheet.create({
     color: colors.gray[900],
     padding: 0,
     ...(isWeb && { outlineStyle: "none" }),
+  },
+
+  recordToolbar: {
+    flexDirection: isDesktop ? "row" : "column",
+    alignItems: "stretch",
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+
+  recordToolbarCard: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    padding: spacing.md,
+  },
+
+  recordToolbarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  recordToolbarTitle: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.gray[900],
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  recordToolbarClear: {
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 999,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    backgroundColor: colors.gray[50],
+  },
+
+  recordToolbarClearText: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.gray[600],
   },
 
   // ============ VISITOR CARDS ============
@@ -3759,6 +3807,34 @@ export default StyleSheet.create({
       web: { boxShadow: "0px 4px 16px rgba(0,0,0,0.12)" },
     }),
     zIndex: 100,
+  },
+
+  hoverCardWide: {
+    width: 420,
+    left: -190,
+  },
+
+  hoverCardGroupTitle: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.gray[500],
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+
+  hoverVisitorGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  hoverVisitorTile: {
+    flex: 1,
+    minWidth: 0,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 10,
+    backgroundColor: colors.gray[50],
   },
 
   hoverCardHeader: {

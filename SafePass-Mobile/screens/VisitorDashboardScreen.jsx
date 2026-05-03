@@ -312,6 +312,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     preferredDate: null,
     preferredTime: null,
     department: "",
+    departments: [],
     purposeSelection: "",
     customPurpose: "",
     idType: "",
@@ -513,20 +514,32 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             option.getHours() === selectedTime.getHours() &&
             option.getMinutes() === selectedTime.getMinutes(),
         );
-      const nextDepartment = activeAppointmentDepartmentOptions.includes(prev.department)
-        ? prev.department
-        : "";
+      const selectedDepartments = Array.isArray(prev.departments)
+        ? prev.departments
+        : prev.department
+          ? [prev.department]
+          : [];
+      const nextDepartments = selectedDepartments.filter((department) =>
+        activeAppointmentDepartmentOptions.includes(department),
+      );
+      const nextDepartment = nextDepartments[0] || "";
       const nextPurpose = activeAppointmentPurposeOptions.includes(prev.purposeSelection)
         ? prev.purposeSelection
         : "";
 
-      if (nextDepartment === prev.department && nextPurpose === prev.purposeSelection && timeStillEnabled) {
+      if (
+        nextDepartment === prev.department &&
+        nextDepartments.join("|") === selectedDepartments.join("|") &&
+        nextPurpose === prev.purposeSelection &&
+        timeStillEnabled
+      ) {
         return prev;
       }
 
       return {
         ...prev,
         department: nextDepartment,
+        departments: nextDepartments,
         purposeSelection: nextPurpose,
         customPurpose: nextPurpose === "Other" ? prev.customPurpose : "",
         preferredTime: timeStillEnabled ? prev.preferredTime : appointmentTimeOptions[0] || null,
@@ -1642,20 +1655,56 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getAppointmentSlotStatusText = (timeOption) => {
     const slot = getAppointmentSlotInfo(timeOption);
     if (!slot) {
-      return isLoadingAppointmentSlots ? "Checking..." : "3 slots";
+      return isLoadingAppointmentSlots ? "Checking..." : "Slots limited";
     }
 
-    if (slot.isFull) return "Full";
-    return `${slot.available} left`;
+    if (slot.isFull) return "Slots are full";
+    return `${slot.available} of ${slot.limit || slot.capacity || 2} left`;
+  };
+
+  const getSelectedAppointmentDepartments = () => {
+    const selectedDepartments = Array.isArray(appointmentForm.departments)
+      ? appointmentForm.departments
+      : [];
+    if (selectedDepartments.length) return selectedDepartments;
+    return appointmentForm.department ? [appointmentForm.department] : [];
+  };
+
+  const getSelectedAppointmentDepartmentsLabel = () => {
+    const selectedDepartments = getSelectedAppointmentDepartments();
+    if (!selectedDepartments.length) return "Select office(s) to visit";
+    if (selectedDepartments.length === 1) return selectedDepartments[0];
+    return `${selectedDepartments.length} offices selected`;
+  };
+
+  const toggleAppointmentDepartment = (department) => {
+    setHasAppointmentDraft(true);
+    setAppointmentForm((prev) => {
+      const selectedDepartments = Array.isArray(prev.departments)
+        ? prev.departments
+        : prev.department
+          ? [prev.department]
+          : [];
+      const exists = selectedDepartments.includes(department);
+      const nextDepartments = exists
+        ? selectedDepartments.filter((item) => item !== department)
+        : [...selectedDepartments, department];
+
+      return {
+        ...prev,
+        departments: nextDepartments,
+        department: nextDepartments[0] || "",
+      };
+    });
   };
 
   const loadAppointmentAvailability = async () => {
     const date = getValidDate(appointmentForm.preferredDate);
-    const department = String(appointmentForm.department || "").trim();
+    const selectedDepartments = getSelectedAppointmentDepartments();
     const isViewingAppointmentRequest =
       selectedVisitorSection === "appointment" && selectedAppointmentScreen === "request";
 
-    if (!isViewingAppointmentRequest || !date || !department) {
+    if (!isViewingAppointmentRequest || !date || !selectedDepartments.length) {
       setAppointmentAvailability(null);
       return;
     }
@@ -1664,7 +1713,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     try {
       const response = await ApiService.getAppointmentAvailability({
         date: date.toISOString(),
-        department,
+        departments: selectedDepartments,
       });
       if (response?.success) {
         setAppointmentAvailability(response);
@@ -1744,6 +1793,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       preferredDate: getDefaultAppointmentDate(),
       preferredTime: getDefaultAppointmentTime(),
       department: "",
+      departments: [],
       purposeSelection: "",
       customPurpose: "",
       idType: getStoredVisitorIdType(visitorRecord),
@@ -1840,6 +1890,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     selectedAppointmentScreen,
     appointmentForm.preferredDate,
     appointmentForm.department,
+    appointmentForm.departments,
   ]);
 
   const handleRequestAppointment = async () => {
@@ -1849,7 +1900,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const purposeCategory = String(appointmentForm.purposeSelection || "").trim();
     const customPurposeOfVisit = String(appointmentForm.customPurpose || "").trim();
     const purposeOfVisit = isOtherPurpose ? customPurposeOfVisit : purposeCategory;
-    const department = String(appointmentForm.department || "").trim();
+    const selectedDepartments = getSelectedAppointmentDepartments();
+    const department = selectedDepartments[0] || "";
     const idType = String(appointmentForm.idType || "").trim();
     const idImage = appointmentForm.idImage;
 
@@ -1898,13 +1950,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (isAppointmentTimeSlotFull(preferredTime)) {
       Alert.alert(
         "Time Slot Full",
-        `${department} already has 3 appointments for ${formatTime(preferredTime)}. Please choose another time.`,
+        "Slots are full please select another time or date.",
       );
       return;
     }
 
-    if (!department) {
-      Alert.alert("Missing Details", "Please provide the office or department to visit.");
+    if (!selectedDepartments.length) {
+      Alert.alert("Missing Details", "Please choose at least one office to visit.");
       return;
     }
 
@@ -1946,6 +1998,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         purposeCategory,
         customPurposeOfVisit: isOtherPurpose ? customPurposeOfVisit : "",
         department,
+        departments: selectedDepartments,
         officeToVisit: department,
         assignedOffice: department,
         appointmentDepartment: department,
@@ -1967,6 +2020,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           purposeCategory,
           customPurposeOfVisit: isOtherPurpose ? customPurposeOfVisit : "",
           appointmentDepartment: department,
+          departments: selectedDepartments,
           assignedOffice: department,
           host: department,
           idType,
@@ -1979,7 +2033,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             "Your new visit request has been sent to staff for review. You can track approval, time adjustments, or rejection updates from this dashboard.",
           date: formatDate(preferredDate),
           time: formatTime(preferredTime),
-          department,
+          department: selectedDepartments.join(", "),
           purpose: purposeOfVisit,
         });
         Alert.alert("Appointment Submitted", "Your request was sent to staff for review.");
@@ -3822,7 +3876,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <View style={visitorDashboardStyles.appointmentQuickInfoRow}>
             <View style={visitorDashboardStyles.appointmentQuickInfoCard}>
               <Text style={visitorDashboardStyles.appointmentQuickInfoLabel}>Availability</Text>
-              <Text style={visitorDashboardStyles.appointmentQuickInfoValue}>3 slots / time</Text>
+              <Text style={visitorDashboardStyles.appointmentQuickInfoValue}>Per time slot</Text>
             </View>
             <View style={visitorDashboardStyles.appointmentQuickInfoCard}>
               <Text style={visitorDashboardStyles.appointmentQuickInfoLabel}>Days</Text>
@@ -3837,7 +3891,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <View style={visitorDashboardStyles.visitorFlowChecklist}>
             {[
               "Choose your purpose. If you select Other, type the exact reason.",
-              "Select the office you want to visit and keep your chosen schedule while updating other fields.",
+              "Select one or more offices you want to visit and keep your chosen schedule while updating other fields.",
               "Pick your preferred date and time before sending the request.",
             ].map((item) => (
               <View key={item} style={visitorDashboardStyles.visitorFlowChecklistRow}>
@@ -3991,12 +4045,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
             ) : null}
 
-            <Text style={visitorDashboardStyles.appointmentAutoHint}>
-              {isLoadingAppointmentSlots
-                ? "Checking staff slot availability..."
-                : appointmentAvailability?.assignedStaff
-                  ? `Slots are limited to 3 visitors per time for ${appointmentAvailability.assignedStaff.name}.`
-                  : "Choose an office first so we can check available staff slots."}
+            <Text
+              style={[
+                visitorDashboardStyles.appointmentAutoHint,
+                isAppointmentTimeSlotFull(appointmentForm.preferredTime) &&
+                  visitorDashboardStyles.appointmentAutoHintError,
+              ]}
+            >
+              {isAppointmentTimeSlotFull(appointmentForm.preferredTime)
+                ? "Slots are full please select another time or date."
+                : isLoadingAppointmentSlots
+                  ? "Checking staff slot availability..."
+                  : appointmentAvailability?.assignedStaff
+                    ? `Slots are limited by the selected time for ${appointmentAvailability.assignedStaff.name}.`
+                    : "Choose office(s) first so we can check available staff slots."}
             </Text>
           </View>
 
@@ -4019,7 +4081,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 <View>
                   <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose an office</Text>
                   <Text style={visitorDashboardStyles.appointmentPickerValue}>
-                    {appointmentForm.department || "Select office to visit"}
+                    {getSelectedAppointmentDepartmentsLabel()}
                   </Text>
                 </View>
               </View>
@@ -4033,7 +4095,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             {showDepartmentDropdown ? (
               <View style={visitorDashboardStyles.purposeDropdownMenu}>
                 {activeAppointmentDepartmentOptions.map((option) => {
-                  const isSelected = appointmentForm.department === option;
+                  const isSelected = getSelectedAppointmentDepartments().includes(option);
                   return (
                     <TouchableOpacity
                       key={option}
@@ -4042,33 +4104,35 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         isSelected && visitorDashboardStyles.purposeOptionItemActive,
                       ]}
                       onPress={() => {
-                        setHasAppointmentDraft(true);
-                        setAppointmentForm((prev) => ({
-                          ...prev,
-                          department: option,
-                        }));
-                        setShowDepartmentDropdown(false);
+                        toggleAppointmentDepartment(option);
                       }}
                       activeOpacity={0.85}
                     >
-                      <Text
-                        style={[
-                          visitorDashboardStyles.purposeOptionText,
-                          isSelected && visitorDashboardStyles.purposeOptionTextActive,
-                        ]}
-                      >
-                        {option}
-                      </Text>
-                      {isSelected ? (
-                        <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
-                      ) : null}
+                      <View style={visitorDashboardStyles.checkboxOptionLeft}>
+                        <View
+                          style={[
+                            visitorDashboardStyles.appointmentCheckboxBox,
+                            isSelected && visitorDashboardStyles.appointmentCheckboxBoxChecked,
+                          ]}
+                        >
+                          {isSelected ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
+                        </View>
+                        <Text
+                          style={[
+                            visitorDashboardStyles.purposeOptionText,
+                            isSelected && visitorDashboardStyles.purposeOptionTextActive,
+                          ]}
+                        >
+                          {option}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
               </View>
             ) : null}
             <Text style={visitorDashboardStyles.appointmentAutoHint}>
-              Choose the office that should review your appointment. Each staff member accepts up to 3 visitors per time slot.
+              Choose one or more offices. Each time slot follows the capacity set by admin.
             </Text>
           </View>
 

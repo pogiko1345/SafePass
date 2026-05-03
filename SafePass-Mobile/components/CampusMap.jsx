@@ -66,6 +66,7 @@ const CampusMap = ({
   const [mapPan, setMapPan] = useState({ x: 0, y: 0 });
   const [activeFloor, setActiveFloor] = useState(selectedFloor || defaultFloorId);
   const [imageError, setImageError] = useState(false);
+  const [hoveredVisitorGroupKey, setHoveredVisitorGroupKey] = useState(null);
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const panAnim = useRef(new Animated.ValueXY()).current;
@@ -221,24 +222,25 @@ const CampusMap = ({
     );
   };
 
-  // Get visitor position style based on coordinates
-  const getVisitorPositionStyle = (visitor) => {
-    // If visitor has actual coordinates from tracking, use them
+  const getVisitorCoordinates = (visitor) => {
     if (visitor.location?.coordinates) {
       const { x, y } = visitor.location.coordinates;
       return {
-        position: "absolute",
-        left: `${x}%`,
-        top: `${y}%`,
-        transform: [{ translateX: -15 }, { translateY: -15 }],
+        x: Number.isFinite(Number(x)) ? Number(x) : 50,
+        y: Number.isFinite(Number(y)) ? Number(y) : 50,
       };
     }
-    
-    // Default position at center if no coordinates available
+
+    return { x: 50, y: 50 };
+  };
+
+  // Get visitor position style based on coordinates
+  const getVisitorPositionStyle = (visitor) => {
+    const { x, y } = getVisitorCoordinates(visitor);
     return {
       position: "absolute",
-      left: "50%",
-      top: "50%",
+      left: `${x}%`,
+      top: `${y}%`,
       transform: [{ translateX: -15 }, { translateY: -15 }],
     };
   };
@@ -310,6 +312,29 @@ const CampusMap = ({
       const visitorFloor = normalizeFloorId(visitor?.location?.floor);
       return !visitorFloor || visitorFloor === normalizedActiveFloor;
     });
+  };
+
+  const getVisitorGroupKey = (visitor) => {
+    const floor = normalizeFloorId(visitor?.location?.floor || activeFloor);
+    const { x, y } = getVisitorCoordinates(visitor);
+    return `${floor}:${Math.round(x * 2) / 2}:${Math.round(y * 2) / 2}`;
+  };
+
+  const groupVisibleVisitors = (visibleVisitors) => {
+    const groups = new Map();
+    visibleVisitors.forEach((visitor) => {
+      const key = getVisitorGroupKey(visitor);
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key).push(visitor);
+    });
+
+    return Array.from(groups.entries()).map(([key, groupVisitors]) => ({
+      key,
+      visitors: groupVisitors,
+      primaryVisitor: groupVisitors[0],
+    }));
   };
 
   const renderMapEmptyState = (visibleVisitors) => {
@@ -397,7 +422,7 @@ const CampusMap = ({
     if (!labels.length) return null;
 
     return labels.map((label) => {
-      const fontSize = Math.min(Number(label.size) || 8, 11);
+      const fontSize = Math.min(Number(label.size) || 6, 7);
       const left =
         typeof label.x === "number" && typeof label.width === "number"
           ? `${label.x - label.width / 2}%`
@@ -429,9 +454,9 @@ const CampusMap = ({
               label.color ? { color: label.color } : null,
               label.textStyle,
             ]}
-            numberOfLines={label.numberOfLines || 2}
+            numberOfLines={label.numberOfLines || 1}
             adjustsFontSizeToFit
-            minimumFontScale={0.5}
+            minimumFontScale={0.35}
           >
             {label.text}
           </Text>
@@ -440,57 +465,83 @@ const CampusMap = ({
     });
   };
 
+  const renderDefaultHoverCard = (groupVisitors) => (
+    <View style={[styles.hoverCard, groupVisitors.length > 1 && styles.hoverCardWide]}>
+      <Text style={styles.hoverCardGroupTitle}>
+        {groupVisitors.length > 1 ? `${groupVisitors.length} visitors here` : "Visitor details"}
+      </Text>
+      <View style={styles.hoverVisitorGrid}>
+        {groupVisitors.slice(0, 3).map((visitor) => {
+          const freshness = getVisitorFreshness(visitor);
+          return (
+            <TouchableOpacity
+              key={visitor.id}
+              style={styles.hoverVisitorTile}
+              onPress={() => onVisitorSelect?.(visitor)}
+            >
+              <Text style={styles.hoverCardName} numberOfLines={1}>{visitor.name}</Text>
+              <Text style={styles.hoverCardPurpose} numberOfLines={1}>{visitor.purpose || "On-site visitor"}</Text>
+              <View style={styles.hoverCardDetails}>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="time-outline" size={13} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>{freshness.label}</Text>
+                </View>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="navigate-outline" size={13} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>{getTrackingSourceLabel(visitor)}</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
   // Render visitor markers
   const renderVisitorMarkers = (visibleVisitors) => {
     if (!showVisitorMarkers) return null;
     if (visibleVisitors.length === 0) return null;
 
-    return visibleVisitors.map((visitor) => {
+    return groupVisibleVisitors(visibleVisitors).map(({ key, visitors: groupVisitors, primaryVisitor }) => {
+      const visitor = primaryVisitor;
       const freshness = getVisitorFreshness(visitor);
       const statusColor =
         visitor.status === "checked_in" || visitor.status === "active"
           ? freshness.color
           : getVisitorStatusColor(visitor.status);
       const positionStyle = getVisitorPositionStyle(visitor);
-      const isHovered = hoveredVisitor?.id === visitor.id;
+      const isHovered =
+        hoveredVisitorGroupKey === key ||
+        groupVisitors.some((groupVisitor) => hoveredVisitor?.id === groupVisitor.id);
       
       return (
         <Animated.View
-          key={visitor.id}
+          key={key}
           style={[styles.visitorMarker, positionStyle]}
+          onMouseEnter={() => {
+            setHoveredVisitorGroupKey(key);
+            onVisitorHover?.(visitor);
+          }}
+          onMouseLeave={() => {
+            setHoveredVisitorGroupKey(null);
+            onVisitorLeave?.();
+          }}
         >
           <TouchableOpacity
             style={[
               styles.visitorMarkerDot, 
+              groupVisitors.length > 1 && styles.visitorMarkerDotCluster,
               { backgroundColor: statusColor }
             ]}
-            onPress={() => onVisitorSelect?.(visitor)}
-            onMouseEnter={() => onVisitorHover?.(visitor)}
-            onMouseLeave={() => onVisitorLeave?.()}
+            onPress={() => groupVisitors.length === 1 && onVisitorSelect?.(visitor)}
           >
             <View style={[styles.visitorMarkerPulse, { backgroundColor: statusColor + "40" }]} />
-            <View style={[styles.visitorMarkerSourceBadge, { borderColor: statusColor }]}>
-              <Text style={[styles.visitorMarkerSourceText, { color: statusColor }]}>
-                {getTrackingSourceLabel(visitor).charAt(0)}
-              </Text>
-            </View>
+            {groupVisitors.length > 1 ? (
+              <Text style={styles.visitorMarkerCountText}>{groupVisitors.length}</Text>
+            ) : null}
           </TouchableOpacity>
-          {isHovered && (renderHoverCard?.() || (
-            <View style={styles.hoverCard}>
-              <Text style={styles.hoverCardName}>{visitor.name}</Text>
-              <Text style={styles.hoverCardPurpose}>{visitor.purpose || "On-site visitor"}</Text>
-              <View style={styles.hoverCardDetails}>
-                <View style={styles.hoverCardDetail}>
-                  <Ionicons name="time-outline" size={14} color="#6B7280" />
-                  <Text style={styles.hoverCardDetailText}>{freshness.label}</Text>
-                </View>
-                <View style={styles.hoverCardDetail}>
-                  <Ionicons name="navigate-outline" size={14} color="#6B7280" />
-                  <Text style={styles.hoverCardDetailText}>{getTrackingSourceLabel(visitor)}</Text>
-                </View>
-              </View>
-            </View>
-          ))}
+          {isHovered && (renderHoverCard?.(groupVisitors, visitor) || renderDefaultHoverCard(groupVisitors))}
         </Animated.View>
       );
     });

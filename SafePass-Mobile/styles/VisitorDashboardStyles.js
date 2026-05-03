@@ -4570,6 +4570,29 @@ export default StyleSheet.create({
     color: "#0A3D91",
   },
 
+  checkboxOptionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+
+  appointmentCheckboxBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  appointmentCheckboxBoxChecked: {
+    borderColor: "#0A3D91",
+    backgroundColor: "#0A3D91",
+  },
+
   appointmentFieldInput: {
     backgroundColor: "#F7FAFE",
     borderWidth: 1,
@@ -4610,6 +4633,10 @@ export default StyleSheet.create({
     color: "#64748B",
     fontWeight: "600",
     marginTop: -2,
+  },
+
+  appointmentAutoHintError: {
+    color: "#DC2626",
   },
 
   appointmentIdUploadCard: {

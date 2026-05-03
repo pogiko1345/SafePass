@@ -1658,44 +1658,61 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </View>
       </View>
 
-      <View style={styles.searchBar}>
-        <Ionicons name="search-outline" size={18} color="#64748B" />
-        <TextInput
-          value={requestSearchTerm}
-          onChangeText={setRequestSearchTerm}
-          placeholder="Search by visitor, email, purpose, date, or office"
-          placeholderTextColor="#94A3B8"
-          style={styles.searchBarInput}
-        />
-      </View>
+      <View style={styles.recordToolbar}>
+        <View style={styles.recordToolbarCard}>
+          <View style={styles.recordToolbarHeader}>
+            <Text style={styles.recordToolbarTitle}>Search</Text>
+            {requestSearchTerm ? (
+              <TouchableOpacity onPress={() => setRequestSearchTerm("")} style={styles.recordToolbarClear}>
+                <Text style={styles.recordToolbarClearText}>Clear</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <View style={styles.searchBar}>
+            <Ionicons name="search-outline" size={18} color="#64748B" />
+            <TextInput
+              value={requestSearchTerm}
+              onChangeText={setRequestSearchTerm}
+              placeholder="Visitor, email, purpose, date, or office"
+              placeholderTextColor="#94A3B8"
+              style={styles.searchBarInput}
+            />
+          </View>
+        </View>
 
-      <View style={styles.filterRow}>
-        {[
-          { key: "all", label: `All (${appointmentRequests.length})` },
-          {
-            key: "today",
-            label: `Today (${appointmentRequests.filter((item) => isSameCalendarDay(item.visitDate)).length})`,
-          },
-          {
-            key: "this-week",
-            label: `This Week (${appointmentRequests.filter((item) => isWithinCurrentWeek(item.visitDate)).length})`,
-          },
-        ].map((item) => (
-          <TouchableOpacity
-            key={item.key}
-            style={[styles.filterChip, requestFilter === item.key && styles.filterChipActive]}
-            onPress={() => setRequestFilter(item.key)}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                requestFilter === item.key && styles.filterChipTextActive,
-              ]}
-            >
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <View style={styles.recordToolbarCard}>
+          <View style={styles.recordToolbarHeader}>
+            <Text style={styles.recordToolbarTitle}>Filters</Text>
+            {requestFilter !== "all" ? (
+              <TouchableOpacity onPress={() => setRequestFilter("all")} style={styles.recordToolbarClear}>
+                <Text style={styles.recordToolbarClearText}>Reset</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <View style={styles.filterRow}>
+            {[
+              { key: "all", label: `All (${appointmentRequests.length})` },
+              {
+                key: "today",
+                label: `Today (${appointmentRequests.filter((item) => isSameCalendarDay(item.visitDate)).length})`,
+              },
+              {
+                key: "this-week",
+                label: `This Week (${appointmentRequests.filter((item) => isWithinCurrentWeek(item.visitDate)).length})`,
+              },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.filterChip, requestFilter === item.key && styles.filterChipActive]}
+                onPress={() => setRequestFilter(item.key)}
+              >
+                <Text style={[styles.filterChipText, requestFilter === item.key && styles.filterChipTextActive]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
       </View>
 
       {renderAppointmentTable(paginatedRequestAppointments, {
@@ -1721,37 +1738,6 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const renderAppointmentRecordContent = () => (
     <>
-      <View style={styles.filterRow}>
-        {[
-          { key: "all", label: `All (${appointmentRecords.length})` },
-          { key: "approved", label: `Approved (${stats.approved})` },
-          { key: "adjusted", label: `Adjusted (${stats.adjusted})` },
-          { key: "rejected", label: `Rejected (${stats.rejected})` },
-          { key: "completed", label: `Completed (${stats.completed})` },
-        ].map((item) => (
-          <TouchableOpacity
-            key={item.key}
-            style={[styles.filterChip, filter === item.key && styles.filterChipActive]}
-            onPress={() => setFilter(item.key)}
-          >
-            <Text style={[styles.filterChipText, filter === item.key && styles.filterChipTextActive]}>
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.searchBar}>
-        <Ionicons name="search-outline" size={18} color="#64748B" />
-        <TextInput
-          value={recordSearchTerm}
-          onChangeText={setRecordSearchTerm}
-          placeholder="Search by visitor, office, date, or purpose"
-          placeholderTextColor="#94A3B8"
-          style={styles.searchBarInput}
-        />
-      </View>
-
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Appointment Records</Text>
@@ -1766,6 +1752,59 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <TouchableOpacity style={styles.sectionActionIconButton} onPress={loadData}>
               <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
             </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.recordToolbar}>
+          <View style={styles.recordToolbarCard}>
+            <View style={styles.recordToolbarHeader}>
+              <Text style={styles.recordToolbarTitle}>Search</Text>
+              {recordSearchTerm ? (
+                <TouchableOpacity onPress={() => setRecordSearchTerm("")} style={styles.recordToolbarClear}>
+                  <Text style={styles.recordToolbarClearText}>Clear</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={styles.searchBar}>
+              <Ionicons name="search-outline" size={18} color="#64748B" />
+              <TextInput
+                value={recordSearchTerm}
+                onChangeText={setRecordSearchTerm}
+                placeholder="Visitor, office, date, or purpose"
+                placeholderTextColor="#94A3B8"
+                style={styles.searchBarInput}
+              />
+            </View>
+          </View>
+
+          <View style={styles.recordToolbarCard}>
+            <View style={styles.recordToolbarHeader}>
+              <Text style={styles.recordToolbarTitle}>Filters</Text>
+              {filter !== "all" ? (
+                <TouchableOpacity onPress={() => setFilter("all")} style={styles.recordToolbarClear}>
+                  <Text style={styles.recordToolbarClearText}>Reset</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={styles.filterRow}>
+              {[
+                { key: "all", label: `All (${appointmentRecords.length})` },
+                { key: "approved", label: `Approved (${stats.approved})` },
+                { key: "adjusted", label: `Adjusted (${stats.adjusted})` },
+                { key: "rejected", label: `Rejected (${stats.rejected})` },
+                { key: "completed", label: `Completed (${stats.completed})` },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.key}
+                  style={[styles.filterChip, filter === item.key && styles.filterChipActive]}
+                  onPress={() => setFilter(item.key)}
+                >
+                  <Text style={[styles.filterChipText, filter === item.key && styles.filterChipTextActive]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
 

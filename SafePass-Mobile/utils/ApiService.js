@@ -369,8 +369,8 @@ async register(userData) {
       const payload = {
         ...staffData,
         role: "staff",
-        status: staffData?.status || "active",
-        isActive: staffData?.isActive ?? true,
+        status: staffData?.status || "inactive",
+        isActive: staffData?.isActive ?? false,
       };
       return await this.fetch("/admin/staff/create", {
         method: "POST",
@@ -404,7 +404,7 @@ async register(userData) {
     } catch (error) {
       console.error("Login API error:", error);
       
-      if (error?.data?.requiresEmailVerification || error?.status === 403) {
+      if (error?.data?.requiresOtpVerification || error?.status === 403) {
         throw new Error(
           error?.data?.message ||
             "Your account is not yet verified. Please verify your account using OTP first."
@@ -1014,11 +1014,12 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async getAppointmentAvailability({ date, department } = {}) {
+  async getAppointmentAvailability({ date, department, departments } = {}) {
     try {
       const queryString = new URLSearchParams({
         date: date || "",
         department: department || "",
+        departments: Array.isArray(departments) ? departments.join(",") : departments || "",
       }).toString();
       return await this.fetch(`/appointments/availability?${queryString}`);
     } catch (error) {
@@ -1444,7 +1445,7 @@ async createSecurityGuard(guardData) {
       body: {
         ...guardData,
         role: 'guard',
-        status: 'active'
+        status: 'inactive'
       }
     });
     
@@ -1452,10 +1453,13 @@ async createSecurityGuard(guardData) {
     return response;
   } catch (error) {
     console.error("❌ Create security guard error:", error);
+    const errorMessage = String(error?.message || "").toLowerCase();
     const isDuplicateEmail =
       error?.status === 409 ||
-      String(error?.message || "").toLowerCase().includes("email already");
-    const message = isDuplicateEmail
+      errorMessage.includes("email already");
+    const message = errorMessage.includes("staff/security number") || errorMessage.includes("employeeid")
+      ? "Staff/Security number already registered. Please use another ID."
+      : isDuplicateEmail
       ? "Email already registered. Please use another email address."
       : (error?.message || "Failed to create security account");
     throw new Error(message);

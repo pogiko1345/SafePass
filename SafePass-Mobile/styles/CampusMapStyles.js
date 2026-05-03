@@ -199,6 +199,21 @@ export default StyleSheet.create({
     }),
   },
 
+  visitorMarkerDotCluster: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  visitorMarkerCountText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    lineHeight: 12,
+  },
+
   visitorMarkerPulse: {
     position: "absolute",
     width: 24,
@@ -373,8 +388,8 @@ export default StyleSheet.create({
 
   mapTextLabel: {
     position: "absolute",
-    minWidth: 34,
-    minHeight: 14,
+    minWidth: 24,
+    minHeight: 10,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -387,8 +402,8 @@ export default StyleSheet.create({
 
   mapTextLabelText: {
     width: "100%",
-    fontSize: 8,
-    lineHeight: 10,
+    fontSize: 6,
+    lineHeight: 7,
     fontWeight: "900",
     color: "#111827",
     textAlign: "center",
@@ -525,6 +540,34 @@ export default StyleSheet.create({
       web: { boxShadow: "0px 4px 16px rgba(0,0,0,0.12)" },
     }),
     zIndex: 100,
+  },
+
+  hoverCardWide: {
+    width: 420,
+    left: -190,
+  },
+
+  hoverCardGroupTitle: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+
+  hoverVisitorGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  hoverVisitorTile: {
+    flex: 1,
+    minWidth: 0,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    backgroundColor: "#F8FBFE",
   },
 
   hoverCardHeader: {

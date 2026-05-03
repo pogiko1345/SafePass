@@ -36,18 +36,13 @@ const SuccessModal = ({
   otpDeliveryMode,
   otpValue,
   otpError,
+  otpTimerLabel,
+  canResendOtp,
   onOtpChange,
   onConfirm,
   onVerifyOtp,
   onResendOtp,
 }) => {
-  const handleCopy = (text, type) => {
-    if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(text).catch(() => {});
-    }
-    Alert.alert("Copied", `${type} copied to clipboard`);
-  };
-
   return (
     <Modal
       visible={visible}
@@ -62,60 +57,30 @@ const SuccessModal = ({
               colors={["#0A3D91", "#041E42"]}
               style={visitorRegisterStyles.successIconGradient}
             >
-              <Ionicons name="checkmark-done" size={48} color="#FFFFFF" />
+              <Ionicons name={isVerified ? "checkmark-done" : "mail-unread-outline"} size={30} color="#FFFFFF" />
             </LinearGradient>
           </View>
-          <Text style={visitorRegisterStyles.successTitle}>Registration Successful</Text>
+          <Text style={visitorRegisterStyles.successTitle}>
+            {isVerified ? "Account Verified" : "Verify Your Email"}
+          </Text>
           <Text style={visitorRegisterStyles.successMessage}>
             {isVerified
               ? "Your account is verified. Continue to sign in to your visitor account."
               : otpDeliveryMode === "backend_log"
                 ? "Email delivery is not available right now. For local testing, enter the 6-digit OTP shown in the backend terminal."
-                : "Enter the 6-digit OTP sent to your email to verify your visitor account before signing in."}
+                : "Enter the 6-digit OTP sent to your email. Your visitor account stays locked until this code is verified."}
           </Text>
-          <View style={visitorRegisterStyles.credentialsBox}>
-            <View style={visitorRegisterStyles.credentialsTitleRow}>
-              <Ionicons name="person-circle-outline" size={16} color="#0A3D91" />
-              <Text style={visitorRegisterStyles.credentialsTitle}>
-                Account Details
+          {account?.email ? (
+            <View style={visitorRegisterStyles.otpEmailPill}>
+              <Ionicons name="mail-outline" size={15} color="#0A3D91" />
+              <Text style={visitorRegisterStyles.otpEmailText} numberOfLines={1}>
+                {account.email}
               </Text>
             </View>
-            <Text style={visitorRegisterStyles.credentialsInfo}>
-              Use your account credentials after OTP verification. The 6-digit code
-              should arrive in your email inbox from SafePass.
-            </Text>
-            {account && (
-              <>
-                <View style={visitorRegisterStyles.credentialRow}>
-                  <Text style={visitorRegisterStyles.credentialLabel}>Username</Text>
-                  <Text style={visitorRegisterStyles.credentialValue}>
-                    {account.username}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => handleCopy(account.username, "Username")}
-                    style={visitorRegisterStyles.copyButton}
-                  >
-                    <Ionicons name="copy-outline" size={18} color="#0A3D91" />
-                  </TouchableOpacity>
-                </View>
-                <View style={visitorRegisterStyles.credentialRow}>
-                  <Text style={visitorRegisterStyles.credentialLabel}>Email</Text>
-                  <Text style={visitorRegisterStyles.credentialValue}>
-                    {account.email}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => handleCopy(account.email, "Email")}
-                    style={visitorRegisterStyles.copyButton}
-                  >
-                    <Ionicons name="copy-outline" size={18} color="#0A3D91" />
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
+          ) : null}
           {!isVerified ? (
             <View style={visitorRegisterStyles.otpVerifyBox}>
-              <Text style={visitorRegisterStyles.credentialLabel}>Enter OTP Code</Text>
+              <Text style={visitorRegisterStyles.otpLabel}>OTP Code</Text>
               <TextInput
                 style={[
                   visitorRegisterStyles.otpInput,
@@ -132,7 +97,7 @@ const SuccessModal = ({
                 <Text style={visitorRegisterStyles.otpErrorText}>{otpError}</Text>
               ) : (
                 <Text style={visitorRegisterStyles.otpHintText}>
-                  We will check the code after you press Verify OTP.
+                  The code expires in 10 minutes. Check your inbox or spam folder.
                 </Text>
               )}
             </View>
@@ -168,12 +133,15 @@ const SuccessModal = ({
           ) : null}
           {!isVerified ? (
             <TouchableOpacity
-              style={visitorRegisterStyles.resendOtpButton}
+              style={[
+                visitorRegisterStyles.resendOtpButton,
+                (!canResendOtp || isVerifying) && visitorRegisterStyles.resendOtpButtonDisabled,
+              ]}
               onPress={onResendOtp}
-              disabled={isVerifying}
+              disabled={!canResendOtp || isVerifying}
             >
               <Text style={visitorRegisterStyles.resendOtpButtonText}>
-                Resend OTP
+                {canResendOtp ? "Resend OTP" : `Resend in ${otpTimerLabel}`}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -440,6 +408,8 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
   const [registrationOtp, setRegistrationOtp] = useState("");
   const [registrationOtpError, setRegistrationOtpError] = useState("");
+  const [registrationOtpExpiresAt, setRegistrationOtpExpiresAt] = useState(null);
+  const [registrationOtpSecondsLeft, setRegistrationOtpSecondsLeft] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -465,9 +435,36 @@ export default function VisitorRegisterScreen({ navigation }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (!registrationOtpExpiresAt) {
+      setRegistrationOtpSecondsLeft(0);
+      return undefined;
+    }
+
+    const updateTimer = () => {
+      const expiryTime = new Date(registrationOtpExpiresAt).getTime();
+      if (!Number.isFinite(expiryTime)) {
+        setRegistrationOtpSecondsLeft(0);
+        return;
+      }
+      setRegistrationOtpSecondsLeft(Math.max(0, Math.ceil((expiryTime - Date.now()) / 1000)));
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [registrationOtpExpiresAt]);
+
   const normalizeFullName = (name) => name.replace(/\s{2,}/g, " ").trim();
 
   const normalizeUsername = (username) => username.trim().toLowerCase();
+
+  const formatOtpTimer = (seconds = 0) => {
+    const safeSeconds = Math.max(0, Number(seconds) || 0);
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+  };
 
   const validateName = (name) => {
     const normalizedName = normalizeFullName(String(name || ""));
@@ -708,6 +705,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           isVerified: false,
           otpDeliveryMode: response.otpDeliveryMode || "email",
         });
+        setRegistrationOtpExpiresAt(response.otpExpiresAt || new Date(Date.now() + 10 * 60 * 1000).toISOString());
         setRegistrationOtp("");
         setRegistrationOtpError("");
         setTimeout(() => {
@@ -863,6 +861,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           ...previous,
           isVerified: true,
         }));
+        setRegistrationOtpExpiresAt(null);
         await handleSuccessConfirm();
         return;
       }
@@ -897,6 +896,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           ...previous,
           otpDeliveryMode: response.otpDeliveryMode || previous?.otpDeliveryMode || "email",
         }));
+        setRegistrationOtpExpiresAt(response.otpExpiresAt || new Date(Date.now() + 10 * 60 * 1000).toISOString());
         setRegistrationOtp("");
         setRegistrationOtpError("");
         Alert.alert(
@@ -1406,6 +1406,8 @@ export default function VisitorRegisterScreen({ navigation }) {
         otpDeliveryMode={registeredVisitor?.otpDeliveryMode || "email"}
         otpValue={registrationOtp}
         otpError={registrationOtpError}
+        otpTimerLabel={formatOtpTimer(registrationOtpSecondsLeft)}
+        canResendOtp={registrationOtpSecondsLeft <= 0}
         onOtpChange={(value) => {
           setRegistrationOtp(String(value || "").replace(/\D/g, "").slice(0, 6));
           if (registrationOtpError) {

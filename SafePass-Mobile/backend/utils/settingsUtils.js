@@ -38,6 +38,7 @@ const DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS = [
 ];
 
 const DEFAULT_APPOINTMENT_TIME_SLOTS = [];
+const DEFAULT_APPOINTMENT_SLOT_LIMIT = 2;
 for (let hour = 7; hour <= 18; hour += 1) {
   for (const minute of [0, 30]) {
     const hour12 = hour % 12 || 12;
@@ -48,6 +49,7 @@ for (let hour = 7; hour <= 18; hour += 1) {
       value: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
       hour,
       minute,
+      capacity: DEFAULT_APPOINTMENT_SLOT_LIMIT,
       enabled: true,
     });
   }
@@ -110,12 +112,17 @@ const toAppointmentTimeSlot = (slot) => {
   const parsed = parseTimeSlotValue(slot);
   if (!parsed) return null;
   const value = `${String(parsed.hour).padStart(2, "0")}:${String(parsed.minute).padStart(2, "0")}`;
+  const parsedCapacity = Number(slot?.capacity ?? slot?.limit ?? slot?.slots ?? DEFAULT_APPOINTMENT_SLOT_LIMIT);
+  const capacity = Number.isInteger(parsedCapacity) && parsedCapacity > 0
+    ? Math.min(parsedCapacity, 50)
+    : DEFAULT_APPOINTMENT_SLOT_LIMIT;
   return {
     id: String(slot?.id || "").trim() || `slot-${value.replace(":", "-")}`,
     label: String(slot?.label || "").trim() || formatTimeSlotLabel(parsed),
     value,
     hour: parsed.hour,
     minute: parsed.minute,
+    capacity,
     enabled: slot?.enabled !== false,
   };
 };
@@ -205,6 +212,7 @@ const sanitizeSystemSettings = (input = {}) => {
 module.exports = {
   DEFAULT_SYSTEM_SETTINGS,
   DEFAULT_APPOINTMENT_OPTIONS,
+  DEFAULT_APPOINTMENT_SLOT_LIMIT,
   DEFAULT_APPOINTMENT_PURPOSE_OPTIONS,
   DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS,
   sanitizeSystemSettings,
