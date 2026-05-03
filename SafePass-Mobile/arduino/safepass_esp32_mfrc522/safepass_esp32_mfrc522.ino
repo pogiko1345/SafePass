@@ -11,7 +11,7 @@
 #define SS_PIN 5
 #define RST_PIN 22
 
-const char* wifiSsid = "GlobeAtHome_21AB1_5";
+const char* wifiSsid = "GlobeAtHome_21AB1_2.4";
 const char* wifiPassword = "ypwD4U4R";
 
 const char* apiUrl = "https://safepass-052h.onrender.com/api/device/location-tap";

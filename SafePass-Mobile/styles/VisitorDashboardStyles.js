@@ -1820,12 +1820,14 @@ export default StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "stretch",
     gap: 14,
+    width: "100%",
   },
 
   approvedCompactActionsColumn: {
     flex: 1,
     minWidth: width <= 560 ? "100%" : 260,
     gap: 12,
+    alignItems: "stretch",
   },
 
   approvedCompactActionCard: {
@@ -1921,6 +1923,8 @@ export default StyleSheet.create({
   approvedVirtualNfcCard: {
     borderRadius: 24,
     overflow: "hidden",
+    minWidth: 0,
+    alignSelf: "stretch",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -1934,15 +1938,22 @@ export default StyleSheet.create({
   },
 
   approvedVirtualNfcCardGradient: {
-    padding: 20,
+    padding: width <= 390 ? 18 : 20,
     gap: 18,
+    minHeight: width <= 390 ? 258 : 280,
+    justifyContent: "space-between",
   },
 
   approvedVirtualNfcHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 18,
+    gap: width <= 390 ? 12 : 18,
+  },
+
+  approvedVirtualNfcCopy: {
+    flex: 1,
+    minWidth: 0,
   },
 
   approvedVirtualNfcBadge: {
@@ -1966,7 +1977,7 @@ export default StyleSheet.create({
   },
 
   approvedVirtualNfcTitle: {
-    fontSize: 24,
+    fontSize: width <= 390 ? 22 : 24,
     fontWeight: "800",
     color: "#FFFFFF",
     marginBottom: 6,
@@ -1976,16 +1987,17 @@ export default StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: "rgba(255,255,255,0.84)",
-    maxWidth: 260,
+    maxWidth: width <= 390 ? 230 : 260,
   },
 
   approvedVirtualNfcIconWrap: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
+    width: width <= 390 ? 54 : 58,
+    height: width <= 390 ? 54 : 58,
+    borderRadius: width <= 390 ? 17 : 18,
     backgroundColor: "rgba(255,255,255,0.14)",
     justifyContent: "center",
     alignItems: "center",
+    flexShrink: 0,
   },
 
   approvedVirtualNfcCardNumberRow: {
@@ -4285,6 +4297,9 @@ export default StyleSheet.create({
   appointmentHistoryStatusCell: {
     flex: 1,
   },
+  appointmentHistoryActionCell: {
+    flex: 1.05,
+  },
   appointmentHistoryStatusPillWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -4401,6 +4416,51 @@ export default StyleSheet.create({
     fontSize: 13,
     fontWeight: "900",
     color: "#FFFFFF",
+  },
+
+  appointmentManageActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 2,
+  },
+
+  appointmentManageButton: {
+    minHeight: 34,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+  },
+
+  appointmentManageDangerButton: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+
+  appointmentManageButtonDisabled: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    opacity: 0.72,
+  },
+
+  appointmentManageButtonText: {
+    fontSize: 11.5,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+
+  appointmentManageDangerText: {
+    color: "#DC2626",
+  },
+
+  appointmentManageButtonTextDisabled: {
+    color: "#94A3B8",
   },
 
   appointmentHistoryCard: {
@@ -5005,6 +5065,146 @@ export default StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     marginTop: 4,
+  },
+
+  appointmentManageModal: {
+    width: "100%",
+    maxWidth: 560,
+    maxHeight: "90%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.14,
+        shadowRadius: 26,
+      },
+      android: { elevation: 6 },
+      web: { boxShadow: "0px 24px 60px rgba(15,23,42,0.16)" },
+    }),
+  },
+
+  appointmentManageModalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 18,
+    backgroundColor: "#F8FBFE",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  appointmentManageModalIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  appointmentManageModalDangerIcon: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+
+  appointmentManageModalCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  appointmentManageModalTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  appointmentManageModalSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+
+  appointmentManageModalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  appointmentManageModalBody: {
+    padding: 18,
+    gap: 14,
+  },
+
+  appointmentManageOriginalCard: {
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  appointmentManageOriginalLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+
+  appointmentManageOriginalValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  appointmentManageFieldGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  appointmentManageField: {
+    flexGrow: 1,
+    flexBasis: width <= 520 ? "100%" : 220,
+    gap: 8,
+  },
+
+  appointmentManageTimeList: {
+    maxHeight: 180,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+
+  appointmentManageModalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    padding: 18,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+  },
+
+  appointmentManageCancelSubmit: {
+    backgroundColor: "#DC2626",
   },
 
   appointmentSecondaryButton: {

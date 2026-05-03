@@ -18,12 +18,28 @@ const deriveVisitProgressStatus = (visitor) => {
     return "rejected";
   }
 
+  if (visitor.appointmentStatus === "cancelled") {
+    return "cancelled";
+  }
+
+  if (visitor.status === "no_show" || visitor.noShowMarkedAt) {
+    return "no_show";
+  }
+
+  if (visitor.status === "expired" || visitor.visitExpiredAt) {
+    return "expired";
+  }
+
   if (visitor.requestCategory === "appointment") {
     if (APPOINTMENT_APPROVED_STATUSES.includes(visitor.appointmentStatus)) {
       return "approved";
     }
 
     if (visitor.appointmentStatus === "pending") {
+      return "pending";
+    }
+
+    if (visitor.appointmentStatus === "rescheduled") {
       return "pending";
     }
   }
@@ -187,7 +203,7 @@ const visitorSchema = new mongoose.Schema({
   },
   appointmentStatus: {
     type: String,
-    enum: ["not_requested", "pending", "approved", "adjusted", "rejected"],
+    enum: ["not_requested", "pending", "approved", "adjusted", "rescheduled", "cancelled", "rejected"],
     default: "not_requested",
     index: true,
   },
@@ -238,6 +254,50 @@ const visitorSchema = new mongoose.Schema({
     default: "",
     trim: true,
   },
+  appointmentCancelledAt: {
+    type: Date,
+    default: null,
+  },
+  appointmentCancelledBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  appointmentCancellationReason: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  appointmentRescheduledAt: {
+    type: Date,
+    default: null,
+  },
+  appointmentRescheduledBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  appointmentRescheduleReason: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  previousVisitDate: {
+    type: Date,
+    default: null,
+  },
+  previousVisitTime: {
+    type: Date,
+    default: null,
+  },
+  visitExpiredAt: {
+    type: Date,
+    default: null,
+  },
+  noShowMarkedAt: {
+    type: Date,
+    default: null,
+  },
   overstayAlertedAt: {
     type: Date,
     default: null,
@@ -246,7 +306,7 @@ const visitorSchema = new mongoose.Schema({
   // ============ Check-in/out Status ============
   status: { 
     type: String, 
-    enum: ['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected'],
+    enum: ['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'no_show', 'rejected', 'cancelled'],
     default: 'pending',
     index: true
   },
@@ -562,6 +622,16 @@ visitorSchema.methods = {
     this.appointmentCompletedAt = null;
     this.appointmentCompletedBy = null;
     this.appointmentCompletionNote = "";
+    this.appointmentCancelledAt = null;
+    this.appointmentCancelledBy = null;
+    this.appointmentCancellationReason = "";
+    this.appointmentRescheduledAt = null;
+    this.appointmentRescheduledBy = null;
+    this.appointmentRescheduleReason = "";
+    this.previousVisitDate = null;
+    this.previousVisitTime = null;
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
     this.overstayAlertedAt = null;
     this.assignedStaff = assignedStaff || null;
     this.assignedStaffName = String(assignedStaffName || "").trim();
@@ -589,6 +659,11 @@ visitorSchema.methods = {
     this.appointmentCompletedAt = null;
     this.appointmentCompletedBy = null;
     this.appointmentCompletionNote = "";
+    this.appointmentCancelledAt = null;
+    this.appointmentCancelledBy = null;
+    this.appointmentCancellationReason = "";
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
     this.overstayAlertedAt = null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
@@ -620,11 +695,77 @@ visitorSchema.methods = {
     this.appointmentCompletedAt = null;
     this.appointmentCompletedBy = null;
     this.appointmentCompletionNote = "";
+    this.appointmentCancelledAt = null;
+    this.appointmentCancelledBy = null;
+    this.appointmentCancellationReason = "";
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
     this.overstayAlertedAt = null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;
     this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  rescheduleAppointmentByVisitor(visitorUser, { visitDate, visitTime, reason = "" } = {}) {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    this.previousVisitDate = this.visitDate || null;
+    this.previousVisitTime = this.visitTime || null;
+    if (visitDate) {
+      this.visitDate = visitDate;
+    }
+    if (visitTime) {
+      this.visitTime = visitTime;
+    }
+    this.appointmentStatus = "rescheduled";
+    this.appointmentRescheduledAt = new Date();
+    this.appointmentRescheduledBy = visitorUser?._id || null;
+    this.appointmentRescheduleReason = String(
+      reason || "Appointment schedule updated by visitor.",
+    ).trim();
+    this.staffActionAt = null;
+    this.staffAdjustmentNote = "";
+    this.staffRejectionReason = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.appointmentCancelledAt = null;
+    this.appointmentCancelledBy = null;
+    this.appointmentCancellationReason = "";
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.overstayAlertedAt = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  cancelAppointmentByVisitor(visitorUser, reason = "") {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.appointmentStatus = "cancelled";
+    this.appointmentCancelledAt = new Date();
+    this.appointmentCancelledBy = visitorUser?._id || null;
+    this.appointmentCancellationReason = String(reason || "").trim();
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
+    this.currentLocation = {
+      ...(this.currentLocation || {}),
+      isActive: false,
+      lastSeenAt: this.currentLocation?.lastSeenAt || new Date(),
+    };
+    this.overstayAlertedAt = null;
     this.syncWorkflowState();
     return this;
   },
@@ -645,6 +786,8 @@ visitorSchema.methods = {
     this.appointmentCompletedAt = null;
     this.appointmentCompletedBy = null;
     this.appointmentCompletionNote = "";
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
     this.overstayAlertedAt = null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
@@ -672,7 +815,37 @@ visitorSchema.methods = {
     this.appointmentCompletionNote = String(
       note || "Appointment completed. Visitor can proceed to check-out.",
     ).trim();
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
     this.overstayAlertedAt = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  markExpired(reason = "Appointment request expired before approval.") {
+    this.status = "expired";
+    this.visitExpiredAt = this.visitExpiredAt || new Date();
+    this.noShowMarkedAt = null;
+    this.overstayAlertedAt = null;
+    this.currentLocation = {
+      ...(this.currentLocation || {}),
+      isActive: false,
+      lastSeenAt: this.currentLocation?.lastSeenAt || new Date(),
+    };
+    this.syncWorkflowState();
+    return this;
+  },
+
+  markNoShow(reason = "Approved appointment date passed without check-in.") {
+    this.status = "no_show";
+    this.noShowMarkedAt = this.noShowMarkedAt || new Date();
+    this.visitExpiredAt = null;
+    this.overstayAlertedAt = null;
+    this.currentLocation = {
+      ...(this.currentLocation || {}),
+      isActive: false,
+      lastSeenAt: this.currentLocation?.lastSeenAt || new Date(),
+    };
     this.syncWorkflowState();
     return this;
   },
@@ -682,6 +855,8 @@ visitorSchema.methods = {
     this.checkedInBy = actorId || null;
     this.checkedOutAt = null;
     this.checkedOutBy = null;
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
     this.overstayAlertedAt = null;
     this.syncWorkflowState();
     return this;

@@ -161,6 +161,14 @@ const getStatusMeta = (status) => {
       return { color: "#0A3D91", background: "#EEF5FF", label: "Approved" };
     case "adjusted":
       return { color: "#D97706", background: "#FEF3C7", label: "Adjusted" };
+    case "rescheduled":
+      return { color: "#D97706", background: "#FEF3C7", label: "Rescheduled" };
+    case "cancelled":
+      return { color: "#64748B", background: "#F1F5F9", label: "Cancelled" };
+    case "expired":
+      return { color: "#DC2626", background: "#FEE2E2", label: "Expired" };
+    case "no_show":
+      return { color: "#B45309", background: "#FEF3C7", label: "No Show" };
     case "rejected":
       return { color: "#DC2626", background: "#FEE2E2", label: "Rejected" };
     case "completed":
@@ -174,6 +182,8 @@ const getAppointmentStatus = (appointment) => {
   if (!appointment) return "pending";
   if (appointment.appointmentCompletedAt) return "completed";
   if (appointment.status === "checked_out") return "completed";
+  if (appointment.status === "expired") return "expired";
+  if (appointment.status === "no_show") return "no_show";
   return String(appointment.appointmentStatus || "pending").toLowerCase();
 };
 

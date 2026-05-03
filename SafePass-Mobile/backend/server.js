@@ -10,6 +10,14 @@ const User = require("./models/User");
 const AccessLog = require("./models/AccessLog");
 const AppSettings = require("./models/AppSettings");
 const Counter = require("./models/Counter");
+const {
+  authMiddleware,
+  requireRoles,
+} = require("./middleware/authMiddleware");
+const {
+  getAppointmentOptions,
+} = require("./services/appointmentOptionsService");
+const createAppointmentOptionsRoutes = require("./routes/appointmentOptionsRoutes");
 const { createRateLimiter, getRateLimitKey } = require("./utils/securityUtils");
 const {
   DEFAULT_SYSTEM_SETTINGS,
@@ -18,7 +26,6 @@ const {
   DEFAULT_APPOINTMENT_PURPOSE_OPTIONS,
   DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS,
   sanitizeSystemSettings,
-  sanitizeAppointmentOptions,
 } = require("./utils/settingsUtils");
 const timestamp = Date.now();
 const randomString = Math.random().toString(36).substr(2, 10).toUpperCase();
@@ -31,11 +38,14 @@ const isVercelRuntime = Boolean(process.env.VERCEL);
 const sensitiveDebugLoggingEnabled =
   String(process.env.ALLOW_SENSITIVE_DEBUG_LOGS || "").trim().toLowerCase() === "true";
 const phoneOtpSmsProviderConfigured = [
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+  "TWILIO_MESSAGING_SERVICE_SID",
+  "TWILIO_PHONE_NUMBER",
+  "TWILIO_SENDER_ID",
   "SEMAPHORE_API_KEY",
   "SEMAPHORE_API_TOKEN",
   "SMS_API_KEY",
-  "TWILIO_ACCOUNT_SID",
-  "TWILIO_AUTH_TOKEN",
 ].some((name) => String(process.env[name] || "").trim());
 
 const APPOINTMENT_ID_TYPE_OPTIONS = [
@@ -398,19 +408,51 @@ const getSemaphoreApiKey = () =>
       "",
   ).trim();
 
+const getConfiguredSmsProvider = () =>
+  String(process.env.SMS_PROVIDER || process.env.PHONE_OTP_PROVIDER || "")
+    .trim()
+    .toLowerCase();
+
+const getTwilioConfig = () => ({
+  accountSid: String(process.env.TWILIO_ACCOUNT_SID || "").trim(),
+  authToken: String(process.env.TWILIO_AUTH_TOKEN || "").trim(),
+  messagingServiceSid: String(process.env.TWILIO_MESSAGING_SERVICE_SID || "").trim(),
+  from: String(
+    process.env.TWILIO_PHONE_NUMBER ||
+      process.env.TWILIO_SENDER_ID ||
+      "",
+  ).trim(),
+});
+
+const isTwilioConfigured = () => {
+  const { accountSid, authToken, messagingServiceSid, from } = getTwilioConfig();
+  return Boolean(accountSid && authToken && (messagingServiceSid || from));
+};
+
 const getPhoneOtpDeliveryProvider = () => {
+  const configuredProvider = getConfiguredSmsProvider();
+  if (configuredProvider === "twilio" && isTwilioConfigured()) return "twilio";
+  if (configuredProvider === "twilio") return "backend_log";
+  if (configuredProvider === "semaphore" && getSemaphoreApiKey()) return "semaphore";
+  if (configuredProvider === "semaphore") return "backend_log";
+  if (configuredProvider === "backend_log") return "backend_log";
+  if (isTwilioConfigured()) return "twilio";
   if (getSemaphoreApiKey()) return "semaphore";
   return "backend_log";
 };
 
 const shouldFallbackPhoneOtpToBackendLog = () =>
   sensitiveDebugLoggingEnabled ||
-  String(process.env.SEMAPHORE_ALLOW_BACKEND_LOG_FALLBACK || "")
+  String(
+    process.env.SMS_ALLOW_BACKEND_LOG_FALLBACK ||
+      process.env.SEMAPHORE_ALLOW_BACKEND_LOG_FALLBACK ||
+      "",
+  )
     .trim()
     .toLowerCase() === "true";
 
 const logPhoneOtpBackendFallback = ({ phoneNumber, otpCode, method, reason }) => {
-  console.warn(`Semaphore OTP fallback enabled: ${reason || "SMS delivery unavailable"}`);
+  console.warn(`SMS OTP fallback enabled: ${reason || "SMS delivery unavailable"}`);
   console.log("");
   console.log("========== PHONE OTP BACKEND FALLBACK ==========");
   console.log(`Number : ${phoneNumber}`);
@@ -497,6 +539,93 @@ const sendSemaphoreOtp = async ({ phoneNumber, otpCode }) => {
   }
 
   return { success: true, provider: "semaphore", data };
+};
+
+const formatPhoneForTwilio = (phoneNumber = "") => {
+  const normalized = normalizePhoneForOtp(phoneNumber);
+  if (/^09\d{9}$/.test(normalized)) {
+    return `+63${normalized.slice(1)}`;
+  }
+
+  const digitsOnly = String(phoneNumber || "").replace(/\D/g, "");
+  if (/^639\d{9}$/.test(digitsOnly)) {
+    return `+${digitsOnly}`;
+  }
+
+  if (/^\+639\d{9}$/.test(String(phoneNumber || "").trim())) {
+    return String(phoneNumber || "").trim();
+  }
+
+  return normalized;
+};
+
+const sendTwilioOtp = async ({ phoneNumber, otpCode }) => {
+  const { accountSid, authToken, messagingServiceSid, from } = getTwilioConfig();
+  if (!isTwilioConfigured()) {
+    return { success: false, skipped: true, provider: "backend_log" };
+  }
+
+  const messageTemplate = String(
+    process.env.TWILIO_OTP_MESSAGE ||
+      process.env.SMS_OTP_MESSAGE ||
+      "Your SafePass login OTP is {otp}. It expires in 5 minutes.",
+  );
+
+  const payload = new URLSearchParams({
+    To: formatPhoneForTwilio(phoneNumber),
+    Body: messageTemplate.includes("{otp}")
+      ? messageTemplate.replaceAll("{otp}", otpCode)
+      : `${messageTemplate} ${otpCode}`,
+  });
+
+  if (messagingServiceSid) {
+    payload.set("MessagingServiceSid", messagingServiceSid);
+  } else {
+    payload.set("From", from);
+  }
+
+  const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: payload.toString(),
+    },
+  );
+
+  const responseText = await response.text();
+  let data = null;
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    data = responseText;
+  }
+
+  if (!response.ok) {
+    const error = new Error(`Twilio OTP request failed with HTTP ${response.status}`);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return { success: true, provider: "twilio", data };
+};
+
+const sendPhoneOtp = async ({ phoneNumber, otpCode, provider }) => {
+  if (provider === "twilio") {
+    return sendTwilioOtp({ phoneNumber, otpCode });
+  }
+
+  if (provider === "semaphore") {
+    return sendSemaphoreOtp({ phoneNumber, otpCode });
+  }
+
+  return { success: false, skipped: true, provider: "backend_log" };
 };
 
 // ========== ENHANCED CORS CONFIGURATION ==========
@@ -621,17 +750,6 @@ const getSystemSettingsRecord = async () =>
     { new: true, upsert: true, setDefaultsOnInsert: true },
   );
 
-const getAppointmentOptions = async ({ activeOnly = false } = {}) => {
-  const settingsRecord = await getSystemSettingsRecord();
-  const options = sanitizeAppointmentOptions(settingsRecord?.appointmentOptions || {});
-  if (!activeOnly) return options;
-  return {
-    offices: options.offices.filter((option) => option.enabled !== false),
-    purposes: options.purposes.filter((option) => option.enabled !== false),
-    timeSlots: options.timeSlots.filter((slot) => slot.enabled !== false),
-  };
-};
-
 // Generate JWT Token
 const generateToken = (userId) => {
   return jwt.sign(
@@ -641,33 +759,6 @@ const generateToken = (userId) => {
       expiresIn: "7d",
     },
   );
-};
-
-// Authentication Middleware
-const authMiddleware = async (req, res, next) => {
-  try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-
-    if (!token) {
-      return res.status(401).json({ error: "No token provided" });
-    }
-
-    const decoded = jwt.verify(
-      token,
-      getRequiredEnvValue("JWT_SECRET"),
-    );
-    const user = await User.findById(decoded.userId).select("-password");
-
-    if (!user) {
-      return res.status(401).json({ error: "User not found" });
-    }
-
-    req.user = user;
-    req.token = token;
-    next();
-  } catch (error) {
-    res.status(401).json({ error: "Please authenticate" });
-  }
 };
 
 const getNotificationTargetRoles = (role) => {
@@ -725,6 +816,17 @@ const createSystemActivity = async ({
     console.error("Create system activity error:", error);
   }
 };
+
+app.use("/api/admin", authMiddleware, requireRoles("admin"));
+app.use("/api/staff", authMiddleware, requireRoles("staff", "admin"));
+app.use(
+  "/api",
+  createAppointmentOptionsRoutes({
+    authMiddleware,
+    requireRoles,
+    createSystemActivity,
+  }),
+);
 
 const createRoleNotification = async ({
   title,
@@ -1156,7 +1258,7 @@ try {
   const mailPort = Number(process.env.MAIL_PORT || 587);
   const mailSecure = String(process.env.MAIL_SECURE || "false").trim() === "true";
 
-  if (mailHost && mailUser && mailPass) {
+  if (process.env.NODE_ENV !== "test" && mailHost && mailUser && mailPass) {
     mailTransporter = nodemailer.createTransport({
       host: mailHost,
       port: mailPort,
@@ -1281,6 +1383,10 @@ const getOtpDeliveryMode = (emailResult) => {
 };
 
 const logEmailOtpForDemo = ({ email, otpCode, label = "EMAIL OTP DEMO" }) => {
+  if (!canUseBackendLogOtpFallback()) {
+    return;
+  }
+
   console.log("");
   console.log(`========== ${label} ==========`);
   console.log(`Email  : ${email}`);
@@ -1410,7 +1516,7 @@ const createPasswordResetOtp = async (req, user) => {
       otpCode,
       label: "PASSWORD RESET OTP",
     });
-    console.log(`Password reset link: ${resetLink}`);
+    logSensitiveDebug(`Password reset link: ${resetLink}`);
   }
 
   return { expiresAt, emailResult, resetLink };
@@ -1599,6 +1705,11 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       (tapAction === "checkin" || tapAction === "check_in" || isAutoGateTap);
 
     const visitor = latestVisitor;
+    const markedPastLifecycle = markPastVisitLifecycleIfNeeded(visitor);
+    if (markedPastLifecycle) {
+      await visitor.save();
+    }
+
     let action = "location_update";
     let accessType = "system";
     let activityType = "arduino_location_tap";
@@ -1612,7 +1723,8 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       activityType = "nfc_card_checkout";
       responseMessage = "Visitor checked out automatically by NFC card";
     } else if (shouldCheckIn) {
-      if (!visitor.hasApprovedVisitWindow()) {
+      const checkInEligibility = getVisitorCheckInEligibility(visitor);
+      if (!checkInEligibility.allowed) {
         await AccessLog.create({
           userId: visitorUser._id,
           userEmail: visitorUser.email,
@@ -1632,12 +1744,12 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
             approvalStatus: visitor.approvalStatus,
             appointmentStatus: visitor.appointmentStatus,
           },
-          notes: `${visitor.fullName} tapped at ${tapLocation.office}, but the visit is not approved`,
+          notes: `${visitor.fullName} tapped at ${tapLocation.office}, but check-in was blocked: ${checkInEligibility.message}`,
         });
 
-        return res.status(403).json({
+        return res.status(checkInEligibility.statusCode || 403).json({
           success: false,
-          message: "Visit is not approved for check-in",
+          message: checkInEligibility.message,
         });
       }
 
@@ -1926,7 +2038,7 @@ const formatDepartmentLabel = (value = "") =>
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
 const APPOINTMENT_SLOT_LIMIT = DEFAULT_APPOINTMENT_SLOT_LIMIT || 2;
-const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted"];
+const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted", "rescheduled"];
 const APPOINTMENT_PURPOSE_OPTIONS = DEFAULT_APPOINTMENT_PURPOSE_OPTIONS;
 const APPOINTMENT_DEPARTMENT_OPTIONS = DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS;
 const ACCOUNT_ROLE_OPTIONS = ["admin", "staff", "security", "guard", "visitor"];
@@ -2188,8 +2300,8 @@ const getPrioritizedVisitor = (visitors = []) => {
   if (checkedIn[0]) return checkedIn[0];
 
   const active = visitors.filter((visitor) =>
-    !["checked_out", "expired", "rejected"].includes(String(visitor?.status || "").toLowerCase()) &&
-    String(visitor?.appointmentStatus || "").toLowerCase() !== "rejected"
+    !["checked_out", "expired", "no_show", "rejected", "cancelled"].includes(String(visitor?.status || "").toLowerCase()) &&
+    !["rejected", "cancelled"].includes(String(visitor?.appointmentStatus || "").toLowerCase())
   );
   const upcoming = active
     .filter((visitor) => getVisitorScheduleTime(visitor) >= now - 60 * 1000)
@@ -2234,6 +2346,128 @@ const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
   slotEnd.setMinutes(slotEnd.getMinutes() + 1);
 
   return { dayStart, dayEnd, slotStart, slotEnd };
+};
+
+const getVisitDayWindow = (visitDateValue) => {
+  const visitDate = new Date(visitDateValue);
+  if (Number.isNaN(visitDate.getTime())) {
+    return null;
+  }
+
+  const dayStart = new Date(visitDate);
+  dayStart.setHours(0, 0, 0, 0);
+
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  return { dayStart, dayEnd };
+};
+
+const getVisitDateRelation = (visitDateValue, nowValue = new Date()) => {
+  const visitWindow = getVisitDayWindow(visitDateValue);
+  const todayWindow = getVisitDayWindow(nowValue);
+  if (!visitWindow || !todayWindow) {
+    return "unknown";
+  }
+
+  if (visitWindow.dayEnd <= todayWindow.dayStart) return "past";
+  if (visitWindow.dayStart >= todayWindow.dayEnd) return "future";
+  return "today";
+};
+
+const markPastVisitLifecycleIfNeeded = (visitor) => {
+  if (!visitor || visitor.checkedInAt || visitor.checkedOutAt) {
+    return false;
+  }
+
+  const visitStatus = String(visitor.status || "").toLowerCase();
+  const appointmentStatus = String(visitor.appointmentStatus || "").toLowerCase();
+  if (["expired", "no_show", "rejected", "cancelled", "checked_out"].includes(visitStatus)) {
+    return false;
+  }
+  if (["rejected", "cancelled"].includes(appointmentStatus)) {
+    return false;
+  }
+  if (getVisitDateRelation(visitor.visitDate) !== "past") {
+    return false;
+  }
+
+  if (visitor.requestCategory === "appointment" && visitor.approvalFlow === "staff") {
+    if (["approved", "adjusted"].includes(appointmentStatus)) {
+      visitor.markNoShow("Approved appointment date passed without check-in.");
+      return true;
+    }
+
+    if (["pending", "rescheduled"].includes(appointmentStatus)) {
+      visitor.markExpired("Appointment request expired before approval.");
+      return true;
+    }
+  }
+
+  if (visitor.approvalStatus === "approved") {
+    visitor.markNoShow("Approved visit date passed without check-in.");
+    return true;
+  }
+
+  if (visitor.approvalStatus === "pending") {
+    visitor.markExpired("Visit request expired before approval.");
+    return true;
+  }
+
+  return false;
+};
+
+const getVisitorCheckInEligibility = (visitor) => {
+  if (!visitor) {
+    return { allowed: false, statusCode: 404, message: "Visitor not found" };
+  }
+
+  if (visitor.status === "checked_in") {
+    return { allowed: false, statusCode: 400, message: "Visitor is already checked in." };
+  }
+
+  if (visitor.status === "checked_out" || visitor.checkedOutAt) {
+    return { allowed: false, statusCode: 400, message: "This visit has already been completed." };
+  }
+
+  if (visitor.status === "no_show" || visitor.noShowMarkedAt) {
+    return {
+      allowed: false,
+      statusCode: 400,
+      message: "This appointment date has passed and was marked as no-show. Please request a new appointment.",
+    };
+  }
+
+  if (visitor.status === "expired" || visitor.visitExpiredAt) {
+    return {
+      allowed: false,
+      statusCode: 400,
+      message: "This appointment has expired. Please request a new appointment.",
+    };
+  }
+
+  if (!visitor.hasApprovedVisitWindow()) {
+    return { allowed: false, statusCode: 400, message: "Your visit is still waiting for approval." };
+  }
+
+  const dateRelation = getVisitDateRelation(visitor.visitDate);
+  if (dateRelation === "past") {
+    return {
+      allowed: false,
+      statusCode: 400,
+      message: "This appointment date has passed. Please request a new appointment.",
+    };
+  }
+
+  if (dateRelation === "future") {
+    return {
+      allowed: false,
+      statusCode: 400,
+      message: "Check-in is only available on your appointment date.",
+    };
+  }
+
+  return { allowed: true };
 };
 
 const isAppointmentServiceDay = (dateValue) => {
@@ -2488,6 +2722,12 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
     if (req.user.role === "visitor") {
       await ensureSafePassAccountId(req.user);
       const visitors = await findVisitorsForUser(req.user);
+      const lifecycleUpdates = visitors
+        .map((visitorRecord) => (markPastVisitLifecycleIfNeeded(visitorRecord) ? visitorRecord : null))
+        .filter(Boolean);
+      if (lifecycleUpdates.length) {
+        await Promise.all(lifecycleUpdates.map((visitorRecord) => visitorRecord.save()));
+      }
       const visitor = getPrioritizedVisitor(visitors);
 
       if (visitor) {
@@ -4785,26 +5025,27 @@ app.post("/api/auth/request-otp", async (req, res) => {
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
     let deliveryProvider = getPhoneOtpDeliveryProvider();
 
-    if (deliveryProvider === "semaphore") {
+    if (deliveryProvider === "twilio" || deliveryProvider === "semaphore") {
       try {
-        await sendSemaphoreOtp({ phoneNumber: cleanPhone, otpCode });
+        await sendPhoneOtp({ phoneNumber: cleanPhone, otpCode, provider: deliveryProvider });
       } catch (smsError) {
-        console.error("Semaphore OTP SMS error:", smsError?.data || smsError);
+        console.error(`${deliveryProvider} OTP SMS error:`, smsError?.data || smsError);
         if (shouldFallbackPhoneOtpToBackendLog()) {
+          const failedProvider = deliveryProvider;
           deliveryProvider = "backend_log";
           logPhoneOtpBackendFallback({
             phoneNumber: cleanPhone,
             otpCode,
             method: method || "sms",
-            reason: "Semaphore account is not ready for SMS sending.",
+            reason: `${failedProvider} account is not ready for SMS sending.`,
           });
         } else {
           otpStore.delete(cleanPhone);
           return res.status(502).json({
             success: false,
             message:
-              "Unable to send SMS OTP right now. Please check Semaphore credits, API key, and active sender name.",
-            deliveryMode: "semaphore",
+              `Unable to send SMS OTP right now. Please check ${deliveryProvider} credentials, credits, and sender setup.`,
+            deliveryMode: deliveryProvider,
           });
         }
       }
@@ -5258,8 +5499,8 @@ app.post("/api/create-demo-user", async (req, res) => {
 
 // ============ EXISTING VISITOR ROUTES ============
 
-// Get all visitors (for security dashboard)
-app.get("/api/visitors", authMiddleware, async (req, res) => {
+// Get all visitors (for admin, staff, and security dashboards)
+app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "security"), async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
 
@@ -5272,6 +5513,13 @@ app.get("/api/visitors", authMiddleware, async (req, res) => {
       .skip((page - 1) * limit)
       .populate("checkedInBy", "firstName lastName")
       .populate("checkedOutBy", "firstName lastName");
+
+    const lifecycleUpdates = visitors
+      .map((visitorRecord) => (markPastVisitLifecycleIfNeeded(visitorRecord) ? visitorRecord : null))
+      .filter(Boolean);
+    if (lifecycleUpdates.length) {
+      await Promise.all(lifecycleUpdates.map((visitorRecord) => visitorRecord.save()));
+    }
 
     const total = await Visitor.countDocuments(query);
 
@@ -5304,6 +5552,22 @@ app.get("/api/visitors/:id", authMiddleware, async (req, res) => {
       });
     }
 
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const canViewVisitor =
+      ["admin", "staff", "security", "guard"].includes(requesterRole) ||
+      isVisitorOwner(req.user, visitor);
+
+    if (!canViewVisitor) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    if (markPastVisitLifecycleIfNeeded(visitor)) {
+      await visitor.save();
+    }
+
     res.json({
       success: true,
       visitor,
@@ -5318,12 +5582,8 @@ app.get("/api/visitors/:id", authMiddleware, async (req, res) => {
 });
 
 // Update visitor (admin/security)
-app.put("/api/visitors/:id", authMiddleware, async (req, res) => {
+app.put("/api/visitors/:id", authMiddleware, requireRoles("admin", "security"), async (req, res) => {
   try {
-    if (!["admin", "security", "guard"].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
     const updates = { ...req.body };
     delete updates._id;
     delete updates.__v;
@@ -5347,12 +5607,8 @@ app.put("/api/visitors/:id", authMiddleware, async (req, res) => {
 });
 
 // Delete visitor (admin only)
-app.delete("/api/visitors/:id", authMiddleware, async (req, res) => {
+app.delete("/api/visitors/:id", authMiddleware, requireRoles("admin"), async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
     const visitor = await Visitor.findById(req.params.id);
     if (!visitor) {
       return res.status(404).json({ success: false, message: "Visitor not found" });
@@ -5402,24 +5658,16 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    if (!visitor.hasApprovedVisitWindow()) {
-      return res.status(400).json({
-        success: false,
-        message: "Your visit is still waiting for approval.",
-      });
+    const markedPastLifecycle = markPastVisitLifecycleIfNeeded(visitor);
+    if (markedPastLifecycle) {
+      await visitor.save();
     }
 
-    if (visitor.status === "checked_in") {
-      return res.status(400).json({
+    const checkInEligibility = getVisitorCheckInEligibility(visitor);
+    if (!checkInEligibility.allowed) {
+      return res.status(checkInEligibility.statusCode || 400).json({
         success: false,
-        message: "You are already checked in for this visit.",
-      });
-    }
-
-    if (visitor.status === "checked_out") {
-      return res.status(400).json({
-        success: false,
-        message: "This visit has already been completed.",
+        message: checkInEligibility.message,
       });
     }
 
@@ -5661,23 +5909,6 @@ app.get("/api/visitors/:id/logs", authMiddleware, async (req, res) => {
   }
 });
 
-// Appointment request form options
-app.get("/api/appointments/options", authMiddleware, async (req, res) => {
-  try {
-    const options = await getAppointmentOptions({ activeOnly: true });
-    res.json({
-      success: true,
-      options,
-    });
-  } catch (error) {
-    console.error("Get appointment options error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to load appointment options.",
-    });
-  }
-});
-
 // Visitor appointment ID OCR validation
 app.post("/api/appointments/id-ocr/validate", authMiddleware, async (req, res) => {
   try {
@@ -5788,72 +6019,6 @@ app.post("/api/appointments/id-ocr/validate", authMiddleware, async (req, res) =
       status: "ocr_validation_error",
       confidence: 0,
       message: "Failed to validate the ID image. Please try again.",
-    });
-  }
-});
-
-app.get("/api/admin/appointments/options", authMiddleware, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
-    const options = await getAppointmentOptions();
-    res.json({
-      success: true,
-      options,
-    });
-  } catch (error) {
-    console.error("Get admin appointment options error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to load appointment management options.",
-    });
-  }
-});
-
-app.put("/api/admin/appointments/options", authMiddleware, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
-    const options = sanitizeAppointmentOptions(req.body?.options || req.body || {});
-    await AppSettings.findOneAndUpdate(
-      { key: "system" },
-      {
-        $set: {
-          appointmentOptions: options,
-          updatedAt: new Date(),
-        },
-        $setOnInsert: { key: "system", ...DEFAULT_SYSTEM_SETTINGS },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
-    );
-
-    await createSystemActivity({
-      actorUser: req.user,
-      activityType: "admin_updated_appointment_options",
-      status: "granted",
-      location: "Appointment Management",
-      notes: "Appointment request form options updated.",
-      metadata: {
-        officeCount: options.offices.length,
-        purposeCount: options.purposes.length,
-        timeSlotCount: options.timeSlots.length,
-      },
-    });
-
-    res.json({
-      success: true,
-      message: "Appointment options updated successfully.",
-      options,
-    });
-  } catch (error) {
-    console.error("Update appointment options error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update appointment management options.",
     });
   }
 });
@@ -6403,6 +6568,328 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
   }
 });
 
+const canVisitorManageAppointment = (visitor = {}) => {
+  const appointmentStatus = String(visitor.appointmentStatus || "").toLowerCase();
+  const visitStatus = String(visitor.status || "").toLowerCase();
+  if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+    return false;
+  }
+  if (["rejected", "cancelled", "completed"].includes(appointmentStatus)) return false;
+  if (["checked_in", "checked_out", "expired", "no_show", "rejected", "cancelled"].includes(visitStatus)) return false;
+  if (visitor.visitExpiredAt || visitor.noShowMarkedAt) return false;
+  if (visitor.appointmentCompletedAt) return false;
+  return ["pending", "approved", "adjusted", "rescheduled"].includes(appointmentStatus);
+};
+
+app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    if (requesterRole !== "admin" && !isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only edit your own appointment.",
+      });
+    }
+
+    if (markPastVisitLifecycleIfNeeded(visitor)) {
+      await visitor.save();
+    }
+
+    if (!canVisitorManageAppointment(visitor)) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment can no longer be edited.",
+      });
+    }
+
+    const { visitDate, preferredDate, visitTime, preferredTime, reason = "" } = req.body || {};
+    const finalVisitDate = visitDate || preferredDate || visitor.visitDate;
+    const finalVisitTime = visitTime || preferredTime || visitor.visitTime;
+    const appointmentDateTime = getCombinedAppointmentDateTime(finalVisitDate, finalVisitTime);
+
+    if (!appointmentDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose a valid appointment date and time.",
+      });
+    }
+
+    if (appointmentDateTime < new Date(Date.now() - 60 * 1000)) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointment schedule cannot be in the past.",
+      });
+    }
+
+    if (!isAppointmentServiceDay(finalVisitDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointments are only available from Monday to Saturday.",
+      });
+    }
+
+    const activeAppointmentOptions = await getAppointmentOptions({ activeOnly: true });
+    const selectedConfiguredSlot = findAppointmentConfiguredSlot(activeAppointmentOptions.timeSlots, appointmentDateTime);
+    if (!selectedConfiguredSlot) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select an enabled appointment time slot.",
+      });
+    }
+
+    const selectedSlotLimit = getAppointmentSlotLimit(selectedConfiguredSlot);
+    const slotCount = await countStaffAppointmentsForSlot({
+      assignedStaff: visitor.assignedStaff,
+      visitDate: finalVisitDate,
+      visitTime: finalVisitTime,
+      excludeVisitorId: visitor._id,
+    });
+
+    if (slotCount >= selectedSlotLimit) {
+      return res.status(409).json({
+        success: false,
+        code: "APPOINTMENT_SLOT_FULL",
+        message: "That time slot is already full. Slots are full please select another time or date.",
+        limit: selectedSlotLimit,
+        currentCount: slotCount,
+      });
+    }
+
+    const originalVisitDate = visitor.visitDate;
+    const originalVisitTime = visitor.visitTime;
+    const wasApproved = ["approved", "adjusted"].includes(String(visitor.appointmentStatus || "").toLowerCase());
+    const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
+
+    visitor.rescheduleAppointmentByVisitor(req.user, {
+      visitDate: new Date(finalVisitDate),
+      visitTime: appointmentDateTime,
+      reason,
+    });
+    await visitor.save();
+
+    const originalSchedule = formatVisitSchedule(originalVisitDate, originalVisitTime);
+    const newSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+    const assignedStaffUser = visitor.assignedStaff
+      ? await User.findById(visitor.assignedStaff)
+      : null;
+
+    await createRoleNotification({
+      title: "Appointment Rescheduled",
+      message: `${visitor.fullName} updated their appointment from ${originalSchedule} to ${newSchedule}.`,
+      type: "warning",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "visitor_rescheduled_appointment",
+        originalVisitDate,
+        originalVisitTime,
+        newVisitDate: visitor.visitDate,
+        newVisitTime: visitor.visitTime,
+        reason,
+      },
+    });
+
+    if (assignedStaffUser) {
+      await createRoleNotification({
+        title: "Appointment Rescheduled",
+        message: `${visitor.fullName} updated their appointment from ${originalSchedule} to ${newSchedule}. Please review the new schedule.`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "staff",
+        targetUser: assignedStaffUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_rescheduled_appointment",
+          originalVisitDate,
+          originalVisitTime,
+          newVisitDate: visitor.visitDate,
+          newVisitTime: visitor.visitTime,
+          reason,
+        },
+      });
+    }
+
+    if (wasApproved) {
+      await createRoleNotification({
+        title: "Approved Appointment Rescheduled",
+        message: `${visitor.fullName}'s approved appointment changed from ${originalSchedule} to ${newSchedule}. Staff review is required before entry.`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_rescheduled_approved_appointment",
+          originalVisitDate,
+          originalVisitTime,
+          newVisitDate: visitor.visitDate,
+          newVisitTime: visitor.visitTime,
+          reason,
+        },
+      });
+    }
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "visitor_rescheduled_appointment",
+      status: "pending",
+      location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment Request",
+      notes: `${visitor.fullName} rescheduled their appointment from ${originalSchedule} to ${newSchedule}.`,
+      metadata: {
+        originalVisitDate,
+        originalVisitTime,
+        newVisitDate: visitor.visitDate,
+        newVisitTime: visitor.visitTime,
+        reason,
+      },
+    });
+
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
+    const [updatedVisitorPayload] = await attachSafePassIdsToVisitors([updatedVisitor]);
+
+    res.json({
+      success: true,
+      message: "Appointment rescheduled successfully. Staff will review the updated schedule.",
+      visitor: updatedVisitorPayload,
+    });
+  } catch (error) {
+    console.error("Visitor reschedule appointment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reschedule appointment.",
+    });
+  }
+});
+
+app.put("/api/visitors/:id/appointment/cancel", authMiddleware, async (req, res) => {
+  try {
+    const { reason } = req.body || {};
+    const cancellationReason = String(reason || "").trim();
+
+    if (!cancellationReason) {
+      return res.status(400).json({
+        success: false,
+        message: "Reason for cancellation is required.",
+      });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    if (requesterRole !== "admin" && !isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only cancel your own appointment.",
+      });
+    }
+
+    if (markPastVisitLifecycleIfNeeded(visitor)) {
+      await visitor.save();
+    }
+
+    if (!canVisitorManageAppointment(visitor)) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment can no longer be cancelled.",
+      });
+    }
+
+    const originalVisitDate = visitor.visitDate;
+    const originalVisitTime = visitor.visitTime;
+    const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
+    const assignedStaffUser = visitor.assignedStaff
+      ? await User.findById(visitor.assignedStaff)
+      : null;
+
+    visitor.cancelAppointmentByVisitor(req.user, cancellationReason);
+    await visitor.save();
+
+    const originalSchedule = formatVisitSchedule(originalVisitDate, originalVisitTime);
+
+    await createRoleNotification({
+      title: "Appointment Cancelled",
+      message: `${visitor.fullName} cancelled their appointment for ${originalSchedule}. Reason: ${cancellationReason}`,
+      type: "warning",
+      severity: "medium",
+      targetRole: "admin",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "visitor_cancelled_appointment",
+        originalVisitDate,
+        originalVisitTime,
+        cancellationReason,
+      },
+    });
+
+    if (assignedStaffUser) {
+      await createRoleNotification({
+        title: "Appointment Cancelled",
+        message: `${visitor.fullName} cancelled their appointment for ${originalSchedule}. Reason: ${cancellationReason}`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "staff",
+        targetUser: assignedStaffUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_cancelled_appointment",
+          originalVisitDate,
+          originalVisitTime,
+          cancellationReason,
+        },
+      });
+    }
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "visitor_cancelled_appointment",
+      status: "cancelled",
+      location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment Request",
+      notes: `${visitor.fullName} cancelled their appointment for ${originalSchedule}.`,
+      metadata: {
+        originalVisitDate,
+        originalVisitTime,
+        cancellationReason,
+      },
+    });
+
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
+    const [updatedVisitorPayload] = await attachSafePassIdsToVisitors([updatedVisitor]);
+
+    res.json({
+      success: true,
+      message: "Appointment cancelled successfully.",
+      visitor: updatedVisitorPayload,
+    });
+  } catch (error) {
+    console.error("Visitor cancel appointment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to cancel appointment.",
+    });
+  }
+});
+
 app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
   try {
     const normalizedRole = String(req.user.role).toLowerCase();
@@ -6426,7 +6913,7 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
     }
 
     if (status === "pending") {
-      query.appointmentStatus = "pending";
+      query.appointmentStatus = { $in: ["pending", "rescheduled"] };
     } else if (status === "approved") {
       query.appointmentStatus = { $in: ["approved", "adjusted"] };
     } else if (status === "rejected") {
@@ -6440,6 +6927,13 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
       .limit(parseInt(limit, 10))
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
+
+    const lifecycleUpdates = appointments
+      .map((appointment) => (markPastVisitLifecycleIfNeeded(appointment) ? appointment : null))
+      .filter(Boolean);
+    if (lifecycleUpdates.length) {
+      await Promise.all(lifecycleUpdates.map((appointment) => appointment.save()));
+    }
 
     res.json({
       success: true,
@@ -6479,10 +6973,18 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       });
     }
 
-    if ((visitor.appointmentStatus || "pending") !== "pending") {
+    if (markPastVisitLifecycleIfNeeded(visitor)) {
+      await visitor.save();
       return res.status(400).json({
         success: false,
-        message: "Only pending appointments can be approved.",
+        message: "This appointment date has already passed. Please adjust the schedule before approving.",
+      });
+    }
+
+    if (!["pending", "rescheduled"].includes(visitor.appointmentStatus || "pending")) {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending or rescheduled appointments can be approved.",
       });
     }
 
@@ -6618,10 +7120,10 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
       });
     }
 
-    if ((visitor.appointmentStatus || "pending") !== "pending") {
+    if (!["pending", "rescheduled"].includes(visitor.appointmentStatus || "pending")) {
       return res.status(400).json({
         success: false,
-        message: "Only pending appointments can be adjusted.",
+        message: "Only pending or rescheduled appointments can be adjusted.",
       });
     }
 
@@ -7028,15 +7530,8 @@ app.put("/api/staff/appointments/:id/complete", authMiddleware, async (req, res)
 });
 
 // Check-in visitor (by security)
-app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
+app.put("/api/visitors/:id/checkin", authMiddleware, requireRoles("admin", "security"), async (req, res) => {
   try {
-    if (!["admin", "security", "guard"].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const visitor = await Visitor.findById(req.params.id);
 
     if (!visitor) {
@@ -7046,24 +7541,16 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    if (!visitor.hasApprovedVisitWindow()) {
-      return res.status(400).json({
-        success: false,
-        message: "Visitor does not have an approved visit window yet",
-      });
+    const markedPastLifecycle = markPastVisitLifecycleIfNeeded(visitor);
+    if (markedPastLifecycle) {
+      await visitor.save();
     }
 
-    if (visitor.status === "checked_in") {
-      return res.status(400).json({
+    const checkInEligibility = getVisitorCheckInEligibility(visitor);
+    if (!checkInEligibility.allowed) {
+      return res.status(checkInEligibility.statusCode || 400).json({
         success: false,
-        message: "Visitor is already checked in",
-      });
-    }
-
-    if (visitor.status === "checked_out") {
-      return res.status(400).json({
-        success: false,
-        message: "Visitor has already checked out",
+        message: checkInEligibility.message,
       });
     }
 
@@ -7110,15 +7597,8 @@ app.put("/api/visitors/:id/checkin", authMiddleware, async (req, res) => {
 });
 
 // Check-out visitor (by security)
-app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
+app.put("/api/visitors/:id/checkout", authMiddleware, requireRoles("admin", "security"), async (req, res) => {
   try {
-    if (!["admin", "security", "guard"].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const visitor = await Visitor.findById(req.params.id);
 
     if (!visitor) {
@@ -7185,7 +7665,7 @@ app.put("/api/visitors/:id/checkout", authMiddleware, async (req, res) => {
 });
 
 // Report visitor
-app.post("/api/visitors/:id/report", authMiddleware, async (req, res) => {
+app.post("/api/visitors/:id/report", authMiddleware, requireRoles("admin", "staff", "security"), async (req, res) => {
   try {
     const { reason } = req.body;
     const visitor = await Visitor.findById(req.params.id);
@@ -7525,6 +8005,10 @@ app.get("/api/visitors/user/:userId", authMiddleware, async (req, res) => {
 
     if (!visitor) {
       visitor = await Visitor.findOne({ email: user.email });
+    }
+
+    if (visitor && markPastVisitLifecycleIfNeeded(visitor)) {
+      await visitor.save();
     }
 
     res.json({

@@ -377,6 +377,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [showQRModal, setShowQRModal] = useState(false);
   const [showAppointmentDatePicker, setShowAppointmentDatePicker] = useState(false);
   const [showAppointmentTimePicker, setShowAppointmentTimePicker] = useState(false);
+  const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
+  const [showEditAppointmentDatePicker, setShowEditAppointmentDatePicker] = useState(false);
+  const [showEditAppointmentTimePicker, setShowEditAppointmentTimePicker] = useState(false);
+  const [showCancelAppointmentModal, setShowCancelAppointmentModal] = useState(false);
   const [showPurposeDropdown, setShowPurposeDropdown] = useState(false);
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
   const [showIdTypeDropdown, setShowIdTypeDropdown] = useState(false);
@@ -393,6 +397,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [isVisitorDarkMode, setIsVisitorDarkMode] = useState(false);
   const [dashboardScrollY, setDashboardScrollY] = useState(0);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
+  const [isUpdatingAppointment, setIsUpdatingAppointment] = useState(false);
   const [isVerifyingAppointmentId, setIsVerifyingAppointmentId] = useState(false);
   const [isVirtualTapLoading, setIsVirtualTapLoading] = useState(false);
   const [isCheckInLoading, setIsCheckInLoading] = useState(false);
@@ -415,6 +420,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     idImage: null,
     idVerification: null,
     privacyAccepted: false,
+  });
+  const [appointmentEditForm, setAppointmentEditForm] = useState({
+    appointment: null,
+    preferredDate: null,
+    preferredTime: null,
+    reason: "",
+  });
+  const [appointmentCancellationForm, setAppointmentCancellationForm] = useState({
+    appointment: null,
+    reason: "",
   });
   const [hasAppointmentDraft, setHasAppointmentDraft] = useState(false);
   const [isAppointmentScreenTransitioning, setIsAppointmentScreenTransitioning] = useState(false);
@@ -585,8 +600,35 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return "Your SafePass card is not active yet. Please contact admin or security.";
     }
 
+    const visitStatus = String(visitorRecord?.status || "").toLowerCase();
+    if (visitStatus === "checked_out" || visitorRecord?.checkedOutAt) {
+      return "This visit has already been completed.";
+    }
+
+    if (visitStatus === "no_show" || visitorRecord?.noShowMarkedAt) {
+      return "This appointment date has passed and was marked as no-show. Please request a new appointment.";
+    }
+
+    if (visitStatus === "expired" || visitorRecord?.visitExpiredAt) {
+      return "This appointment has expired. Please request a new appointment.";
+    }
+
     if (!isVisitorAccessApproved(visitorRecord)) {
       return "This visit must be approved before check-in and check-out are available.";
+    }
+
+    const scheduledDate = getValidDate(visitorRecord?.visitDate);
+    if (scheduledDate) {
+      const visitDay = new Date(scheduledDate);
+      visitDay.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (visitDay.getTime() < today.getTime()) {
+        return "This appointment date has passed. Please request a new appointment.";
+      }
+      if (visitDay.getTime() > today.getTime()) {
+        return "Check-in is only available on your appointment date.";
+      }
     }
 
     return "";
@@ -938,7 +980,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       !visitor?._id ||
       status === "pending" ||
       approvalStatus === "pending" ||
-      appointmentStatus === "pending";
+      appointmentStatus === "pending" ||
+      appointmentStatus === "rescheduled";
 
     if (!isWaitingForVisitUpdate) {
       return undefined;
@@ -2049,6 +2092,99 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     applyAppointmentDateSelection(new Date(year, month - 1, day));
   };
 
+  const isAppointmentManageable = (record = visitor) => {
+    const appointmentStatus = String(record?.appointmentStatus || "").toLowerCase();
+    const visitStatus = String(record?.status || "").toLowerCase();
+    if (record?.requestCategory !== "appointment" || record?.approvalFlow !== "staff") return false;
+    if (["rejected", "cancelled", "completed"].includes(appointmentStatus)) return false;
+    if (["checked_in", "checked_out", "expired", "no_show", "rejected", "cancelled"].includes(visitStatus)) return false;
+    if (record?.checkedOutAt || record?.visitExpiredAt || record?.noShowMarkedAt) return false;
+    if (record?.appointmentCompletedAt) return false;
+    return ["pending", "approved", "adjusted", "rescheduled"].includes(appointmentStatus);
+  };
+
+  const getAppointmentManageDisabledReason = (record = visitor) => {
+    const appointmentStatus = String(record?.appointmentStatus || "").toLowerCase();
+    if (appointmentStatus === "rejected") return "Rejected appointments can no longer be changed.";
+    if (appointmentStatus === "cancelled") return "This appointment is already cancelled.";
+    if (record?.appointmentCompletedAt || String(record?.status || "").toLowerCase() === "checked_out") {
+      return "Completed appointments can no longer be changed.";
+    }
+    if (String(record?.status || "").toLowerCase() === "no_show" || record?.noShowMarkedAt) {
+      return "Missed appointments can no longer be changed. Please request a new appointment.";
+    }
+    if (String(record?.status || "").toLowerCase() === "expired" || record?.visitExpiredAt) {
+      return "Expired appointments can no longer be changed. Please request a new appointment.";
+    }
+    if (String(record?.status || "").toLowerCase() === "checked_in") {
+      return "Checked-in appointments can no longer be changed.";
+    }
+    return "This appointment can no longer be changed.";
+  };
+
+  const openEditAppointmentModal = (record = visitor) => {
+    if (!isAppointmentManageable(record)) {
+      showVisitorAlert("Appointment Locked", getAppointmentManageDisabledReason(record));
+      return;
+    }
+
+    const dateValue = getValidDate(record?.visitDate) || getDefaultAppointmentDate();
+    const timeValue = getValidDate(record?.visitTime) || getDefaultAppointmentTime();
+    setAppointmentEditForm({
+      appointment: record,
+      preferredDate: dateValue,
+      preferredTime: timeValue,
+      reason: "",
+    });
+    setShowEditAppointmentDatePicker(false);
+    setShowEditAppointmentTimePicker(false);
+    setShowEditAppointmentModal(true);
+  };
+
+  const openCancelAppointmentModal = (record = visitor) => {
+    if (!isAppointmentManageable(record)) {
+      showVisitorAlert("Appointment Locked", getAppointmentManageDisabledReason(record));
+      return;
+    }
+
+    setAppointmentCancellationForm({
+      appointment: record,
+      reason: "",
+    });
+    setShowCancelAppointmentModal(true);
+  };
+
+  const applyEditAppointmentDateSelection = (selectedValue) => {
+    const selectedDate = getValidDate(selectedValue);
+    if (!selectedDate) return;
+    selectedDate.setHours(12, 0, 0, 0);
+    if (selectedDate.getDay() === 0) {
+      const adjustedDate = getNextAvailableAppointmentDate(selectedDate);
+      showVisitorAlert(
+        "Sunday Unavailable",
+        `Appointments are only available from Monday to Saturday. We moved your date to ${formatDate(adjustedDate)}.`,
+      );
+      selectedDate.setTime(adjustedDate.getTime());
+    }
+    setAppointmentEditForm((prev) => ({ ...prev, preferredDate: selectedDate }));
+  };
+
+  const handleEditAppointmentWebDateChange = (event) => {
+    const nextValue = event?.target?.value;
+    if (!nextValue) return;
+    const [year, month, day] = nextValue.split("-").map(Number);
+    if (!year || !month || !day) return;
+    applyEditAppointmentDateSelection(new Date(year, month - 1, day));
+  };
+
+  const handleEditAppointmentDateChange = (event, selectedDate) => {
+    if (Platform.OS === "android") {
+      setShowEditAppointmentDatePicker(false);
+    }
+    if (event?.type === "dismissed" || !selectedDate) return;
+    applyEditAppointmentDateSelection(selectedDate);
+  };
+
   const buildAppointmentForm = (visitorRecord = visitor) => {
     return {
       preferredDate: getDefaultAppointmentDate(),
@@ -2069,7 +2205,44 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setHasAppointmentDraft(false);
   };
 
-  const handlePickAppointmentIdImage = async () => {
+  const processAppointmentIdImageAsset = async (asset) => {
+    if (!asset?.uri) return;
+
+    const imageValue = asset.base64
+      ? `data:${asset.mimeType || "image/jpeg"};base64,${asset.base64}`
+      : asset.uri;
+
+    setIsVerifyingAppointmentId(true);
+    setHasAppointmentDraft(true);
+    setAppointmentForm((prev) => ({
+      ...prev,
+      idImage: imageValue,
+      idVerification: {
+        status: "scanning",
+        confidence: 0,
+        message: "Scanning your valid ID image...",
+      },
+    }));
+
+    const verification = await IDScannerService.verifyIDImage({
+      imageUri: imageValue,
+      idType: appointmentForm.idType,
+    });
+
+    setAppointmentForm((prev) => ({
+      ...prev,
+      idImage: imageValue,
+      idVerification: verification,
+    }));
+
+    showVisitorAlert(
+      verification?.isValid ? "ID Pre-check Passed" : "ID Needs a Clearer Photo",
+      verification?.message ||
+        `Your ${appointmentForm.idType} picture was saved. Please make sure the uploaded photo matches the ID type you selected.`,
+    );
+  };
+
+  const selectAppointmentIdImage = async (source = "gallery") => {
     try {
       if (!appointmentForm.idType) {
         showVisitorAlert(
@@ -2079,65 +2252,57 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         return;
       }
 
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const isCameraSource = source === "camera";
+      const permission = isCameraSource
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         showVisitorAlert(
           "Permission Needed",
-          "Please allow photo access so you can upload a valid ID picture.",
+          isCameraSource
+            ? "Please allow camera access so you can take a valid ID picture."
+            : "Please allow photo access so you can upload a valid ID picture.",
         );
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const pickerOptions = {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.75,
         base64: true,
-      });
+      };
+      const result = isCameraSource
+        ? await ImagePicker.launchCameraAsync(pickerOptions)
+        : await ImagePicker.launchImageLibraryAsync(pickerOptions);
 
       if (result.canceled) return;
 
       const asset = result.assets?.[0];
-    if (!asset?.uri) return;
-
-      const imageValue = asset.base64
-        ? `data:${asset.mimeType || "image/jpeg"};base64,${asset.base64}`
-        : asset.uri;
-
-      setIsVerifyingAppointmentId(true);
-      setHasAppointmentDraft(true);
-      setAppointmentForm((prev) => ({
-        ...prev,
-        idImage: imageValue,
-        idVerification: {
-          status: "scanning",
-          confidence: 0,
-          message: "Scanning your valid ID image...",
-        },
-      }));
-
-      const verification = await IDScannerService.verifyIDImage({
-        imageUri: imageValue,
-        idType: appointmentForm.idType,
-      });
-
-      setAppointmentForm((prev) => ({
-        ...prev,
-        idImage: imageValue,
-        idVerification: verification,
-      }));
-
-      showVisitorAlert(
-        verification?.isValid ? "ID Pre-check Passed" : "ID Needs a Clearer Photo",
-        verification?.message ||
-          `Your ${appointmentForm.idType} picture was saved. Please make sure the uploaded photo matches the ID type you selected.`,
-      );
+      await processAppointmentIdImageAsset(asset);
     } catch (error) {
       console.error("Pick appointment ID image error:", error);
-      showVisitorAlert("Upload Failed", "Unable to select the ID image. Please try again.");
+      showVisitorAlert("Upload Failed", "Unable to prepare the ID image. Please try again.");
     } finally {
       setIsVerifyingAppointmentId(false);
     }
+  };
+
+  const handlePickAppointmentIdImage = async () => {
+    if (Platform.OS === "web") {
+      await selectAppointmentIdImage("gallery");
+      return;
+    }
+
+    showVisitorAlert(
+      "Valid ID Picture",
+      "Choose how you want to add your valid ID picture.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Take Photo", onPress: () => selectAppointmentIdImage("camera") },
+        { text: "Choose from Gallery", onPress: () => selectAppointmentIdImage("gallery") },
+      ],
+    );
   };
 
   const handleVerifyAppointmentIdAgain = async () => {
@@ -2386,6 +2551,139 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     } finally {
       setIsSubmittingAppointment(false);
     }
+  };
+
+  const submitAppointmentReschedule = async () => {
+    const targetAppointment = appointmentEditForm.appointment;
+    if (!targetAppointment?._id) {
+      showVisitorAlert("Missing Appointment", "Please select an appointment to edit.");
+      return;
+    }
+
+    if (!isAppointmentManageable(targetAppointment)) {
+      showVisitorAlert("Appointment Locked", getAppointmentManageDisabledReason(targetAppointment));
+      return;
+    }
+
+    const preferredDate = appointmentEditForm.preferredDate;
+    const preferredTime = appointmentEditForm.preferredTime;
+    if (!preferredDate || !preferredTime) {
+      showVisitorAlert("Missing Schedule", "Please choose the new appointment date and time.");
+      return;
+    }
+
+    const combinedDateTime = new Date(preferredDate);
+    combinedDateTime.setHours(preferredTime.getHours(), preferredTime.getMinutes(), 0, 0);
+    if (Number.isNaN(combinedDateTime.getTime())) {
+      showVisitorAlert("Invalid Schedule", "Please choose a valid appointment date and time.");
+      return;
+    }
+
+    if (combinedDateTime < new Date(Date.now() - 60 * 1000)) {
+      showVisitorAlert("Invalid Schedule", "Appointment schedule cannot be in the past.");
+      return;
+    }
+
+    if (new Date(preferredDate).getDay() === 0) {
+      showVisitorAlert("Sunday Unavailable", "Appointments are only available from Monday to Saturday.");
+      return;
+    }
+
+    setIsUpdatingAppointment(true);
+    try {
+      const response = await ApiService.rescheduleVisitorAppointment(targetAppointment._id, {
+        preferredDate: new Date(preferredDate).toISOString(),
+        preferredTime: combinedDateTime.toISOString(),
+        reason: String(appointmentEditForm.reason || "").trim(),
+      });
+
+      if (response?.success) {
+        setShowEditAppointmentModal(false);
+        showVisitorPushNotice({
+          title: "Appointment Updated",
+          message: response.message || "Your appointment schedule was updated and sent to staff.",
+          type: "success",
+        });
+        showVisitorAlert("Appointment Updated", response.message || "Your appointment schedule was updated.");
+        await loadVisitorData();
+        handleAppointmentScreenNavigation("history", "Refreshing appointment history...");
+        return;
+      }
+
+      showVisitorAlert("Update Failed", response?.message || "Failed to update appointment.");
+    } catch (error) {
+      console.error("Reschedule appointment error:", error);
+      showVisitorAlert("Update Failed", error?.message || "Failed to update appointment.");
+    } finally {
+      setIsUpdatingAppointment(false);
+    }
+  };
+
+  const confirmAppointmentReschedule = () => {
+    showVisitorAlert(
+      "Confirm Appointment Update",
+      "This will send the new date and time to staff for review. Continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Update", onPress: submitAppointmentReschedule },
+      ],
+    );
+  };
+
+  const submitAppointmentCancellation = async () => {
+    const targetAppointment = appointmentCancellationForm.appointment;
+    const reason = String(appointmentCancellationForm.reason || "").trim();
+
+    if (!targetAppointment?._id) {
+      showVisitorAlert("Missing Appointment", "Please select an appointment to cancel.");
+      return;
+    }
+
+    if (!isAppointmentManageable(targetAppointment)) {
+      showVisitorAlert("Appointment Locked", getAppointmentManageDisabledReason(targetAppointment));
+      return;
+    }
+
+    if (!reason) {
+      showVisitorAlert("Reason Required", "Please enter a reason for cancellation.");
+      return;
+    }
+
+    setIsUpdatingAppointment(true);
+    try {
+      const response = await ApiService.cancelVisitorAppointment(targetAppointment._id, { reason });
+
+      if (response?.success) {
+        setShowCancelAppointmentModal(false);
+        showVisitorPushNotice({
+          title: "Appointment Cancelled",
+          message: response.message || "Your appointment has been cancelled.",
+          type: "success",
+        });
+        showVisitorAlert("Appointment Cancelled", response.message || "Your appointment has been cancelled.");
+        await loadVisitorData();
+        handleAppointmentScreenNavigation("history", "Refreshing appointment history...");
+        return;
+      }
+
+      showVisitorAlert("Cancellation Failed", response?.message || "Failed to cancel appointment.");
+    } catch (error) {
+      console.error("Cancel appointment error:", error);
+      showVisitorAlert("Cancellation Failed", error?.message || "Failed to cancel appointment.");
+    } finally {
+      setIsUpdatingAppointment(false);
+    }
+  };
+
+  const confirmAppointmentCancellation = () => {
+    showVisitorAlert(
+      "Confirm Cancellation",
+      "This will cancel your appointment and notify staff and admin. Continue?",
+      [
+        { text: "Back", style: "cancel" },
+        { text: "Cancel Appointment", style: "destructive", onPress: submitAppointmentCancellation },
+      ],
+    );
   };
 
   const handleVirtualNfcCardTap = async () => {
@@ -2655,7 +2953,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getStatusColor = () => {
     if (visitor?.approvalStatus === "pending") return "#F59E0B";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "#F59E0B";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "#D97706";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "#0A3D91";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "cancelled") return "#6B7280";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "#DC2626";
     switch(visitor?.status) {
       case 'checked_in': return '#10B981';
@@ -2663,6 +2963,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       case 'pending': return '#F59E0B';
       case 'checked_out': return '#6B7280';
       case 'expired': return '#EF4444';
+      case 'no_show': return '#B45309';
       case 'rejected': return '#DC2626';
       default: return '#0A3D91';
     }
@@ -2671,7 +2972,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getStatusText = () => {
     if (visitor?.approvalStatus === "pending") return "Pending Admin Approval";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "Pending Staff Review";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "Rescheduled - Staff Review";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "Time Adjusted";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "cancelled") return "Appointment Cancelled";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "Appointment Declined";
     switch(visitor?.status) {
       case 'checked_in': return 'Checked In';
@@ -2679,6 +2982,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       case 'pending': return 'Pending Approval';
       case 'checked_out': return 'Checked Out';
       case 'expired': return 'Expired';
+      case 'no_show': return 'No Show';
       case 'rejected': return 'Rejected';
       default: return 'Active';
     }
@@ -2687,7 +2991,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getStatusIcon = () => {
     if (visitor?.approvalStatus === "pending") return "time-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "briefcase-outline";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "refresh-circle-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "swap-horizontal-outline";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "cancelled") return "ban-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "close-circle";
     switch(visitor?.status) {
       case 'checked_in': return 'checkmark-circle';
@@ -2695,6 +3001,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       case 'pending': return 'time-outline';
       case 'checked_out': return 'log-out';
       case 'expired': return 'alert-circle';
+      case 'no_show': return 'time-outline';
       case 'rejected': return 'close-circle';
       default: return 'id-card';
     }
@@ -2703,7 +3010,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getAppointmentStatusText = (record = {}) => {
     if (record?.approvalStatus === "pending") return "Pending Admin Approval";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "Pending Staff Review";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "Rescheduled - Staff Review";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjusted") return "Time Adjusted";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "cancelled") return "Appointment Cancelled";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "Appointment Declined";
     switch (record?.status) {
       case "checked_in": return "Checked In";
@@ -2711,6 +3020,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       case "pending": return "Pending Approval";
       case "checked_out": return "Checked Out";
       case "expired": return "Expired";
+      case "no_show": return "No Show";
       case "rejected": return "Rejected";
       default: return "Active";
     }
@@ -2719,7 +3029,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getAppointmentStatusColor = (record = {}) => {
     if (record?.approvalStatus === "pending") return "#F59E0B";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "#F59E0B";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "#D97706";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjusted") return "#0A3D91";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "cancelled") return "#6B7280";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "#DC2626";
     switch (record?.status) {
       case "checked_in": return "#10B981";
@@ -2727,6 +3039,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       case "pending": return "#F59E0B";
       case "checked_out": return "#6B7280";
       case "expired": return "#EF4444";
+      case "no_show": return "#B45309";
       case "rejected": return "#DC2626";
       default: return "#0A3D91";
     }
@@ -2735,7 +3048,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getAppointmentStatusIcon = (record = {}) => {
     if (record?.approvalStatus === "pending") return "time-outline";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "briefcase-outline";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "refresh-circle-outline";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjusted") return "swap-horizontal-outline";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "cancelled") return "ban-outline";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "close-circle";
     switch (record?.status) {
       case "checked_in": return "checkmark-circle";
@@ -2743,6 +3058,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       case "pending": return "time-outline";
       case "checked_out": return "log-out";
       case "expired": return "alert-circle";
+      case "no_show": return "time-outline";
       case "rejected": return "close-circle";
       default: return "id-card";
     }
@@ -2857,6 +3173,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       statusIcon: getAppointmentStatusIcon(record),
       statusColor: recordStatusColor,
       description:
+        record?.appointmentCancellationReason ||
+        record?.appointmentRescheduleReason ||
         record?.staffApprovalNote ||
         record?.staffRejectionReason ||
         record?.approvalNotes ||
@@ -3903,7 +4221,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
         <View style={visitorDashboardStyles.approvedActionGrid}>
           <AnimatedPressable
-            style={visitorDashboardStyles.approvedVirtualNfcCard}
+            style={[
+              visitorDashboardStyles.approvedVirtualNfcCard,
+              { width: compactApprovedActionCardWidth },
+            ]}
             onPress={() => setShowVirtualNfcModal(true)}
             activeOpacity={0.9}
             disabled={isVirtualTapLoading}
@@ -3915,7 +4236,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               style={visitorDashboardStyles.approvedVirtualNfcCardGradient}
             >
               <View style={visitorDashboardStyles.approvedVirtualNfcHeader}>
-                <View>
+                <View style={visitorDashboardStyles.approvedVirtualNfcCopy}>
                   <View style={visitorDashboardStyles.approvedVirtualNfcBadge}>
                     <Ionicons name="radio" size={14} color="#EEF5FF" />
                     <Text style={visitorDashboardStyles.approvedVirtualNfcBadgeText}>
@@ -4882,6 +5203,56 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     </View>
   );
 
+  const renderAppointmentManageActions = (record) => {
+    if (!record?._id) return null;
+    const canManage = isAppointmentManageable(record);
+
+    return (
+      <View style={visitorDashboardStyles.appointmentManageActionRow}>
+        <TouchableOpacity
+          style={[
+            visitorDashboardStyles.appointmentManageButton,
+            !canManage && visitorDashboardStyles.appointmentManageButtonDisabled,
+          ]}
+          activeOpacity={0.86}
+          disabled={!canManage || isUpdatingAppointment}
+          onPress={() => openEditAppointmentModal(record)}
+        >
+          <Ionicons name="create-outline" size={15} color={canManage ? "#0A3D91" : "#94A3B8"} />
+          <Text
+            style={[
+              visitorDashboardStyles.appointmentManageButtonText,
+              !canManage && visitorDashboardStyles.appointmentManageButtonTextDisabled,
+            ]}
+          >
+            Edit
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            visitorDashboardStyles.appointmentManageButton,
+            visitorDashboardStyles.appointmentManageDangerButton,
+            !canManage && visitorDashboardStyles.appointmentManageButtonDisabled,
+          ]}
+          activeOpacity={0.86}
+          disabled={!canManage || isUpdatingAppointment}
+          onPress={() => openCancelAppointmentModal(record)}
+        >
+          <Ionicons name="close-circle-outline" size={15} color={canManage ? "#DC2626" : "#94A3B8"} />
+          <Text
+            style={[
+              visitorDashboardStyles.appointmentManageButtonText,
+              visitorDashboardStyles.appointmentManageDangerText,
+              !canManage && visitorDashboardStyles.appointmentManageButtonTextDisabled,
+            ]}
+          >
+            Cancel
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const renderAppointmentHistoryPanel = () => (
     <View style={[visitorDashboardStyles.appointmentScreenShell, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.appointmentScreenCard}>
@@ -4971,6 +5342,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         </Text>
                       </TouchableOpacity>
                     ) : null}
+                    {renderAppointmentManageActions(entry.record)}
                   </View>
                 ))}
               </View>
@@ -4982,6 +5354,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryDateCell]}>Date</Text>
                   <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryTimeCell]}>Time</Text>
                   <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryStatusCell]}>Status</Text>
+                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryActionCell]}>Actions</Text>
                 </View>
                 {appointmentHistoryEntries.map((entry) => (
                   <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryTableRow}>
@@ -5002,6 +5375,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       <Text style={[visitorDashboardStyles.appointmentHistoryStatusPillText, { color: entry.statusColor }]} numberOfLines={2}>
                         {entry.statusLabel}
                       </Text>
+                    </View>
+                    <View style={visitorDashboardStyles.appointmentHistoryActionCell}>
+                      {renderAppointmentManageActions(entry.record)}
                     </View>
                   </View>
                 ))}
@@ -5522,6 +5898,244 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <Ionicons name="close" size={16} color="#64748B" />
         </TouchableOpacity>
       ) : null}
+
+      <Modal
+        visible={showEditAppointmentModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEditAppointmentModal(false)}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.appointmentManageModal}>
+            <View style={visitorDashboardStyles.appointmentManageModalHeader}>
+              <View style={visitorDashboardStyles.appointmentManageModalIcon}>
+                <Ionicons name="create-outline" size={22} color="#0A3D91" />
+              </View>
+              <View style={visitorDashboardStyles.appointmentManageModalCopy}>
+                <Text style={visitorDashboardStyles.appointmentManageModalTitle}>Edit Appointment</Text>
+                <Text style={visitorDashboardStyles.appointmentManageModalSubtitle}>
+                  Change your appointment date or time. Staff will be notified.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={visitorDashboardStyles.appointmentManageModalClose}
+                onPress={() => setShowEditAppointmentModal(false)}
+                disabled={isUpdatingAppointment}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={visitorDashboardStyles.appointmentManageModalBody}>
+              <View style={visitorDashboardStyles.appointmentManageOriginalCard}>
+                <Text style={visitorDashboardStyles.appointmentManageOriginalLabel}>Current schedule</Text>
+                <Text style={visitorDashboardStyles.appointmentManageOriginalValue}>
+                  {appointmentEditForm.appointment?.visitDate ? formatDate(appointmentEditForm.appointment.visitDate) : "Not scheduled"} at {appointmentEditForm.appointment?.visitTime ? formatTime(appointmentEditForm.appointment.visitTime) : "Not scheduled"}
+                </Text>
+              </View>
+
+              <View style={visitorDashboardStyles.appointmentManageFieldGrid}>
+                <View style={visitorDashboardStyles.appointmentManageField}>
+                  <Text style={visitorDashboardStyles.appointmentFieldLabel}>New Date</Text>
+                  {Platform.OS === "web" ? (
+                    <input
+                      type="date"
+                      value={
+                        appointmentEditForm.preferredDate
+                          ? new Date(appointmentEditForm.preferredDate).toISOString().slice(0, 10)
+                          : ""
+                      }
+                      min={getAppointmentMinDateValue()}
+                      onChange={handleEditAppointmentWebDateChange}
+                      style={{
+                        minHeight: 44,
+                        borderRadius: 12,
+                        border: "1px solid #D9E4F2",
+                        padding: "0 12px",
+                        fontWeight: 700,
+                        color: "#0F172A",
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={visitorDashboardStyles.appointmentPickerField}
+                        onPress={() => setShowEditAppointmentDatePicker((current) => !current)}
+                      >
+                        <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                          {formatAppointmentPickerDate(appointmentEditForm.preferredDate)}
+                        </Text>
+                        <Ionicons name="calendar-outline" size={18} color="#0A3D91" />
+                      </TouchableOpacity>
+                      {showEditAppointmentDatePicker && DateTimePickerComponent ? (
+                        <DateTimePickerComponent
+                          value={getValidDate(appointmentEditForm.preferredDate) || getDefaultAppointmentDate()}
+                          mode="date"
+                          display={Platform.OS === "ios" ? "spinner" : "default"}
+                          onChange={handleEditAppointmentDateChange}
+                          minimumDate={getNextAvailableAppointmentDate(new Date())}
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </View>
+
+                <View style={visitorDashboardStyles.appointmentManageField}>
+                  <Text style={visitorDashboardStyles.appointmentFieldLabel}>New Time</Text>
+                  <TouchableOpacity
+                    style={visitorDashboardStyles.appointmentPickerField}
+                    onPress={() => setShowEditAppointmentTimePicker((current) => !current)}
+                  >
+                    <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                      {appointmentEditForm.preferredTime ? formatTime(appointmentEditForm.preferredTime) : "Select time"}
+                    </Text>
+                    <Ionicons name={showEditAppointmentTimePicker ? "chevron-up" : "chevron-down"} size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+                  {showEditAppointmentTimePicker ? (
+                    <View style={visitorDashboardStyles.appointmentManageTimeList}>
+                      <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                        {appointmentTimeOptions.map((option) => {
+                          const isSelected =
+                            appointmentEditForm.preferredTime &&
+                            new Date(appointmentEditForm.preferredTime).getHours() === option.getHours() &&
+                            new Date(appointmentEditForm.preferredTime).getMinutes() === option.getMinutes();
+                          return (
+                            <TouchableOpacity
+                              key={`edit-${option.getHours()}-${option.getMinutes()}`}
+                              style={[
+                                visitorDashboardStyles.pickerOptionItem,
+                                isSelected && visitorDashboardStyles.pickerOptionItemActive,
+                              ]}
+                              onPress={() => {
+                                setAppointmentEditForm((prev) => ({ ...prev, preferredTime: option }));
+                                setShowEditAppointmentTimePicker(false);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  visitorDashboardStyles.pickerOptionText,
+                                  isSelected && visitorDashboardStyles.pickerOptionTextActive,
+                                ]}
+                              >
+                                {formatTime(option)}
+                              </Text>
+                              {isSelected ? <Ionicons name="checkmark-circle" size={18} color="#0A3D91" /> : null}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+
+              <TextInput
+                style={[visitorDashboardStyles.appointmentFieldInput, visitorDashboardStyles.appointmentFieldTextarea]}
+                value={appointmentEditForm.reason}
+                onChangeText={(text) => setAppointmentEditForm((prev) => ({ ...prev, reason: text }))}
+                placeholder="Reason for reschedule (optional)"
+                placeholderTextColor="#94A3B8"
+                multiline
+              />
+            </View>
+
+            <View style={visitorDashboardStyles.appointmentManageModalActions}>
+              <TouchableOpacity
+                style={visitorDashboardStyles.appointmentSecondaryButton}
+                onPress={() => setShowEditAppointmentModal(false)}
+                disabled={isUpdatingAppointment}
+              >
+                <Text style={visitorDashboardStyles.appointmentSecondaryButtonText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={visitorDashboardStyles.appointmentPrimaryButton}
+                onPress={confirmAppointmentReschedule}
+                disabled={isUpdatingAppointment}
+              >
+                {isUpdatingAppointment ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="refresh-outline" size={18} color="#FFFFFF" />
+                    <Text style={visitorDashboardStyles.appointmentPrimaryButtonText}>Update</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCancelAppointmentModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCancelAppointmentModal(false)}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.appointmentManageModal}>
+            <View style={visitorDashboardStyles.appointmentManageModalHeader}>
+              <View style={[visitorDashboardStyles.appointmentManageModalIcon, visitorDashboardStyles.appointmentManageModalDangerIcon]}>
+                <Ionicons name="close-circle-outline" size={22} color="#DC2626" />
+              </View>
+              <View style={visitorDashboardStyles.appointmentManageModalCopy}>
+                <Text style={visitorDashboardStyles.appointmentManageModalTitle}>Cancel Appointment</Text>
+                <Text style={visitorDashboardStyles.appointmentManageModalSubtitle}>
+                  Tell staff why you need to cancel this appointment.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={visitorDashboardStyles.appointmentManageModalClose}
+                onPress={() => setShowCancelAppointmentModal(false)}
+                disabled={isUpdatingAppointment}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={visitorDashboardStyles.appointmentManageModalBody}>
+              <View style={visitorDashboardStyles.appointmentManageOriginalCard}>
+                <Text style={visitorDashboardStyles.appointmentManageOriginalLabel}>Appointment</Text>
+                <Text style={visitorDashboardStyles.appointmentManageOriginalValue}>
+                  {appointmentCancellationForm.appointment?.visitDate ? formatDate(appointmentCancellationForm.appointment.visitDate) : "Not scheduled"} at {appointmentCancellationForm.appointment?.visitTime ? formatTime(appointmentCancellationForm.appointment.visitTime) : "Not scheduled"}
+                </Text>
+              </View>
+              <TextInput
+                style={[visitorDashboardStyles.appointmentFieldInput, visitorDashboardStyles.appointmentFieldTextarea]}
+                value={appointmentCancellationForm.reason}
+                onChangeText={(text) => setAppointmentCancellationForm((prev) => ({ ...prev, reason: text }))}
+                placeholder="Reason for cancellation"
+                placeholderTextColor="#94A3B8"
+                multiline
+              />
+            </View>
+
+            <View style={visitorDashboardStyles.appointmentManageModalActions}>
+              <TouchableOpacity
+                style={visitorDashboardStyles.appointmentSecondaryButton}
+                onPress={() => setShowCancelAppointmentModal(false)}
+                disabled={isUpdatingAppointment}
+              >
+                <Text style={visitorDashboardStyles.appointmentSecondaryButtonText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[visitorDashboardStyles.appointmentPrimaryButton, visitorDashboardStyles.appointmentManageCancelSubmit]}
+                onPress={confirmAppointmentCancellation}
+                disabled={isUpdatingAppointment}
+              >
+                {isUpdatingAppointment ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="close-circle-outline" size={18} color="#FFFFFF" />
+                    <Text style={visitorDashboardStyles.appointmentPrimaryButtonText}>Cancel Appointment</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={!!visitorAlert}

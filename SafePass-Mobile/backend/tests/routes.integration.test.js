@@ -8,6 +8,8 @@ const mongoose = require("mongoose");
 process.env.JWT_SECRET = process.env.JWT_SECRET || "integration-test-secret";
 process.env.ARDUINO_DEVICE_KEY =
   process.env.ARDUINO_DEVICE_KEY || "integration-test-device-key";
+process.env.NODE_ENV = "test";
+process.env.ALLOW_SENSITIVE_DEBUG_LOGS = "false";
 
 mongoose.connect = async () => mongoose.connection;
 mongoose.connection.readyState = 1;
@@ -169,6 +171,9 @@ const NotificationMock = {
 };
 
 const VisitorMock = {};
+const CounterMock = {
+  findOneAndUpdate: async () => ({ sequence: 1 }),
+};
 
 const registerMockModule = (relativePath, exportsValue) => {
   const resolvedPath = path.resolve(__dirname, relativePath);
@@ -185,6 +190,7 @@ registerMockModule("../models/AppSettings.js", AppSettingsMock);
 registerMockModule("../models/AccessLog.js", AccessLogMock);
 registerMockModule("../models/Notification.js", NotificationMock);
 registerMockModule("../models/Visitor.js", VisitorMock);
+registerMockModule("../models/Counter.js", CounterMock);
 
 const app = require("../server");
 

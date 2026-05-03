@@ -1017,6 +1017,32 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async rescheduleVisitorAppointment(visitorId, appointmentData) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/appointment/reschedule`, {
+        method: "PUT",
+        body: appointmentData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Reschedule visitor appointment error:", error);
+      throw error;
+    }
+  }
+
+  async cancelVisitorAppointment(visitorId, cancellationData) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/appointment/cancel`, {
+        method: "PUT",
+        body: cancellationData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Cancel visitor appointment error:", error);
+      throw error;
+    }
+  }
+
   async getAppointmentAvailability({ date, department, departments } = {}) {
     try {
       const queryString = new URLSearchParams({
