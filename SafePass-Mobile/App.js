@@ -58,10 +58,10 @@ const Storage =
 const Stack = createNativeStackNavigator();
 const APP_NAME = APP_DISPLAY_NAME;
 const APP_ORGANIZATION = APP_ORGANIZATION_NAME;
-const IDLE_LOGOUT_MS = 15 * 60 * 1000;
+const IDLE_LOGOUT_MS = 30 * 60 * 1000;
 const LAST_ACTIVITY_AT_KEY = "lastActivityAt";
 const AUTH_NOTICE_KEY = "authNotice";
-const SESSION_EXPIRED_MESSAGE = "Your session expired. Please sign in again.";
+const SESSION_EXPIRED_MESSAGE = "You were inactive for 30 minutes. Please login again.";
 const WEB_ROUTE_TITLES = {
   RoleSelect: `Access Portal | ${APP_ORGANIZATION}`,
   Login: `Login | ${APP_ORGANIZATION}`,
@@ -120,7 +120,30 @@ export default function App() {
     }
   }, [navigationRef]);
 
-  const performAppLogout = useCallback(async ({ resetNavigation = true } = {}) => {
+  const getStoredIdleState = useCallback(async () => {
+    const lastActivityRaw = await Storage.getItem(LAST_ACTIVITY_AT_KEY);
+    const lastActivityAt = Number(lastActivityRaw);
+
+    if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) {
+      return {
+        expired: false,
+        lastActivityAt: Date.now(),
+        remainingMs: IDLE_LOGOUT_MS,
+      };
+    }
+
+    const elapsedMs = Date.now() - lastActivityAt;
+    return {
+      expired: elapsedMs >= IDLE_LOGOUT_MS,
+      lastActivityAt,
+      remainingMs: Math.max(IDLE_LOGOUT_MS - elapsedMs, 0),
+    };
+  }, []);
+
+  const performAppLogout = useCallback(async ({
+    resetNavigation = true,
+    notice = "",
+  } = {}) => {
     try {
       await ApiService.logout();
     } catch (error) {
@@ -128,6 +151,9 @@ export default function App() {
       await ApiService.clearAuth();
     } finally {
       await Storage.removeItem(LAST_ACTIVITY_AT_KEY);
+      if (notice) {
+        await Storage.setItem(AUTH_NOTICE_KEY, notice);
+      }
       setCurrentUser(null);
       setIsLoading(false);
       if (resetNavigation) {
@@ -149,9 +175,37 @@ export default function App() {
     });
 
     idleTimerRef.current = setTimeout(() => {
-      performAppLogout({ resetNavigation: true });
+      performAppLogout({
+        resetNavigation: true,
+        notice: SESSION_EXPIRED_MESSAGE,
+      });
     }, IDLE_LOGOUT_MS);
   }, [currentUser, performAppLogout]);
+
+  const scheduleIdleTimerFromStoredActivity = useCallback(async () => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+
+    if (!currentUser) return;
+
+    const idleState = await getStoredIdleState();
+    if (idleState.expired) {
+      await performAppLogout({
+        resetNavigation: true,
+        notice: SESSION_EXPIRED_MESSAGE,
+      });
+      return;
+    }
+
+    idleTimerRef.current = setTimeout(() => {
+      performAppLogout({
+        resetNavigation: true,
+        notice: SESSION_EXPIRED_MESSAGE,
+      });
+    }, idleState.remainingMs || IDLE_LOGOUT_MS);
+  }, [currentUser, getStoredIdleState, performAppLogout]);
 
   useEffect(() => {
     checkAuthStatus();
@@ -181,7 +235,7 @@ export default function App() {
       const wasBackground = /inactive|background/.test(appStateRef.current);
       appStateRef.current = nextState;
       if (nextState === "active" && wasBackground) {
-        resetIdleTimer();
+        scheduleIdleTimerFromStoredActivity();
       }
     });
 
@@ -210,7 +264,7 @@ export default function App() {
         idleTimerRef.current = null;
       }
     };
-  }, [currentUser, resetIdleTimer]);
+  }, [currentUser, resetIdleTimer, scheduleIdleTimerFromStoredActivity]);
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined" && isLoading) {
@@ -239,6 +293,15 @@ export default function App() {
         const rememberedSessionActive = await ApiService.isRememberedSessionActive();
         if (!rememberedSessionActive) {
           console.log("Remembered login expired. Asking user to sign in again.");
+          await ApiService.clearAuth();
+          await Storage.setItem(AUTH_NOTICE_KEY, SESSION_EXPIRED_MESSAGE);
+          setCurrentUser(null);
+          return;
+        }
+
+        const idleState = await getStoredIdleState();
+        if (idleState.expired) {
+          console.log("Idle session expired. Asking user to sign in again.");
           await ApiService.clearAuth();
           await Storage.setItem(AUTH_NOTICE_KEY, SESSION_EXPIRED_MESSAGE);
           setCurrentUser(null);

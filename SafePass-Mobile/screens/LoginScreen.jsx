@@ -38,7 +38,8 @@ const BIOMETRIC_LOGIN_EMAIL_KEY = "biometricLoginEmail";
 const BIOMETRIC_LOGIN_PASSWORD_KEY = "biometricLoginPassword";
 const LAST_ACTIVITY_AT_KEY = "lastActivityAt";
 const AUTH_NOTICE_KEY = "authNotice";
-const SESSION_EXPIRED_MESSAGE = "Your session expired. Please sign in again.";
+const IDLE_LOGOUT_MS = 30 * 60 * 1000;
+const SESSION_EXPIRED_MESSAGE = "You were inactive for 30 minutes. Please login again.";
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
@@ -347,6 +348,23 @@ export default function LoginScreen({ navigation, route }) {
       if (token && user) {
         const rememberedSessionActive = await ApiService.isRememberedSessionActive();
         if (!rememberedSessionActive) {
+          const rememberedEmail = await Storage.getItem("rememberedEmail");
+          await ApiService.clearAuth();
+          if (rememberedEmail) {
+            setEmail(rememberedEmail);
+            setRememberMe(true);
+          }
+          setLoginError(SESSION_EXPIRED_MESSAGE);
+          return;
+        }
+
+        const lastActivityRaw = await Storage.getItem(LAST_ACTIVITY_AT_KEY);
+        const lastActivityAt = Number(lastActivityRaw);
+        if (
+          Number.isFinite(lastActivityAt) &&
+          lastActivityAt > 0 &&
+          Date.now() - lastActivityAt >= IDLE_LOGOUT_MS
+        ) {
           const rememberedEmail = await Storage.getItem("rememberedEmail");
           await ApiService.clearAuth();
           if (rememberedEmail) {
