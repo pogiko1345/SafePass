@@ -137,6 +137,12 @@ export default function LoginScreen({ navigation, route }) {
   const [loginSuccessMessage, setLoginSuccessMessage] = useState("");
   const [biometricLoginReady, setBiometricLoginReady] = useState(false);
   const [isBiometricLoading, setIsBiometricLoading] = useState(false);
+  const [pendingVisitorOtpEmail, setPendingVisitorOtpEmail] = useState("");
+  const [loginOtpCode, setLoginOtpCode] = useState("");
+  const [loginOtpError, setLoginOtpError] = useState("");
+  const [isLoginOtpBusy, setIsLoginOtpBusy] = useState(false);
+  const [loginOtpExpiresAt, setLoginOtpExpiresAt] = useState(null);
+  const [loginOtpSecondsLeft, setLoginOtpSecondsLeft] = useState(0);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -203,6 +209,13 @@ export default function LoginScreen({ navigation, route }) {
 
   const normalizeResetOtpValue = (value) =>
     String(value || "").replace(/[^0-9]/g, "").slice(0, 6);
+
+  const formatOtpTimer = (seconds = 0) => {
+    const safeSeconds = Math.max(0, Number(seconds) || 0);
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+  };
 
   useEffect(() => {
     if (initialEmail) {
@@ -280,6 +293,26 @@ export default function LoginScreen({ navigation, route }) {
     }
     return () => clearInterval(interval);
   }, [resetStep, resetTimer]);
+
+  useEffect(() => {
+    if (!loginOtpExpiresAt) {
+      setLoginOtpSecondsLeft(0);
+      return undefined;
+    }
+
+    const updateTimer = () => {
+      const expiryTime = new Date(loginOtpExpiresAt).getTime();
+      if (!Number.isFinite(expiryTime)) {
+        setLoginOtpSecondsLeft(0);
+        return;
+      }
+      setLoginOtpSecondsLeft(Math.max(0, Math.ceil((expiryTime - Date.now()) / 1000)));
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [loginOtpExpiresAt]);
 
   const checkAuthAndConnection = async () => {
     try {
@@ -398,6 +431,10 @@ export default function LoginScreen({ navigation, route }) {
     setEmail(text.replace(/^\s+/, ""));
     setLoginError("");
     setLoginSuccessMessage("");
+    setPendingVisitorOtpEmail("");
+    setLoginOtpCode("");
+    setLoginOtpError("");
+    setLoginOtpExpiresAt(null);
     if (errors.email) {
       setErrors({ ...errors, email: "" });
     }
@@ -409,6 +446,74 @@ export default function LoginScreen({ navigation, route }) {
     setLoginSuccessMessage("");
     if (errors.password) {
       setErrors({ ...errors, password: "" });
+    }
+  };
+
+  const handleLoginOtpChange = (text) => {
+    setLoginOtpCode(normalizeResetOtpValue(text));
+    setLoginOtpError("");
+  };
+
+  const handleResendVisitorOtp = async () => {
+    const otpEmail = normalizeResetEmailValue(pendingVisitorOtpEmail || email);
+    if (!otpEmail) {
+      setLoginOtpError("Enter your visitor email first.");
+      return;
+    }
+
+    try {
+      setIsLoginOtpBusy(true);
+      setLoginOtpError("");
+      const response = await ApiService.resendRegistrationOtp(otpEmail);
+      if (response?.success) {
+        setPendingVisitorOtpEmail(otpEmail);
+        setLoginOtpCode("");
+        setLoginOtpExpiresAt(response.otpExpiresAt || new Date(Date.now() + 10 * 60 * 1000).toISOString());
+        setLoginSuccessMessage(
+          response.otpDeliveryMode === "backend_log"
+            ? "A new OTP was generated. For local testing, check the backend terminal."
+            : "A new OTP was sent to your email.",
+        );
+        return;
+      }
+      setLoginOtpError(response?.message || "Unable to resend OTP. Please try again.");
+    } catch (error) {
+      setLoginOtpError(error?.message || "Unable to resend OTP. Please try again.");
+    } finally {
+      setIsLoginOtpBusy(false);
+    }
+  };
+
+  const handleVerifyVisitorOtpFromLogin = async () => {
+    const otpEmail = normalizeResetEmailValue(pendingVisitorOtpEmail || email);
+    const otpCode = normalizeResetOtpValue(loginOtpCode);
+
+    if (!otpEmail) {
+      setLoginOtpError("Enter your visitor email first.");
+      return;
+    }
+    if (otpCode.length !== 6) {
+      setLoginOtpError("Enter the 6-digit OTP code.");
+      return;
+    }
+
+    try {
+      setIsLoginOtpBusy(true);
+      setLoginOtpError("");
+      const response = await ApiService.verifyRegistrationOtp(otpEmail, otpCode);
+      if (response?.success) {
+        setPendingVisitorOtpEmail("");
+        setLoginOtpCode("");
+        setLoginOtpExpiresAt(null);
+        setLoginSuccessMessage("Account verified. Signing you in...");
+        await handleLogin();
+        return;
+      }
+      setLoginOtpError(response?.message || "Invalid OTP code. Please try again.");
+    } catch (error) {
+      setLoginOtpError(error?.message || "Invalid OTP code. Please try again.");
+    } finally {
+      setIsLoginOtpBusy(false);
     }
   };
 
@@ -823,6 +928,10 @@ export default function LoginScreen({ navigation, route }) {
       
       if (verifyResponse.success) {
         setShowLoginSplash(true);
+        setPendingVisitorOtpEmail("");
+        setLoginOtpCode("");
+        setLoginOtpError("");
+        setLoginOtpExpiresAt(null);
         const normalizedUser = {
           ...verifyResponse.user,
           role: normalizeRole(verifyResponse.user?.role) || "visitor",
@@ -868,10 +977,15 @@ export default function LoginScreen({ navigation, route }) {
       const errorMessage = String(error?.message || "");
       
       if (
+        error?.data?.requiresOtpVerification ||
         errorMessage.includes("not yet verified") ||
-        errorMessage.includes("verify your email") ||
         errorMessage.toLowerCase().includes("otp")
       ) {
+        const otpEmail = normalizeResetEmailValue(email);
+        setPendingVisitorOtpEmail(otpEmail);
+        setLoginOtpCode("");
+        setLoginOtpError("");
+        setLoginOtpExpiresAt(null);
         setLoginError("Your account is not yet verified. Please verify your account using OTP first.");
       } else if (errorMessage.includes("pending")) {
         setLoginError("Your account is pending approval. Please wait for admin approval.");
@@ -1172,6 +1286,79 @@ export default function LoginScreen({ navigation, route }) {
                       </Text>
                     )}
                   </View>
+
+                  {pendingVisitorOtpEmail ? (
+                    <View style={loginStyles.visitorOtpPanel}>
+                      <View style={loginStyles.visitorOtpHeader}>
+                        <View style={loginStyles.visitorOtpIcon}>
+                          <Ionicons name="mail-unread-outline" size={18} color="#0A3D91" />
+                        </View>
+                        <View style={loginStyles.visitorOtpHeaderCopy}>
+                          <Text style={loginStyles.visitorOtpTitle}>Verify Visitor Account</Text>
+                          <Text style={loginStyles.visitorOtpSubtitle} numberOfLines={2}>
+                            Enter the OTP sent to {pendingVisitorOtpEmail}.
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={[
+                        loginStyles.inputContainer,
+                        loginStyles.visitorOtpInputContainer,
+                        loginOtpError && loginStyles.inputError,
+                      ]}>
+                        <Ionicons name="keypad-outline" size={18} color="#6B7280" />
+                        <TextInput
+                          style={[loginStyles.input, loginStyles.visitorOtpInput]}
+                          placeholder="6-digit OTP"
+                          placeholderTextColor="#9CA3AF"
+                          value={loginOtpCode}
+                          onChangeText={handleLoginOtpChange}
+                          keyboardType="number-pad"
+                          maxLength={6}
+                          editable={!isLoginOtpBusy && !isLoading}
+                          returnKeyType="done"
+                          onSubmitEditing={handleVerifyVisitorOtpFromLogin}
+                        />
+                      </View>
+                      {loginOtpError ? (
+                        <Text style={loginStyles.errorText}>{loginOtpError}</Text>
+                      ) : (
+                        <Text style={loginStyles.visitorOtpHint}>
+                          The OTP expires after 10 minutes. Verified visitors can continue to appointments.
+                        </Text>
+                      )}
+                      <View style={loginStyles.visitorOtpActions}>
+                        <TouchableOpacity
+                          style={[
+                            loginStyles.visitorOtpSecondaryButton,
+                            (isLoginOtpBusy || loginOtpSecondsLeft > 0) && loginStyles.visitorOtpDisabledButton,
+                          ]}
+                          onPress={handleResendVisitorOtp}
+                          disabled={isLoginOtpBusy || loginOtpSecondsLeft > 0}
+                        >
+                          <Text style={loginStyles.visitorOtpSecondaryText}>
+                            {loginOtpSecondsLeft > 0 ? `Resend in ${formatOtpTimer(loginOtpSecondsLeft)}` : "Resend OTP"}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            loginStyles.visitorOtpPrimaryButton,
+                            isLoginOtpBusy && loginStyles.visitorOtpDisabledButton,
+                          ]}
+                          onPress={handleVerifyVisitorOtpFromLogin}
+                          disabled={isLoginOtpBusy}
+                        >
+                          {isLoginOtpBusy ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <>
+                              <Text style={loginStyles.visitorOtpPrimaryText}>Verify & Sign In</Text>
+                              <Ionicons name="arrow-forward-outline" size={16} color="#FFFFFF" />
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : null}
 
                   {/* Remember Me & Forgot Password */}
                   <View style={[loginStyles.row, authRowResponsiveStyle]}>

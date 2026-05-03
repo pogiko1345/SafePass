@@ -85,6 +85,14 @@ const visitorSchema = new mongoose.Schema({
     default: "",
     trim: true,
   },
+  idValidationConfidence: {
+    type: Number,
+    default: null,
+  },
+  idValidationCheckedAt: {
+    type: Date,
+    default: null,
+  },
   dataPrivacyAccepted: {
     type: Boolean,
     default: false,

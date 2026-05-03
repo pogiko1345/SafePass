@@ -48,6 +48,8 @@ export default StyleSheet.create({
     top: Platform.select({ ios: 58, android: 34, web: 18 }),
     left: width <= 390 ? 14 : 20,
     right: width <= 390 ? 14 : 20,
+    maxWidth: 520,
+    alignSelf: "center",
     zIndex: 40,
     flexDirection: "row",
     alignItems: "flex-start",
@@ -72,6 +74,16 @@ export default StyleSheet.create({
   visitorPushNoticeSuccess: {
     borderColor: "#B7D5F6",
     backgroundColor: "#F8FBFE",
+  },
+
+  visitorPushNoticeWarning: {
+    borderColor: "#FED7AA",
+    backgroundColor: "#FFFBF5",
+  },
+
+  visitorPushNoticeError: {
+    borderColor: "#FECACA",
+    backgroundColor: "#FFF7F7",
   },
 
   visitorPushNoticeIcon: {
@@ -99,6 +111,126 @@ export default StyleSheet.create({
     lineHeight: 17,
     color: "#475569",
     fontWeight: "600",
+  },
+
+  visitorPushNoticeTime: {
+    marginTop: 3,
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  visitorAlertModalContent: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: width <= 390 ? 18 : 22,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.18,
+        shadowRadius: 28,
+      },
+      android: { elevation: 14 },
+      web: { boxShadow: "0px 24px 54px rgba(15,23,42,0.18)" },
+    }),
+  },
+
+  visitorAlertIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    marginBottom: 14,
+  },
+
+  visitorAlertIconSuccess: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#BBF7D0",
+  },
+
+  visitorAlertIconError: {
+    backgroundColor: "#FFF7F7",
+    borderColor: "#FECACA",
+  },
+
+  visitorAlertIconWarning: {
+    backgroundColor: "#FFFBF5",
+    borderColor: "#FED7AA",
+  },
+
+  visitorAlertTitle: {
+    fontSize: width <= 390 ? 19 : 21,
+    fontWeight: "900",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+
+  visitorAlertMessage: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "600",
+    color: "#64748B",
+    textAlign: "center",
+  },
+
+  visitorAlertActionRow: {
+    marginTop: 22,
+    width: "100%",
+    flexDirection: width <= 420 ? "column-reverse" : "row",
+    gap: 10,
+  },
+
+  visitorAlertButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+
+  visitorAlertButtonPrimary: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+
+  visitorAlertButtonSecondary: {
+    backgroundColor: "#F8FBFE",
+  },
+
+  visitorAlertButtonDanger: {
+    backgroundColor: "#DC2626",
+    borderColor: "#DC2626",
+  },
+
+  visitorAlertButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  visitorAlertButtonPrimaryText: {
+    color: "#FFFFFF",
+  },
+
+  visitorAlertButtonSecondaryText: {
+    color: "#475569",
   },
 
   dashboardShell: {
@@ -2136,10 +2268,11 @@ export default StyleSheet.create({
   // ============ QR MODAL ============
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(15,23,42,0.62)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 16,
+    paddingHorizontal: width <= 390 ? 14 : 20,
+    paddingVertical: 24,
   },
 
   visitorWarningModalContent: {
@@ -2320,10 +2453,12 @@ export default StyleSheet.create({
 
   qrModalContent: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    width: "86%",
-    maxWidth: 340,
+    borderRadius: 22,
+    width: "100%",
+    maxWidth: 360,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
   },
 
   qrModalHeader: {
@@ -2340,7 +2475,7 @@ export default StyleSheet.create({
   },
 
   qrContainer: {
-    padding: 20,
+    padding: width <= 390 ? 16 : 20,
     alignItems: "center",
   },
 
@@ -2378,7 +2513,9 @@ export default StyleSheet.create({
 
   qrDetails: {
     flexDirection: "row",
-    gap: 20,
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 12,
     marginBottom: 20,
   },
 
@@ -2411,18 +2548,20 @@ export default StyleSheet.create({
 
   virtualNfcModalContent: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    width: "88%",
+    borderRadius: 22,
+    width: "100%",
     maxWidth: 660,
     maxHeight: "88%",
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
   },
 
   virtualNfcModalContentCompact: {
-    width: "88%",
+    width: "100%",
     maxWidth: 380,
     maxHeight: "86%",
-    borderRadius: 22,
+    borderRadius: 20,
   },
 
   virtualNfcModalHeader: {
@@ -2780,12 +2919,14 @@ export default StyleSheet.create({
   },
 
   accessFlowModalContent: {
-    width: "88%",
-    maxWidth: 388,
+    width: "100%",
+    maxWidth: 420,
     maxHeight: "92%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    borderRadius: 22,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
   },
 
   accessFlowHero: {
@@ -3564,12 +3705,12 @@ export default StyleSheet.create({
   },
 
   appointmentScreenShell: {
-    gap: 18,
+    gap: width <= 390 ? 14 : 18,
   },
 
   appointmentScreenCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 28,
+    borderRadius: width <= 390 ? 20 : 22,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#DDE7F3",
@@ -3586,8 +3727,8 @@ export default StyleSheet.create({
   },
 
   appointmentInlineBody: {
-    padding: 20,
-    gap: 18,
+    padding: width <= 390 ? 16 : 20,
+    gap: width <= 390 ? 14 : 18,
   },
 
   appointmentRequestInfoPill: {
@@ -3659,8 +3800,8 @@ export default StyleSheet.create({
 
   appointmentMenuHero: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 28,
-    padding: 24,
+    borderRadius: width <= 390 ? 20 : 22,
+    padding: width <= 390 ? 16 : 22,
     borderWidth: 1,
     borderColor: "#DDE7F3",
     gap: 16,
@@ -3734,18 +3875,18 @@ export default StyleSheet.create({
   appointmentMenuGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
+    gap: width <= 390 ? 12 : 16,
   },
 
   appointmentMenuCard: {
     flexGrow: 1,
     flexBasis: 260,
     backgroundColor: "#FFFFFF",
-    borderRadius: 28,
-    padding: 22,
+    borderRadius: width <= 390 ? 18 : 22,
+    padding: width <= 390 ? 16 : 20,
     borderWidth: 1,
     borderColor: "#DDE7F3",
-    minHeight: 220,
+    minHeight: width <= 390 ? 190 : 210,
     justifyContent: "space-between",
     ...Platform.select({
       ios: {
@@ -4397,6 +4538,25 @@ export default StyleSheet.create({
     gap: 8,
   },
 
+  appointmentFormRowWide: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 16,
+    width: "100%",
+    zIndex: 2,
+  },
+
+  appointmentFormRowStacked: {
+    gap: 14,
+    width: "100%",
+    zIndex: 2,
+  },
+
+  appointmentFormColumnWide: {
+    flex: 1,
+    minWidth: 0,
+  },
+
   appointmentFieldLabel: {
     fontSize: 12,
     fontWeight: "700",
@@ -4454,6 +4614,7 @@ export default StyleSheet.create({
     alignItems: "center",
     gap: 12,
     flex: 1,
+    minWidth: 0,
   },
 
   appointmentPickerIconWrap: {
@@ -4478,6 +4639,18 @@ export default StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: "#0F172A",
+    flexShrink: 1,
+  },
+
+  appointmentPickerSubValue: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
+  appointmentPickerSubValueError: {
+    color: "#DC2626",
   },
 
   purposeDropdownMenu: {
@@ -4486,6 +4659,11 @@ export default StyleSheet.create({
     borderColor: "#E2E8F0",
     borderRadius: 18,
     overflow: "hidden",
+    zIndex: 30,
+    ...Platform.select({
+      android: { elevation: 6 },
+      web: { boxShadow: "0px 12px 28px rgba(15,23,42,0.12)" },
+    }),
   },
 
   pickerDropdownMenu: {
@@ -4494,6 +4672,11 @@ export default StyleSheet.create({
     borderColor: "#E2E8F0",
     borderRadius: 18,
     overflow: "hidden",
+    zIndex: 30,
+    ...Platform.select({
+      android: { elevation: 6 },
+      web: { boxShadow: "0px 12px 28px rgba(15,23,42,0.12)" },
+    }),
   },
 
   pickerDropdownScroll: {
@@ -4690,6 +4873,89 @@ export default StyleSheet.create({
   },
 
   appointmentChangeIdText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
+  idVerificationCard: {
+    marginTop: 2,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    backgroundColor: "#F8FBFE",
+    padding: 12,
+    gap: 10,
+  },
+
+  idVerificationCardPassed: {
+    borderColor: "#BBF7D0",
+    backgroundColor: "#F0FDF4",
+  },
+
+  idVerificationCardFailed: {
+    borderColor: "#FECACA",
+    backgroundColor: "#FFF7F7",
+  },
+
+  idVerificationHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  idVerificationIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+
+  idVerificationIconPassed: {
+    backgroundColor: "#DCFCE7",
+  },
+
+  idVerificationCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  idVerificationTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  idVerificationMessage: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "600",
+    color: "#475569",
+  },
+
+  idVerificationScore: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+
+  idVerificationAction: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+  },
+
+  idVerificationActionText: {
     fontSize: 12,
     fontWeight: "800",
     color: "#0A3D91",
@@ -5443,6 +5709,53 @@ export default StyleSheet.create({
     fontWeight: "600",
   },
 
+  visitorMapActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 14,
+  },
+
+  visitorMapPrimaryAction: {
+    flexGrow: 1,
+    flexBasis: width <= 560 ? "100%" : 180,
+    minHeight: 46,
+    borderRadius: 16,
+    backgroundColor: "#0A3D91",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+
+  visitorMapPrimaryActionText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  visitorMapActionButton: {
+    flexGrow: 1,
+    flexBasis: width <= 560 ? "100%" : 150,
+    minHeight: 46,
+    borderRadius: 16,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#D9E4F2",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+
+  visitorMapActionButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+
   accountPanelCard: {
     backgroundColor: "#F7FAFE",
     borderRadius: 22,
@@ -5891,6 +6204,7 @@ export default StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.98)",
     borderWidth: 1,
     borderColor: "#DCE7F3",
+    overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -5910,10 +6224,31 @@ export default StyleSheet.create({
     gap: 5,
     paddingVertical: 9,
     borderRadius: 22,
+    zIndex: 2,
   },
 
   bottomNavItemActive: {
+    backgroundColor: "transparent",
+  },
+
+  bottomNavActiveIndicator: {
+    position: "absolute",
+    left: 7,
+    top: 7,
+    bottom: 7,
+    borderRadius: 24,
     backgroundColor: "#061A2E",
+    zIndex: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#061A2E",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 10px 18px rgba(6,26,46,0.18)" },
+    }),
   },
 
   bottomNavLabel: {

@@ -25,32 +25,50 @@ import styles from "../styles/StaffDashboardStyles";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const SidebarHoverPressable = ({ children, style, hoverScale = 1.035, onPress, disabled, ...props }) => {
+const SidebarHoverPressable = ({
+  children,
+  style,
+  hoverScale = 1.035,
+  hoverLift = 0,
+  onPress,
+  disabled,
+  ...props
+}) => {
   const scale = useRef(new Animated.Value(1)).current;
+  const lift = useRef(new Animated.Value(0)).current;
 
-  const animateScale = useCallback((toValue) => {
+  const animateHover = useCallback((scaleValue, liftValue) => {
     if (Platform.OS !== "web") return;
-    Animated.spring(scale, {
-      toValue,
-      useNativeDriver: true,
-      tension: 180,
-      friction: 12,
-    }).start();
-  }, [scale]);
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: scaleValue,
+        useNativeDriver: true,
+        tension: 180,
+        friction: 12,
+      }),
+      Animated.spring(lift, {
+        toValue: liftValue,
+        useNativeDriver: true,
+        tension: 180,
+        friction: 12,
+      }),
+    ]).start();
+  }, [lift, scale]);
 
   return (
     <AnimatedPressable
       {...props}
       disabled={disabled}
       onPress={onPress}
-      onHoverIn={() => animateScale(hoverScale)}
-      onHoverOut={() => animateScale(1)}
-      onMouseEnter={() => animateScale(hoverScale)}
-      onMouseLeave={() => animateScale(1)}
+      onHoverIn={() => animateHover(hoverScale, hoverLift)}
+      onHoverOut={() => animateHover(1, 0)}
+      onMouseEnter={() => animateHover(hoverScale, hoverLift)}
+      onMouseLeave={() => animateHover(1, 0)}
       style={[
         style,
         Platform.OS === "web" && styles.sidebarHoverSurface,
-        { transform: [{ scale }] },
+        Platform.OS === "web" && !onPress && styles.passiveHoverSurface,
+        { transform: [{ translateY: lift }, { scale }] },
         disabled && { opacity: 0.7 },
       ]}
     >
@@ -58,6 +76,17 @@ const SidebarHoverPressable = ({ children, style, hoverScale = 1.035, onPress, d
     </AnimatedPressable>
   );
 };
+
+const HomeHoverPressable = ({ children, style, hoverScale = 1.018, hoverLift = -4, ...props }) => (
+  <SidebarHoverPressable
+    {...props}
+    style={style}
+    hoverScale={hoverScale}
+    hoverLift={hoverLift}
+  >
+    {children}
+  </SidebarHoverPressable>
+);
 
 const formatDate = (value) =>
   value
@@ -223,6 +252,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [profileSaving, setProfileSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [detailAppointment, setDetailAppointment] = useState(null);
   const itemsPerPage = 5;
 
@@ -957,36 +987,26 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     );
   };
 
-  const handleLogout = async () => {
-    const performLogout = async () => {
-      if (isSigningOut) return;
-      setIsSigningOut(true);
-      try {
-        await ApiService.logout();
-      } finally {
-        if (typeof onLogout === "function") onLogout();
-        navigation.reset({ index: 0, routes: [{ name: "Login" }] });
-      }
-    };
+  const handleLogout = () => {
+    if (isSigningOut) return;
+    setShowLogoutModal(true);
+  };
 
-    if (Platform.OS === "web") {
-      const confirmed = globalThis?.window?.confirm?.(
-        "Are you sure you want to sign out?",
-      );
-      if (confirmed) {
-        await performLogout();
-      }
-      return;
+  const closeLogoutModal = () => {
+    if (isSigningOut) return;
+    setShowLogoutModal(false);
+  };
+
+  const confirmLogout = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await ApiService.logout();
+    } finally {
+      setShowLogoutModal(false);
+      if (typeof onLogout === "function") onLogout();
+      navigation.reset({ index: 0, routes: [{ name: "Login" }] });
     }
-
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Sign Out", style: "destructive", onPress: performLogout },
-      ],
-    );
   };
 
   const buildAppointmentPrintRows = (records) =>
@@ -1403,7 +1423,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       </LinearGradient>
 
       <View style={styles.homeInsightsGrid}>
-        <View style={styles.homeInsightCard}>
+        <HomeHoverPressable style={styles.homeInsightCard}>
           <View style={styles.homeInsightIconWrap}>
             <Ionicons name="time-outline" size={18} color="#0A3D91" />
           </View>
@@ -1416,9 +1436,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               ? `${formatDate(nextUpcomingAppointment.visitDate)} at ${formatTime(nextUpcomingAppointment.visitTime)}`
               : "Your next approved appointment will appear here."}
           </Text>
-        </View>
+        </HomeHoverPressable>
 
-        <View style={styles.homeInsightCard}>
+        <HomeHoverPressable style={styles.homeInsightCard}>
           <View style={styles.homeInsightIconWrap}>
             <Ionicons name="business-outline" size={18} color="#047857" />
           </View>
@@ -1427,9 +1447,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           <Text style={styles.homeInsightMeta}>
             Manage requests and records routed to your office assignment.
           </Text>
-        </View>
+        </HomeHoverPressable>
 
-        <View style={styles.homeInsightCard}>
+        <HomeHoverPressable style={styles.homeInsightCard}>
           <View style={styles.homeInsightHeader}>
             <View style={styles.homeInsightIconWrap}>
               <Ionicons name="notifications-outline" size={18} color="#7C3AED" />
@@ -1447,12 +1467,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           <Text style={styles.homeInsightMeta}>
             Tap any item below to jump straight into the related appointment.
           </Text>
-        </View>
+        </HomeHoverPressable>
       </View>
 
+      <View style={styles.homeWorkspaceGrid}>
+        <View style={styles.homeWorkspaceMain}>
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
-          <View>
+          <View style={styles.sectionHeaderCopy}>
             <Text style={styles.sectionTitle}>Today's Schedule</Text>
             <Text style={styles.sectionSubtitle}>
               Today's approved and adjusted visitors for your office.
@@ -1480,7 +1502,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             {todaysSchedule.map((appointment) => {
               const statusMeta = getStatusMeta(getAppointmentStatus(appointment));
               return (
-                <TouchableOpacity
+                <HomeHoverPressable
                   key={appointment._id}
                   style={styles.todayScheduleCard}
                   onPress={() => {
@@ -1500,7 +1522,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                   <Text style={styles.todaySchedulePurpose}>
                     {appointment.purposeOfVisit || "No visit purpose provided"}
                   </Text>
-                </TouchableOpacity>
+                </HomeHoverPressable>
               );
             })}
           </View>
@@ -1508,7 +1530,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       </View>
 
       <View style={styles.quickActionsGrid}>
-        <TouchableOpacity style={styles.quickActionCard} onPress={() => selectSubmodule("appointment-request")}>
+        <HomeHoverPressable style={styles.quickActionCard} onPress={() => selectSubmodule("appointment-request")}>
           <View style={styles.quickActionMetaRow}>
             <View style={styles.quickActionBadge}>
               <Text style={styles.quickActionBadgeText}>{stats.pending} Pending</Text>
@@ -1523,9 +1545,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             Open the pending request queue and respond to new visitor schedules.
           </Text>
           <Text style={styles.quickActionFooterText}>Open request table</Text>
-        </TouchableOpacity>
+        </HomeHoverPressable>
 
-        <TouchableOpacity style={styles.quickActionCard} onPress={() => selectSubmodule("appointment-record")}>
+        <HomeHoverPressable style={styles.quickActionCard} onPress={() => selectSubmodule("appointment-record")}>
           <View style={styles.quickActionMetaRow}>
             <View style={styles.quickActionBadge}>
               <Text style={styles.quickActionBadgeText}>{appointmentRecords.length} Records</Text>
@@ -1540,9 +1562,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             Review all appointment records and track status changes over time.
           </Text>
           <Text style={styles.quickActionFooterText}>Open record history</Text>
-        </TouchableOpacity>
+        </HomeHoverPressable>
 
-        <TouchableOpacity style={styles.quickActionCard} onPress={() => selectSubmodule("account-info")}>
+        <HomeHoverPressable style={styles.quickActionCard} onPress={() => selectSubmodule("account-info")}>
           <View style={styles.quickActionMetaRow}>
             <View style={styles.quickActionBadge}>
               <Text style={styles.quickActionBadgeText}>{user?.department || "Profile"}</Text>
@@ -1557,12 +1579,15 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             Check your assigned office profile and account details with limited access.
           </Text>
           <Text style={styles.quickActionFooterText}>Open my profile</Text>
-        </TouchableOpacity>
+        </HomeHoverPressable>
       </View>
 
-      <View style={styles.sectionCard}>
+        </View>
+
+        <View style={styles.homeWorkspaceSide}>
+      <View style={[styles.sectionCard, styles.notificationsCard]}>
         <View style={styles.sectionHeader}>
-          <View>
+          <View style={styles.sectionHeaderCopy}>
             <Text style={styles.sectionTitle}>Recent Notifications</Text>
             <Text style={styles.sectionSubtitle}>
               Stay updated with visitor activity, approvals, and schedule changes.
@@ -1592,19 +1617,19 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             </TouchableOpacity>
           </View>
         ) : (
-          (notifications || []).slice(0, 5).map((notification) => (
+          <View style={styles.notificationList}>
+          {(notifications || []).slice(0, 5).map((notification) => (
             (() => {
               const notificationMeta = getNotificationMeta(notification);
               return (
-                <TouchableOpacity
-                  key={notification._id}
-                  style={[
-                    styles.notificationItem,
+                <HomeHoverPressable
+                        key={notification._id}
+                        style={[
+                          styles.notificationItem,
                     !isNotificationRead(notification) && styles.notificationItemUnread,
-                  ]}
-                  onPress={() => handleNotificationPress(notification)}
-                  activeOpacity={0.85}
-                >
+                        ]}
+                        onPress={() => handleNotificationPress(notification)}
+                      >
                   <View style={[styles.notificationDot, !isNotificationRead(notification) && styles.notificationDotUnread]} />
                   <View style={styles.notificationContent}>
                     <View style={styles.notificationTitleRow}>
@@ -1631,11 +1656,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                       <Text style={styles.notificationActionHint}>Tap to open related appointment</Text>
                     </View>
                   </View>
-                </TouchableOpacity>
+                </HomeHoverPressable>
               );
             })()
-          ))
+          ))}
+          </View>
         )}
+      </View>
+        </View>
       </View>
     </>
   );
@@ -2112,7 +2140,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         <SidebarHoverPressable
           style={styles.sidebarHeader}
           onPress={() => selectSubmodule("account-info")}
-          hoverScale={1.025}
+          hoverScale={1.012}
         >
           <View style={styles.sidebarAvatar}>
             <Text style={styles.sidebarAvatarText}>{profileInitials}</Text>
@@ -2140,7 +2168,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                   hasSelectedChild && styles.sidebarModuleButtonActive,
                 ]}
                 onPress={() => toggleModule(module.key)}
-                hoverScale={1.03}
+                hoverScale={1.012}
               >
                 <View style={[styles.sidebarModuleIcon, { backgroundColor: `${module.color}18` }]}>
                   <Ionicons name={module.icon} size={20} color={module.color} />
@@ -2178,7 +2206,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                           isActive && styles.sidebarSubmoduleButtonActive,
                         ]}
                         onPress={() => selectSubmodule(submodule.key)}
-                        hoverScale={1.035}
+                        hoverScale={1.012}
                       >
                         <Text
                           style={[
@@ -2206,7 +2234,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       <SidebarHoverPressable
         style={styles.logoutButton}
         onPress={handleLogout}
-        hoverScale={1.035}
+        hoverScale={1.012}
         disabled={isSigningOut}
       >
         {isSigningOut ? (
@@ -2410,6 +2438,43 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalReject} onPress={submitRejection}>
                 <Text style={styles.modalRejectText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={closeLogoutModal}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, styles.logoutModalCard]}>
+            <View style={styles.logoutModalIcon}>
+              <Ionicons name="log-out-outline" size={24} color="#DC2626" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Sign out?</Text>
+            <Text style={styles.logoutModalSubtitle}>
+              You will return to the login screen and need to sign in again to access the staff dashboard.
+            </Text>
+            <View style={styles.logoutModalActionRow}>
+              <TouchableOpacity
+                style={styles.logoutModalCancel}
+                onPress={closeLogoutModal}
+                disabled={isSigningOut}
+              >
+                <Text style={styles.logoutModalCancelText}>Stay Signed In</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.logoutModalConfirm}
+                onPress={confirmLogout}
+                disabled={isSigningOut}
+              >
+                {isSigningOut ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="log-out-outline" size={16} color="#FFFFFF" />
+                )}
+                <Text style={styles.logoutModalConfirmText}>
+                  {isSigningOut ? "Signing Out..." : "Sign Out"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

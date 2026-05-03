@@ -900,8 +900,8 @@ export default StyleSheet.create({
     width: width < 1180 ? "100%" : undefined,
     minWidth: 0,
     borderWidth: 1,
-    borderColor: "#D8E8FF",
-    borderRadius: 18,
+    borderColor: "#DCE8F4",
+    borderRadius: 16,
     backgroundColor: "#FFFFFF",
     padding: 14,
   },
@@ -920,10 +920,12 @@ export default StyleSheet.create({
   },
 
   appointmentToolbarTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "900",
     color: "#0F172A",
     marginBottom: 3,
+    textTransform: "uppercase",
+    letterSpacing: 0.45,
   },
 
   appointmentToolbarSubtitle: {
@@ -964,16 +966,17 @@ export default StyleSheet.create({
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 14,
+    borderColor: "#DBE3F0",
+    borderRadius: 16,
     backgroundColor: "#F8FBFE",
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
 
   appointmentToolbarSearchInput: {
     flex: 1,
     minWidth: 0,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: "600",
     color: "#0F172A",
     paddingVertical: Platform.OS === "web" ? 10 : 8,
   },
@@ -1008,8 +1011,8 @@ export default StyleSheet.create({
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 13,
+    borderColor: "#DBE3F0",
+    borderRadius: 14,
     backgroundColor: "#F8FBFE",
     paddingHorizontal: 11,
   },
@@ -1029,8 +1032,8 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     gap: 8,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 13,
+    borderColor: "#DBE3F0",
+    borderRadius: 14,
     backgroundColor: "#F8FBFE",
     paddingHorizontal: 11,
   },
@@ -1672,33 +1675,49 @@ export default StyleSheet.create({
     alignSelf: "stretch",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 12,
+    borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.05,
+        shadowRadius: 18,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 14px 28px rgba(15, 23, 42, 0.05)" },
+    }),
   },
 
   adminTableHeaderRow: {
     flexDirection: "row",
-    backgroundColor: "#F8FBFE",
+    backgroundColor: "#F8FAFC",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
   },
 
   adminTableRow: {
     flexDirection: "row",
-    minHeight: 54,
+    minHeight: 64,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: "#EEF2F7",
+    ...Platform.select({
+      web: {
+        transition: "background-color 0.18s ease",
+        ":hover": { backgroundColor: "#F8FBFE" },
+      },
+    }),
   },
 
   adminTableCell: {
-    paddingHorizontal: 9,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     justifyContent: "center",
   },
 
   adminTableHeaderCell: {
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
 
   adminTableFlexCell: {
@@ -1707,29 +1726,29 @@ export default StyleSheet.create({
   },
 
   adminTableHeaderText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "800",
-    color: "#334155",
+    color: "#475569",
     textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.7,
   },
 
   adminTableCellText: {
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 20,
     color: "#0F172A",
   },
 
   adminTablePrimaryText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800",
     color: "#0F172A",
-    marginBottom: 2,
   },
 
   adminTableSecondaryText: {
-    fontSize: 11,
-    lineHeight: 16,
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
     color: "#64748B",
   },
 
@@ -1746,19 +1765,28 @@ export default StyleSheet.create({
   adminTableActionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: 8,
   },
 
   adminTableActionButton: {
     borderWidth: 1,
-    borderRadius: 9,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    minWidth: 78,
+    alignItems: "center",
+    justifyContent: "center",
+    ...Platform.select({
+      web: {
+        cursor: "pointer",
+        transition: "background-color 0.18s ease, border-color 0.18s ease",
+      },
+    }),
   },
 
   adminTableActionText: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "800",
   },
 
   recordListActionRow: {
@@ -3441,6 +3469,9 @@ export default StyleSheet.create({
 
   userPaginationRow: {
     marginTop: 18,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#EEF2F7",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -3449,8 +3480,9 @@ export default StyleSheet.create({
   },
 
   userPaginationSummary: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#64748B",
+    fontWeight: "600",
   },
 
   userPaginationControls: {
@@ -3461,10 +3493,12 @@ export default StyleSheet.create({
   userPaginationButton: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
+    minWidth: 112,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 14,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     backgroundColor: "#FFFFFF",
@@ -3476,8 +3510,8 @@ export default StyleSheet.create({
   },
 
   userPaginationButtonText: {
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 13,
+    fontWeight: "800",
     color: "#334155",
   },
 

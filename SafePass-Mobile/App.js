@@ -84,6 +84,20 @@ const WEB_ROUTE_TITLES = {
   Settings: `Settings | ${APP_ORGANIZATION}`,
 };
 
+const DEFAULT_STACK_TRANSITION = {
+  animation: "slide_from_right",
+  animationDuration: 320,
+  animationTypeForReplace: "push",
+  gestureEnabled: true,
+  fullScreenGestureEnabled: true,
+  contentStyle: { backgroundColor: "#F4F7FB" },
+};
+
+const VISITOR_STACK_TRANSITION = {
+  ...DEFAULT_STACK_TRANSITION,
+  animationDuration: 300,
+};
+
 let logoutCallback = null;
 
 export default function App() {
@@ -404,7 +418,7 @@ export default function App() {
         initialRouteName={initialRoute}
         screenOptions={{
           headerShown: false,
-          animation: Platform.OS === "web" ? "none" : "slide_from_right",
+          ...DEFAULT_STACK_TRANSITION,
         }}
       >
         {/* Auth & Role Selection */}
@@ -431,11 +445,20 @@ export default function App() {
         <Stack.Screen
           name="VisitorRegister"
           component={VisitorRegisterScreen}
+          options={VISITOR_STACK_TRANSITION}
         />
-        <Stack.Screen name="Verification" component={VerificationScreen} />
+        <Stack.Screen
+          name="Verification"
+          component={VerificationScreen}
+          options={VISITOR_STACK_TRANSITION}
+        />
 
         {/* Help Screen */}
-        <Stack.Screen name="Help" component={HelpScreen} />
+        <Stack.Screen
+          name="Help"
+          component={HelpScreen}
+          options={VISITOR_STACK_TRANSITION}
+        />
 
         {/* Dashboard Screens */}
         {!IS_VISITOR_ONLY_APP && (
@@ -468,7 +491,7 @@ export default function App() {
             )}
           </Stack.Screen>
         )}
-        <Stack.Screen name="VisitorDashboard">
+        <Stack.Screen name="VisitorDashboard" options={VISITOR_STACK_TRANSITION}>
           {(props) => (
             <VisitorDashboardScreen
               {...props}
@@ -478,17 +501,33 @@ export default function App() {
         </Stack.Screen>
 
         {/* Visitor Screens */}
-        <Stack.Screen name="VisitorPass" component={VisitorPassScreen} />
-        <Stack.Screen name="WebMapScreen" component={WebMapScreen} />
+        <Stack.Screen
+          name="VisitorPass"
+          component={VisitorPassScreen}
+          options={VISITOR_STACK_TRANSITION}
+        />
+        <Stack.Screen
+          name="WebMapScreen"
+          component={WebMapScreen}
+          options={VISITOR_STACK_TRANSITION}
+        />
 
         {/* Common Screens */}
-        <Stack.Screen name="Profile">
+        <Stack.Screen name="Profile" options={VISITOR_STACK_TRANSITION}>
           {(props) => (
             <ProfileScreen {...props} onLogout={() => setCurrentUser(null)} />
           )}
         </Stack.Screen>
-        <Stack.Screen name="AccessLog" component={AccessLogScreen} />
-        <Stack.Screen name="NFCScan" component={NFCScanScreen} />
+        <Stack.Screen
+          name="AccessLog"
+          component={AccessLogScreen}
+          options={VISITOR_STACK_TRANSITION}
+        />
+        <Stack.Screen
+          name="NFCScan"
+          component={NFCScanScreen}
+          options={VISITOR_STACK_TRANSITION}
+        />
 
         {/* Admin Management Screens */}
         {!IS_VISITOR_ONLY_APP && (

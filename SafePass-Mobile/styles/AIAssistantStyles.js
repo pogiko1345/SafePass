@@ -171,7 +171,8 @@ export default StyleSheet.create({
     borderColor: '#E2E8F0',
     ...Platform.select({
       web: {
-        outline: 'none',
+        outlineStyle: 'none',
+        outlineWidth: 0,
       },
     }),
   },

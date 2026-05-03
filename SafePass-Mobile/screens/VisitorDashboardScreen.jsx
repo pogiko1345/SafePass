@@ -9,7 +9,6 @@ import {
   Image,
   Platform,
   StatusBar,
-  Alert,
   Modal,
   Vibration,
   TextInput,
@@ -25,6 +24,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
 import ApiService from "../utils/ApiService";
+import IDScannerService from "../utils/IDScannerService";
 import CampusMap from "../components/CampusMap";
 import visitorDashboardStyles from "../styles/VisitorDashboardStyles";
 import {
@@ -169,6 +169,99 @@ const VISITOR_SELECTED_SECTION_KEY = "visitorDashboardSelectedSection";
 const VISITOR_APPOINTMENT_SCREEN_KEY = "visitorDashboardAppointmentScreen";
 const VISITOR_MAP_FLOOR_KEY = "visitorDashboardMapFloor";
 const VISITOR_APPOINTMENT_SCREENS = ["menu", "request", "history", "status"];
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+
+const AnimatedPressable = ({
+  children,
+  style,
+  onPress,
+  disabled = false,
+  activeOpacity = 0.9,
+  pressScale = 0.97,
+  ...props
+}) => {
+  const pressAnim = useRef(new Animated.Value(1)).current;
+
+  const animatePress = (toValue, duration = 120) => {
+    Animated.timing(pressAnim, {
+      toValue,
+      duration,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  };
+
+  return (
+    <AnimatedTouchableOpacity
+      {...props}
+      disabled={disabled}
+      activeOpacity={activeOpacity}
+      style={[style, { transform: [{ scale: pressAnim }] }]}
+      onPress={onPress}
+      onPressIn={() => !disabled && animatePress(pressScale, 90)}
+      onPressOut={() => !disabled && animatePress(1, 140)}
+    >
+      {children}
+    </AnimatedTouchableOpacity>
+  );
+};
+
+const ScrollReveal = ({
+  children,
+  scrollY,
+  viewportHeight,
+  delay = 0,
+  threshold = 70,
+  style,
+}) => {
+  const [layoutY, setLayoutY] = useState(null);
+  const [hasRevealed, setHasRevealed] = useState(false);
+  const revealAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (hasRevealed || layoutY === null) return;
+
+    const revealPoint = Number(scrollY || 0) + Number(viewportHeight || 0) - threshold;
+    if (layoutY > revealPoint) return;
+
+    setHasRevealed(true);
+    Animated.timing(revealAnim, {
+      toValue: 1,
+      duration: 380,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  }, [delay, hasRevealed, layoutY, revealAnim, scrollY, threshold, viewportHeight]);
+
+  return (
+    <Animated.View
+      onLayout={(event) => setLayoutY(event.nativeEvent.layout.y)}
+      style={[
+        style,
+        {
+          opacity: revealAnim,
+          transform: [
+            {
+              translateY: revealAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [18, 0],
+              }),
+            },
+            {
+              scale: revealAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.985, 1],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+};
 
 const getEnabledAppointmentOptionLabels = (items = [], fallback = []) => {
   if (!Array.isArray(items) || items.length === 0) return fallback;
@@ -266,7 +359,7 @@ if (Platform.OS !== 'web') {
 }
 
 export default function VisitorDashboardScreen({ navigation, onLogout }) {
-  const { width: viewportWidth } = useWindowDimensions();
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const isWideVisitorDashboard = viewportWidth >= 960;
   const isTabletVisitorDashboard = viewportWidth >= 680;
   const isCompactVisitorDashboard = viewportWidth <= 420;
@@ -296,8 +389,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [checkOutTargetVisitor, setCheckOutTargetVisitor] = useState(null);
   const [visitorPushNotice, setVisitorPushNotice] = useState(null);
   const [visitorWarningNotice, setVisitorWarningNotice] = useState(null);
+  const [visitorAlert, setVisitorAlert] = useState(null);
   const [isVisitorDarkMode, setIsVisitorDarkMode] = useState(false);
+  const [dashboardScrollY, setDashboardScrollY] = useState(0);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
+  const [isVerifyingAppointmentId, setIsVerifyingAppointmentId] = useState(false);
   const [isVirtualTapLoading, setIsVirtualTapLoading] = useState(false);
   const [isCheckInLoading, setIsCheckInLoading] = useState(false);
   const [isCheckOutLoading, setIsCheckOutLoading] = useState(false);
@@ -317,11 +413,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     customPurpose: "",
     idType: "",
     idImage: null,
+    idVerification: null,
     privacyAccepted: false,
   });
   const [hasAppointmentDraft, setHasAppointmentDraft] = useState(false);
   const [isAppointmentScreenTransitioning, setIsAppointmentScreenTransitioning] = useState(false);
   const [appointmentTransitionLabel, setAppointmentTransitionLabel] = useState("Loading appointment module...");
+  const [visitorTransitionDirection, setVisitorTransitionDirection] = useState(1);
   const [greeting, setGreeting] = useState("");
   const [isNfcSupported, setIsNfcSupported] = useState(false);
   const [isNfcEnabled, setIsNfcEnabled] = useState(false);
@@ -345,13 +443,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const dashboardScrollRef = useRef(null);
   const phoneLocationSubscriptionRef = useRef(null);
   const appointmentTransitionTimeoutRef = useRef(null);
+  const visitorTabTransitionTimeoutRef = useRef(null);
   const visitorPushNoticeTimeoutRef = useRef(null);
   const appointmentWebDateInputRef = useRef(null);
   const shownVisitorWarningIdsRef = useRef(new Set());
   const visitorWarningCheckInFlightRef = useRef(false);
   const dashboardHeroAnim = useRef(new Animated.Value(0)).current;
   const dashboardContentAnim = useRef(new Animated.Value(0)).current;
+  const visitorTransitionAnim = useRef(new Animated.Value(1)).current;
+  const bottomNavAnim = useRef(new Animated.Value(0)).current;
   const isCompactVirtualCardView = viewportWidth <= 540;
+  const isWideAppointmentView = viewportWidth >= 780;
   const commandMetricCardWidth = isWideVisitorDashboard
     ? "31.8%"
     : isTabletVisitorDashboard
@@ -549,11 +651,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   useEffect(() => {
     const isAppointmentSection = selectedVisitorSection === "appointment";
-    const heroDuration = isVisitorHomeSection ? 180 : isAppointmentSection ? 210 : 160;
-    const contentDuration = isVisitorHomeSection ? 190 : isAppointmentSection ? 240 : 180;
+    const heroDuration = isVisitorHomeSection ? 190 : isAppointmentSection ? 220 : 180;
+    const contentDuration = isVisitorHomeSection ? 210 : isAppointmentSection ? 240 : 200;
 
     dashboardHeroAnim.setValue(0);
     dashboardContentAnim.setValue(0);
+    visitorTransitionAnim.setValue(0);
 
     Animated.parallel([
       Animated.timing(dashboardHeroAnim, {
@@ -568,6 +671,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         easing: Easing.out(Easing.cubic),
         useNativeDriver: Platform.OS !== "web",
       }),
+      Animated.timing(visitorTransitionAnim, {
+        toValue: 1,
+        duration: contentDuration,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== "web",
+      }),
     ]).start();
   }, [
     selectedVisitorSection,
@@ -575,6 +684,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     isVisitorHomeSection,
     dashboardHeroAnim,
     dashboardContentAnim,
+    visitorTransitionAnim,
   ]);
   const dashboardShellResponsiveStyle = {
     paddingHorizontal: dashboardHorizontalGutter,
@@ -607,8 +717,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const compactApprovedGradientStyle = isCompactVisitorDashboard
     ? visitorDashboardStyles.approvedHeroGradientCompact
     : null;
+  const bottomNavBarWidth = Math.min(
+    Math.max(viewportWidth - (isCompactVisitorDashboard ? 24 : 36), 0),
+    420,
+  );
+  const bottomNavItemWidth = Math.max((bottomNavBarWidth - 14) / VISITOR_MODULES.length, 0);
   const approvedSectionHeaderResponsiveStyle = viewportWidth <= 560
     ? { marginBottom: 12 }
+    : null;
+  const appointmentFormRowResponsiveStyle = isWideAppointmentView
+    ? visitorDashboardStyles.appointmentFormRowWide
+    : visitorDashboardStyles.appointmentFormRowStacked;
+  const appointmentFormColumnResponsiveStyle = isWideAppointmentView
+    ? visitorDashboardStyles.appointmentFormColumnWide
     : null;
 
   const loadVisitorPreferences = async () => {
@@ -633,6 +754,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleAppointmentScreenNavigation = (targetScreen, loadingLabel = "Loading appointment module...") => {
+    const currentAppointmentIndex = VISITOR_APPOINTMENT_SCREENS.indexOf(selectedAppointmentScreen);
+    const nextAppointmentIndex = VISITOR_APPOINTMENT_SCREENS.indexOf(targetScreen);
+    if (
+      currentAppointmentIndex !== -1 &&
+      nextAppointmentIndex !== -1 &&
+      currentAppointmentIndex !== nextAppointmentIndex
+    ) {
+      setVisitorTransitionDirection(nextAppointmentIndex > currentAppointmentIndex ? 1 : -1);
+    }
+
     if (
       selectedVisitorSection === "appointment" &&
       selectedAppointmentScreen === targetScreen &&
@@ -664,27 +795,91 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleVisitorSectionChange = (sectionId) => {
-    scrollDashboardToTop(false);
+    const currentIndex = VISITOR_MODULES.findIndex((module) => module.id === selectedVisitorSection);
+    const nextIndex = VISITOR_MODULES.findIndex((module) => module.id === sectionId);
+    if (currentIndex !== -1 && nextIndex !== -1 && currentIndex !== nextIndex) {
+      setVisitorTransitionDirection(nextIndex > currentIndex ? 1 : -1);
+      Animated.spring(bottomNavAnim, {
+        toValue: nextIndex,
+        friction: 8,
+        tension: 90,
+        useNativeDriver: Platform.OS !== "web",
+      }).start();
+    }
 
-    if (sectionId === "appointment") {
-      if (selectedVisitorSection === "appointment") {
-        if (selectedAppointmentScreen !== "menu") {
-          handleAppointmentScreenNavigation("menu", "Opening appointment center...");
-        }
-        return;
-      }
-
-      setSelectedVisitorSection("appointment");
-      handleAppointmentScreenNavigation("menu", "Opening appointment center...");
+    if (selectedVisitorSection === sectionId && sectionId !== "appointment") {
+      scrollDashboardToTop(true);
       return;
     }
 
-    if (appointmentTransitionTimeoutRef.current) {
-      clearTimeout(appointmentTransitionTimeoutRef.current);
-      appointmentTransitionTimeoutRef.current = null;
+    const switchSection = () => {
+      scrollDashboardToTop(false);
+
+      if (sectionId === "appointment") {
+        if (selectedVisitorSection === "appointment") {
+          if (selectedAppointmentScreen !== "menu") {
+            handleAppointmentScreenNavigation("menu", "Opening appointment center...");
+          }
+          return;
+        }
+
+        setSelectedVisitorSection("appointment");
+        handleAppointmentScreenNavigation("menu", "Opening appointment center...");
+        return;
+      }
+
+      if (appointmentTransitionTimeoutRef.current) {
+        clearTimeout(appointmentTransitionTimeoutRef.current);
+        appointmentTransitionTimeoutRef.current = null;
+      }
+      setIsAppointmentScreenTransitioning(false);
+      setSelectedVisitorSection(sectionId);
+    };
+
+    if (visitorTabTransitionTimeoutRef.current) {
+      clearTimeout(visitorTabTransitionTimeoutRef.current);
+      visitorTabTransitionTimeoutRef.current = null;
     }
-    setIsAppointmentScreenTransitioning(false);
-    setSelectedVisitorSection(sectionId);
+
+    Animated.parallel([
+      Animated.timing(dashboardContentAnim, {
+        toValue: 0,
+        duration: 115,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: Platform.OS !== "web",
+      }),
+      Animated.timing(visitorTransitionAnim, {
+        toValue: 0,
+        duration: 115,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: Platform.OS !== "web",
+      }),
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      visitorTabTransitionTimeoutRef.current = setTimeout(() => {
+        switchSection();
+        visitorTabTransitionTimeoutRef.current = null;
+      }, 20);
+    });
+  };
+
+  const handleVisitorRouteNavigation = (routeName, params) => {
+    Animated.sequence([
+      Animated.timing(visitorTransitionAnim, {
+        toValue: 0.94,
+        duration: 80,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== "web",
+      }),
+      Animated.timing(visitorTransitionAnim, {
+        toValue: 1,
+        duration: 120,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== "web",
+      }),
+    ]).start(() => {
+      navigation.navigate(routeName, params);
+    });
   };
 
   useEffect(() => {
@@ -694,11 +889,29 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }, [selectedVisitorSection, selectedAppointmentScreen, isAppointmentScreenTransitioning]);
 
   useEffect(() => {
+    const selectedIndex = Math.max(
+      VISITOR_MODULES.findIndex((module) => module.id === selectedVisitorSection),
+      0,
+    );
+
+    Animated.spring(bottomNavAnim, {
+      toValue: selectedIndex,
+      friction: 8,
+      tension: 90,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  }, [selectedVisitorSection, bottomNavAnim]);
+
+  useEffect(() => {
     loadVisitorData();
     setGreetingMessage();
     checkNfcSupport();
     
     return () => {
+      if (visitorTabTransitionTimeoutRef.current) {
+        clearTimeout(visitorTabTransitionTimeoutRef.current);
+        visitorTabTransitionTimeoutRef.current = null;
+      }
       stopNfcReading();
       stopPhoneLocationTracking();
     };
@@ -783,12 +996,52 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       title,
       message,
       type,
+      createdAt: new Date(),
     });
 
     visitorPushNoticeTimeoutRef.current = setTimeout(() => {
       setVisitorPushNotice(null);
       visitorPushNoticeTimeoutRef.current = null;
     }, 6000);
+  };
+
+  const getVisitorAlertType = (title = "", message = "") => {
+    const text = `${title} ${message}`.toLowerCase();
+    if (text.includes("success") || text.includes("submitted") || text.includes("approved") || text.includes("granted")) {
+      return "success";
+    }
+    if (text.includes("failed") || text.includes("error") || text.includes("invalid")) {
+      return "error";
+    }
+    if (text.includes("missing") || text.includes("unavailable") || text.includes("denied") || text.includes("warning")) {
+      return "warning";
+    }
+    return "info";
+  };
+
+  const showVisitorAlert = (title, message, buttons = [{ text: "OK" }]) => {
+    const normalizedButtons = Array.isArray(buttons) && buttons.length > 0
+      ? buttons
+      : [{ text: "OK" }];
+
+    setVisitorAlert({
+      id: `visitor-alert-${Date.now()}`,
+      title: String(title || "Notice"),
+      message: String(message || ""),
+      type: getVisitorAlertType(title, message),
+      buttons: normalizedButtons.map((button, index) => ({
+        text: button?.text || (index === 0 ? "OK" : "Confirm"),
+        style: button?.style || "default",
+        onPress: button?.onPress,
+      })),
+    });
+  };
+
+  const dismissVisitorAlert = (button) => {
+    setVisitorAlert(null);
+    if (typeof button?.onPress === "function") {
+      setTimeout(() => button.onPress(), 80);
+    }
   };
 
   useEffect(() => {
@@ -1000,6 +1253,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
       const warningId = String(latestWarning._id);
       shownVisitorWarningIdsRef.current.add(warningId);
+      const warningSeverity = String(latestWarning?.severity || latestWarning?.type || "warning").toLowerCase();
 
       if (Platform.OS !== "web") {
         Vibration.vibrate([0, 120, 80, 120]);
@@ -1012,7 +1266,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         id: warningId,
         title: latestWarning.title || "Security Report Warning",
         message: latestWarning.message || "A new notice has been added to your visitor account.",
-        severity: severity || "warning",
+        severity: warningSeverity || "warning",
         createdAt: latestWarning.createdAt || latestWarning.timestamp || new Date().toISOString(),
       });
     } catch (error) {
@@ -1191,7 +1445,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       if (isProfileMissing) {
         setVisitor(null);
       } else {
-        Alert.alert("Error", "Failed to load visitor data");
+        showVisitorAlert("Error", "Failed to load visitor data");
       }
     } finally {
       if (!silent) {
@@ -1247,7 +1501,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       setIsNfcEnabled(isEnabled);
 
       if (showDisabledAlert && !isEnabled) {
-        Alert.alert(
+        showVisitorAlert(
           "NFC Disabled",
           "Please enable NFC in your device settings.",
           [
@@ -1292,7 +1546,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const startNfcReading = async () => {
     const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
     if (blockedMessage) {
-      Alert.alert(
+      showVisitorAlert(
         blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
         blockedMessage,
       );
@@ -1302,7 +1556,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const nfcAvailability = await refreshNfcAvailability({ showDisabledAlert: true });
 
     if (!nfcAvailability.moduleAvailable) {
-      Alert.alert(
+      showVisitorAlert(
         "NFC Module Unavailable",
         "This app build does not include the native NFC module. Install the SafePass development or release APK, then try again.",
       );
@@ -1310,7 +1564,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     if (!nfcAvailability.supported) {
-      Alert.alert(
+      showVisitorAlert(
         "NFC Not Supported",
         "Your device doesn't support NFC. Please use the digital access card or manual check-in."
       );
@@ -1497,7 +1751,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         
         // Check if this is a check-in or check-out
         if (response.action === 'check_in') {
-          Alert.alert(
+          showVisitorAlert(
             "✓ Checked In Successfully",
             `Welcome ${visitor.fullName}! Gate is opening.`,
             [{ text: "OK", onPress: () => loadVisitorData() }]
@@ -1506,13 +1760,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           setShowVirtualNfcModal(false);
           setShowVirtualNfcSuccessModal(false);
           setSelectedVisitorSection("home");
-          Alert.alert(
+          showVisitorAlert(
             "✓ Checked Out Successfully",
             `Goodbye ${visitor.fullName}! Thank you for visiting.`,
             [{ text: "OK", onPress: () => loadVisitorData() }]
           );
         } else {
-          Alert.alert(
+          showVisitorAlert(
             "Access Granted",
             `Welcome ${visitor.fullName}! Gate is opening.`,
             [{ text: "OK" }]
@@ -1534,7 +1788,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
         
-        Alert.alert(
+        showVisitorAlert(
           "Access Denied",
           response.message || "Your visit request has not been approved yet.",
           [{ text: "OK" }]
@@ -1544,7 +1798,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       console.error("NFC tap processing error:", error);
       setNfcStatus({ type: 'error', message: 'Failed to process tap. Please try again.' });
       
-      Alert.alert(
+      showVisitorAlert(
         "Error",
         "Failed to process NFC tap. Please check your connection and try again.",
         [{ text: "OK" }]
@@ -1655,11 +1909,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getAppointmentSlotStatusText = (timeOption) => {
     const slot = getAppointmentSlotInfo(timeOption);
     if (!slot) {
-      return isLoadingAppointmentSlots ? "Checking..." : "Slots limited";
+      return isLoadingAppointmentSlots ? "Checking slots..." : "Select office to view slots";
     }
 
-    if (slot.isFull) return "Slots are full";
-    return `${slot.available} of ${slot.limit || slot.capacity || 2} left`;
+    const totalSlots = Number(slot.limit || slot.capacity || 0);
+    const availableSlots = Number(
+      slot.available ?? Math.max(totalSlots - Number(slot.count || 0), 0),
+    );
+
+    if (slot.isFull || availableSlots <= 0) return "Slots are full";
+
+    const slotLabel = availableSlots === 1 ? "slot" : "slots";
+    return `${availableSlots} ${slotLabel} available${totalSlots ? ` of ${totalSlots}` : ""}`;
   };
 
   const getSelectedAppointmentDepartments = () => {
@@ -1734,7 +1995,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     selectedDate.setHours(12, 0, 0, 0);
     if (selectedDate.getDay() === 0) {
       const adjustedDate = getNextAvailableAppointmentDate(selectedDate);
-      Alert.alert(
+      showVisitorAlert(
         "Sunday Unavailable",
         `Appointments are only available from Monday to Saturday. We moved your date to ${formatDate(adjustedDate)}.`,
       );
@@ -1798,6 +2059,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       customPurpose: "",
       idType: getStoredVisitorIdType(visitorRecord),
       idImage: null,
+      idVerification: null,
       privacyAccepted: false,
     };
   };
@@ -1810,7 +2072,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handlePickAppointmentIdImage = async () => {
     try {
       if (!appointmentForm.idType) {
-        Alert.alert(
+        showVisitorAlert(
           "Choose ID Type First",
           "Please choose which valid ID you will present before uploading its picture.",
         );
@@ -1819,7 +2081,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
+        showVisitorAlert(
           "Permission Needed",
           "Please allow photo access so you can upload a valid ID picture.",
         );
@@ -1842,18 +2104,77 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         ? `data:${asset.mimeType || "image/jpeg"};base64,${asset.base64}`
         : asset.uri;
 
+      setIsVerifyingAppointmentId(true);
       setHasAppointmentDraft(true);
       setAppointmentForm((prev) => ({
         ...prev,
         idImage: imageValue,
+        idVerification: {
+          status: "scanning",
+          confidence: 0,
+          message: "Scanning your valid ID image...",
+        },
       }));
-      Alert.alert(
-        "ID Image Saved",
-        `Your ${appointmentForm.idType} picture was saved. Please make sure the uploaded photo matches the ID type you selected.`,
+
+      const verification = await IDScannerService.verifyIDImage({
+        imageUri: imageValue,
+        idType: appointmentForm.idType,
+      });
+
+      setAppointmentForm((prev) => ({
+        ...prev,
+        idImage: imageValue,
+        idVerification: verification,
+      }));
+
+      showVisitorAlert(
+        verification?.isValid ? "ID Pre-check Passed" : "ID Needs a Clearer Photo",
+        verification?.message ||
+          `Your ${appointmentForm.idType} picture was saved. Please make sure the uploaded photo matches the ID type you selected.`,
       );
     } catch (error) {
       console.error("Pick appointment ID image error:", error);
-      Alert.alert("Upload Failed", "Unable to select the ID image. Please try again.");
+      showVisitorAlert("Upload Failed", "Unable to select the ID image. Please try again.");
+    } finally {
+      setIsVerifyingAppointmentId(false);
+    }
+  };
+
+  const handleVerifyAppointmentIdAgain = async () => {
+    if (!appointmentForm.idType || !appointmentForm.idImage || isVerifyingAppointmentId) return;
+
+    setIsVerifyingAppointmentId(true);
+    setAppointmentForm((prev) => ({
+      ...prev,
+      idVerification: {
+        status: "scanning",
+        confidence: 0,
+        message: "Scanning your valid ID image...",
+      },
+    }));
+
+    try {
+      const verification = await IDScannerService.verifyIDImage({
+        imageUri: appointmentForm.idImage,
+        idType: appointmentForm.idType,
+      });
+      setAppointmentForm((prev) => ({
+        ...prev,
+        idVerification: verification,
+      }));
+    } catch (error) {
+      console.error("Appointment ID re-scan error:", error);
+      setAppointmentForm((prev) => ({
+        ...prev,
+        idVerification: {
+          isValid: false,
+          status: "ai_precheck_error",
+          confidence: 0,
+          message: "Unable to scan this ID image. Please upload a clearer image and try again.",
+        },
+      }));
+    } finally {
+      setIsVerifyingAppointmentId(false);
     }
   };
 
@@ -1906,27 +2227,27 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const idImage = appointmentForm.idImage;
 
     if (!currentUser?._id) {
-      Alert.alert("Login Required", "Please sign in again before requesting a new appointment.");
+      showVisitorAlert("Login Required", "Please sign in again before requesting a new appointment.");
       return;
     }
 
     if (!purposeCategory) {
-      Alert.alert("Missing Details", "Please select a purpose of visit.");
+      showVisitorAlert("Missing Details", "Please select a purpose of visit.");
       return;
     }
 
     if (isOtherPurpose && !customPurposeOfVisit) {
-      Alert.alert("Missing Details", "Please enter your purpose of visit.");
+      showVisitorAlert("Missing Details", "Please enter your purpose of visit.");
       return;
     }
 
     if (!preferredDate || !preferredTime) {
-      Alert.alert("Missing Details", "Please select the preferred date and time.");
+      showVisitorAlert("Missing Details", "Please select the preferred date and time.");
       return;
     }
 
     if (new Date(preferredDate).getDay() === 0) {
-      Alert.alert(
+      showVisitorAlert(
         "Sunday Unavailable",
         "Appointments are only available from Monday to Saturday. Please choose another date.",
       );
@@ -1934,12 +2255,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     if (isLoadingAppointmentSlots) {
-      Alert.alert("Checking Slots", "Please wait while we confirm available appointment slots.");
+      showVisitorAlert("Checking Slots", "Please wait while we confirm available appointment slots.");
       return;
     }
 
     if (appointmentAvailability && appointmentAvailability.assignedStaff === null) {
-      Alert.alert(
+      showVisitorAlert(
         "No Staff Available",
         appointmentAvailability.message ||
           "No active staff account is assigned to this office yet. Please choose another office or contact admin.",
@@ -1948,7 +2269,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     if (isAppointmentTimeSlotFull(preferredTime)) {
-      Alert.alert(
+      showVisitorAlert(
         "Time Slot Full",
         "Slots are full please select another time or date.",
       );
@@ -1956,22 +2277,36 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     if (!selectedDepartments.length) {
-      Alert.alert("Missing Details", "Please choose at least one office to visit.");
+      showVisitorAlert("Missing Details", "Please choose at least one office to visit.");
       return;
     }
 
     if (!idType) {
-      Alert.alert("Missing Valid ID", "Please choose the valid ID type you will present on campus.");
+      showVisitorAlert("Missing Valid ID", "Please choose the valid ID type you will present on campus.");
       return;
     }
 
     if (!idImage) {
-      Alert.alert("Missing Valid ID Picture", "Please upload a clear picture of your valid ID before submitting.");
+      showVisitorAlert("Missing Valid ID Picture", "Please upload a clear picture of your valid ID before submitting.");
+      return;
+    }
+
+    if (isVerifyingAppointmentId) {
+      showVisitorAlert("ID Verification Running", "Please wait until OCR verification finishes.");
+      return;
+    }
+
+    if (!appointmentForm.idVerification?.isValid) {
+      showVisitorAlert(
+        "Verify Valid ID First",
+        appointmentForm.idVerification?.message ||
+          "Please upload a clear valid ID photo and let OCR verification pass before submitting.",
+      );
       return;
     }
 
     if (!appointmentForm.privacyAccepted) {
-      Alert.alert(
+      showVisitorAlert(
         "Data Privacy Confirmation",
         "Please confirm that you allow Sapphire SafePass to collect your appointment and ID information for visit verification.",
       );
@@ -1981,12 +2316,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const combinedDateTime = new Date(preferredDate);
     combinedDateTime.setHours(preferredTime.getHours(), preferredTime.getMinutes(), 0, 0);
     if (Number.isNaN(combinedDateTime.getTime())) {
-      Alert.alert("Invalid Schedule", "Please choose a valid preferred date and time.");
+      showVisitorAlert("Invalid Schedule", "Please choose a valid preferred date and time.");
       return;
     }
 
     if (combinedDateTime < new Date(Date.now() - 60 * 1000)) {
-      Alert.alert("Invalid Schedule", "Appointment schedule cannot be in the past.");
+      showVisitorAlert("Invalid Schedule", "Appointment schedule cannot be in the past.");
       return;
     }
 
@@ -2006,6 +2341,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         idType,
         idNumber: idType,
         idImage,
+        idVerification: appointmentForm.idVerification,
         dataPrivacyAccepted: true,
         dataPrivacyAcceptedAt: new Date().toISOString(),
       });
@@ -2026,6 +2362,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           idType,
           idNumber: idType,
           idImage,
+          idVerification: appointmentForm.idVerification,
         }));
         setAppointmentFeedback({
           title: "Appointment Submitted Successfully",
@@ -2036,16 +2373,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           department: selectedDepartments.join(", "),
           purpose: purposeOfVisit,
         });
-        Alert.alert("Appointment Submitted", "Your request was sent to staff for review.");
+        showVisitorAlert("Appointment Submitted", "Your request was sent to staff for review.");
         await loadVisitorData();
         handleAppointmentScreenNavigation("history", "Opening appointment history...");
         return;
       }
 
-      Alert.alert("Request Failed", response?.message || "Failed to send your appointment request.");
+      showVisitorAlert("Request Failed", response?.message || "Failed to send your appointment request.");
     } catch (error) {
       console.error("Request appointment error:", error);
-      Alert.alert("Request Failed", error?.message || "Failed to send your appointment request.");
+      showVisitorAlert("Request Failed", error?.message || "Failed to send your appointment request.");
     } finally {
       setIsSubmittingAppointment(false);
     }
@@ -2061,7 +2398,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
     const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
     if (blockedMessage) {
-      Alert.alert(
+      showVisitorAlert(
         blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
         blockedMessage,
       );
@@ -2069,7 +2406,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     if (String(visitor?.status || "").toLowerCase() === "checked_out") {
-      Alert.alert(
+      showVisitorAlert(
         "Visit Completed",
         "This SafePass card has already been checked out and can no longer be used.",
       );
@@ -2107,7 +2444,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         type: "error",
         message: error?.message || "Unable to start the NFC tap flow. Please try again.",
       });
-      Alert.alert("NFC Unavailable", error?.message || "Unable to start the NFC tap flow right now.");
+      showVisitorAlert("NFC Unavailable", error?.message || "Unable to start the NFC tap flow right now.");
     } finally {
       setIsVirtualTapLoading(false);
     }
@@ -2116,7 +2453,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleCheckIn = async () => {
     if (!visitor) return;
     
-    Alert.alert(
+    showVisitorAlert(
       "Check In",
       "Are you ready to check in for your visit?",
       [
@@ -2127,13 +2464,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             try {
               const response = await ApiService.visitorCheckIn(visitor._id);
               if (response.success) {
-                Alert.alert("✅ Success", "You have been checked in!");
+                showVisitorAlert("✅ Success", "You have been checked in!");
                 loadVisitorData();
               } else {
-                Alert.alert("Error", response.message || "Failed to check in");
+                showVisitorAlert("Error", response.message || "Failed to check in");
               }
             } catch (error) {
-              Alert.alert("Error", "Failed to check in");
+              showVisitorAlert("Error", "Failed to check in");
             }
           }
         }
@@ -2144,7 +2481,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleCheckOut = async () => {
     if (!visitor) return;
     
-    Alert.alert(
+    showVisitorAlert(
       "Check Out",
       "Are you sure you want to check out?",
       [
@@ -2155,13 +2492,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             try {
               const response = await ApiService.visitorCheckOut(visitor._id);
               if (response.success) {
-                Alert.alert("✅ Success", "You have been checked out. Thank you for visiting!");
+                showVisitorAlert("✅ Success", "You have been checked out. Thank you for visiting!");
                 loadVisitorData();
               } else {
-                Alert.alert("Error", response.message || "Failed to check out");
+                showVisitorAlert("Error", response.message || "Failed to check out");
               }
             } catch (error) {
-              Alert.alert("Error", "Failed to check out");
+              showVisitorAlert("Error", "Failed to check out");
             }
           }
         }
@@ -2172,7 +2509,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleCheckInAction = () => {
     const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
     if (blockedMessage) {
-      Alert.alert(
+      showVisitorAlert(
         blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
         blockedMessage,
       );
@@ -2199,10 +2536,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         return;
       }
 
-      Alert.alert("Check-In Failed", response?.message || "Failed to check in.");
+      showVisitorAlert("Check-In Failed", response?.message || "Failed to check in.");
     } catch (error) {
       console.error("Visitor check-in error:", error);
-      Alert.alert("Check-In Failed", error?.message || "Failed to check in.");
+      showVisitorAlert("Check-In Failed", error?.message || "Failed to check in.");
     } finally {
       setIsCheckInLoading(false);
     }
@@ -2211,7 +2548,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleCheckOutAction = (targetVisitor = visitor) => {
     const blockedMessage = getVisitorAccessBlockedMessage(targetVisitor, currentUser);
     if (blockedMessage) {
-      Alert.alert(
+      showVisitorAlert(
         blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
         blockedMessage,
       );
@@ -2219,7 +2556,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     if (String(targetVisitor?.status || "").toLowerCase() !== "checked_in") {
-      Alert.alert("Check-Out Unavailable", "Only a checked-in visit can be checked out.");
+      showVisitorAlert("Check-Out Unavailable", "Only a checked-in visit can be checked out.");
       return;
     }
 
@@ -2249,10 +2586,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         return;
       }
 
-      Alert.alert("Check-Out Failed", response?.message || "Failed to check out.");
+      showVisitorAlert("Check-Out Failed", response?.message || "Failed to check out.");
     } catch (error) {
       console.error("Visitor check-out error:", error);
-      Alert.alert("Check-Out Failed", error?.message || "Failed to check out.");
+      showVisitorAlert("Check-Out Failed", error?.message || "Failed to check out.");
     } finally {
       setIsCheckOutLoading(false);
     }
@@ -2413,7 +2750,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const handleLogout = async () => {
     await stopNfcReading();
-    Alert.alert(
+    showVisitorAlert(
       "Logout",
       "Are you sure you want to logout?",
       [
@@ -2550,6 +2887,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     icon: "navigate",
     position: visitorDestinationInfo.position,
   };
+  const activeVisitorMapFloor =
+    MONITORING_MAP_FLOORS.find((floor) => floor.id === selectedVisitorMapFloor)?.id ||
+    visitorDestinationInfo.floorId ||
+    "ground";
   const recentAppointmentEntries = appointmentHistoryEntries.slice(0, 3);
   const approvedAppointmentCount = appointmentHistoryEntries.filter((entry) =>
     String(entry.statusLabel || "").toLowerCase().includes("approved"),
@@ -2679,6 +3020,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     opacity: dashboardContentAnim,
     transform: [
       {
+        translateX: visitorTransitionAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [visitorTransitionDirection * 14, 0],
+        }),
+      },
+      {
         translateY: dashboardContentAnim.interpolate({
           inputRange: [0, 1],
           outputRange: [selectedVisitorSection === "appointment" ? 16 : 7, 0],
@@ -2694,19 +3041,24 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const renderHomeDiscoveryStrip = () => (
-    <Animated.View
-      style={[
-        visitorDashboardStyles.homeDiscoveryShell,
-        dashboardSectionResponsiveStyle,
-        dashboardContentAnimatedStyle,
-      ]}
+    <ScrollReveal
+      scrollY={dashboardScrollY}
+      viewportHeight={viewportHeight}
+      delay={80}
     >
-      <LinearGradient
-        colors={["#041E42", "#0A3D91", "#1B5FC1"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={visitorDashboardStyles.homeDiscoveryCard}
+      <Animated.View
+        style={[
+          visitorDashboardStyles.homeDiscoveryShell,
+          dashboardSectionResponsiveStyle,
+          dashboardContentAnimatedStyle,
+        ]}
       >
+        <LinearGradient
+          colors={["#041E42", "#0A3D91", "#1B5FC1"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={visitorDashboardStyles.homeDiscoveryCard}
+        >
         <View style={visitorDashboardStyles.homeDiscoverySearchRow}>
           <View style={visitorDashboardStyles.homeDiscoverySearchBar}>
             <Ionicons name="search-outline" size={18} color="#0A3D91" />
@@ -2732,7 +3084,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
         <View style={visitorDashboardStyles.homeDiscoveryCategoryRow}>
           {homeQuickCategories.map((item) => (
-            <TouchableOpacity
+            <AnimatedPressable
               key={item.label}
               style={visitorDashboardStyles.homeDiscoveryCategoryItem}
               activeOpacity={0.86}
@@ -2749,11 +3101,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </View>
               </View>
               <Text style={visitorDashboardStyles.homeDiscoveryCategoryLabel}>{item.label}</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           ))}
         </View>
-      </LinearGradient>
-    </Animated.View>
+        </LinearGradient>
+      </Animated.View>
+    </ScrollReveal>
   );
 
   const renderAppointmentSegmentBar = (activeScreen) => (
@@ -2768,7 +3121,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               : () => handleAppointmentScreenNavigation("history", "Loading appointment history...");
 
         return (
-          <TouchableOpacity
+          <AnimatedPressable
             key={tab.id}
             style={[
               visitorDashboardStyles.appointmentSegmentButton,
@@ -2790,20 +3143,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             >
               {tab.label}
             </Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         );
       })}
     </View>
   );
 
   const renderAppointmentInsightsCard = () => (
-    <View
-      style={[
-        visitorDashboardStyles.appointmentInsightsCard,
-        dashboardSectionResponsiveStyle,
-        isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard,
-      ]}
+    <ScrollReveal
+      scrollY={dashboardScrollY}
+      viewportHeight={viewportHeight}
+      delay={70}
     >
+      <View
+        style={[
+          visitorDashboardStyles.appointmentInsightsCard,
+          dashboardSectionResponsiveStyle,
+          isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard,
+        ]}
+      >
       <View style={visitorDashboardStyles.appointmentInsightsHeader}>
         <View>
           <Text style={visitorDashboardStyles.appointmentInsightsEyebrow}>Visitor Summary</Text>
@@ -2811,14 +3169,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             Appointment Snapshot
           </Text>
         </View>
-        <TouchableOpacity
+        <AnimatedPressable
           style={visitorDashboardStyles.appointmentInsightsAction}
           activeOpacity={0.86}
           onPress={() => handleVisitorSectionChange("appointment")}
         >
           <Text style={visitorDashboardStyles.appointmentInsightsActionText}>Open Module</Text>
           <Ionicons name="arrow-forward-outline" size={16} color="#0A3D91" />
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
 
       <View style={visitorDashboardStyles.appointmentInsightsGrid}>
@@ -2855,7 +3213,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           </Text>
         </View>
       </View>
-    </View>
+      </View>
+    </ScrollReveal>
   );
 
   const renderRecentAppointmentRail = () => {
@@ -3199,18 +3558,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       </View>
 
       <View style={visitorDashboardStyles.accountButtonDock}>
-        <TouchableOpacity
+        <AnimatedPressable
           style={[visitorDashboardStyles.visitorFlowPrimaryButton, visitorDashboardStyles.accountDockPrimaryButton]}
-          onPress={() => navigation.navigate("Profile")}
+          onPress={() => handleVisitorRouteNavigation("Profile")}
           activeOpacity={0.88}
         >
           <Ionicons name="create-outline" size={18} color="#FFFFFF" />
           <Text style={visitorDashboardStyles.visitorFlowPrimaryButtonText}>
             Open Profile
           </Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
 
-        <TouchableOpacity
+        <AnimatedPressable
           style={[visitorDashboardStyles.accountLogoutButton, visitorDashboardStyles.accountDockLogoutButton]}
           onPress={handleLogout}
           activeOpacity={0.88}
@@ -3219,7 +3578,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <Text style={visitorDashboardStyles.accountLogoutButtonText}>
             Logout
           </Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     </View>
   );
@@ -3227,11 +3586,29 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const renderBottomNavigation = () => (
     <View style={visitorDashboardStyles.bottomNavShell}>
       <View style={[visitorDashboardStyles.bottomNavBar, isVisitorDarkMode && visitorDashboardStyles.darkBottomNavBar]}>
+        <Animated.View
+          style={[
+            visitorDashboardStyles.bottomNavActiveIndicator,
+            { pointerEvents: "none" },
+            {
+              width: bottomNavItemWidth,
+              transform: [
+                {
+                  translateX: bottomNavAnim.interpolate({
+                    inputRange: VISITOR_MODULES.map((_, index) => index),
+                    outputRange: VISITOR_MODULES.map((_, index) => index * bottomNavItemWidth),
+                    extrapolate: "clamp",
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
         {VISITOR_MODULES.map((module) => {
           const isActive = selectedVisitorSection === module.id;
 
           return (
-            <TouchableOpacity
+            <AnimatedPressable
               key={module.id}
               style={[
                 visitorDashboardStyles.bottomNavItem,
@@ -3239,6 +3616,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               ]}
               onPress={() => handleVisitorSectionChange(module.id)}
               activeOpacity={0.9}
+              pressScale={0.94}
             >
               <Ionicons
                 name={module.icon}
@@ -3254,7 +3632,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               >
                 {module.label}
               </Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           );
         })}
       </View>
@@ -3317,56 +3695,62 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     "Assigned on account creation";
 
   const renderSectionIntro = () => (
-    <View
-      style={[
-        visitorDashboardStyles.sectionIntroCard,
-        dashboardSectionResponsiveStyle,
-        { backgroundColor: sectionIntro.accentSoft },
-      ]}
+    <ScrollReveal
+      scrollY={dashboardScrollY}
+      viewportHeight={viewportHeight}
+      delay={50}
     >
-      <View style={visitorDashboardStyles.sectionIntroTopRow}>
-        <View
-          style={[
-            visitorDashboardStyles.sectionIntroIconWrap,
-            { backgroundColor: `${sectionIntro.accent}18` },
-          ]}
-        >
-          <Ionicons name={sectionIntro.icon} size={20} color={sectionIntro.accent} />
-        </View>
-        <View
-          style={[
-            visitorDashboardStyles.sectionIntroBadge,
-            { backgroundColor: `${sectionIntro.accent}12` },
-          ]}
-        >
-          <Text style={[visitorDashboardStyles.sectionIntroBadgeText, { color: sectionIntro.accent }]}>
-            {sectionIntro.badge}
-          </Text>
-        </View>
-      </View>
-
-      <View style={visitorDashboardStyles.sectionIntroCopy}>
-        <Text style={[visitorDashboardStyles.sectionIntroEyebrow, { color: sectionIntro.accent }]}>
-          {sectionIntro.eyebrow}
-        </Text>
-        <Text style={visitorDashboardStyles.sectionIntroTitle}>{sectionIntro.title}</Text>
-        <Text style={visitorDashboardStyles.sectionIntroSubtitle}>{sectionIntro.subtitle}</Text>
-      </View>
-
-      <View style={visitorDashboardStyles.sectionIntroHighlightRow}>
-        {sectionIntro.highlights.map((item) => (
-          <View key={item} style={visitorDashboardStyles.sectionIntroHighlightPill}>
-            <View
-              style={[
-                visitorDashboardStyles.sectionIntroHighlightDot,
-                { backgroundColor: sectionIntro.accent },
-              ]}
-            />
-            <Text style={visitorDashboardStyles.sectionIntroHighlightText}>{item}</Text>
+      <View
+        style={[
+          visitorDashboardStyles.sectionIntroCard,
+          dashboardSectionResponsiveStyle,
+          { backgroundColor: sectionIntro.accentSoft },
+        ]}
+      >
+        <View style={visitorDashboardStyles.sectionIntroTopRow}>
+          <View
+            style={[
+              visitorDashboardStyles.sectionIntroIconWrap,
+              { backgroundColor: `${sectionIntro.accent}18` },
+            ]}
+          >
+            <Ionicons name={sectionIntro.icon} size={20} color={sectionIntro.accent} />
           </View>
-        ))}
+          <View
+            style={[
+              visitorDashboardStyles.sectionIntroBadge,
+              { backgroundColor: `${sectionIntro.accent}12` },
+            ]}
+          >
+            <Text style={[visitorDashboardStyles.sectionIntroBadgeText, { color: sectionIntro.accent }]}>
+              {sectionIntro.badge}
+            </Text>
+          </View>
+        </View>
+
+        <View style={visitorDashboardStyles.sectionIntroCopy}>
+          <Text style={[visitorDashboardStyles.sectionIntroEyebrow, { color: sectionIntro.accent }]}>
+            {sectionIntro.eyebrow}
+          </Text>
+          <Text style={visitorDashboardStyles.sectionIntroTitle}>{sectionIntro.title}</Text>
+          <Text style={visitorDashboardStyles.sectionIntroSubtitle}>{sectionIntro.subtitle}</Text>
+        </View>
+
+        <View style={visitorDashboardStyles.sectionIntroHighlightRow}>
+          {sectionIntro.highlights.map((item) => (
+            <View key={item} style={visitorDashboardStyles.sectionIntroHighlightPill}>
+              <View
+                style={[
+                  visitorDashboardStyles.sectionIntroHighlightDot,
+                  { backgroundColor: sectionIntro.accent },
+                ]}
+              />
+              <Text style={visitorDashboardStyles.sectionIntroHighlightText}>{item}</Text>
+            </View>
+          ))}
+        </View>
       </View>
-    </View>
+    </ScrollReveal>
   );
 
   const renderVisitorEmptyState = () => (
@@ -3405,12 +3789,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             ? "Your visitor account is already active. Submit a new preferred date, time, and purpose here instead of registering again."
             : "Your visitor account is active. Submit an appointment request so your approved pass can appear here."}
       </Text>
-      <TouchableOpacity
+      <AnimatedPressable
         style={visitorDashboardStyles.registerButton}
         onPress={
           canRequestNewAppointment || canCreateFreshAppointment
             ? openAppointmentRequestScreen
-            : () => navigation.navigate("VisitorRegister")
+            : () => handleVisitorRouteNavigation("VisitorRegister")
         }
       >
         <LinearGradient
@@ -3426,26 +3810,31 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             {canRequestNewAppointment || canCreateFreshAppointment ? "Request Appointment" : "Register as Visitor"}
           </Text>
         </LinearGradient>
-      </TouchableOpacity>
+      </AnimatedPressable>
     </View>
   );
 
   const renderApprovedVisitorDashboard = () => (
     <>
-      <View
-        style={[
-          visitorDashboardStyles.approvedHeroCard,
-          compactApprovedHeroStyle,
-          dashboardSectionResponsiveStyle,
-          dashboardHeroCardResponsiveStyle,
-        ]}
+      <ScrollReveal
+        scrollY={dashboardScrollY}
+        viewportHeight={viewportHeight}
+        delay={40}
       >
-        <LinearGradient
-          colors={["#0A3D91", "#1C6DD0", "#0A3D91"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[visitorDashboardStyles.approvedHeroGradient, compactApprovedGradientStyle]}
+        <View
+          style={[
+            visitorDashboardStyles.approvedHeroCard,
+            compactApprovedHeroStyle,
+            dashboardSectionResponsiveStyle,
+            dashboardHeroCardResponsiveStyle,
+          ]}
         >
+          <LinearGradient
+            colors={["#0A3D91", "#1C6DD0", "#0A3D91"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[visitorDashboardStyles.approvedHeroGradient, compactApprovedGradientStyle]}
+          >
           <View style={visitorDashboardStyles.approvedHeroBadge}>
             <Ionicons name="shield-checkmark" size={16} color="#0A3D91" />
             <Text style={visitorDashboardStyles.approvedHeroBadgeText}>Approved Access</Text>
@@ -3490,24 +3879,30 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </Text>
             </View>
           </View>
-        </LinearGradient>
-      </View>
-
-      <View style={[visitorDashboardStyles.approvedActionSection, dashboardSectionResponsiveStyle]}>
-        <View
-          style={[
-            visitorDashboardStyles.approvedSectionHeader,
-            approvedSectionHeaderResponsiveStyle,
-          ]}
-        >
-          <Text style={visitorDashboardStyles.approvedSectionTitle}>Access Tools</Text>
-          <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
-            Use your pass, manage your visit, and keep your arrival flow ready.
-          </Text>
+          </LinearGradient>
         </View>
+      </ScrollReveal>
+
+      <ScrollReveal
+        scrollY={dashboardScrollY}
+        viewportHeight={viewportHeight}
+        delay={100}
+      >
+        <View style={[visitorDashboardStyles.approvedActionSection, dashboardSectionResponsiveStyle]}>
+          <View
+            style={[
+              visitorDashboardStyles.approvedSectionHeader,
+              approvedSectionHeaderResponsiveStyle,
+            ]}
+          >
+            <Text style={visitorDashboardStyles.approvedSectionTitle}>Access Tools</Text>
+            <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
+              Use your pass, manage your visit, and keep your arrival flow ready.
+            </Text>
+          </View>
 
         <View style={visitorDashboardStyles.approvedActionGrid}>
-          <TouchableOpacity
+          <AnimatedPressable
             style={visitorDashboardStyles.approvedVirtualNfcCard}
             onPress={() => setShowVirtualNfcModal(true)}
             activeOpacity={0.9}
@@ -3548,10 +3943,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </Text>
               </View>
             </LinearGradient>
-          </TouchableOpacity>
+          </AnimatedPressable>
 
           <View style={visitorDashboardStyles.approvedCompactActionsColumn}>
-            <TouchableOpacity
+            <AnimatedPressable
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
               onPress={handleCheckInAction}
               activeOpacity={0.9}
@@ -3572,9 +3967,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   Confirm arrival and notify security monitoring.
                 </Text>
               </View>
-            </TouchableOpacity>
+            </AnimatedPressable>
 
-            <TouchableOpacity
+            <AnimatedPressable
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
               onPress={() => handleCheckOutAction()}
               activeOpacity={0.9}
@@ -3593,23 +3988,29 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   Close your visit once your appointment is complete.
                 </Text>
               </View>
-            </TouchableOpacity>
+            </AnimatedPressable>
+          </View>
           </View>
         </View>
-      </View>
+      </ScrollReveal>
 
-      <View style={[visitorDashboardStyles.approvedTimelineSection, dashboardSectionResponsiveStyle]}>
-        <View
-          style={[
-            visitorDashboardStyles.approvedSectionHeader,
-            approvedSectionHeaderResponsiveStyle,
-          ]}
-        >
-          <Text style={visitorDashboardStyles.approvedSectionTitle}>Visit Snapshot</Text>
-          <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
-            Review your purpose, office, and key reminders before arriving.
-          </Text>
-        </View>
+      <ScrollReveal
+        scrollY={dashboardScrollY}
+        viewportHeight={viewportHeight}
+        delay={160}
+      >
+        <View style={[visitorDashboardStyles.approvedTimelineSection, dashboardSectionResponsiveStyle]}>
+          <View
+            style={[
+              visitorDashboardStyles.approvedSectionHeader,
+              approvedSectionHeaderResponsiveStyle,
+            ]}
+          >
+            <Text style={visitorDashboardStyles.approvedSectionTitle}>Visit Snapshot</Text>
+            <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
+              Review your purpose, office, and key reminders before arriving.
+            </Text>
+          </View>
 
         <View style={visitorDashboardStyles.approvedSnapshotGrid}>
           <View style={visitorDashboardStyles.approvedSnapshotCard}>
@@ -3628,8 +4029,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <Text style={visitorDashboardStyles.approvedSnapshotLabel}>Connectivity</Text>
             <Text style={visitorDashboardStyles.approvedSnapshotValue}>Wi-Fi or data on</Text>
           </View>
+          </View>
         </View>
-      </View>
+      </ScrollReveal>
 
       {renderRecentAppointmentRail()}
     </>
@@ -3901,7 +4303,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             ))}
           </View>
 
-          <View style={visitorDashboardStyles.appointmentField}>
+          <View style={appointmentFormRowResponsiveStyle}>
+          <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
             <Text style={visitorDashboardStyles.appointmentFieldLabel}>Preferred Date</Text>
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentPickerField}
@@ -3955,7 +4358,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             ) : null}
           </View>
 
-          <View style={visitorDashboardStyles.appointmentField}>
+          <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
             <Text style={visitorDashboardStyles.appointmentFieldLabel}>Preferred Time</Text>
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentPickerField}
@@ -3976,6 +4379,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Text style={visitorDashboardStyles.appointmentPickerValue}>
                     {appointmentForm.preferredTime ? formatTime(appointmentForm.preferredTime) : "Select preferred time"}
                   </Text>
+                  {appointmentForm.preferredTime ? (
+                    <Text
+                      style={[
+                        visitorDashboardStyles.appointmentPickerSubValue,
+                        isAppointmentTimeSlotFull(appointmentForm.preferredTime) &&
+                          visitorDashboardStyles.appointmentPickerSubValueError,
+                      ]}
+                    >
+                      {getAppointmentSlotStatusText(appointmentForm.preferredTime)}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
               <Ionicons
@@ -4061,8 +4475,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     : "Choose office(s) first so we can check available staff slots."}
             </Text>
           </View>
+          </View>
 
-          <View style={visitorDashboardStyles.appointmentField}>
+          <View style={appointmentFormRowResponsiveStyle}>
+          <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
             <Text style={visitorDashboardStyles.appointmentFieldLabel}>Office to Visit</Text>
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentPickerField}
@@ -4136,7 +4552,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </Text>
           </View>
 
-          <View style={visitorDashboardStyles.appointmentField}>
+          <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
             <Text style={visitorDashboardStyles.appointmentFieldLabel}>Purpose Of Visit</Text>
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentPickerField}
@@ -4217,8 +4633,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               />
             ) : null}
           </View>
+          </View>
 
-          <View style={visitorDashboardStyles.appointmentField}>
+          <View style={appointmentFormRowResponsiveStyle}>
+          <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
             <Text style={visitorDashboardStyles.appointmentFieldLabel}>Valid ID To Present</Text>
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentPickerField}
@@ -4266,6 +4684,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                           ...prev,
                           idType: option,
                           idImage: prev.idType && prev.idType !== option ? null : prev.idImage,
+                          idVerification: prev.idType && prev.idType !== option ? null : prev.idVerification,
                         }));
                         setShowIdTypeDropdown(false);
                       }}
@@ -4292,7 +4711,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </Text>
           </View>
 
-          <View style={visitorDashboardStyles.appointmentField}>
+          <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
             <Text style={visitorDashboardStyles.appointmentFieldLabel}>Valid ID Picture</Text>
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentIdUploadCard}
@@ -4320,6 +4739,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <TouchableOpacity
                 style={visitorDashboardStyles.appointmentChangeIdButton}
                 onPress={handlePickAppointmentIdImage}
+                disabled={isVerifyingAppointmentId}
                 activeOpacity={0.85}
               >
                 <Ionicons name="refresh-outline" size={16} color="#0A3D91" />
@@ -4328,9 +4748,77 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </Text>
               </TouchableOpacity>
             ) : null}
+            {appointmentForm.idImage ? (
+              <View
+                style={[
+                  visitorDashboardStyles.idVerificationCard,
+                  appointmentForm.idVerification?.isValid
+                    ? visitorDashboardStyles.idVerificationCardPassed
+                    : appointmentForm.idVerification
+                      ? visitorDashboardStyles.idVerificationCardFailed
+                      : null,
+                ]}
+              >
+                <View style={visitorDashboardStyles.idVerificationHeader}>
+                  <View
+                    style={[
+                      visitorDashboardStyles.idVerificationIcon,
+                      appointmentForm.idVerification?.isValid &&
+                        visitorDashboardStyles.idVerificationIconPassed,
+                    ]}
+                  >
+                    {isVerifyingAppointmentId ||
+                    appointmentForm.idVerification?.status === "scanning" ? (
+                      <ActivityIndicator size="small" color="#0A3D91" />
+                    ) : (
+                      <Ionicons
+                        name={
+                          appointmentForm.idVerification?.isValid
+                            ? "shield-checkmark-outline"
+                            : "alert-circle-outline"
+                        }
+                        size={18}
+                        color={appointmentForm.idVerification?.isValid ? "#047857" : "#DC2626"}
+                      />
+                    )}
+                  </View>
+                  <View style={visitorDashboardStyles.idVerificationCopy}>
+                    <Text style={visitorDashboardStyles.idVerificationTitle}>
+                      {isVerifyingAppointmentId ||
+                      appointmentForm.idVerification?.status === "scanning"
+                        ? "OCR verification running"
+                        : appointmentForm.idVerification?.isValid
+                          ? "OCR verification passed"
+                          : "OCR verification needed"}
+                    </Text>
+                    <Text style={visitorDashboardStyles.idVerificationMessage}>
+                      {appointmentForm.idVerification?.message ||
+                        "Scan the uploaded ID image before submitting your appointment request."}
+                    </Text>
+                  </View>
+                  {typeof appointmentForm.idVerification?.confidence === "number" ? (
+                    <Text style={visitorDashboardStyles.idVerificationScore}>
+                      {appointmentForm.idVerification.confidence}%
+                    </Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity
+                  style={visitorDashboardStyles.idVerificationAction}
+                  onPress={handleVerifyAppointmentIdAgain}
+                  disabled={isVerifyingAppointmentId}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="scan-outline" size={16} color="#0A3D91" />
+                  <Text style={visitorDashboardStyles.idVerificationActionText}>
+                    {isVerifyingAppointmentId ? "Scanning..." : "Run OCR verification"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
             <Text style={visitorDashboardStyles.appointmentAutoHint}>
-              Upload the same ID type you selected above. Staff or security will complete the final review.
+              Upload the same ID type you selected above. OCR verification helps catch unclear or mismatched ID photos before staff or security completes the final review.
             </Text>
+          </View>
           </View>
 
           <TouchableOpacity
@@ -4618,7 +5106,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             const isActive = selectedVisitorMapFloor === floor.id;
 
             return (
-              <TouchableOpacity
+              <AnimatedPressable
                 key={floor.id}
                 style={[
                   visitorDashboardStyles.visitorFloorTab,
@@ -4640,7 +5128,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 >
                   {floor.name}
                 </Text>
-              </TouchableOpacity>
+              </AnimatedPressable>
             );
           })}
         </View>
@@ -4650,7 +5138,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         visitors={[]}
         floors={MONITORING_MAP_FLOORS}
         offices={MONITORING_MAP_OFFICES}
-        selectedFloor={visitorDestinationInfo.floorId || selectedVisitorMapFloor}
+        selectedFloor={activeVisitorMapFloor}
         selectedOffice="all"
         destinationMarkers={isCheckedOutVisitor ? [] : [visitorDestinationMarker]}
         showVisitorMarkers={false}
@@ -4669,14 +5157,41 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </Text>
       </View>
 
-      <TouchableOpacity
+      <View style={visitorDashboardStyles.visitorMapActionRow}>
+        <AnimatedPressable
+          style={visitorDashboardStyles.visitorMapPrimaryAction}
+          onPress={() => setSelectedVisitorMapFloor(visitorDestinationInfo.floorId || "ground")}
+          activeOpacity={0.88}
+        >
+          <Ionicons name="navigate" size={17} color="#FFFFFF" />
+          <Text style={visitorDashboardStyles.visitorMapPrimaryActionText}>Start Navigation</Text>
+        </AnimatedPressable>
+        <AnimatedPressable
+          style={visitorDashboardStyles.visitorMapActionButton}
+          onPress={() => setSelectedVisitorMapFloor("ground")}
+          activeOpacity={0.88}
+        >
+          <Ionicons name="refresh-outline" size={17} color="#0A3D91" />
+          <Text style={visitorDashboardStyles.visitorMapActionButtonText}>Reset Route</Text>
+        </AnimatedPressable>
+        <AnimatedPressable
+          style={visitorDashboardStyles.visitorMapActionButton}
+          onPress={openAppointmentRequestScreen}
+          activeOpacity={0.88}
+        >
+          <Ionicons name="swap-horizontal-outline" size={17} color="#0A3D91" />
+          <Text style={visitorDashboardStyles.visitorMapActionButtonText}>Change Destination</Text>
+        </AnimatedPressable>
+      </View>
+
+      <AnimatedPressable
         style={visitorDashboardStyles.visitorFlowSecondaryButton}
-        onPress={() => navigation.navigate("WebMapScreen", { destinationOffice: visitorDestinationInfo.officeName })}
+        onPress={() => handleVisitorRouteNavigation("WebMapScreen", { destinationOffice: visitorDestinationInfo.officeName })}
         activeOpacity={0.86}
       >
         <Ionicons name="navigate-outline" size={18} color="#0A3D91" />
         <Text style={visitorDashboardStyles.visitorFlowSecondaryButtonText}>View Full In-App Directions</Text>
-      </TouchableOpacity>
+      </AnimatedPressable>
     </View>
   );
 
@@ -4715,8 +5230,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </Text>
             </View>
             <View style={visitorDashboardStyles.headerActions}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate("Profile")}
+              <AnimatedPressable
+                onPress={() => handleVisitorRouteNavigation("Profile")}
                 style={visitorDashboardStyles.profileButton}
                 activeOpacity={0.86}
               >
@@ -4728,7 +5243,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     {visitor?.fullName?.charAt(0) || "V"}
                   </Text>
                 </LinearGradient>
-              </TouchableOpacity>
+              </AnimatedPressable>
             </View>
           </View>
 
@@ -4802,8 +5317,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   {sectionIntro.badge}
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={() => navigation.navigate("Profile")}
+              <AnimatedPressable
+                onPress={() => handleVisitorRouteNavigation("Profile")}
                 style={[
                   visitorDashboardStyles.miniBrandProfileButton,
                   { backgroundColor: `${sectionIntro.accent}14`, borderColor: `${sectionIntro.accent}26` },
@@ -4818,7 +5333,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 >
                   {visitor?.fullName?.charAt(0) || "V"}
                 </Text>
-              </TouchableOpacity>
+              </AnimatedPressable>
             </View>
           </View>
         </View>
@@ -4829,6 +5344,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         style={[visitorDashboardStyles.mainScrollView, isVisitorDarkMode && visitorDashboardStyles.darkMainScrollView]}
         showsVerticalScrollIndicator
         contentContainerStyle={visitorDashboardStyles.scrollContent}
+        onScroll={(event) => setDashboardScrollY(event.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
@@ -4842,12 +5359,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             dashboardShellResponsiveStyle,
           ]}
         >
-          <Animated.View
-            style={[
-              visitorDashboardStyles.commandDeckAnimatedWrap,
-              dashboardHeroAnimatedStyle,
-            ]}
+          <ScrollReveal
+            scrollY={dashboardScrollY}
+            viewportHeight={viewportHeight}
+            delay={0}
           >
+            <Animated.View
+              style={[
+                visitorDashboardStyles.commandDeckAnimatedWrap,
+                dashboardHeroAnimatedStyle,
+              ]}
+            >
           <View
             style={[
               visitorDashboardStyles.commandDeckCard,
@@ -4876,7 +5398,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
             <View style={visitorDashboardStyles.commandMetricsGrid}>
               {commandMetrics.map((item) => (
-                <TouchableOpacity
+                <AnimatedPressable
                   key={item.label}
                   style={[
                     visitorDashboardStyles.commandMetricCard,
@@ -4895,7 +5417,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Text style={[visitorDashboardStyles.commandMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]} numberOfLines={1}>
                     {item.value}
                   </Text>
-                </TouchableOpacity>
+                </AnimatedPressable>
               ))}
             </View>
 
@@ -4933,7 +5455,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   commandActionRowResponsiveStyle,
                 ]}
               >
-                <TouchableOpacity
+                <AnimatedPressable
                   style={[
                     visitorDashboardStyles.commandPrimaryButton,
                     commandActionButtonResponsiveStyle,
@@ -4945,12 +5467,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Text style={visitorDashboardStyles.commandPrimaryButtonText}>
                     {isApprovedVisitor ? "Register Another Appointment" : "Register Appointment"}
                   </Text>
-                </TouchableOpacity>
+                </AnimatedPressable>
 
               </View>
             ) : null}
           </View>
-          </Animated.View>
+            </Animated.View>
+          </ScrollReveal>
 
           {!isVisitorHomeSection ? (
             <Animated.View style={dashboardContentAnimatedStyle}>
@@ -4966,13 +5489,23 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           style={[
             visitorDashboardStyles.visitorPushNotice,
             visitorPushNotice.type === "success" && visitorDashboardStyles.visitorPushNoticeSuccess,
+            visitorPushNotice.type === "warning" && visitorDashboardStyles.visitorPushNoticeWarning,
+            visitorPushNotice.type === "error" && visitorDashboardStyles.visitorPushNoticeError,
           ]}
           activeOpacity={0.92}
           onPress={() => setVisitorPushNotice(null)}
         >
           <View style={visitorDashboardStyles.visitorPushNoticeIcon}>
             <Ionicons
-              name={visitorPushNotice.type === "success" ? "checkmark-circle" : "notifications-outline"}
+              name={
+                visitorPushNotice.type === "success"
+                  ? "checkmark-circle"
+                  : visitorPushNotice.type === "error"
+                    ? "close-circle-outline"
+                    : visitorPushNotice.type === "warning"
+                      ? "alert-circle-outline"
+                      : "notifications-outline"
+              }
               size={18}
               color="#0A3D91"
             />
@@ -4984,10 +5517,91 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <Text style={visitorDashboardStyles.visitorPushNoticeText}>
               {visitorPushNotice.message}
             </Text>
+            <Text style={visitorDashboardStyles.visitorPushNoticeTime}>Just now</Text>
           </View>
           <Ionicons name="close" size={16} color="#64748B" />
         </TouchableOpacity>
       ) : null}
+
+      <Modal
+        visible={!!visitorAlert}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setVisitorAlert(null)}
+      >
+        <View style={visitorDashboardStyles.modalOverlay}>
+          <View style={visitorDashboardStyles.visitorAlertModalContent}>
+            <View
+              style={[
+                visitorDashboardStyles.visitorAlertIconWrap,
+                visitorAlert?.type === "success" && visitorDashboardStyles.visitorAlertIconSuccess,
+                visitorAlert?.type === "error" && visitorDashboardStyles.visitorAlertIconError,
+                visitorAlert?.type === "warning" && visitorDashboardStyles.visitorAlertIconWarning,
+              ]}
+            >
+              <Ionicons
+                name={
+                  visitorAlert?.type === "success"
+                    ? "checkmark-circle-outline"
+                    : visitorAlert?.type === "error"
+                      ? "close-circle-outline"
+                      : visitorAlert?.type === "warning"
+                        ? "alert-circle-outline"
+                        : "information-circle-outline"
+                }
+                size={26}
+                color={
+                  visitorAlert?.type === "success"
+                    ? "#047857"
+                    : visitorAlert?.type === "error"
+                      ? "#DC2626"
+                      : visitorAlert?.type === "warning"
+                        ? "#D97706"
+                        : "#0A3D91"
+                }
+              />
+            </View>
+            <Text style={visitorDashboardStyles.visitorAlertTitle}>
+              {visitorAlert?.title || "Notice"}
+            </Text>
+            {visitorAlert?.message ? (
+              <Text style={visitorDashboardStyles.visitorAlertMessage}>
+                {visitorAlert.message}
+              </Text>
+            ) : null}
+            <View style={visitorDashboardStyles.visitorAlertActionRow}>
+              {(visitorAlert?.buttons || [{ text: "OK" }]).map((button, index) => {
+                const isCancel = button.style === "cancel";
+                const isDestructive = button.style === "destructive";
+                const isPrimary = !isCancel && index === (visitorAlert?.buttons || []).length - 1;
+                return (
+                  <TouchableOpacity
+                    key={`${button.text}-${index}`}
+                    style={[
+                      visitorDashboardStyles.visitorAlertButton,
+                      isCancel && visitorDashboardStyles.visitorAlertButtonSecondary,
+                      isPrimary && visitorDashboardStyles.visitorAlertButtonPrimary,
+                      isDestructive && visitorDashboardStyles.visitorAlertButtonDanger,
+                    ]}
+                    onPress={() => dismissVisitorAlert(button)}
+                    activeOpacity={0.88}
+                  >
+                    <Text
+                      style={[
+                        visitorDashboardStyles.visitorAlertButtonText,
+                        isCancel && visitorDashboardStyles.visitorAlertButtonSecondaryText,
+                        isPrimary && visitorDashboardStyles.visitorAlertButtonPrimaryText,
+                      ]}
+                    >
+                      {button.text}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={!!visitorWarningNotice}
@@ -5702,3 +6316,4 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     </SafeAreaView>
   );
 }
+

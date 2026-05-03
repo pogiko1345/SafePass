@@ -536,11 +536,14 @@ async verifyCredentials(email, password) {
     console.error("Verify credentials error:", error);
 
     if (!this.isDevFallbackEnabled()) {
-      throw new Error(
+      const credentialError = new Error(
         error?.data?.message ||
           error.message ||
           "Invalid email or password"
       );
+      credentialError.status = error?.status;
+      credentialError.data = error?.data;
+      throw credentialError;
     }
 
     // Demo accounts (development fallback if backend not running)
@@ -1024,6 +1027,21 @@ async verifyCredentials(email, password) {
       return await this.fetch(`/appointments/availability?${queryString}`);
     } catch (error) {
       console.error("Get appointment availability error:", error);
+      throw error;
+    }
+  }
+
+  async validateAppointmentIdImage({ idType, imageUri } = {}) {
+    try {
+      return await this.fetch("/appointments/id-ocr/validate", {
+        method: "POST",
+        body: {
+          idType,
+          imageUri,
+        },
+      });
+    } catch (error) {
+      console.error("Validate appointment ID image error:", error);
       throw error;
     }
   }

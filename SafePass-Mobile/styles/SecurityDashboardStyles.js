@@ -519,8 +519,8 @@ export default StyleSheet.create({
   },
 
   securityHeroSideLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "800",
     color: colors.gray[700],
     marginTop: 4,
   },
@@ -905,9 +905,9 @@ export default StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.white,
+    backgroundColor: "#F8FBFE",
     borderWidth: 1,
-    borderColor: colors.gray[200],
+    borderColor: "#DBE3F0",
     borderRadius: 16,
     paddingHorizontal: spacing.md,
     paddingVertical: Platform.select({ ios: 12, android: 10, web: 12 }),
@@ -917,7 +917,8 @@ export default StyleSheet.create({
 
   searchInput: {
     flex: 1,
-    fontSize: fontSize.base,
+    fontSize: 14,
+    fontWeight: "600",
     color: colors.gray[900],
     padding: 0,
     ...(isWeb && { outlineStyle: "none" }),
@@ -926,16 +927,16 @@ export default StyleSheet.create({
   recordToolbar: {
     flexDirection: isDesktop ? "row" : "column",
     alignItems: "stretch",
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+    gap: 12,
+    marginBottom: 18,
   },
 
   recordToolbarCard: {
     flex: 1,
     minWidth: 0,
     borderWidth: 1,
-    borderColor: colors.gray[200],
-    borderRadius: 18,
+    borderColor: "#DCE8F4",
+    borderRadius: 16,
     backgroundColor: colors.white,
     padding: spacing.md,
   },
@@ -949,11 +950,11 @@ export default StyleSheet.create({
   },
 
   recordToolbarTitle: {
-    fontSize: fontSize.xs,
-    fontWeight: "800",
+    fontSize: 13,
+    fontWeight: "900",
     color: colors.gray[900],
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.45,
   },
 
   recordToolbarClear: {
@@ -966,7 +967,7 @@ export default StyleSheet.create({
   },
 
   recordToolbarClearText: {
-    fontSize: fontSize.xs,
+    fontSize: 12,
     fontWeight: "800",
     color: colors.gray[600],
   },
@@ -1184,7 +1185,7 @@ export default StyleSheet.create({
       },
       android: { elevation: 2 },
       web: {
-        boxShadow: "0px 8px 24px rgba(15, 23, 42, 0.06)",
+        boxShadow: "0px 14px 28px rgba(15, 23, 42, 0.05)",
       },
     }),
   },
@@ -1192,38 +1193,39 @@ export default StyleSheet.create({
   appointmentRecordsTableRow: {
     flexDirection: "row",
     alignItems: "stretch",
-    minHeight: 74,
+    minHeight: 64,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomColor: "#EEF2F7",
     backgroundColor: colors.white,
     ...webHover({
       cursor: "pointer",
-      transition: "background-color 0.2s ease",
+      transition: "background-color 0.18s ease",
       ":hover": {
-        backgroundColor: colors.gray[50],
+        backgroundColor: "#F8FBFE",
       },
     }),
   },
 
   appointmentRecordsTableHeader: {
     minHeight: 48,
-    backgroundColor: colors.gray[900],
-    borderBottomWidth: 0,
+    backgroundColor: "#F8FAFC",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
   },
 
   appointmentRecordsHeaderCell: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    fontSize: fontSize.xs,
+    paddingVertical: 14,
+    fontSize: 12,
     fontWeight: "800",
-    color: colors.white,
+    color: "#475569",
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.7,
   },
 
   appointmentRecordsCell: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 14,
     justifyContent: "center",
   },
 
@@ -1288,9 +1290,10 @@ export default StyleSheet.create({
   },
 
   appointmentRecordsMutedText: {
-    marginTop: 3,
-    fontSize: fontSize.xs,
-    fontWeight: "500",
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "600",
     color: colors.gray[500],
   },
 
@@ -1298,16 +1301,17 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 999,
+    gap: 6,
+    minWidth: 78,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
     backgroundColor: colors.secondarySoft,
     borderWidth: 1,
     borderColor: colors.secondaryLight,
     ...webHover({
       cursor: "pointer",
-      transition: "all 0.2s ease",
+      transition: "background-color 0.18s ease, border-color 0.18s ease",
       ":hover": {
         backgroundColor: colors.secondaryLight,
       },
@@ -1315,13 +1319,16 @@ export default StyleSheet.create({
   },
 
   appointmentRecordsViewButtonText: {
-    fontSize: fontSize.xs,
+    fontSize: 12,
     fontWeight: "800",
     color: colors.secondary,
   },
 
   appointmentRecordsPaginationRow: {
-    marginTop: spacing.lg,
+    marginTop: 18,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#EEF2F7",
     marginBottom: spacing.xl,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1331,7 +1338,7 @@ export default StyleSheet.create({
   },
 
   appointmentRecordsPaginationInfo: {
-    fontSize: fontSize.sm,
+    fontSize: 13,
     color: colors.gray[500],
     fontWeight: "600",
   },
@@ -1356,7 +1363,7 @@ export default StyleSheet.create({
     backgroundColor: colors.white,
     ...webHover({
       cursor: "pointer",
-      transition: "all 0.2s ease",
+      transition: "background-color 0.18s ease, border-color 0.18s ease",
       ":hover": {
         backgroundColor: colors.gray[50],
       },
@@ -1369,7 +1376,7 @@ export default StyleSheet.create({
   },
 
   appointmentRecordsPaginationButtonText: {
-    fontSize: fontSize.sm,
+    fontSize: 13,
     fontWeight: "800",
     color: colors.gray[800],
   },
@@ -1519,7 +1526,7 @@ export default StyleSheet.create({
     alignItems: "center",
     padding: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomColor: "#EEF2F7",
     ...webHover({
       cursor: "pointer",
       transition: "all 0.18s ease",
@@ -1884,9 +1891,9 @@ export default StyleSheet.create({
     backgroundColor: colors.white,
     ...webHover({
       cursor: "pointer",
-      transition: "background-color 0.2s ease",
+      transition: "background-color 0.18s ease",
       ":hover": {
-        backgroundColor: colors.gray[50],
+        backgroundColor: "#F8FBFE",
       },
     }),
   },
@@ -1897,18 +1904,19 @@ export default StyleSheet.create({
 
   reportVisitorTableHeader: {
     minHeight: 44,
-    backgroundColor: colors.gray[900],
-    borderBottomWidth: 0,
+    backgroundColor: "#F8FAFC",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
   },
 
   reportVisitorHeaderCell: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    fontSize: fontSize.xs,
+    paddingVertical: 14,
+    fontSize: 12,
     fontWeight: "800",
-    color: colors.white,
+    color: "#475569",
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.7,
   },
 
   reportVisitorCell: {
@@ -2371,7 +2379,7 @@ export default StyleSheet.create({
     alignItems: "center",
     gap: spacing.xs,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 14,
     borderRadius: 10,
     backgroundColor: "#EEF5FF",
     borderWidth: 1,
@@ -2621,7 +2629,7 @@ export default StyleSheet.create({
     backgroundColor: colors.white,
     marginBottom: spacing.md,
     ...webHover({
-      transition: "all 0.2s ease",
+      transition: "background-color 0.18s ease, border-color 0.18s ease",
       ":hover": {
         borderColor: "#B7D5F6",
         boxShadow: "0px 10px 22px rgba(15, 23, 42, 0.07)",
@@ -2680,7 +2688,7 @@ export default StyleSheet.create({
     borderColor: "#D9E4F0",
     ...webHover({
       cursor: "pointer",
-      transition: "all 0.2s ease",
+      transition: "background-color 0.18s ease, border-color 0.18s ease",
       ":hover": {
         backgroundColor: "#EEF5FF",
         transform: "translateX(3px)",
@@ -3345,8 +3353,8 @@ export default StyleSheet.create({
   },
 
   visitorDetailTimelineTitle: {
-    fontSize: fontSize.sm,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "800",
     color: colors.gray[800],
   },
 

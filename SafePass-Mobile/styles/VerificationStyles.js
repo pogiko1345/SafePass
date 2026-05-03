@@ -599,7 +599,8 @@ export default StyleSheet.create({
     ...Platform.select({
       web: {
         transition: "border-color 0.2s ease",
-        outline: "none",
+        outlineStyle: "none",
+        outlineWidth: 0,
         ":focus": {
           borderColor: "#0A3D91",
         },

@@ -1,7 +1,6 @@
 // utils/IDScannerService.js
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
-import { Platform } from 'react-native';
+import ApiService from './ApiService';
 
 class IDScannerService {
   constructor() {
@@ -43,6 +42,94 @@ class IDScannerService {
       console.error('ID scan error:', error);
       return null;
     }
+  }
+
+  async verifyIDImage({ imageUri, idType = '' } = {}) {
+    const normalizedIdType = String(idType || '').trim();
+    const normalizedImageUri = String(imageUri || '').trim();
+
+    if (!normalizedIdType) {
+      return {
+        isValid: false,
+        status: 'missing_id_type',
+        confidence: 0,
+        message: 'Choose the valid ID type before scanning.',
+        checks: [],
+      };
+    }
+
+    if (!normalizedImageUri) {
+      return {
+        isValid: false,
+        status: 'missing_image',
+        confidence: 0,
+        message: 'Upload a clear ID image before scanning.',
+        checks: [],
+      };
+    }
+
+    try {
+      const ocrValidation = await ApiService.validateAppointmentIdImage({
+        idType: normalizedIdType,
+        imageUri: normalizedImageUri,
+      });
+
+      return {
+        isValid: Boolean(ocrValidation?.isValid),
+        status: ocrValidation?.status || 'ocr_validation_error',
+        confidence: Number(ocrValidation?.confidence || 0),
+        message:
+          ocrValidation?.message ||
+          'OCR verification finished, but no result message was returned.',
+        idType: normalizedIdType,
+        checkedAt: ocrValidation?.checkedAt || new Date().toISOString(),
+        checks: Array.isArray(ocrValidation?.checks) ? ocrValidation.checks : [],
+        details: ocrValidation?.details || null,
+      };
+    } catch (error) {
+      console.error('Backend OCR verification error:', error);
+      return {
+        isValid: false,
+        status: 'ocr_validation_error',
+        confidence: 0,
+        message:
+          error?.message ||
+          'Unable to validate this ID with OCR right now. Please try again.',
+        checks: [],
+      };
+    }
+  }
+
+  async inspectImage(imageUri) {
+    const value = String(imageUri || '').trim();
+    const hasImagePayload =
+      value.startsWith('data:image/') ||
+      value.startsWith('file:') ||
+      value.startsWith('content:') ||
+      value.startsWith('http');
+    const base64Length = value.startsWith('data:image/') ? value.split(',')[1]?.length || 0 : value.length;
+    const payloadScore = base64Length > 2000 ? 2 : base64Length > 120 ? 1 : 0;
+    const metadata = {
+      hasImagePayload,
+      base64Length,
+      payloadScore,
+      width: null,
+      height: null,
+    };
+
+    try {
+      const info = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [],
+        { format: ImageManipulator.SaveFormat.JPEG }
+      );
+      metadata.width = info.width || null;
+      metadata.height = info.height || null;
+    } catch (error) {
+      // URI-only uploads can still be valid; metadata is best-effort.
+    }
+
+    return metadata;
   }
 
   // Preprocess image for better OCR results

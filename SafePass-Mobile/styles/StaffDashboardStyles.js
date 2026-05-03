@@ -18,12 +18,14 @@ export default StyleSheet.create({
 
   sidebar: {
     width: width > 960 ? 296 : "100%",
+    maxHeight: width > 960 ? undefined : 360,
+    overflow: "hidden",
     backgroundColor: "#F8FBFE",
     borderRightWidth: width > 960 ? 1 : 0,
     borderBottomWidth: width > 960 ? 0 : 1,
     borderColor: "#E2E8F0",
-    padding: 18,
-    gap: 18,
+    padding: width > 640 ? 18 : 14,
+    gap: width > 640 ? 18 : 12,
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -105,10 +107,16 @@ export default StyleSheet.create({
   sidebarHoverSurface: {
     cursor: "pointer",
     transformOrigin: "center",
+    willChange: "transform",
+  },
+
+  passiveHoverSurface: {
+    cursor: "default",
   },
 
   sidebarModuleCard: {
     marginBottom: 10,
+    paddingHorizontal: 2,
   },
 
   sidebarModuleButton: {
@@ -126,7 +134,6 @@ export default StyleSheet.create({
       ":hover": {
         backgroundColor: "#EEF5FF",
         borderColor: "#9EC5F8",
-        transform: "translateX(3px)",
       },
     }),
   },
@@ -184,7 +191,6 @@ export default StyleSheet.create({
       transition: "all 0.18s ease",
       ":hover": {
         backgroundColor: "#EEF5FF",
-        transform: "translateX(3px)",
       },
     }),
   },
@@ -252,15 +258,18 @@ export default StyleSheet.create({
   },
 
   scrollContent: {
-    padding: 18,
-    paddingBottom: 40,
-    gap: 18,
+    padding: width > 900 ? 24 : 16,
+    paddingBottom: 44,
+    gap: width > 900 ? 20 : 16,
+    width: "100%",
+    maxWidth: 1480,
+    alignSelf: "center",
   },
 
   pageHeaderCard: {
     backgroundColor: "#FCFEFF",
-    borderRadius: 24,
-    padding: 22,
+    borderRadius: 22,
+    padding: width > 720 ? 22 : 18,
     borderWidth: 1,
     borderColor: "#DCE8F4",
     ...Platform.select({
@@ -285,7 +294,7 @@ export default StyleSheet.create({
 
   pageTitle: {
     marginTop: 8,
-    fontSize: 28,
+    fontSize: width > 640 ? 28 : 24,
     fontWeight: "800",
     color: "#0F172A",
   },
@@ -299,8 +308,8 @@ export default StyleSheet.create({
   },
 
   heroCard: {
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: 22,
+    padding: width > 720 ? 22 : 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
     ...Platform.select({
@@ -316,7 +325,7 @@ export default StyleSheet.create({
   },
 
   heroHeader: {
-    flexDirection: "row",
+    flexDirection: width > 640 ? "row" : "column",
     justifyContent: "space-between",
     gap: 16,
   },
@@ -334,7 +343,7 @@ export default StyleSheet.create({
   },
 
   heroTitle: {
-    fontSize: 26,
+    fontSize: width > 640 ? 26 : 23,
     fontWeight: "800",
     color: "#FFFFFF",
     marginTop: 6,
@@ -356,23 +365,24 @@ export default StyleSheet.create({
 
   statsRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
+    gap: 12,
+    marginTop: 18,
     flexWrap: "wrap",
   },
 
   homeInsightsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
+    gap: width > 900 ? 18 : 14,
   },
 
   homeInsightCard: {
     flex: 1,
-    minWidth: width > 720 ? 220 : "100%",
+    minWidth: width > 720 ? 230 : "100%",
+    minHeight: width > 720 ? 178 : undefined,
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 20,
+    padding: width > 720 ? 18 : 16,
     borderWidth: 1,
     borderColor: "#DCE8F4",
     ...Platform.select({
@@ -388,7 +398,6 @@ export default StyleSheet.create({
         cursor: "default",
         transition: "all 0.2s ease",
         ":hover": {
-          transform: "translateY(-3px)",
           boxShadow: "0px 18px 34px rgba(15, 23, 42, 0.09)",
           borderColor: "#B7D5F6",
         },
@@ -425,7 +434,7 @@ export default StyleSheet.create({
 
   homeInsightValue: {
     marginTop: 8,
-    fontSize: 18,
+    fontSize: width > 640 ? 18 : 16,
     fontWeight: "800",
     color: "#0F172A",
   },
@@ -437,33 +446,49 @@ export default StyleSheet.create({
     color: "#64748B",
   },
 
+  homeWorkspaceGrid: {
+    flexDirection: width > 1180 ? "row" : "column",
+    alignItems: "stretch",
+    gap: width > 900 ? 18 : 14,
+  },
+
+  homeWorkspaceMain: {
+    flex: 1.7,
+    gap: width > 900 ? 18 : 14,
+    minWidth: 0,
+  },
+
+  homeWorkspaceSide: {
+    flex: 1,
+    minWidth: width > 1180 ? 360 : 0,
+  },
+
   todayScheduleList: {
-    gap: 12,
+    gap: 10,
   },
 
   todayScheduleCard: {
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "#DCE8F4",
     backgroundColor: "#F8FBFE",
-    padding: 16,
+    padding: 15,
     ...webHover({
       cursor: "pointer",
       transition: "all 0.18s ease",
-      ":hover": {
-        backgroundColor: "#FFFFFF",
-        borderColor: "#B7D5F6",
-        transform: "translateY(-2px)",
-        boxShadow: "0px 10px 24px rgba(15, 23, 42, 0.08)",
-      },
+        ":hover": {
+          backgroundColor: "#FFFFFF",
+          borderColor: "#B7D5F6",
+          boxShadow: "0px 10px 24px rgba(15, 23, 42, 0.08)",
+        },
     }),
   },
 
   todayScheduleTopRow: {
-    flexDirection: "row",
+    flexDirection: width > 520 ? "row" : "column",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 8,
   },
 
   todayScheduleName: {
@@ -505,10 +530,11 @@ export default StyleSheet.create({
   },
 
   heroStat: {
-    minWidth: 108,
+    flex: width > 640 ? 1 : undefined,
+    minWidth: width > 640 ? 120 : "30%",
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
@@ -535,8 +561,8 @@ export default StyleSheet.create({
   recordToolbar: {
     flexDirection: width > 980 ? "row" : "column",
     alignItems: "stretch",
-    gap: 14,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 18,
   },
 
   recordToolbarCard: {
@@ -544,7 +570,7 @@ export default StyleSheet.create({
     minWidth: 0,
     borderWidth: 1,
     borderColor: "#DCE8F4",
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: "#FFFFFF",
     padding: 14,
   },
@@ -583,16 +609,17 @@ export default StyleSheet.create({
   quickActionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
+    gap: width > 900 ? 16 : 12,
   },
 
   quickActionCard: {
     flex: 1,
-    minWidth: width > 640 ? 220 : undefined,
+    minWidth: width > 720 ? 210 : undefined,
     width: width > 640 ? undefined : "100%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
+    borderRadius: 20,
     padding: 18,
+    minHeight: 210,
     borderWidth: 1,
     borderColor: "#DCE8F4",
     ...Platform.select({
@@ -608,7 +635,6 @@ export default StyleSheet.create({
         cursor: "pointer",
         transition: "all 0.2s ease",
         ":hover": {
-          transform: "translateY(-4px)",
           boxShadow: "0px 20px 38px rgba(15, 23, 42, 0.10)",
           borderColor: "#B7D5F6",
         },
@@ -672,6 +698,7 @@ export default StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: "#64748B",
+    flexGrow: 1,
   },
 
   quickActionFooterText: {
@@ -726,8 +753,8 @@ export default StyleSheet.create({
 
   sectionCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 20,
+    padding: width > 720 ? 18 : 16,
     borderWidth: 1,
     borderColor: "#DCE8F4",
     ...Platform.select({
@@ -750,15 +777,20 @@ export default StyleSheet.create({
   },
 
   sectionHeader: {
-    flexDirection: "row",
+    flexDirection: width > 560 ? "row" : "column",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 12,
+    marginBottom: 14,
     gap: 12,
   },
 
+  sectionHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
   sectionTitle: {
-    fontSize: 20,
+    fontSize: width > 640 ? 20 : 18,
     fontWeight: "800",
     color: "#0F172A",
   },
@@ -773,7 +805,7 @@ export default StyleSheet.create({
   sectionActionRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     flexWrap: "wrap",
     justifyContent: "flex-end",
   },
@@ -826,7 +858,10 @@ export default StyleSheet.create({
 
   emptyState: {
     alignItems: "center",
-    paddingVertical: 26,
+    justifyContent: "center",
+    minHeight: 220,
+    paddingVertical: 28,
+    paddingHorizontal: 12,
   },
 
   emptyTitle: {
@@ -898,7 +933,7 @@ export default StyleSheet.create({
   statusBadge: {
     alignSelf: "flex-start",
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 999,
   },
 
@@ -1053,19 +1088,18 @@ export default StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E5EDF5",
-    marginBottom: 10,
+    marginBottom: 0,
     ...webHover({
       cursor: "pointer",
       transition: "all 0.18s ease",
       ":hover": {
         backgroundColor: "#FFFFFF",
         borderColor: "#B7D5F6",
-        transform: "translateX(3px)",
         boxShadow: "0px 10px 22px rgba(15, 23, 42, 0.07)",
       },
     }),
@@ -1093,10 +1127,10 @@ export default StyleSheet.create({
   },
 
   notificationTitleRow: {
-    flexDirection: "row",
+    flexDirection: width > 520 ? "row" : "column",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 10,
+    gap: 8,
   },
 
   notificationTitle: {
@@ -1162,8 +1196,8 @@ export default StyleSheet.create({
 
   notificationFooterRow: {
     marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: width > 520 ? "row" : "column",
+    alignItems: width > 520 ? "center" : "flex-start",
     justifyContent: "space-between",
     gap: 10,
     flexWrap: "wrap",
@@ -1175,6 +1209,14 @@ export default StyleSheet.create({
     color: "#64748B",
   },
 
+  notificationList: {
+    gap: 10,
+  },
+
+  notificationsCard: {
+    height: "100%",
+  },
+
   tableCard: {
     minWidth: width > 960 ? 0 : 1060,
     width: width > 960 ? "100%" : 1060,
@@ -1183,6 +1225,11 @@ export default StyleSheet.create({
     borderColor: "#E2E8F0",
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
+    ...webHover({
+      web: {
+        boxShadow: "0px 14px 28px rgba(15, 23, 42, 0.05)",
+      },
+    }),
   },
 
   tableScroll: {
@@ -1253,6 +1300,13 @@ export default StyleSheet.create({
     paddingVertical: 0,
     borderBottomWidth: 1,
     borderBottomColor: "#EEF2F7",
+    backgroundColor: "#FFFFFF",
+    ...webHover({
+      transition: "background-color 0.18s ease",
+      ":hover": {
+        backgroundColor: "#F8FBFE",
+      },
+    }),
   },
 
   tableEmptyState: {
@@ -1335,6 +1389,14 @@ export default StyleSheet.create({
     backgroundColor: "#EEF5FF",
     minWidth: 78,
     alignItems: "center",
+    justifyContent: "center",
+    ...webHover({
+      cursor: "pointer",
+      transition: "background-color 0.18s ease, border-color 0.18s ease",
+      ":hover": {
+        backgroundColor: "#DBEAFE",
+      },
+    }),
   },
 
   tableActionButtonPrimary: {
@@ -1862,7 +1924,10 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    marginTop: 16,
+    marginTop: 18,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#EEF2F7",
     flexWrap: "wrap",
   },
 
@@ -1879,12 +1944,12 @@ export default StyleSheet.create({
   },
 
   paginationButton: {
-    minWidth: 108,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
+    minWidth: 112,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: "#E2E8F0",
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
@@ -2075,6 +2140,90 @@ export default StyleSheet.create({
   },
 
   modalRejectText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  logoutModalCard: {
+    maxWidth: 420,
+    alignItems: "center",
+    padding: width > 520 ? 24 : 20,
+  },
+
+  logoutModalIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    marginBottom: 14,
+  },
+
+  logoutModalTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+
+  logoutModalSubtitle: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 21,
+    color: "#64748B",
+    textAlign: "center",
+  },
+
+  logoutModalActionRow: {
+    marginTop: 22,
+    flexDirection: width > 520 ? "row" : "column-reverse",
+    alignItems: "stretch",
+    gap: 10,
+    width: "100%",
+  },
+
+  logoutModalCancel: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE8F4",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+
+  logoutModalCancelText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#334155",
+  },
+
+  logoutModalConfirm: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 14,
+    ...webHover({
+      cursor: "pointer",
+      transition: "background-color 0.18s ease",
+      ":hover": {
+        backgroundColor: "#B91C1C",
+      },
+    }),
+  },
+
+  logoutModalConfirmText: {
     fontSize: 14,
     fontWeight: "800",
     color: "#FFFFFF",

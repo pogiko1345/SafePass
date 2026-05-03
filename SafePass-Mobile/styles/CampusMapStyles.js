@@ -295,6 +295,46 @@ export default StyleSheet.create({
     color: "#0A3D91",
   },
 
+  routeGuideLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 12,
+  },
+
+  routeGuideSegment: {
+    position: "absolute",
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "#0A3D91",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.82)",
+  },
+
+  routeGuideSegmentVertical: {
+    width: 4,
+  },
+
+  routeStartMarker: {
+    position: "absolute",
+    transform: [{ translateX: -18 }, { translateY: -18 }],
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    zIndex: 14,
+  },
+
+  routeStartMarkerText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+
   mapEmptyState: {
     position: "absolute",
     top: 0,
@@ -409,9 +449,16 @@ export default StyleSheet.create({
     textAlign: "center",
     textTransform: "uppercase",
     includeFontPadding: false,
-    textShadowColor: "rgba(255, 255, 255, 0.95)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    ...Platform.select({
+      web: {
+        textShadow: "0px 1px 2px rgba(255, 255, 255, 0.95)",
+      },
+      default: {
+        textShadowColor: "rgba(255, 255, 255, 0.95)",
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
+      },
+    }),
   },
 
   mapControls: {

@@ -435,7 +435,8 @@ export default StyleSheet.create({
     gap: 12,
     ...(isWeb && {
       transition: "border-color 0.2s ease, box-shadow 0.2s ease",
-      outline: "none",
+      outlineStyle: "none",
+      outlineWidth: 0,
     }),
   },
 
@@ -444,7 +445,10 @@ export default StyleSheet.create({
     fontSize: 16,
     color: "#0F172A",
     padding: 0,
-    outline: "none",
+    ...(isWeb && {
+      outlineStyle: "none",
+      outlineWidth: 0,
+    }),
   },
 
   inputError: {
@@ -574,6 +578,112 @@ export default StyleSheet.create({
     fontSize: 13,
     color: "#0A3D91",
     fontWeight: "600",
+  },
+
+  visitorOtpPanel: {
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    borderRadius: 10,
+    padding: 12,
+    marginTop: -4,
+    marginBottom: 18,
+  },
+
+  visitorOtpHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
+
+  visitorOtpIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: "#EEF5FF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+  },
+
+  visitorOtpHeaderCopy: {
+    flex: 1,
+  },
+
+  visitorOtpTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  visitorOtpSubtitle: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 2,
+  },
+
+  visitorOtpInputContainer: {
+    paddingVertical: Platform.select({ ios: 11, android: 9, web: 9 }),
+    marginBottom: 2,
+  },
+
+  visitorOtpInput: {
+    textAlign: "center",
+    letterSpacing: 3,
+    fontWeight: "800",
+  },
+
+  visitorOtpHint: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 6,
+    lineHeight: 16,
+  },
+
+  visitorOtpActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+
+  visitorOtpSecondaryButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#B7D5F6",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  visitorOtpSecondaryText: {
+    color: "#0A3D91",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  visitorOtpPrimaryButton: {
+    flex: 1.2,
+    minHeight: 42,
+    borderRadius: 8,
+    backgroundColor: "#0A3D91",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+
+  visitorOtpPrimaryText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  visitorOtpDisabledButton: {
+    opacity: 0.62,
   },
 
   verificationHeader: {

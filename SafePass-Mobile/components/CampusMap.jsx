@@ -40,6 +40,34 @@ const getCompactOfficeLabel = (label, maxLength = 16) => {
   return `${normalizedLabel.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 };
 
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+
+const MapPressable = ({ children, style, onPress, disabled = false, ...props }) => {
+  const pressAnim = useRef(new Animated.Value(1)).current;
+
+  const animatePress = (toValue, duration = 120) => {
+    Animated.timing(pressAnim, {
+      toValue,
+      duration,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  };
+
+  return (
+    <AnimatedTouchableOpacity
+      {...props}
+      disabled={disabled}
+      activeOpacity={0.88}
+      style={[style, { transform: [{ scale: pressAnim }] }]}
+      onPress={onPress}
+      onPressIn={() => !disabled && animatePress(0.96, 80)}
+      onPressOut={() => !disabled && animatePress(1, 130)}
+    >
+      {children}
+    </AnimatedTouchableOpacity>
+  );
+};
+
 const CampusMap = ({
   visitors = [],
   floors = [],
@@ -70,9 +98,12 @@ const CampusMap = ({
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const panAnim = useRef(new Animated.ValueXY()).current;
+  const floorFadeAnim = useRef(new Animated.Value(1)).current;
+  const routePulseAnim = useRef(new Animated.Value(0)).current;
   const mapScaleRef = useRef(1);
   const mapPanRef = useRef({ x: 0, y: 0 });
   const mapSizeRef = useRef({ width: 0, height: 500 });
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
     mapScaleRef.current = mapScale;
@@ -156,9 +187,30 @@ const CampusMap = ({
 
   // Update active floor when selected floor changes
   useEffect(() => {
-    setActiveFloor(selectedFloor || defaultFloorId);
-    setImageError(false);
-    resetMapView();
+    const nextFloor = selectedFloor || defaultFloorId;
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      setActiveFloor(nextFloor);
+      setImageError(false);
+      resetMapView();
+      return;
+    }
+    if (nextFloor === activeFloor) return;
+
+    Animated.timing(floorFadeAnim, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: Platform.OS !== "web",
+    }).start(() => {
+      setActiveFloor(nextFloor);
+      setImageError(false);
+      resetMapView();
+      Animated.timing(floorFadeAnim, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: Platform.OS !== "web",
+      }).start();
+    });
   }, [defaultFloorId, selectedFloor]);
 
   const resetMapView = () => {
@@ -172,11 +224,41 @@ const CampusMap = ({
 
   const handleFloorSelect = (floorId) => {
     if (!floorId || floorId === activeFloor) return;
-    setActiveFloor(floorId);
-    setImageError(false);
-    resetMapView();
-    onFloorChange?.(floorId);
+    Animated.timing(floorFadeAnim, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: Platform.OS !== "web",
+    }).start(() => {
+      setActiveFloor(floorId);
+      setImageError(false);
+      resetMapView();
+      onFloorChange?.(floorId);
+      Animated.timing(floorFadeAnim, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: Platform.OS !== "web",
+      }).start();
+    });
   };
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(routePulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(routePulseAnim, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [routePulseAnim]);
 
   // Get floor plan image based on selected floor from blueprints
   const getFloorPlanImage = () => {
@@ -347,7 +429,7 @@ const CampusMap = ({
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.floorNavigationScroll}>
       <View style={styles.floorNavigation}>
         {floors.map((floor) => (
-          <TouchableOpacity
+          <MapPressable
             key={floor.id}
             style={[
               styles.floorButton,
@@ -368,7 +450,7 @@ const CampusMap = ({
             >
               {floor.name}
             </Text>
-          </TouchableOpacity>
+          </MapPressable>
         ))}
       </View>
     </ScrollView>
@@ -398,7 +480,7 @@ const CampusMap = ({
       if (!position) return null;
       
       return (
-        <TouchableOpacity
+        <MapPressable
           key={office.id}
           style={[
             styles.officeLabel,
@@ -412,7 +494,7 @@ const CampusMap = ({
               {getCompactOfficeLabel(office.name)}
             </Text>
           </View>
-        </TouchableOpacity>
+        </MapPressable>
       );
     });
   };
@@ -435,9 +517,9 @@ const CampusMap = ({
       return (
         <View
           key={label.id || `${label.text}-${left}-${top}`}
-          pointerEvents="none"
           style={[
             styles.mapTextLabel,
+            { pointerEvents: "none" },
             {
               left,
               top,
@@ -562,11 +644,44 @@ const CampusMap = ({
       const top = typeof position.y === "number" ? `${position.y}%` : position.y;
 
       return (
-        <View
+        <Animated.View
           key={marker.id || marker.officeId || marker.label}
-          style={[styles.destinationMarker, { left, top }]}
+          style={[
+            styles.destinationMarker,
+            { left, top },
+            {
+              transform: [
+                { translateX: -18 },
+                { translateY: -36 },
+                {
+                  scale: routePulseAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.98, 1.05],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <View style={styles.destinationMarkerPulse} />
+          <Animated.View
+            style={[
+              styles.destinationMarkerPulse,
+              {
+                opacity: routePulseAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.45, 0.1],
+                }),
+                transform: [
+                  {
+                    scale: routePulseAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.55],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
           <View style={styles.destinationMarkerPin}>
             <Ionicons name={marker.icon || "navigate"} size={16} color="#FFFFFF" />
           </View>
@@ -575,9 +690,69 @@ const CampusMap = ({
               {marker.label || "Go here"}
             </Text>
           </View>
-        </View>
+        </Animated.View>
       );
     });
+  };
+
+  const renderRouteGuide = () => {
+    const normalizedActiveFloor = normalizeFloorId(activeFloor);
+    const marker = destinationMarkers.find(
+      (item) => normalizeFloorId(item.floor) === normalizedActiveFloor,
+    );
+    if (!marker) return null;
+
+    const position = marker.position || getOfficePosition(marker.officeId);
+    if (!position) return null;
+
+    const start = normalizedActiveFloor === "ground" ? { x: 6.8, y: 40 } : { x: 84, y: 70 };
+    const end = {
+      x: typeof position.x === "number" ? position.x : Number.parseFloat(position.x),
+      y: typeof position.y === "number" ? position.y : Number.parseFloat(position.y),
+    };
+    if (!Number.isFinite(end.x) || !Number.isFinite(end.y)) return null;
+
+    const horizontalLeft = Math.min(start.x, end.x);
+    const horizontalWidth = Math.max(Math.abs(end.x - start.x), 1.5);
+    const verticalTop = Math.min(start.y, end.y);
+    const verticalHeight = Math.max(Math.abs(end.y - start.y), 1.5);
+
+    return (
+      <View style={[styles.routeGuideLayer, { pointerEvents: "none" }]}>
+        <Animated.View
+          style={[
+            styles.routeGuideSegment,
+            {
+              left: `${horizontalLeft}%`,
+              top: `${start.y}%`,
+              width: `${horizontalWidth}%`,
+              opacity: routePulseAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.42, 0.82],
+              }),
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.routeGuideSegment,
+            styles.routeGuideSegmentVertical,
+            {
+              left: `${end.x}%`,
+              top: `${verticalTop}%`,
+              height: `${verticalHeight}%`,
+              opacity: routePulseAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.42, 0.82],
+              }),
+            },
+          ]}
+        />
+        <View style={[styles.routeStartMarker, { left: `${start.x}%`, top: `${start.y}%` }]}>
+          <Text style={styles.routeStartMarkerText}>You are here</Text>
+        </View>
+      </View>
+    );
   };
 
   // Handle zoom
@@ -661,6 +836,7 @@ const CampusMap = ({
           style={[
             styles.mapZoomLayer,
             {
+              opacity: floorFadeAnim,
               transform: [
                 { translateX: panAnim.x },
                 { translateY: panAnim.y },
@@ -681,6 +857,7 @@ const CampusMap = ({
 
               {/* Text labels, visitors, and destinations share the blueprint coordinate space. */}
               {shouldShowMapLabels ? renderMapLabels() : null}
+              {renderRouteGuide()}
               {renderVisitorMarkers(visibleVisitors)}
               {renderDestinationMarkers()}
             </View>
@@ -720,6 +897,7 @@ const CampusMap = ({
 
               {/* Office pills are still used only when there is no real blueprint image. */}
               {shouldShowOfficeLabels ? renderOfficeLabels() : null}
+              {renderRouteGuide()}
               {renderVisitorMarkers(visibleVisitors)}
               {renderDestinationMarkers()}
             </>
@@ -730,24 +908,24 @@ const CampusMap = ({
 
         {/* Map Controls */}
         <View style={styles.mapControls}>
-          <TouchableOpacity
+          <MapPressable
             style={styles.mapControlButton}
             onPress={handleZoomIn}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
+          </MapPressable>
+          <MapPressable
             style={styles.mapControlButton}
             onPress={handleZoomOut}
           >
             <Ionicons name="remove" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
+          </MapPressable>
+          <MapPressable
             style={styles.mapControlButton}
             onPress={handleReset}
           >
             <Ionicons name="compass" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
+          </MapPressable>
         </View>
         
         {/* Active Visitors Count */}
