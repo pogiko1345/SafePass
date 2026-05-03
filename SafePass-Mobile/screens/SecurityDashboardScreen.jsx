@@ -1129,15 +1129,27 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const getStatusBadge = (visitor) => {
-    if (visitor.status === 'checked_in') {
+    const visitStatus = String(visitor?.status || "").toLowerCase();
+    const appointmentStatus = String(visitor?.appointmentStatus || "").toLowerCase();
+    const approvalStatus = String(visitor?.approvalStatus || "").toLowerCase();
+
+    if (visitStatus === 'no_show') {
+      return { bg: '#FFEDD5', text: '#C2410C', label: 'NO-SHOW' };
+    } else if (visitStatus === 'expired') {
+      return { bg: '#E5E7EB', text: '#4B5563', label: 'EXPIRED' };
+    } else if (appointmentStatus === 'cancelled' || visitStatus === 'cancelled') {
+      return { bg: '#FEE2E2', text: '#B91C1C', label: 'CANCELLED' };
+    } else if (appointmentStatus === 'rescheduled') {
+      return { bg: '#E0F2FE', text: '#0369A1', label: 'RESCHEDULED' };
+    } else if (visitStatus === 'checked_in') {
       return { bg: '#EEF5FF', text: '#0A3D91', label: 'CHECKED IN' };
-    } else if (visitor.status === 'checked_out') {
+    } else if (visitStatus === 'checked_out') {
       return { bg: '#F3F4F6', text: '#6B7280', label: 'CHECKED OUT' };
-    } else if (visitor.appointmentStatus === 'rejected' || visitor.approvalStatus === 'rejected') {
+    } else if (appointmentStatus === 'rejected' || approvalStatus === 'rejected') {
       return { bg: '#FEE2E2', text: '#DC2626', label: 'REJECTED' };
     } else if (
-      visitor.appointmentStatus === 'pending' ||
-      (!visitor.appointmentStatus && visitor.approvalStatus === 'pending')
+      appointmentStatus === 'pending' ||
+      (!appointmentStatus && approvalStatus === 'pending')
     ) {
       return { bg: '#FEF3C7', text: '#D97706', label: 'PENDING' };
     } else if (hasApprovedVisitWindow(visitor)) {

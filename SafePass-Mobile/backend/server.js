@@ -1225,6 +1225,105 @@ const getVisitorCheckInLocation = (visitor, source = "mobile_app") => {
   };
 };
 
+const CHECK_IN_GRACE_PERIOD_MINUTES = 15;
+const GATE_CHECKPOINT_IDS = new Set([
+  "main_gate",
+  "gate",
+  "gate_1",
+  "reader_1",
+  "entrance",
+  "entry",
+  "campus_entry",
+  "campus_exit",
+  "arduino_reader",
+  "arduino_reader_1",
+  "lobby",
+]);
+
+const isGateCheckpoint = (location = {}) =>
+  GATE_CHECKPOINT_IDS.has(normalizeCheckpointId(location.checkpointId || location.office));
+
+const getAssignedAppointmentOffice = (visitor = {}) =>
+  visitor.appointmentDepartment || visitor.assignedOffice || visitor.host || "";
+
+const isWrongAppointmentOfficeScan = (visitor = {}, location = {}) => {
+  if (!visitor || !location || isGateCheckpoint(location)) return false;
+
+  const assignedOffice = normalizeDepartmentValue(getAssignedAppointmentOffice(visitor));
+  const scannedOffice = normalizeDepartmentValue(location.office || location.checkpointId);
+  return Boolean(assignedOffice && scannedOffice && assignedOffice !== scannedOffice);
+};
+
+const createWrongOfficeScanNotifications = async ({
+  visitor,
+  visitorUser,
+  tapLocation,
+  deviceId,
+  action = "scan",
+}) => {
+  const assignedOffice = getAssignedAppointmentOffice(visitor) || "Assigned office";
+  const scannedOffice = tapLocation?.office || "Unknown checkpoint";
+  const scannedAt = new Date();
+  const message =
+    `${visitor.fullName} scanned at ${scannedOffice}, but their assigned office is ${assignedOffice}.`;
+
+  await Promise.all([
+    createRoleNotification({
+      title: "Wrong Office Scan",
+      message: `This is not your assigned office/room. Assigned office: ${assignedOffice}. Scanned office: ${scannedOffice}.`,
+      type: "warning",
+      severity: "medium",
+      targetRole: "visitor",
+      targetUser: visitorUser?._id || null,
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "wrong_office_scan",
+        assignedOffice,
+        scannedOffice,
+        scannedAt,
+        deviceId,
+        action,
+      },
+    }),
+    createRoleNotification({
+      title: "Wrong Office Scan",
+      message,
+      type: "warning",
+      severity: "medium",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: "wrong_office_scan",
+        visitorName: visitor.fullName,
+        assignedOffice,
+        scannedOffice,
+        scannedAt,
+        deviceId,
+        action,
+      },
+    }),
+  ]);
+
+  await createSystemActivity({
+    actorUser: null,
+    relatedVisitor: visitor,
+    relatedUser: visitorUser,
+    activityType: "wrong_office_scan",
+    status: "denied",
+    location: scannedOffice,
+    notes: `${message} Scan time: ${scannedAt.toLocaleString()}.`,
+    metadata: {
+      assignedOffice,
+      scannedOffice,
+      scannedAt,
+      deviceId,
+      action,
+    },
+  });
+};
+
 const validateDeviceKey = (req, res, next) => {
   const expectedKey = String(process.env.ARDUINO_DEVICE_KEY || "").trim();
   const providedKey = req.header("x-device-key") || req.body?.deviceKey;
@@ -1705,15 +1804,61 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       (tapAction === "checkin" || tapAction === "check_in" || isAutoGateTap);
 
     const visitor = latestVisitor;
-    const markedPastLifecycle = markPastVisitLifecycleIfNeeded(visitor);
-    if (markedPastLifecycle) {
-      await visitor.save();
-    }
+    await applyAppointmentLifecycleIfNeeded(visitor);
 
     let action = "location_update";
     let accessType = "system";
     let activityType = "arduino_location_tap";
     let responseMessage = "Visitor location updated";
+    const wrongOfficeScan =
+      isWrongAppointmentOfficeScan(visitor, tapLocation) &&
+      !shouldCheckOut &&
+      (shouldCheckIn || visitor.status === "checked_in");
+
+    if (wrongOfficeScan) {
+      const assignedOffice = getAssignedAppointmentOffice(visitor) || "Assigned office";
+      const scannedOffice = tapLocation.office || "Unknown checkpoint";
+
+      await AccessLog.create({
+        userId: visitorUser._id,
+        userEmail: visitorUser.email,
+        userName: visitor.fullName,
+        actorRole: "device",
+        location: scannedOffice,
+        accessType: shouldCheckIn ? "entry" : "system",
+        activityType: "wrong_office_scan",
+        status: "denied",
+        nfcCardId: normalizedCardId,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser._id,
+        metadata: {
+          deviceId,
+          tapLocation,
+          assignedOffice,
+          scannedOffice,
+          visitorStatus: visitor.status,
+          approvalStatus: visitor.approvalStatus,
+          appointmentStatus: visitor.appointmentStatus,
+        },
+        notes: `${visitor.fullName} scanned at ${scannedOffice}, but their assigned office is ${assignedOffice}.`,
+      });
+
+      await createWrongOfficeScanNotifications({
+        visitor,
+        visitorUser,
+        tapLocation,
+        deviceId,
+        action: shouldCheckIn ? "check_in" : "location_update",
+      });
+
+      return res.status(403).json({
+        success: false,
+        code: "WRONG_OFFICE_SCAN",
+        message: "This is not your assigned office/room.",
+        assignedOffice,
+        scannedOffice,
+      });
+    }
 
     if (shouldCheckOut) {
       visitor.updateCurrentLocation(tapLocation, { deviceId });
@@ -2375,6 +2520,16 @@ const getVisitDateRelation = (visitDateValue, nowValue = new Date()) => {
   return "today";
 };
 
+const getAppointmentCheckInWindow = (visitor = {}) => {
+  const scheduledAt = getCombinedAppointmentDateTime(visitor.visitDate, visitor.visitTime);
+  if (!scheduledAt) return null;
+
+  const graceUntil = new Date(scheduledAt);
+  graceUntil.setMinutes(graceUntil.getMinutes() + CHECK_IN_GRACE_PERIOD_MINUTES);
+
+  return { scheduledAt, graceUntil };
+};
+
 const markPastVisitLifecycleIfNeeded = (visitor) => {
   if (!visitor || visitor.checkedInAt || visitor.checkedOutAt) {
     return false;
@@ -2382,40 +2537,205 @@ const markPastVisitLifecycleIfNeeded = (visitor) => {
 
   const visitStatus = String(visitor.status || "").toLowerCase();
   const appointmentStatus = String(visitor.appointmentStatus || "").toLowerCase();
-  if (["expired", "no_show", "rejected", "cancelled", "checked_out"].includes(visitStatus)) {
+  const dateRelation = getVisitDateRelation(visitor.visitDate);
+
+  if (visitStatus === "no_show") {
+    const noShowDateRelation = getVisitDateRelation(visitor.noShowMarkedAt || visitor.visitDate);
+    if (noShowDateRelation === "past") {
+      visitor.markExpired("No-show appointment expired on the next day.");
+      return "expired";
+    }
+    return false;
+  }
+
+  if (["expired", "rejected", "cancelled", "checked_out"].includes(visitStatus)) {
     return false;
   }
   if (["rejected", "cancelled"].includes(appointmentStatus)) {
     return false;
   }
-  if (getVisitDateRelation(visitor.visitDate) !== "past") {
-    return false;
-  }
 
   if (visitor.requestCategory === "appointment" && visitor.approvalFlow === "staff") {
     if (["approved", "adjusted"].includes(appointmentStatus)) {
-      visitor.markNoShow("Approved appointment date passed without check-in.");
-      return true;
+      const checkInWindow = getAppointmentCheckInWindow(visitor);
+      if (checkInWindow && new Date() > checkInWindow.graceUntil) {
+        visitor.markNoShow(
+          `Visitor did not check in within ${CHECK_IN_GRACE_PERIOD_MINUTES} minutes after the scheduled appointment time.`,
+        );
+        return "no_show";
+      }
+      return false;
     }
 
     if (["pending", "rescheduled"].includes(appointmentStatus)) {
-      visitor.markExpired("Appointment request expired before approval.");
-      return true;
+      if (dateRelation === "past") {
+        visitor.markExpired("Appointment request expired before approval.");
+        return "expired";
+      }
+      return false;
     }
   }
 
   if (visitor.approvalStatus === "approved") {
-    visitor.markNoShow("Approved visit date passed without check-in.");
-    return true;
+    const checkInWindow = getAppointmentCheckInWindow(visitor);
+    if (checkInWindow && new Date() > checkInWindow.graceUntil) {
+      visitor.markNoShow(
+        `Visitor did not check in within ${CHECK_IN_GRACE_PERIOD_MINUTES} minutes after the scheduled visit time.`,
+      );
+      return "no_show";
+    }
+    return false;
   }
 
   if (visitor.approvalStatus === "pending") {
-    visitor.markExpired("Visit request expired before approval.");
-    return true;
+    if (dateRelation === "past") {
+      visitor.markExpired("Visit request expired before approval.");
+      return "expired";
+    }
+    return false;
   }
 
   return false;
 };
+
+const notifyAppointmentLifecycleChange = async (visitor, lifecycleStatus) => {
+  if (!visitor || !lifecycleStatus) return;
+
+  const visitorUser = visitor.email
+    ? await User.findOne({ email: String(visitor.email).trim().toLowerCase(), role: "visitor" })
+    : null;
+  const assignedStaffUser = visitor.assignedStaff
+    ? await User.findById(visitor.assignedStaff)
+    : null;
+  const schedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+
+  if (lifecycleStatus === "no_show") {
+    const message = `${visitor.fullName} did not check in for the appointment on ${schedule} within the ${CHECK_IN_GRACE_PERIOD_MINUTES}-minute grace period.`;
+    await Promise.all([
+      createRoleNotification({
+        title: "Appointment Marked No-Show",
+        message: "You missed your appointment check-in window. Please request a new appointment if you still need to visit.",
+        type: "warning",
+        severity: "medium",
+        targetRole: "visitor",
+        targetUser: visitorUser?._id || null,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: { activityType: "appointment_no_show", visitDate: visitor.visitDate, visitTime: visitor.visitTime },
+      }),
+      createRoleNotification({
+        title: "Appointment No-Show",
+        message,
+        type: "warning",
+        severity: "medium",
+        targetRole: "admin",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: { activityType: "appointment_no_show", visitDate: visitor.visitDate, visitTime: visitor.visitTime },
+      }),
+      assignedStaffUser
+        ? createRoleNotification({
+            title: "Appointment No-Show",
+            message,
+            type: "warning",
+            severity: "medium",
+            targetRole: "staff",
+            targetUser: assignedStaffUser._id,
+            relatedVisitor: visitor._id,
+            relatedUser: visitorUser?._id || null,
+            metadata: { activityType: "appointment_no_show", visitDate: visitor.visitDate, visitTime: visitor.visitTime },
+          })
+        : Promise.resolve(),
+    ]);
+
+    await createSystemActivity({
+      actorUser: null,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "appointment_no_show",
+      status: "no_show",
+      location: getAssignedAppointmentOffice(visitor) || "Appointment",
+      notes: message,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        graceMinutes: CHECK_IN_GRACE_PERIOD_MINUTES,
+      },
+    });
+    return;
+  }
+
+  if (lifecycleStatus === "expired") {
+    const message = `${visitor.fullName}'s appointment for ${schedule} is now expired.`;
+    await createRoleNotification({
+      title: "Appointment Expired",
+      message: "Your missed or pending appointment has expired. Please request a new appointment if needed.",
+      type: "info",
+      severity: "low",
+      targetRole: "visitor",
+      targetUser: visitorUser?._id || null,
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: { activityType: "appointment_expired", visitDate: visitor.visitDate, visitTime: visitor.visitTime },
+    });
+
+    await createSystemActivity({
+      actorUser: null,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "appointment_expired",
+      status: "expired",
+      location: getAssignedAppointmentOffice(visitor) || "Appointment",
+      notes: message,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+  }
+};
+
+const applyAppointmentLifecycleIfNeeded = async (visitor) => {
+  const lifecycleStatus = markPastVisitLifecycleIfNeeded(visitor);
+  if (!lifecycleStatus) return false;
+
+  await visitor.save();
+  await notifyAppointmentLifecycleChange(visitor, lifecycleStatus);
+  return lifecycleStatus;
+};
+
+const runAppointmentLifecycleSweep = async () => {
+  try {
+    if (mongoose.connection.readyState !== 1) return;
+
+    const candidates = await Visitor.find({
+      checkedInAt: null,
+      checkedOutAt: null,
+      $or: [
+        { status: "no_show" },
+        {
+          requestCategory: "appointment",
+          approvalFlow: "staff",
+          appointmentStatus: { $in: ["pending", "approved", "adjusted", "rescheduled"] },
+          status: { $nin: ["checked_in", "checked_out", "expired", "cancelled", "rejected"] },
+        },
+        {
+          approvalStatus: { $in: ["pending", "approved"] },
+          status: { $nin: ["checked_in", "checked_out", "expired", "cancelled", "rejected"] },
+        },
+      ],
+    })
+      .sort({ visitDate: 1 })
+      .limit(300);
+
+    await Promise.all(candidates.map((visitorRecord) => applyAppointmentLifecycleIfNeeded(visitorRecord)));
+  } catch (error) {
+    console.error("Appointment lifecycle sweep error:", error);
+  }
+};
+
+setTimeout(runAppointmentLifecycleSweep, 30 * 1000);
+setInterval(runAppointmentLifecycleSweep, 5 * 60 * 1000);
 
 const getVisitorCheckInEligibility = (visitor) => {
   if (!visitor) {
@@ -2450,6 +2770,11 @@ const getVisitorCheckInEligibility = (visitor) => {
     return { allowed: false, statusCode: 400, message: "Your visit is still waiting for approval." };
   }
 
+  const checkInWindow = getAppointmentCheckInWindow(visitor);
+  if (!checkInWindow) {
+    return { allowed: false, statusCode: 400, message: "This appointment has an invalid schedule." };
+  }
+
   const dateRelation = getVisitDateRelation(visitor.visitDate);
   if (dateRelation === "past") {
     return {
@@ -2464,6 +2789,23 @@ const getVisitorCheckInEligibility = (visitor) => {
       allowed: false,
       statusCode: 400,
       message: "Check-in is only available on your appointment date.",
+    };
+  }
+
+  const now = new Date();
+  if (now < checkInWindow.scheduledAt) {
+    return {
+      allowed: false,
+      statusCode: 400,
+      message: `Check-in opens at your scheduled appointment time: ${checkInWindow.scheduledAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+    };
+  }
+
+  if (now > checkInWindow.graceUntil) {
+    return {
+      allowed: false,
+      statusCode: 400,
+      message: `The ${CHECK_IN_GRACE_PERIOD_MINUTES}-minute check-in grace period has passed. This appointment is marked as no-show.`,
     };
   }
 
@@ -2722,12 +3064,7 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
     if (req.user.role === "visitor") {
       await ensureSafePassAccountId(req.user);
       const visitors = await findVisitorsForUser(req.user);
-      const lifecycleUpdates = visitors
-        .map((visitorRecord) => (markPastVisitLifecycleIfNeeded(visitorRecord) ? visitorRecord : null))
-        .filter(Boolean);
-      if (lifecycleUpdates.length) {
-        await Promise.all(lifecycleUpdates.map((visitorRecord) => visitorRecord.save()));
-      }
+      await Promise.all(visitors.map((visitorRecord) => applyAppointmentLifecycleIfNeeded(visitorRecord)));
       const visitor = getPrioritizedVisitor(visitors);
 
       if (visitor) {
@@ -5514,12 +5851,7 @@ app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "securit
       .populate("checkedInBy", "firstName lastName")
       .populate("checkedOutBy", "firstName lastName");
 
-    const lifecycleUpdates = visitors
-      .map((visitorRecord) => (markPastVisitLifecycleIfNeeded(visitorRecord) ? visitorRecord : null))
-      .filter(Boolean);
-    if (lifecycleUpdates.length) {
-      await Promise.all(lifecycleUpdates.map((visitorRecord) => visitorRecord.save()));
-    }
+    await Promise.all(visitors.map((visitorRecord) => applyAppointmentLifecycleIfNeeded(visitorRecord)));
 
     const total = await Visitor.countDocuments(query);
 
@@ -5564,9 +5896,7 @@ app.get("/api/visitors/:id", authMiddleware, async (req, res) => {
       });
     }
 
-    if (markPastVisitLifecycleIfNeeded(visitor)) {
-      await visitor.save();
-    }
+    await applyAppointmentLifecycleIfNeeded(visitor);
 
     res.json({
       success: true,
@@ -5658,10 +5988,7 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
       });
     }
 
-    const markedPastLifecycle = markPastVisitLifecycleIfNeeded(visitor);
-    if (markedPastLifecycle) {
-      await visitor.save();
-    }
+    await applyAppointmentLifecycleIfNeeded(visitor);
 
     const checkInEligibility = getVisitorCheckInEligibility(visitor);
     if (!checkInEligibility.allowed) {
@@ -6578,7 +6905,7 @@ const canVisitorManageAppointment = (visitor = {}) => {
   if (["checked_in", "checked_out", "expired", "no_show", "rejected", "cancelled"].includes(visitStatus)) return false;
   if (visitor.visitExpiredAt || visitor.noShowMarkedAt) return false;
   if (visitor.appointmentCompletedAt) return false;
-  return ["pending", "approved", "adjusted", "rescheduled"].includes(appointmentStatus);
+  return ["pending", "approved"].includes(appointmentStatus);
 };
 
 app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, res) => {
@@ -6596,9 +6923,7 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
       });
     }
 
-    if (markPastVisitLifecycleIfNeeded(visitor)) {
-      await visitor.save();
-    }
+    await applyAppointmentLifecycleIfNeeded(visitor);
 
     if (!canVisitorManageAppointment(visitor)) {
       return res.status(400).json({
@@ -6662,7 +6987,7 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
 
     const originalVisitDate = visitor.visitDate;
     const originalVisitTime = visitor.visitTime;
-    const wasApproved = ["approved", "adjusted"].includes(String(visitor.appointmentStatus || "").toLowerCase());
+    const wasApproved = String(visitor.appointmentStatus || "").toLowerCase() === "approved";
     const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
 
     visitor.rescheduleAppointmentByVisitor(req.user, {
@@ -6798,9 +7123,7 @@ app.put("/api/visitors/:id/appointment/cancel", authMiddleware, async (req, res)
       });
     }
 
-    if (markPastVisitLifecycleIfNeeded(visitor)) {
-      await visitor.save();
-    }
+    await applyAppointmentLifecycleIfNeeded(visitor);
 
     if (!canVisitorManageAppointment(visitor)) {
       return res.status(400).json({
@@ -6811,6 +7134,7 @@ app.put("/api/visitors/:id/appointment/cancel", authMiddleware, async (req, res)
 
     const originalVisitDate = visitor.visitDate;
     const originalVisitTime = visitor.visitTime;
+    const wasApproved = String(visitor.appointmentStatus || "").toLowerCase() === "approved";
     const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
     const assignedStaffUser = visitor.assignedStaff
       ? await User.findById(visitor.assignedStaff)
@@ -6849,6 +7173,24 @@ app.put("/api/visitors/:id/appointment/cancel", authMiddleware, async (req, res)
         relatedUser: visitorUser?._id || null,
         metadata: {
           activityType: "visitor_cancelled_appointment",
+          originalVisitDate,
+          originalVisitTime,
+          cancellationReason,
+        },
+      });
+    }
+
+    if (wasApproved) {
+      await createRoleNotification({
+        title: "Approved Appointment Cancelled",
+        message: `${visitor.fullName}'s approved appointment for ${originalSchedule} was cancelled. Reason: ${cancellationReason}`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_cancelled_approved_appointment",
           originalVisitDate,
           originalVisitTime,
           cancellationReason,
@@ -6928,12 +7270,7 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
 
-    const lifecycleUpdates = appointments
-      .map((appointment) => (markPastVisitLifecycleIfNeeded(appointment) ? appointment : null))
-      .filter(Boolean);
-    if (lifecycleUpdates.length) {
-      await Promise.all(lifecycleUpdates.map((appointment) => appointment.save()));
-    }
+    await Promise.all(appointments.map((appointment) => applyAppointmentLifecycleIfNeeded(appointment)));
 
     res.json({
       success: true,
@@ -6973,11 +7310,14 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
       });
     }
 
-    if (markPastVisitLifecycleIfNeeded(visitor)) {
-      await visitor.save();
+    const lifecycleStatus = await applyAppointmentLifecycleIfNeeded(visitor);
+    if (lifecycleStatus) {
       return res.status(400).json({
         success: false,
-        message: "This appointment date has already passed. Please adjust the schedule before approving.",
+        message:
+          lifecycleStatus === "no_show"
+            ? "This appointment missed the 15-minute check-in grace period and is now marked No-Show."
+            : "This appointment has expired. Please adjust the schedule before approving.",
       });
     }
 
@@ -7541,10 +7881,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, requireRoles("admin", "secu
       });
     }
 
-    const markedPastLifecycle = markPastVisitLifecycleIfNeeded(visitor);
-    if (markedPastLifecycle) {
-      await visitor.save();
-    }
+    await applyAppointmentLifecycleIfNeeded(visitor);
 
     const checkInEligibility = getVisitorCheckInEligibility(visitor);
     if (!checkInEligibility.allowed) {
@@ -8007,8 +8344,8 @@ app.get("/api/visitors/user/:userId", authMiddleware, async (req, res) => {
       visitor = await Visitor.findOne({ email: user.email });
     }
 
-    if (visitor && markPastVisitLifecycleIfNeeded(visitor)) {
-      await visitor.save();
+    if (visitor) {
+      await applyAppointmentLifecycleIfNeeded(visitor);
     }
 
     res.json({

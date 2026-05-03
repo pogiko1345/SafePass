@@ -2100,7 +2100,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (["checked_in", "checked_out", "expired", "no_show", "rejected", "cancelled"].includes(visitStatus)) return false;
     if (record?.checkedOutAt || record?.visitExpiredAt || record?.noShowMarkedAt) return false;
     if (record?.appointmentCompletedAt) return false;
-    return ["pending", "approved", "adjusted", "rescheduled"].includes(appointmentStatus);
+    return ["pending", "approved"].includes(appointmentStatus);
   };
 
   const getAppointmentManageDisabledReason = (record = visitor) => {

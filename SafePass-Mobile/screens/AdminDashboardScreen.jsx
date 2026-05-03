@@ -466,6 +466,14 @@ const getStatusColor = (status) => {
       return { bg: "#EEF5FF", text: "#0A3D91", label: "APPROVED" };
     case "rejected":
       return { bg: "#FEE2E2", text: "#DC2626", label: "REJECTED" };
+    case "cancelled":
+      return { bg: "#FEE2E2", text: "#B91C1C", label: "CANCELLED" };
+    case "rescheduled":
+      return { bg: "#E0F2FE", text: "#0369A1", label: "RESCHEDULED" };
+    case "no_show":
+      return { bg: "#FFEDD5", text: "#C2410C", label: "NO-SHOW" };
+    case "expired":
+      return { bg: "#E5E7EB", text: "#4B5563", label: "EXPIRED" };
     case "checked_in":
       return { bg: "#EEF5FF", text: "#0A3D91", label: "CHECKED IN" };
     case "checked_out":
@@ -597,6 +605,10 @@ const getRequestStatus = (request) => {
   const visitStatus = String(request.status || "").toLowerCase();
 
   if (requestCategory === "appointment") {
+    if (visitStatus === "expired") return "expired";
+    if (visitStatus === "no_show") return "no_show";
+    if (appointmentStatus === "cancelled") return "cancelled";
+    if (appointmentStatus === "rescheduled") return "rescheduled";
     if (appointmentStatus === "pending") return "pending";
     if (appointmentStatus === "rejected") return "rejected";
     if (appointmentStatus === "approved" || appointmentStatus === "adjusted") {
