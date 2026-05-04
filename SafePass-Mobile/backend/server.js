@@ -45,6 +45,10 @@ const phoneOtpSmsProviderConfigured = [
   "TWILIO_SENDER_ID",
   "SEMAPHORE_API_KEY",
   "SEMAPHORE_API_TOKEN",
+  "IPROGTECH_API_TOKEN",
+  "IPROGTECH_API_KEY",
+  "IPROG_SMS_API_TOKEN",
+  "IPROG_SMS_API_KEY",
   "SMS_API_KEY",
 ].some((name) => String(process.env[name] || "").trim());
 
@@ -408,6 +412,15 @@ const getSemaphoreApiKey = () =>
       "",
   ).trim();
 
+const getIprogTechApiToken = () =>
+  String(
+    process.env.IPROGTECH_API_TOKEN ||
+      process.env.IPROGTECH_API_KEY ||
+      process.env.IPROG_SMS_API_TOKEN ||
+      process.env.IPROG_SMS_API_KEY ||
+      "",
+  ).trim();
+
 const getConfiguredSmsProvider = () =>
   String(process.env.SMS_PROVIDER || process.env.PHONE_OTP_PROVIDER || "")
     .trim()
@@ -435,8 +448,13 @@ const getPhoneOtpDeliveryProvider = () => {
   if (configuredProvider === "twilio") return "backend_log";
   if (configuredProvider === "semaphore" && getSemaphoreApiKey()) return "semaphore";
   if (configuredProvider === "semaphore") return "backend_log";
+  if (["iprogtech", "iprog", "iprogsms"].includes(configuredProvider) && getIprogTechApiToken()) {
+    return "iprogtech";
+  }
+  if (["iprogtech", "iprog", "iprogsms"].includes(configuredProvider)) return "backend_log";
   if (configuredProvider === "backend_log") return "backend_log";
   if (isTwilioConfigured()) return "twilio";
+  if (getIprogTechApiToken()) return "iprogtech";
   if (getSemaphoreApiKey()) return "semaphore";
   return "backend_log";
 };
@@ -446,6 +464,7 @@ const shouldFallbackPhoneOtpToBackendLog = () =>
   String(
     process.env.SMS_ALLOW_BACKEND_LOG_FALLBACK ||
       process.env.SEMAPHORE_ALLOW_BACKEND_LOG_FALLBACK ||
+      process.env.IPROGTECH_ALLOW_BACKEND_LOG_FALLBACK ||
       "",
   )
     .trim()
@@ -616,6 +635,83 @@ const sendTwilioOtp = async ({ phoneNumber, otpCode }) => {
   return { success: true, provider: "twilio", data };
 };
 
+const formatPhoneForIprogTech = (phoneNumber = "") => {
+  const normalized = normalizePhoneForOtp(phoneNumber);
+  if (/^09\d{9}$/.test(normalized)) return normalized;
+
+  const digitsOnly = String(phoneNumber || "").replace(/\D/g, "");
+  if (/^639\d{9}$/.test(digitsOnly)) return `0${digitsOnly.slice(2)}`;
+  if (/^9\d{9}$/.test(digitsOnly)) return `0${digitsOnly}`;
+
+  return normalized;
+};
+
+const getIprogTechBaseUrl = () =>
+  String(process.env.IPROGTECH_BASE_URL || process.env.IPROG_SMS_BASE_URL || "https://sms.iprogtech.com")
+    .trim()
+    .replace(/\/+$/, "");
+
+const sendIprogTechOtp = async ({ phoneNumber, otpCode }) => {
+  const apiToken = getIprogTechApiToken();
+  if (!apiToken) {
+    return { success: false, skipped: true, provider: "backend_log" };
+  }
+
+  const messageTemplate = String(
+    process.env.IPROGTECH_OTP_MESSAGE ||
+      process.env.IPROG_SMS_OTP_MESSAGE ||
+      process.env.SMS_OTP_MESSAGE ||
+      "Your SafePass login OTP is {otp}. It expires in 5 minutes.",
+  );
+  const message = messageTemplate.includes("{otp}")
+    ? messageTemplate.replaceAll("{otp}", otpCode)
+    : `${messageTemplate} ${otpCode}`;
+  const payload = new URLSearchParams({
+    api_token: apiToken,
+    phone_number: formatPhoneForIprogTech(phoneNumber),
+    message,
+  });
+  const smsProvider = String(process.env.IPROGTECH_SMS_PROVIDER || "").trim();
+  if (smsProvider) {
+    payload.set("sms_provider", smsProvider);
+  }
+
+  const response = await fetch(`${getIprogTechBaseUrl()}/api/v1/sms_messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: payload.toString(),
+  });
+
+  const responseText = await response.text();
+  let data = null;
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    data = responseText;
+  }
+
+  const providerStatus = String(data?.status || "").toLowerCase();
+  const providerMessage = String(data?.message || "").toLowerCase();
+  const providerRejected =
+    providerStatus === "error" ||
+    providerStatus === "failed" ||
+    providerStatus === "500" ||
+    providerMessage.includes("invalid token") ||
+    providerMessage.includes("failed");
+
+  if (!response.ok || providerRejected) {
+    const error = new Error(`iProgTech OTP request failed with HTTP ${response.status}`);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return { success: true, provider: "iprogtech", data };
+};
+
 const sendPhoneOtp = async ({ phoneNumber, otpCode, provider }) => {
   if (provider === "twilio") {
     return sendTwilioOtp({ phoneNumber, otpCode });
@@ -623,6 +719,10 @@ const sendPhoneOtp = async ({ phoneNumber, otpCode, provider }) => {
 
   if (provider === "semaphore") {
     return sendSemaphoreOtp({ phoneNumber, otpCode });
+  }
+
+  if (provider === "iprogtech") {
+    return sendIprogTechOtp({ phoneNumber, otpCode });
   }
 
   return { success: false, skipped: true, provider: "backend_log" };
