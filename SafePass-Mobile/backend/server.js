@@ -38,11 +38,6 @@ const isVercelRuntime = Boolean(process.env.VERCEL);
 const sensitiveDebugLoggingEnabled =
   String(process.env.ALLOW_SENSITIVE_DEBUG_LOGS || "").trim().toLowerCase() === "true";
 const phoneOtpSmsProviderConfigured = [
-  "TWILIO_ACCOUNT_SID",
-  "TWILIO_AUTH_TOKEN",
-  "TWILIO_MESSAGING_SERVICE_SID",
-  "TWILIO_PHONE_NUMBER",
-  "TWILIO_SENDER_ID",
   "SEMAPHORE_API_KEY",
   "SEMAPHORE_API_TOKEN",
   "IPROGTECH_API_TOKEN",
@@ -426,26 +421,8 @@ const getConfiguredSmsProvider = () =>
     .trim()
     .toLowerCase();
 
-const getTwilioConfig = () => ({
-  accountSid: String(process.env.TWILIO_ACCOUNT_SID || "").trim(),
-  authToken: String(process.env.TWILIO_AUTH_TOKEN || "").trim(),
-  messagingServiceSid: String(process.env.TWILIO_MESSAGING_SERVICE_SID || "").trim(),
-  from: String(
-    process.env.TWILIO_PHONE_NUMBER ||
-      process.env.TWILIO_SENDER_ID ||
-      "",
-  ).trim(),
-});
-
-const isTwilioConfigured = () => {
-  const { accountSid, authToken, messagingServiceSid, from } = getTwilioConfig();
-  return Boolean(accountSid && authToken && (messagingServiceSid || from));
-};
-
 const getPhoneOtpDeliveryProvider = () => {
   const configuredProvider = getConfiguredSmsProvider();
-  if (configuredProvider === "twilio" && isTwilioConfigured()) return "twilio";
-  if (configuredProvider === "twilio") return "backend_log";
   if (configuredProvider === "semaphore" && getSemaphoreApiKey()) return "semaphore";
   if (configuredProvider === "semaphore") return "backend_log";
   if (["iprogtech", "iprog", "iprogsms"].includes(configuredProvider) && getIprogTechApiToken()) {
@@ -453,7 +430,6 @@ const getPhoneOtpDeliveryProvider = () => {
   }
   if (["iprogtech", "iprog", "iprogsms"].includes(configuredProvider)) return "backend_log";
   if (configuredProvider === "backend_log") return "backend_log";
-  if (isTwilioConfigured()) return "twilio";
   if (getIprogTechApiToken()) return "iprogtech";
   if (getSemaphoreApiKey()) return "semaphore";
   return "backend_log";
@@ -560,81 +536,6 @@ const sendSemaphoreOtp = async ({ phoneNumber, otpCode }) => {
   return { success: true, provider: "semaphore", data };
 };
 
-const formatPhoneForTwilio = (phoneNumber = "") => {
-  const normalized = normalizePhoneForOtp(phoneNumber);
-  if (/^09\d{9}$/.test(normalized)) {
-    return `+63${normalized.slice(1)}`;
-  }
-
-  const digitsOnly = String(phoneNumber || "").replace(/\D/g, "");
-  if (/^639\d{9}$/.test(digitsOnly)) {
-    return `+${digitsOnly}`;
-  }
-
-  if (/^\+639\d{9}$/.test(String(phoneNumber || "").trim())) {
-    return String(phoneNumber || "").trim();
-  }
-
-  return normalized;
-};
-
-const sendTwilioOtp = async ({ phoneNumber, otpCode }) => {
-  const { accountSid, authToken, messagingServiceSid, from } = getTwilioConfig();
-  if (!isTwilioConfigured()) {
-    return { success: false, skipped: true, provider: "backend_log" };
-  }
-
-  const messageTemplate = String(
-    process.env.TWILIO_OTP_MESSAGE ||
-      process.env.SMS_OTP_MESSAGE ||
-      "Your SafePass login OTP is {otp}. It expires in 5 minutes.",
-  );
-
-  const payload = new URLSearchParams({
-    To: formatPhoneForTwilio(phoneNumber),
-    Body: messageTemplate.includes("{otp}")
-      ? messageTemplate.replaceAll("{otp}", otpCode)
-      : `${messageTemplate} ${otpCode}`,
-  });
-
-  if (messagingServiceSid) {
-    payload.set("MessagingServiceSid", messagingServiceSid);
-  } else {
-    payload.set("From", from);
-  }
-
-  const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-  const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
-      body: payload.toString(),
-    },
-  );
-
-  const responseText = await response.text();
-  let data = null;
-  try {
-    data = responseText ? JSON.parse(responseText) : null;
-  } catch {
-    data = responseText;
-  }
-
-  if (!response.ok) {
-    const error = new Error(`Twilio OTP request failed with HTTP ${response.status}`);
-    error.status = response.status;
-    error.data = data;
-    throw error;
-  }
-
-  return { success: true, provider: "twilio", data };
-};
-
 const formatPhoneForIprogTech = (phoneNumber = "") => {
   const normalized = normalizePhoneForOtp(phoneNumber);
   if (/^09\d{9}$/.test(normalized)) return normalized;
@@ -713,10 +614,6 @@ const sendIprogTechOtp = async ({ phoneNumber, otpCode }) => {
 };
 
 const sendPhoneOtp = async ({ phoneNumber, otpCode, provider }) => {
-  if (provider === "twilio") {
-    return sendTwilioOtp({ phoneNumber, otpCode });
-  }
-
   if (provider === "semaphore") {
     return sendSemaphoreOtp({ phoneNumber, otpCode });
   }
@@ -5462,7 +5359,7 @@ app.post("/api/auth/request-otp", async (req, res) => {
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
     let deliveryProvider = getPhoneOtpDeliveryProvider();
 
-    if (deliveryProvider === "twilio" || deliveryProvider === "semaphore") {
+    if (deliveryProvider !== "backend_log") {
       try {
         await sendPhoneOtp({ phoneNumber: cleanPhone, otpCode, provider: deliveryProvider });
       } catch (smsError) {
