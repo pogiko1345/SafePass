@@ -172,7 +172,8 @@ const reviewAppointmentIdImage = ({ idType, idImage, idVerification }) => {
 
   if (
     normalizedVerificationStatus === "ai_precheck_passed" ||
-    normalizedVerificationStatus === "ocr_validation_passed"
+    normalizedVerificationStatus === "ocr_validation_passed" ||
+    normalizedVerificationStatus === "ocr_manual_review_required"
   ) {
     return {
       isAccepted: true,
@@ -6277,18 +6278,20 @@ app.post("/api/appointments/id-ocr/validate", authMiddleware, async (req, res) =
     const ocrResult = await callOcrSpace({ imageUri: normalizedImageUri });
     if (!ocrResult.success) {
       const status =
-        ocrResult.skipped && !REQUIRE_OCR_ID_VALIDATION
-          ? "ocr_validation_skipped"
+        !REQUIRE_OCR_ID_VALIDATION
+          ? "ocr_manual_review_required"
           : "ocr_validation_error";
-      const responseStatus = ocrResult.skipped && !REQUIRE_OCR_ID_VALIDATION ? 200 : 502;
+      const responseStatus = !REQUIRE_OCR_ID_VALIDATION ? 200 : 502;
       return res.status(responseStatus).json({
-        success: !REQUIRE_OCR_ID_VALIDATION && ocrResult.skipped,
-        isValid: !REQUIRE_OCR_ID_VALIDATION && ocrResult.skipped,
+        success: !REQUIRE_OCR_ID_VALIDATION,
+        isValid: !REQUIRE_OCR_ID_VALIDATION,
         status,
         confidence: 0,
         message:
-          ocrResult.message ||
-          "OCR verification is unavailable right now. Please try again later.",
+          !REQUIRE_OCR_ID_VALIDATION
+            ? "OCR verification is unavailable right now. You can continue; staff or security will complete the final ID review."
+            : ocrResult.message ||
+              "OCR verification is unavailable right now. Please try again later.",
         checkedAt: new Date().toISOString(),
       });
     }
@@ -6297,22 +6300,30 @@ app.post("/api/appointments/id-ocr/validate", authMiddleware, async (req, res) =
       idType: normalizedIdType,
       rawText: ocrResult.text,
     });
-    const isValid = match.hasMeaningfulText && match.hasExpectedMatch && !match.hasConflict;
+    const isExactMatch = match.hasMeaningfulText && match.hasExpectedMatch && !match.hasConflict;
+    const needsManualReview = match.hasMeaningfulText && !match.hasConflict && !match.hasExpectedMatch;
+    const isValid = isExactMatch || needsManualReview;
     const hasReadableButWrongType =
       match.hasMeaningfulText && !match.hasExpectedMatch && match.conflictingMatches.length > 0;
 
     return res.json({
       success: true,
       isValid,
-      status: isValid ? "ocr_validation_passed" : "ocr_validation_failed",
+      status: isExactMatch
+        ? "ocr_validation_passed"
+        : needsManualReview
+          ? "ocr_manual_review_required"
+          : "ocr_validation_failed",
       confidence: match.confidence,
       idType: normalizedIdType,
       checkedAt: new Date().toISOString(),
-      message: isValid
+      message: isExactMatch
         ? `${normalizedIdType} passed OCR verification. Staff or security will still complete the final review.`
+        : needsManualReview
+          ? `Readable ID text was detected, but OCR could not confidently match it to ${normalizedIdType}. You can continue; staff or security will complete the final review.`
         : hasReadableButWrongType
           ? `The uploaded ID appears to be a different ID type. Please upload a ${normalizedIdType}.`
-          : "OCR could not confirm that this photo matches the selected ID type. Please upload a brighter, clearer front photo.",
+          : "OCR could not read enough ID text. Please upload a brighter front photo or try a closer crop of the ID.",
       checks: [
         {
           key: "ocr_text",
