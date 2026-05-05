@@ -925,17 +925,9 @@ export default function LoginScreen({ navigation, route }) {
 
   const handleLogin = async () => {
     if (!validateForm()) return;
-    if (!apiConnected) {
-      Alert.alert(
-        "Connection Error",
-        "Cannot connect to server. Please check your connection.",
-        [{ text: "Retry", onPress: checkAuthAndConnection }]
-      );
-      return;
-    }
 
     setIsLoading(true);
-    setLoginSplashMessage("Signing you in...");
+    setLoginSplashMessage(apiConnected ? "Signing you in..." : "Connecting to SafePass...");
     setLoginError("");
     setLoginSuccessMessage("");
     
@@ -1422,10 +1414,10 @@ export default function LoginScreen({ navigation, route }) {
                     ref={loginButtonRef}
                     style={[
                       loginStyles.loginButton,
-                      (!apiConnected || isLoading) && loginStyles.buttonDisabled
+                      isLoading && loginStyles.buttonDisabled
                     ]}
                     onPress={handleLogin}
-                    disabled={!apiConnected || isLoading}
+                    disabled={isLoading}
                     activeOpacity={0.8}
                     {...(isWeb && {
                       onKeyPress: (e) => handleKeyPress(e, handleLogin),
@@ -1438,7 +1430,7 @@ export default function LoginScreen({ navigation, route }) {
                       <>
                         <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
                         <Text style={loginStyles.loginButtonText}>
-                          {apiConnected ? 'SIGN IN' : 'SERVER OFFLINE'}
+                          SIGN IN
                         </Text>
                       </>
                     )}
@@ -1522,7 +1514,7 @@ export default function LoginScreen({ navigation, route }) {
                   <View style={loginStyles.infoBox}>
                     <Ionicons name="information-circle" size={20} color="#EF4444" />
                     <Text style={loginStyles.infoText}>
-                      Unable to connect to server. Please check your connection.
+                      Server health check did not respond yet. You can still try signing in.
                     </Text>
                   </View>
                 )}

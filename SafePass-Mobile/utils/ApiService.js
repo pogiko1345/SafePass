@@ -47,6 +47,7 @@ const API_BASE_URL_CANDIDATES = [
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
 const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const REMEMBERED_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const HEALTH_CHECK_TIMEOUT_MS = 20000;
 const REMEMBERED_SESSION_EXPIRES_AT_KEY = "rememberedSessionExpiresAt";
 const SENSITIVE_STORAGE_KEYS = [
   "userToken",
@@ -1806,7 +1807,7 @@ generateRandomPassword(length = 10) {
       const controller =
         typeof AbortController !== "undefined" ? new AbortController() : null;
       const timeoutId = controller
-        ? setTimeout(() => controller.abort(), 5000)
+        ? setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS)
         : null;
 
       const response = await fetch(`${API_BASE_URL}/health`, {
@@ -1897,7 +1898,7 @@ ApiService.prototype.testConnection = async function testConnectionWithAndroidFa
       const controller =
         typeof AbortController !== "undefined" ? new AbortController() : null;
       const timeoutId = controller
-        ? setTimeout(() => controller.abort(), 5000)
+        ? setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS)
         : null;
 
       const response = await fetch(`${baseUrl}/health`, {
