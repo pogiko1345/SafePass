@@ -88,6 +88,32 @@ class IDScannerService {
       };
     } catch (error) {
       console.error('Backend OCR verification error:', error);
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const isOcrProviderError =
+        errorMessage.includes('ocr space') ||
+        errorMessage.includes('ocr verification') ||
+        errorMessage.includes('http 403') ||
+        errorMessage.includes('http 502');
+
+      if (isOcrProviderError) {
+        return {
+          isValid: true,
+          status: 'ocr_manual_review_required',
+          confidence: 0,
+          message:
+            'OCR verification is unavailable right now. You can continue; staff or security will complete the final ID review.',
+          idType: normalizedIdType,
+          checkedAt: new Date().toISOString(),
+          checks: [
+            {
+              key: 'manual_review',
+              passed: true,
+              label: 'Queued for staff/security ID review',
+            },
+          ],
+        };
+      }
+
       return {
         isValid: false,
         status: 'ocr_validation_error',
