@@ -6846,7 +6846,7 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         purposeCategory: normalizedPurposeCategory || undefined,
         customPurposeOfVisit: normalizedCustomPurpose || undefined,
         visitDate: new Date(finalVisitDate),
-        visitTime: new Date(finalVisitTime),
+        visitTime: appointmentDateTime,
         department: formatDepartmentLabel(departmentLabel),
         assignedStaff: routedStaff._id,
         assignedStaffName: getFullName(routedStaff),
@@ -7578,7 +7578,7 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
 
     visitor.adjustAppointment(req.user, {
       visitDate: finalVisitDate ? new Date(finalVisitDate) : null,
-      visitTime: new Date(finalVisitTime),
+      visitTime: adjustedDateTime,
       note,
     });
     await visitor.save();
