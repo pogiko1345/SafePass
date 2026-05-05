@@ -1881,6 +1881,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return date;
   };
 
+  const formatAppointmentTimeValue = (dateValue) => {
+    const date = getValidDate(dateValue);
+    if (!date) return "";
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  };
+
   const getNextAvailableAppointmentDate = (inputDate = new Date()) => {
     const nextDate = new Date(inputDate);
     nextDate.setHours(12, 0, 0, 0);
@@ -2494,7 +2500,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     try {
       const response = await ApiService.requestVisitorAppointment(currentUser._id, {
         preferredDate: new Date(preferredDate).toISOString(),
-        preferredTime: combinedDateTime.toISOString(),
+        preferredTime: formatAppointmentTimeValue(preferredTime),
         purposeCategory,
         customPurposeOfVisit: isOtherPurpose ? customPurposeOfVisit : "",
         department,
@@ -2593,7 +2599,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     try {
       const response = await ApiService.rescheduleVisitorAppointment(targetAppointment._id, {
         preferredDate: new Date(preferredDate).toISOString(),
-        preferredTime: combinedDateTime.toISOString(),
+        preferredTime: formatAppointmentTimeValue(preferredTime),
         reason: String(appointmentEditForm.reason || "").trim(),
       });
 

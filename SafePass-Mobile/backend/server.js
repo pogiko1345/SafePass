@@ -2200,13 +2200,69 @@ const getAppointmentSlotLimit = (slot = {}) => {
   return Number.isInteger(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 50) : APPOINTMENT_SLOT_LIMIT;
 };
 
+const parseAppointmentTimeParts = (value) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return { hour: value.getHours(), minute: value.getMinutes() };
+  }
+
+  const rawValue = String(value || "").trim();
+  const timeMatch = rawValue.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+  if (timeMatch) {
+    let hour = Number(timeMatch[1]);
+    const minute = Number(timeMatch[2]);
+    const suffix = String(timeMatch[3] || "").toUpperCase();
+    if (suffix === "PM" && hour < 12) hour += 12;
+    if (suffix === "AM" && hour === 12) hour = 0;
+    if (
+      Number.isInteger(hour) &&
+      Number.isInteger(minute) &&
+      hour >= 0 &&
+      hour <= 23 &&
+      minute >= 0 &&
+      minute <= 59
+    ) {
+      return { hour, minute };
+    }
+  }
+
+  const parsedDate = new Date(rawValue);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return { hour: parsedDate.getHours(), minute: parsedDate.getMinutes() };
+  }
+
+  return null;
+};
+
+const getConfiguredAppointmentSlotParts = (slot = {}) => {
+  const directHour = Number(slot.hour);
+  const directMinute = Number(slot.minute);
+  if (
+    Number.isInteger(directHour) &&
+    Number.isInteger(directMinute) &&
+    directHour >= 0 &&
+    directHour <= 23 &&
+    directMinute >= 0 &&
+    directMinute <= 59
+  ) {
+    return { hour: directHour, minute: directMinute };
+  }
+
+  return parseAppointmentTimeParts(slot.value || slot.label);
+};
+
 const findAppointmentConfiguredSlot = (timeSlots = [], appointmentDateTime) => {
   if (!appointmentDateTime) return null;
-  return timeSlots.find(
-    (slot) =>
-      Number(slot.hour) === appointmentDateTime.getHours() &&
-      Number(slot.minute) === appointmentDateTime.getMinutes(),
-  ) || null;
+  const selectedParts = parseAppointmentTimeParts(appointmentDateTime);
+  if (!selectedParts) return null;
+
+  return timeSlots.find((slot) => {
+    const slotParts = getConfiguredAppointmentSlotParts(slot);
+    return (
+      slotParts &&
+      slotParts.hour === selectedParts.hour &&
+      slotParts.minute === selectedParts.minute
+    );
+  }) || null;
 };
 
 const normalizePhoneValue = (value = "") => {
@@ -2457,22 +2513,22 @@ const getPrioritizedVisitor = (visitors = []) => {
 
 const getCombinedAppointmentDateTime = (visitDateValue, visitTimeValue) => {
   const visitDate = new Date(visitDateValue);
-  const visitTime = new Date(visitTimeValue);
+  const visitTime = parseAppointmentTimeParts(visitTimeValue);
 
-  if (Number.isNaN(visitDate.getTime()) || Number.isNaN(visitTime.getTime())) {
+  if (Number.isNaN(visitDate.getTime()) || !visitTime) {
     return null;
   }
 
   const combined = new Date(visitDate);
-  combined.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+  combined.setHours(visitTime.hour, visitTime.minute, 0, 0);
   return Number.isNaN(combined.getTime()) ? null : combined;
 };
 
 const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
   const visitDate = new Date(visitDateValue);
-  const visitTime = new Date(visitTimeValue);
+  const visitTime = parseAppointmentTimeParts(visitTimeValue);
 
-  if (Number.isNaN(visitDate.getTime()) || Number.isNaN(visitTime.getTime())) {
+  if (Number.isNaN(visitDate.getTime()) || !visitTime) {
     return null;
   }
 
@@ -2483,7 +2539,7 @@ const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
   dayEnd.setDate(dayEnd.getDate() + 1);
 
   const slotStart = new Date(visitDate);
-  slotStart.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+  slotStart.setHours(visitTime.hour, visitTime.minute, 0, 0);
 
   const slotEnd = new Date(slotStart);
   slotEnd.setMinutes(slotEnd.getMinutes() + 1);
