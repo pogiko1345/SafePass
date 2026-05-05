@@ -323,7 +323,7 @@ const CampusMap = ({
       position: "absolute",
       left: `${x}%`,
       top: `${y}%`,
-      transform: [{ translateX: -15 }, { translateY: -15 }],
+      transform: [{ translateX: -9 }, { translateY: -9 }],
     };
   };
 

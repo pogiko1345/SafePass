@@ -4270,6 +4270,21 @@ export default StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#EEF2F7",
   },
+  appointmentHistoryTableDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    minHeight: 38,
+    paddingHorizontal: 12,
+    backgroundColor: "#F8FBFE",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  appointmentHistoryTableDateText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
   appointmentHistoryTableHeadText: {
     fontSize: 11,
     fontWeight: "800",
@@ -4319,6 +4334,23 @@ export default StyleSheet.create({
 
   appointmentHistoryCards: {
     gap: 12,
+  },
+
+  appointmentHistoryDateGroup: {
+    gap: 10,
+  },
+
+  appointmentHistoryDateGroupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 4,
+  },
+
+  appointmentHistoryDateGroupTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0A3D91",
   },
 
   appointmentHistoryCardItem: {

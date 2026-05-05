@@ -1117,6 +1117,176 @@ const CHECKPOINT_LOCATIONS = {
     office: "STO",
     coordinates: { x: 86.8, y: 47 },
   },
+  second_mock_up: {
+    floor: "second",
+    office: "Mock Up",
+    coordinates: { x: 20.5, y: 53 },
+  },
+  mock_up: {
+    floor: "second",
+    office: "Mock Up",
+    coordinates: { x: 20.5, y: 53 },
+  },
+  second_classroom_1: {
+    floor: "second",
+    office: "Classroom 1",
+    coordinates: { x: 20.5, y: 81.5 },
+  },
+  second_classroom_2: {
+    floor: "second",
+    office: "Classroom 2",
+    coordinates: { x: 33, y: 42 },
+  },
+  second_classroom_3: {
+    floor: "second",
+    office: "Classroom 3",
+    coordinates: { x: 33, y: 82 },
+  },
+  second_classroom_4: {
+    floor: "second",
+    office: "Classroom 4",
+    coordinates: { x: 46.5, y: 42 },
+  },
+  second_classroom_5: {
+    floor: "second",
+    office: "Classroom 5",
+    coordinates: { x: 46.5, y: 82 },
+  },
+  second_classroom_6: {
+    floor: "second",
+    office: "Classroom 6",
+    coordinates: { x: 60, y: 42 },
+  },
+  second_classroom_7: {
+    floor: "second",
+    office: "Classroom 7",
+    coordinates: { x: 60, y: 82 },
+  },
+  second_classroom_8: {
+    floor: "second",
+    office: "Classroom 8",
+    coordinates: { x: 73.5, y: 82 },
+  },
+  second_laboratory: {
+    floor: "second",
+    office: "Laboratory",
+    coordinates: { x: 73.5, y: 42 },
+  },
+  laboratory: {
+    floor: "second",
+    office: "Laboratory",
+    coordinates: { x: 73.5, y: 42 },
+  },
+  second_tesda: {
+    floor: "second",
+    office: "TESDA",
+    coordinates: { x: 91, y: 22.5 },
+  },
+  tesda: {
+    floor: "second",
+    office: "TESDA",
+    coordinates: { x: 91, y: 22.5 },
+  },
+  second_hallway: {
+    floor: "second",
+    office: "Hallway",
+    coordinates: { x: 47.5, y: 61 },
+  },
+  hallway: {
+    floor: "second",
+    office: "Hallway",
+    coordinates: { x: 47.5, y: 61 },
+  },
+  second_female_cr: {
+    floor: "second",
+    office: "Female CR",
+    coordinates: { x: 88.2, y: 44 },
+  },
+  second_male_cr: {
+    floor: "second",
+    office: "Male CR",
+    coordinates: { x: 88.2, y: 56 },
+  },
+  third_workshop: {
+    floor: "third",
+    office: "Workshop",
+    coordinates: { x: 21.5, y: 38.5 },
+  },
+  workshop: {
+    floor: "third",
+    office: "Workshop",
+    coordinates: { x: 21.5, y: 38.5 },
+  },
+  third_tools_room: {
+    floor: "third",
+    office: "Tools Room",
+    coordinates: { x: 21.5, y: 88.5 },
+  },
+  tools_room: {
+    floor: "third",
+    office: "Tools Room",
+    coordinates: { x: 21.5, y: 88.5 },
+  },
+  third_classroom_1: {
+    floor: "third",
+    office: "Classroom 1",
+    coordinates: { x: 35, y: 38.5 },
+  },
+  third_classroom_2: {
+    floor: "third",
+    office: "Classroom 2",
+    coordinates: { x: 48, y: 38.5 },
+  },
+  third_classroom_3: {
+    floor: "third",
+    office: "Classroom 3",
+    coordinates: { x: 61, y: 38.5 },
+  },
+  third_classroom_4: {
+    floor: "third",
+    office: "Classroom 4",
+    coordinates: { x: 35, y: 79 },
+  },
+  third_classroom_5: {
+    floor: "third",
+    office: "Classroom 5",
+    coordinates: { x: 48, y: 79 },
+  },
+  third_library: {
+    floor: "third",
+    office: "Library",
+    coordinates: { x: 73.5, y: 38.5 },
+  },
+  library: {
+    floor: "third",
+    office: "Library",
+    coordinates: { x: 73.5, y: 38.5 },
+  },
+  third_students_lounge: {
+    floor: "third",
+    office: "Students Lounge",
+    coordinates: { x: 67, y: 75 },
+  },
+  students_lounge: {
+    floor: "third",
+    office: "Students Lounge",
+    coordinates: { x: 67, y: 75 },
+  },
+  third_female_cr: {
+    floor: "third",
+    office: "Female CR",
+    coordinates: { x: 88, y: 38 },
+  },
+  third_male_cr: {
+    floor: "third",
+    office: "Male CR",
+    coordinates: { x: 88, y: 52 },
+  },
+  third_fire_exit: {
+    floor: "third",
+    office: "Fire Exit",
+    coordinates: { x: 54.5, y: 15 },
+  },
 };
 
 const normalizeCheckpointId = (value = "") =>
@@ -1779,17 +1949,12 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     }
 
     const normalizedCheckpoint = normalizeCheckpointId(tapLocation.checkpointId || tapLocation.office);
-    const isMainGateTap =
-      normalizedCheckpoint === "main_gate" ||
-      normalizedCheckpoint === "gate" ||
-      normalizedCheckpoint === "campus_entry" ||
-      normalizedCheckpoint === "campus_exit";
+    const isMainGateTap = isGateCheckpoint(tapLocation);
     const isAutoGateTap =
-      tapAction === "auto" ||
       tapAction === "gate" ||
       tapAction === "entry" ||
       tapAction === "exit" ||
-      isMainGateTap;
+      (tapAction === "auto" && isMainGateTap);
     const shouldCheckOut =
       checkedInVisitor &&
       tapAction !== "location" &&
@@ -1859,8 +2024,12 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     }
 
     if (shouldCheckOut) {
-      visitor.updateCurrentLocation(tapLocation, { deviceId });
       visitor.markCheckedOut(null);
+      visitor.updateCurrentLocation(tapLocation, {
+        deviceId,
+        action: "check_out",
+        statusLabel: "Exited",
+      });
       action = "check_out";
       accessType = "exit";
       activityType = "nfc_card_checkout";
@@ -1897,7 +2066,11 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       }
 
       visitor.markCheckedIn(null);
-      visitor.updateCurrentLocation(tapLocation, { deviceId });
+      visitor.updateCurrentLocation(tapLocation, {
+        deviceId,
+        action: "check_in",
+        statusLabel: `Inside ${tapLocation.office || "checkpoint"}`,
+      });
       action = "check_in";
       accessType = "entry";
       activityType = "nfc_card_checkin";
@@ -1930,7 +2103,11 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         });
       }
 
-      visitor.updateCurrentLocation(tapLocation, { deviceId });
+      visitor.updateCurrentLocation(tapLocation, {
+        deviceId,
+        action: "location_update",
+        statusLabel: `Moved to ${tapLocation.office || "checkpoint"}`,
+      });
     }
 
     await visitor.save();
@@ -2202,7 +2379,7 @@ const getAppointmentSlotLimit = (slot = {}) => {
 
 const parseAppointmentTimeParts = (value) => {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return { hour: value.getHours(), minute: value.getMinutes() };
+    return getAppointmentTimezoneParts(value);
   }
 
   const rawValue = String(value || "").trim();
@@ -2227,10 +2404,64 @@ const parseAppointmentTimeParts = (value) => {
 
   const parsedDate = new Date(rawValue);
   if (!Number.isNaN(parsedDate.getTime())) {
-    return { hour: parsedDate.getHours(), minute: parsedDate.getMinutes() };
+    return getAppointmentTimezoneParts(parsedDate);
   }
 
   return null;
+};
+
+const APPOINTMENT_TIMEZONE_OFFSET_MINUTES = Number.isFinite(
+  Number(process.env.APPOINTMENT_TIMEZONE_OFFSET_MINUTES),
+)
+  ? Number(process.env.APPOINTMENT_TIMEZONE_OFFSET_MINUTES)
+  : 8 * 60;
+
+const getAppointmentTimezoneParts = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const shiftedDate = new Date(date.getTime() + APPOINTMENT_TIMEZONE_OFFSET_MINUTES * 60 * 1000);
+  return {
+    year: shiftedDate.getUTCFullYear(),
+    month: shiftedDate.getUTCMonth(),
+    day: shiftedDate.getUTCDate(),
+    hour: shiftedDate.getUTCHours(),
+    minute: shiftedDate.getUTCMinutes(),
+  };
+};
+
+const getAppointmentDateParts = (value) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return getAppointmentTimezoneParts(value);
+  }
+
+  const rawValue = String(value || "").trim();
+  const dateMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateMatch) {
+    return {
+      year: Number(dateMatch[1]),
+      month: Number(dateMatch[2]) - 1,
+      day: Number(dateMatch[3]),
+    };
+  }
+
+  const parsedDate = new Date(rawValue);
+  if (Number.isNaN(parsedDate.getTime())) return null;
+  return getAppointmentTimezoneParts(parsedDate);
+};
+
+const createAppointmentTimezoneDate = ({ year, month, day, hour = 0, minute = 0 }) => {
+  const utcTimestamp =
+    Date.UTC(year, month, day, hour, minute, 0, 0) -
+    APPOINTMENT_TIMEZONE_OFFSET_MINUTES * 60 * 1000;
+  const date = new Date(utcTimestamp);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getAppointmentDayOfWeek = (value) => {
+  const parts = getAppointmentDateParts(value);
+  if (!parts) return null;
+  return createAppointmentTimezoneDate({ ...parts, hour: 12 })?.getUTCDay() ?? null;
 };
 
 const getConfiguredAppointmentSlotParts = (slot = {}) => {
@@ -2371,10 +2602,12 @@ const findVisitorsForUser = async (user) => {
   if (!filters.length) return [];
 
   return Visitor.find({ $or: filters }).sort({
-    visitDate: 1,
-    visitTime: 1,
+    appointmentRescheduledAt: -1,
+    appointmentRequestedAt: -1,
     registeredAt: -1,
     createdAt: -1,
+    visitTime: -1,
+    visitDate: -1,
   });
 };
 
@@ -2488,58 +2721,175 @@ const getVisitorScheduleTime = (visitor) => {
   return Number.isNaN(fallback.getTime()) ? 0 : fallback.getTime();
 };
 
+const getVisitorSubmissionTime = (visitor = {}) => {
+  const timestamps = [
+    visitor.appointmentRescheduledAt,
+    visitor.appointmentRequestedAt,
+    visitor.registeredAt,
+    visitor.createdAt,
+    visitor.visitTime,
+    visitor.visitDate,
+  ];
+
+  return timestamps.reduce((latest, value) => {
+    const timestamp = new Date(value || 0).getTime();
+    return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+  }, 0);
+};
+
 const getPrioritizedVisitor = (visitors = []) => {
   if (!Array.isArray(visitors) || !visitors.length) return null;
 
-  const now = Date.now();
   const checkedIn = visitors
     .filter((visitor) => String(visitor?.status || "").toLowerCase() === "checked_in")
-    .sort((left, right) => getVisitorScheduleTime(right) - getVisitorScheduleTime(left));
+    .sort((left, right) => getVisitorSubmissionTime(right) - getVisitorSubmissionTime(left));
 
   if (checkedIn[0]) return checkedIn[0];
 
-  const active = visitors.filter((visitor) =>
-    !["checked_out", "expired", "no_show", "rejected", "cancelled"].includes(String(visitor?.status || "").toLowerCase()) &&
-    !["rejected", "cancelled"].includes(String(visitor?.appointmentStatus || "").toLowerCase())
-  );
-  const upcoming = active
-    .filter((visitor) => getVisitorScheduleTime(visitor) >= now - 60 * 1000)
-    .sort((left, right) => getVisitorScheduleTime(left) - getVisitorScheduleTime(right));
+  const submittedAppointments = visitors
+    .filter((visitor) => visitor?.requestCategory === "appointment")
+    .sort((left, right) => getVisitorSubmissionTime(right) - getVisitorSubmissionTime(left));
 
-  if (upcoming[0]) return upcoming[0];
+  if (submittedAppointments[0]) return submittedAppointments[0];
 
-  return [...visitors].sort((left, right) => getVisitorScheduleTime(right) - getVisitorScheduleTime(left))[0];
+  return [...visitors].sort((left, right) => getVisitorSubmissionTime(right) - getVisitorSubmissionTime(left))[0];
 };
 
 const getCombinedAppointmentDateTime = (visitDateValue, visitTimeValue) => {
-  const visitDate = new Date(visitDateValue);
+  const visitDate = getAppointmentDateParts(visitDateValue);
   const visitTime = parseAppointmentTimeParts(visitTimeValue);
 
-  if (Number.isNaN(visitDate.getTime()) || !visitTime) {
+  if (!visitDate || !visitTime) {
     return null;
   }
 
-  const combined = new Date(visitDate);
-  combined.setHours(visitTime.hour, visitTime.minute, 0, 0);
-  return Number.isNaN(combined.getTime()) ? null : combined;
+  return createAppointmentTimezoneDate({
+    year: visitDate.year,
+    month: visitDate.month,
+    day: visitDate.day,
+    hour: visitTime.hour,
+    minute: visitTime.minute,
+  });
+};
+
+const buildVisitorProfilePayload = async (visitorUser) => {
+  await ensureSafePassAccountId(visitorUser);
+  const visitors = await findVisitorsForUser(visitorUser);
+  await Promise.all(visitors.map((visitorRecord) => applyAppointmentLifecycleIfNeeded(visitorRecord)));
+  const visitor = getPrioritizedVisitor(visitors);
+
+  if (visitor) {
+    if (!visitorUser.visitorId || String(visitorUser.visitorId) !== String(visitor._id)) {
+      visitorUser.visitorId = visitor._id;
+      await visitorUser.save();
+    }
+
+    const visitorPayload = visitor.toObject();
+    visitorPayload.nfcCardId = visitorUser.nfcCardId || "";
+
+    return {
+      success: true,
+      visitor: visitorPayload,
+      appointments: visitors,
+      account: getVisitorAccountPayload(visitorUser),
+    };
+  }
+
+  return {
+    success: true,
+    visitor: null,
+    appointments: [],
+    account: getVisitorAccountPayload(visitorUser),
+  };
+};
+
+const buildLiveVisitorLocationPayload = (visitor = {}) => {
+  const currentLocation = visitor.currentLocation || {};
+  const coordinates = currentLocation.coordinates || {};
+  const lastScanTime =
+    currentLocation.lastSeenAt ||
+    visitor.checkedInAt ||
+    visitor.updatedAt ||
+    visitor.registeredAt;
+  const statusLabel =
+    currentLocation.statusLabel ||
+    (String(visitor.status || "").toLowerCase() === "checked_in"
+      ? `Inside ${currentLocation.office || visitor.assignedOffice || visitor.host || "campus"}`
+      : "Exited");
+
+  return {
+    visitorId: visitor._id,
+    name: visitor.fullName,
+    email: visitor.email,
+    phone: visitor.phoneNumber,
+    purpose: visitor.purposeOfVisit,
+    office: currentLocation.office || visitor.assignedOffice || visitor.host || "Campus",
+    checkpointId: currentLocation.checkpointId || "",
+    floor: currentLocation.floor || "ground",
+    coordinates: {
+      x: Number.isFinite(Number(coordinates.x)) ? Number(coordinates.x) : null,
+      y: Number.isFinite(Number(coordinates.y)) ? Number(coordinates.y) : null,
+    },
+    lastScanTime,
+    status: currentLocation.isActive === false ? "exited" : "inside",
+    statusLabel,
+    source: currentLocation.source || "checkpoint",
+    checkedInAt: visitor.checkedInAt,
+  };
+};
+
+const getActiveLiveVisitors = async (limit = 200) => {
+  const activeVisitors = await Visitor.find({
+    status: "checked_in",
+  })
+    .sort({
+      "currentLocation.lastSeenAt": -1,
+      checkedInAt: -1,
+      updatedAt: -1,
+      registeredAt: -1,
+    })
+    .limit(limit)
+    .lean();
+
+  const latestByVisitor = new Map();
+
+  activeVisitors.forEach((visitor) => {
+    const identity = String(visitor?._id || "");
+    if (!identity || latestByVisitor.has(identity)) {
+      return;
+    }
+
+    latestByVisitor.set(identity, visitor);
+  });
+
+  return Array.from(latestByVisitor.values());
 };
 
 const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
-  const visitDate = new Date(visitDateValue);
+  const visitDate = getAppointmentDateParts(visitDateValue);
   const visitTime = parseAppointmentTimeParts(visitTimeValue);
 
-  if (Number.isNaN(visitDate.getTime()) || !visitTime) {
+  if (!visitDate || !visitTime) {
     return null;
   }
 
-  const dayStart = new Date(visitDate);
-  dayStart.setHours(0, 0, 0, 0);
-
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-
-  const slotStart = new Date(visitDate);
-  slotStart.setHours(visitTime.hour, visitTime.minute, 0, 0);
+  const dayStart = createAppointmentTimezoneDate({
+    year: visitDate.year,
+    month: visitDate.month,
+    day: visitDate.day,
+  });
+  const dayEnd = createAppointmentTimezoneDate({
+    year: visitDate.year,
+    month: visitDate.month,
+    day: visitDate.day + 1,
+  });
+  const slotStart = createAppointmentTimezoneDate({
+    year: visitDate.year,
+    month: visitDate.month,
+    day: visitDate.day,
+    hour: visitTime.hour,
+    minute: visitTime.minute,
+  });
 
   const slotEnd = new Date(slotStart);
   slotEnd.setMinutes(slotEnd.getMinutes() + 1);
@@ -2548,16 +2898,21 @@ const getAppointmentSlotWindow = (visitDateValue, visitTimeValue) => {
 };
 
 const getVisitDayWindow = (visitDateValue) => {
-  const visitDate = new Date(visitDateValue);
-  if (Number.isNaN(visitDate.getTime())) {
+  const visitDate = getAppointmentDateParts(visitDateValue);
+  if (!visitDate) {
     return null;
   }
 
-  const dayStart = new Date(visitDate);
-  dayStart.setHours(0, 0, 0, 0);
-
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  const dayStart = createAppointmentTimezoneDate({
+    year: visitDate.year,
+    month: visitDate.month,
+    day: visitDate.day,
+  });
+  const dayEnd = createAppointmentTimezoneDate({
+    year: visitDate.year,
+    month: visitDate.month,
+    day: visitDate.day + 1,
+  });
 
   return { dayStart, dayEnd };
 };
@@ -2867,12 +3222,8 @@ const getVisitorCheckInEligibility = (visitor) => {
 };
 
 const isAppointmentServiceDay = (dateValue) => {
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) {
-    return false;
-  }
-
-  return date.getDay() !== 0;
+  const dayOfWeek = getAppointmentDayOfWeek(dateValue);
+  return dayOfWeek !== null && dayOfWeek !== 0;
 };
 
 const countStaffAppointmentsForSlot = async ({
@@ -3116,34 +3467,7 @@ const userData = {
 app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
   try {
     if (req.user.role === "visitor") {
-      await ensureSafePassAccountId(req.user);
-      const visitors = await findVisitorsForUser(req.user);
-      await Promise.all(visitors.map((visitorRecord) => applyAppointmentLifecycleIfNeeded(visitorRecord)));
-      const visitor = getPrioritizedVisitor(visitors);
-
-      if (visitor) {
-        if (!req.user.visitorId || String(req.user.visitorId) !== String(visitor._id)) {
-          req.user.visitorId = visitor._id;
-          await req.user.save();
-        }
-
-        const visitorPayload = visitor.toObject();
-        visitorPayload.nfcCardId = req.user.nfcCardId || "";
-
-        return res.json({
-          success: true,
-          visitor: visitorPayload,
-          appointments: visitors,
-          account: getVisitorAccountPayload(req.user),
-        });
-      }
-
-      return res.json({
-        success: true,
-        visitor: null,
-        appointments: [],
-        account: getVisitorAccountPayload(req.user),
-      });
+      return res.json(await buildVisitorProfilePayload(req.user));
     }
 
     res.status(404).json({
@@ -5891,7 +6215,7 @@ app.post("/api/create-demo-user", async (req, res) => {
 // ============ EXISTING VISITOR ROUTES ============
 
 // Get all visitors (for admin, staff, and security dashboards)
-app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "security"), async (req, res) => {
+app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "security", "guard"), async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
 
@@ -5923,6 +6247,33 @@ app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "securit
     });
   }
 });
+
+app.get(
+  "/api/security/live-visitor-locations",
+  authMiddleware,
+  requireRoles("admin", "security", "guard"),
+  async (req, res) => {
+    try {
+      const requestedLimit = Number.parseInt(req.query?.limit, 10);
+      const limit = Number.isFinite(requestedLimit)
+        ? Math.min(Math.max(requestedLimit, 1), 300)
+        : 200;
+      const activeVisitors = await getActiveLiveVisitors(limit);
+
+      res.json({
+        success: true,
+        generatedAt: new Date(),
+        visitors: activeVisitors.map((visitor) => buildLiveVisitorLocationPayload(visitor)),
+      });
+    } catch (error) {
+      console.error("Get live visitor locations error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch live visitor locations",
+      });
+    }
+  },
+);
 
 // Get single visitor by ID
 app.get("/api/visitors/:id", authMiddleware, async (req, res) => {
@@ -6055,6 +6406,7 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
     visitor.markCheckedIn(req.user._id);
     visitor.updateCurrentLocation(getVisitorCheckInLocation(visitor, checkInSource), {
       deviceId: checkInSource === "virtual_nfc_card" ? "visitor-app" : "mobile-app",
+      action: "check_in",
     });
     await visitor.save();
 
@@ -6073,6 +6425,8 @@ app.put("/api/visitors/:id/self-checkin", authMiddleware, async (req, res) => {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
         source: checkInSource,
+        action: "check_in",
+        currentLocation: visitor.currentLocation,
       },
       notes: `Visitor self check-in via ${sourceLabel}`,
     });
@@ -6196,6 +6550,8 @@ app.put("/api/visitors/:id/self-checkout", authMiddleware, async (req, res) => {
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
         source: checkOutSource,
+        action: "check_out",
+        currentLocation: visitor.currentLocation,
       },
       notes: `Visitor self check-out via ${sourceLabel}`,
     });
@@ -6969,7 +7325,16 @@ const canVisitorManageAppointment = (visitor = {}) => {
   if (["checked_in", "checked_out", "expired", "no_show", "rejected", "cancelled"].includes(visitStatus)) return false;
   if (visitor.visitExpiredAt || visitor.noShowMarkedAt) return false;
   if (visitor.appointmentCompletedAt) return false;
-  return ["pending", "approved"].includes(appointmentStatus);
+  return ["pending", "approved", "adjusted", "rescheduled"].includes(appointmentStatus);
+};
+
+const isLatestVisitorAppointment = async (visitor = {}) => {
+  const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
+  const visitorRecords = visitorUser
+    ? await findVisitorsForUser(visitorUser)
+    : await Visitor.find({ email: String(visitor.email || "").trim().toLowerCase() });
+  const latestVisitor = getPrioritizedVisitor(visitorRecords);
+  return Boolean(latestVisitor && isSameObjectId(latestVisitor._id, visitor._id));
 };
 
 app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, res) => {
@@ -6993,6 +7358,13 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
       return res.status(400).json({
         success: false,
         message: "This appointment can no longer be edited.",
+      });
+    }
+
+    if (requesterRole !== "admin" && !(await isLatestVisitorAppointment(visitor))) {
+      return res.status(400).json({
+        success: false,
+        message: "Only your latest appointment request can be edited. Older appointments are read-only history.",
       });
     }
 
@@ -7051,7 +7423,7 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
 
     const originalVisitDate = visitor.visitDate;
     const originalVisitTime = visitor.visitTime;
-    const wasApproved = String(visitor.appointmentStatus || "").toLowerCase() === "approved";
+    const wasApproved = ["approved", "adjusted"].includes(String(visitor.appointmentStatus || "").toLowerCase());
     const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
 
     visitor.rescheduleAppointmentByVisitor(req.user, {
@@ -7196,9 +7568,16 @@ app.put("/api/visitors/:id/appointment/cancel", authMiddleware, async (req, res)
       });
     }
 
+    if (requesterRole !== "admin" && !(await isLatestVisitorAppointment(visitor))) {
+      return res.status(400).json({
+        success: false,
+        message: "Only your latest appointment request can be cancelled. Older appointments are read-only history.",
+      });
+    }
+
     const originalVisitDate = visitor.visitDate;
     const originalVisitTime = visitor.visitTime;
-    const wasApproved = String(visitor.appointmentStatus || "").toLowerCase() === "approved";
+    const wasApproved = ["approved", "adjusted"].includes(String(visitor.appointmentStatus || "").toLowerCase());
     const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
     const assignedStaffUser = visitor.assignedStaff
       ? await User.findById(visitor.assignedStaff)
@@ -7956,6 +8335,10 @@ app.put("/api/visitors/:id/checkin", authMiddleware, requireRoles("admin", "secu
     }
 
     visitor.markCheckedIn(req.user._id);
+    visitor.updateCurrentLocation(getVisitorCheckInLocation(visitor, "security_dashboard"), {
+      deviceId: "security-dashboard",
+      action: "check_in",
+    });
     await visitor.save();
 
     const accessLog = new AccessLog({
@@ -7969,6 +8352,10 @@ app.put("/api/visitors/:id/checkin", authMiddleware, requireRoles("admin", "secu
       status: "granted",
       relatedVisitor: visitor._id,
       relatedUser: req.user._id,
+      metadata: {
+        action: "check_in",
+        currentLocation: visitor.currentLocation,
+      },
       notes: `Checked in by ${req.user.firstName} ${req.user.lastName}`,
     });
     await accessLog.save();
@@ -8037,6 +8424,10 @@ app.put("/api/visitors/:id/checkout", authMiddleware, requireRoles("admin", "sec
       status: "granted",
       relatedVisitor: visitor._id,
       relatedUser: req.user._id,
+      metadata: {
+        action: "check_out",
+        currentLocation: visitor.currentLocation,
+      },
       notes: `Checked out by ${req.user.firstName} ${req.user.lastName}`,
     });
     await accessLog.save();
@@ -8331,26 +8722,8 @@ app.get("/api/visitors/stats", authMiddleware, async (req, res) => {
 // Get visitor profile for logged-in visitor
 app.get("/api/visitor-profile", authMiddleware, async (req, res) => {
   try {
-    // If user is a visitor, get their visitor record
     if (req.user.role === "visitor") {
-      await ensureSafePassAccountId(req.user);
-      const visitor = await findVisitorForUser(req.user);
-
-      if (visitor) {
-        const visitorPayload = visitor.toObject();
-        visitorPayload.nfcCardId = req.user.nfcCardId || "";
-        return res.json({
-          success: true,
-          visitor: visitorPayload,
-          account: getVisitorAccountPayload(req.user),
-        });
-      }
-
-      return res.json({
-        success: true,
-        visitor: null,
-        account: getVisitorAccountPayload(req.user),
-      });
+      return res.json(await buildVisitorProfilePayload(req.user));
     }
 
     res.status(404).json({

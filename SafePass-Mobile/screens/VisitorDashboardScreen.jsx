@@ -162,13 +162,13 @@ const getStoredVisitorIdType = (visitorRecord = {}) => {
 
 const PHONE_TRACKING_INTERVAL_MS = 15000;
 const PHONE_TRACKING_DISTANCE_METERS = 8;
-const VISITOR_PENDING_REFRESH_INTERVAL_MS = 30000;
-const VISITOR_LIVE_REFRESH_INTERVAL_MS = 10000;
+const VISITOR_PENDING_REFRESH_INTERVAL_MS = 5000;
+const VISITOR_LIVE_REFRESH_INTERVAL_MS = 5000;
 const VISITOR_CONNECTIVITY_REMINDER_KEY = "visitorConnectivityReminderShown";
 const VISITOR_SELECTED_SECTION_KEY = "visitorDashboardSelectedSection";
 const VISITOR_APPOINTMENT_SCREEN_KEY = "visitorDashboardAppointmentScreen";
 const VISITOR_MAP_FLOOR_KEY = "visitorDashboardMapFloor";
-const VISITOR_APPOINTMENT_SCREENS = ["menu", "request", "history", "status"];
+const VISITOR_APPOINTMENT_SCREENS = ["menu", "request", "history"];
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 const AnimatedPressable = ({
@@ -394,6 +394,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [visitorPushNotice, setVisitorPushNotice] = useState(null);
   const [visitorWarningNotice, setVisitorWarningNotice] = useState(null);
   const [visitorAlert, setVisitorAlert] = useState(null);
+  const [bottomNavMeasuredWidth, setBottomNavMeasuredWidth] = useState(0);
   const [isVisitorDarkMode, setIsVisitorDarkMode] = useState(false);
   const [dashboardScrollY, setDashboardScrollY] = useState(0);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
@@ -759,10 +760,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const compactApprovedGradientStyle = isCompactVisitorDashboard
     ? visitorDashboardStyles.approvedHeroGradientCompact
     : null;
-  const bottomNavBarWidth = Math.min(
+  const bottomNavEstimatedWidth = Math.min(
     Math.max(viewportWidth - (isCompactVisitorDashboard ? 24 : 36), 0),
     420,
   );
+  const bottomNavBarWidth = bottomNavMeasuredWidth || bottomNavEstimatedWidth;
   const bottomNavItemWidth = Math.max((bottomNavBarWidth - 14) / VISITOR_MODULES.length, 0);
   const approvedSectionHeaderResponsiveStyle = viewportWidth <= 560
     ? { marginBottom: 12 }
@@ -790,12 +792,31 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }, [navigation]);
 
   const scrollDashboardToTop = (animated = true) => {
+    setDashboardScrollY(0);
     requestAnimationFrame(() => {
       dashboardScrollRef.current?.scrollTo?.({ y: 0, animated });
     });
   };
 
+  const closeAppointmentPopovers = () => {
+    setShowAppointmentDatePicker(false);
+    setShowAppointmentTimePicker(false);
+    setShowPurposeDropdown(false);
+    setShowDepartmentDropdown(false);
+    setShowIdTypeDropdown(false);
+  };
+
+  const dismissVisitorPushNotice = () => {
+    if (visitorPushNoticeTimeoutRef.current) {
+      clearTimeout(visitorPushNoticeTimeoutRef.current);
+      visitorPushNoticeTimeoutRef.current = null;
+    }
+    setVisitorPushNotice(null);
+  };
+
   const handleAppointmentScreenNavigation = (targetScreen, loadingLabel = "Loading appointment module...") => {
+    if (!VISITOR_APPOINTMENT_SCREENS.includes(targetScreen)) return;
+
     const currentAppointmentIndex = VISITOR_APPOINTMENT_SCREENS.indexOf(selectedAppointmentScreen);
     const nextAppointmentIndex = VISITOR_APPOINTMENT_SCREENS.indexOf(targetScreen);
     if (
@@ -817,16 +838,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
     if (appointmentTransitionTimeoutRef.current) {
       clearTimeout(appointmentTransitionTimeoutRef.current);
+      appointmentTransitionTimeoutRef.current = null;
     }
 
     scrollDashboardToTop(false);
     setAppointmentTransitionLabel(loadingLabel);
     setIsAppointmentScreenTransitioning(true);
-    setShowAppointmentDatePicker(false);
-    setShowAppointmentTimePicker(false);
-    setShowPurposeDropdown(false);
-    setShowDepartmentDropdown(false);
-    setShowIdTypeDropdown(false);
+    closeAppointmentPopovers();
 
     appointmentTransitionTimeoutRef.current = setTimeout(() => {
       setSelectedAppointmentScreen(targetScreen);
@@ -837,16 +855,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleVisitorSectionChange = (sectionId) => {
+    if (!VISITOR_MODULES.some((module) => module.id === sectionId)) return;
+
     const currentIndex = VISITOR_MODULES.findIndex((module) => module.id === selectedVisitorSection);
     const nextIndex = VISITOR_MODULES.findIndex((module) => module.id === sectionId);
     if (currentIndex !== -1 && nextIndex !== -1 && currentIndex !== nextIndex) {
       setVisitorTransitionDirection(nextIndex > currentIndex ? 1 : -1);
-      Animated.spring(bottomNavAnim, {
-        toValue: nextIndex,
-        friction: 8,
-        tension: 90,
-        useNativeDriver: Platform.OS !== "web",
-      }).start();
     }
 
     if (selectedVisitorSection === sectionId && sectionId !== "appointment") {
@@ -1359,6 +1373,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             status: visitorRecord.status,
             approvalStatus: visitorRecord.approvalStatus,
             appointmentStatus: visitorRecord.appointmentStatus,
+            requestCategory: visitorRecord.requestCategory,
+            approvalFlow: visitorRecord.approvalFlow,
+            purposeOfVisit: visitorRecord.purposeOfVisit,
+            assignedOffice: visitorRecord.assignedOffice,
+            appointmentDepartment: visitorRecord.appointmentDepartment,
+            visitDate: visitorRecord.visitDate,
+            visitTime: visitorRecord.visitTime,
+            appointmentRequestedAt: visitorRecord.appointmentRequestedAt,
+            appointmentRescheduledAt: visitorRecord.appointmentRescheduledAt,
+            staffActionAt: visitorRecord.staffActionAt,
             nfcCardId: accountSafePassId || visitorRecord.nfcCardId,
             checkedInAt: visitorRecord.checkedInAt,
             checkedOutAt: visitorRecord.checkedOutAt,
@@ -1379,8 +1403,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         status: appointment?.status,
         approvalStatus: appointment?.approvalStatus,
         appointmentStatus: appointment?.appointmentStatus,
+        requestCategory: appointment?.requestCategory,
+        approvalFlow: appointment?.approvalFlow,
+        purposeOfVisit: appointment?.purposeOfVisit,
+        assignedOffice: appointment?.assignedOffice,
+        appointmentDepartment: appointment?.appointmentDepartment,
         visitDate: appointment?.visitDate,
         visitTime: appointment?.visitTime,
+        appointmentRequestedAt: appointment?.appointmentRequestedAt,
+        appointmentRescheduledAt: appointment?.appointmentRescheduledAt,
+        staffActionAt: appointment?.staffActionAt,
         checkedInAt: appointment?.checkedInAt,
         checkedOutAt: appointment?.checkedOutAt,
         updatedAt: appointment?.updatedAt,
@@ -1785,7 +1817,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
       if (response.success) {
         // Provide success feedback
-        setNfcStatus({ type: 'success', message: '✓ Access granted! Gate opening...' });
+        setNfcStatus({ type: 'success', message: 'Access granted! Gate opening...' });
         
         // Play success sound/feedback
         if (Platform.OS !== 'web') {
@@ -1795,7 +1827,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         // Check if this is a check-in or check-out
         if (response.action === 'check_in') {
           showVisitorAlert(
-            "✓ Checked In Successfully",
+            "Checked In Successfully",
             `Welcome ${visitor.fullName}! Gate is opening.`,
             [{ text: "OK", onPress: () => loadVisitorData() }]
           );
@@ -1804,7 +1836,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           setShowVirtualNfcSuccessModal(false);
           setSelectedVisitorSection("home");
           showVisitorAlert(
-            "✓ Checked Out Successfully",
+            "Checked Out Successfully",
             `Goodbye ${visitor.fullName}! Thank you for visiting.`,
             [{ text: "OK", onPress: () => loadVisitorData() }]
           );
@@ -2059,9 +2091,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleAppointmentDatePress = () => {
-    setShowAppointmentTimePicker(false);
-    setShowPurposeDropdown(false);
-    setShowDepartmentDropdown(false);
+    closeAppointmentPopovers();
 
     if (Platform.OS === "web") {
       const input = appointmentWebDateInputRef.current;
@@ -2106,7 +2136,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (["checked_in", "checked_out", "expired", "no_show", "rejected", "cancelled"].includes(visitStatus)) return false;
     if (record?.checkedOutAt || record?.visitExpiredAt || record?.noShowMarkedAt) return false;
     if (record?.appointmentCompletedAt) return false;
-    return ["pending", "approved"].includes(appointmentStatus);
+    if (currentAppointmentRecord?._id && record?._id && String(record._id) !== String(currentAppointmentRecord._id)) {
+      return false;
+    }
+    return ["pending", "approved", "adjusted", "rescheduled"].includes(appointmentStatus);
   };
 
   const getAppointmentManageDisabledReason = (record = visitor) => {
@@ -2124,6 +2157,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
     if (String(record?.status || "").toLowerCase() === "checked_in") {
       return "Checked-in appointments can no longer be changed.";
+    }
+    if (currentAppointmentRecord?._id && record?._id && String(record._id) !== String(currentAppointmentRecord._id)) {
+      return "Older appointments are read-only history.";
     }
     return "This appointment can no longer be changed.";
   };
@@ -2147,6 +2183,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     setShowEditAppointmentModal(true);
   };
 
+  const closeEditAppointmentModal = () => {
+    setShowEditAppointmentDatePicker(false);
+    setShowEditAppointmentTimePicker(false);
+    setShowEditAppointmentModal(false);
+  };
+
   const openCancelAppointmentModal = (record = visitor) => {
     if (!isAppointmentManageable(record)) {
       showVisitorAlert("Appointment Locked", getAppointmentManageDisabledReason(record));
@@ -2158,6 +2200,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       reason: "",
     });
     setShowCancelAppointmentModal(true);
+  };
+
+  const closeCancelAppointmentModal = () => {
+    setShowCancelAppointmentModal(false);
   };
 
   const applyEditAppointmentDateSelection = (selectedValue) => {
@@ -2354,11 +2400,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (!hasAppointmentDraft) {
       populateAppointmentForm();
     }
-    setShowAppointmentDatePicker(false);
-    setShowAppointmentTimePicker(false);
-    setShowPurposeDropdown(false);
-    setShowDepartmentDropdown(false);
-    setShowIdTypeDropdown(false);
+    closeAppointmentPopovers();
     setSelectedVisitorSection("appointment");
     handleAppointmentScreenNavigation(
       "request",
@@ -2366,12 +2408,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     );
   };
 
+  const openAppointmentHistoryScreen = () => {
+    closeAppointmentPopovers();
+    setSelectedVisitorSection("appointment");
+    handleAppointmentScreenNavigation("history", "Loading appointment history...");
+  };
+
   const closeAppointmentRequestScreen = () => {
-    setShowAppointmentDatePicker(false);
-    setShowAppointmentTimePicker(false);
-    setShowPurposeDropdown(false);
-    setShowDepartmentDropdown(false);
-    setShowIdTypeDropdown(false);
+    closeAppointmentPopovers();
     handleAppointmentScreenNavigation("menu", "Returning to appointment menu...");
   };
 
@@ -2604,7 +2648,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       });
 
       if (response?.success) {
-        setShowEditAppointmentModal(false);
+        closeEditAppointmentModal();
         showVisitorPushNotice({
           title: "Appointment Updated",
           message: response.message || "Your appointment schedule was updated and sent to staff.",
@@ -2660,7 +2704,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       const response = await ApiService.cancelVisitorAppointment(targetAppointment._id, { reason });
 
       if (response?.success) {
-        setShowCancelAppointmentModal(false);
+        closeCancelAppointmentModal();
         showVisitorPushNotice({
           title: "Appointment Cancelled",
           message: response.message || "Your appointment has been cancelled.",
@@ -2768,7 +2812,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             try {
               const response = await ApiService.visitorCheckIn(visitor._id);
               if (response.success) {
-                showVisitorAlert("✅ Success", "You have been checked in!");
+                showVisitorAlert("Success", "You have been checked in!");
                 loadVisitorData();
               } else {
                 showVisitorAlert("Error", response.message || "Failed to check in");
@@ -2796,7 +2840,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             try {
               const response = await ApiService.visitorCheckOut(visitor._id);
               if (response.success) {
-                showVisitorAlert("✅ Success", "You have been checked out. Thank you for visiting!");
+                showVisitorAlert("Success", "You have been checked out. Thank you for visiting!");
                 loadVisitorData();
               } else {
                 showVisitorAlert("Error", response.message || "Failed to check out");
@@ -2977,9 +3021,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const getStatusText = () => {
     if (visitor?.approvalStatus === "pending") return "Pending Admin Approval";
-    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "Pending Staff Review";
-    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "Rescheduled - Staff Review";
-    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "Time Adjusted";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "Pending";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "Reschedule Requested";
+    if (visitor?.approvalFlow === "staff" && ["approved", "adjusted"].includes(visitor?.appointmentStatus)) return "Approved";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "cancelled") return "Appointment Cancelled";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "Appointment Declined";
     switch(visitor?.status) {
@@ -3014,19 +3058,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const getAppointmentStatusText = (record = {}) => {
-    if (record?.approvalStatus === "pending") return "Pending Admin Approval";
-    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "Pending Staff Review";
-    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "Rescheduled - Staff Review";
-    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjusted") return "Time Adjusted";
-    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "cancelled") return "Appointment Cancelled";
-    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "Appointment Declined";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "Pending";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "Reschedule Requested";
+    if (record?.approvalFlow === "staff" && ["approved", "adjusted"].includes(record?.appointmentStatus)) return "Approved";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "cancelled") return "Cancelled";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "Declined";
+    if (record?.approvalStatus === "pending") return "Pending";
     switch (record?.status) {
       case "checked_in": return "Checked In";
       case "approved": return "Approved";
-      case "pending": return "Pending Approval";
-      case "checked_out": return "Checked Out";
+      case "pending": return "Pending";
+      case "checked_out": return "Completed";
       case "expired": return "Expired";
-      case "no_show": return "No Show";
+      case "no_show": return "No-Show";
       case "rejected": return "Rejected";
       default: return "Active";
     }
@@ -3124,7 +3168,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const isPendingStaffReview =
     !isPendingApproval &&
     visitor?.approvalFlow === "staff" &&
-    visitor?.appointmentStatus === "pending";
+    ["pending", "rescheduled"].includes(String(visitor?.appointmentStatus || "").toLowerCase());
   const isAdjustedAppointment =
     visitor?.approvalFlow === "staff" &&
     visitor?.appointmentStatus === "adjusted" &&
@@ -3144,27 +3188,61 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const isCompactHistoryLayout = viewportWidth <= 760;
   const approvedActionLabel = isNfcReading ? "Stop NFC" : "Start NFC";
   const approvedActionIcon = isNfcReading ? "pause-circle" : "radio";
-  const appointmentSourceRecords = [
-    ...appointmentHistory,
-    ...(visitor ? [visitor] : []),
-  ].filter(Boolean);
-  const uniqueAppointmentRecords = Array.from(
-    new Map(
-      appointmentSourceRecords.map((record) => [
-        String(record?._id || `${record?.visitDate}-${record?.visitTime}-${record?.purposeOfVisit}`),
-        record,
-      ]),
-    ).values(),
-  ).sort((left, right) => {
-    const leftDate = new Date(left?.visitTime || left?.visitDate || left?.registeredAt || 0).getTime();
-    const rightDate = new Date(right?.visitTime || right?.visitDate || right?.registeredAt || 0).getTime();
-    return rightDate - leftDate;
-  });
-  const appointmentHistoryEntries = uniqueAppointmentRecords.map((record) => {
+  const getAppointmentActivityTime = (record = {}) => {
+    const values = [
+      record?.appointmentRescheduledAt,
+      record?.appointmentRequestedAt,
+      record?.registeredAt,
+      record?.createdAt,
+      record?.visitTime,
+      record?.visitDate,
+    ];
+
+    return values.reduce((latest, value) => {
+      const timestamp = new Date(value || 0).getTime();
+      return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+    }, 0);
+  };
+  const getAppointmentRecordKey = (record = {}, index = 0) =>
+    record?._id
+      ? String(record._id)
+      : `appointment-${index}-${record?.visitDate || "date"}-${record?.visitTime || "time"}-${record?.purposeOfVisit || "purpose"}-${record?.appointmentDepartment || record?.assignedOffice || record?.host || "office"}`;
+  const getAppointmentDateGroupKey = (record = {}) => {
+    const date = new Date(record?.visitDate || record?.visitTime || 0);
+    if (Number.isNaN(date.getTime())) return "unscheduled";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+  const getAppointmentDateSortValue = (record = {}) => {
+    const date = new Date(record?.visitDate || record?.visitTime || 0);
+    if (Number.isNaN(date.getTime())) return 0;
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+  };
+  const getAppointmentTimeSortValue = (record = {}) => {
+    const time = new Date(record?.visitTime || record?.visitDate || 0);
+    if (Number.isNaN(time.getTime())) return Number.MAX_SAFE_INTEGER;
+    return time.getHours() * 60 + time.getMinutes();
+  };
+  const compareAppointmentScheduleAscending = (left, right) => {
+    const leftDate = left?.dateSortValue ?? getAppointmentDateSortValue(left?.record);
+    const rightDate = right?.dateSortValue ?? getAppointmentDateSortValue(right?.record);
+    if (leftDate !== rightDate) return leftDate - rightDate;
+
+    const leftTime = left?.timeSortValue ?? getAppointmentTimeSortValue(left?.record);
+    const rightTime = right?.timeSortValue ?? getAppointmentTimeSortValue(right?.record);
+    if (leftTime !== rightTime) return leftTime - rightTime;
+
+    return String(left?.id || "").localeCompare(String(right?.id || ""));
+  };
+  const buildAppointmentEntry = (record, index = 0) => {
     const recordStatusText = getAppointmentStatusText(record);
     const recordStatusColor = getAppointmentStatusColor(record);
+    const dateGroupKey = getAppointmentDateGroupKey(record);
     return {
-      id: record?._id || `${record?.visitDate}-${record?.visitTime}`,
+      id: getAppointmentRecordKey(record, index),
       record,
       rawStatus: String(record?.status || "").toLowerCase(),
       title: record?.purposeOfVisit || "Campus Appointment",
@@ -3178,29 +3256,125 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       statusLabel: recordStatusText,
       statusIcon: getAppointmentStatusIcon(record),
       statusColor: recordStatusColor,
+      dateGroupKey,
+      dateGroupLabel: dateGroupKey === "unscheduled" ? "Unscheduled" : formatDate(record?.visitDate || record?.visitTime),
+      dateSortValue: getAppointmentDateSortValue(record),
+      timeSortValue: getAppointmentTimeSortValue(record),
       description:
         record?.appointmentCancellationReason ||
         record?.appointmentRescheduleReason ||
+        record?.staffAdjustmentNote ||
         record?.staffApprovalNote ||
         record?.staffRejectionReason ||
         record?.approvalNotes ||
         "Track the latest status of your submitted visit request here.",
     };
+  };
+  const appointmentSourceRecords = [
+    ...appointmentHistory,
+    ...(visitor ? [visitor] : []),
+  ].filter(Boolean);
+  const uniqueAppointmentRecords = Array.from(
+    new Map(
+      appointmentSourceRecords.map((record, index) => [
+        getAppointmentRecordKey(record, index),
+        record,
+      ]),
+    ).values(),
+  ).sort((left, right) => {
+    return getAppointmentActivityTime(right) - getAppointmentActivityTime(left);
   });
+  const currentAppointmentRecord = uniqueAppointmentRecords[0] || visitor || null;
+  const getAppointmentFeedbackSchedule = () => {
+    if (!appointmentFeedback?.date) {
+      return {
+        dateGroupKey: "unscheduled",
+        dateGroupLabel: "Unscheduled",
+        dateSortValue: 0,
+        timeSortValue: Number.MAX_SAFE_INTEGER,
+      };
+    }
 
-  if (appointmentFeedback) {
-    appointmentHistoryEntries.unshift({
+    const feedbackDate = new Date(appointmentFeedback.date);
+    if (Number.isNaN(feedbackDate.getTime())) {
+      return {
+        dateGroupKey: "unscheduled",
+        dateGroupLabel: "Unscheduled",
+        dateSortValue: 0,
+        timeSortValue: Number.MAX_SAFE_INTEGER,
+      };
+    }
+
+    const dateOnly = new Date(feedbackDate);
+    dateOnly.setHours(0, 0, 0, 0);
+    const year = feedbackDate.getFullYear();
+    const month = String(feedbackDate.getMonth() + 1).padStart(2, "0");
+    const day = String(feedbackDate.getDate()).padStart(2, "0");
+    const parsedFeedbackTime = new Date(`${appointmentFeedback.date} ${appointmentFeedback.time || ""}`);
+    const hasFeedbackTime = !Number.isNaN(parsedFeedbackTime.getTime());
+
+    return {
+      dateGroupKey: `${year}-${month}-${day}`,
+      dateGroupLabel: appointmentFeedback.date,
+      dateSortValue: dateOnly.getTime(),
+      timeSortValue: hasFeedbackTime
+        ? parsedFeedbackTime.getHours() * 60 + parsedFeedbackTime.getMinutes()
+        : Number.MAX_SAFE_INTEGER,
+    };
+  };
+  const appointmentFeedbackSchedule = getAppointmentFeedbackSchedule();
+  const currentAppointmentEntry = appointmentFeedback
+    ? {
       id: `feedback-${appointmentFeedback.date || "latest"}-${appointmentFeedback.time || "latest"}`,
       title: appointmentFeedback?.purpose || "Appointment Request",
       office: appointmentFeedback?.department || "Pending assignment",
       dateLabel: appointmentFeedback?.date || "Pending schedule",
       timeLabel: appointmentFeedback?.time || "Pending schedule",
-      statusLabel: "Submitted",
+      statusLabel: "Pending",
       statusIcon: "paper-plane-outline",
       statusColor: "#0A3D91",
+      dateGroupKey: appointmentFeedbackSchedule.dateGroupKey,
+      dateGroupLabel: appointmentFeedbackSchedule.dateGroupLabel,
+      dateSortValue: appointmentFeedbackSchedule.dateSortValue,
+      timeSortValue: appointmentFeedbackSchedule.timeSortValue,
       description: appointmentFeedback?.message || "Your latest request was sent to staff for review.",
+    }
+    : currentAppointmentRecord
+      ? buildAppointmentEntry(currentAppointmentRecord)
+      : null;
+  const currentAppointmentKey = currentAppointmentRecord ? getAppointmentRecordKey(currentAppointmentRecord) : "";
+  const appointmentHistoryEntries = uniqueAppointmentRecords
+    .filter((record) => record !== currentAppointmentRecord && getAppointmentRecordKey(record) !== currentAppointmentKey)
+    .map((record, index) => buildAppointmentEntry(record, index));
+  const appointmentDisplayEntries = [
+    currentAppointmentEntry,
+    ...appointmentHistoryEntries,
+  ].filter(Boolean);
+  const appointmentHistoryGroups = Object.values(
+    appointmentDisplayEntries.reduce((groups, entry) => {
+      const groupKey = entry.dateGroupKey || "unscheduled";
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          key: groupKey,
+          label: entry.dateGroupLabel || "Unscheduled",
+          dateSortValue: entry.dateSortValue || 0,
+          entries: [],
+        };
+      }
+      groups[groupKey].entries.push(entry);
+      return groups;
+    }, {}),
+  )
+    .map((group) => ({
+      ...group,
+      entries: [...group.entries].sort(compareAppointmentScheduleAscending),
+    }))
+    .sort((left, right) => {
+      if (left.dateSortValue !== right.dateSortValue) {
+        return right.dateSortValue - left.dateSortValue;
+      }
+      return String(left.label).localeCompare(String(right.label));
     });
-  }
   const visitorDestinationInfo = getVisitorDestinationInfo(visitor);
   const visitorRouteSteps = buildVisitorRouteSteps(visitorDestinationInfo);
   const visitorDestinationMarker = {
@@ -3215,13 +3389,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     MONITORING_MAP_FLOORS.find((floor) => floor.id === selectedVisitorMapFloor)?.id ||
     visitorDestinationInfo.floorId ||
     "ground";
-  const recentAppointmentEntries = appointmentHistoryEntries.slice(0, 3);
-  const approvedAppointmentCount = appointmentHistoryEntries.filter((entry) =>
+  const recentAppointmentEntries = appointmentDisplayEntries.slice(0, 3);
+  const approvedAppointmentCount = appointmentDisplayEntries.filter((entry) =>
     String(entry.statusLabel || "").toLowerCase().includes("approved"),
   ).length;
-  const pendingAppointmentCount = appointmentHistoryEntries.filter((entry) => {
+  const pendingAppointmentCount = appointmentDisplayEntries.filter((entry) => {
     const normalizedStatus = String(entry.statusLabel || "").toLowerCase();
-    return normalizedStatus.includes("pending") || normalizedStatus.includes("review");
+    return normalizedStatus.includes("pending") || normalizedStatus.includes("review") || normalizedStatus.includes("reschedule");
   }).length;
   const displayName =
     visitor?.fullName ||
@@ -3507,7 +3681,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={[visitorDashboardStyles.appointmentInsightsMetricCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <Text style={visitorDashboardStyles.appointmentInsightsMetricLabel}>Requests</Text>
           <Text style={[visitorDashboardStyles.appointmentInsightsMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
-            {appointmentHistoryEntries.length || 0}
+            {appointmentDisplayEntries.length || 0}
           </Text>
         </View>
         <View style={[visitorDashboardStyles.appointmentInsightsMetricCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
@@ -3564,10 +3738,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <TouchableOpacity
             style={visitorDashboardStyles.recentActivityAction}
             activeOpacity={0.86}
-            onPress={() => {
-              setSelectedVisitorSection("appointment");
-              handleAppointmentScreenNavigation("history", "Loading appointment history...");
-            }}
+            onPress={openAppointmentHistoryScreen}
           >
             <Text style={visitorDashboardStyles.recentActivityActionText}>View all</Text>
             <Ionicons name="arrow-forward-outline" size={16} color="#0A3D91" />
@@ -3909,7 +4080,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const renderBottomNavigation = () => (
     <View style={visitorDashboardStyles.bottomNavShell}>
-      <View style={[visitorDashboardStyles.bottomNavBar, isVisitorDarkMode && visitorDashboardStyles.darkBottomNavBar]}>
+      <View
+        style={[visitorDashboardStyles.bottomNavBar, isVisitorDarkMode && visitorDashboardStyles.darkBottomNavBar]}
+        onLayout={(event) => {
+          const nextWidth = Math.round(event.nativeEvent.layout.width);
+          if (nextWidth > 0 && nextWidth !== bottomNavMeasuredWidth) {
+            setBottomNavMeasuredWidth(nextWidth);
+          }
+        }}
+      >
         <Animated.View
           style={[
             visitorDashboardStyles.bottomNavActiveIndicator,
@@ -4490,12 +4669,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           </View>
           <View style={visitorDashboardStyles.appointmentMenuHeroBadge}>
             <Text style={visitorDashboardStyles.appointmentMenuHeroBadgeText}>
-              {appointmentHistoryEntries.length ? `${appointmentHistoryEntries.length} Active` : "Ready"}
+              {currentAppointmentEntry ? "Current" : "Ready"}
             </Text>
           </View>
         </View>
         {renderAppointmentSegmentBar("menu")}
       </View>
+
+      {renderCurrentAppointmentCard()}
 
       <View style={visitorDashboardStyles.appointmentMenuGrid}>
         <TouchableOpacity
@@ -4541,10 +4722,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           </View>
           <Text style={visitorDashboardStyles.appointmentMenuCardTitle}>Appointment History</Text>
           <Text style={visitorDashboardStyles.appointmentMenuCardText}>
-            Review your latest appointment details, approval progress, and request trail.
+            Review older appointment records. History is read-only and cannot be edited or deleted.
           </Text>
           <View style={visitorDashboardStyles.appointmentMenuCardFooter}>
-            <Text style={visitorDashboardStyles.appointmentMenuCardFooterText}>Status, office, and timeline</Text>
+            <Text style={visitorDashboardStyles.appointmentMenuCardFooterText}>Older records only</Text>
             <Ionicons name="arrow-forward-outline" size={18} color="#0A3D91" />
           </View>
         </TouchableOpacity>
@@ -4690,10 +4871,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentPickerField}
               onPress={() => {
-                setShowAppointmentTimePicker((current) => !current);
-                setShowAppointmentDatePicker(false);
-                setShowPurposeDropdown(false);
-                setShowDepartmentDropdown(false);
+                const shouldOpenTimePicker = !showAppointmentTimePicker;
+                closeAppointmentPopovers();
+                setShowAppointmentTimePicker(shouldOpenTimePicker);
               }}
               activeOpacity={0.85}
             >
@@ -4810,10 +4990,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentPickerField}
               onPress={() => {
-                setShowDepartmentDropdown((current) => !current);
-                setShowPurposeDropdown(false);
-                setShowAppointmentDatePicker(false);
-                setShowAppointmentTimePicker(false);
+                const shouldOpenDepartmentDropdown = !showDepartmentDropdown;
+                closeAppointmentPopovers();
+                setShowDepartmentDropdown(shouldOpenDepartmentDropdown);
               }}
               activeOpacity={0.85}
             >
@@ -4884,8 +5063,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentPickerField}
               onPress={() => {
-                setShowPurposeDropdown((current) => !current);
-                setShowDepartmentDropdown(false);
+                const shouldOpenPurposeDropdown = !showPurposeDropdown;
+                closeAppointmentPopovers();
+                setShowPurposeDropdown(shouldOpenPurposeDropdown);
               }}
               activeOpacity={0.85}
             >
@@ -4968,11 +5148,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <TouchableOpacity
               style={visitorDashboardStyles.appointmentPickerField}
               onPress={() => {
-                setShowIdTypeDropdown((current) => !current);
-                setShowPurposeDropdown(false);
-                setShowDepartmentDropdown(false);
-                setShowAppointmentDatePicker(false);
-                setShowAppointmentTimePicker(false);
+                const shouldOpenIdTypeDropdown = !showIdTypeDropdown;
+                closeAppointmentPopovers();
+                setShowIdTypeDropdown(shouldOpenIdTypeDropdown);
               }}
               activeOpacity={0.85}
             >
@@ -5212,6 +5390,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const renderAppointmentManageActions = (record) => {
     if (!record?._id) return null;
     const canManage = isAppointmentManageable(record);
+    const normalizedAppointmentStatus = String(record?.appointmentStatus || "").toLowerCase();
+    const editLabel = ["approved", "adjusted"].includes(normalizedAppointmentStatus)
+      ? "Request Changes"
+      : "Edit";
 
     return (
       <View style={visitorDashboardStyles.appointmentManageActionRow}>
@@ -5231,7 +5413,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               !canManage && visitorDashboardStyles.appointmentManageButtonTextDisabled,
             ]}
           >
-            Edit
+            {editLabel}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -5259,15 +5441,76 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     );
   };
 
+  const renderCurrentAppointmentCard = () => {
+    if (!currentAppointmentEntry) {
+      return (
+        <View style={visitorDashboardStyles.appointmentHistoryEmpty}>
+          <Ionicons name="calendar-clear-outline" size={34} color="#94A3B8" />
+          <Text style={visitorDashboardStyles.appointmentHistoryEmptyTitle}>No current appointment</Text>
+          <Text style={visitorDashboardStyles.appointmentHistoryEmptyText}>
+            Submit a new appointment request to start staff review.
+          </Text>
+        </View>
+      );
+    }
+
+    const entry = currentAppointmentEntry;
+    return (
+      <View style={visitorDashboardStyles.appointmentHistoryCardItem}>
+        <View style={visitorDashboardStyles.appointmentHistoryCardTop}>
+          <View style={visitorDashboardStyles.appointmentHistoryCardCopy}>
+            <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Current / Latest Appointment</Text>
+            <Text style={visitorDashboardStyles.appointmentHistoryCardTitle} numberOfLines={2}>
+              {entry.title}
+            </Text>
+            <Text style={visitorDashboardStyles.appointmentHistoryCardOffice} numberOfLines={2}>
+              {entry.office}
+            </Text>
+          </View>
+          <View
+            style={[
+              visitorDashboardStyles.appointmentHistoryCardPill,
+              { backgroundColor: `${entry.statusColor}14` },
+            ]}
+          >
+            <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
+            <Text
+              style={[visitorDashboardStyles.appointmentHistoryCardPillText, { color: entry.statusColor }]}
+              numberOfLines={1}
+            >
+              {entry.statusLabel}
+            </Text>
+          </View>
+        </View>
+
+        <View style={visitorDashboardStyles.appointmentHistoryCardMetaRow}>
+          <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+            <Ionicons name="calendar-outline" size={15} color="#0A3D91" />
+            <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>{entry.dateLabel}</Text>
+          </View>
+          <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+            <Ionicons name="time-outline" size={15} color="#0A3D91" />
+            <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>{entry.timeLabel}</Text>
+          </View>
+        </View>
+
+        <Text style={visitorDashboardStyles.appointmentHistoryCardDescription} numberOfLines={3}>
+          {entry.description}
+        </Text>
+        {renderAppointmentManageActions(entry.record)}
+      </View>
+    );
+  };
+
   const renderAppointmentHistoryPanel = () => (
     <View style={[visitorDashboardStyles.appointmentScreenShell, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.appointmentScreenCard}>
         <View style={visitorDashboardStyles.appointmentHistoryHeader}>
           <View style={visitorDashboardStyles.appointmentHistoryHeaderCopy}>
             <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Appointment Module</Text>
-            <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Appointment History</Text>
+            <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Appointment Records</Text>
             <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
-              Review your latest appointment details and create a new request when needed.
+              All submitted appointments are grouped by date. Current appointment actions stay in Overview.
             </Text>
           </View>
           <TouchableOpacity
@@ -5283,72 +5526,62 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={visitorDashboardStyles.appointmentHistoryBody}>
           {renderAppointmentSegmentBar("history")}
 
-          {appointmentHistoryEntries.length ? (
+          {appointmentDisplayEntries.length ? (
             isCompactHistoryLayout ? (
               <View style={visitorDashboardStyles.appointmentHistoryCards}>
-                {appointmentHistoryEntries.map((entry) => (
-                  <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryCardItem}>
-                    <View style={visitorDashboardStyles.appointmentHistoryCardTop}>
-                      <View style={visitorDashboardStyles.appointmentHistoryCardCopy}>
-                        <Text style={visitorDashboardStyles.appointmentHistoryCardTitle} numberOfLines={2}>
-                          {entry.title}
-                        </Text>
-                        <Text style={visitorDashboardStyles.appointmentHistoryCardOffice} numberOfLines={2}>
-                          {entry.office}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          visitorDashboardStyles.appointmentHistoryCardPill,
-                          { backgroundColor: `${entry.statusColor}14` },
-                        ]}
-                      >
-                        <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
-                        <Text
-                          style={[visitorDashboardStyles.appointmentHistoryCardPillText, { color: entry.statusColor }]}
-                          numberOfLines={1}
-                        >
-                          {entry.statusLabel}
-                        </Text>
-                      </View>
+                {appointmentHistoryGroups.map((group) => (
+                  <View key={group.key} style={visitorDashboardStyles.appointmentHistoryDateGroup}>
+                    <View style={visitorDashboardStyles.appointmentHistoryDateGroupHeader}>
+                      <Ionicons name="calendar-outline" size={15} color="#0A3D91" />
+                      <Text style={visitorDashboardStyles.appointmentHistoryDateGroupTitle}>{group.label}</Text>
                     </View>
+                    {group.entries.map((entry) => (
+                      <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryCardItem}>
+                        <View style={visitorDashboardStyles.appointmentHistoryCardTop}>
+                          <View style={visitorDashboardStyles.appointmentHistoryCardCopy}>
+                            <Text style={visitorDashboardStyles.appointmentHistoryCardTitle} numberOfLines={2}>
+                              {entry.title}
+                            </Text>
+                            <Text style={visitorDashboardStyles.appointmentHistoryCardOffice} numberOfLines={2}>
+                              {entry.office}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              visitorDashboardStyles.appointmentHistoryCardPill,
+                              { backgroundColor: `${entry.statusColor}14` },
+                            ]}
+                          >
+                            <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
+                            <Text
+                              style={[visitorDashboardStyles.appointmentHistoryCardPillText, { color: entry.statusColor }]}
+                              numberOfLines={1}
+                            >
+                              {entry.statusLabel}
+                            </Text>
+                          </View>
+                        </View>
 
-                    <View style={visitorDashboardStyles.appointmentHistoryCardMetaRow}>
-                      <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
-                        <Ionicons name="calendar-outline" size={15} color="#0A3D91" />
-                        <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
-                          {entry.dateLabel}
+                        <View style={visitorDashboardStyles.appointmentHistoryCardMetaRow}>
+                          <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+                            <Ionicons name="calendar-outline" size={15} color="#0A3D91" />
+                            <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
+                              {entry.dateLabel}
+                            </Text>
+                          </View>
+                          <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+                            <Ionicons name="time-outline" size={15} color="#0A3D91" />
+                            <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
+                              {entry.timeLabel}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={visitorDashboardStyles.appointmentHistoryCardDescription} numberOfLines={3}>
+                          {entry.description}
                         </Text>
                       </View>
-                      <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
-                        <Ionicons name="time-outline" size={15} color="#0A3D91" />
-                        <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
-                          {entry.timeLabel}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Text style={visitorDashboardStyles.appointmentHistoryCardDescription} numberOfLines={3}>
-                      {entry.description}
-                    </Text>
-                    {entry.rawStatus === "checked_in" ? (
-                      <TouchableOpacity
-                        style={visitorDashboardStyles.appointmentHistoryCheckOutButton}
-                        activeOpacity={0.88}
-                        onPress={() => handleCheckOutAction(entry.record)}
-                        disabled={isCheckOutLoading}
-                      >
-                        {isCheckOutLoading ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Ionicons name="log-out-outline" size={17} color="#FFFFFF" />
-                        )}
-                        <Text style={visitorDashboardStyles.appointmentHistoryCheckOutButtonText}>
-                          Check Out This Visit
-                        </Text>
-                      </TouchableOpacity>
-                    ) : null}
-                    {renderAppointmentManageActions(entry.record)}
+                    ))}
                   </View>
                 ))}
               </View>
@@ -5360,32 +5593,36 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryDateCell]}>Date</Text>
                   <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryTimeCell]}>Time</Text>
                   <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryStatusCell]}>Status</Text>
-                  <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryActionCell]}>Actions</Text>
                 </View>
-                {appointmentHistoryEntries.map((entry) => (
-                  <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryTableRow}>
-                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryPurposeCell]} numberOfLines={2}>
-                      {entry.title}
-                    </Text>
-                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryOfficeCell]} numberOfLines={2}>
-                      {entry.office}
-                    </Text>
-                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryDateCell]} numberOfLines={2}>
-                      {entry.dateLabel}
-                    </Text>
-                    <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryTimeCell]} numberOfLines={1}>
-                      {entry.timeLabel}
-                    </Text>
-                    <View style={[visitorDashboardStyles.appointmentHistoryStatusCell, visitorDashboardStyles.appointmentHistoryStatusPillWrap]}>
-                      <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
-                      <Text style={[visitorDashboardStyles.appointmentHistoryStatusPillText, { color: entry.statusColor }]} numberOfLines={2}>
-                        {entry.statusLabel}
-                      </Text>
+                {appointmentHistoryGroups.map((group) => (
+                  <React.Fragment key={group.key}>
+                    <View style={visitorDashboardStyles.appointmentHistoryTableDateRow}>
+                      <Ionicons name="calendar-outline" size={14} color="#0A3D91" />
+                      <Text style={visitorDashboardStyles.appointmentHistoryTableDateText}>{group.label}</Text>
                     </View>
-                    <View style={visitorDashboardStyles.appointmentHistoryActionCell}>
-                      {renderAppointmentManageActions(entry.record)}
-                    </View>
-                  </View>
+                    {group.entries.map((entry) => (
+                      <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryTableRow}>
+                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryPurposeCell]} numberOfLines={2}>
+                          {entry.title}
+                        </Text>
+                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryOfficeCell]} numberOfLines={2}>
+                          {entry.office}
+                        </Text>
+                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryDateCell]} numberOfLines={2}>
+                          {entry.dateLabel}
+                        </Text>
+                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryTimeCell]} numberOfLines={1}>
+                          {entry.timeLabel}
+                        </Text>
+                        <View style={[visitorDashboardStyles.appointmentHistoryStatusCell, visitorDashboardStyles.appointmentHistoryStatusPillWrap]}>
+                          <View style={[visitorDashboardStyles.appointmentHistoryStatusDot, { backgroundColor: entry.statusColor }]} />
+                          <Text style={[visitorDashboardStyles.appointmentHistoryStatusPillText, { color: entry.statusColor }]} numberOfLines={2}>
+                            {entry.statusLabel}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </React.Fragment>
                 ))}
               </View>
             )
@@ -5394,7 +5631,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <Ionicons name="calendar-clear-outline" size={34} color="#94A3B8" />
               <Text style={visitorDashboardStyles.appointmentHistoryEmptyTitle}>No appointments yet</Text>
               <Text style={visitorDashboardStyles.appointmentHistoryEmptyText}>
-                Your submitted and approved visit requests will appear here once you start using the appointment module.
+                Your submitted appointment records will appear here grouped by date.
               </Text>
             </View>
           )}
@@ -5842,7 +6079,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     visitorDashboardStyles.commandPrimaryButton,
                     commandActionButtonResponsiveStyle,
                   ]}
-                  onPress={() => handleVisitorSectionChange("appointment")}
+                  onPress={openAppointmentRequestScreen}
                   activeOpacity={0.9}
                 >
                   <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
@@ -5875,7 +6112,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             visitorPushNotice.type === "error" && visitorDashboardStyles.visitorPushNoticeError,
           ]}
           activeOpacity={0.92}
-          onPress={() => setVisitorPushNotice(null)}
+          onPress={dismissVisitorPushNotice}
         >
           <View style={visitorDashboardStyles.visitorPushNoticeIcon}>
             <Ionicons
@@ -5909,7 +6146,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         visible={showEditAppointmentModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowEditAppointmentModal(false)}
+        onRequestClose={closeEditAppointmentModal}
       >
         <View style={visitorDashboardStyles.modalOverlay}>
           <View style={visitorDashboardStyles.appointmentManageModal}>
@@ -5925,7 +6162,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
               <TouchableOpacity
                 style={visitorDashboardStyles.appointmentManageModalClose}
-                onPress={() => setShowEditAppointmentModal(false)}
+                onPress={closeEditAppointmentModal}
                 disabled={isUpdatingAppointment}
               >
                 <Ionicons name="close" size={20} color="#64748B" />
@@ -5966,7 +6203,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     <>
                       <TouchableOpacity
                         style={visitorDashboardStyles.appointmentPickerField}
-                        onPress={() => setShowEditAppointmentDatePicker((current) => !current)}
+                        onPress={() => {
+                          const shouldOpenDatePicker = !showEditAppointmentDatePicker;
+                          setShowEditAppointmentTimePicker(false);
+                          setShowEditAppointmentDatePicker(shouldOpenDatePicker);
+                        }}
                       >
                         <Text style={visitorDashboardStyles.appointmentPickerValue}>
                           {formatAppointmentPickerDate(appointmentEditForm.preferredDate)}
@@ -5990,7 +6231,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Text style={visitorDashboardStyles.appointmentFieldLabel}>New Time</Text>
                   <TouchableOpacity
                     style={visitorDashboardStyles.appointmentPickerField}
-                    onPress={() => setShowEditAppointmentTimePicker((current) => !current)}
+                    onPress={() => {
+                      const shouldOpenTimePicker = !showEditAppointmentTimePicker;
+                      setShowEditAppointmentDatePicker(false);
+                      setShowEditAppointmentTimePicker(shouldOpenTimePicker);
+                    }}
                   >
                     <Text style={visitorDashboardStyles.appointmentPickerValue}>
                       {appointmentEditForm.preferredTime ? formatTime(appointmentEditForm.preferredTime) : "Select time"}
@@ -6048,7 +6293,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <View style={visitorDashboardStyles.appointmentManageModalActions}>
               <TouchableOpacity
                 style={visitorDashboardStyles.appointmentSecondaryButton}
-                onPress={() => setShowEditAppointmentModal(false)}
+                onPress={closeEditAppointmentModal}
                 disabled={isUpdatingAppointment}
               >
                 <Text style={visitorDashboardStyles.appointmentSecondaryButtonText}>Back</Text>
@@ -6076,7 +6321,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         visible={showCancelAppointmentModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowCancelAppointmentModal(false)}
+        onRequestClose={closeCancelAppointmentModal}
       >
         <View style={visitorDashboardStyles.modalOverlay}>
           <View style={visitorDashboardStyles.appointmentManageModal}>
@@ -6092,7 +6337,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
               <TouchableOpacity
                 style={visitorDashboardStyles.appointmentManageModalClose}
-                onPress={() => setShowCancelAppointmentModal(false)}
+                onPress={closeCancelAppointmentModal}
                 disabled={isUpdatingAppointment}
               >
                 <Ionicons name="close" size={20} color="#64748B" />
@@ -6119,7 +6364,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <View style={visitorDashboardStyles.appointmentManageModalActions}>
               <TouchableOpacity
                 style={visitorDashboardStyles.appointmentSecondaryButton}
-                onPress={() => setShowCancelAppointmentModal(false)}
+                onPress={closeCancelAppointmentModal}
                 disabled={isUpdatingAppointment}
               >
                 <Text style={visitorDashboardStyles.appointmentSecondaryButtonText}>Back</Text>

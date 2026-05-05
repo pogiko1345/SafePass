@@ -372,6 +372,16 @@ const visitorSchema = new mongoose.Schema({
       type: Date,
       default: null,
     },
+    action: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    statusLabel: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     isActive: {
       type: Boolean,
       default: false,
@@ -400,6 +410,8 @@ const visitorSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
       },
+      action: String,
+      statusLabel: String,
     },
   ],
   
@@ -863,12 +875,15 @@ visitorSchema.methods = {
   },
 
   markCheckedOut(actorId) {
-    this.checkedOutAt = new Date();
+    const now = new Date();
+    this.checkedOutAt = now;
     this.checkedOutBy = actorId || null;
     this.currentLocation = {
       ...(this.currentLocation || {}),
       isActive: false,
-      lastSeenAt: this.currentLocation?.lastSeenAt || new Date(),
+      action: "check_out",
+      statusLabel: "Exited",
+      lastSeenAt: now,
     };
     this.overstayAlertedAt = null;
     this.syncWorkflowState();
@@ -879,9 +894,19 @@ visitorSchema.methods = {
     const now = new Date();
     const coordinates = location.coordinates || {};
     const gps = location.gps || {};
+    const action = String(metadata.action || location.action || "location_update").trim();
+    const office = String(location.office || "").trim();
+    const isActive = this.status === "checked_in";
+    const statusLabel =
+      String(metadata.statusLabel || location.statusLabel || "").trim() ||
+      (action === "check_out"
+        ? "Exited"
+        : action === "check_in"
+          ? `Inside ${office || "checkpoint"}`
+          : `Moved to ${office || "checkpoint"}`);
     const nextLocation = {
       floor: String(location.floor || "").trim(),
-      office: String(location.office || "").trim(),
+      office,
       checkpointId: String(location.checkpointId || "").trim(),
       coordinates: {
         x: Number.isFinite(Number(coordinates.x)) ? Number(coordinates.x) : null,
@@ -898,7 +923,9 @@ visitorSchema.methods = {
       source: String(location.source || "arduino_tap").trim(),
       deviceId: String(metadata.deviceId || location.deviceId || "").trim(),
       lastSeenAt: now,
-      isActive: this.status === "checked_in",
+      action,
+      statusLabel,
+      isActive,
     };
 
     this.currentLocation = nextLocation;

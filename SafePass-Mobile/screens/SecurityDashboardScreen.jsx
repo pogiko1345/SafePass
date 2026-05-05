@@ -83,6 +83,60 @@ const SidebarHoverPressable = ({ children, style, hoverScale = 1.035, onPress, d
   );
 };
 
+const getAppointmentDateKey = (appointment) => {
+  const scheduleValue = appointment?.visitDate || appointment?.visitTime;
+  if (!scheduleValue) return "unscheduled";
+
+  const date = new Date(scheduleValue);
+  if (Number.isNaN(date.getTime())) return "unscheduled";
+
+  return date.toISOString().slice(0, 10);
+};
+
+const getAppointmentDateSortValue = (appointment) => {
+  const scheduleValue = appointment?.visitDate || appointment?.visitTime;
+  const date = scheduleValue ? new Date(scheduleValue) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
+};
+
+const getAppointmentTimeSortValue = (appointment) => {
+  const scheduleValue = appointment?.visitTime || appointment?.visitDate;
+  const date = scheduleValue ? new Date(scheduleValue) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
+};
+
+const compareAppointmentsBySchedule = (left, right) => {
+  const dateDifference = getAppointmentDateSortValue(left) - getAppointmentDateSortValue(right);
+  if (dateDifference !== 0) return dateDifference;
+
+  const timeDifference = getAppointmentTimeSortValue(left) - getAppointmentTimeSortValue(right);
+  if (timeDifference !== 0) return timeDifference;
+
+  return String(left?._id || "").localeCompare(String(right?._id || ""));
+};
+
+const groupAppointmentsByDate = (appointments = []) => {
+  const groupedAppointments = appointments.reduce((groups, appointment) => {
+    const dateKey = getAppointmentDateKey(appointment);
+    if (!groups.has(dateKey)) {
+      groups.set(dateKey, []);
+    }
+    groups.get(dateKey).push(appointment);
+    return groups;
+  }, new Map());
+
+  return Array.from(groupedAppointments.entries())
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+    .map(([dateKey, entries]) => ({
+      dateKey,
+      label:
+        dateKey === "unscheduled"
+          ? "Schedule pending"
+          : formatDate(entries[0]?.visitDate || entries[0]?.visitTime),
+      entries: [...entries].sort(compareAppointmentsBySchedule),
+    }));
+};
+
 export default function SecurityDashboardScreen({ navigation }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isDesktop = viewportWidth >= 1024;
@@ -588,9 +642,39 @@ export default function SecurityDashboardScreen({ navigation }) {
     };
   };
 
-  const deriveVisitorLocations = (activeVisitors = []) =>
+  const getVisitorTrackingIdentity = (visitor = {}) =>
+    String(visitor?.nfcCardId || visitor?.safePassId || visitor?.email || visitor?._id || "").toLowerCase();
+
+  const getVisitorTrackingTimestamp = (visitor = {}) =>
+    new Date(
+      visitor?.currentLocation?.lastSeenAt ||
+        visitor?.checkedInAt ||
+        visitor?.updatedAt ||
+        visitor?.registeredAt ||
+        visitor?.createdAt ||
+        0,
+    ).getTime() || 0;
+
+  const dedupeActiveTrackedVisitors = (activeVisitors = []) => {
+    const visitorMap = new Map();
+
     activeVisitors
       .filter((visitor) => visitor?.status === 'checked_in')
+      .forEach((visitor) => {
+        const identity = getVisitorTrackingIdentity(visitor);
+        if (!identity) return;
+
+        const existingVisitor = visitorMap.get(identity);
+        if (!existingVisitor || getVisitorTrackingTimestamp(visitor) > getVisitorTrackingTimestamp(existingVisitor)) {
+          visitorMap.set(identity, visitor);
+        }
+      });
+
+    return Array.from(visitorMap.values());
+  };
+
+  const deriveVisitorLocations = (activeVisitors = []) =>
+    dedupeActiveTrackedVisitors(activeVisitors)
       .map((visitor, index) => {
         const assignedDestination = getVisitorAssignedDestination(visitor);
         const liveLocation = visitor.currentLocation?.isActive
@@ -606,13 +690,18 @@ export default function SecurityDashboardScreen({ navigation }) {
 
         return {
           id: visitor._id,
+          _id: visitor._id,
           name: visitor.fullName,
+          email: visitor.email,
           phone: visitor.phoneNumber,
           purpose: visitor.purposeOfVisit,
           host: visitor.host,
           checkInTime: visitor.checkedInAt,
           status: visitor.status,
+          trackingStatus: liveLocation?.statusLabel || "Inside campus",
+          lastScanTime: liveLocation?.lastSeenAt || visitor.checkedInAt,
           idPhoto: visitor.idImage,
+          sourceVisitor: visitor,
           location: {
             floor: liveLocation?.floor || assignedDestination.floorId || 'ground',
             office: liveLocation?.office || assignedDestination.officeName || getRandomOffice(),
@@ -630,14 +719,84 @@ export default function SecurityDashboardScreen({ navigation }) {
                   x: 15 + ((index * 17) % 70),
                   y: 15 + ((index * 23) % 70),
                 },
-            timestamp: liveLocation?.lastSeenAt || new Date(),
+            timestamp: liveLocation?.lastSeenAt || visitor.checkedInAt || new Date(),
             source:
               liveLocation?.source ||
               (hasAssignedCoordinates ? 'assigned_office' : 'system_estimate'),
+            statusLabel: liveLocation?.statusLabel || "Inside campus",
+            checkpointId: liveLocation?.checkpointId || "",
           },
           movement: visitor.locationHistory || [],
         };
       });
+
+  const normalizeLiveVisitorLocations = (liveVisitors = []) =>
+    liveVisitors.map((visitor, index) => {
+      const matchedVisitor =
+        visitors.all.find(
+          (existingVisitor) => String(existingVisitor?._id) === String(visitor?.visitorId),
+        ) || null;
+      const coordinates = visitor?.coordinates || {};
+      const hasCoordinates =
+        Number.isFinite(Number(coordinates.x)) &&
+        Number.isFinite(Number(coordinates.y));
+
+      return {
+        id: visitor.visitorId,
+        _id: visitor.visitorId,
+        name: matchedVisitor?.fullName || visitor.name,
+        fullName: matchedVisitor?.fullName || visitor.name,
+        email: matchedVisitor?.email || visitor.email,
+        phone: matchedVisitor?.phoneNumber || visitor.phone,
+        phoneNumber: matchedVisitor?.phoneNumber || visitor.phone,
+        purpose: matchedVisitor?.purposeOfVisit || visitor.purpose,
+        purposeOfVisit: matchedVisitor?.purposeOfVisit || visitor.purpose,
+        host: matchedVisitor?.host || matchedVisitor?.assignedStaffName || "",
+        assignedOffice: matchedVisitor?.assignedOffice || visitor.office || "",
+        checkInTime: matchedVisitor?.checkedInAt || visitor.checkedInAt,
+        checkedInAt: matchedVisitor?.checkedInAt || visitor.checkedInAt,
+        status: matchedVisitor?.status || visitor.status,
+        trackingStatus: visitor.statusLabel || "Inside campus",
+        lastScanTime: visitor.lastScanTime,
+        idPhoto: matchedVisitor?.idImage || null,
+        idImage: matchedVisitor?.idImage || null,
+        sourceVisitor: matchedVisitor,
+        location: {
+          floor: visitor.floor || "ground",
+          office: visitor.office || getRandomOffice(),
+          coordinates: hasCoordinates
+            ? {
+                x: Number(coordinates.x),
+                y: Number(coordinates.y),
+              }
+            : {
+                x: 15 + ((index * 17) % 70),
+                y: 15 + ((index * 23) % 70),
+              },
+          timestamp: visitor.lastScanTime || new Date(),
+          source: visitor.source || "checkpoint",
+          statusLabel: visitor.statusLabel || "Inside campus",
+          checkpointId: visitor.checkpointId || "",
+        },
+        currentLocation:
+          matchedVisitor?.currentLocation || {
+            floor: visitor.floor || "ground",
+            office: visitor.office || "Campus",
+            coordinates: hasCoordinates
+              ? {
+                  x: Number(coordinates.x),
+                  y: Number(coordinates.y),
+                }
+              : null,
+            lastSeenAt: visitor.lastScanTime || null,
+            source: visitor.source || "checkpoint",
+            statusLabel: visitor.statusLabel || "Inside campus",
+            checkpointId: visitor.checkpointId || "",
+            isActive: visitor.status !== "exited",
+          },
+        movement: matchedVisitor?.locationHistory || [],
+      };
+    });
 
   const deriveAccessLogs = (all = []) =>
     all
@@ -771,7 +930,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const loadOperationalData = async ({ force = false } = {}) => {
     try {
-      const allVisitorsRes = await ApiService.getVisitors({});
+      const allVisitorsRes = await ApiService.getVisitors({ limit: 500 });
       const allVisitors = allVisitorsRes.visitors || [];
       const nextSignature = buildOperationalDataSignature(allVisitors);
 
@@ -809,6 +968,19 @@ export default function SecurityDashboardScreen({ navigation }) {
       return true;
     } catch (error) {
       console.error("Load operational data error:", error);
+      return false;
+    }
+  };
+
+  const loadLiveVisitorLocations = async () => {
+    try {
+      const response = await ApiService.getSecurityLiveVisitorLocations({ limit: 200 });
+      setVisitorLocations(
+        normalizeLiveVisitorLocations(Array.isArray(response?.visitors) ? response.visitors : []),
+      );
+      return true;
+    } catch (error) {
+      console.error("Load live visitor locations error:", error);
       return false;
     }
   };
@@ -872,7 +1044,10 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const loadVisitorLocations = async () => {
-    await loadOperationalData({ force: true });
+    await Promise.all([
+      loadOperationalData({ force: true }),
+      loadLiveVisitorLocations(),
+    ]);
   };
 
   const getRandomFloor = () => {
@@ -1027,7 +1202,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
   
   const handleVisitorSelect = (visitor) => {
-    setSelectedVisitor(visitor);
+    setSelectedVisitor(visitor?.sourceVisitor || visitor);
     setShowDetailModal(true);
   };
 
@@ -1048,7 +1223,10 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (securityLiveRefreshRef.current) return;
     securityLiveRefreshRef.current = true;
     try {
-      await loadOperationalData();
+      await Promise.all([
+        loadOperationalData(),
+        loadLiveVisitorLocations(),
+      ]);
     } finally {
       securityLiveRefreshRef.current = false;
     }
@@ -1058,7 +1236,10 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (liveMapRefreshRef.current) return;
     liveMapRefreshRef.current = true;
     try {
-      await loadOperationalData();
+      const loaded = await loadLiveVisitorLocations();
+      if (!loaded) {
+        await loadOperationalData();
+      }
     } finally {
       liveMapRefreshRef.current = false;
     }
@@ -1560,8 +1741,14 @@ export default function SecurityDashboardScreen({ navigation }) {
   );
   const paginatedAppointmentRecords = useMemo(() => {
     const startIndex = (appointmentRecordsPage - 1) * appointmentRecordsItemsPerPage;
-    return filteredVisitors.slice(startIndex, startIndex + appointmentRecordsItemsPerPage);
+    return [...filteredVisitors]
+      .sort(compareAppointmentsBySchedule)
+      .slice(startIndex, startIndex + appointmentRecordsItemsPerPage);
   }, [filteredVisitors, appointmentRecordsPage]);
+  const paginatedAppointmentRecordGroups = useMemo(
+    () => groupAppointmentsByDate(paginatedAppointmentRecords),
+    [paginatedAppointmentRecords],
+  );
 
   const filteredReports = useMemo(() => {
     const normalizedSearch = String(reportSearchQuery || '').trim().toLowerCase();
@@ -2160,7 +2347,12 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsStatusCell]}>Status</Text>
                 <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsActionCell]}>Action</Text>
               </View>
-              {paginatedAppointmentRecords.map((visitor) => renderAppointmentRecordRow(visitor))}
+              {paginatedAppointmentRecordGroups.flatMap((group) => [
+                <View key={`appointment-group-${group.dateKey}`} style={styles.appointmentRecordsDateGroupRow}>
+                  <Text style={styles.appointmentRecordsDateGroupText}>{group.label}</Text>
+                </View>,
+                ...group.entries.map((visitor) => renderAppointmentRecordRow(visitor)),
+              ])}
             </View>
           </ScrollView>
         ) : (
@@ -2862,6 +3054,12 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <View style={styles.hoverCardDetail}>
                   <Ionicons name="location-outline" size={13} color="#6B7280" />
                   <Text style={styles.hoverCardDetailText} numberOfLines={1}>{visitor.location.office}</Text>
+                </View>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="radio-outline" size={13} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>
+                    {visitor.location.statusLabel || visitor.trackingStatus || "Inside campus"}
+                  </Text>
                 </View>
                 <View style={styles.hoverCardDetail}>
                   <Ionicons name="time-outline" size={13} color="#6B7280" />

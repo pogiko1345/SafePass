@@ -1309,6 +1309,22 @@ export default StyleSheet.create({
     }),
   },
 
+  tableDateGroupRow: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    backgroundColor: "#F8FAFC",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  tableDateGroupText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0F172A",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
   tableEmptyState: {
     minHeight: 190,
     alignItems: "center",

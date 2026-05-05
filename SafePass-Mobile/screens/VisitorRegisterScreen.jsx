@@ -408,8 +408,8 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
   const [registrationOtp, setRegistrationOtp] = useState("");
   const [registrationOtpError, setRegistrationOtpError] = useState("");
-  const [registrationOtpExpiresAt, setRegistrationOtpExpiresAt] = useState(null);
-  const [registrationOtpSecondsLeft, setRegistrationOtpSecondsLeft] = useState(0);
+  const [registrationOtpResendAvailableAt, setRegistrationOtpResendAvailableAt] = useState(null);
+  const [registrationOtpResendSecondsLeft, setRegistrationOtpResendSecondsLeft] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -436,24 +436,24 @@ export default function VisitorRegisterScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    if (!registrationOtpExpiresAt) {
-      setRegistrationOtpSecondsLeft(0);
+    if (!registrationOtpResendAvailableAt) {
+      setRegistrationOtpResendSecondsLeft(0);
       return undefined;
     }
 
     const updateTimer = () => {
-      const expiryTime = new Date(registrationOtpExpiresAt).getTime();
-      if (!Number.isFinite(expiryTime)) {
-        setRegistrationOtpSecondsLeft(0);
+      const availableTime = new Date(registrationOtpResendAvailableAt).getTime();
+      if (!Number.isFinite(availableTime)) {
+        setRegistrationOtpResendSecondsLeft(0);
         return;
       }
-      setRegistrationOtpSecondsLeft(Math.max(0, Math.ceil((expiryTime - Date.now()) / 1000)));
+      setRegistrationOtpResendSecondsLeft(Math.max(0, Math.ceil((availableTime - Date.now()) / 1000)));
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [registrationOtpExpiresAt]);
+  }, [registrationOtpResendAvailableAt]);
 
   const normalizeFullName = (name) => name.replace(/\s{2,}/g, " ").trim();
 
@@ -705,7 +705,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           isVerified: false,
           otpDeliveryMode: response.otpDeliveryMode || "email",
         });
-        setRegistrationOtpExpiresAt(response.otpExpiresAt || new Date(Date.now() + 10 * 60 * 1000).toISOString());
+        setRegistrationOtpResendAvailableAt(new Date(Date.now() + 60 * 1000).toISOString());
         setRegistrationOtp("");
         setRegistrationOtpError("");
         setTimeout(() => {
@@ -861,7 +861,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           ...previous,
           isVerified: true,
         }));
-        setRegistrationOtpExpiresAt(null);
+        setRegistrationOtpResendAvailableAt(null);
         await handleSuccessConfirm();
         return;
       }
@@ -896,7 +896,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           ...previous,
           otpDeliveryMode: response.otpDeliveryMode || previous?.otpDeliveryMode || "email",
         }));
-        setRegistrationOtpExpiresAt(response.otpExpiresAt || new Date(Date.now() + 10 * 60 * 1000).toISOString());
+        setRegistrationOtpResendAvailableAt(new Date(Date.now() + 60 * 1000).toISOString());
         setRegistrationOtp("");
         setRegistrationOtpError("");
         Alert.alert(
@@ -1406,8 +1406,8 @@ export default function VisitorRegisterScreen({ navigation }) {
         otpDeliveryMode={registeredVisitor?.otpDeliveryMode || "email"}
         otpValue={registrationOtp}
         otpError={registrationOtpError}
-        otpTimerLabel={formatOtpTimer(registrationOtpSecondsLeft)}
-        canResendOtp={registrationOtpSecondsLeft <= 0}
+        otpTimerLabel={formatOtpTimer(registrationOtpResendSecondsLeft)}
+        canResendOtp={registrationOtpResendSecondsLeft <= 0}
         onOtpChange={(value) => {
           setRegistrationOtp(String(value || "").replace(/\D/g, "").slice(0, 6));
           if (registrationOtpError) {

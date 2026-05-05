@@ -142,8 +142,8 @@ export default function LoginScreen({ navigation, route }) {
   const [loginOtpCode, setLoginOtpCode] = useState("");
   const [loginOtpError, setLoginOtpError] = useState("");
   const [isLoginOtpBusy, setIsLoginOtpBusy] = useState(false);
-  const [loginOtpExpiresAt, setLoginOtpExpiresAt] = useState(null);
-  const [loginOtpSecondsLeft, setLoginOtpSecondsLeft] = useState(0);
+  const [loginOtpResendAvailableAt, setLoginOtpResendAvailableAt] = useState(null);
+  const [loginOtpResendSecondsLeft, setLoginOtpResendSecondsLeft] = useState(0);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -296,24 +296,24 @@ export default function LoginScreen({ navigation, route }) {
   }, [resetStep, resetTimer]);
 
   useEffect(() => {
-    if (!loginOtpExpiresAt) {
-      setLoginOtpSecondsLeft(0);
+    if (!loginOtpResendAvailableAt) {
+      setLoginOtpResendSecondsLeft(0);
       return undefined;
     }
 
     const updateTimer = () => {
-      const expiryTime = new Date(loginOtpExpiresAt).getTime();
-      if (!Number.isFinite(expiryTime)) {
-        setLoginOtpSecondsLeft(0);
+      const availableTime = new Date(loginOtpResendAvailableAt).getTime();
+      if (!Number.isFinite(availableTime)) {
+        setLoginOtpResendSecondsLeft(0);
         return;
       }
-      setLoginOtpSecondsLeft(Math.max(0, Math.ceil((expiryTime - Date.now()) / 1000)));
+      setLoginOtpResendSecondsLeft(Math.max(0, Math.ceil((availableTime - Date.now()) / 1000)));
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [loginOtpExpiresAt]);
+  }, [loginOtpResendAvailableAt]);
 
   const checkAuthAndConnection = async () => {
     try {
@@ -452,7 +452,7 @@ export default function LoginScreen({ navigation, route }) {
     setPendingVisitorOtpEmail("");
     setLoginOtpCode("");
     setLoginOtpError("");
-    setLoginOtpExpiresAt(null);
+    setLoginOtpResendAvailableAt(null);
     if (errors.email) {
       setErrors({ ...errors, email: "" });
     }
@@ -486,7 +486,7 @@ export default function LoginScreen({ navigation, route }) {
       if (response?.success) {
         setPendingVisitorOtpEmail(otpEmail);
         setLoginOtpCode("");
-        setLoginOtpExpiresAt(response.otpExpiresAt || new Date(Date.now() + 10 * 60 * 1000).toISOString());
+        setLoginOtpResendAvailableAt(new Date(Date.now() + 60 * 1000).toISOString());
         setLoginSuccessMessage(
           response.otpDeliveryMode === "backend_log"
             ? "A new OTP was generated. For local testing, check the backend terminal."
@@ -522,7 +522,7 @@ export default function LoginScreen({ navigation, route }) {
       if (response?.success) {
         setPendingVisitorOtpEmail("");
         setLoginOtpCode("");
-        setLoginOtpExpiresAt(null);
+        setLoginOtpResendAvailableAt(null);
         setLoginSuccessMessage("Account verified. Signing you in...");
         await handleLogin();
         return;
@@ -995,7 +995,7 @@ export default function LoginScreen({ navigation, route }) {
         setPendingVisitorOtpEmail(otpEmail);
         setLoginOtpCode("");
         setLoginOtpError("");
-        setLoginOtpExpiresAt(null);
+        setLoginOtpResendAvailableAt(null);
         setLoginError("Your account is not yet verified. Please verify your account using OTP first.");
       } else if (errorMessage.includes("pending")) {
         setLoginError("Your account is pending approval. Please wait for admin approval.");
@@ -1340,13 +1340,13 @@ export default function LoginScreen({ navigation, route }) {
                         <TouchableOpacity
                           style={[
                             loginStyles.visitorOtpSecondaryButton,
-                            (isLoginOtpBusy || loginOtpSecondsLeft > 0) && loginStyles.visitorOtpDisabledButton,
+                            (isLoginOtpBusy || loginOtpResendSecondsLeft > 0) && loginStyles.visitorOtpDisabledButton,
                           ]}
                           onPress={handleResendVisitorOtp}
-                          disabled={isLoginOtpBusy || loginOtpSecondsLeft > 0}
+                          disabled={isLoginOtpBusy || loginOtpResendSecondsLeft > 0}
                         >
                           <Text style={loginStyles.visitorOtpSecondaryText}>
-                            {loginOtpSecondsLeft > 0 ? `Resend in ${formatOtpTimer(loginOtpSecondsLeft)}` : "Resend OTP"}
+                            {loginOtpResendSecondsLeft > 0 ? `Resend in ${formatOtpTimer(loginOtpResendSecondsLeft)}` : "Resend OTP"}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -1748,7 +1748,7 @@ export default function LoginScreen({ navigation, route }) {
                     <View style={loginStyles.timerContainer}>
                       <Ionicons name="time-outline" size={16} color="#6B7280" />
                       <Text style={loginStyles.timerText}>
-                        {canResendReset ? 'Code expired' : `Resend in ${resetTimer}s`}
+                        {canResendReset ? 'You can resend the code now' : `Resend in ${resetTimer}s`}
                       </Text>
                     </View>
 

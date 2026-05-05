@@ -995,6 +995,18 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async getSecurityLiveVisitorLocations(filters = {}) {
+    try {
+      const queryString = new URLSearchParams(filters).toString();
+      return await this.fetch(
+        `/security/live-visitor-locations${queryString ? `?${queryString}` : ""}`,
+      );
+    } catch (error) {
+      console.error("Get security live visitor locations error:", error);
+      throw error;
+    }
+  }
+
   async getVisitorById(visitorId) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}`);

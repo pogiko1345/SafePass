@@ -207,6 +207,60 @@ const matchesAppointmentSearch = (appointment, searchTerm) => {
   return searchableParts.some((value) => value.includes(normalizedSearch));
 };
 
+const getAppointmentDateKey = (appointment) => {
+  const scheduleValue = appointment?.visitDate || appointment?.visitTime;
+  if (!scheduleValue) return "unscheduled";
+
+  const date = new Date(scheduleValue);
+  if (Number.isNaN(date.getTime())) return "unscheduled";
+
+  return date.toISOString().slice(0, 10);
+};
+
+const getAppointmentDateSortValue = (appointment) => {
+  const scheduleValue = appointment?.visitDate || appointment?.visitTime;
+  const date = scheduleValue ? new Date(scheduleValue) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
+};
+
+const getAppointmentTimeSortValue = (appointment) => {
+  const scheduleValue = appointment?.visitTime || appointment?.visitDate;
+  const date = scheduleValue ? new Date(scheduleValue) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
+};
+
+const compareAppointmentsBySchedule = (left, right) => {
+  const dateDifference = getAppointmentDateSortValue(left) - getAppointmentDateSortValue(right);
+  if (dateDifference !== 0) return dateDifference;
+
+  const timeDifference = getAppointmentTimeSortValue(left) - getAppointmentTimeSortValue(right);
+  if (timeDifference !== 0) return timeDifference;
+
+  return String(left?._id || "").localeCompare(String(right?._id || ""));
+};
+
+const groupAppointmentsByDate = (appointments = []) => {
+  const groupedAppointments = appointments.reduce((groups, appointment) => {
+    const dateKey = getAppointmentDateKey(appointment);
+    if (!groups.has(dateKey)) {
+      groups.set(dateKey, []);
+    }
+    groups.get(dateKey).push(appointment);
+    return groups;
+  }, new Map());
+
+  return Array.from(groupedAppointments.entries())
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+    .map(([dateKey, entries]) => ({
+      dateKey,
+      label:
+        dateKey === "unscheduled"
+          ? "Schedule pending"
+          : formatDate(entries[0]?.visitDate || entries[0]?.visitTime),
+      entries: [...entries].sort(compareAppointmentsBySchedule),
+    }));
+};
+
 const isSameCalendarDay = (value, referenceDate = new Date()) => {
   if (!value) return false;
   const target = new Date(value);
@@ -474,12 +528,16 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const paginatedRequestAppointments = useMemo(() => {
     const startIndex = (requestPage - 1) * itemsPerPage;
-    return filteredRequestAppointments.slice(startIndex, startIndex + itemsPerPage);
+    return [...filteredRequestAppointments]
+      .sort(compareAppointmentsBySchedule)
+      .slice(startIndex, startIndex + itemsPerPage);
   }, [filteredRequestAppointments, requestPage]);
 
   const paginatedRecordAppointments = useMemo(() => {
     const startIndex = (recordPage - 1) * itemsPerPage;
-    return filteredAppointments.slice(startIndex, startIndex + itemsPerPage);
+    return [...filteredAppointments]
+      .sort(compareAppointmentsBySchedule)
+      .slice(startIndex, startIndex + itemsPerPage);
   }, [filteredAppointments, recordPage]);
 
   const requestPageCount = Math.max(1, Math.ceil(filteredRequestAppointments.length / itemsPerPage));
@@ -1120,7 +1178,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Text style={styles.emptySubtitle}>{emptySubtitle}</Text>
           </View>
         ) : (
-          appointmentsToRender.map((appointment) => {
+          groupAppointmentsByDate(appointmentsToRender).flatMap((group) => [
+            <View key={`${mode}-${group.dateKey}`} style={styles.tableDateGroupRow}>
+              <Text style={styles.tableDateGroupText}>{group.label}</Text>
+            </View>,
+            ...group.entries.map((appointment) => {
             const appointmentStatus = getAppointmentStatus(appointment);
             const statusMeta = getStatusMeta(appointmentStatus);
             const isPending = appointmentStatus === "pending";
@@ -1214,7 +1276,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                 </View>
               </View>
             );
-          })
+          }),
+          ])
         )}
       </View>
     </ScrollView>

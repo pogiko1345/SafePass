@@ -1213,6 +1213,22 @@ export default StyleSheet.create({
     borderBottomColor: "#E2E8F0",
   },
 
+  appointmentRecordsDateGroupRow: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    backgroundColor: "#F8FAFC",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  appointmentRecordsDateGroupText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.gray[900],
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
   appointmentRecordsHeaderCell: {
     paddingHorizontal: spacing.md,
     paddingVertical: 14,

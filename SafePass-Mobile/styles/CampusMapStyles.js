@@ -176,16 +176,16 @@ export default StyleSheet.create({
 
   visitorMarker: {
     position: "absolute",
-    width: 30,
-    height: 30,
+    width: 18,
+    height: 18,
     zIndex: 10,
   },
 
   visitorMarkerDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
     borderColor: "#FFFFFF",
     ...Platform.select({
       ios: {
@@ -200,27 +200,27 @@ export default StyleSheet.create({
   },
 
   visitorMarkerDotCluster: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
 
   visitorMarkerCountText: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: "900",
     color: "#FFFFFF",
-    lineHeight: 12,
+    lineHeight: 10,
   },
 
   visitorMarkerPulse: {
     position: "absolute",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    top: -6,
-    left: -6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    top: -4,
+    left: -4,
   },
 
   visitorMarkerSourceBadge: {

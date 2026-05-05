@@ -108,7 +108,8 @@ export default function VerificationScreen({ navigation, route }) {
     setPhoneNumber(cleanPhone.slice(0, 10));
   }, [userData?.phone]);
 
-  // Timer for OTP
+  // This timer is only the resend cooldown. The SMS OTP itself remains valid
+  // until the backend expiry window ends.
   useEffect(() => {
     let interval;
     if (otpSent && otpTimer > 0) {
@@ -656,12 +657,12 @@ export default function VerificationScreen({ navigation, route }) {
                         </View>
 
                         <View style={verificationStyles.timerContainer}>
-                          <Ionicons name="time-outline" size={16} color={canResend ? "#EF4444" : "#6B7280"} />
+                          <Ionicons name="time-outline" size={16} color={canResend ? "#0A3D91" : "#6B7280"} />
                           <Text style={[
                             verificationStyles.timerText,
                             canResend && verificationStyles.timerExpired
                           ]}>
-                            {canResend ? 'Code expired' : `Resend code in ${formatTimer(otpTimer)}`}
+                            {canResend ? 'You can resend the code now' : `Resend code in ${formatTimer(otpTimer)}`}
                           </Text>
                         </View>
 
