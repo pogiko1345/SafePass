@@ -8,6 +8,8 @@ const Visitor = require("./models/Visitor");
 const Notification = require("./models/Notification");
 const User = require("./models/User");
 const AccessLog = require("./models/AccessLog");
+const AttendanceRecord = require("./models/AttendanceRecord");
+const SmsNotificationLog = require("./models/SmsNotificationLog");
 const AppSettings = require("./models/AppSettings");
 const Counter = require("./models/Counter");
 const {
@@ -624,6 +626,356 @@ const sendPhoneOtp = async ({ phoneNumber, otpCode, provider }) => {
   }
 
   return { success: false, skipped: true, provider: "backend_log" };
+};
+
+const ATTENDANCE_USER_TYPES = ["student", "teacher", "staff", "security", "guard", "visitor"];
+
+const normalizeUserRoleValue = (value = "") => String(value || "").trim().toLowerCase();
+
+const toObjectIdOrNull = (value) => {
+  if (!value) return null;
+  try {
+    return new mongoose.Types.ObjectId(value);
+  } catch {
+    return null;
+  }
+};
+
+const getStartOfDay = (value = new Date()) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const getEndOfDay = (value = new Date()) => {
+  const date = getStartOfDay(value);
+  if (!date) return null;
+  date.setDate(date.getDate() + 1);
+  return date;
+};
+
+const parseDateRangeQuery = ({ dateFrom, dateTo, startDate, endDate } = {}) => {
+  const normalizedStart = dateFrom || startDate || null;
+  const normalizedEnd = dateTo || endDate || null;
+  const range = {};
+
+  if (normalizedStart) {
+    const start = getStartOfDay(normalizedStart);
+    if (start) range.$gte = start;
+  }
+
+  if (normalizedEnd) {
+    const end = getEndOfDay(normalizedEnd);
+    if (end) range.$lt = end;
+  }
+
+  return Object.keys(range).length ? range : null;
+};
+
+const applyDateRangeFilter = (query, fieldName, params = {}) => {
+  const range = parseDateRangeQuery(params);
+  if (range) {
+    query[fieldName] = range;
+  }
+  return query;
+};
+
+const parseClockMinutes = (value = "") => {
+  const match = String(value || "")
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+};
+
+const getAttendanceModuleForRole = (role = "", user = {}) => {
+  const normalizedRole = normalizeUserRoleValue(role);
+  if (normalizedRole === "student") return "student_attendance";
+  if (normalizedRole === "teacher") return "teacher_attendance";
+  if (normalizedRole === "visitor") return "visitor_checkin";
+  if (normalizedRole === "security" || normalizedRole === "guard") return "security_monitoring";
+  if (normalizedRole === "staff") return "staff_access";
+  if (String(user.department || "").toLowerCase().includes("security")) return "security_monitoring";
+  return "staff_access";
+};
+
+const evaluateLateAttendance = (user = {}, timestamp = new Date()) => {
+  const scheduledStartMinutes = parseClockMinutes(user?.scheduleProfile?.startTime);
+  const graceMinutes = Number(user?.scheduleProfile?.graceMinutes ?? 10);
+  if (scheduledStartMinutes === null) {
+    return { isLate: false, lateMinutes: 0, status: "present" };
+  }
+
+  const target = new Date(timestamp);
+  const actualMinutes = target.getHours() * 60 + target.getMinutes();
+  const effectiveStart = scheduledStartMinutes + Math.max(0, graceMinutes);
+  const lateMinutes = Math.max(0, actualMinutes - effectiveStart);
+  return {
+    isLate: lateMinutes > 0,
+    lateMinutes,
+    status: lateMinutes > 0 ? "late" : "present",
+  };
+};
+
+const buildAttendanceBasePayload = ({
+  user = null,
+  visitor = null,
+  action = "check_in",
+  role = "",
+  nfcCardId = "",
+  tapLocation = {},
+  deviceId = "",
+  timestamp = new Date(),
+}) => {
+  const normalizedRole = normalizeUserRoleValue(role || user?.role);
+  const attendanceDate = getStartOfDay(timestamp) || new Date();
+  const module = getAttendanceModuleForRole(normalizedRole, user);
+  const lateMeta = visitor ? { isLate: false, lateMinutes: 0, status: "inside" } : evaluateLateAttendance(user, timestamp);
+  const destination =
+    visitor?.assignedOffice ||
+    visitor?.appointmentDepartment ||
+    visitor?.host ||
+    "";
+
+  return {
+    userId: user?._id || null,
+    visitorId: visitor?._id || null,
+    name: visitor?.fullName || getFullName(user) || user?.email || "Unknown user",
+    userType: normalizedRole || "visitor",
+    role: normalizedRole,
+    module,
+    nfcCardId,
+    attendanceDate,
+    checkInTime: action === "check_in" ? timestamp : null,
+    lastTapTime: timestamp,
+    checkpointIn: tapLocation?.checkpointId || tapLocation?.office || "",
+    location: tapLocation?.office || "",
+    destination,
+    status: visitor ? "inside" : lateMeta.status,
+    isLate: lateMeta.isLate,
+    lateMinutes: lateMeta.lateMinutes,
+    sourceDeviceId: deviceId,
+    metadata: {
+      floor: tapLocation?.floor || "",
+      checkpointId: tapLocation?.checkpointId || "",
+    },
+  };
+};
+
+const appendAttendanceCheckpoint = (attendanceRecord, tapLocation, action, timestamp = new Date()) => {
+  attendanceRecord.checkpointHistory = Array.isArray(attendanceRecord.checkpointHistory)
+    ? attendanceRecord.checkpointHistory
+    : [];
+  attendanceRecord.checkpointHistory.push({
+    checkpointId: tapLocation?.checkpointId || tapLocation?.office || "",
+    checkpointName: tapLocation?.office || "",
+    floor: tapLocation?.floor || "",
+    office: tapLocation?.office || "",
+    action,
+    tappedAt: timestamp,
+  });
+};
+
+const upsertAttendanceRecordForTap = async ({
+  user = null,
+  visitor = null,
+  action = "check_in",
+  tapLocation = {},
+  timestamp = new Date(),
+  nfcCardId = "",
+  deviceId = "",
+}) => {
+  const normalizedRole = normalizeUserRoleValue(user?.role || visitor?.role || "visitor");
+  const dayStart = getStartOfDay(timestamp);
+  const dayEnd = getEndOfDay(timestamp);
+  const query = {
+    attendanceDate: { $gte: dayStart, $lt: dayEnd },
+    module: getAttendanceModuleForRole(normalizedRole, user),
+  };
+
+  if (visitor?._id) {
+    query.visitorId = visitor._id;
+  } else if (user?._id) {
+    query.userId = user._id;
+  }
+
+  let attendanceRecord = await AttendanceRecord.findOne(query).sort({ createdAt: -1 });
+  if (!attendanceRecord) {
+    attendanceRecord = new AttendanceRecord(
+      buildAttendanceBasePayload({
+        user,
+        visitor,
+        role: normalizedRole,
+        action,
+        nfcCardId,
+        tapLocation,
+        deviceId,
+        timestamp,
+      }),
+    );
+  }
+
+  attendanceRecord.lastTapTime = timestamp;
+  attendanceRecord.location = tapLocation?.office || attendanceRecord.location || "";
+  attendanceRecord.nfcCardId = nfcCardId || attendanceRecord.nfcCardId || "";
+  attendanceRecord.sourceDeviceId = deviceId || attendanceRecord.sourceDeviceId || "";
+  appendAttendanceCheckpoint(attendanceRecord, tapLocation, action, timestamp);
+
+  if (action === "check_in" && !attendanceRecord.checkInTime) {
+    const basePayload = buildAttendanceBasePayload({
+      user,
+      visitor,
+      role: normalizedRole,
+      action,
+      nfcCardId,
+      tapLocation,
+      deviceId,
+      timestamp,
+    });
+    Object.assign(attendanceRecord, {
+      checkInTime: timestamp,
+      checkpointIn: basePayload.checkpointIn,
+      status: basePayload.status,
+      isLate: basePayload.isLate,
+      lateMinutes: basePayload.lateMinutes,
+    });
+  }
+
+  if (action === "check_out") {
+    attendanceRecord.checkOutTime = timestamp;
+    attendanceRecord.checkpointOut = tapLocation?.checkpointId || tapLocation?.office || "";
+    attendanceRecord.isCompleted = true;
+    attendanceRecord.status = normalizedRole === "visitor" ? "completed" : "checked_out";
+    attendanceRecord.sessionDurationMinutes = attendanceRecord.checkInTime
+      ? Math.max(0, Math.round((timestamp.getTime() - attendanceRecord.checkInTime.getTime()) / 60000))
+      : attendanceRecord.sessionDurationMinutes;
+  }
+
+  if (action === "location_update" && normalizedRole === "visitor") {
+    attendanceRecord.status = attendanceRecord.checkOutTime ? "completed" : "inside";
+  }
+
+  await attendanceRecord.save();
+  return attendanceRecord;
+};
+
+const sendSemaphoreTextMessage = async ({ phoneNumber, message }) => {
+  const apiKey = getSemaphoreApiKey();
+  if (!apiKey) return { success: false, skipped: true, provider: "backend_log" };
+
+  const payload = new URLSearchParams({
+    apikey: apiKey,
+    number: phoneNumber,
+    message,
+  });
+  const senderName = String(process.env.SEMAPHORE_SENDER_NAME || "").trim();
+  if (senderName) {
+    payload.set("sendername", senderName);
+  }
+
+  const response = await fetch("https://api.semaphore.co/api/v4/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: payload.toString(),
+  });
+  const data = await response.text();
+  if (!response.ok) {
+    const error = new Error(`Semaphore SMS request failed with HTTP ${response.status}`);
+    error.data = data;
+    throw error;
+  }
+  return { success: true, provider: "semaphore", data };
+};
+
+const sendIprogTechTextMessage = async ({ phoneNumber, message }) => {
+  const apiToken = getIprogTechApiToken();
+  if (!apiToken) return { success: false, skipped: true, provider: "backend_log" };
+
+  const payload = new URLSearchParams({
+    api_token: apiToken,
+    phone_number: formatPhoneForIprogTech(phoneNumber),
+    message,
+  });
+  const response = await fetch(`${getIprogTechBaseUrl()}/api/v1/sms_messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: payload.toString(),
+  });
+  const data = await response.text();
+  if (!response.ok) {
+    const error = new Error(`iProgTech SMS request failed with HTTP ${response.status}`);
+    error.data = data;
+    throw error;
+  }
+  return { success: true, provider: "iprogtech", data };
+};
+
+const sendGeneralSms = async ({ phoneNumber, message }) => {
+  const provider = getPhoneOtpDeliveryProvider();
+  if (provider === "semaphore") return sendSemaphoreTextMessage({ phoneNumber, message });
+  if (provider === "iprogtech") return sendIprogTechTextMessage({ phoneNumber, message });
+  return { success: false, skipped: true, provider: "backend_log" };
+};
+
+const sendStudentGuardianAttendanceSms = async ({ user, action, timestamp, status }) => {
+  const normalizedRole = normalizeUserRoleValue(user?.role);
+  if (normalizedRole !== "student") {
+    return { success: false, skipped: true, reason: "not_student" };
+  }
+
+  if (!user?.smsOptIn || !user?.guardianPhone) {
+    return { success: false, skipped: true, reason: "guardian_sms_not_configured" };
+  }
+
+  const messageType = action === "check_out" ? "student_check_out" : "student_check_in";
+  const studentName = getFullName(user) || user.email || "Student";
+  const body =
+    `CentriX/SafePass: ${studentName} ${action === "check_out" ? "checked out" : "checked in"} ` +
+    `on ${new Date(timestamp).toLocaleDateString()} at ${new Date(timestamp).toLocaleTimeString()}. ` +
+    `Status: ${status}.`;
+
+  const smsLog = await SmsNotificationLog.create({
+    userId: user._id,
+    recipientName: user.guardianName || "Guardian",
+    recipientPhone: user.guardianPhone,
+    messageType,
+    messageBody: body,
+    status: "queued",
+    metadata: {
+      studentName,
+      action,
+    },
+  });
+
+  try {
+    const result = await sendGeneralSms({
+      phoneNumber: user.guardianPhone,
+      message: body,
+    });
+
+    if (result?.success) {
+      smsLog.status = "sent";
+      smsLog.provider = result.provider || "";
+      smsLog.sentAt = new Date();
+    } else {
+      smsLog.status = "skipped";
+      smsLog.provider = result?.provider || "backend_log";
+      smsLog.errorMessage = result?.reason || "SMS provider unavailable";
+    }
+  } catch (error) {
+    smsLog.status = "failed";
+    smsLog.errorMessage = error?.message || "SMS send failed";
+  }
+
+  await smsLog.save();
+  return { success: smsLog.status === "sent", log: smsLog };
 };
 
 // ========== ENHANCED CORS CONFIGURATION ==========
@@ -1582,7 +1934,9 @@ const generateTemporaryPassword = (length = 10) => {
 
 const getEmployeeIdPrefix = (role = "staff") => {
   const normalizedRole = String(role || "").toLowerCase();
-  return normalizedRole === "security" || normalizedRole === "guard" ? "SEC" : "STF";
+  if (normalizedRole === "security" || normalizedRole === "guard") return "SEC";
+  if (normalizedRole === "teacher") return "TCH";
+  return "STF";
 };
 
 const generateYearEmployeeIdCandidate = (role = "staff") => {
@@ -1596,6 +1950,21 @@ const generateUniqueEmployeeId = async (role = "staff") => {
   let candidate = generateYearEmployeeIdCandidate(role);
   while (await User.exists({ employeeId: candidate })) {
     candidate = generateYearEmployeeIdCandidate(role);
+  }
+  return candidate;
+};
+
+const generateAcademicIdCandidate = (prefix = "STU") => {
+  const currentYear = new Date().getFullYear();
+  const numericPart = crypto.randomInt(0, 1000000).toString().padStart(6, "0");
+  return `${prefix}-${currentYear}-${numericPart}`;
+};
+
+const generateUniqueAcademicId = async ({ role = "student", fieldName = "studentId" } = {}) => {
+  const prefix = normalizeUserRoleValue(role) === "teacher" ? "TCH" : "STU";
+  let candidate = generateAcademicIdCandidate(prefix);
+  while (await User.exists({ [fieldName]: candidate })) {
+    candidate = generateAcademicIdCandidate(prefix);
   }
   return candidate;
 };
@@ -1857,12 +2226,13 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       });
     }
 
-    const visitorUser = await User.findOne({
-      role: "visitor",
+    const cardUser = await User.findOne({
       nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
-    }).select("_id email firstName lastName nfcCardId role status accessPermissions");
+    }).select(
+      "_id email firstName lastName nfcCardId role status accessPermissions department position guardianName guardianPhone smsOptIn scheduleProfile",
+    );
 
-    if (!visitorUser) {
+    if (!cardUser) {
       await AccessLog.create({
         userEmail: "",
         userName: "Unknown NFC Card",
@@ -1881,26 +2251,26 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
 
       return res.status(404).json({
         success: false,
-        message: "NFC card is not assigned to a visitor",
+        message: "NFC card is not assigned to any user",
       });
     }
 
-    if (!isUserSafePassCardActive(visitorUser)) {
+    if (!isUserSafePassCardActive(cardUser)) {
       await AccessLog.create({
-        userId: visitorUser._id,
-        userEmail: visitorUser.email,
-        userName: `${visitorUser.firstName || ""} ${visitorUser.lastName || ""}`.trim(),
+        userId: cardUser._id,
+        userEmail: cardUser.email,
+        userName: `${cardUser.firstName || ""} ${cardUser.lastName || ""}`.trim(),
         actorRole: "device",
         location: tapLocation.office,
         accessType: "system",
         activityType: "arduino_location_tap",
         status: "denied",
         nfcCardId: normalizedCardId,
-        relatedUser: visitorUser._id,
+        relatedUser: cardUser._id,
         metadata: {
           deviceId,
           tapLocation,
-          accountStatus: visitorUser.status,
+          accountStatus: cardUser.status,
         },
         notes: `Inactive NFC card tapped at ${tapLocation.office}`,
       });
@@ -1911,30 +2281,120 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       });
     }
 
+    const normalizedUserRole = normalizeUserRoleValue(cardUser.role);
+
+    if (normalizedUserRole !== "visitor") {
+      const now = new Date();
+      const dayStart = getStartOfDay(now);
+      const dayEnd = getEndOfDay(now);
+      const latestAttendance = await AttendanceRecord.findOne({
+        userId: cardUser._id,
+        attendanceDate: { $gte: dayStart, $lt: dayEnd },
+      }).sort({ createdAt: -1 });
+
+      const hasOpenAttendance = Boolean(
+        latestAttendance?.checkInTime && !latestAttendance?.checkOutTime,
+      );
+      const isMainGateTap = isGateCheckpoint(tapLocation);
+      const isAutoGateTap =
+        tapAction === "gate" ||
+        tapAction === "entry" ||
+        tapAction === "exit" ||
+        (tapAction === "auto" && isMainGateTap);
+      const shouldCheckOut =
+        hasOpenAttendance &&
+        tapAction !== "location" &&
+        tapAction !== "track" &&
+        (tapAction === "checkout" || tapAction === "check_out" || isAutoGateTap);
+      const shouldCheckIn =
+        !hasOpenAttendance &&
+        tapAction !== "location" &&
+        tapAction !== "track" &&
+        (tapAction === "checkin" || tapAction === "check_in" || isAutoGateTap);
+      const action = shouldCheckOut
+        ? "check_out"
+        : shouldCheckIn
+          ? "check_in"
+          : "location_update";
+      const accessType = action === "check_out" ? "exit" : action === "check_in" ? "entry" : "system";
+      const attendanceRecord = await upsertAttendanceRecordForTap({
+        user: cardUser,
+        action,
+        tapLocation,
+        timestamp: now,
+        nfcCardId: normalizedCardId,
+        deviceId,
+      });
+      const userDisplayName = getFullName(cardUser) || cardUser.email || "Campus user";
+
+      await AccessLog.create({
+        userId: cardUser._id,
+        userEmail: cardUser.email,
+        userName: userDisplayName,
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType,
+        activityType: `${normalizedUserRole}_${action}`,
+        status: "granted",
+        nfcCardId: normalizedCardId,
+        relatedUser: cardUser._id,
+        metadata: {
+          deviceId,
+          action,
+          tapLocation,
+          userType: normalizedUserRole,
+          attendanceRecordId: attendanceRecord._id,
+        },
+        notes: `${userDisplayName} ${action.replace("_", " ")} by NFC at ${tapLocation.office}`,
+      });
+
+      if (normalizedUserRole === "student" && (action === "check_in" || action === "check_out")) {
+        await sendStudentGuardianAttendanceSms({
+          user: cardUser,
+          action,
+          timestamp: now,
+          status: attendanceRecord.status,
+        });
+      }
+
+      return res.json({
+        success: true,
+        message:
+          action === "check_in"
+            ? "Attendance check-in recorded"
+            : action === "check_out"
+              ? "Attendance check-out recorded"
+              : "Location checkpoint recorded",
+        userType: normalizedUserRole,
+        action,
+        attendance: attendanceRecord,
+      });
+    }
+
     const checkedInVisitor = await Visitor.findOne({
-      email: visitorUser.email,
+      email: cardUser.email,
       status: "checked_in",
     }).sort({ checkedInAt: -1 });
 
     const latestVisitor =
       checkedInVisitor ||
       (await Visitor.findOne({
-        email: visitorUser.email,
+        email: cardUser.email,
         status: { $ne: "checked_out" },
       }).sort({ visitDate: -1, registeredAt: -1 }));
 
     if (!latestVisitor) {
       await AccessLog.create({
-        userId: visitorUser._id,
-        userEmail: visitorUser.email,
-        userName: `${visitorUser.firstName || ""} ${visitorUser.lastName || ""}`.trim(),
+        userId: cardUser._id,
+        userEmail: cardUser.email,
+        userName: `${cardUser.firstName || ""} ${cardUser.lastName || ""}`.trim(),
         actorRole: "device",
         location: tapLocation.office,
         accessType: "system",
         activityType: "arduino_location_tap",
         status: "denied",
         nfcCardId: normalizedCardId,
-        relatedUser: visitorUser._id,
+        relatedUser: cardUser._id,
         metadata: {
           deviceId,
           tapLocation,
@@ -1983,8 +2443,8 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       const scannedOffice = tapLocation.office || "Unknown checkpoint";
 
       await AccessLog.create({
-        userId: visitorUser._id,
-        userEmail: visitorUser.email,
+        userId: cardUser._id,
+        userEmail: cardUser.email,
         userName: visitor.fullName,
         actorRole: "device",
         location: scannedOffice,
@@ -1993,7 +2453,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         status: "denied",
         nfcCardId: normalizedCardId,
         relatedVisitor: visitor._id,
-        relatedUser: visitorUser._id,
+        relatedUser: cardUser._id,
         metadata: {
           deviceId,
           tapLocation,
@@ -2008,7 +2468,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
 
       await createWrongOfficeScanNotifications({
         visitor,
-        visitorUser,
+        visitorUser: cardUser,
         tapLocation,
         deviceId,
         action: shouldCheckIn ? "check_in" : "location_update",
@@ -2038,8 +2498,8 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       const checkInEligibility = getVisitorCheckInEligibility(visitor);
       if (!checkInEligibility.allowed) {
         await AccessLog.create({
-          userId: visitorUser._id,
-          userEmail: visitorUser.email,
+          userId: cardUser._id,
+          userEmail: cardUser.email,
           userName: visitor.fullName,
           actorRole: "device",
           location: tapLocation.office,
@@ -2048,7 +2508,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
           status: "denied",
           nfcCardId: normalizedCardId,
           relatedVisitor: visitor._id,
-          relatedUser: visitorUser._id,
+          relatedUser: cardUser._id,
           metadata: {
             deviceId,
             tapLocation,
@@ -2078,8 +2538,8 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     } else {
       if (visitor.status !== "checked_in") {
         await AccessLog.create({
-          userId: visitorUser._id,
-          userEmail: visitorUser.email,
+          userId: cardUser._id,
+          userEmail: cardUser.email,
           userName: visitor.fullName,
           actorRole: "device",
           location: tapLocation.office,
@@ -2088,7 +2548,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
           status: "denied",
           nfcCardId: normalizedCardId,
           relatedVisitor: visitor._id,
-          relatedUser: visitorUser._id,
+          relatedUser: cardUser._id,
           metadata: {
             deviceId,
             tapLocation,
@@ -2111,9 +2571,18 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     }
 
     await visitor.save();
+    const visitorAttendanceRecord = await upsertAttendanceRecordForTap({
+      user: cardUser,
+      visitor,
+      action,
+      tapLocation,
+      timestamp: new Date(),
+      nfcCardId: normalizedCardId,
+      deviceId,
+    });
 
     await AccessLog.create({
-      userId: visitorUser._id,
+      userId: cardUser._id,
       userEmail: visitor.email,
       userName: visitor.fullName,
       actorRole: "device",
@@ -2123,12 +2592,13 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       status: "granted",
       nfcCardId: normalizedCardId,
       relatedVisitor: visitor._id,
-      relatedUser: visitorUser._id,
+      relatedUser: cardUser._id,
       metadata: {
         deviceId,
         action,
         tapLocation,
         currentLocation: visitor.currentLocation,
+        attendanceRecordId: visitorAttendanceRecord._id,
       },
       notes: `${visitor.fullName} ${action.replace("_", " ")} by NFC card at ${tapLocation.office}`,
     });
@@ -2141,7 +2611,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
           message: `${visitor.fullName} ${isCheckIn ? "checked in" : "checked out"} automatically using the NFC card at ${tapLocation.office}.`,
           targetRole: "security",
           relatedVisitor: visitor._id,
-          relatedUser: visitorUser._id,
+          relatedUser: cardUser._id,
           type: "info",
           severity: "low",
           metadata: {
@@ -2156,7 +2626,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
           message: `${visitor.fullName} ${isCheckIn ? "checked in" : "checked out"} automatically using the NFC card at ${tapLocation.office}.`,
           targetRole: "admin",
           relatedVisitor: visitor._id,
-          relatedUser: visitorUser._id,
+          relatedUser: cardUser._id,
           type: "info",
           severity: "low",
           metadata: {
@@ -2191,6 +2661,407 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     });
   }
 });
+
+app.post(
+  "/api/nfc/station/tap",
+  authMiddleware,
+  requireRoles("admin", "security", "guard", "staff"),
+  async (req, res) => {
+    try {
+      const cardId = String(
+        req.body?.nfcCardId ||
+          req.body?.cardId ||
+          req.body?.uid ||
+          req.body?.tagId ||
+          "",
+      )
+        .trim()
+        .toUpperCase();
+      const normalizedCardId = normalizeNfcCardId(cardId);
+      const deviceId = String(req.body?.deviceId || "mobile-checkpoint-station").trim();
+      const tapLocation = getTapLocationFromRequest(req.body || {});
+      const tapAction = String(req.body?.action || req.body?.tapAction || "auto")
+        .trim()
+        .toLowerCase();
+      const operatorRole = normalizeUserRoleValue(req.user?.role);
+      const operatorName = getFullName(req.user) || req.user?.email || "Checkpoint operator";
+
+      if (!normalizedCardId) {
+        return res.status(400).json({
+          success: false,
+          message: "Missing NFC card ID",
+        });
+      }
+
+      if (!tapLocation.floor || !tapLocation.office) {
+        return res.status(400).json({
+          success: false,
+          message: "Missing checkpoint floor or office",
+        });
+      }
+
+      const cardUser = await User.findOne({
+        nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
+      }).select(
+        "_id email firstName lastName nfcCardId role status accessPermissions department position guardianName guardianPhone smsOptIn scheduleProfile",
+      );
+
+      if (!cardUser) {
+        await AccessLog.create({
+          userId: req.user._id,
+          userEmail: req.user.email,
+          userName: operatorName,
+          actorRole: operatorRole || "security",
+          location: tapLocation.office,
+          accessType: "system",
+          activityType: "station_location_tap",
+          status: "denied",
+          nfcCardId: normalizedCardId,
+          metadata: {
+            deviceId,
+            tapLocation,
+            targetCardId: normalizedCardId,
+          },
+          notes: `Checkpoint station could not match NFC card ${normalizedCardId} at ${tapLocation.office}.`,
+        });
+
+        return res.status(404).json({
+          success: false,
+          message: "NFC card is not assigned to any user",
+        });
+      }
+
+      if (!isUserSafePassCardActive(cardUser)) {
+        await AccessLog.create({
+          userId: req.user._id,
+          userEmail: req.user.email,
+          userName: operatorName,
+          actorRole: operatorRole || "security",
+          location: tapLocation.office,
+          accessType: "system",
+          activityType: "station_location_tap",
+          status: "denied",
+          nfcCardId: normalizedCardId,
+          relatedUser: cardUser._id,
+          metadata: {
+            deviceId,
+            tapLocation,
+            accountStatus: cardUser.status,
+          },
+          notes: `${getFullName(cardUser) || cardUser.email || "Campus user"} has an inactive NFC card.`,
+        });
+
+        return res.status(403).json({
+          success: false,
+          message: "NFC card is not active",
+        });
+      }
+
+      const normalizedUserRole = normalizeUserRoleValue(cardUser.role);
+
+      if (normalizedUserRole !== "visitor") {
+        const now = new Date();
+        const dayStart = getStartOfDay(now);
+        const dayEnd = getEndOfDay(now);
+        const latestAttendance = await AttendanceRecord.findOne({
+          userId: cardUser._id,
+          attendanceDate: { $gte: dayStart, $lt: dayEnd },
+        }).sort({ createdAt: -1 });
+
+        const hasOpenAttendance = Boolean(
+          latestAttendance?.checkInTime && !latestAttendance?.checkOutTime,
+        );
+        const isMainGateTap = isGateCheckpoint(tapLocation);
+        const isAutoGateTap =
+          tapAction === "gate" ||
+          tapAction === "entry" ||
+          tapAction === "exit" ||
+          (tapAction === "auto" && isMainGateTap);
+        const shouldCheckOut =
+          hasOpenAttendance &&
+          tapAction !== "location" &&
+          tapAction !== "track" &&
+          (tapAction === "checkout" || tapAction === "check_out" || isAutoGateTap);
+        const shouldCheckIn =
+          !hasOpenAttendance &&
+          tapAction !== "location" &&
+          tapAction !== "track" &&
+          (tapAction === "checkin" || tapAction === "check_in" || isAutoGateTap);
+        const action = shouldCheckOut
+          ? "check_out"
+          : shouldCheckIn
+            ? "check_in"
+            : "location_update";
+        const accessType =
+          action === "check_out" ? "exit" : action === "check_in" ? "entry" : "system";
+        const attendanceRecord = await upsertAttendanceRecordForTap({
+          user: cardUser,
+          action,
+          tapLocation,
+          timestamp: now,
+          nfcCardId: normalizedCardId,
+          deviceId,
+        });
+        const userDisplayName = getFullName(cardUser) || cardUser.email || "Campus user";
+
+        await AccessLog.create({
+          userId: req.user._id,
+          userEmail: req.user.email,
+          userName: operatorName,
+          actorRole: operatorRole || "security",
+          location: tapLocation.office,
+          accessType,
+          activityType: `station_${normalizedUserRole}_${action}`,
+          status: "granted",
+          nfcCardId: normalizedCardId,
+          relatedUser: cardUser._id,
+          metadata: {
+            deviceId,
+            action,
+            tapLocation,
+            userType: normalizedUserRole,
+            attendanceRecordId: attendanceRecord._id,
+            targetUserId: cardUser._id,
+          },
+          notes: `${operatorName} recorded ${userDisplayName} ${action.replace("_", " ")} at ${tapLocation.office}.`,
+        });
+
+        if (normalizedUserRole === "student" && (action === "check_in" || action === "check_out")) {
+          await sendStudentGuardianAttendanceSms({
+            user: cardUser,
+            action,
+            timestamp: now,
+            status: attendanceRecord.status,
+          });
+        }
+
+        return res.json({
+          success: true,
+          message:
+            action === "check_in"
+              ? "Attendance check-in recorded"
+              : action === "check_out"
+                ? "Attendance check-out recorded"
+                : "Location checkpoint recorded",
+          userType: normalizedUserRole,
+          action,
+          attendance: attendanceRecord,
+          user: {
+            _id: cardUser._id,
+            name: userDisplayName,
+            email: cardUser.email,
+            role: normalizedUserRole,
+            nfcCardId: normalizedCardId,
+          },
+        });
+      }
+
+      const checkedInVisitor = await Visitor.findOne({
+        email: cardUser.email,
+        status: "checked_in",
+      }).sort({ checkedInAt: -1 });
+
+      const latestVisitor =
+        checkedInVisitor ||
+        (await Visitor.findOne({
+          email: cardUser.email,
+          status: { $ne: "checked_out" },
+        }).sort({ visitDate: -1, registeredAt: -1 }));
+
+      if (!latestVisitor) {
+        await AccessLog.create({
+          userId: req.user._id,
+          userEmail: req.user.email,
+          userName: operatorName,
+          actorRole: operatorRole || "security",
+          location: tapLocation.office,
+          accessType: "system",
+          activityType: "station_location_tap",
+          status: "denied",
+          nfcCardId: normalizedCardId,
+          relatedUser: cardUser._id,
+          metadata: {
+            deviceId,
+            tapLocation,
+          },
+          notes: `Checkpoint station could not find an active visit for ${getFullName(cardUser) || cardUser.email}.`,
+        });
+
+        return res.status(409).json({
+          success: false,
+          message: "No active visit found for this NFC card",
+        });
+      }
+
+      const isMainGateTap = isGateCheckpoint(tapLocation);
+      const isAutoGateTap =
+        tapAction === "gate" ||
+        tapAction === "entry" ||
+        tapAction === "exit" ||
+        (tapAction === "auto" && isMainGateTap);
+      const shouldCheckOut =
+        checkedInVisitor &&
+        tapAction !== "location" &&
+        tapAction !== "track" &&
+        (tapAction === "checkout" || tapAction === "check_out" || isAutoGateTap);
+      const shouldCheckIn =
+        !checkedInVisitor &&
+        tapAction !== "location" &&
+        tapAction !== "track" &&
+        (tapAction === "checkin" || tapAction === "check_in" || isAutoGateTap);
+
+      const visitor = latestVisitor;
+      await applyAppointmentLifecycleIfNeeded(visitor);
+
+      let action = "location_update";
+      let accessType = "system";
+      let activityType = "station_location_tap";
+      let responseMessage = "Visitor location updated";
+
+      if (shouldCheckOut) {
+        visitor.markCheckedOut(req.user._id);
+        visitor.updateCurrentLocation(tapLocation, {
+          deviceId,
+          action: "check_out",
+          statusLabel: "Exited",
+        });
+        action = "check_out";
+        accessType = "exit";
+        activityType = "station_checkout";
+        responseMessage = "Visitor checked out at checkpoint station";
+      } else if (shouldCheckIn) {
+        const checkInEligibility = getVisitorCheckInEligibility(visitor);
+        if (!checkInEligibility.allowed) {
+          await AccessLog.create({
+            userId: req.user._id,
+            userEmail: req.user.email,
+            userName: operatorName,
+            actorRole: operatorRole || "security",
+            location: tapLocation.office,
+            accessType: "entry",
+            activityType: "station_checkin",
+            status: "denied",
+            nfcCardId: normalizedCardId,
+            relatedVisitor: visitor._id,
+            relatedUser: cardUser._id,
+            metadata: {
+              deviceId,
+              tapLocation,
+              visitorStatus: visitor.status,
+              approvalStatus: visitor.approvalStatus,
+              appointmentStatus: visitor.appointmentStatus,
+            },
+            notes: `${operatorName} could not check in ${visitor.fullName}: ${checkInEligibility.message}`,
+          });
+
+          return res.status(checkInEligibility.statusCode || 403).json({
+            success: false,
+            message: checkInEligibility.message,
+          });
+        }
+
+        visitor.markCheckedIn(req.user._id);
+        visitor.updateCurrentLocation(tapLocation, {
+          deviceId,
+          action: "check_in",
+          statusLabel: `Inside ${tapLocation.office || "checkpoint"}`,
+        });
+        action = "check_in";
+        accessType = "entry";
+        activityType = "station_checkin";
+        responseMessage = "Visitor checked in at checkpoint station";
+      } else {
+        if (visitor.status !== "checked_in") {
+          await AccessLog.create({
+            userId: req.user._id,
+            userEmail: req.user.email,
+            userName: operatorName,
+            actorRole: operatorRole || "security",
+            location: tapLocation.office,
+            accessType: "system",
+            activityType: "station_location_tap",
+            status: "denied",
+            nfcCardId: normalizedCardId,
+            relatedVisitor: visitor._id,
+            relatedUser: cardUser._id,
+            metadata: {
+              deviceId,
+              tapLocation,
+              visitorStatus: visitor.status,
+            },
+            notes: `${visitor.fullName} must be checked in before location tracking can start.`,
+          });
+
+          return res.status(409).json({
+            success: false,
+            message: "Visitor must be checked in before location tracking can start",
+          });
+        }
+
+        visitor.updateCurrentLocation(tapLocation, {
+          deviceId,
+          action: "location_update",
+          statusLabel: `Moved to ${tapLocation.office || "checkpoint"}`,
+        });
+      }
+
+      await visitor.save();
+      const visitorAttendanceRecord = await upsertAttendanceRecordForTap({
+        user: cardUser,
+        visitor,
+        action,
+        tapLocation,
+        timestamp: new Date(),
+        nfcCardId: normalizedCardId,
+        deviceId,
+      });
+
+      await AccessLog.create({
+        userId: req.user._id,
+        userEmail: req.user.email,
+        userName: operatorName,
+        actorRole: operatorRole || "security",
+        location: tapLocation.office,
+        accessType,
+        activityType,
+        status: "granted",
+        nfcCardId: normalizedCardId,
+        relatedVisitor: visitor._id,
+        relatedUser: cardUser._id,
+        metadata: {
+          deviceId,
+          action,
+          tapLocation,
+          currentLocation: visitor.currentLocation,
+          attendanceRecordId: visitorAttendanceRecord._id,
+        },
+        notes: `${operatorName} recorded ${visitor.fullName} ${action.replace("_", " ")} at ${tapLocation.office}.`,
+      });
+
+      return res.json({
+        success: true,
+        message: responseMessage,
+        action,
+        userType: "visitor",
+        visitorId: visitor._id,
+        currentLocation: visitor.currentLocation,
+        visitor: {
+          _id: visitor._id,
+          fullName: visitor.fullName,
+          email: visitor.email,
+          status: visitor.status,
+          currentLocation: visitor.currentLocation,
+        },
+      });
+    } catch (error) {
+      console.error("Checkpoint station tap error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to process checkpoint tap",
+      });
+    }
+  },
+);
 
 app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => {
   try {
@@ -2838,6 +3709,39 @@ const buildLiveVisitorLocationPayload = (visitor = {}) => {
   };
 };
 
+const buildLivePresencePayload = (attendanceRecord = {}) => {
+  const history = Array.isArray(attendanceRecord.checkpointHistory)
+    ? attendanceRecord.checkpointHistory
+    : [];
+  const latestCheckpoint = history.length ? history[history.length - 1] : null;
+
+  return {
+    attendanceId: attendanceRecord._id,
+    userId: attendanceRecord.userId || null,
+    visitorId: attendanceRecord.visitorId || null,
+    name: attendanceRecord.name,
+    userType: attendanceRecord.userType,
+    role: attendanceRecord.role || attendanceRecord.userType,
+    module: attendanceRecord.module,
+    nfcCardId: attendanceRecord.nfcCardId || "",
+    location: attendanceRecord.location || latestCheckpoint?.office || "",
+    checkpointId:
+      latestCheckpoint?.checkpointId ||
+      attendanceRecord.checkpointIn ||
+      "",
+    checkpointName:
+      latestCheckpoint?.checkpointName ||
+      latestCheckpoint?.office ||
+      attendanceRecord.location ||
+      "",
+    floor: latestCheckpoint?.floor || "",
+    status: attendanceRecord.status,
+    checkInTime: attendanceRecord.checkInTime || null,
+    lastTapTime: attendanceRecord.lastTapTime || attendanceRecord.checkInTime || null,
+    isLate: Boolean(attendanceRecord.isLate),
+  };
+};
+
 const getActiveLiveVisitors = async (limit = 200) => {
   const activeVisitors = await Visitor.find({
     status: "checked_in",
@@ -3350,8 +4254,26 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
+    const normalizedRole = normalizeUserRoleValue(role || "visitor");
+    const allowedRegistrationRoles = new Set([
+      "visitor",
+      "staff",
+      "security",
+      "guard",
+      "student",
+      "teacher",
+      "admin",
+    ]);
+
+    if (!allowedRegistrationRoles.has(normalizedRole)) {
+      return res.status(400).json({
+        error: "Unsupported account role",
+        field: "role",
+      });
+    }
+
     let nfcCardId = null;
-    if (role !== "visitor" || (role === "visitor" && status === "active")) {
+    if (normalizedRole !== "visitor" || (normalizedRole === "visitor" && status === "active")) {
       const timestamp = Date.now();
       const randomString = Math.random()
         .toString(36)
@@ -3363,8 +4285,18 @@ app.post("/api/register", async (req, res) => {
     let employeeId = req.body.employeeId
       ? String(req.body.employeeId).trim()
       : undefined;
-    if (!employeeId && (role === "staff" || role === "guard")) {
-      employeeId = await generateUniqueEmployeeId(role);
+    if (!employeeId && ["staff", "guard", "security", "teacher"].includes(normalizedRole)) {
+      employeeId = await generateUniqueEmployeeId(normalizedRole);
+    }
+
+    let studentId = req.body.studentId ? String(req.body.studentId).trim() : undefined;
+    if (!studentId && normalizedRole === "student") {
+      studentId = await generateUniqueAcademicId({ role: "student", fieldName: "studentId" });
+    }
+
+    let teacherId = req.body.teacherId ? String(req.body.teacherId).trim() : undefined;
+    if (!teacherId && normalizedRole === "teacher") {
+      teacherId = await generateUniqueAcademicId({ role: "teacher", fieldName: "teacherId" });
     }
 
 const userData = {
@@ -3374,12 +4306,25 @@ const userData = {
   email: normalizedEmail,
   password,
   phone: normalizedPhone,
-  role: role || 'visitor',
+  role: normalizedRole,
   nfcCardId,
   employeeId: employeeId || undefined,
+  studentId: studentId || undefined,
+  teacherId: teacherId || undefined,
+  guardianName: String(req.body.guardianName || "").trim(),
+  guardianPhone: normalizePhoneValue(req.body.guardianPhone || ""),
+  smsOptIn: Boolean(req.body.smsOptIn),
+  course: String(req.body.course || "").trim(),
+  yearLevel: String(req.body.yearLevel || "").trim(),
+  section: String(req.body.section || "").trim(),
+  scheduleProfile: {
+    startTime: String(req.body?.scheduleProfile?.startTime || req.body.startTime || "").trim(),
+    endTime: String(req.body?.scheduleProfile?.endTime || req.body.endTime || "").trim(),
+    graceMinutes: Number(req.body?.scheduleProfile?.graceMinutes ?? req.body.graceMinutes ?? 10),
+  },
   department: req.body.department || '',
   position: req.body.position || '',     
-  status: status || (role === 'visitor' ? 'pending' : 'active'),
+  status: status || (normalizedRole === 'visitor' ? 'pending' : 'active'),
   visitorId: visitorId || null,
 };
 
@@ -6025,13 +6970,35 @@ app.get("/api/access-logs", authMiddleware, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
+    const requesterRole = normalizeUserRoleValue(req.user?.role);
+    const canViewAllLogs = ["admin", "security", "guard", "staff"].includes(requesterRole);
+    const query = {};
 
-    const accessLogs = await AccessLog.find({ userId: req.user._id })
+    if (!canViewAllLogs || String(req.query.all || "").toLowerCase() !== "true") {
+      query.userId = req.user._id;
+    }
+
+    applyDateRangeFilter(query, "timestamp", req.query);
+
+    if (req.query.status) query.status = String(req.query.status).trim().toLowerCase();
+    if (req.query.accessType) query.accessType = String(req.query.accessType).trim().toLowerCase();
+    if (req.query.activityType) query.activityType = String(req.query.activityType).trim();
+    if (req.query.location) {
+      query.location = { $regex: String(req.query.location).trim(), $options: "i" };
+    }
+    if (req.query.userType) {
+      query.$or = [
+        { actorRole: String(req.query.userType).trim().toLowerCase() },
+        { "metadata.userType": String(req.query.userType).trim().toLowerCase() },
+      ];
+    }
+
+    const accessLogs = await AccessLog.find(query)
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit);
 
-    const total = await AccessLog.countDocuments({ userId: req.user._id });
+    const total = await AccessLog.countDocuments(query);
 
     res.json({
       success: true,
@@ -6221,6 +7188,7 @@ app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "securit
 
     let query = {};
     if (status) query.status = status;
+    applyDateRangeFilter(query, "visitDate", req.query);
 
     const visitors = await Visitor.find(query)
       .sort({ registeredAt: -1 })
@@ -6249,6 +7217,144 @@ app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "securit
 });
 
 app.get(
+  "/api/attendance",
+  authMiddleware,
+  requireRoles("admin", "security", "guard", "staff"),
+  async (req, res) => {
+    try {
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 50;
+      const skip = (page - 1) * limit;
+      const query = {};
+
+      applyDateRangeFilter(query, "attendanceDate", req.query);
+
+      if (req.query.userType) query.userType = String(req.query.userType).trim().toLowerCase();
+      if (req.query.status) query.status = String(req.query.status).trim().toLowerCase();
+      if (req.query.module) query.module = String(req.query.module).trim().toLowerCase();
+      if (req.query.location) {
+        query.location = { $regex: String(req.query.location).trim(), $options: "i" };
+      }
+      if (req.query.search) {
+        query.name = { $regex: String(req.query.search).trim(), $options: "i" };
+      }
+
+      const [records, total] = await Promise.all([
+        AttendanceRecord.find(query)
+          .sort({ attendanceDate: -1, checkInTime: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        AttendanceRecord.countDocuments(query),
+      ]);
+
+      res.json({
+        success: true,
+        attendance: records,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error("Get attendance records error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch attendance records",
+      });
+    }
+  },
+);
+
+app.get(
+  "/api/attendance/summary",
+  authMiddleware,
+  requireRoles("admin", "security", "guard", "staff"),
+  async (req, res) => {
+    try {
+      const query = {};
+      applyDateRangeFilter(query, "attendanceDate", req.query);
+      if (req.query.userType) query.userType = String(req.query.userType).trim().toLowerCase();
+
+      const records = await AttendanceRecord.find(query).select(
+        "userType status isLate isNoShow isExpired isCompleted",
+      );
+
+      const summary = records.reduce(
+        (accumulator, record) => {
+          accumulator.total += 1;
+          accumulator.byUserType[record.userType] =
+            (accumulator.byUserType[record.userType] || 0) + 1;
+          accumulator.byStatus[record.status] =
+            (accumulator.byStatus[record.status] || 0) + 1;
+          if (record.isLate) accumulator.late += 1;
+          if (record.isNoShow) accumulator.noShow += 1;
+          if (record.isExpired) accumulator.expired += 1;
+          if (record.isCompleted) accumulator.completed += 1;
+          return accumulator;
+        },
+        {
+          total: 0,
+          late: 0,
+          noShow: 0,
+          expired: 0,
+          completed: 0,
+          byUserType: {},
+          byStatus: {},
+        },
+      );
+
+      res.json({ success: true, summary });
+    } catch (error) {
+      console.error("Get attendance summary error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch attendance summary",
+      });
+    }
+  },
+);
+
+app.get("/api/my-attendance", authMiddleware, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const skip = (page - 1) * limit;
+    const query = {
+      userId: req.user._id,
+    };
+
+    applyDateRangeFilter(query, "attendanceDate", req.query);
+
+    const [records, total] = await Promise.all([
+      AttendanceRecord.find(query)
+        .sort({ attendanceDate: -1, checkInTime: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      AttendanceRecord.countDocuments(query),
+    ]);
+
+    res.json({
+      success: true,
+      attendance: records,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Get my attendance error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch your attendance records",
+    });
+  }
+});
+
+app.get(
   "/api/security/live-visitor-locations",
   authMiddleware,
   requireRoles("admin", "security", "guard"),
@@ -6270,6 +7376,70 @@ app.get(
       res.status(500).json({
         success: false,
         message: "Failed to fetch live visitor locations",
+      });
+    }
+  },
+);
+
+app.get(
+  "/api/security/live-presence",
+  authMiddleware,
+  requireRoles("admin", "security", "guard"),
+  async (req, res) => {
+    try {
+      const requestedLimit = Number.parseInt(req.query?.limit, 10);
+      const limit = Number.isFinite(requestedLimit)
+        ? Math.min(Math.max(requestedLimit, 1), 300)
+        : 200;
+      const todayStart = getStartOfDay(new Date());
+      const todayEnd = getEndOfDay(new Date());
+
+      const activeRecords = await AttendanceRecord.find({
+        attendanceDate: { $gte: todayStart, $lt: todayEnd },
+        checkInTime: { $ne: null },
+        checkOutTime: null,
+      })
+        .sort({ lastTapTime: -1, checkInTime: -1, createdAt: -1 })
+        .limit(limit)
+        .lean();
+
+      const latestByIdentity = new Map();
+      activeRecords.forEach((record) => {
+        const identity = String(record?.visitorId || record?.userId || record?._id || "");
+        if (!identity || latestByIdentity.has(identity)) {
+          return;
+        }
+        latestByIdentity.set(identity, record);
+      });
+
+      const presence = Array.from(latestByIdentity.values()).map((record) =>
+        buildLivePresencePayload(record),
+      );
+
+      const summary = presence.reduce(
+        (accumulator, item) => {
+          accumulator.total += 1;
+          accumulator.byUserType[item.userType] =
+            (accumulator.byUserType[item.userType] || 0) + 1;
+          return accumulator;
+        },
+        {
+          total: 0,
+          byUserType: {},
+        },
+      );
+
+      res.json({
+        success: true,
+        generatedAt: new Date(),
+        presence,
+        summary,
+      });
+    } catch (error) {
+      console.error("Get live presence error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch live presence",
       });
     }
   },
@@ -9440,7 +10610,7 @@ app.get("/api/admin/nfc-cards", authMiddleware, async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const users = await User.find({ nfcCardId: { $exists: true, $ne: null } })
-      .select("firstName lastName email nfcCardId role status createdAt")
+      .select("firstName lastName email nfcCardId role status createdAt accessPermissions")
       .skip(skip)
       .limit(parseInt(limit));
 
@@ -9448,7 +10618,10 @@ app.get("/api/admin/nfc-cards", authMiddleware, async (req, res) => {
       id: user._id,
       cardNumber: user.nfcCardId,
       userName: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      role: user.role,
       status: user.status === "active" ? "active" : "inactive",
+      cardActive: Boolean(user.accessPermissions?.cardActive),
       issuedDate: user.createdAt,
       userId: user._id,
     }));
@@ -9564,18 +10737,17 @@ app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
 
     const user = userId
       ? await User.findById(userId)
-      : await User.findOne({ email: normalizedEmail, role: "visitor" });
+      : await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Visitor account not found.",
+        message: "User account not found.",
       });
     }
 
     const previousCardId = user.nfcCardId || "";
     user.nfcCardId = normalizedCardId;
-    user.role = "visitor";
     user.status = "active";
     user.isActive = true;
     user.accessPermissions = {
@@ -9610,6 +10782,8 @@ app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
         cardNumber: user.nfcCardId,
         previousCardNumber: previousCardId,
         userName: `${user.firstName} ${user.lastName}`.trim(),
+        email: user.email,
+        role: user.role,
         status: "active",
         issuedDate: new Date(),
         userId: user._id,

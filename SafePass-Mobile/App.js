@@ -12,6 +12,7 @@ import AdminDashboardScreen from "./screens/AdminDashboardScreen";
 import SecurityDashboardScreen from "./screens/SecurityDashboardScreen";
 import VisitorDashboardScreen from "./screens/VisitorDashboardScreen";
 import StaffDashboardScreen from "./screens/StaffDashboardScreen";
+import StudentDashboardScreen from "./screens/StudentDashboardScreen";
 
 // Common Screens
 import ProfileScreen from "./screens/ProfileScreenV2";
@@ -27,6 +28,7 @@ import WebMapScreen from "./screens/WebMapScreen";
 // Admin Management Screens
 import VisitorManagementScreen from "./screens/VisitorManagementScreen";
 import NFCManagementScreen from "./screens/NFCManagementScreen";
+import AttendanceRecordsScreen from "./screens/AttendanceRecordsScreen";
 import ReportsScreen from "./screens/ReportsScreen";
 import SecurityLogsScreen from "./screens/SecurityLogsScreen";
 import SettingsScreen from "./screens/SettingsScreen";
@@ -71,6 +73,7 @@ const WEB_ROUTE_TITLES = {
   AdminDashboard: `Admin Dashboard | ${APP_ORGANIZATION}`,
   StaffDashboard: `Staff Dashboard | ${APP_ORGANIZATION}`,
   SecurityDashboard: `Security Operations | ${APP_ORGANIZATION}`,
+  StudentDashboard: `Student Dashboard | ${APP_ORGANIZATION}`,
   VisitorDashboard: `Visitor Dashboard | ${APP_ORGANIZATION}`,
   VisitorPass: `Visitor Pass | ${APP_ORGANIZATION}`,
   WebMapScreen: `Campus Map | ${APP_ORGANIZATION}`,
@@ -79,6 +82,7 @@ const WEB_ROUTE_TITLES = {
   NFCScan: `NFC Scanner | ${APP_ORGANIZATION}`,
   VisitorManagement: `Visitor Management | ${APP_ORGANIZATION}`,
   NFCManagement: `NFC Management | ${APP_ORGANIZATION}`,
+  AttendanceRecords: `Attendance Records | ${APP_ORGANIZATION}`,
   Reports: `Reports | ${APP_ORGANIZATION}`,
   SecurityLogs: `Security Logs | ${APP_ORGANIZATION}`,
   Settings: `Settings | ${APP_ORGANIZATION}`,
@@ -554,6 +558,15 @@ export default function App() {
             )}
           </Stack.Screen>
         )}
+        {!IS_VISITOR_ONLY_APP && (
+          <Stack.Screen name="StudentDashboard">
+            {(props) => (
+              <StudentDashboardScreen
+                {...props}
+              />
+            )}
+          </Stack.Screen>
+        )}
         <Stack.Screen name="VisitorDashboard" options={VISITOR_STACK_TRANSITION}>
           {(props) => (
             <VisitorDashboardScreen
@@ -601,6 +614,9 @@ export default function App() {
         )}
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="NFCManagement" component={NFCManagementScreen} />
+        )}
+        {!IS_VISITOR_ONLY_APP && (
+          <Stack.Screen name="AttendanceRecords" component={AttendanceRecordsScreen} />
         )}
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="Reports" component={ReportsScreen} />

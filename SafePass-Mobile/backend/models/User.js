@@ -25,6 +25,31 @@ const userSchema = new mongoose.Schema({
   emergencyContact: { type: String, default: "" },
   profilePhoto: { type: String, default: "" },
   visitorId: { type: mongoose.Schema.Types.ObjectId, ref: "Visitor" },
+  studentId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    default: undefined,
+    trim: true,
+  },
+  teacherId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    default: undefined,
+    trim: true,
+  },
+  guardianName: { type: String, default: "", trim: true },
+  guardianPhone: { type: String, default: "", trim: true },
+  smsOptIn: { type: Boolean, default: false },
+  course: { type: String, default: "", trim: true },
+  yearLevel: { type: String, default: "", trim: true },
+  section: { type: String, default: "", trim: true },
+  scheduleProfile: {
+    startTime: { type: String, default: "", trim: true },
+    endTime: { type: String, default: "", trim: true },
+    graceMinutes: { type: Number, default: 10 },
+  },
   
   department: { type: String, default: "" },
   position: { type: String, default: "" },
@@ -32,7 +57,7 @@ const userSchema = new mongoose.Schema({
   
 role: {
   type: String,
-  enum: ["visitor", "security", "guard", "admin", "staff"],
+  enum: ["visitor", "security", "guard", "admin", "staff", "student", "teacher"],
   default: "visitor",
 },
   status: {
@@ -86,6 +111,14 @@ userSchema.pre("save", async function () {
 
   if (this.username === null || this.username === "") {
     this.username = undefined;
+  }
+
+  if (this.studentId === null || this.studentId === "") {
+    this.studentId = undefined;
+  }
+
+  if (this.teacherId === null || this.teacherId === "") {
+    this.teacherId = undefined;
   }
 
   if (this.nfcCardId === null || this.nfcCardId === "") {

@@ -1,556 +1,802 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
+  RefreshControl,
+  SafeAreaView,
   ScrollView,
-  StatusBar,
-  Platform,
-  Vibration,
-  Animated,
-  Dimensions,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import styles from "../styles/mainStyles";
-import nfcStyles from "../styles/NFCScanStyles";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
 
-const { width } = Dimensions.get("window");
+const CHECKPOINTS = [
+  { key: "main-gate", label: "Main Gate", floor: "ground", office: "Main Gate", icon: "log-in-outline" },
+  { key: "registrar", label: "Registrar", floor: "ground", office: "Registrar", icon: "document-text-outline" },
+  { key: "admin-office", label: "Administration", floor: "ground", office: "Administration", icon: "business-outline" },
+  { key: "library", label: "Library", floor: "third", office: "Library", icon: "library-outline" },
+  { key: "training", label: "Training", floor: "first", office: "Training", icon: "school-outline" },
+  { key: "security-office", label: "Security Office", floor: "ground", office: "Security Office", icon: "shield-outline" },
+];
+
+const ACTION_OPTIONS = [
+  { key: "auto", label: "Auto", subtitle: "Use checkpoint logic" },
+  { key: "check_in", label: "Check In", subtitle: "Force arrival" },
+  { key: "check_out", label: "Check Out", subtitle: "Force departure" },
+  { key: "location", label: "Location", subtitle: "Track movement only" },
+];
+
+const ALLOWED_ROLES = new Set(["admin", "security", "guard", "staff"]);
+
+const formatDateTime = (value) => {
+  if (!value) return "N/A";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "N/A";
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatRoleLabel = (role = "") =>
+  String(role || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase()) || "User";
 
 export default function NFCScanScreen({ navigation }) {
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState(null);
-  const [scanHistory, setScanHistory] = useState([]);
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [nfcSupported, setNfcSupported] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState("Main Gate");
-  
-  // Animation values
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [selectedCheckpointKey, setSelectedCheckpointKey] = useState(CHECKPOINTS[0].key);
+  const [selectedAction, setSelectedAction] = useState("auto");
+  const [cardId, setCardId] = useState("");
+  const [stationEvents, setStationEvents] = useState([]);
+  const [latestResult, setLatestResult] = useState(null);
 
-  // Available locations
-  const locations = [
-    { id: 1, name: "Main Gate", icon: "business-outline", zone: "Entry" },
-    { id: 2, name: "Library Entrance", icon: "library-outline", zone: "Academic" },
-    { id: 3, name: "Flight Simulator Lab", icon: "airplane-outline", zone: "Restricted" },
-    { id: 4, name: "Administration Building", icon: "business-outline", zone: "Admin" },
-    { id: 5, name: "Cafeteria", icon: "restaurant-outline", zone: "Common" },
-    { id: 6, name: "Parking Area", icon: "car-outline", zone: "Facility" },
-    { id: 7, name: "Security Office", icon: "shield-outline", zone: "Security" },
-    { id: 8, name: "Maintenance Bay", icon: "construct-outline", zone: "Restricted" },
-  ];
-
-  useEffect(() => {
-    loadUser();
-    checkNFCSupport();
-  }, []);
-
-  useEffect(() => {
-    let pulseAnimation;
-    let rotateAnimation;
-    let scanLineAnimation;
-    
-    if (isScanning) {
-      // Pulse animation
-      pulseAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.2,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      pulseAnimation.start();
-
-      // Rotation animation
-      rotateAnimation = Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        })
-      );
-      rotateAnimation.start();
-
-      // Scan line animation
-      scanLineAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(scanLineAnim, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scanLineAnim, {
-            toValue: 0,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      scanLineAnimation.start();
-    } else {
-      // Reset animations
-      pulseAnim.setValue(1);
-      rotateAnim.setValue(0);
-      scanLineAnim.setValue(0);
-    }
-
-    return () => {
-      pulseAnimation?.stop();
-      rotateAnimation?.stop();
-      scanLineAnimation?.stop();
-    };
-  }, [isScanning]);
+  const selectedCheckpoint = useMemo(
+    () => CHECKPOINTS.find((checkpoint) => checkpoint.key === selectedCheckpointKey) || CHECKPOINTS[0],
+    [selectedCheckpointKey],
+  );
 
   const loadUser = async () => {
-    setIsLoading(true);
     try {
-      const currentUser = await ApiService.getCurrentUser();
+      const currentUser =
+        (await ApiService.getCurrentUser()) ||
+        (await ApiService.restoreCurrentUserFromToken());
       if (!currentUser) {
         navigation.replace("Login");
         return;
       }
       setUser(currentUser);
-      
-      // Load recent scan history
-      const logs = await ApiService.getAccessLogs(1, 5);
-      setScanHistory(logs.accessLogs || []);
     } catch (error) {
-      console.error("Load user error:", error);
+      console.error("Load checkpoint user error:", error);
+      Alert.alert("Error", "Failed to load checkpoint station user.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const checkNFCSupport = async () => {
-    // Check if device supports NFC
-    if (Platform.OS === 'web') {
-      setNfcSupported(false);
-    } else {
-      try {
-        // You can add actual NFC SDK here (e.g., react-native-nfc-manager)
-        // For now, we'll simulate support
-        setNfcSupported(true);
-      } catch (error) {
-        setNfcSupported(false);
-      }
-    }
-  };
+  useEffect(() => {
+    loadUser();
+  }, []);
 
-  const performNFCSimulate = async () => {
-    if (isScanning) return;
-    
-    setIsScanning(true);
-    setScanResult(null);
-    
-    // Vibrate to indicate scan start
-    if (Platform.OS !== 'web') {
-      Vibration.vibrate(50);
-    }
-    
+  const handleRefresh = async () => {
+    setRefreshing(true);
     try {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const response = await ApiService.simulateNfcScan(selectedLocation, "entry");
-      
-      const result = {
-        success: response.status === "granted",
-        message: response.message,
-        location: selectedLocation,
-        timestamp: new Date().toLocaleTimeString(),
-        date: new Date().toLocaleDateString(),
-        accessType: "entry",
-        cardId: user.nfcCardId || "N/A"
-      };
-      
-      setScanResult(result);
-      
-      // Add to local history
-      setScanHistory(prev => [result, ...prev.slice(0, 4)]);
-      
-      // Success/Denied haptic feedback
-      if (Platform.OS !== 'web') {
-        Vibration.vibrate(result.success ? [0, 50, 50, 50] : [0, 100, 50, 100]);
-      }
-      
-      // Show alert with more details
-      Alert.alert(
-        result.success ? "✅ Access Granted" : "❌ Access Denied",
-        `${result.location}\n${result.message}\n\nCard: ${user.nfcCardId?.substring(0, 8)}...`,
-        [
-          { 
-            text: "View Logs", 
-            onPress: () => navigation.navigate("AccessLog") 
-          },
-          { 
-            text: "OK", 
-            style: "cancel" 
-          }
-        ]
-      );
-      
-    } catch (error) {
-      console.error("NFC scan error:", error);
-      Alert.alert("Error", "Failed to complete NFC scan. Please try again.");
+      await loadUser();
     } finally {
-      setIsScanning(false);
+      setRefreshing(false);
     }
   };
 
-  const formatCardId = (cardId) => {
-    if (!cardId) return "NO CARD ASSIGNED";
-    if (cardId.length > 12) {
-      return `${cardId.substring(0, 8)}...${cardId.substring(cardId.length - 4)}`;
-    }
-    return cardId;
+  const recordLocalEvent = (event) => {
+    setStationEvents((currentEvents) => [event, ...currentEvents].slice(0, 8));
   };
 
-  if (isLoading && !user) {
+  const handleSubmitTap = async () => {
+    const normalizedCardId = String(cardId || "").trim().toUpperCase();
+    if (!normalizedCardId) {
+      Alert.alert("Card Required", "Enter or scan the NFC card UID first.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const response = await ApiService.submitCheckpointTap({
+        nfcCardId: normalizedCardId,
+        action: selectedAction,
+        floor: selectedCheckpoint.floor,
+        office: selectedCheckpoint.office,
+        checkpointId: selectedCheckpoint.key,
+        checkpointName: selectedCheckpoint.label,
+        deviceId: "mobile-checkpoint-station",
+      });
+
+      const event = {
+        success: true,
+        message: response?.message || "Checkpoint tap processed.",
+        timestamp: new Date().toISOString(),
+        checkpoint: selectedCheckpoint.label,
+        action: response?.action || selectedAction,
+        userType: response?.userType || response?.user?.role || "visitor",
+        name:
+          response?.user?.name ||
+          response?.visitor?.fullName ||
+          response?.attendance?.name ||
+          "Campus user",
+        status:
+          response?.attendance?.status ||
+          response?.visitor?.status ||
+          response?.currentLocation?.statusLabel ||
+          "processed",
+        raw: response,
+      };
+
+      setLatestResult(event);
+      recordLocalEvent(event);
+      setCardId("");
+    } catch (error) {
+      const failedEvent = {
+        success: false,
+        message: error?.message || "Checkpoint tap failed.",
+        timestamp: new Date().toISOString(),
+        checkpoint: selectedCheckpoint.label,
+        action: selectedAction,
+        userType: "unknown",
+        name: normalizedCardId,
+        status: "denied",
+      };
+      setLatestResult(failedEvent);
+      recordLocalEvent(failedEvent);
+      Alert.alert("Tap Failed", failedEvent.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) {
     return (
-      <View style={nfcStyles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0A3D91" />
-        <Text style={nfcStyles.loadingText}>Loading NFC reader...</Text>
-      </View>
+        <Text style={styles.loadingText}>Loading checkpoint station...</Text>
+      </SafeAreaView>
     );
   }
 
   if (!user) return null;
 
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const translateY = scanLineAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-100, 100],
-  });
+  const isAllowed = ALLOWED_ROLES.has(String(user.role || "").toLowerCase());
 
   return (
-    <SafeAreaView style={nfcStyles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
-      
-      <ScrollView 
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={nfcStyles.scrollContainer}
       >
-        {/* Header */}
-        <View style={nfcStyles.header}>
-          <TouchableOpacity
-            style={nfcStyles.backButton}
-            onPress={() => navigation.goBack()}
-            disabled={isScanning}
-          >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        <View style={styles.headerCard}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color="#0A3D91" />
           </TouchableOpacity>
-          
-          <View style={nfcStyles.headerContent}>
-            <Text style={nfcStyles.headerTitle}>NFC Scanner</Text>
-            <Text style={nfcStyles.headerSubtitle}>Tap or simulate NFC card</Text>
-          </View>
-          
-          <TouchableOpacity
-            style={nfcStyles.historyButton}
-            onPress={() => navigation.navigate("AccessLog")}
-          >
-            <Ionicons name="time-outline" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* NFC Card Info */}
-        <View style={nfcStyles.cardInfo}>
-          <View style={nfcStyles.cardHeader}>
-            <View style={nfcStyles.cardIconContainer}>
-              <Ionicons name="card" size={28} color="#FFFFFF" />
-            </View>
-            <View style={nfcStyles.cardStatus}>
-              <View style={nfcStyles.statusDot} />
-              <Text style={nfcStyles.statusText}>Active</Text>
-            </View>
-          </View>
-          
-          <Text style={nfcStyles.cardNumber}>
-            {formatCardId(user.nfcCardId)}
-          </Text>
-          
-          <View style={nfcStyles.cardFooter}>
-            <View>
-              <Text style={nfcStyles.cardLabel}>Card Holder</Text>
-              <Text style={nfcStyles.cardValue}>
-                {user.firstName} {user.lastName}
-              </Text>
-            </View>
-            <View>
-              <Text style={nfcStyles.cardLabel}>Type</Text>
-              <Text style={nfcStyles.cardValue}>
-                {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-              </Text>
-            </View>
+          <View style={styles.headerCopy}>
+            <Text style={styles.headerEyebrow}>Checkpoint Station</Text>
+            <Text style={styles.headerTitle}>NFC Tap Console</Text>
+            <Text style={styles.headerSubtitle}>
+              Process check-in, check-out, and checkpoint movement using the same campus attendance
+              and visitor logic as the NFC hardware flow.
+            </Text>
           </View>
         </View>
 
-        {/* Location Selection */}
-        <View style={nfcStyles.locationSection}>
-          <Text style={nfcStyles.sectionTitle}>Select Location</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={nfcStyles.locationScroll}
-          >
-            {locations.map((location) => (
-              <TouchableOpacity
-                key={location.id}
-                style={[
-                  nfcStyles.locationCard,
-                  selectedLocation === location.name && nfcStyles.locationCardActive
-                ]}
-                onPress={() => setSelectedLocation(location.name)}
-                disabled={isScanning}
-              >
-                <View style={[
-                  nfcStyles.locationIcon,
-                  selectedLocation === location.name && nfcStyles.locationIconActive
-                ]}>
-                  <Ionicons 
-                    name={location.icon} 
-                    size={24} 
-                    color={selectedLocation === location.name ? "#FFFFFF" : "#6B7280"} 
+        <View style={styles.operatorCard}>
+          <View>
+            <Text style={styles.operatorLabel}>Operator</Text>
+            <Text style={styles.operatorName}>
+              {user.firstName} {user.lastName}
+            </Text>
+            <Text style={styles.operatorMeta}>{formatRoleLabel(user.role)}</Text>
+          </View>
+          <View style={[styles.operatorStatusBadge, !isAllowed && styles.operatorStatusBadgeWarning]}>
+            <Text style={[styles.operatorStatusText, !isAllowed && styles.operatorStatusTextWarning]}>
+              {isAllowed ? "Authorized" : "Read Only"}
+            </Text>
+          </View>
+        </View>
+
+        {!isAllowed ? (
+          <View style={styles.warningCard}>
+            <Ionicons name="warning-outline" size={20} color="#B45309" />
+            <Text style={styles.warningText}>
+              This screen is meant for admin, staff, and security checkpoint operators. Your account
+              can open it, but station taps will be blocked by the backend.
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Checkpoint</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionRow}>
+            {CHECKPOINTS.map((checkpoint) => {
+              const selected = checkpoint.key === selectedCheckpointKey;
+              return (
+                <TouchableOpacity
+                  key={checkpoint.key}
+                  style={[styles.optionCard, selected && styles.optionCardActive]}
+                  onPress={() => setSelectedCheckpointKey(checkpoint.key)}
+                >
+                  <Ionicons
+                    name={checkpoint.icon}
+                    size={18}
+                    color={selected ? "#FFFFFF" : "#0A3D91"}
                   />
-                </View>
-                <Text style={[
-                  nfcStyles.locationName,
-                  selectedLocation === location.name && nfcStyles.locationNameActive
-                ]}>
-                  {location.name}
-                </Text>
-                <Text style={nfcStyles.locationZone}>{location.zone}</Text>
-              </TouchableOpacity>
-            ))}
+                  <Text style={[styles.optionLabel, selected && styles.optionLabelActive]}>
+                    {checkpoint.label}
+                  </Text>
+                  <Text style={[styles.optionMeta, selected && styles.optionMetaActive]}>
+                    {checkpoint.floor}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
-        {/* NFC Scanner Animation */}
-        <View style={nfcStyles.scannerContainer}>
-          <Animated.View 
-            style={[
-              nfcStyles.scannerRing,
-              { transform: [{ scale: pulseAnim }] }
-            ]} 
-          />
-          
-          <Animated.View 
-            style={[
-              nfcStyles.scannerRing2,
-              { transform: [{ scale: Animated.multiply(pulseAnim, 1.5) }] }
-            ]} 
-          />
-          
-          <View style={nfcStyles.scannerInner}>
-            <Animated.View style={{ transform: [{ rotate }] }}>
-              <Ionicons 
-                name={isScanning ? "radio" : "scan-outline"} 
-                size={60} 
-                color={isScanning ? "#0A3D91" : "#9CA3AF"} 
-              />
-            </Animated.View>
-            
-            {isScanning && (
-              <Animated.View 
-                style={[
-                  nfcStyles.scanLine,
-                  { transform: [{ translateY }] }
-                ]} 
-              />
-            )}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tap Mode</Text>
+          <View style={styles.actionGrid}>
+            {ACTION_OPTIONS.map((option) => {
+              const selected = option.key === selectedAction;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[styles.actionCard, selected && styles.actionCardActive]}
+                  onPress={() => setSelectedAction(option.key)}
+                >
+                  <Text style={[styles.actionLabel, selected && styles.actionLabelActive]}>
+                    {option.label}
+                  </Text>
+                  <Text style={[styles.actionMeta, selected && styles.actionMetaActive]}>
+                    {option.subtitle}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-
-          <Text style={nfcStyles.scannerStatus}>
-            {isScanning 
-              ? "Scanning NFC Card..." 
-              : nfcSupported 
-                ? "Ready to Scan" 
-                : "NFC Not Supported (Simulation Mode)"}
-          </Text>
-          
-          {!nfcSupported && (
-            <Text style={nfcStyles.simulateBadge}>
-              SIMULATION MODE
-            </Text>
-          )}
         </View>
 
-        {/* Scan Button */}
-        <TouchableOpacity
-          style={[
-            nfcStyles.scanButton,
-            isScanning && nfcStyles.scanButtonDisabled
-          ]}
-          onPress={performNFCSimulate}
-          disabled={isScanning}
-          activeOpacity={0.7}
-        >
-          {isScanning ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="scan" size={24} color="#FFFFFF" />
-              <Text style={nfcStyles.scanButtonText}>Tap to Scan</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {/* Scan Result */}
-        {scanResult && (
-          <View style={[
-            nfcStyles.resultCard,
-            { borderLeftColor: scanResult.success ? "#10B981" : "#EF4444" }
-          ]}>
-            <View style={nfcStyles.resultHeader}>
-              <View style={nfcStyles.resultIconContainer}>
-                <Ionicons 
-                  name={scanResult.success ? "checkmark-circle" : "close-circle"} 
-                  size={32} 
-                  color={scanResult.success ? "#10B981" : "#EF4444"} 
-                />
-              </View>
-              <View style={nfcStyles.resultTitleContainer}>
-                <Text style={nfcStyles.resultTitle}>
-                  {scanResult.success ? "Access Granted" : "Access Denied"}
-                </Text>
-                <Text style={nfcStyles.resultLocation}>
-                  {scanResult.location}
-                </Text>
-              </View>
-            </View>
-
-            <View style={nfcStyles.resultDetails}>
-              <View style={nfcStyles.resultRow}>
-                <Ionicons name="time-outline" size={16} color="#6B7280" />
-                <Text style={nfcStyles.resultLabel}>Time:</Text>
-                <Text style={nfcStyles.resultValue}>{scanResult.timestamp}</Text>
-              </View>
-              
-              <View style={nfcStyles.resultRow}>
-                <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                <Text style={nfcStyles.resultLabel}>Date:</Text>
-                <Text style={nfcStyles.resultValue}>{scanResult.date}</Text>
-              </View>
-              
-              <View style={nfcStyles.resultRow}>
-                <Ionicons name="card-outline" size={16} color="#6B7280" />
-                <Text style={nfcStyles.resultLabel}>Card:</Text>
-                <Text style={nfcStyles.resultValue}>{formatCardId(scanResult.cardId)}</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity 
-              style={nfcStyles.viewLogButton}
-              onPress={() => navigation.navigate("AccessLog")}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Card Input</Text>
+          <TextInput
+            style={styles.cardInput}
+            placeholder="Enter or paste NFC card UID"
+            placeholderTextColor="#94A3B8"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            value={cardId}
+            onChangeText={setCardId}
+          />
+          <View style={styles.inlineActions}>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => setCardId(String(user.nfcCardId || "").toUpperCase())}
             >
-              <Text style={nfcStyles.viewLogText}>View Access Logs</Text>
-              <Ionicons name="arrow-forward" size={16} color="#0A3D91" />
+              <Ionicons name="card-outline" size={16} color="#0A3D91" />
+              <Text style={styles.secondaryButtonText}>Use My Card</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.primaryButton, busy && styles.buttonDisabled]}
+              onPress={handleSubmitTap}
+              disabled={busy || !isAllowed}
+            >
+              {busy ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>Process Tap</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
-        )}
+        </View>
 
-        {/* Recent Scans */}
-        {scanHistory.length > 0 && (
-          <View style={nfcStyles.historySection}>
-            <View style={nfcStyles.historyHeader}>
-              <Text style={nfcStyles.historyTitle}>Recent Scans</Text>
-              <TouchableOpacity onPress={() => navigation.navigate("AccessLog")}>
-                <Text style={nfcStyles.historyLink}>View All</Text>
-              </TouchableOpacity>
+        {latestResult ? (
+          <View
+            style={[
+              styles.resultCard,
+              latestResult.success ? styles.resultCardSuccess : styles.resultCardError,
+            ]}
+          >
+            <View style={styles.resultHeader}>
+              <View style={styles.resultIconWrap}>
+                <Ionicons
+                  name={latestResult.success ? "checkmark-circle" : "close-circle"}
+                  size={26}
+                  color={latestResult.success ? "#166534" : "#B91C1C"}
+                />
+              </View>
+              <View style={styles.resultCopy}>
+                <Text style={styles.resultTitle}>{latestResult.name}</Text>
+                <Text style={styles.resultSubtitle}>{latestResult.message}</Text>
+              </View>
             </View>
+            <View style={styles.resultMetaGrid}>
+              <View style={styles.resultMetaCard}>
+                <Text style={styles.resultMetaLabel}>User Type</Text>
+                <Text style={styles.resultMetaValue}>{formatRoleLabel(latestResult.userType)}</Text>
+              </View>
+              <View style={styles.resultMetaCard}>
+                <Text style={styles.resultMetaLabel}>Action</Text>
+                <Text style={styles.resultMetaValue}>{formatRoleLabel(latestResult.action)}</Text>
+              </View>
+              <View style={styles.resultMetaCard}>
+                <Text style={styles.resultMetaLabel}>Checkpoint</Text>
+                <Text style={styles.resultMetaValue}>{latestResult.checkpoint}</Text>
+              </View>
+              <View style={styles.resultMetaCard}>
+                <Text style={styles.resultMetaLabel}>Status</Text>
+                <Text style={styles.resultMetaValue}>{formatRoleLabel(latestResult.status)}</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
 
-            {scanHistory.slice(0, 3).map((scan, index) => (
-              <View key={index} style={nfcStyles.historyItem}>
-                <View style={[
-                  nfcStyles.historyIcon,
-                  { backgroundColor: scan.status === "granted" ? "#E3F2E9" : "#FEE2E2" }
-                ]}>
-                  <Ionicons 
-                    name={scan.status === "granted" ? "checkmark" : "close"} 
-                    size={16} 
-                    color={scan.status === "granted" ? "#0A3D91" : "#DC2626"} 
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Station Feed</Text>
+            <Text style={styles.sectionHint}>Current session</Text>
+          </View>
+          {stationEvents.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="pulse-outline" size={34} color="#94A3B8" />
+              <Text style={styles.emptyTitle}>No checkpoint events yet</Text>
+              <Text style={styles.emptyText}>
+                Process a card tap to see check-in, check-out, or movement results here.
+              </Text>
+            </View>
+          ) : (
+            stationEvents.map((event, index) => (
+              <View
+                key={`${event.timestamp}-${index}`}
+                style={[styles.feedRow, index > 0 && styles.feedRowBorder]}
+              >
+                <View
+                  style={[
+                    styles.feedIconWrap,
+                    event.success ? styles.feedIconWrapSuccess : styles.feedIconWrapError,
+                  ]}
+                >
+                  <Ionicons
+                    name={event.success ? "checkmark" : "close"}
+                    size={16}
+                    color={event.success ? "#166534" : "#B91C1C"}
                   />
                 </View>
-                <View style={nfcStyles.historyInfo}>
-                  <Text style={nfcStyles.historyLocation}>
-                    {scan.location || "Unknown Location"}
+                <View style={styles.feedCopy}>
+                  <Text style={styles.feedTitle}>{event.name}</Text>
+                  <Text style={styles.feedSubtitle}>
+                    {formatRoleLabel(event.userType)} | {formatRoleLabel(event.action)} | {event.checkpoint}
                   </Text>
-                  <Text style={nfcStyles.historyTime}>
-                    {new Date(scan.timestamp).toLocaleTimeString([], { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </Text>
+                  <Text style={styles.feedTimestamp}>{formatDateTime(event.timestamp)}</Text>
                 </View>
-                <View style={[
-                  nfcStyles.historyBadge,
-                  { backgroundColor: scan.status === "granted" ? "#E3F2E9" : "#FEE2E2" }
-                ]}>
-                  <Text style={[
-                    nfcStyles.historyBadgeText,
-                    { color: scan.status === "granted" ? "#0A3D91" : "#DC2626" }
-                  ]}>
-                    {scan.status?.toUpperCase() || "UNKNOWN"}
+                <View style={styles.feedStatusBadge}>
+                  <Text style={styles.feedStatusText}>
+                    {event.success ? "OK" : "BLOCKED"}
                   </Text>
                 </View>
               </View>
-            ))}
-          </View>
-        )}
-
-        {/* Instructions */}
-        <View style={nfcStyles.instructionsCard}>
-          <View style={nfcStyles.instructionsHeader}>
-            <Ionicons name="information-circle-outline" size={22} color="#0A3D91" />
-            <Text style={nfcStyles.instructionsTitle}>How NFC Works</Text>
-          </View>
-          
-          <View style={nfcStyles.instructionsList}>
-            <View style={nfcStyles.instructionItem}>
-              <View style={nfcStyles.instructionDot} />
-              <Text style={nfcStyles.instructionText}>
-                Hold your device near the NFC reader
-              </Text>
-            </View>
-            <View style={nfcStyles.instructionItem}>
-              <View style={nfcStyles.instructionDot} />
-              <Text style={nfcStyles.instructionText}>
-                Each scan is logged in the system
-              </Text>
-            </View>
-            <View style={nfcStyles.instructionItem}>
-              <View style={nfcStyles.instructionDot} />
-              <Text style={nfcStyles.instructionText}>
-                Access is granted based on your role
-              </Text>
-            </View>
-            <View style={nfcStyles.instructionItem}>
-              <View style={nfcStyles.instructionDot} />
-              <Text style={nfcStyles.instructionText}>
-                Report lost cards immediately
-              </Text>
-            </View>
-          </View>
+            ))
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F4F7FB",
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F4F7FB",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#334155",
+  },
+  content: {
+    padding: 18,
+    paddingBottom: 28,
+  },
+  headerCard: {
+    flexDirection: "row",
+    gap: 14,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#EEF5FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerCopy: {
+    flex: 1,
+  },
+  headerEyebrow: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0A3D91",
+    textTransform: "uppercase",
+  },
+  headerTitle: {
+    marginTop: 4,
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  headerSubtitle: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#475569",
+  },
+  operatorCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  operatorLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+    textTransform: "uppercase",
+  },
+  operatorName: {
+    marginTop: 4,
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  operatorMeta: {
+    marginTop: 4,
+    fontSize: 13,
+    color: "#64748B",
+  },
+  operatorStatusBadge: {
+    borderRadius: 999,
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  operatorStatusBadgeWarning: {
+    backgroundColor: "#FEF3C7",
+  },
+  operatorStatusText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#166534",
+  },
+  operatorStatusTextWarning: {
+    color: "#92400E",
+  },
+  warningCard: {
+    flexDirection: "row",
+    gap: 10,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#92400E",
+  },
+  section: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 12,
+  },
+  sectionHint: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  optionRow: {
+    gap: 10,
+    paddingBottom: 4,
+  },
+  optionCard: {
+    minWidth: 128,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    padding: 12,
+    backgroundColor: "#F8FAFC",
+    gap: 8,
+  },
+  optionCardActive: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+  optionLabel: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  optionLabelActive: {
+    color: "#FFFFFF",
+  },
+  optionMeta: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+  optionMetaActive: {
+    color: "#D8E8FF",
+  },
+  actionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  actionCard: {
+    flexGrow: 1,
+    flexBasis: 140,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    padding: 12,
+    backgroundColor: "#F8FAFC",
+  },
+  actionCardActive: {
+    borderColor: "#0A3D91",
+    backgroundColor: "#EEF5FF",
+  },
+  actionLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  actionLabelActive: {
+    color: "#0A3D91",
+  },
+  actionMeta: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+  },
+  actionMetaActive: {
+    color: "#1E40AF",
+  },
+  cardInput: {
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: "#0F172A",
+  },
+  inlineActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  secondaryButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EEF5FF",
+    paddingVertical: 12,
+  },
+  secondaryButtonText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+  primaryButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    backgroundColor: "#0A3D91",
+    paddingVertical: 12,
+  },
+  primaryButtonText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  buttonDisabled: {
+    opacity: 0.65,
+  },
+  resultCard: {
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  resultCardSuccess: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#86EFAC",
+  },
+  resultCardError: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FCA5A5",
+  },
+  resultHeader: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+  },
+  resultIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resultCopy: {
+    flex: 1,
+  },
+  resultTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  resultSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#475569",
+  },
+  resultMetaGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 14,
+  },
+  resultMetaCard: {
+    flexGrow: 1,
+    flexBasis: 140,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 12,
+  },
+  resultMetaLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+    textTransform: "uppercase",
+  },
+  resultMetaValue: {
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 28,
+    paddingHorizontal: 18,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 14,
+  },
+  emptyTitle: {
+    marginTop: 10,
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  emptyText: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+    textAlign: "center",
+  },
+  feedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 6,
+  },
+  feedRowBorder: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+  feedIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  feedIconWrapSuccess: {
+    backgroundColor: "#DCFCE7",
+  },
+  feedIconWrapError: {
+    backgroundColor: "#FEE2E2",
+  },
+  feedCopy: {
+    flex: 1,
+  },
+  feedTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  feedSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+  },
+  feedTimestamp: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#94A3B8",
+  },
+  feedStatusBadge: {
+    borderRadius: 999,
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  feedStatusText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+});

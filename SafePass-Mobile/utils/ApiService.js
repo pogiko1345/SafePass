@@ -1007,12 +1007,66 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async getSecurityLivePresence(filters = {}) {
+    try {
+      const queryString = new URLSearchParams(filters).toString();
+      return await this.fetch(
+        `/security/live-presence${queryString ? `?${queryString}` : ""}`,
+      );
+    } catch (error) {
+      console.error("Get security live presence error:", error);
+      throw error;
+    }
+  }
+
   async getVisitorById(visitorId) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}`);
       return response;
     } catch (error) {
       console.error("Get visitor error:", error);
+      throw error;
+    }
+  }
+
+  async getAttendance(filters = {}) {
+    try {
+      const queryString = new URLSearchParams(filters).toString();
+      return await this.fetch(`/attendance${queryString ? `?${queryString}` : ""}`);
+    } catch (error) {
+      console.error("Get attendance error:", error);
+      throw error;
+    }
+  }
+
+  async getAttendanceSummary(filters = {}) {
+    try {
+      const queryString = new URLSearchParams(filters).toString();
+      return await this.fetch(`/attendance/summary${queryString ? `?${queryString}` : ""}`);
+    } catch (error) {
+      console.error("Get attendance summary error:", error);
+      throw error;
+    }
+  }
+
+  async getMyAttendance(filters = {}) {
+    try {
+      const queryString = new URLSearchParams(filters).toString();
+      return await this.fetch(`/my-attendance${queryString ? `?${queryString}` : ""}`);
+    } catch (error) {
+      console.error("Get my attendance error:", error);
+      throw error;
+    }
+  }
+
+  async submitCheckpointTap(tapData) {
+    try {
+      return await this.fetch("/nfc/station/tap", {
+        method: "POST",
+        body: tapData,
+      });
+    } catch (error) {
+      console.error("Submit checkpoint tap error:", error);
       throw error;
     }
   }
@@ -1467,9 +1521,9 @@ async rejectVisitor(visitorId, reason) {
     }
   }
 
-  async revokeNfcCard(cardId) {
+  async revokeNfcCard(userId) {
     try {
-      const response = await this.fetch(`/admin/nfc-cards/${cardId}/revoke`, {
+      const response = await this.fetch(`/admin/nfc-cards/${userId}/revoke`, {
         method: "PUT",
       });
       return response;

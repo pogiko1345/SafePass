@@ -1042,6 +1042,19 @@ export default function LoginScreen({ navigation, route }) {
           accent: "#0A3D91",
           panel: "Staff Coordination",
         };
+      case "student":
+      case "teacher":
+        return {
+          label: effectiveRole === "teacher" ? "Teacher Access" : "Student Access",
+          title: effectiveRole === "teacher" ? "Teacher Attendance Sign-In" : "Student Attendance Sign-In",
+          subtitle:
+            effectiveRole === "teacher"
+              ? "Review your latest attendance records and campus checkpoint activity."
+              : "Check your attendance history, latest NFC activity, and guardian SMS status.",
+          icon: effectiveRole === "teacher" ? "school-outline" : "id-card-outline",
+          accent: "#0A3D91",
+          panel: "Attendance Console",
+        };
       case "admin":
         return {
           label: "Administrative Access",

@@ -3148,6 +3148,11 @@ const loadDashboardData = useCallback(async () => {
     stats.tomorrowVisits,
   ]);
 
+  const issuedNfcCardsCount = useMemo(
+    () => allUsers.filter((userItem) => Boolean(userItem?.nfcCardId)).length,
+    [allUsers],
+  );
+
   const dashboardQuickActions = useMemo(() => ([
     {
       key: "requests",
@@ -3157,6 +3162,24 @@ const loadDashboardData = useCallback(async () => {
       color: ADMIN_BLUE,
       badge: `${stats.pendingRequests || 0} pending`,
       action: "requests",
+    },
+    {
+      key: "attendance",
+      title: "Attendance",
+      subtitle: "Open student, teacher, staff, and visitor attendance records.",
+      icon: "calendar-clear-outline",
+      color: ADMIN_BLUE,
+      badge: "Daily logs",
+      action: "attendance",
+    },
+    {
+      key: "nfc",
+      title: "NFC System",
+      subtitle: "Open card provisioning, UID mapping, and tap coverage.",
+      icon: "scan-outline",
+      color: ADMIN_BLUE,
+      badge: `${issuedNfcCardsCount || 0} cards`,
+      action: "nfc",
     },
     {
       key: "staff",
@@ -3206,6 +3229,7 @@ const loadDashboardData = useCallback(async () => {
   ]), [
     allUsers.length,
     guardUsers.length,
+    issuedNfcCardsCount,
     monitoredMapVisitors.length,
     staffUsers.length,
     stats.pendingRequests,
@@ -3374,6 +3398,12 @@ const loadDashboardData = useCallback(async () => {
         break;
       case "analytics":
         selectAdminSubmodule("report-records");
+        break;
+      case "attendance":
+        navigation.navigate("AttendanceRecords");
+        break;
+      case "nfc":
+        navigation.navigate("NFCManagement");
         break;
       case "settings":
         applySidebarAnimation();
@@ -5518,7 +5548,7 @@ const loadDashboardData = useCallback(async () => {
         </View>
 
         <View style={styles.quickActionsGrid}>
-          {dashboardQuickActions.slice(0, 4).map((item) => (
+          {dashboardQuickActions.map((item) => (
             <HoverBubble
               key={item.key}
               hoverScale={1.055}

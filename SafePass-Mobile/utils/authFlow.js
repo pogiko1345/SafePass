@@ -1,7 +1,7 @@
 export const normalizeRole = (role) => String(role || "").toLowerCase().trim();
 
 export const isRecognizedRole = (role) =>
-  ["visitor", "security", "guard", "admin", "staff"].includes(normalizeRole(role));
+  ["visitor", "security", "guard", "admin", "staff", "student", "teacher"].includes(normalizeRole(role));
 
 export const getDashboardRoute = (userOrRole) => {
   const role =
@@ -17,6 +17,9 @@ export const getDashboardRoute = (userOrRole) => {
     case "security":
     case "guard":
       return "SecurityDashboard";
+    case "student":
+    case "teacher":
+      return "StudentDashboard";
     case "visitor":
       return "VisitorDashboard";
     default:

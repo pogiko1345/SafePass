@@ -137,6 +137,11 @@ const groupAppointmentsByDate = (appointments = []) => {
     }));
 };
 
+const titleCase = (value = "") =>
+  String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase()) || "Unknown";
+
 export default function SecurityDashboardScreen({ navigation }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isDesktop = viewportWidth >= 1024;
@@ -171,6 +176,10 @@ export default function SecurityDashboardScreen({ navigation }) {
   });
   
   const [activeUsers, setActiveUsers] = useState([]);
+  const [livePresenceSummary, setLivePresenceSummary] = useState({
+    total: 0,
+    byUserType: {},
+  });
   const [recentAccess, setRecentAccess] = useState([]);
   const [alerts, setAlerts] = useState([]);
   
@@ -392,6 +401,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
       await Promise.all([
         loadOperationalData({ force: true }),
+        loadSecurityLivePresence(),
         loadNotifications(currentUser, { force: true }),
       ]);
 
@@ -956,11 +966,10 @@ export default function SecurityDashboardScreen({ navigation }) {
       setAccessLogs(derivedLogs);
       setLogsTotal(derivedLogs.length);
       setReports(derivedReports);
-      setActiveUsers(collections.active);
       setRecentAccess(derivedLogs.slice(0, 10));
       setDashboardStats((current) => ({
         ...current,
-        activeUsers: collections.active.length,
+        activeUsers: current.activeUsers || collections.active.length,
         totalVisitorsToday: stats.totalToday,
         recentAccess: derivedLogs.length,
         occupancyRate: 0,
@@ -981,6 +990,25 @@ export default function SecurityDashboardScreen({ navigation }) {
       return true;
     } catch (error) {
       console.error("Load live visitor locations error:", error);
+      return false;
+    }
+  };
+
+  const loadSecurityLivePresence = async () => {
+    try {
+      const response = await ApiService.getSecurityLivePresence({ limit: 200 });
+      const presence = Array.isArray(response?.presence) ? response.presence : [];
+      const summary = response?.summary || { total: presence.length, byUserType: {} };
+
+      setActiveUsers(presence);
+      setLivePresenceSummary(summary);
+      setDashboardStats((current) => ({
+        ...current,
+        activeUsers: summary.total || presence.length,
+      }));
+      return true;
+    } catch (error) {
+      console.error("Load security live presence error:", error);
       return false;
     }
   };
@@ -1047,6 +1075,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     await Promise.all([
       loadOperationalData({ force: true }),
       loadLiveVisitorLocations(),
+      loadSecurityLivePresence(),
     ]);
   };
 
@@ -1086,11 +1115,11 @@ export default function SecurityDashboardScreen({ navigation }) {
     },
     {
       key: 'campus-activity',
-      label: 'Visitor Arrival / Departure',
+      label: 'Campus Presence',
       icon: 'walk-outline',
       color: '#0A3D91',
       submodules: [
-        { key: 'checked-in-visitors', label: 'Visitor Arrival / Departure', badge: visitors.active.length || 0 },
+        { key: 'checked-in-visitors', label: 'Campus Presence', badge: dashboardStats.activeUsers || visitors.active.length || 0 },
       ],
     },
     {
@@ -1137,8 +1166,8 @@ export default function SecurityDashboardScreen({ navigation }) {
         return { title: 'Appointment Records', subtitle: 'Review appointment records in a read-only security view.' };
       case 'checked-in-visitors':
         return {
-          title: 'Visitor Arrival / Departure',
-          subtitle: 'See visitor arrivals, current campus presence, and recent departures in one security view.',
+          title: 'Campus Presence',
+          subtitle: 'See visitor arrivals, live attendance presence, and recent departures in one security view.',
         };
       case 'report-file':
         return { title: 'File a Report', subtitle: 'Submit a security report and review recently filed incidents.' };
@@ -1212,6 +1241,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     try {
       await Promise.all([
         loadOperationalData({ force: true }),
+        loadSecurityLivePresence(),
         loadNotifications(user, { force: true }),
       ]);
     } finally {
@@ -1226,6 +1256,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       await Promise.all([
         loadOperationalData(),
         loadLiveVisitorLocations(),
+        loadSecurityLivePresence(),
       ]);
     } finally {
       securityLiveRefreshRef.current = false;
@@ -1911,6 +1942,29 @@ export default function SecurityDashboardScreen({ navigation }) {
     </View>
   );
 
+  const livePresenceByType = livePresenceSummary?.byUserType || {};
+
+  const getPresenceIcon = (userType) => {
+    switch (String(userType || "").toLowerCase()) {
+      case "student":
+        return "school-outline";
+      case "teacher":
+        return "reader-outline";
+      case "staff":
+        return "briefcase-outline";
+      case "security":
+      case "guard":
+        return "shield-checkmark-outline";
+      case "visitor":
+        return "person-outline";
+      default:
+        return "person-circle-outline";
+    }
+  };
+
+  const getPresenceLocation = (item) =>
+    item?.location || item?.checkpointName || item?.checkpointId || "Campus checkpoint";
+
   // Render Dashboard Tab
   const renderDashboardTab = () => (
     <ScrollView 
@@ -2116,6 +2170,72 @@ export default function SecurityDashboardScreen({ navigation }) {
                   <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
                   <Text style={styles.emptyRefreshButtonText}>Check again</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View style={[styles.securityPanelCard, { width: '100%' }]}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="people-outline" size={20} color="#0A3D91" />
+              <View>
+                <Text style={styles.sectionTitle}>Campus Presence</Text>
+                <Text style={styles.securitySectionSubtitle}>
+                  Live on-site attendance across students, teachers, staff, security, and visitors.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => selectGuardSubmodule('checked-in-visitors')}>
+              <Text style={styles.viewAll}>Open Presence</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.reportStatsGrid}>
+            <View style={styles.reportStatCard}>
+              <Text style={styles.reportStatValue}>{livePresenceSummary?.total || 0}</Text>
+              <Text style={styles.reportStatLabel}>On Site</Text>
+            </View>
+            <View style={styles.reportStatCard}>
+              <Text style={styles.reportStatValue}>{livePresenceByType.student || 0}</Text>
+              <Text style={styles.reportStatLabel}>Students</Text>
+            </View>
+            <View style={styles.reportStatCard}>
+              <Text style={styles.reportStatValue}>{livePresenceByType.teacher || 0}</Text>
+              <Text style={styles.reportStatLabel}>Teachers</Text>
+            </View>
+            <View style={styles.reportStatCard}>
+              <Text style={styles.reportStatValue}>{livePresenceByType.visitor || 0}</Text>
+              <Text style={styles.reportStatLabel}>Visitors</Text>
+            </View>
+          </View>
+
+          <View style={styles.activityList}>
+            {activeUsers.slice(0, 6).map((presenceItem, index) => (
+              <View
+                key={presenceItem.attendanceId || `${presenceItem.userId || presenceItem.visitorId}-${index}`}
+                style={styles.activityItem}
+              >
+                <View style={[styles.activityIcon, { backgroundColor: '#EEF5FF' }]}>
+                  <Ionicons name={getPresenceIcon(presenceItem.userType)} size={16} color="#0A3D91" />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>{presenceItem.name}</Text>
+                  <Text style={styles.activityLocation}>
+                    {titleCase(presenceItem.userType)} at {getPresenceLocation(presenceItem)}
+                  </Text>
+                </View>
+                <Text style={styles.activityTime}>{formatTime(presenceItem.lastTapTime)}</Text>
+              </View>
+            ))}
+
+            {activeUsers.length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={44} color="#D1D5DB" />
+                <Text style={styles.emptyStateTitle}>No live presence data yet</Text>
+                <Text style={styles.emptyStateSubtitle}>
+                  Active campus attendance will appear here after NFC check-ins start coming in.
+                </Text>
               </View>
             )}
           </View>
@@ -2513,6 +2633,63 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name="walk-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyStateTitle}>No visitors inside campus</Text>
             <Text style={styles.emptyStateSubtitle}>Checked-in visitors will appear here with their assigned floor and office.</Text>
+          </View>
+        )}
+
+        <View style={[styles.sectionHeader, { marginTop: 16 }]}>
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="people-outline" size={18} color="#0A3D91" />
+            <Text style={styles.sectionTitle}>All Live Campus Presence</Text>
+          </View>
+          <Text style={styles.securitySectionSubtitle}>
+            {livePresenceSummary?.total || 0} active attendance record{livePresenceSummary?.total === 1 ? '' : 's'}
+          </Text>
+        </View>
+
+        <View style={styles.reportStatsGrid}>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{livePresenceByType.student || 0}</Text>
+            <Text style={styles.reportStatLabel}>Students</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{livePresenceByType.teacher || 0}</Text>
+            <Text style={styles.reportStatLabel}>Teachers</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{livePresenceByType.staff || 0}</Text>
+            <Text style={styles.reportStatLabel}>Staff</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{(livePresenceByType.security || 0) + (livePresenceByType.guard || 0)}</Text>
+            <Text style={styles.reportStatLabel}>Security</Text>
+          </View>
+        </View>
+
+        {activeUsers.length > 0 ? (
+          <View style={styles.activityList}>
+            {activeUsers.map((presenceItem, index) => (
+              <View
+                key={presenceItem.attendanceId || `${presenceItem.userId || presenceItem.visitorId}-${index}`}
+                style={styles.activityItem}
+              >
+                <View style={[styles.activityIcon, { backgroundColor: '#EEF5FF' }]}>
+                  <Ionicons name={getPresenceIcon(presenceItem.userType)} size={16} color="#0A3D91" />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>{presenceItem.name}</Text>
+                  <Text style={styles.activityLocation}>
+                    {titleCase(presenceItem.userType)} at {getPresenceLocation(presenceItem)}
+                  </Text>
+                </View>
+                <Text style={styles.activityTime}>{formatTime(presenceItem.lastTapTime)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="people-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateTitle}>No live campus presence</Text>
+            <Text style={styles.emptyStateSubtitle}>Students, teachers, staff, and visitors currently on site will appear here.</Text>
           </View>
         )}
 
