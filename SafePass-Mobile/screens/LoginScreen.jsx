@@ -147,7 +147,7 @@ export default function LoginScreen({ navigation, route }) {
   const [loginOtpResendSecondsLeft, setLoginOtpResendSecondsLeft] = useState(0);
 
   // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0.96)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const cardAnim = useRef(new Animated.Value(0)).current;
   const logoPulseAnim = useRef(new Animated.Value(0)).current;

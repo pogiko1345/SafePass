@@ -1,7 +1,13 @@
 import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { AppState, View, Text, ActivityIndicator, Platform } from "react-native";
-import { CommonActions, NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
+import {
+  CommonActions,
+  DefaultTheme,
+  NavigationContainer,
+  useNavigationContainerRef,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { brandColors } from "./styles/brandColors";
 
 // ============ ONLY VISITOR, SECURITY, ADMIN SCREENS ============
 import LoginScreen from "./screens/LoginScreen";
@@ -80,6 +86,14 @@ const WEB_ROUTE_TITLES = {
   SecurityLogs: `Security Logs | ${APP_ORGANIZATION}`,
   Settings: `Settings | ${APP_ORGANIZATION}`,
 };
+const SAFE_PASS_NAV_THEME = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: brandColors.background,
+    card: brandColors.background,
+  },
+};
 
 const ScreenFallback = () => (
   <View
@@ -87,10 +101,10 @@ const ScreenFallback = () => (
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
-      backgroundColor: "#F5F7FA",
+      backgroundColor: brandColors.background,
     }}
   >
-    <ActivityIndicator size="large" color="#0A3D91" />
+    <ActivityIndicator size="large" color={brandColors.blue} />
   </View>
 );
 
@@ -100,7 +114,7 @@ const DEFAULT_STACK_TRANSITION = {
   animationTypeForReplace: "push",
   gestureEnabled: true,
   fullScreenGestureEnabled: true,
-  contentStyle: { backgroundColor: "#F4F7FB" },
+  contentStyle: { backgroundColor: brandColors.background },
 };
 
 const VISITOR_STACK_TRANSITION = {
@@ -374,7 +388,7 @@ export default function App() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#F5F7FA",
+          backgroundColor: brandColors.navy,
           paddingHorizontal: 24,
         }}
       >
@@ -382,12 +396,12 @@ export default function App() {
           style={{
             width: "100%",
             maxWidth: 360,
-            backgroundColor: "#FFFFFF",
-            borderRadius: 24,
+            backgroundColor: brandColors.surface,
+            borderRadius: 8,
             paddingVertical: 28,
             paddingHorizontal: 24,
             alignItems: "center",
-            shadowColor: "#0F172A",
+            shadowColor: brandColors.text,
             shadowOffset: { width: 0, height: 12 },
             shadowOpacity: 0.08,
             shadowRadius: 24,
@@ -398,7 +412,7 @@ export default function App() {
             style={{
               fontSize: 24,
               fontWeight: "800",
-              color: "#0F172A",
+              color: brandColors.text,
               textAlign: "center",
             }}
           >
@@ -409,7 +423,7 @@ export default function App() {
               marginTop: 6,
               fontSize: 13,
               lineHeight: 19,
-              color: "#475569",
+              color: brandColors.textMuted,
               textAlign: "center",
             }}
           >
@@ -420,18 +434,18 @@ export default function App() {
               width: 56,
               height: 4,
               borderRadius: 999,
-              backgroundColor: "#0A3D91",
+              backgroundColor: brandColors.blue,
               marginTop: 16,
               marginBottom: 20,
             }}
           />
-          <ActivityIndicator size="large" color="#0A3D91" />
+          <ActivityIndicator size="large" color={brandColors.blue} />
           <Text
             style={{
               marginTop: 16,
               fontSize: 14,
               fontWeight: "600",
-              color: "#1E293B",
+              color: brandColors.text,
               textAlign: "center",
             }}
           >
@@ -442,7 +456,7 @@ export default function App() {
               marginTop: 6,
               fontSize: 12,
               lineHeight: 18,
-              color: "#64748B",
+              color: brandColors.textMuted,
               textAlign: "center",
             }}
           >
@@ -478,9 +492,10 @@ export default function App() {
   console.log("Current user:", currentUser ? `${currentUser.role}` : "None");
 
   return (
-    <View style={{ flex: 1 }} onTouchStart={resetIdleTimer}>
+    <View style={{ flex: 1, backgroundColor: brandColors.background }} onTouchStart={resetIdleTimer}>
       <NavigationContainer
         ref={navigationRef}
+        theme={SAFE_PASS_NAV_THEME}
         documentTitle={{
           enabled: Platform.OS === "web",
           formatter: (_options, route) =>
