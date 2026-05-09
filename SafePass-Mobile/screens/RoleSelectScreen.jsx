@@ -18,6 +18,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import roleSelectStyles from "../styles/RoleSelectStyles";
+import { brandColors, sapphireGradient } from "../styles/brandColors";
 
 const isWeb = Platform.OS === "web";
 
@@ -30,6 +31,9 @@ export default function RoleSelectScreen({ navigation, route }) {
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const card1Anim = useRef(new Animated.Value(0)).current;
   const card2Anim = useRef(new Animated.Value(0)).current;
+  const logoFloatAnim = useRef(new Animated.Value(0)).current;
+  const visitorPressAnim = useRef(new Animated.Value(1)).current;
+  const loginPressAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", () => {
@@ -70,6 +74,22 @@ export default function RoleSelectScreen({ navigation, route }) {
       ]),
     ]).start();
 
+    const floatAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoFloatAnim, {
+          toValue: 1,
+          duration: 2200,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(logoFloatAnim, {
+          toValue: 0,
+          duration: 2200,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    );
+    floatAnimation.start();
+
     if (Platform.OS !== "web") {
       AccessibilityInfo.announceForAccessibility(
         "Role selection screen. Choose visitor registration or login to access your account."
@@ -79,8 +99,9 @@ export default function RoleSelectScreen({ navigation, route }) {
     return () => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
+      floatAnimation.stop();
     };
-  }, [card1Anim, card2Anim, fadeAnim, scaleAnim, slideAnim]);
+  }, [card1Anim, card2Anim, fadeAnim, logoFloatAnim, scaleAnim, slideAnim]);
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
@@ -134,11 +155,30 @@ export default function RoleSelectScreen({ navigation, route }) {
     }
   };
 
+  const animateCardPress = (animatedValue, toValue) => {
+    Animated.spring(animatedValue, {
+      toValue,
+      friction: 7,
+      tension: 90,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  };
+
   const isRowLayout = windowWidth >= 768 && !keyboardVisible;
+  const logoFloatStyle = {
+    transform: [
+      {
+        translateY: logoFloatAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -6],
+        }),
+      },
+    ],
+  };
 
   return (
     <SafeAreaView style={roleSelectStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#041E42" translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor={brandColors.navy} translucent={false} />
 
       <ScrollView
         contentContainerStyle={roleSelectStyles.scrollContainer}
@@ -156,7 +196,7 @@ export default function RoleSelectScreen({ navigation, route }) {
           ]}
         >
           <LinearGradient
-            colors={["#041E42", "#0A3D91", "#1C6DD0"]}
+            colors={sapphireGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={roleSelectStyles.hero}
@@ -177,13 +217,13 @@ export default function RoleSelectScreen({ navigation, route }) {
                 </View>
               </View>
 
-              <View style={roleSelectStyles.logoContainer}>
+              <Animated.View style={[roleSelectStyles.logoContainer, logoFloatStyle]}>
                 <Image
                   source={require("../assets/LogoSapphire.jpg")}
                   style={roleSelectStyles.logoImage}
                   resizeMode="contain"
                 />
-              </View>
+              </Animated.View>
 
               <Text style={roleSelectStyles.heroTitle}>
                 Sapphire International Aviation Academy
@@ -197,7 +237,7 @@ export default function RoleSelectScreen({ navigation, route }) {
               </Text>
               <View style={roleSelectStyles.flightAccent}>
                 <View style={roleSelectStyles.flightAccentLine} />
-                <Ionicons name="airplane" size={13} color="rgba(255,255,255,0.92)" />
+                <Ionicons name="airplane" size={13} color={brandColors.surface} />
                 <View style={roleSelectStyles.flightAccentDot} />
               </View>
             </View>
@@ -238,6 +278,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                         outputRange: [30, 0],
                       }),
                     },
+                    { scale: visitorPressAnim },
                   ],
                 },
               ]}
@@ -245,6 +286,8 @@ export default function RoleSelectScreen({ navigation, route }) {
               <TouchableOpacity
                 style={roleSelectStyles.card}
                 onPress={handleVisitorSelect}
+                onPressIn={() => animateCardPress(visitorPressAnim, 0.98)}
+                onPressOut={() => animateCardPress(visitorPressAnim, 1)}
                 activeOpacity={0.7}
                 accessibilityLabel="Visitor registration"
                 accessibilityHint="Create a new visitor account to schedule your visit"
@@ -255,15 +298,15 @@ export default function RoleSelectScreen({ navigation, route }) {
                 })}
               >
                 <LinearGradient
-                  colors={["#FFFFFF", "#F8FBFE"]}
+                  colors={[brandColors.surface, brandColors.surfaceSoft]}
                   style={roleSelectStyles.cardGradient}
                 >
                   <View style={roleSelectStyles.cardIconWrapper}>
                     <LinearGradient
-                      colors={["#0A3D91", "#1C6DD0"]}
+                      colors={[brandColors.blue, brandColors.sky]}
                       style={roleSelectStyles.cardIconGradient}
                     >
-                      <Ionicons name="person-add-outline" size={28} color="#FFFFFF" />
+                      <Ionicons name="person-add-outline" size={28} color={brandColors.surface} />
                     </LinearGradient>
                   </View>
                   <View style={roleSelectStyles.cardContent}>
@@ -274,21 +317,21 @@ export default function RoleSelectScreen({ navigation, route }) {
                     </Text>
                     <View style={roleSelectStyles.cardFeatures}>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="card-outline" size={12} color="#0A3D91" />
+                        <Ionicons name="card-outline" size={12} color={brandColors.blue} />
                         <Text style={roleSelectStyles.featurePillText}>Virtual NFC Card</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="calendar-outline" size={12} color="#0A3D91" />
+                        <Ionicons name="calendar-outline" size={12} color={brandColors.blue} />
                         <Text style={roleSelectStyles.featurePillText}>Schedule Visit</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="document-text-outline" size={12} color="#0A3D91" />
+                        <Ionicons name="document-text-outline" size={12} color={brandColors.blue} />
                         <Text style={roleSelectStyles.featurePillText}>Fast Check-In</Text>
                       </View>
                     </View>
                   </View>
                   <View style={roleSelectStyles.cardArrow}>
-                    <Ionicons name="arrow-forward" size={20} color="#0A3D91" />
+                    <Ionicons name="arrow-forward" size={20} color={brandColors.blue} />
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
@@ -307,6 +350,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                         outputRange: [30, 0],
                       }),
                     },
+                    { scale: loginPressAnim },
                   ],
                 },
               ]}
@@ -314,6 +358,8 @@ export default function RoleSelectScreen({ navigation, route }) {
               <TouchableOpacity
                 style={roleSelectStyles.card}
                 onPress={handleLoginSelect}
+                onPressIn={() => animateCardPress(loginPressAnim, 0.98)}
+                onPressOut={() => animateCardPress(loginPressAnim, 1)}
                 activeOpacity={0.7}
                 accessibilityLabel="Login"
                 accessibilityHint="Go to the login screen for your account"
@@ -324,15 +370,15 @@ export default function RoleSelectScreen({ navigation, route }) {
                 })}
               >
                 <LinearGradient
-                  colors={["#FFFFFF", "#EFF6FF"]}
+                  colors={[brandColors.surface, brandColors.blueSoft]}
                   style={roleSelectStyles.cardGradient}
                 >
                   <View style={roleSelectStyles.cardIconWrapper}>
                     <LinearGradient
-                      colors={["#041E42", "#0A3D91"]}
+                      colors={[brandColors.navy, brandColors.blue]}
                       style={roleSelectStyles.cardIconGradient}
                     >
-                      <Ionicons name="log-in-outline" size={28} color="#FFFFFF" />
+                      <Ionicons name="log-in-outline" size={28} color={brandColors.surface} />
                     </LinearGradient>
                   </View>
                   <View style={roleSelectStyles.cardContent}>
@@ -343,21 +389,21 @@ export default function RoleSelectScreen({ navigation, route }) {
                     </Text>
                     <View style={roleSelectStyles.cardFeatures}>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="checkmark-circle-outline" size={12} color="#0A3D91" />
+                        <Ionicons name="checkmark-circle-outline" size={12} color={brandColors.blue} />
                         <Text style={roleSelectStyles.featurePillText}>Check Status</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="shield-checkmark-outline" size={12} color="#0A3D91" />
+                        <Ionicons name="shield-checkmark-outline" size={12} color={brandColors.blue} />
                         <Text style={roleSelectStyles.featurePillText}>Secure Access</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="settings-outline" size={12} color="#0A3D91" />
+                        <Ionicons name="settings-outline" size={12} color={brandColors.blue} />
                         <Text style={roleSelectStyles.featurePillText}>Manage Visit</Text>
                       </View>
                     </View>
                   </View>
                   <View style={roleSelectStyles.cardArrow}>
-                    <Ionicons name="arrow-forward" size={20} color="#0A3D91" />
+                    <Ionicons name="arrow-forward" size={20} color={brandColors.blue} />
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
@@ -366,15 +412,15 @@ export default function RoleSelectScreen({ navigation, route }) {
 
           <View style={roleSelectStyles.infoGrid}>
             <View style={roleSelectStyles.infoCard}>
-              <Ionicons name="shield-checkmark-outline" size={19} color="#10B981" />
+              <Ionicons name="shield-checkmark-outline" size={19} color={brandColors.success} />
               <Text style={roleSelectStyles.infoCardText}>Secure Access</Text>
             </View>
             <View style={roleSelectStyles.infoCard}>
-              <Ionicons name="location-outline" size={19} color="#F59E0B" />
+              <Ionicons name="location-outline" size={19} color={brandColors.warning} />
               <Text style={roleSelectStyles.infoCardText}>GPS Tracking</Text>
             </View>
             <View style={roleSelectStyles.infoCard}>
-              <Ionicons name="notifications-outline" size={19} color="#1C6DD0" />
+              <Ionicons name="notifications-outline" size={19} color={brandColors.sky} />
               <Text style={roleSelectStyles.infoCardText}>Real-time Alerts</Text>
             </View>
           </View>
@@ -386,14 +432,14 @@ export default function RoleSelectScreen({ navigation, route }) {
             accessibilityRole="link"
             activeOpacity={0.6}
           >
-            <Ionicons name="help-circle-outline" size={18} color="#6B7280" />
+            <Ionicons name="help-circle-outline" size={18} color={brandColors.textMuted} />
             <Text style={roleSelectStyles.helpText}>Need help?</Text>
           </TouchableOpacity>
 
           <View style={roleSelectStyles.contactCard}>
             <View style={roleSelectStyles.contactHeader}>
               <View style={roleSelectStyles.contactHeaderIcon}>
-                <Ionicons name="call-outline" size={18} color="#0A3D91" />
+                <Ionicons name="call-outline" size={18} color={brandColors.blue} />
               </View>
               <View style={roleSelectStyles.contactHeaderText}>
                 <Text style={roleSelectStyles.contactTitle}>School Contact Details</Text>
@@ -424,7 +470,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                 onPress={() => openExternalLink("https://sapphireaviationacademy.edu.ph/")}
                 activeOpacity={0.75}
               >
-                <Ionicons name="globe-outline" size={15} color="#0A3D91" />
+                <Ionicons name="globe-outline" size={15} color={brandColors.blue} />
                 <Text style={roleSelectStyles.contactLinkText}>Website</Text>
               </TouchableOpacity>
 
@@ -433,7 +479,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                 onPress={() => openExternalLink("https://www.facebook.com/sapphireaviationacademy/")}
                 activeOpacity={0.75}
               >
-                <Ionicons name="logo-facebook" size={15} color="#0A3D91" />
+                <Ionicons name="logo-facebook" size={15} color={brandColors.blue} />
                 <Text style={roleSelectStyles.contactLinkText}>Facebook</Text>
               </TouchableOpacity>
 
@@ -442,7 +488,7 @@ export default function RoleSelectScreen({ navigation, route }) {
                 onPress={() => openExternalLink("https://www.youtube.com/@sapphireaviation5105")}
                 activeOpacity={0.75}
               >
-                <Ionicons name="logo-youtube" size={15} color="#0A3D91" />
+                <Ionicons name="logo-youtube" size={15} color={brandColors.blue} />
                 <Text style={roleSelectStyles.contactLinkText}>YouTube</Text>
               </TouchableOpacity>
             </View>

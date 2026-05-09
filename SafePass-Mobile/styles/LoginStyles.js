@@ -1,19 +1,21 @@
 import { StyleSheet, Platform, Dimensions } from "react-native";
+import { brandColors } from "./brandColors";
 
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 const isSmallPhone = width <= 375;
 const isTablet = width >= 768 && width < 1024;
+const shadowColor = brandColors.text;
 
 export default StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F8FC",
+    backgroundColor: brandColors.background,
   },
 
   container: {
     flex: 1,
-    backgroundColor: "#F4F8FC",
+    backgroundColor: brandColors.background,
   },
 
   scrollContainer: {
@@ -23,7 +25,7 @@ export default StyleSheet.create({
 
   splashContainer: {
     flex: 1,
-    backgroundColor: "#041E42",
+    backgroundColor: brandColors.navy,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -47,16 +49,16 @@ export default StyleSheet.create({
   loginSplashCard: {
     width: "100%",
     maxWidth: 340,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
     borderRadius: 24,
     paddingHorizontal: 28,
     paddingVertical: 30,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: brandColors.border,
     ...Platform.select({
       ios: {
-        shadowColor: "#0F172A",
+        shadowColor,
         shadowOffset: { width: 0, height: 18 },
         shadowOpacity: 0.16,
         shadowRadius: 28,
@@ -74,9 +76,9 @@ export default StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: "#EEF5FF",
+    backgroundColor: brandColors.blueSoft,
     borderWidth: 4,
-    borderColor: "#D8E8FF",
+    borderColor: brandColors.blueBorder,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 18,
@@ -86,13 +88,13 @@ export default StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
   },
 
   loginSplashTitle: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#0F172A",
+    color: brandColors.text,
     marginBottom: 8,
     textAlign: "center",
   },
@@ -100,7 +102,7 @@ export default StyleSheet.create({
   loginSplashMessage: {
     fontSize: 15,
     lineHeight: 22,
-    color: "#475569",
+    color: brandColors.textMuted,
     textAlign: "center",
     marginBottom: 18,
   },
@@ -109,7 +111,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#F8FBFE",
+    backgroundColor: brandColors.surfaceSoft,
     borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -120,11 +122,11 @@ export default StyleSheet.create({
   loginSplashLoadingText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#0A3D91",
+    color: brandColors.blue,
   },
 
   header: {
-    backgroundColor: "#041E42",
+    backgroundColor: brandColors.navy,
     paddingHorizontal: 24,
     paddingTop: Platform.select({
       ios: 52,
@@ -137,7 +139,7 @@ export default StyleSheet.create({
     overflow: "hidden",
     ...Platform.select({
       ios: {
-        shadowColor: "#041E42",
+        shadowColor: brandColors.navy,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.16,
         shadowRadius: 18,
@@ -178,7 +180,7 @@ export default StyleSheet.create({
     height: 28,
     borderRadius: 14,
     marginRight: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
   },
 
   headerGlowOne: {
@@ -188,7 +190,7 @@ export default StyleSheet.create({
     width: 148,
     height: 148,
     borderRadius: 74,
-    backgroundColor: "rgba(255,255,255,0.09)",
+    display: "none",
   },
 
   headerGlowTwo: {
@@ -198,7 +200,7 @@ export default StyleSheet.create({
     width: 190,
     height: 190,
     borderRadius: 95,
-    backgroundColor: "rgba(56,189,248,0.12)",
+    display: "none",
   },
 
   brandBadgeTextWrap: {
@@ -214,7 +216,7 @@ export default StyleSheet.create({
   },
 
   brandBadgeTitle: {
-    color: "#FFFFFF",
+    color: brandColors.surface,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -226,7 +228,7 @@ export default StyleSheet.create({
     marginBottom: 12,
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.28)",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -235,12 +237,12 @@ export default StyleSheet.create({
         shadowRadius: 10,
       },
       android: { elevation: 6 },
-      web: { boxShadow: "0px 6px 18px rgba(0,0,0,0.18)" },
+      web: { boxShadow: "0px 6px 18px rgba(4, 30, 66, 0.18)" },
     }),
   },
 
   appName: {
-    color: "#FFFFFF",
+    color: brandColors.surface,
     fontSize: isSmallPhone ? 18 : isTablet ? 24 : 22,
     fontWeight: "800",
     textAlign: "center",
@@ -295,7 +297,7 @@ export default StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
   },
 
   statusText: {
@@ -312,10 +314,10 @@ export default StyleSheet.create({
     padding: isSmallPhone ? 20 : 24,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#E6EDF7",
+    borderColor: brandColors.border,
     ...Platform.select({
       ios: {
-        shadowColor: "#0F172A",
+        shadowColor,
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.08,
         shadowRadius: 20,
@@ -337,28 +339,28 @@ export default StyleSheet.create({
     marginBottom: 20,
     paddingVertical: 9,
     paddingHorizontal: 14,
-    backgroundColor: "#F3F7FB",
+    backgroundColor: brandColors.surfaceSoft,
     borderRadius: 8,
     gap: 6,
     borderWidth: 1,
-    borderColor: "#E4EBF5",
+    borderColor: brandColors.border,
     ...(isWeb && { cursor: "pointer" }),
   },
 
   backToRoleText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#0A3D91",
+    color: brandColors.blue,
   },
 
   roleHero: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F7FAFD",
+    backgroundColor: brandColors.surfaceSoft,
     borderRadius: 8,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E6EDF7",
+    borderColor: brandColors.border,
     marginBottom: 18,
   },
 
@@ -378,7 +380,7 @@ export default StyleSheet.create({
   roleEyebrow: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#64748B",
+    color: brandColors.textMuted,
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 3,
@@ -387,13 +389,13 @@ export default StyleSheet.create({
   rolePanel: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
+    color: brandColors.text,
   },
 
   welcomeTitle: {
     fontSize: isSmallPhone ? 24 : 28,
     fontWeight: "800",
-    color: "#0F172A",
+    color: brandColors.text,
     textAlign: "center",
     marginBottom: 6,
     letterSpacing: 0,
@@ -401,7 +403,7 @@ export default StyleSheet.create({
 
   welcomeSubtitle: {
     fontSize: isSmallPhone ? 14 : 15,
-    color: "#5B667A",
+    color: brandColors.textMuted,
     textAlign: "center",
     marginBottom: 24,
     lineHeight: 21,
@@ -414,7 +416,7 @@ export default StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#334155",
+    color: brandColors.text,
     marginBottom: 7,
     marginLeft: 4,
   },
@@ -423,7 +425,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1.5,
-    borderColor: "#DCE5F0",
+    borderColor: brandColors.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: Platform.select({
@@ -431,7 +433,7 @@ export default StyleSheet.create({
       android: 10,
       web: 12,
     }),
-    backgroundColor: "#F8FBFE",
+    backgroundColor: brandColors.surfaceSoft,
     gap: 12,
     ...(isWeb && {
       transition: "border-color 0.2s ease, box-shadow 0.2s ease",
@@ -443,7 +445,7 @@ export default StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#0F172A",
+    color: brandColors.text,
     padding: 0,
     ...(isWeb && {
       outlineStyle: "none",
@@ -466,7 +468,7 @@ export default StyleSheet.create({
 
   helperText: {
     fontSize: 12,
-    color: "#64748B",
+    color: brandColors.textMuted,
     marginTop: 5,
     marginLeft: 4,
   },
@@ -493,23 +495,23 @@ export default StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
   },
 
   checkboxChecked: {
-    backgroundColor: "#0A3D91",
-    borderColor: "#0A3D91",
+    backgroundColor: brandColors.blue,
+    borderColor: brandColors.blue,
   },
 
   rememberText: {
     fontSize: 14,
-    color: "#334155",
+    color: brandColors.text,
     fontWeight: "600",
   },
 
   forgotText: {
     fontSize: 14,
-    color: "#0A3D91",
+    color: brandColors.blue,
     fontWeight: "700",
   },
 
@@ -517,8 +519,8 @@ export default StyleSheet.create({
     minHeight: 48,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#B7D5F6",
-    backgroundColor: "#EEF5FF",
+    borderColor: brandColors.blueBorder,
+    backgroundColor: brandColors.blueSoft,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -529,11 +531,11 @@ export default StyleSheet.create({
   biometricLoginText: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#0A3D91",
+    color: brandColors.blue,
   },
 
   loginButton: {
-    backgroundColor: "#0A3D91",
+    backgroundColor: brandColors.blue,
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: "center",
@@ -550,7 +552,7 @@ export default StyleSheet.create({
   },
 
   loginButtonText: {
-    color: "#FFFFFF",
+    color: brandColors.surface,
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.4,
@@ -566,17 +568,17 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
-    backgroundColor: "#EEF5FF",
+    backgroundColor: brandColors.blueSoft,
     borderRadius: 8,
     gap: 8,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#D8E8FF",
+    borderColor: brandColors.blueBorder,
   },
 
   twoFactorText: {
     fontSize: 13,
-    color: "#0A3D91",
+    color: brandColors.blue,
     fontWeight: "600",
   },
 

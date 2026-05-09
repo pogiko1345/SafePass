@@ -18,6 +18,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import loginStyles from "../styles/LoginStyles";
+import { brandColors } from "../styles/brandColors";
 import { Ionicons } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
 import ApiService from "../utils/ApiService";
@@ -148,6 +149,10 @@ export default function LoginScreen({ navigation, route }) {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  const logoPulseAnim = useRef(new Animated.Value(0)).current;
+  const statusPulseAnim = useRef(new Animated.Value(1)).current;
+  const loginButtonPressAnim = useRef(new Animated.Value(1)).current;
 
   // ============ FORGOT PASSWORD STATES ============
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -192,8 +197,51 @@ export default function LoginScreen({ navigation, route }) {
         duration: 500,
         useNativeDriver: Platform.OS !== 'web',
       }),
+      Animated.timing(cardAnim, {
+        toValue: 1,
+        duration: 620,
+        delay: 120,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
     ]).start();
-  }, []);
+
+    const logoPulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoPulseAnim, {
+          toValue: 1,
+          duration: 1800,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(logoPulseAnim, {
+          toValue: 0,
+          duration: 1800,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    );
+    const statusPulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(statusPulseAnim, {
+          toValue: 1.04,
+          duration: 1100,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(statusPulseAnim, {
+          toValue: 1,
+          duration: 1100,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    );
+
+    logoPulse.start();
+    statusPulse.start();
+
+    return () => {
+      logoPulse.stop();
+      statusPulse.stop();
+    };
+  }, [cardAnim, fadeAnim, logoPulseAnim, slideAnim, statusPulseAnim]);
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
@@ -831,7 +879,14 @@ export default function LoginScreen({ navigation, route }) {
 
   // ============ PASSWORD STRENGTH UI ============
   const getPasswordStrengthColor = () => {
-    const colors = ['#E5E7EB', '#EF4444', '#F59E0B', '#10B981', '#0A3D91', '#0A3D91'];
+    const colors = [
+      brandColors.border,
+      brandColors.danger,
+      brandColors.warning,
+      brandColors.success,
+      brandColors.blue,
+      brandColors.blue,
+    ];
     return colors[passwordStrength] || colors[0];
   };
 
@@ -1020,7 +1075,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Continue Your Visit Journey",
           subtitle: "Track approvals, manage appointments, and keep your Sapphire visit details in one secure place.",
           icon: "person-outline",
-          accent: "#0A3D91",
+          accent: brandColors.blue,
           panel: "Visitor Coordination",
         };
       case "security":
@@ -1030,7 +1085,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Checkpoint Team Sign-In",
           subtitle: "Enter the secure operations workspace for approvals, arrival monitoring, and access validation.",
           icon: "shield-checkmark-outline",
-          accent: "#0A3D91",
+          accent: brandColors.blue,
           panel: "Operations Console",
         };
       case "staff":
@@ -1039,7 +1094,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Appointment Desk Sign-In",
           subtitle: "Review visitor appointments, adjust schedules, and respond to requests from the staff dashboard.",
           icon: "briefcase-outline",
-          accent: "#0A3D91",
+          accent: brandColors.blue,
           panel: "Staff Coordination",
         };
       case "student":
@@ -1052,7 +1107,7 @@ export default function LoginScreen({ navigation, route }) {
               ? "Review your latest attendance records and campus checkpoint activity."
               : "Check your attendance history, latest NFC activity, and guardian SMS status.",
           icon: effectiveRole === "teacher" ? "school-outline" : "id-card-outline",
-          accent: "#0A3D91",
+          accent: brandColors.blue,
           panel: "Attendance Console",
         };
       case "admin":
@@ -1061,7 +1116,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Command and Oversight Login",
           subtitle: "Open the administrative control center for user review, access supervision, and reporting.",
           icon: "settings-outline",
-          accent: "#1C6DD0",
+          accent: brandColors.sky,
           panel: "Admin Control",
         };
       default:
@@ -1070,7 +1125,7 @@ export default function LoginScreen({ navigation, route }) {
           title: "Welcome Back",
           subtitle: "Sign in to continue with your secure SafePass workflow.",
           icon: "log-in-outline",
-          accent: "#0A3D91",
+          accent: brandColors.blue,
           panel: "Secure Entry",
         };
     }
@@ -1097,12 +1152,21 @@ export default function LoginScreen({ navigation, route }) {
     }
   };
 
+  const animateButtonPress = (toValue) => {
+    Animated.spring(loginButtonPressAnim, {
+      toValue,
+      friction: 7,
+      tension: 90,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  };
+
   // ============ SPLASH SCREEN ============
   if (isCheckingAuth) {
     return (
       <View style={loginStyles.splashContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#1A2A6C" />
-        <ActivityIndicator size="large" color="#FFFFFF" />
+        <StatusBar barStyle="light-content" backgroundColor={brandColors.navy} />
+        <ActivityIndicator size="large" color={brandColors.surface} />
         <Text style={loginStyles.splashText}>Restoring your session...</Text>
       </View>
     );
@@ -1125,10 +1189,31 @@ export default function LoginScreen({ navigation, route }) {
         : resetToken
           ? "Create a new password from your secure reset link."
           : "Create a new password that matches the same Secure Login standards.";
+  const logoPulseStyle = {
+    transform: [
+      {
+        scale: logoPulseAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.035],
+        }),
+      },
+    ],
+  };
+  const cardEntranceStyle = {
+    opacity: cardAnim,
+    transform: [
+      {
+        translateY: cardAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [28, 0],
+        }),
+      },
+    ],
+  };
 
   return (
     <SafeAreaView style={loginStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#1A2A6C" />
+      <StatusBar barStyle="light-content" backgroundColor={brandColors.navy} />
       
       <KeyboardAvoidingView
         style={loginStyles.container}
@@ -1160,9 +1245,9 @@ export default function LoginScreen({ navigation, route }) {
                     </View>
                   </View>
 
-                  <Image 
-                    source={Logo} 
-                    style={[loginStyles.logoImage, logoResponsiveStyle]}
+                  <Animated.Image
+                    source={Logo}
+                    style={[loginStyles.logoImage, logoResponsiveStyle, logoPulseStyle]}
                     resizeMode="contain"
                   />
                   <Text style={[loginStyles.appName, appNameResponsiveStyle]}>
@@ -1173,25 +1258,28 @@ export default function LoginScreen({ navigation, route }) {
                   </Text>
                   <View style={loginStyles.flightAccent}>
                     <View style={loginStyles.flightAccentLine} />
-                    <Ionicons name="airplane" size={13} color="rgba(255,255,255,0.92)" />
+                    <Ionicons name="airplane" size={13} color={brandColors.surface} />
                     <View style={loginStyles.flightAccentDot} />
                   </View>
                   
                   {/* API Status Badge */}
-                  <View style={[
+                  <Animated.View style={[
                     loginStyles.statusBadge,
-                    { backgroundColor: apiConnected ? '#10B981' : '#EF4444' }
+                    {
+                      backgroundColor: apiConnected ? brandColors.success : brandColors.danger,
+                      transform: [{ scale: statusPulseAnim }],
+                    },
                   ]}>
                     <View style={loginStyles.statusDot} />
                     <Text style={loginStyles.statusText}>
                       {apiConnected ? 'SYSTEM ONLINE' : 'SERVER OFFLINE'}
                     </Text>
-                  </View>
+                  </Animated.View>
                 </View>
               </View>
 
               {/* Login Card */}
-              <View style={[loginStyles.card, cardResponsiveStyle]}>
+              <Animated.View style={[loginStyles.card, cardResponsiveStyle, cardEntranceStyle]}>
                 {/* Back to Role Select */}
                 {!IS_VISITOR_ONLY_APP && (
                   <TouchableOpacity
@@ -1203,7 +1291,7 @@ export default function LoginScreen({ navigation, route }) {
                       tabIndex: 0,
                     })}
                   >
-                    <Ionicons name="arrow-back" size={20} color="#1A2A6C" />
+                    <Ionicons name="arrow-back" size={20} color={brandColors.navy} />
                     <Text style={loginStyles.backToRoleText}>Change Role</Text>
                   </TouchableOpacity>
                 )}
@@ -1216,7 +1304,7 @@ export default function LoginScreen({ navigation, route }) {
                       { backgroundColor: roleConfig.accent },
                     ]}
                   >
-                    <Ionicons name={roleConfig.icon} size={22} color="#FFFFFF" />
+                    <Ionicons name={roleConfig.icon} size={22} color={brandColors.surface} />
                   </View>
                   <View style={loginStyles.roleHeroText}>
                     <Text style={loginStyles.roleEyebrow}>{roleConfig.label}</Text>
@@ -1240,12 +1328,12 @@ export default function LoginScreen({ navigation, route }) {
                       loginStyles.inputContainer,
                       errors.email && loginStyles.inputError
                     ]}>
-                      <Ionicons name="person-outline" size={20} color="#6B7280" />
+                      <Ionicons name="person-outline" size={20} color={brandColors.textMuted} />
                       <TextInput
                         ref={emailInputRef}
                         style={loginStyles.input}
                         placeholder="Enter username or email"
-                        placeholderTextColor="#9CA3AF"
+                        placeholderTextColor={brandColors.textMuted}
                         value={email}
                         onChangeText={handleEmailChange}
                         onBlur={() => {
@@ -1278,12 +1366,12 @@ export default function LoginScreen({ navigation, route }) {
                       loginStyles.inputContainer,
                       (errors.password || loginError) && loginStyles.inputError
                     ]}>
-                      <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
+                      <Ionicons name="lock-closed-outline" size={20} color={brandColors.textMuted} />
                       <TextInput
                         ref={passwordInputRef}
                         style={loginStyles.input}
                         placeholder="Enter your password"
-                        placeholderTextColor="#9CA3AF"
+                        placeholderTextColor={brandColors.textMuted}
                         value={password}
                         onChangeText={handlePasswordChange}
                         onBlur={validatePasswordField}
@@ -1296,7 +1384,7 @@ export default function LoginScreen({ navigation, route }) {
                         <Ionicons 
                           name={showPassword ? "eye-off-outline" : "eye-outline"} 
                           size={20} 
-                          color="#6B7280" 
+                          color={brandColors.textMuted}
                         />
                       </TouchableOpacity>
                     </View>
@@ -1314,7 +1402,7 @@ export default function LoginScreen({ navigation, route }) {
                     <View style={loginStyles.visitorOtpPanel}>
                       <View style={loginStyles.visitorOtpHeader}>
                         <View style={loginStyles.visitorOtpIcon}>
-                          <Ionicons name="mail-unread-outline" size={18} color="#0A3D91" />
+                          <Ionicons name="mail-unread-outline" size={18} color={brandColors.blue} />
                         </View>
                         <View style={loginStyles.visitorOtpHeaderCopy}>
                           <Text style={loginStyles.visitorOtpTitle}>Verify Visitor Account</Text>
@@ -1328,11 +1416,11 @@ export default function LoginScreen({ navigation, route }) {
                         loginStyles.visitorOtpInputContainer,
                         loginOtpError && loginStyles.inputError,
                       ]}>
-                        <Ionicons name="keypad-outline" size={18} color="#6B7280" />
+                        <Ionicons name="keypad-outline" size={18} color={brandColors.textMuted} />
                         <TextInput
                           style={[loginStyles.input, loginStyles.visitorOtpInput]}
                           placeholder="6-digit OTP"
-                          placeholderTextColor="#9CA3AF"
+                          placeholderTextColor={brandColors.textMuted}
                           value={loginOtpCode}
                           onChangeText={handleLoginOtpChange}
                           keyboardType="number-pad"
@@ -1371,11 +1459,11 @@ export default function LoginScreen({ navigation, route }) {
                           disabled={isLoginOtpBusy}
                         >
                           {isLoginOtpBusy ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
+                            <ActivityIndicator size="small" color={brandColors.surface} />
                           ) : (
                             <>
                               <Text style={loginStyles.visitorOtpPrimaryText}>Verify & Sign In</Text>
-                              <Ionicons name="arrow-forward-outline" size={16} color="#FFFFFF" />
+                              <Ionicons name="arrow-forward-outline" size={16} color={brandColors.surface} />
                             </>
                           )}
                         </TouchableOpacity>
@@ -1394,7 +1482,7 @@ export default function LoginScreen({ navigation, route }) {
                         loginStyles.checkbox,
                         rememberMe && loginStyles.checkboxChecked
                       ]}>
-                        {rememberMe && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
+                        {rememberMe && <Ionicons name="checkmark" size={12} color={brandColors.surface} />}
                       </View>
                       <Text style={loginStyles.rememberText}>Remember me</Text>
                     </TouchableOpacity>
@@ -1412,10 +1500,10 @@ export default function LoginScreen({ navigation, route }) {
                       activeOpacity={0.86}
                     >
                       {isBiometricLoading ? (
-                        <ActivityIndicator size="small" color="#0A3D91" />
+                        <ActivityIndicator size="small" color={brandColors.blue} />
                       ) : (
                         <>
-                          <Ionicons name="finger-print-outline" size={20} color="#0A3D91" />
+                          <Ionicons name="finger-print-outline" size={20} color={brandColors.blue} />
                           <Text style={loginStyles.biometricLoginText}>Use phone biometric</Text>
                         </>
                       )}
@@ -1423,35 +1511,39 @@ export default function LoginScreen({ navigation, route }) {
                   ) : null}
 
                   {/* Login Button */}
-                  <TouchableOpacity
-                    ref={loginButtonRef}
-                    style={[
-                      loginStyles.loginButton,
-                      isLoading && loginStyles.buttonDisabled
-                    ]}
-                    onPress={handleLogin}
-                    disabled={isLoading}
-                    activeOpacity={0.8}
-                    {...(isWeb && {
-                      onKeyPress: (e) => handleKeyPress(e, handleLogin),
-                      tabIndex: 0,
-                    })}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
-                        <Text style={loginStyles.loginButtonText}>
-                          SIGN IN
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                  <Animated.View style={{ transform: [{ scale: loginButtonPressAnim }] }}>
+                    <TouchableOpacity
+                      ref={loginButtonRef}
+                      style={[
+                        loginStyles.loginButton,
+                        isLoading && loginStyles.buttonDisabled
+                      ]}
+                      onPress={handleLogin}
+                      onPressIn={() => animateButtonPress(0.98)}
+                      onPressOut={() => animateButtonPress(1)}
+                      disabled={isLoading}
+                      activeOpacity={0.8}
+                      {...(isWeb && {
+                        onKeyPress: (e) => handleKeyPress(e, handleLogin),
+                        tabIndex: 0,
+                      })}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator color={brandColors.surface} />
+                      ) : (
+                        <>
+                          <Ionicons name="log-in-outline" size={20} color={brandColors.surface} />
+                          <Text style={loginStyles.loginButtonText}>
+                            SIGN IN
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </Animated.View>
 
                   {/* 2FA Info */}
                   <View style={loginStyles.twoFactorInfo}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color="#1A2A6C" />
+                    <Ionicons name="shield-checkmark-outline" size={16} color={brandColors.navy} />
                     <Text style={loginStyles.twoFactorText}>
                       Secure login with 2-factor authentication
                     </Text>
@@ -1463,8 +1555,8 @@ export default function LoginScreen({ navigation, route }) {
                         marginBottom: 16,
                         borderRadius: 8,
                         borderWidth: 1,
-                        borderColor: "#DDE7F3",
-                        backgroundColor: "#F8FBFE",
+                        borderColor: brandColors.border,
+                        backgroundColor: brandColors.surfaceSoft,
                         paddingHorizontal: isCompactLogin ? 14 : 16,
                         paddingVertical: isCompactLogin ? 14 : 16,
                       }}
@@ -1473,7 +1565,7 @@ export default function LoginScreen({ navigation, route }) {
                         style={{
                           fontSize: 14,
                           fontWeight: "800",
-                          color: "#0F172A",
+                          color: brandColors.text,
                           textAlign: "center",
                           marginBottom: 4,
                         }}
@@ -1484,7 +1576,7 @@ export default function LoginScreen({ navigation, route }) {
                         style={{
                           fontSize: 13,
                           lineHeight: 19,
-                          color: "#64748B",
+                          color: brandColors.textMuted,
                           textAlign: "center",
                           marginBottom: 12,
                         }}
@@ -1494,8 +1586,8 @@ export default function LoginScreen({ navigation, route }) {
                       <TouchableOpacity
                         style={{
                           borderWidth: 1,
-                          borderColor: "#B7D5F6",
-                          backgroundColor: "#EEF5FF",
+                          borderColor: brandColors.blueBorder,
+                          backgroundColor: brandColors.blueSoft,
                           borderRadius: 8,
                           paddingVertical: 13,
                           paddingHorizontal: 16,
@@ -1507,12 +1599,12 @@ export default function LoginScreen({ navigation, route }) {
                         onPress={() => navigation.navigate("VisitorRegister")}
                         activeOpacity={0.85}
                       >
-                        <Ionicons name="person-add-outline" size={18} color="#0A3D91" />
+                        <Ionicons name="person-add-outline" size={18} color={brandColors.blue} />
                         <Text
                           style={{
                             fontSize: 14,
                             fontWeight: "800",
-                            color: "#0A3D91",
+                            color: brandColors.blue,
                           }}
                         >
                           Create Account
@@ -1525,13 +1617,13 @@ export default function LoginScreen({ navigation, route }) {
                 {/* Server Info - Only when offline */}
                 {!apiConnected && (
                   <View style={loginStyles.infoBox}>
-                    <Ionicons name="information-circle" size={20} color="#EF4444" />
+                    <Ionicons name="information-circle" size={20} color={brandColors.danger} />
                     <Text style={loginStyles.infoText}>
                       Server health check did not respond yet. You can still try signing in.
                     </Text>
                   </View>
                 )}
-              </View>
+              </Animated.View>
 
               {/* Footer */}
               <View style={[loginStyles.footer, footerResponsiveStyle]}>
@@ -1551,7 +1643,7 @@ export default function LoginScreen({ navigation, route }) {
                       onPress={() => openExternalLink("https://sapphireaviationacademy.edu.ph/")}
                       activeOpacity={0.75}
                     >
-                      <Ionicons name="globe-outline" size={14} color="#0A3D91" />
+                      <Ionicons name="globe-outline" size={14} color={brandColors.blue} />
                       <Text style={loginStyles.footerLinkText}>Website</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -1559,7 +1651,7 @@ export default function LoginScreen({ navigation, route }) {
                       onPress={() => openExternalLink("https://www.facebook.com/sapphireaviationacademy/")}
                       activeOpacity={0.75}
                     >
-                      <Ionicons name="logo-facebook" size={14} color="#0A3D91" />
+                      <Ionicons name="logo-facebook" size={14} color={brandColors.blue} />
                       <Text style={loginStyles.footerLinkText}>Facebook</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -1567,7 +1659,7 @@ export default function LoginScreen({ navigation, route }) {
                       onPress={() => openExternalLink("https://www.youtube.com/@sapphireaviation5105")}
                       activeOpacity={0.75}
                     >
-                      <Ionicons name="logo-youtube" size={14} color="#0A3D91" />
+                      <Ionicons name="logo-youtube" size={14} color={brandColors.blue} />
                       <Text style={loginStyles.footerLinkText}>YouTube</Text>
                     </TouchableOpacity>
                   </View>
@@ -1606,13 +1698,13 @@ export default function LoginScreen({ navigation, route }) {
                     style={loginStyles.modalCloseButton}
                     onPress={handleCloseForgotPassword}
                   >
-                    <Ionicons name="close" size={22} color="#FFFFFF" />
+                    <Ionicons name="close" size={22} color={brandColors.surface} />
                   </TouchableOpacity>
                 </View>
 
                 <View style={loginStyles.modalHeroContent}>
                   <View style={loginStyles.modalHeroIcon}>
-                    <Ionicons name="lock-open-outline" size={26} color="#FFFFFF" />
+                    <Ionicons name="lock-open-outline" size={26} color={brandColors.surface} />
                   </View>
                   <Text style={loginStyles.modalTitle}>{resetStepTitle}</Text>
                   <Text style={loginStyles.modalSubtitle}>{resetStepSubtitle}</Text>
@@ -1660,11 +1752,11 @@ export default function LoginScreen({ navigation, route }) {
                         loginStyles.inputContainer,
                         resetEmailError ? loginStyles.inputError : null
                       ]}>
-                        <Ionicons name="mail-outline" size={20} color="#6B7280" />
+                        <Ionicons name="mail-outline" size={20} color={brandColors.textMuted} />
                         <TextInput
                           style={loginStyles.input}
                           placeholder="your.email@sapphireaviationacademy.edu.ph"
-                          placeholderTextColor="#9CA3AF"
+                          placeholderTextColor={brandColors.textMuted}
                           value={resetEmail}
                           onChangeText={(text) => {
                             setResetEmail(text.replace(/\s+/g, ""));
@@ -1689,7 +1781,7 @@ export default function LoginScreen({ navigation, route }) {
                     </View>
 
                     <View style={loginStyles.modalInfoCard}>
-                      <Ionicons name="mail-unread-outline" size={18} color="#0A3D91" />
+                      <Ionicons name="mail-unread-outline" size={18} color={brandColors.blue} />
                       <Text style={loginStyles.modalInfoText}>
                         Use the email linked to your SafePass account. We will send a 6-digit verification code and a secure reset link.
                       </Text>
@@ -1705,10 +1797,10 @@ export default function LoginScreen({ navigation, route }) {
                       activeOpacity={0.8}
                     >
                       {isLoading ? (
-                        <ActivityIndicator color="#FFFFFF" />
+                        <ActivityIndicator color={brandColors.surface} />
                       ) : (
                         <>
-                          <Ionicons name="send-outline" size={20} color="#FFFFFF" />
+                          <Ionicons name="send-outline" size={20} color={brandColors.surface} />
                           <Text style={loginStyles.otpButtonText}>Send Reset Code</Text>
                         </>
                       )}
@@ -1719,7 +1811,7 @@ export default function LoginScreen({ navigation, route }) {
                 {resetStep === 2 && (
                   <>
                     <View style={loginStyles.modalInfoCard}>
-                      <Ionicons name="shield-checkmark-outline" size={18} color="#0A3D91" />
+                      <Ionicons name="shield-checkmark-outline" size={18} color={brandColors.blue} />
                       <Text style={loginStyles.modalInfoText}>
                         Enter the 6-digit verification code sent to the email below.
                       </Text>
@@ -1731,11 +1823,11 @@ export default function LoginScreen({ navigation, route }) {
                         loginStyles.inputContainer,
                         resetOtpError ? loginStyles.inputError : null
                       ]}>
-                        <Ionicons name="key-outline" size={20} color="#6B7280" />
+                        <Ionicons name="key-outline" size={20} color={brandColors.textMuted} />
                         <TextInput
                           style={loginStyles.input}
                           placeholder="000000"
-                          placeholderTextColor="#9CA3AF"
+                          placeholderTextColor={brandColors.textMuted}
                           value={resetOtp}
                           onChangeText={(text) => {
                             const numericValue = normalizeResetOtpValue(text);
@@ -1759,7 +1851,7 @@ export default function LoginScreen({ navigation, route }) {
                     </View>
 
                     <View style={loginStyles.timerContainer}>
-                      <Ionicons name="time-outline" size={16} color="#6B7280" />
+                      <Ionicons name="time-outline" size={16} color={brandColors.textMuted} />
                       <Text style={loginStyles.timerText}>
                         {canResendReset ? 'You can resend the code now' : `Resend in ${resetTimer}s`}
                       </Text>
@@ -1775,7 +1867,7 @@ export default function LoginScreen({ navigation, route }) {
                       activeOpacity={0.8}
                     >
                       {isLoading ? (
-                        <ActivityIndicator color="#FFFFFF" />
+                        <ActivityIndicator color={brandColors.surface} />
                       ) : (
                         <Text style={loginStyles.otpVerifyText}>Verify Code</Text>
                       )}
@@ -1799,7 +1891,7 @@ export default function LoginScreen({ navigation, route }) {
                 {resetStep === 3 && (
                   <>
                     <View style={loginStyles.modalInfoCard}>
-                      <Ionicons name="keypad-outline" size={18} color="#0A3D91" />
+                      <Ionicons name="keypad-outline" size={18} color={brandColors.blue} />
                       <Text style={loginStyles.modalInfoText}>
                         {resetToken
                           ? "Create a strong new password from your secure reset link, then confirm it before returning to login."
@@ -1813,7 +1905,7 @@ export default function LoginScreen({ navigation, route }) {
                         <Ionicons 
                           name={passwordChecks.length ? "checkmark-circle" : "ellipse-outline"} 
                           size={16} 
-                          color={passwordChecks.length ? "#10B981" : "#9CA3AF"} 
+                          color={passwordChecks.length ? brandColors.success : brandColors.textMuted}
                         />
                         <Text style={[loginStyles.requirementText, passwordChecks.length && loginStyles.requirementMet]}>
                           At least 8 characters
@@ -1823,7 +1915,7 @@ export default function LoginScreen({ navigation, route }) {
                         <Ionicons 
                           name={passwordChecks.uppercase ? "checkmark-circle" : "ellipse-outline"} 
                           size={16} 
-                          color={passwordChecks.uppercase ? "#10B981" : "#9CA3AF"} 
+                          color={passwordChecks.uppercase ? brandColors.success : brandColors.textMuted}
                         />
                         <Text style={[loginStyles.requirementText, passwordChecks.uppercase && loginStyles.requirementMet]}>
                           One uppercase letter
@@ -1833,7 +1925,7 @@ export default function LoginScreen({ navigation, route }) {
                         <Ionicons 
                           name={passwordChecks.lowercase ? "checkmark-circle" : "ellipse-outline"} 
                           size={16} 
-                          color={passwordChecks.lowercase ? "#10B981" : "#9CA3AF"} 
+                          color={passwordChecks.lowercase ? brandColors.success : brandColors.textMuted}
                         />
                         <Text style={[loginStyles.requirementText, passwordChecks.lowercase && loginStyles.requirementMet]}>
                           One lowercase letter
@@ -1843,7 +1935,7 @@ export default function LoginScreen({ navigation, route }) {
                         <Ionicons 
                           name={passwordChecks.number ? "checkmark-circle" : "ellipse-outline"} 
                           size={16} 
-                          color={passwordChecks.number ? "#10B981" : "#9CA3AF"} 
+                          color={passwordChecks.number ? brandColors.success : brandColors.textMuted}
                         />
                         <Text style={[loginStyles.requirementText, passwordChecks.number && loginStyles.requirementMet]}>
                           One number
@@ -1857,11 +1949,11 @@ export default function LoginScreen({ navigation, route }) {
                         loginStyles.inputContainer,
                         newPasswordError ? loginStyles.inputError : null
                       ]}>
-                        <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
+                        <Ionicons name="lock-closed-outline" size={20} color={brandColors.textMuted} />
                         <TextInput
                           style={loginStyles.input}
                           placeholder="Enter new password"
-                          placeholderTextColor="#9CA3AF"
+                          placeholderTextColor={brandColors.textMuted}
                           value={newPassword}
                           onChangeText={(text) => {
                             setNewPassword(text);
@@ -1881,7 +1973,7 @@ export default function LoginScreen({ navigation, route }) {
                           <Ionicons 
                             name={showNewPassword ? "eye-off-outline" : "eye-outline"} 
                             size={20} 
-                            color="#6B7280" 
+                            color={brandColors.textMuted}
                           />
                         </TouchableOpacity>
                       </View>
@@ -1896,7 +1988,7 @@ export default function LoginScreen({ navigation, route }) {
                                   key={level}
                                   style={[
                                     loginStyles.passwordStrengthSegment,
-                                    { backgroundColor: level <= passwordStrength ? getPasswordStrengthColor() : '#E5E7EB' }
+                                    { backgroundColor: level <= passwordStrength ? getPasswordStrengthColor() : brandColors.border }
                                   ]}
                                 />
                               ))}
@@ -1915,11 +2007,11 @@ export default function LoginScreen({ navigation, route }) {
                         loginStyles.inputContainer,
                         confirmNewPasswordError ? loginStyles.inputError : null
                       ]}>
-                        <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
+                        <Ionicons name="lock-closed-outline" size={20} color={brandColors.textMuted} />
                         <TextInput
                           style={loginStyles.input}
                           placeholder="Confirm new password"
-                          placeholderTextColor="#9CA3AF"
+                          placeholderTextColor={brandColors.textMuted}
                           value={confirmNewPassword}
                           onChangeText={(text) => {
                             setConfirmNewPassword(text);
@@ -1933,7 +2025,7 @@ export default function LoginScreen({ navigation, route }) {
                           <Ionicons 
                             name={showConfirmNewPassword ? "eye-off-outline" : "eye-outline"} 
                             size={20} 
-                            color="#6B7280" 
+                            color={brandColors.textMuted}
                           />
                         </TouchableOpacity>
                       </View>
@@ -1947,11 +2039,11 @@ export default function LoginScreen({ navigation, route }) {
                         <Ionicons 
                           name={newPassword === confirmNewPassword ? "checkmark-circle" : "close-circle"} 
                           size={16} 
-                          color={newPassword === confirmNewPassword ? "#10B981" : "#EF4444"} 
+                          color={newPassword === confirmNewPassword ? brandColors.success : brandColors.danger}
                         />
                         <Text style={[
                           loginStyles.passwordMatchText,
-                          { color: newPassword === confirmNewPassword ? "#10B981" : "#EF4444" }
+                          { color: newPassword === confirmNewPassword ? brandColors.success : brandColors.danger }
                         ]}>
                           {newPassword === confirmNewPassword ? "Passwords match" : "Passwords do not match"}
                         </Text>
@@ -1969,7 +2061,7 @@ export default function LoginScreen({ navigation, route }) {
                       activeOpacity={0.8}
                     >
                       {isLoading ? (
-                        <ActivityIndicator color="#FFFFFF" />
+                        <ActivityIndicator color={brandColors.surface} />
                       ) : (
                         <Text style={loginStyles.otpVerifyText}>Reset Password</Text>
                       )}
@@ -2008,7 +2100,7 @@ export default function LoginScreen({ navigation, route }) {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="arrow-back" size={16} color="#6B7280" />
+                  <Ionicons name="arrow-back" size={16} color={brandColors.textMuted} />
                   <Text style={loginStyles.backLinkText}>
                     {resetStep === 1 ? 'Back to Login' : 'Back'}
                   </Text>
@@ -2037,7 +2129,7 @@ export default function LoginScreen({ navigation, route }) {
             <Text style={loginStyles.loginSplashTitle}>Welcome Back</Text>
             <Text style={loginStyles.loginSplashMessage}>{loginSplashMessage}</Text>
             <View style={loginStyles.loginSplashLoadingRow}>
-              <ActivityIndicator size="small" color="#0A3D91" />
+              <ActivityIndicator size="small" color={brandColors.blue} />
               <Text style={loginStyles.loginSplashLoadingText}>
                 Securing your account access...
               </Text>

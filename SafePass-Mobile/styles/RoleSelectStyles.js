@@ -1,10 +1,12 @@
 import { StyleSheet, Platform, Dimensions } from "react-native";
+import { brandColors } from "./brandColors";
 
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 
 const isSmallPhone = width <= 375;
 const isTablet = width >= 768 && width < 1024;
+const shadowColor = brandColors.text;
 
 const fontSizes = {
   xs: isSmallPhone ? 11 : 12,
@@ -28,7 +30,7 @@ const spacing = {
 export default StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F8FC",
+    backgroundColor: brandColors.background,
   },
 
   scrollContainer: {
@@ -54,7 +56,7 @@ export default StyleSheet.create({
     overflow: "hidden",
     ...Platform.select({
       ios: {
-        shadowColor: "#041E42",
+        shadowColor: brandColors.navy,
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.22,
         shadowRadius: 20,
@@ -71,7 +73,7 @@ export default StyleSheet.create({
     width: 148,
     height: 148,
     borderRadius: 74,
-    backgroundColor: "rgba(255,255,255,0.09)",
+    display: "none",
   },
 
   heroGlowTwo: {
@@ -81,7 +83,7 @@ export default StyleSheet.create({
     width: 190,
     height: 190,
     borderRadius: 95,
-    backgroundColor: "rgba(56,189,248,0.12)",
+    display: "none",
   },
 
   heroContent: {
@@ -113,7 +115,7 @@ export default StyleSheet.create({
     height: 28,
     borderRadius: 14,
     marginRight: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
   },
 
   brandBadgeTextWrap: {
@@ -130,7 +132,7 @@ export default StyleSheet.create({
 
   brandBadgeTitle: {
     fontSize: 13,
-    color: "#FFFFFF",
+    color: brandColors.surface,
     fontWeight: "700",
   },
 
@@ -144,13 +146,13 @@ export default StyleSheet.create({
     borderRadius: isSmallPhone ? 39 : 46,
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.28)",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
   },
 
   heroTitle: {
     fontSize: isSmallPhone ? 18 : isTablet ? 24 : 22,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: brandColors.surface,
     textAlign: "center",
     lineHeight: isSmallPhone ? 24 : 28,
     letterSpacing: 0,
@@ -213,7 +215,7 @@ export default StyleSheet.create({
   sectionTitle: {
     fontSize: fontSizes.xl,
     fontWeight: "800",
-    color: "#0F172A",
+    color: brandColors.text,
     textAlign: "center",
     marginBottom: spacing.xs,
     letterSpacing: -0.4,
@@ -221,7 +223,7 @@ export default StyleSheet.create({
 
   sectionSubtitle: {
     fontSize: fontSizes.base,
-    color: "#5B667A",
+    color: brandColors.textMuted,
     textAlign: "center",
     marginBottom: spacing.xl,
     lineHeight: 24,
@@ -253,12 +255,12 @@ export default StyleSheet.create({
   },
 
   card: {
-    borderRadius: isSmallPhone ? 22 : 28,
+    borderRadius: 8,
     overflow: "hidden",
     height: "100%",
     ...Platform.select({
       ios: {
-        shadowColor: "#0F172A",
+        shadowColor,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.08,
         shadowRadius: 18,
@@ -274,11 +276,11 @@ export default StyleSheet.create({
 
   cardGradient: {
     padding: spacing.lg,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
     minHeight: isSmallPhone ? 290 : 330,
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: "#E6EDF7",
+    borderColor: brandColors.border,
   },
 
   cardIconWrapper: {
@@ -302,7 +304,7 @@ export default StyleSheet.create({
   cardTitle: {
     fontSize: fontSizes.lg,
     fontWeight: "800",
-    color: "#111827",
+    color: brandColors.text,
     marginBottom: 8,
     textAlign: "center",
     letterSpacing: -0.2,
@@ -310,7 +312,7 @@ export default StyleSheet.create({
 
   cardDescription: {
     fontSize: fontSizes.sm,
-    color: "#5B667A",
+    color: brandColors.textMuted,
     marginBottom: spacing.md,
     lineHeight: 21,
     textAlign: "center",
@@ -327,18 +329,18 @@ export default StyleSheet.create({
   featurePill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F4F7FB",
+    backgroundColor: brandColors.surfaceSoft,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
     borderRadius: 999,
     gap: 4,
     borderWidth: 1,
-    borderColor: "#E5EDF6",
+    borderColor: brandColors.border,
   },
 
   featurePillText: {
     fontSize: fontSizes.xs,
-    color: "#425066",
+    color: brandColors.textMuted,
     fontWeight: "600",
   },
 
@@ -347,7 +349,7 @@ export default StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F4F7FB",
+    backgroundColor: brandColors.blueSoft,
     justifyContent: "center",
     alignItems: "center",
     marginTop: spacing.xs,
@@ -365,13 +367,13 @@ export default StyleSheet.create({
   infoCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: brandColors.surface,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 999,
     gap: spacing.xs,
     borderWidth: 1,
-    borderColor: "#E5EAF3",
+    borderColor: brandColors.border,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -386,7 +388,7 @@ export default StyleSheet.create({
 
   infoCardText: {
     fontSize: fontSizes.xs,
-    color: "#425066",
+    color: brandColors.textMuted,
     fontWeight: "600",
   },
 
@@ -405,23 +407,23 @@ export default StyleSheet.create({
 
   helpText: {
     fontSize: fontSizes.sm,
-    color: "#6B7280",
+    color: brandColors.textMuted,
     fontWeight: "600",
   },
 
   contactCard: {
     marginTop: spacing.md,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    backgroundColor: brandColors.surface,
+    borderRadius: 8,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: "#E5EAF3",
+    borderColor: brandColors.border,
     width: "100%",
     maxWidth: 760,
     alignSelf: "center",
     ...Platform.select({
       ios: {
-        shadowColor: "#0F172A",
+        shadowColor,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.05,
         shadowRadius: 18,
@@ -441,7 +443,7 @@ export default StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "#EAF2FF",
+    backgroundColor: brandColors.blueSoft,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -453,13 +455,13 @@ export default StyleSheet.create({
 
   contactTitle: {
     fontSize: fontSizes.base,
-    color: "#0F172A",
+    color: brandColors.text,
     fontWeight: "800",
   },
 
   contactSubtitle: {
     fontSize: fontSizes.sm,
-    color: "#64748B",
+    color: brandColors.textMuted,
     marginTop: 3,
     fontWeight: "500",
   },
@@ -476,12 +478,12 @@ export default StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#EEF3F8",
+    borderBottomColor: brandColors.border,
   },
 
   contactLabel: {
     fontSize: fontSizes.sm,
-    color: "#64748B",
+    color: brandColors.textMuted,
     fontWeight: "600",
     minWidth: isSmallPhone ? 78 : 92,
   },
@@ -489,7 +491,7 @@ export default StyleSheet.create({
   contactValue: {
     flex: 1,
     fontSize: fontSizes.sm,
-    color: "#334155",
+    color: brandColors.text,
     fontWeight: "700",
     textAlign: "right",
   },
@@ -509,22 +511,22 @@ export default StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: "#F4F7FB",
+    backgroundColor: brandColors.surfaceSoft,
     borderWidth: 1,
-    borderColor: "#E5EDF6",
+    borderColor: brandColors.border,
     ...(isWeb && { cursor: "pointer" }),
   },
 
   contactLinkText: {
     fontSize: fontSizes.xs,
-    color: "#0A3D91",
+    color: brandColors.blue,
     fontWeight: "700",
   },
 
   contactCopyright: {
     marginTop: spacing.sm,
     fontSize: fontSizes.xs,
-    color: "#94A3B8",
+    color: brandColors.textMuted,
     fontWeight: "600",
     textAlign: "left",
   },
@@ -532,7 +534,7 @@ export default StyleSheet.create({
   versionText: {
     textAlign: "center",
     fontSize: fontSizes.xs,
-    color: "#94A3B8",
+    color: brandColors.textMuted,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
