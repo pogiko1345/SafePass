@@ -43,6 +43,9 @@
       }
     },
     "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      "expo-sharing",
       "react-native-nfc-manager",
       [
         "expo-image-picker",

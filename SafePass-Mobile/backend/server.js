@@ -1013,9 +1013,11 @@ const connectToDatabase = () => {
       .connect(MONGODB_URI)
 
       .then(() => {
-        console.log(
-          `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
-        );
+        if (process.env.NODE_ENV !== "test") {
+          console.log(
+            `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
+          );
+        }
         return mongoose.connection;
       })
       .catch((err) => {
@@ -4585,8 +4587,13 @@ const runAppointmentLifecycleSweep = async () => {
   }
 };
 
-setTimeout(runAppointmentLifecycleSweep, 30 * 1000);
-setInterval(runAppointmentLifecycleSweep, 5 * 60 * 1000);
+if (process.env.NODE_ENV !== "test") {
+  const appointmentLifecycleTimeout = setTimeout(runAppointmentLifecycleSweep, 30 * 1000);
+  const appointmentLifecycleInterval = setInterval(runAppointmentLifecycleSweep, 5 * 60 * 1000);
+
+  appointmentLifecycleTimeout.unref?.();
+  appointmentLifecycleInterval.unref?.();
+}
 
 const getVisitorCheckInEligibility = (visitor) => {
   if (!visitor) {

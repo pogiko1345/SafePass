@@ -1,4 +1,7 @@
 .vercel
+node_modules/
+*.log
+SafePass-Mobile/.vercel/
 .env*.local
 SafePass-Mobile/backend/.env
 SafePass-Mobile/backend/.env.*

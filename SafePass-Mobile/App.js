@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { AppState, View, Text, ActivityIndicator, Platform } from "react-native";
 import { CommonActions, NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -7,31 +7,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import LoginScreen from "./screens/LoginScreen";
 import VisitorRegisterScreen from "./screens/VisitorRegisterScreen";
 
-// Dashboard Screens
-import AdminDashboardScreen from "./screens/AdminDashboardScreen";
-import SecurityDashboardScreen from "./screens/SecurityDashboardScreen";
-import VisitorDashboardScreen from "./screens/VisitorDashboardScreen";
-import StaffDashboardScreen from "./screens/StaffDashboardScreen";
-import StudentDashboardScreen from "./screens/StudentDashboardScreen";
-
-// Common Screens
-import ProfileScreen from "./screens/ProfileScreenV2";
-import AccessLogScreen from "./screens/AccessLogScreen";
-import NFCScanScreen from "./screens/NFCScanScreen";
 import HelpScreen from "./screens/HelpScreen";
 import VerificationScreen from "./screens/VerificationScreen";
-
-// Visitor Screens
-import VisitorPassScreen from "./screens/VisitorPassScreen";
-import WebMapScreen from "./screens/WebMapScreen";
-
-// Admin Management Screens
-import VisitorManagementScreen from "./screens/VisitorManagementScreen";
-import NFCManagementScreen from "./screens/NFCManagementScreen";
-import AttendanceRecordsScreen from "./screens/AttendanceRecordsScreen";
-import ReportsScreen from "./screens/ReportsScreen";
-import SecurityLogsScreen from "./screens/SecurityLogsScreen";
-import SettingsScreen from "./screens/SettingsScreen";
 
 // Role Selection
 import RoleSelectScreen from "./screens/RoleSelectScreen";
@@ -58,6 +35,22 @@ const Storage =
     : require("@react-native-async-storage/async-storage").default;
 
 const Stack = createNativeStackNavigator();
+const AdminDashboardScreen = lazy(() => import("./screens/AdminDashboardScreen"));
+const SecurityDashboardScreen = lazy(() => import("./screens/SecurityDashboardScreen"));
+const VisitorDashboardScreen = lazy(() => import("./screens/VisitorDashboardScreen"));
+const StaffDashboardScreen = lazy(() => import("./screens/StaffDashboardScreen"));
+const StudentDashboardScreen = lazy(() => import("./screens/StudentDashboardScreen"));
+const ProfileScreen = lazy(() => import("./screens/ProfileScreenV2"));
+const AccessLogScreen = lazy(() => import("./screens/AccessLogScreen"));
+const NFCScanScreen = lazy(() => import("./screens/NFCScanScreen"));
+const VisitorPassScreen = lazy(() => import("./screens/VisitorPassScreen"));
+const WebMapScreen = lazy(() => import("./screens/WebMapScreen"));
+const VisitorManagementScreen = lazy(() => import("./screens/VisitorManagementScreen"));
+const NFCManagementScreen = lazy(() => import("./screens/NFCManagementScreen"));
+const AttendanceRecordsScreen = lazy(() => import("./screens/AttendanceRecordsScreen"));
+const ReportsScreen = lazy(() => import("./screens/ReportsScreen"));
+const SecurityLogsScreen = lazy(() => import("./screens/SecurityLogsScreen"));
+const SettingsScreen = lazy(() => import("./screens/SettingsScreen"));
 const APP_NAME = APP_DISPLAY_NAME;
 const APP_ORGANIZATION = APP_ORGANIZATION_NAME;
 const IDLE_LOGOUT_MS = 30 * 60 * 1000;
@@ -87,6 +80,19 @@ const WEB_ROUTE_TITLES = {
   SecurityLogs: `Security Logs | ${APP_ORGANIZATION}`,
   Settings: `Settings | ${APP_ORGANIZATION}`,
 };
+
+const ScreenFallback = () => (
+  <View
+    style={{
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "#F5F7FA",
+    }}
+  >
+    <ActivityIndicator size="large" color="#0A3D91" />
+  </View>
+);
 
 const DEFAULT_STACK_TRANSITION = {
   animation: "slide_from_right",
@@ -481,13 +487,14 @@ export default function App() {
             WEB_ROUTE_TITLES[route?.name] || `${APP_NAME} | ${APP_ORGANIZATION}`,
         }}
       >
-      <Stack.Navigator
-        initialRouteName={initialRoute}
-        screenOptions={{
-          headerShown: false,
-          ...DEFAULT_STACK_TRANSITION,
-        }}
-      >
+      <Suspense fallback={<ScreenFallback />}>
+        <Stack.Navigator
+          initialRouteName={initialRoute}
+          screenOptions={{
+            headerShown: false,
+            ...DEFAULT_STACK_TRANSITION,
+          }}
+        >
         {/* Auth & Role Selection */}
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
@@ -627,7 +634,8 @@ export default function App() {
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="Settings" component={SettingsScreen} />
         )}
-      </Stack.Navigator>
+        </Stack.Navigator>
+      </Suspense>
       </NavigationContainer>
     </View>
   );

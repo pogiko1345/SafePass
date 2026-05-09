@@ -13,7 +13,7 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "@expo/webpack-config": "^18.0.0",
-    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "^8.6.0",
     "@react-native-firebase/app": "^24.0.0",
     "@react-native-firebase/auth": "^24.0.0",
@@ -25,32 +25,33 @@
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "expo": "~55.0.0",
-    "expo-application": "~55.0.9",
-    "expo-blur": "~55.0.9",
-    "expo-camera": "^55.0.11",
-    "expo-constants": "^55.0.7",
-    "expo-crypto": "~55.0.9",
-    "expo-haptics": "^55.0.11",
-    "expo-image-manipulator": "^55.0.11",
-    "expo-image-picker": "~55.0.12",
-    "expo-linear-gradient": "~55.0.8",
-    "expo-local-authentication": "~55.0.9",
-    "expo-location": "~55.1.2",
-    "expo-print": "^55.0.9",
-    "expo-secure-store": "~55.0.8",
-    "expo-sharing": "^55.0.14",
-    "expo-status-bar": "~55.0.4",
+    "expo": "~55.0.23",
+    "expo-application": "~55.0.14",
+    "expo-blur": "~55.0.14",
+    "expo-camera": "~55.0.18",
+    "expo-constants": "~55.0.16",
+    "expo-crypto": "~55.0.14",
+    "expo-font": "~55.0.7",
+    "expo-haptics": "~55.0.14",
+    "expo-image-manipulator": "~55.0.16",
+    "expo-image-picker": "~55.0.20",
+    "expo-linear-gradient": "~55.0.13",
+    "expo-local-authentication": "~55.0.13",
+    "expo-location": "~55.1.9",
+    "expo-print": "~55.0.14",
+    "expo-secure-store": "~55.0.13",
+    "expo-sharing": "~55.0.18",
+    "expo-status-bar": "~55.0.6",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.1.1",
     "mongoose": "^9.2.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "react-native": "0.83.2",
+    "react-native": "0.83.6",
     "react-native-gesture-handler": "^2.30.1",
     "react-native-linear-gradient": "^2.8.3",
-    "react-native-maps": "1.26.20",
+    "react-native-maps": "1.27.2",
     "react-native-nfc-manager": "^3.17.2",
     "react-native-permissions": "^5.5.1",
     "react-native-safe-area-context": "~5.6.2",
@@ -61,7 +62,22 @@
   "devDependencies": {
     "@babel/core": "^7.22.9",
     "webpack": "^5.88.0",
-    "webpack-dev-server": "^4.15.1"
+    "webpack-dev-server": "^5.2.3"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-nfc-manager"
+        ]
+      }
+    }
+  },
+  "overrides": {
+    "minimatch": "3.1.5",
+    "postcss": "8.5.14",
+    "semver": "7.8.0",
+    "serialize-javascript": "7.0.5"
   },
   "private": true
 }
