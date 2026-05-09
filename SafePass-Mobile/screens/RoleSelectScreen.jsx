@@ -33,8 +33,11 @@ export default function RoleSelectScreen({ navigation, route }) {
   const card1Anim = useRef(new Animated.Value(0)).current;
   const card2Anim = useRef(new Animated.Value(0)).current;
   const logoFloatAnim = useRef(new Animated.Value(0)).current;
+  const cardFloatAnim = useRef(new Animated.Value(0)).current;
   const visitorPressAnim = useRef(new Animated.Value(1)).current;
   const loginPressAnim = useRef(new Animated.Value(1)).current;
+  const visitorHoverAnim = useRef(new Animated.Value(0)).current;
+  const loginHoverAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", () => {
@@ -91,6 +94,22 @@ export default function RoleSelectScreen({ navigation, route }) {
     );
     floatAnimation.start();
 
+    const cardFloatAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(cardFloatAnim, {
+          toValue: 1,
+          duration: 2400,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(cardFloatAnim, {
+          toValue: 0,
+          duration: 2400,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    );
+    cardFloatAnimation.start();
+
     if (Platform.OS !== "web") {
       AccessibilityInfo.announceForAccessibility(
         "Role selection screen. Choose visitor registration or login to access your account."
@@ -101,8 +120,9 @@ export default function RoleSelectScreen({ navigation, route }) {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
       floatAnimation.stop();
+      cardFloatAnimation.stop();
     };
-  }, [card1Anim, card2Anim, fadeAnim, logoFloatAnim, scaleAnim, slideAnim]);
+  }, [card1Anim, card2Anim, cardFloatAnim, fadeAnim, logoFloatAnim, scaleAnim, slideAnim]);
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
@@ -160,6 +180,15 @@ export default function RoleSelectScreen({ navigation, route }) {
     Animated.spring(animatedValue, {
       toValue,
       friction: 7,
+      tension: 90,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  };
+
+  const animateCardHover = (animatedValue, toValue) => {
+    Animated.spring(animatedValue, {
+      toValue,
+      friction: 8,
       tension: 90,
       useNativeDriver: Platform.OS !== "web",
     }).start();
@@ -296,7 +325,25 @@ export default function RoleSelectScreen({ navigation, route }) {
                         outputRange: [30, 0],
                       }),
                     },
+                    {
+                      translateY: cardFloatAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -5],
+                      }),
+                    },
+                    {
+                      translateY: visitorHoverAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -8],
+                      }),
+                    },
                     { scale: visitorPressAnim },
+                    {
+                      scale: visitorHoverAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.025],
+                      }),
+                    },
                   ],
                 },
               ]}
@@ -311,6 +358,8 @@ export default function RoleSelectScreen({ navigation, route }) {
                 accessibilityHint="Create a new visitor account to schedule your visit"
                 accessibilityRole="button"
                 {...(isWeb && {
+                  onMouseEnter: () => animateCardHover(visitorHoverAnim, 1),
+                  onMouseLeave: () => animateCardHover(visitorHoverAnim, 0),
                   onKeyPress: (e) => handleKeyPress(e, handleVisitorSelect),
                   tabIndex: 0,
                 })}
@@ -368,7 +417,25 @@ export default function RoleSelectScreen({ navigation, route }) {
                         outputRange: [30, 0],
                       }),
                     },
+                    {
+                      translateY: cardFloatAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-4, 1],
+                      }),
+                    },
+                    {
+                      translateY: loginHoverAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -8],
+                      }),
+                    },
                     { scale: loginPressAnim },
+                    {
+                      scale: loginHoverAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.025],
+                      }),
+                    },
                   ],
                 },
               ]}
@@ -383,6 +450,8 @@ export default function RoleSelectScreen({ navigation, route }) {
                 accessibilityHint="Go to the login screen for your account"
                 accessibilityRole="button"
                 {...(isWeb && {
+                  onMouseEnter: () => animateCardHover(loginHoverAnim, 1),
+                  onMouseLeave: () => animateCardHover(loginHoverAnim, 0),
                   onKeyPress: (e) => handleKeyPress(e, handleLoginSelect),
                   tabIndex: 0,
                 })}

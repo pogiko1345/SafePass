@@ -150,6 +150,8 @@ export default function LoginScreen({ navigation, route }) {
   const logoPulseAnim = useRef(new Animated.Value(0)).current;
   const statusPulseAnim = useRef(new Animated.Value(1)).current;
   const loginButtonPressAnim = useRef(new Animated.Value(1)).current;
+  const loginButtonHoverAnim = useRef(new Animated.Value(0)).current;
+  const loginButtonFloatAnim = useRef(new Animated.Value(0)).current;
 
   // ============ FORGOT PASSWORD STATES ============
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -230,15 +232,31 @@ export default function LoginScreen({ navigation, route }) {
         }),
       ])
     );
+    const buttonFloat = Animated.loop(
+      Animated.sequence([
+        Animated.timing(loginButtonFloatAnim, {
+          toValue: 1,
+          duration: 2300,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(loginButtonFloatAnim, {
+          toValue: 0,
+          duration: 2300,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    );
 
     logoPulse.start();
     statusPulse.start();
+    buttonFloat.start();
 
     return () => {
       logoPulse.stop();
       statusPulse.stop();
+      buttonFloat.stop();
     };
-  }, [cardAnim, fadeAnim, logoPulseAnim, slideAnim, statusPulseAnim]);
+  }, [cardAnim, fadeAnim, loginButtonFloatAnim, logoPulseAnim, slideAnim, statusPulseAnim]);
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
@@ -1158,6 +1176,15 @@ export default function LoginScreen({ navigation, route }) {
     }).start();
   };
 
+  const animateButtonHover = (toValue) => {
+    Animated.spring(loginButtonHoverAnim, {
+      toValue,
+      friction: 8,
+      tension: 90,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  };
+
   // ============ SPLASH SCREEN ============
   if (isCheckingAuth) {
     return (
@@ -1525,7 +1552,31 @@ export default function LoginScreen({ navigation, route }) {
                   ) : null}
 
                   {/* Login Button */}
-                  <Animated.View style={{ transform: [{ scale: loginButtonPressAnim }] }}>
+                  <Animated.View
+                    style={{
+                      transform: [
+                        {
+                          translateY: loginButtonFloatAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, -4],
+                          }),
+                        },
+                        {
+                          translateY: loginButtonHoverAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, -7],
+                          }),
+                        },
+                        { scale: loginButtonPressAnim },
+                        {
+                          scale: loginButtonHoverAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.025],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
                     <TouchableOpacity
                       ref={loginButtonRef}
                       style={[
@@ -1538,6 +1589,8 @@ export default function LoginScreen({ navigation, route }) {
                       disabled={isLoading}
                       activeOpacity={0.8}
                       {...(isWeb && {
+                        onMouseEnter: () => animateButtonHover(1),
+                        onMouseLeave: () => animateButtonHover(0),
                         onKeyPress: (e) => handleKeyPress(e, handleLogin),
                         tabIndex: 0,
                       })}
