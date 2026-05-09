@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import SocialDock from "../components/SocialDock";
 import roleSelectStyles from "../styles/RoleSelectStyles";
 import { brandColors, sapphireGradient } from "../styles/brandColors";
 
@@ -165,6 +166,23 @@ export default function RoleSelectScreen({ navigation, route }) {
   };
 
   const isRowLayout = windowWidth >= 768 && !keyboardVisible;
+  const socialLinks = [
+    {
+      label: "Website",
+      icon: "globe-outline",
+      onPress: () => openExternalLink("https://sapphireaviationacademy.edu.ph/"),
+    },
+    {
+      label: "Facebook",
+      icon: "logo-facebook",
+      onPress: () => openExternalLink("https://www.facebook.com/sapphireaviationacademy/"),
+    },
+    {
+      label: "YouTube",
+      icon: "logo-youtube",
+      onPress: () => openExternalLink("https://www.youtube.com/@sapphireaviation5105"),
+    },
+  ];
   const logoFloatStyle = {
     transform: [
       {
@@ -464,34 +482,7 @@ export default function RoleSelectScreen({ navigation, route }) {
               </View>
             </View>
 
-            <View style={roleSelectStyles.contactLinkRow}>
-              <TouchableOpacity
-                style={roleSelectStyles.contactLinkChip}
-                onPress={() => openExternalLink("https://sapphireaviationacademy.edu.ph/")}
-                activeOpacity={0.75}
-              >
-                <Ionicons name="globe-outline" size={15} color={brandColors.blue} />
-                <Text style={roleSelectStyles.contactLinkText}>Website</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={roleSelectStyles.contactLinkChip}
-                onPress={() => openExternalLink("https://www.facebook.com/sapphireaviationacademy/")}
-                activeOpacity={0.75}
-              >
-                <Ionicons name="logo-facebook" size={15} color={brandColors.blue} />
-                <Text style={roleSelectStyles.contactLinkText}>Facebook</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={roleSelectStyles.contactLinkChip}
-                onPress={() => openExternalLink("https://www.youtube.com/@sapphireaviation5105")}
-                activeOpacity={0.75}
-              >
-                <Ionicons name="logo-youtube" size={15} color={brandColors.blue} />
-                <Text style={roleSelectStyles.contactLinkText}>YouTube</Text>
-              </TouchableOpacity>
-            </View>
+            <SocialDock links={socialLinks} />
 
             <Text style={roleSelectStyles.contactCopyright}>
               Copyright 2024. Sapphire International Aviation Academy

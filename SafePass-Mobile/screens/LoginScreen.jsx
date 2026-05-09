@@ -20,6 +20,7 @@ import {
 import loginStyles from "../styles/LoginStyles";
 import { brandColors } from "../styles/brandColors";
 import { Ionicons } from "@expo/vector-icons";
+import SocialDock from "../components/SocialDock";
 import * as LocalAuthentication from "expo-local-authentication";
 import ApiService from "../utils/ApiService";
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
@@ -97,10 +98,6 @@ export default function LoginScreen({ navigation, route }) {
     padding: isCompactLogin ? 14 : 16,
     ...(isWeb ? { maxWidth: loginMaxContentWidth } : null),
   };
-  const footerLinkRowResponsiveStyle = isCompactLogin ? { width: "100%" } : null;
-  const footerLinkChipResponsiveStyle = isCompactLogin
-    ? { width: "100%", justifyContent: "center" }
-    : null;
   const forgotModalContentResponsiveStyle = {
     maxHeight: viewportHeight <= 760 ? "96%" : "92%",
     borderRadius: isCompactLogin ? 18 : 24,
@@ -1189,6 +1186,23 @@ export default function LoginScreen({ navigation, route }) {
         : resetToken
           ? "Create a new password from your secure reset link."
           : "Create a new password that matches the same Secure Login standards.";
+  const socialLinks = [
+    {
+      label: "Website",
+      icon: "globe-outline",
+      onPress: () => openExternalLink("https://sapphireaviationacademy.edu.ph/"),
+    },
+    {
+      label: "Facebook",
+      icon: "logo-facebook",
+      onPress: () => openExternalLink("https://www.facebook.com/sapphireaviationacademy/"),
+    },
+    {
+      label: "YouTube",
+      icon: "logo-youtube",
+      onPress: () => openExternalLink("https://www.youtube.com/@sapphireaviation5105"),
+    },
+  ];
   const logoPulseStyle = {
     transform: [
       {
@@ -1637,32 +1651,7 @@ export default function LoginScreen({ navigation, route }) {
                   </Text>
                   <Text style={loginStyles.footerContactLine}>Tel No: (02) 7091 - 3362</Text>
                   <Text style={loginStyles.footerContactLine}>Mobile No: 0917 580 4858</Text>
-                  <View style={[loginStyles.footerLinkRow, footerLinkRowResponsiveStyle]}>
-                    <TouchableOpacity
-                      style={[loginStyles.footerLinkChip, footerLinkChipResponsiveStyle]}
-                      onPress={() => openExternalLink("https://sapphireaviationacademy.edu.ph/")}
-                      activeOpacity={0.75}
-                    >
-                      <Ionicons name="globe-outline" size={14} color={brandColors.blue} />
-                      <Text style={loginStyles.footerLinkText}>Website</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[loginStyles.footerLinkChip, footerLinkChipResponsiveStyle]}
-                      onPress={() => openExternalLink("https://www.facebook.com/sapphireaviationacademy/")}
-                      activeOpacity={0.75}
-                    >
-                      <Ionicons name="logo-facebook" size={14} color={brandColors.blue} />
-                      <Text style={loginStyles.footerLinkText}>Facebook</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[loginStyles.footerLinkChip, footerLinkChipResponsiveStyle]}
-                      onPress={() => openExternalLink("https://www.youtube.com/@sapphireaviation5105")}
-                      activeOpacity={0.75}
-                    >
-                      <Ionicons name="logo-youtube" size={14} color={brandColors.blue} />
-                      <Text style={loginStyles.footerLinkText}>YouTube</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <SocialDock links={socialLinks} />
                   <Text style={loginStyles.footerCopyright}>
                     Copyright 2024. Sapphire International Aviation Academy
                   </Text>
