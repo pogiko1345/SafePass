@@ -94,6 +94,38 @@ const SAFE_PASS_NAV_THEME = {
     card: brandColors.background,
   },
 };
+const WEB_LINKING = {
+  prefixes:
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? [window.location.origin]
+      : [],
+  config: {
+    initialRouteName: IS_VISITOR_ONLY_APP ? "Login" : "RoleSelect",
+    screens: {
+      ...(!IS_VISITOR_ONLY_APP ? { RoleSelect: "" } : {}),
+      Login: IS_VISITOR_ONLY_APP ? "" : "login",
+      VisitorRegister: "visitor-register",
+      Verification: "verification",
+      Help: "help",
+      AdminDashboard: "admin",
+      StaffDashboard: "staff",
+      SecurityDashboard: "security",
+      StudentDashboard: "student",
+      VisitorDashboard: "visitor",
+      VisitorPass: "visitor-pass",
+      WebMapScreen: "campus-map",
+      Profile: "profile",
+      AccessLog: "access-log",
+      NFCScan: "nfc-scan",
+      VisitorManagement: "visitor-management",
+      NFCManagement: "nfc-management",
+      AttendanceRecords: "attendance-records",
+      Reports: "reports",
+      SecurityLogs: "security-logs",
+      Settings: "settings",
+    },
+  },
+};
 
 const ScreenFallback = () => (
   <View
@@ -496,6 +528,7 @@ export default function App() {
       <NavigationContainer
         ref={navigationRef}
         theme={SAFE_PASS_NAV_THEME}
+        linking={Platform.OS === "web" ? WEB_LINKING : undefined}
         documentTitle={{
           enabled: Platform.OS === "web",
           formatter: (_options, route) =>
