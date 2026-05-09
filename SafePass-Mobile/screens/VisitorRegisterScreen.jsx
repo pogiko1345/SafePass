@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Animated,
   Modal,
   useWindowDimensions,
 } from "react-native";
@@ -412,6 +413,15 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [registrationOtpResendSecondsLeft, setRegistrationOtpResendSecondsLeft] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const screenFadeAnim = useRef(new Animated.Value(0.96)).current;
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const formAnim = useRef(new Animated.Value(0)).current;
+  const iconFloatAnim = useRef(new Animated.Value(0)).current;
+  const progressFloatAnim = useRef(new Animated.Value(0)).current;
+  const secondaryPressAnim = useRef(new Animated.Value(1)).current;
+  const continuePressAnim = useRef(new Animated.Value(1)).current;
+  const secondaryHoverAnim = useRef(new Animated.Value(0)).current;
+  const continueHoverAnim = useRef(new Animated.Value(0)).current;
 
   const goToVisitorLogin = (overrides = {}) => {
     navigation.reset({
@@ -434,6 +444,65 @@ export default function VisitorRegisterScreen({ navigation }) {
         "Visitor Registration | Sapphire International Aviation Academy";
     }
   }, []);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(screenFadeAnim, {
+        toValue: 1,
+        duration: 420,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+      Animated.spring(headerAnim, {
+        toValue: 1,
+        friction: 10,
+        tension: 44,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+      Animated.timing(formAnim, {
+        toValue: 1,
+        duration: 560,
+        delay: 120,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+    ]).start();
+
+    const iconFloat = Animated.loop(
+      Animated.sequence([
+        Animated.timing(iconFloatAnim, {
+          toValue: 1,
+          duration: 2200,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(iconFloatAnim, {
+          toValue: 0,
+          duration: 2200,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    );
+    const progressFloat = Animated.loop(
+      Animated.sequence([
+        Animated.timing(progressFloatAnim, {
+          toValue: 1,
+          duration: 2600,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(progressFloatAnim, {
+          toValue: 0,
+          duration: 2600,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    );
+
+    iconFloat.start();
+    progressFloat.start();
+
+    return () => {
+      iconFloat.stop();
+      progressFloat.stop();
+    };
+  }, [formAnim, headerAnim, iconFloatAnim, progressFloatAnim, screenFadeAnim]);
 
   useEffect(() => {
     if (!registrationOtpResendAvailableAt) {
@@ -464,6 +533,24 @@ export default function VisitorRegisterScreen({ navigation }) {
     const minutes = Math.floor(safeSeconds / 60);
     const remainingSeconds = safeSeconds % 60;
     return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+  };
+
+  const animatePress = (animatedValue, toValue) => {
+    Animated.spring(animatedValue, {
+      toValue,
+      friction: 7,
+      tension: 100,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  };
+
+  const animateHover = (animatedValue, toValue) => {
+    Animated.spring(animatedValue, {
+      toValue,
+      friction: 8,
+      tension: 90,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
   };
 
   const validateName = (name) => {
@@ -1028,6 +1115,66 @@ export default function VisitorRegisterScreen({ navigation }) {
     </View>
   );
 
+  const headerEntranceStyle = {
+    opacity: screenFadeAnim,
+    transform: [
+      {
+        translateY: headerAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-18, 0],
+        }),
+      },
+    ],
+  };
+  const iconFloatStyle = {
+    transform: [
+      {
+        translateY: iconFloatAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -6],
+        }),
+      },
+    ],
+  };
+  const formEntranceStyle = {
+    opacity: formAnim,
+    transform: [
+      {
+        translateY: formAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [24, 0],
+        }),
+      },
+    ],
+  };
+  const progressFloatStyle = {
+    transform: [
+      {
+        translateY: progressFloatAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -4],
+        }),
+      },
+    ],
+  };
+  const getActionMotionStyle = (pressAnim, hoverAnim) => ({
+    transform: [
+      {
+        translateY: hoverAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -6],
+        }),
+      },
+      { scale: pressAnim },
+      {
+        scale: hoverAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.02],
+        }),
+      },
+    ],
+  });
+
   return (
     <SafeAreaView style={visitorRegisterStyles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
@@ -1043,12 +1190,13 @@ export default function VisitorRegisterScreen({ navigation }) {
           bounces={false}
           contentContainerStyle={visitorRegisterStyles.scrollContainer}
         >
-          <LinearGradient
-            colors={["#041E42", "#0A3D91", "#0A3D91"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[visitorRegisterStyles.header, headerResponsiveStyle]}
-          >
+          <Animated.View style={headerEntranceStyle}>
+            <LinearGradient
+              colors={["#041E42", "#0A3D91", "#0A3D91"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[visitorRegisterStyles.header, headerResponsiveStyle]}
+            >
             <View style={[visitorRegisterStyles.headerButtons, headerButtonsResponsiveStyle]}>
               <TouchableOpacity
                 style={visitorRegisterStyles.backButton}
@@ -1074,7 +1222,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                   </Text>
                 </View>
               </View>
-              <View style={visitorRegisterStyles.headerIconContainer}>
+              <Animated.View style={[visitorRegisterStyles.headerIconContainer, iconFloatStyle]}>
                 <LinearGradient
                   colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.05)"]}
                   style={[
@@ -1084,7 +1232,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                 >
                   <Ionicons name="person-add" size={32} color="#FFFFFF" />
                 </LinearGradient>
-              </View>
+              </Animated.View>
               <Text style={[visitorRegisterStyles.headerTitle, headerTitleResponsiveStyle]}>
                 Create Your Visitor Account
               </Text>
@@ -1112,10 +1260,19 @@ export default function VisitorRegisterScreen({ navigation }) {
                 </View>
               </View>
             </View>
-          </LinearGradient>
+            </LinearGradient>
+          </Animated.View>
 
-          <View style={[visitorRegisterStyles.formShell, formShellResponsiveStyle]}>
-            <View style={[visitorRegisterStyles.progressContainer, sectionCardResponsiveStyle]}>
+          <Animated.View
+            style={[visitorRegisterStyles.formShell, formShellResponsiveStyle, formEntranceStyle]}
+          >
+            <Animated.View
+              style={[
+                visitorRegisterStyles.progressContainer,
+                sectionCardResponsiveStyle,
+                progressFloatStyle,
+              ]}
+            >
               <View style={visitorRegisterStyles.progressHeader}>
                 <Text style={visitorRegisterStyles.progressTitle}>
                   Registration Progress
@@ -1170,7 +1327,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                   );
                 })}
               </View>
-            </View>
+            </Animated.View>
 
             <View style={[visitorRegisterStyles.content, contentResponsiveStyle]}>
               <View style={[visitorRegisterStyles.sectionHeader, sectionHeaderResponsiveStyle]}>
@@ -1340,48 +1497,70 @@ export default function VisitorRegisterScreen({ navigation }) {
               </View>
 
               <View style={[visitorRegisterStyles.actionRow, actionRowResponsiveStyle]}>
-                <TouchableOpacity
+                <Animated.View
                   style={[
-                    visitorRegisterStyles.secondaryActionButton,
+                    { flex: isCompactRegister ? 0 : 1 },
                     actionButtonResponsiveStyle,
+                    getActionMotionStyle(secondaryPressAnim, secondaryHoverAnim),
                   ]}
-                  onPress={() => goToVisitorLogin()}
-                  activeOpacity={0.8}
                 >
-                  <Ionicons name="arrow-back" size={18} color="#475569" />
-                  <Text style={visitorRegisterStyles.secondaryActionText}>
-                    Back to Login
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    visitorRegisterStyles.continueButton,
-                    actionButtonResponsiveStyle,
-                  ]}
-                  onPress={handleSubmit}
-                  activeOpacity={0.8}
-                  disabled={isSubmitting}
-                >
-                  <LinearGradient
-                    colors={["#0A3D91", "#0A3D91"]}
-                    style={visitorRegisterStyles.gradientButton}
+                  <TouchableOpacity
+                    style={visitorRegisterStyles.secondaryActionButton}
+                    onPress={() => goToVisitorLogin()}
+                    onPressIn={() => animatePress(secondaryPressAnim, 0.98)}
+                    onPressOut={() => animatePress(secondaryPressAnim, 1)}
+                    activeOpacity={0.8}
+                    {...(Platform.OS === "web" && {
+                      onMouseEnter: () => animateHover(secondaryHoverAnim, 1),
+                      onMouseLeave: () => animateHover(secondaryHoverAnim, 0),
+                    })}
                   >
-                    {isSubmitting ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Text style={visitorRegisterStyles.continueButtonText}>
-                          Create Account
-                        </Text>
-                        <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <Ionicons name="arrow-back" size={18} color="#475569" />
+                    <Text style={visitorRegisterStyles.secondaryActionText}>
+                      Back to Login
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+
+                <Animated.View
+                  style={[
+                    { flex: isCompactRegister ? 0 : 1.35 },
+                    actionButtonResponsiveStyle,
+                    getActionMotionStyle(continuePressAnim, continueHoverAnim),
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={visitorRegisterStyles.continueButton}
+                    onPress={handleSubmit}
+                    onPressIn={() => animatePress(continuePressAnim, 0.98)}
+                    onPressOut={() => animatePress(continuePressAnim, 1)}
+                    activeOpacity={0.8}
+                    disabled={isSubmitting}
+                    {...(Platform.OS === "web" && {
+                      onMouseEnter: () => animateHover(continueHoverAnim, 1),
+                      onMouseLeave: () => animateHover(continueHoverAnim, 0),
+                    })}
+                  >
+                    <LinearGradient
+                      colors={["#0A3D91", "#0A3D91"]}
+                      style={visitorRegisterStyles.gradientButton}
+                    >
+                      {isSubmitting ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Text style={visitorRegisterStyles.continueButtonText}>
+                            Create Account
+                          </Text>
+                          <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                        </>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Animated.View>
               </View>
             </View>
-          </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
       <DataPrivacyModal
