@@ -302,6 +302,43 @@ const visitorSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  currentDestination: {
+    office: { type: String, default: "", trim: true },
+    floor: { type: String, default: "", trim: true },
+    checkpointId: { type: String, default: "", trim: true },
+    reason: { type: String, default: "", trim: true },
+    status: {
+      type: String,
+      enum: ["initial", "redirected", "completed"],
+      default: "initial",
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    updatedAt: { type: Date, default: null },
+  },
+  destinationHistory: [
+    {
+      fromOffice: { type: String, default: "", trim: true },
+      toOffice: { type: String, default: "", trim: true },
+      floor: { type: String, default: "", trim: true },
+      checkpointId: { type: String, default: "", trim: true },
+      reason: { type: String, default: "", trim: true },
+      status: {
+        type: String,
+        enum: ["initial", "redirected", "completed"],
+        default: "redirected",
+      },
+      updatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
+      updatedAt: { type: Date, default: Date.now },
+    },
+  ],
   
   // ============ Check-in/out Status ============
   status: { 
@@ -625,6 +662,28 @@ visitorSchema.methods = {
     this.appointmentDepartment = String(department || "").trim();
     this.assignedOffice = this.appointmentDepartment || this.assignedOffice || "";
     this.host = this.appointmentDepartment || this.host || "";
+    this.currentDestination = {
+      office: this.appointmentDepartment || this.assignedOffice || this.host || "",
+      floor: "",
+      checkpointId: "",
+      reason: "Initial appointment destination",
+      status: "initial",
+      updatedBy: null,
+      updatedAt: new Date(),
+    };
+    this.destinationHistory = [
+      ...(Array.isArray(this.destinationHistory) ? this.destinationHistory : []),
+      {
+        fromOffice: "",
+        toOffice: this.currentDestination.office,
+        floor: "",
+        checkpointId: "",
+        reason: "Initial appointment destination",
+        status: "initial",
+        updatedBy: null,
+        updatedAt: new Date(),
+      },
+    ].slice(-25);
     this.appointmentStatus = "pending";
     this.appointmentRequestedAt = new Date();
     this.staffActionBy = null;
@@ -651,7 +710,58 @@ visitorSchema.methods = {
     this.checkedOutAt = null;
     this.checkedInBy = null;
     this.checkedOutBy = null;
+    if (!this.currentDestination?.office) {
+      this.currentDestination = {
+        office: this.appointmentDepartment || this.assignedOffice || this.host || "",
+        floor: "",
+        checkpointId: "",
+        reason: "Initial appointment destination",
+        status: "initial",
+        updatedBy: staffUser?._id || null,
+        updatedAt: new Date(),
+      };
+    }
     this.syncWorkflowState();
+    return this;
+  },
+
+  updateNextDestination({ office = "", floor = "", checkpointId = "", reason = "", staffUser = null } = {}) {
+    const nextOffice = String(office || "").trim();
+    const previousOffice =
+      this.currentDestination?.office ||
+      this.appointmentDepartment ||
+      this.assignedOffice ||
+      this.host ||
+      "";
+
+    if (!nextOffice) {
+      return this;
+    }
+
+    const now = new Date();
+    this.currentDestination = {
+      office: nextOffice,
+      floor: String(floor || "").trim(),
+      checkpointId: String(checkpointId || "").trim(),
+      reason: String(reason || "Visitor redirected by staff.").trim(),
+      status: "redirected",
+      updatedBy: staffUser?._id || null,
+      updatedAt: now,
+    };
+    this.destinationHistory = [
+      ...(Array.isArray(this.destinationHistory) ? this.destinationHistory : []),
+      {
+        fromOffice: previousOffice,
+        toOffice: nextOffice,
+        floor: this.currentDestination.floor,
+        checkpointId: this.currentDestination.checkpointId,
+        reason: this.currentDestination.reason,
+        status: "redirected",
+        updatedBy: staffUser?._id || null,
+        updatedAt: now,
+      },
+    ].slice(-25);
+
     return this;
   },
 

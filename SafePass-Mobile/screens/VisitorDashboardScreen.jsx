@@ -169,6 +169,17 @@ const VISITOR_SELECTED_SECTION_KEY = "visitorDashboardSelectedSection";
 const VISITOR_APPOINTMENT_SCREEN_KEY = "visitorDashboardAppointmentScreen";
 const VISITOR_MAP_FLOOR_KEY = "visitorDashboardMapFloor";
 const VISITOR_APPOINTMENT_SCREENS = ["menu", "request", "history"];
+const SCHOOL_OFFICE_HOURS = {
+  openHour: 8,
+  openMinute: 0,
+  closeHour: 18,
+  closeMinute: 0,
+};
+const AFTER_HOURS_APPOINTMENT_NOTICE = {
+  title: "Appointment Request Received",
+  message:
+    "Your appointment request has been submitted successfully. Since it was sent after school hours, it will be reviewed once the office reopens on the next school day.",
+};
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 const AnimatedPressable = ({
@@ -299,7 +310,8 @@ const VISITOR_OFFICE_MAP_ALIASES = {
 
 const getVisitorDestinationInfo = (visitorRecord = {}) => {
   const requestedOffice = String(
-    visitorRecord?.appointmentDepartment ||
+    visitorRecord?.currentDestination?.office ||
+      visitorRecord?.appointmentDepartment ||
       visitorRecord?.assignedOffice ||
       visitorRecord?.host ||
       "",
@@ -321,6 +333,38 @@ const getVisitorDestinationInfo = (visitorRecord = {}) => {
     icon: office?.icon || "navigate-outline",
     position: MONITORING_MAP_OFFICE_POSITIONS[officeId],
   };
+};
+
+const isSchoolOfficeServiceDay = (dateValue = new Date()) => {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return false;
+  return date.getDay() !== 0;
+};
+
+const isAfterSchoolOfficeHours = (dateValue = new Date()) => {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return false;
+  if (!isSchoolOfficeServiceDay(date)) return true;
+
+  const openAt = new Date(date);
+  openAt.setHours(SCHOOL_OFFICE_HOURS.openHour, SCHOOL_OFFICE_HOURS.openMinute, 0, 0);
+
+  const closedAt = new Date(date);
+  closedAt.setHours(SCHOOL_OFFICE_HOURS.closeHour, SCHOOL_OFFICE_HOURS.closeMinute, 0, 0);
+
+  return date < openAt || date >= closedAt;
+};
+
+const getAppointmentAfterHoursNotice = (response = {}, submittedAt = new Date()) => {
+  if (response?.afterHoursNotice?.title && response?.afterHoursNotice?.message) {
+    return response.afterHoursNotice;
+  }
+
+  if (response?.afterHours === true || isAfterSchoolOfficeHours(submittedAt)) {
+    return AFTER_HOURS_APPOINTMENT_NOTICE;
+  }
+
+  return null;
 };
 
 const buildVisitorRouteSteps = (destination = {}) => {
@@ -1286,11 +1330,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     try {
       const response = await ApiService.getNotifications({ read: "false", limit: 10 });
       const unreadNotifications = Array.isArray(response?.notifications) ? response.notifications : [];
-      const latestWarning = unreadNotifications.find((notification) => {
+      const latestNotice = unreadNotifications.find((notification) => {
         const notificationId = String(notification?._id || "");
         const notificationType = String(notification?.type || "").toLowerCase();
         const severity = String(notification?.severity || "").toLowerCase();
         const notificationText = `${notification?.title || ""} ${notification?.message || ""}`.toLowerCase();
+        const activityType = String(notification?.metadata?.activityType || "").toLowerCase();
 
         return (
           notificationId &&
@@ -1299,33 +1344,52 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             notificationType === "warning" ||
             notificationType === "alert" ||
             severity === "high" ||
-            notificationText.includes("reported")
+            notificationText.includes("reported") ||
+            activityType === "office_correct_location" ||
+            activityType === "visitor_destination_redirected"
           )
         );
       });
 
-      if (!latestWarning?._id) {
+      if (!latestNotice?._id) {
         return;
       }
 
-      const warningId = String(latestWarning._id);
-      shownVisitorWarningIdsRef.current.add(warningId);
-      const warningSeverity = String(latestWarning?.severity || latestWarning?.type || "warning").toLowerCase();
+      const noticeId = String(latestNotice._id);
+      shownVisitorWarningIdsRef.current.add(noticeId);
+      const noticeSeverity = String(latestNotice?.severity || latestNotice?.type || "warning").toLowerCase();
+      const activityType = String(latestNotice?.metadata?.activityType || "").toLowerCase();
+      const isWarningNotice =
+        noticeSeverity === "warning" ||
+        noticeSeverity === "high" ||
+        String(latestNotice?.type || "").toLowerCase() === "alert" ||
+        activityType === "office_wrong_location";
 
-      if (Platform.OS !== "web") {
+      if (Platform.OS !== "web" && isWarningNotice) {
         Vibration.vibrate([0, 120, 80, 120]);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch((error) => {
           console.log("Visitor warning haptic error:", error);
         });
       }
 
-      setVisitorWarningNotice({
-        id: warningId,
-        title: latestWarning.title || "Security Report Warning",
-        message: latestWarning.message || "A new notice has been added to your visitor account.",
-        severity: warningSeverity || "warning",
-        createdAt: latestWarning.createdAt || latestWarning.timestamp || new Date().toISOString(),
-      });
+      if (isWarningNotice) {
+        setVisitorWarningNotice({
+          id: noticeId,
+          title: latestNotice.title || "Security Report Warning",
+          message: latestNotice.message || "A new notice has been added to your visitor account.",
+          severity: noticeSeverity || "warning",
+          createdAt: latestNotice.createdAt || latestNotice.timestamp || new Date().toISOString(),
+        });
+      } else {
+        showVisitorPushNotice({
+          title: latestNotice.title || "Location Updated",
+          message: latestNotice.message || "Your visitor route has been updated.",
+          type: "success",
+        });
+        ApiService.markNotificationAsRead(noticeId).catch((error) => {
+          console.error("Mark visitor location notice as read error:", error);
+        });
+      }
     } catch (error) {
       console.error("Load visitor warning error:", error);
     } finally {
@@ -2541,6 +2605,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
 
     setIsSubmittingAppointment(true);
+    const submittedAt = new Date();
     try {
       const response = await ApiService.requestVisitorAppointment(currentUser._id, {
         preferredDate: new Date(preferredDate).toISOString(),
@@ -2562,6 +2627,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       });
 
       if (response?.success) {
+        const afterHoursNotice = getAppointmentAfterHoursNotice(response, submittedAt);
+        const feedbackMessage = afterHoursNotice?.message ||
+          "Your new visit request has been sent to staff for review. You can track approval, time adjustments, or rejection updates from this dashboard.";
+
         setHasAppointmentDraft(false);
         setAppointmentForm(buildAppointmentForm({
           ...visitor,
@@ -2580,15 +2649,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           idVerification: appointmentForm.idVerification,
         }));
         setAppointmentFeedback({
-          title: "Appointment Submitted Successfully",
-          message:
-            "Your new visit request has been sent to staff for review. You can track approval, time adjustments, or rejection updates from this dashboard.",
+          title: afterHoursNotice?.title || "Appointment Submitted Successfully",
+          message: feedbackMessage,
           date: formatDate(preferredDate),
           time: formatTime(preferredTime),
           department: selectedDepartments.join(", "),
           purpose: purposeOfVisit,
         });
-        showVisitorAlert("Appointment Submitted", "Your request was sent to staff for review.");
+        showVisitorAlert(
+          afterHoursNotice?.title || "Appointment Submitted",
+          afterHoursNotice?.message || "Your request was sent to staff for review.",
+        );
         await loadVisitorData();
         handleAppointmentScreenNavigation("history", "Opening appointment history...");
         return;

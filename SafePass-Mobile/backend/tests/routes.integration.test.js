@@ -171,6 +171,33 @@ const NotificationMock = {
 };
 
 const VisitorMock = {};
+const AttendanceRecordMock = {
+  find: () => ({
+    sort: () => ({
+      limit: async () => [],
+    }),
+  }),
+  findOne: async () => null,
+  create: async (data) => data,
+};
+const VisitorMovementLogMock = {
+  find: () => ({
+    sort: () => ({
+      limit: async () => [],
+    }),
+  }),
+  findOne: async () => null,
+  create: async (data) => data,
+};
+const NfcCheckpointMock = {
+  findOne: async () => null,
+  find: () => ({
+    sort: async () => [],
+  }),
+};
+const SmsNotificationLogMock = {
+  create: async (data) => data,
+};
 const CounterMock = {
   findOneAndUpdate: async () => ({ sequence: 1 }),
 };
@@ -190,6 +217,10 @@ registerMockModule("../models/AppSettings.js", AppSettingsMock);
 registerMockModule("../models/AccessLog.js", AccessLogMock);
 registerMockModule("../models/Notification.js", NotificationMock);
 registerMockModule("../models/Visitor.js", VisitorMock);
+registerMockModule("../models/AttendanceRecord.js", AttendanceRecordMock);
+registerMockModule("../models/VisitorMovementLog.js", VisitorMovementLogMock);
+registerMockModule("../models/NfcCheckpoint.js", NfcCheckpointMock);
+registerMockModule("../models/SmsNotificationLog.js", SmsNotificationLogMock);
 registerMockModule("../models/Counter.js", CounterMock);
 
 const app = require("../server");

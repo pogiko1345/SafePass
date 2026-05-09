@@ -15,12 +15,23 @@ import {
   UIManager,
   Animated,
   Pressable,
+  StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import ApiService from "../utils/ApiService";
 import { printRecordsTable } from "../utils/printUtils";
+import {
+  BRAND,
+  MobileBottomNav,
+  MobileEmptyState,
+  MobileFilterChips,
+  MobileLoadingState,
+  MobileSearchField,
+  MobileStatusBadge,
+} from "../components/mobile/MobileRoleComponents";
 import styles from "../styles/StaffDashboardStyles";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -285,10 +296,49 @@ const isWithinCurrentWeek = (value, referenceDate = new Date()) => {
   return target >= startOfWeek && target < endOfWeek;
 };
 
+const staffMobileTabs = [
+  { key: "dashboard", label: "Home", icon: "briefcase-outline", activeIcon: "briefcase" },
+  { key: "requests", label: "Requests", icon: "mail-unread-outline", activeIcon: "mail-unread" },
+  { key: "visitors", label: "Visitors", icon: "people-outline", activeIcon: "people" },
+  { key: "history", label: "History", icon: "archive-outline", activeIcon: "archive" },
+  { key: "profile", label: "Profile", icon: "person-outline", activeIcon: "person" },
+];
+
+const requestFilterOptions = [
+  { key: "all", label: "All" },
+  { key: "today", label: "Today" },
+  { key: "this-week", label: "This Week" },
+];
+
+const historyFilterOptions = [
+  { key: "all", label: "All" },
+  { key: "approved", label: "Approved" },
+  { key: "adjusted", label: "Adjusted" },
+  { key: "completed", label: "Completed" },
+  { key: "rejected", label: "Rejected" },
+];
+
+const staffRedirectDestinations = [
+  "Registrar",
+  "Accounting",
+  "Cashier",
+  "Administration",
+  "Information Desk",
+  "Guidance",
+  "Faculty Room",
+  "I.T Room",
+  "Laboratory",
+  "Library",
+];
+
 export default function StaffDashboardScreen({ navigation, onLogout }) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const isPhoneLayout = viewportWidth < 768;
   const [user, setUser] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [mobileTab, setMobileTab] = useState("dashboard");
   const [filter, setFilter] = useState("pending");
   const [expandedModule, setExpandedModule] = useState("home");
   const [selectedSubmodule, setSelectedSubmodule] = useState("home");
@@ -315,6 +365,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [attendanceTapLoading, setAttendanceTapLoading] = useState("");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [detailAppointment, setDetailAppointment] = useState(null);
@@ -344,9 +395,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
       setUser(currentUser);
 
-      const [appointmentResponse, notificationResponse] = await Promise.allSettled([
+      const [appointmentResponse, notificationResponse, attendanceResponse] = await Promise.allSettled([
         ApiService.getStaffAppointments({ status: "all", limit: 200 }),
         ApiService.getNotifications({ limit: 20 }),
+        ApiService.getMyAttendance({ limit: 10 }),
       ]);
 
       if (appointmentResponse.status === "fulfilled") {
@@ -361,6 +413,13 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       } else {
         console.error("Staff notifications error:", notificationResponse.reason);
         setNotifications([]);
+      }
+
+      if (attendanceResponse.status === "fulfilled") {
+        setAttendance(Array.isArray(attendanceResponse.value?.attendance) ? attendanceResponse.value.attendance : []);
+      } else {
+        console.error("Staff attendance error:", attendanceResponse.reason);
+        setAttendance([]);
       }
     } catch (error) {
       console.error("Load staff dashboard error:", error);
@@ -385,6 +444,39 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     setRefreshing(true);
     loadData();
   }, [loadData]);
+
+  const handleStaffAttendanceTap = async (action) => {
+    if (attendanceTapLoading) return;
+
+    setAttendanceTapLoading(action);
+    try {
+      const response = await ApiService.submitMyAttendanceTap({
+        action,
+        source: "virtual_nfc_card",
+        nfcCardId: user?.nfcCardId,
+        office: "Staff Virtual NFC Card",
+        floor: "Mobile",
+        checkpointId: "staff-virtual-nfc",
+      });
+
+      if (response?.attendance) {
+        setAttendance((currentRecords) => [
+          response.attendance,
+          ...currentRecords.filter((record) => String(record._id) !== String(response.attendance._id)),
+        ]);
+      }
+
+      await loadData();
+      Alert.alert(
+        action === "check_in" ? "Checked In" : "Checked Out",
+        response?.message || "Your staff attendance was recorded.",
+      );
+    } catch (error) {
+      Alert.alert("NFC Card Error", error?.message || "Unable to record your staff attendance.");
+    } finally {
+      setAttendanceTapLoading("");
+    }
+  };
 
   const isNotificationRead = useCallback(
     (notification) =>
@@ -474,6 +566,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const unreadNotificationsCount = useMemo(
     () => (notifications || []).filter((item) => !isNotificationRead(item)).length,
     [notifications, isNotificationRead],
+  );
+
+  const latestAttendanceRecord = attendance[0] || null;
+  const isStaffCheckedIn = Boolean(
+    latestAttendanceRecord?.checkInTime && !latestAttendanceRecord?.checkOutTime,
   );
 
   const checkedInNowCount = useMemo(
@@ -1055,6 +1152,63 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     );
   };
 
+  const submitVisitorDestinationUpdate = async (appointment, office) => {
+    if (!appointment?._id || !office || processingId) return;
+
+    setProcessingId(appointment._id);
+    try {
+      const response = await ApiService.updateVisitorDestination(appointment._id, {
+        office,
+        reason: `Redirected by ${profileName || "staff"} during appointment handling.`,
+      });
+
+      if (response?.visitor) {
+        mergeAppointment(response.visitor);
+        setDetailAppointment(response.visitor);
+      }
+
+      await loadData();
+      Alert.alert(
+        "Destination Updated",
+        response?.message || `Visitor was redirected to ${office}.`,
+      );
+    } catch (error) {
+      Alert.alert("Redirect Failed", error?.message || "Could not update the visitor destination.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRedirectVisitor = (appointment) => {
+    if (!appointment?._id) return;
+
+    if (Platform.OS === "web") {
+      const office = globalThis?.window?.prompt?.(
+        "Enter the visitor's next destination office:",
+        appointment.currentDestination?.office ||
+          appointment.appointmentDepartment ||
+          appointment.assignedOffice ||
+          "Cashier",
+      );
+      if (office && office.trim()) {
+        submitVisitorDestinationUpdate(appointment, office.trim());
+      }
+      return;
+    }
+
+    Alert.alert(
+      "Redirect Visitor",
+      "Choose the visitor's next destination. The visitor and security will be notified.",
+      [
+        { text: "Cancel", style: "cancel" },
+        ...staffRedirectDestinations.slice(0, 5).map((office) => ({
+          text: office,
+          onPress: () => submitVisitorDestinationUpdate(appointment, office),
+        })),
+      ],
+    );
+  };
+
   const handleLogout = () => {
     if (isSigningOut) return;
     setShowLogoutModal(true);
@@ -1365,6 +1519,21 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               </Text>
             </View>
             <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Next Destination</Text>
+              <Text style={styles.detailValue}>
+                {detailAppointment.currentDestination?.office ||
+                  detailAppointment.appointmentDepartment ||
+                  detailAppointment.assignedOffice ||
+                  "Assigned department"}
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Current Location</Text>
+              <Text style={styles.detailValue}>
+                {detailAppointment.currentLocation?.office || "Not tapped inside campus yet"}
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Schedule</Text>
               <Text style={styles.detailValue}>
                 {formatDate(detailAppointment.visitDate)} at {formatTime(detailAppointment.visitTime)}
@@ -1461,6 +1630,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               <Text style={styles.detailNoteText}>{detailAppointment.appointmentCompletionNote}</Text>
             </View>
           ) : null}
+
+          {detailAppointment.status === "checked_in" && !detailAppointment.checkedOutAt ? (
+            <TouchableOpacity
+              style={[styles.sectionActionButton, processingId === detailAppointment._id && styles.disabledAction]}
+              onPress={() => handleRedirectVisitor(detailAppointment)}
+              disabled={processingId === detailAppointment._id}
+            >
+              <Ionicons name="navigate-outline" size={16} color="#0A3D91" />
+              <Text style={styles.sectionActionButtonText}>Update Next Destination</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     );
@@ -1494,6 +1674,77 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
         </View>
       </LinearGradient>
+
+      <View style={staffVirtualStyles.card}>
+        <View style={staffVirtualStyles.cardTopRow}>
+          <View style={staffVirtualStyles.nfcIcon}>
+            <Ionicons name="radio-outline" size={26} color="#FFFFFF" />
+          </View>
+          <View style={staffVirtualStyles.cardCopy}>
+            <Text style={staffVirtualStyles.eyebrow}>Staff Virtual NFC Card</Text>
+            <Text style={staffVirtualStyles.title}>
+              {isStaffCheckedIn ? "Currently Checked In" : "Ready for Check In"}
+            </Text>
+            <Text style={staffVirtualStyles.meta}>
+              Card ID: {user?.nfcCardId || "Not assigned"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={staffVirtualStyles.statusRow}>
+          <View style={staffVirtualStyles.statusPill}>
+            <Ionicons
+              name={isStaffCheckedIn ? "checkmark-circle-outline" : "ellipse-outline"}
+              size={16}
+              color={isStaffCheckedIn ? "#047857" : "#64748B"}
+            />
+            <Text style={[
+              staffVirtualStyles.statusText,
+              { color: isStaffCheckedIn ? "#047857" : "#64748B" },
+            ]}>
+              {isStaffCheckedIn ? "Inside campus" : "Outside campus"}
+            </Text>
+          </View>
+          <Text style={staffVirtualStyles.timeText}>
+            In {formatTime(latestAttendanceRecord?.checkInTime)} • Out {formatTime(latestAttendanceRecord?.checkOutTime)}
+          </Text>
+        </View>
+
+        <View style={staffVirtualStyles.actionRow}>
+          <TouchableOpacity
+            style={[staffVirtualStyles.actionButton, isStaffCheckedIn && staffVirtualStyles.disabledButton]}
+            onPress={() => handleStaffAttendanceTap("check_in")}
+            disabled={isStaffCheckedIn || Boolean(attendanceTapLoading)}
+          >
+            {attendanceTapLoading === "check_in" ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
+                <Text style={staffVirtualStyles.actionText}>Check In</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              staffVirtualStyles.actionButton,
+              staffVirtualStyles.exitButton,
+              !isStaffCheckedIn && staffVirtualStyles.disabledButton,
+            ]}
+            onPress={() => handleStaffAttendanceTap("check_out")}
+            disabled={!isStaffCheckedIn || Boolean(attendanceTapLoading)}
+          >
+            {attendanceTapLoading === "check_out" ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
+                <Text style={staffVirtualStyles.actionText}>Check Out</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <View style={styles.homeInsightsGrid}>
         <HomeHoverPressable style={styles.homeInsightCard}>
@@ -2338,8 +2589,391 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     return renderHomeContent();
   };
 
-  if (loading) {
+  const renderMobileHeader = () => (
+    <View style={staffMobileStyles.header}>
+      <View style={staffMobileStyles.headerTop}>
+        <View style={staffMobileStyles.avatar}>
+          <Text style={staffMobileStyles.avatarText}>{profileInitials}</Text>
+        </View>
+        <View style={staffMobileStyles.headerActions}>
+          <TouchableOpacity
+            style={staffMobileStyles.headerIconButton}
+            onPress={() => setMobileTab("notifications")}
+          >
+            <Ionicons name="notifications-outline" size={19} color={BRAND.blue} />
+            {unreadNotificationsCount ? <View style={staffMobileStyles.dotBadge} /> : null}
+          </TouchableOpacity>
+          <TouchableOpacity style={staffMobileStyles.headerIconButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={19} color={BRAND.blue} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      <Text style={staffMobileStyles.eyebrow}>Staff Mobile</Text>
+      <Text style={staffMobileStyles.headerTitle}>Appointment Desk</Text>
+      <Text style={staffMobileStyles.headerSubtitle}>
+        Review requests, track today&apos;s visitors, and keep your office queue moving.
+      </Text>
+    </View>
+  );
+
+  const renderMobileStats = () => (
+    <View style={staffMobileStyles.statsGrid}>
+      {[
+        { label: "Pending", value: stats.pending, icon: "mail-unread-outline", color: BRAND.warning },
+        { label: "Today", value: todaysSchedule.length, icon: "today-outline", color: BRAND.blue },
+        { label: "Inside", value: checkedInNowCount, icon: "walk-outline", color: BRAND.success },
+      ].map((item) => (
+        <View key={item.label} style={staffMobileStyles.statCard}>
+          <Ionicons name={item.icon} size={18} color={item.color} />
+          <Text style={staffMobileStyles.statValue}>{item.value}</Text>
+          <Text style={staffMobileStyles.statLabel}>{item.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderMobileAppointmentCard = (appointment, mode = "request") => {
+    const appointmentStatus = getAppointmentStatus(appointment);
+    const isPending = appointmentStatus === "pending";
+    const isProcessing = processingId === appointment._id;
+    const canComplete =
+      mode === "history" &&
+      appointment.status === "checked_in" &&
+      !appointment.checkedOutAt &&
+      !appointment.appointmentCompletedAt;
+
     return (
+      <TouchableOpacity
+        key={appointment._id}
+        style={staffMobileStyles.appointmentCard}
+        onPress={() => setDetailAppointment(appointment)}
+        activeOpacity={0.82}
+      >
+        <View style={staffMobileStyles.appointmentTop}>
+          <View style={staffMobileStyles.appointmentAvatar}>
+            <Ionicons name="person-outline" size={20} color={BRAND.blue} />
+          </View>
+          <View style={staffMobileStyles.appointmentMain}>
+            <Text style={staffMobileStyles.appointmentName} numberOfLines={1}>
+              {appointment.fullName || "Visitor"}
+            </Text>
+            <Text style={staffMobileStyles.appointmentPurpose} numberOfLines={2}>
+              {appointment.purposeOfVisit || "No visit purpose provided"}
+            </Text>
+          </View>
+          <MobileStatusBadge status={appointmentStatus} label={getStatusMeta(appointmentStatus).label} />
+        </View>
+
+        <View style={staffMobileStyles.metaRow}>
+          <View style={staffMobileStyles.metaPill}>
+            <Ionicons name="calendar-outline" size={14} color="#64748B" />
+            <Text style={staffMobileStyles.metaPillText}>{formatDate(appointment.visitDate)}</Text>
+          </View>
+          <View style={staffMobileStyles.metaPill}>
+            <Ionicons name="time-outline" size={14} color="#64748B" />
+            <Text style={staffMobileStyles.metaPillText}>{formatTime(appointment.visitTime)}</Text>
+          </View>
+          <View style={staffMobileStyles.metaPill}>
+            <Ionicons name="business-outline" size={14} color="#64748B" />
+            <Text style={staffMobileStyles.metaPillText} numberOfLines={1}>
+              {appointment.appointmentDepartment || appointment.assignedOffice || user?.department || "Office"}
+            </Text>
+          </View>
+        </View>
+
+        {mode === "request" && isPending ? (
+          <View style={staffMobileStyles.cardActions}>
+            <TouchableOpacity
+              style={[staffMobileStyles.actionButton, staffMobileStyles.approveButton, isProcessing && staffMobileStyles.disabledButton]}
+              onPress={() => handleApprove(appointment)}
+              disabled={isProcessing}
+            >
+              {isProcessing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={staffMobileStyles.approveButtonText}>Approve</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={staffMobileStyles.actionButton} onPress={() => openAdjustModal(appointment)} disabled={isProcessing}>
+              <Text style={staffMobileStyles.actionButtonText}>Adjust</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[staffMobileStyles.actionButton, staffMobileStyles.rejectButton]}
+              onPress={() => openRejectModal(appointment)}
+              disabled={isProcessing}
+            >
+              <Text style={staffMobileStyles.rejectButtonText}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {canComplete ? (
+          <TouchableOpacity
+            style={[staffMobileStyles.fullActionButton, isProcessing && staffMobileStyles.disabledButton]}
+            onPress={() => handleComplete(appointment)}
+            disabled={isProcessing}
+          >
+            <Ionicons name="flag-outline" size={17} color="#FFFFFF" />
+            <Text style={staffMobileStyles.fullActionButtonText}>Mark Complete</Text>
+          </TouchableOpacity>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderMobileDashboard = () => (
+    <>
+      {renderMobileHeader()}
+      {renderMobileStats()}
+      <View style={staffVirtualStyles.card}>
+        <View style={staffVirtualStyles.cardTopRow}>
+          <View style={staffVirtualStyles.nfcIcon}>
+            <Ionicons name="radio-outline" size={24} color="#FFFFFF" />
+          </View>
+          <View style={staffVirtualStyles.cardCopy}>
+            <Text style={staffVirtualStyles.eyebrow}>Staff Virtual NFC Card</Text>
+            <Text style={staffVirtualStyles.title}>
+              {isStaffCheckedIn ? "Currently Checked In" : "Ready for Check In"}
+            </Text>
+            <Text style={staffVirtualStyles.meta}>Card ID: {user?.nfcCardId || "Not assigned"}</Text>
+          </View>
+        </View>
+        <View style={staffVirtualStyles.actionRow}>
+          <TouchableOpacity
+            style={[staffVirtualStyles.actionButton, isStaffCheckedIn && staffVirtualStyles.disabledButton]}
+            onPress={() => handleStaffAttendanceTap("check_in")}
+            disabled={isStaffCheckedIn || Boolean(attendanceTapLoading)}
+          >
+            {attendanceTapLoading === "check_in" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={staffVirtualStyles.actionText}>Check In</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[staffVirtualStyles.actionButton, staffVirtualStyles.exitButton, !isStaffCheckedIn && staffVirtualStyles.disabledButton]}
+            onPress={() => handleStaffAttendanceTap("check_out")}
+            disabled={!isStaffCheckedIn || Boolean(attendanceTapLoading)}
+          >
+            {attendanceTapLoading === "check_out" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={staffVirtualStyles.actionText}>Check Out</Text>}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={staffMobileStyles.sectionHeader}>
+        <Text style={staffMobileStyles.sectionTitle}>Today&apos;s Visitors</Text>
+        <TouchableOpacity onPress={() => setMobileTab("visitors")}>
+          <Text style={staffMobileStyles.sectionLink}>View all</Text>
+        </TouchableOpacity>
+      </View>
+      {todaysSchedule.length ? (
+        todaysSchedule.slice(0, 3).map((appointment) => renderMobileAppointmentCard(appointment, "visitor"))
+      ) : (
+        <MobileEmptyState icon="calendar-outline" title="No visitors today" message="Approved visitors for today will appear here." />
+      )}
+    </>
+  );
+
+  const renderMobileRequests = () => (
+    <>
+      <View style={staffMobileStyles.compactHeader}>
+        <Text style={staffMobileStyles.compactTitle}>Appointment Requests</Text>
+        <Text style={staffMobileStyles.compactSubtitle}>Approve, reject, or adjust incoming visitor requests.</Text>
+      </View>
+      <View style={staffMobileStyles.toolbar}>
+        <MobileSearchField
+          value={requestSearchTerm}
+          onChangeText={setRequestSearchTerm}
+          placeholder="Search visitor, office, purpose..."
+        />
+        <MobileFilterChips options={requestFilterOptions} value={requestFilter} onChange={setRequestFilter} />
+      </View>
+      {filteredRequestAppointments.length ? (
+        filteredRequestAppointments.slice(0, 30).map((appointment) => renderMobileAppointmentCard(appointment, "request"))
+      ) : (
+        <MobileEmptyState icon="mail-open-outline" title="No matching requests" message="New appointment requests assigned to your office will show here." />
+      )}
+    </>
+  );
+
+  const renderMobileVisitors = () => (
+    <>
+      <View style={staffMobileStyles.compactHeader}>
+        <Text style={staffMobileStyles.compactTitle}>Today&apos;s Visitors</Text>
+        <Text style={staffMobileStyles.compactSubtitle}>Scheduled and active visitor appointments for your office.</Text>
+      </View>
+      {todaysSchedule.length ? (
+        todaysSchedule.map((appointment) => renderMobileAppointmentCard(appointment, "visitor"))
+      ) : (
+        <MobileEmptyState icon="people-outline" title="No scheduled visitors" message="Approved visitors scheduled for today will appear here." />
+      )}
+    </>
+  );
+
+  const renderMobileHistory = () => (
+    <>
+      <View style={staffMobileStyles.compactHeader}>
+        <Text style={staffMobileStyles.compactTitle}>Appointment History</Text>
+        <Text style={staffMobileStyles.compactSubtitle}>Search previous approvals, adjustments, rejections, and completed visits.</Text>
+      </View>
+      <View style={staffMobileStyles.toolbar}>
+        <MobileSearchField
+          value={recordSearchTerm}
+          onChangeText={setRecordSearchTerm}
+          placeholder="Search appointment history..."
+        />
+        <MobileFilterChips options={historyFilterOptions} value={filter} onChange={setFilter} />
+      </View>
+      {filteredAppointments.length ? (
+        filteredAppointments.slice(0, 40).map((appointment) => renderMobileAppointmentCard(appointment, "history"))
+      ) : (
+        <MobileEmptyState icon="archive-outline" title="No history found" message="Try a different search or status filter." />
+      )}
+    </>
+  );
+
+  const renderMobileNotifications = () => (
+    <>
+      <View style={staffMobileStyles.compactHeader}>
+        <Text style={staffMobileStyles.compactTitle}>Notifications</Text>
+        <Text style={staffMobileStyles.compactSubtitle}>Latest request and appointment updates.</Text>
+      </View>
+      {notifications.length ? (
+        notifications.slice(0, 40).map((notification) => {
+          const meta = getNotificationMeta(notification);
+          return (
+            <TouchableOpacity
+              key={notification._id}
+              style={staffMobileStyles.notificationCard}
+              onPress={() => handleNotificationPress(notification)}
+            >
+              <View style={[staffMobileStyles.notificationIcon, { backgroundColor: `${meta.accent}16` }]}>
+                <Ionicons name={meta.icon} size={18} color={meta.accent} />
+              </View>
+              <View style={staffMobileStyles.notificationCopy}>
+                <Text style={staffMobileStyles.notificationTitle}>{notification.title || meta.label}</Text>
+                <Text style={staffMobileStyles.notificationMessage} numberOfLines={2}>{notification.message || "No message provided."}</Text>
+                <Text style={staffMobileStyles.notificationTime}>{formatRelativeTime(notification.createdAt)}</Text>
+              </View>
+              {!isNotificationRead(notification) ? <View style={staffMobileStyles.notificationUnreadDot} /> : null}
+            </TouchableOpacity>
+          );
+        })
+      ) : (
+        <MobileEmptyState icon="notifications-off-outline" title="No notifications" message="Staff notifications will appear here." />
+      )}
+    </>
+  );
+
+  const renderMobileProfile = () => (
+    <>
+      <View style={staffMobileStyles.compactHeader}>
+        <Text style={staffMobileStyles.compactTitle}>Staff Profile</Text>
+        <Text style={staffMobileStyles.compactSubtitle}>Your office assignment and staff account details.</Text>
+      </View>
+      <View style={staffMobileStyles.profileCard}>
+        <View style={staffMobileStyles.profileTop}>
+          <View style={staffMobileStyles.profileAvatar}>
+            <Text style={staffMobileStyles.profileAvatarText}>{profileInitials}</Text>
+          </View>
+          <View style={staffMobileStyles.profileCopy}>
+            <Text style={staffMobileStyles.profileName}>{profileName}</Text>
+            <Text style={staffMobileStyles.profileRole}>Staff Panel</Text>
+          </View>
+        </View>
+        {[
+          ["Email", user?.email],
+          ["Department", user?.department || "Not assigned"],
+          ["Staff ID", user?.staffId || user?.employeeId || "Not assigned"],
+          ["Contact", user?.phone || user?.phoneNumber || "Not configured"],
+        ].map(([label, value]) => (
+          <View key={label} style={staffMobileStyles.profileRow}>
+            <Text style={staffMobileStyles.profileLabel}>{label}</Text>
+            <Text style={staffMobileStyles.profileValue}>{value}</Text>
+          </View>
+        ))}
+      </View>
+      <TouchableOpacity style={staffMobileStyles.logoutFullButton} onPress={handleLogout}>
+        <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+        <Text style={staffMobileStyles.logoutFullButtonText}>Sign Out</Text>
+      </TouchableOpacity>
+    </>
+  );
+
+  const renderMobileDetailModal = () => (
+    <Modal visible={Boolean(detailAppointment)} transparent animationType="slide" onRequestClose={() => setDetailAppointment(null)}>
+      <View style={staffMobileStyles.modalOverlay}>
+        <View style={staffMobileStyles.detailSheet}>
+          <View style={staffMobileStyles.detailHeader}>
+            <View>
+              <Text style={staffMobileStyles.detailTitle}>{detailAppointment?.fullName || "Visitor Details"}</Text>
+              <Text style={staffMobileStyles.detailSubtitle}>{detailAppointment?.purposeOfVisit || "No purpose provided"}</Text>
+            </View>
+            <TouchableOpacity style={staffMobileStyles.closeButton} onPress={() => setDetailAppointment(null)}>
+              <Ionicons name="close" size={20} color="#475569" />
+            </TouchableOpacity>
+          </View>
+          {detailAppointment ? (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={staffMobileStyles.detailBody}>
+              <MobileStatusBadge status={getAppointmentStatus(detailAppointment)} label={getStatusMeta(getAppointmentStatus(detailAppointment)).label} />
+              {[
+                ["Email", detailAppointment.email || "No email"],
+                ["Phone", detailAppointment.phoneNumber || detailAppointment.phone || "No phone"],
+                ["Schedule", `${formatDate(detailAppointment.visitDate)} at ${formatTime(detailAppointment.visitTime)}`],
+                ["Office", detailAppointment.appointmentDepartment || detailAppointment.assignedOffice || "Assigned department"],
+                ["Next Destination", detailAppointment.currentDestination?.office || detailAppointment.appointmentDepartment || detailAppointment.assignedOffice || "Assigned department"],
+                ["Current Location", detailAppointment.currentLocation?.office || "Not tapped inside campus yet"],
+                ["Checked In", formatDateTime(detailAppointment.checkedInAt)],
+                ["Checked Out", formatDateTime(detailAppointment.checkedOutAt)],
+              ].map(([label, value]) => (
+                <View key={label} style={staffMobileStyles.detailRow}>
+                  <Text style={staffMobileStyles.detailLabel}>{label}</Text>
+                  <Text style={staffMobileStyles.detailValue}>{value}</Text>
+                </View>
+              ))}
+              {detailAppointment.status === "checked_in" && !detailAppointment.checkedOutAt ? (
+                <TouchableOpacity
+                  style={staffMobileStyles.fullActionButton}
+                  onPress={() => handleRedirectVisitor(detailAppointment)}
+                  disabled={processingId === detailAppointment._id}
+                >
+                  <Ionicons name="navigate-outline" size={17} color="#FFFFFF" />
+                  <Text style={staffMobileStyles.fullActionButtonText}>Update Next Destination</Text>
+                </TouchableOpacity>
+              ) : null}
+            </ScrollView>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderMobileStaffScreen = () => {
+    const content =
+      mobileTab === "requests"
+        ? renderMobileRequests()
+        : mobileTab === "visitors"
+          ? renderMobileVisitors()
+          : mobileTab === "history"
+            ? renderMobileHistory()
+            : mobileTab === "profile"
+              ? renderMobileProfile()
+              : mobileTab === "notifications"
+                ? renderMobileNotifications()
+                : renderMobileDashboard();
+
+    return (
+      <SafeAreaView style={staffMobileStyles.safeArea}>
+        <ScrollView
+          style={staffMobileStyles.scroll}
+          contentContainerStyle={staffMobileStyles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BRAND.blue} />}
+        >
+          {content}
+        </ScrollView>
+        <MobileBottomNav tabs={staffMobileTabs} activeTab={mobileTab} onChange={setMobileTab} />
+        {renderMobileDetailModal()}
+      </SafeAreaView>
+    );
+  };
+
+  if (loading) {
+    return isPhoneLayout ? (
+      <MobileLoadingState message="Loading staff appointments..." />
+    ) : (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={styles.loadingText}>Loading staff appointments...</Text>
@@ -2349,6 +2983,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   }
 
   const selectedSubmoduleMeta = getSelectedSubmoduleMeta();
+
+  if (isPhoneLayout) {
+    return renderMobileStaffScreen();
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -2557,3 +3195,528 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     </SafeAreaView>
   );
 }
+
+const staffVirtualStyles = StyleSheet.create({
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 18,
+    marginTop: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  cardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  nfcIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0A3D91",
+  },
+  cardCopy: {
+    flex: 1,
+  },
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0A3D91",
+    textTransform: "uppercase",
+  },
+  title: {
+    marginTop: 4,
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  meta: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "#475569",
+  },
+  statusRow: {
+    marginTop: 16,
+    gap: 8,
+  },
+  statusPill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#F1F5F9",
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  timeText: {
+    fontSize: 13,
+    color: "#64748B",
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  actionButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 12,
+    backgroundColor: "#0A3D91",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  exitButton: {
+    backgroundColor: "#DC2626",
+  },
+  disabledButton: {
+    opacity: 0.45,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+});
+
+const staffMobileStyles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: BRAND.page,
+  },
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 22,
+  },
+  header: {
+    borderRadius: 24,
+    padding: 18,
+    backgroundColor: "#123B6D",
+    marginBottom: 12,
+  },
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  headerIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dotBadge: {
+    position: "absolute",
+    top: 9,
+    right: 9,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: BRAND.danger,
+  },
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#BFDBFE",
+    textTransform: "uppercase",
+  },
+  headerTitle: {
+    marginTop: 6,
+    fontSize: 27,
+    lineHeight: 32,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  headerSubtitle: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#DBEAFE",
+  },
+  statsGrid: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 17,
+    padding: 13,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  statValue: {
+    marginTop: 8,
+    fontSize: 22,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  statLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  sectionLink: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.blue,
+  },
+  compactHeader: {
+    borderRadius: 21,
+    padding: 17,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 12,
+  },
+  compactTitle: {
+    fontSize: 23,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  compactSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: BRAND.muted,
+  },
+  toolbar: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  appointmentCard: {
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 10,
+  },
+  appointmentTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  appointmentAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+  appointmentMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  appointmentName: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  appointmentPurpose: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: BRAND.muted,
+  },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 12,
+  },
+  metaPill: {
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#F8FBFE",
+  },
+  metaPillText: {
+    maxWidth: 190,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#475569",
+  },
+  cardActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  actionButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF2F7",
+  },
+  approveButton: {
+    backgroundColor: BRAND.blue,
+  },
+  rejectButton: {
+    backgroundColor: "#FEE2E2",
+  },
+  actionButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#334155",
+  },
+  approveButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  rejectButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.danger,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  fullActionButton: {
+    marginTop: 12,
+    minHeight: 44,
+    borderRadius: 13,
+    backgroundColor: BRAND.blue,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  fullActionButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  notificationCard: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 10,
+  },
+  notificationIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notificationCopy: {
+    flex: 1,
+  },
+  notificationTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  notificationMessage: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: BRAND.muted,
+  },
+  notificationTime: {
+    marginTop: 7,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+  },
+  notificationUnreadDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: BRAND.blue,
+    marginTop: 4,
+  },
+  profileCard: {
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  profileTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  profileAvatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#123B6D",
+  },
+  profileAvatarText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  profileCopy: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  profileRole: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  profileRow: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#EEF2F7",
+  },
+  profileLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  profileValue: {
+    marginTop: 5,
+    fontSize: 14,
+    fontWeight: "800",
+    color: BRAND.ink,
+  },
+  logoutFullButton: {
+    marginTop: 12,
+    minHeight: 48,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  logoutFullButtonText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.danger,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "flex-end",
+  },
+  detailSheet: {
+    maxHeight: "88%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+  },
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  detailTitle: {
+    fontSize: 21,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  detailSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: BRAND.muted,
+  },
+  closeButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  detailBody: {
+    paddingBottom: 20,
+  },
+  detailRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+  detailLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  detailValue: {
+    marginTop: 5,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "800",
+    color: BRAND.ink,
+  },
+});

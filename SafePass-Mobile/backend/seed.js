@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, required: true },
   role: { 
     type: String, 
-    enum: ['visitor', 'security', 'guard', 'admin'],
+    enum: ['visitor', 'security', 'guard', 'admin', 'staff', 'student', 'teacher'],
     default: 'visitor'
   },
   status: {
@@ -33,6 +33,11 @@ const userSchema = new mongoose.Schema({
   position: String,
   department: String,
   nfcCardId: { type: String, unique: true, sparse: true },
+  studentId: String,
+  employeeId: String,
+  guardianName: String,
+  guardianPhone: String,
+  smsOptIn: { type: Boolean, default: false },
   isActive: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
@@ -123,6 +128,54 @@ const seedDatabase = async () => {
     
     const createdSecurity = await User.insertMany(securityUsers);
     console.log(`✅ Created ${createdSecurity.length} security account\n`);
+
+    // ============ CREATE STAFF ACCOUNT ============
+    console.log('Creating Staff Account...');
+
+    const staffUsers = [
+      {
+        firstName: 'Maria',
+        lastName: 'Registrar',
+        email: 'staff@sapphire.edu',
+        password: await bcrypt.hash('Staff123!', 10),
+        phone: '09123456781',
+        role: 'staff',
+        status: 'active',
+        isActive: true,
+        employeeId: 'STF-DEMO-001',
+        position: 'Registrar Staff',
+        department: 'Registrar',
+        nfcCardId: `SAFEPASS-STF-${Date.now()}`,
+      }
+    ];
+
+    const createdStaff = await User.insertMany(staffUsers);
+    console.log(`Created ${createdStaff.length} staff account\n`);
+
+    // ============ CREATE STUDENT ACCOUNT ============
+    console.log('Creating Student Account...');
+
+    const studentUsers = [
+      {
+        firstName: 'Alex',
+        lastName: 'Student',
+        email: 'student@sapphire.edu',
+        password: await bcrypt.hash('Student123!', 10),
+        phone: '09123456782',
+        role: 'student',
+        status: 'active',
+        isActive: true,
+        studentId: 'STU-DEMO-001',
+        department: 'Aircraft Maintenance',
+        guardianName: 'Ana Student',
+        guardianPhone: '09123456783',
+        smsOptIn: true,
+        nfcCardId: `SAFEPASS-STU-${Date.now()}`,
+      }
+    ];
+
+    const createdStudents = await User.insertMany(studentUsers);
+    console.log(`Created ${createdStudents.length} student account\n`);
 
     // ============ CREATE APPROVED VISITOR ACCOUNT ============
     console.log('📝 Creating Approved Visitor Account...');
@@ -228,6 +281,18 @@ const seedDatabase = async () => {
     console.log(`   Password: Security123!`);
     console.log(`   Role: Security - Can verify visitors`);
     console.log('');
+
+    console.log('STAFF ACCOUNT:');
+    console.log(`   Email: staff@sapphire.edu`);
+    console.log(`   Password: Staff123!`);
+    console.log(`   Role: Staff - Can manage appointment requests`);
+    console.log('');
+
+    console.log('STUDENT ACCOUNT:');
+    console.log(`   Email: student@sapphire.edu`);
+    console.log(`   Password: Student123!`);
+    console.log(`   Role: Student - Can use mobile attendance`);
+    console.log('');
     
     console.log('✅ APPROVED VISITOR ACCOUNT:');
     console.log(`   Email: john.smith@email.com`);
@@ -245,6 +310,8 @@ const seedDatabase = async () => {
     console.log('\n💡 TESTING TIPS:');
     console.log('   • Admin: admin@sapphire.edu / Admin123! - to approve visitors');
     console.log('   • Security: security@sapphire.edu / Security123! - to check in/out visitors');
+    console.log('   • Staff: staff@sapphire.edu / Staff123! - to manage appointments');
+    console.log('   • Student: student@sapphire.edu / Student123! - to test student attendance');
     console.log('   • Approved Visitor: john.smith@email.com / Visitor123! - to test visitor dashboard');
     console.log('   • Pending Visitor: jane.doe@email.com / pending123 - to test pending approval message');
     console.log('   • Your registered visitors need admin approval before they can login');

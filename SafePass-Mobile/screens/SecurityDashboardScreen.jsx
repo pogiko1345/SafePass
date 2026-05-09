@@ -20,6 +20,7 @@ import {
   AppState,
   useWindowDimensions,
   Pressable,
+  StyleSheet,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
@@ -27,6 +28,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import ApiService from "../utils/ApiService";
 import { canAccessSecurityDashboard, normalizeRole } from "../utils/authFlow";
+import {
+  BRAND,
+  MobileBottomNav,
+  MobileEmptyState,
+  MobileFilterChips,
+  MobileLoadingState,
+  MobileSearchField,
+  MobileStatusBadge,
+} from "../components/mobile/MobileRoleComponents";
 import {
   PHILIPPINE_MOBILE_NUMBER_MESSAGE,
   isValidPhilippineMobileNumber,
@@ -142,9 +152,31 @@ const titleCase = (value = "") =>
     .replace(/_/g, " ")
     .replace(/\b\w/g, (match) => match.toUpperCase()) || "Unknown";
 
+const securityMobileTabs = [
+  { key: "monitor", label: "Monitor", icon: "pulse-outline", activeIcon: "pulse" },
+  { key: "logs", label: "Logs", icon: "list-outline", activeIcon: "list" },
+  { key: "alerts", label: "Alerts", icon: "warning-outline", activeIcon: "warning" },
+  { key: "track", label: "Track", icon: "location-outline", activeIcon: "location" },
+  { key: "profile", label: "Profile", icon: "person-outline", activeIcon: "person" },
+];
+
+const securityStatusFilters = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Inside" },
+  { key: "approved", label: "Approved" },
+  { key: "completed", label: "Done" },
+];
+
+const securityDateFilters = [
+  { key: "all", label: "Any Date" },
+  { key: "today", label: "Today" },
+  { key: "week", label: "This Week" },
+];
+
 export default function SecurityDashboardScreen({ navigation }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isDesktop = viewportWidth >= 1024;
+  const isMobileLayout = viewportWidth < 768;
   const sidebarTargetWidth = isDesktop ? 280 : 260;
 
   // ============ STATE MANAGEMENT ============
@@ -214,10 +246,13 @@ export default function SecurityDashboardScreen({ navigation }) {
   
   // UI State
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [securityMobileTab, setSecurityMobileTab] = useState('monitor');
   const [expandedModule, setExpandedModule] = useState('home');
   const [selectedSubmodule, setSelectedSubmodule] = useState('home-main');
   const [visitorFilter, setVisitorFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileDateFilter, setMobileDateFilter] = useState('all');
+  const [mobileLocationFilter, setMobileLocationFilter] = useState('all');
   const [appointmentRecordsPage, setAppointmentRecordsPage] = useState(1);
   const [showVisitorModal, setShowVisitorModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -763,6 +798,8 @@ export default function SecurityDashboardScreen({ navigation }) {
         purposeOfVisit: matchedVisitor?.purposeOfVisit || visitor.purpose,
         host: matchedVisitor?.host || matchedVisitor?.assignedStaffName || "",
         assignedOffice: matchedVisitor?.assignedOffice || visitor.office || "",
+        expectedDestination: visitor.expectedDestination || matchedVisitor?.currentDestination?.office || matchedVisitor?.appointmentDepartment || matchedVisitor?.assignedOffice || "",
+        lastTappedOffice: visitor.lastTappedOffice || visitor.office || "",
         checkInTime: matchedVisitor?.checkedInAt || visitor.checkedInAt,
         checkedInAt: matchedVisitor?.checkedInAt || visitor.checkedInAt,
         status: matchedVisitor?.status || visitor.status,
@@ -804,7 +841,8 @@ export default function SecurityDashboardScreen({ navigation }) {
             checkpointId: visitor.checkpointId || "",
             isActive: visitor.status !== "exited",
           },
-        movement: matchedVisitor?.locationHistory || [],
+        movement: visitor.movementHistory || matchedVisitor?.locationHistory || [],
+        wrongLocationAlerts: visitor.wrongLocationAlerts || [],
       };
     });
 
@@ -1745,6 +1783,53 @@ export default function SecurityDashboardScreen({ navigation }) {
       v.host?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [visitorFilter, visitors, searchQuery]);
+
+  const mobileLocationOptions = useMemo(() => {
+    const labels = filteredVisitors
+      .map((visitor) => visitor.assignedOffice || visitor.appointmentDepartment || visitor.host || "")
+      .filter(Boolean);
+    return [
+      { key: "all", label: "All Locations" },
+      ...Array.from(new Set(labels)).slice(0, 8).map((label) => ({ key: label, label })),
+    ];
+  }, [filteredVisitors]);
+
+  const mobileVisibleVisitors = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setDate(endOfToday.getDate() + 1);
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+
+    return filteredVisitors.filter((visitor) => {
+      const scheduleDate = new Date(visitor.visitDate || visitor.checkedInAt || visitor.updatedAt || 0);
+      const location = visitor.assignedOffice || visitor.appointmentDepartment || visitor.host || "";
+
+      if (mobileLocationFilter !== "all" && location !== mobileLocationFilter) return false;
+      if (mobileDateFilter === "today") return scheduleDate >= startOfToday && scheduleDate < endOfToday;
+      if (mobileDateFilter === "week") return scheduleDate >= startOfWeek;
+      return true;
+    });
+  }, [filteredVisitors, mobileDateFilter, mobileLocationFilter]);
+
+  const mobileLogItems = useMemo(() => {
+    const normalizedSearch = String(searchQuery || "").trim().toLowerCase();
+    return (accessLogs || []).filter((log) => {
+      if (!normalizedSearch) return true;
+      return [
+        log.visitorName,
+        log.userName,
+        log.location,
+        log.status,
+        log.activityType,
+        log.accessType,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedSearch));
+    });
+  }, [accessLogs, searchQuery]);
 
   const appointmentRecordsItemsPerPage = 6;
   const checkedInVisitors = useMemo(
@@ -3719,9 +3804,433 @@ export default function SecurityDashboardScreen({ navigation }) {
     );
   };
 
+  const renderMobileHeader = () => (
+    <View style={securityMobileStyles.header}>
+      <View style={securityMobileStyles.headerTop}>
+        <View>
+          <Text style={securityMobileStyles.eyebrow}>Security Mobile</Text>
+          <Text style={securityMobileStyles.headerTitle}>Live Monitor</Text>
+        </View>
+        <View style={securityMobileStyles.headerActions}>
+          <TouchableOpacity style={securityMobileStyles.headerButton} onPress={() => setShowNotificationModal(true)}>
+            <Ionicons name="notifications-outline" size={19} color={BRAND.blue} />
+            {unreadCount > 0 ? <View style={securityMobileStyles.dotBadge} /> : null}
+          </TouchableOpacity>
+          <TouchableOpacity style={securityMobileStyles.headerButton} onPress={handleLogoutPress}>
+            <Ionicons name="log-out-outline" size={19} color={BRAND.blue} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      <Text style={securityMobileStyles.headerSubtitle}>
+        Quick scanning, visitor tracking, alerts, and access activity for campus security.
+      </Text>
+    </View>
+  );
+
+  const renderMobileMetrics = () => (
+    <View style={securityMobileStyles.metricGrid}>
+      {[
+        { label: "Inside", value: visitorStats.activeNow, icon: "walk-outline", color: BRAND.success },
+        { label: "On Site", value: livePresenceSummary?.total || 0, icon: "people-outline", color: BRAND.blue },
+        { label: "Alerts", value: alerts.length, icon: "warning-outline", color: BRAND.danger },
+        { label: "Logs", value: accessLogs.length, icon: "list-outline", color: BRAND.warning },
+      ].map((item) => (
+        <View key={item.label} style={securityMobileStyles.metricCard}>
+          <View style={[securityMobileStyles.metricIcon, { backgroundColor: `${item.color}16` }]}>
+            <Ionicons name={item.icon} size={18} color={item.color} />
+          </View>
+          <Text style={securityMobileStyles.metricValue}>{item.value}</Text>
+          <Text style={securityMobileStyles.metricLabel}>{item.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderMobileQuickActions = () => (
+    <View style={securityMobileStyles.quickActions}>
+      <TouchableOpacity style={[securityMobileStyles.quickAction, securityMobileStyles.quickActionPrimary]} onPress={() => navigation.navigate("NFCScan")}>
+        <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
+        <Text style={securityMobileStyles.quickActionPrimaryText}>NFC Scan</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={securityMobileStyles.quickAction} onPress={() => setSecurityMobileTab("track")}>
+        <Ionicons name="location-outline" size={20} color={BRAND.blue} />
+        <Text style={securityMobileStyles.quickActionText}>Track</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={securityMobileStyles.quickAction} onPress={() => setSecurityMobileTab("alerts")}>
+        <Ionicons name="flag-outline" size={20} color={BRAND.danger} />
+        <Text style={securityMobileStyles.quickActionText}>Flag</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderMobileVisitorCard = (visitor, compact = false) => {
+    const statusBadge = getStatusBadge(visitor);
+    const isCheckedIn = visitor.status === "checked_in";
+    const isProcessing = isVisitorProcessing(visitor._id);
+    const destination = getVisitorAssignedDestination(visitor);
+
+    return (
+      <TouchableOpacity
+        key={visitor._id}
+        style={securityMobileStyles.visitorCard}
+        onPress={() => handleViewDetails(visitor)}
+        activeOpacity={0.82}
+      >
+        <View style={securityMobileStyles.visitorTop}>
+          <View style={securityMobileStyles.visitorIcon}>
+            <Ionicons name={isCheckedIn ? "walk-outline" : "person-outline"} size={20} color={BRAND.blue} />
+          </View>
+          <View style={securityMobileStyles.visitorCopy}>
+            <Text style={securityMobileStyles.visitorName} numberOfLines={1}>{visitor.fullName || "Visitor"}</Text>
+            <Text style={securityMobileStyles.visitorMeta} numberOfLines={1}>
+              {destination.officeName} • {destination.floorLabel}
+            </Text>
+          </View>
+          <MobileStatusBadge status={statusBadge.label.toLowerCase()} label={statusBadge.label} />
+        </View>
+        {!compact ? (
+          <>
+            <Text style={securityMobileStyles.visitorPurpose} numberOfLines={2}>
+              {visitor.purposeOfVisit || "No purpose recorded"}
+            </Text>
+            <View style={securityMobileStyles.visitorChips}>
+              <View style={securityMobileStyles.metaChip}>
+                <Ionicons name="calendar-outline" size={14} color="#64748B" />
+                <Text style={securityMobileStyles.metaChipText}>{formatDate(visitor.visitDate)}</Text>
+              </View>
+              <View style={securityMobileStyles.metaChip}>
+                <Ionicons name="time-outline" size={14} color="#64748B" />
+                <Text style={securityMobileStyles.metaChipText}>{formatTime(visitor.checkedInAt || visitor.visitTime)}</Text>
+              </View>
+            </View>
+            <View style={securityMobileStyles.visitorActions}>
+              {hasApprovedVisitWindow(visitor) && visitor.status !== "checked_out" ? (
+                <TouchableOpacity
+                  style={[securityMobileStyles.visitorActionPrimary, isProcessing && securityMobileStyles.disabled]}
+                  onPress={() => (isCheckedIn ? handleCheckOut(visitor) : handleCheckIn(visitor))}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={securityMobileStyles.visitorActionPrimaryText}>{isCheckedIn ? "Check Out" : "Check In"}</Text>
+                  )}
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={securityMobileStyles.visitorActionIcon} onPress={() => handleReportVisitor(visitor)}>
+                <Ionicons name="flag-outline" size={18} color={BRAND.danger} />
+              </TouchableOpacity>
+              <TouchableOpacity style={securityMobileStyles.visitorActionIcon} onPress={() => handleViewDetails(visitor)}>
+                <Ionicons name="information-circle-outline" size={18} color={BRAND.blue} />
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderMobileToolbar = () => (
+    <View style={securityMobileStyles.toolbar}>
+      <MobileSearchField
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search name, status, location..."
+      />
+      <MobileFilterChips options={securityStatusFilters} value={visitorFilter} onChange={setVisitorFilter} />
+      <MobileFilterChips options={securityDateFilters} value={mobileDateFilter} onChange={setMobileDateFilter} />
+      <MobileFilterChips options={mobileLocationOptions} value={mobileLocationFilter} onChange={setMobileLocationFilter} />
+    </View>
+  );
+
+  const renderMobileMonitor = () => (
+    <>
+      {renderMobileHeader()}
+      {renderMobileMetrics()}
+      {renderMobileQuickActions()}
+      {renderMobileToolbar()}
+      <View style={securityMobileStyles.sectionHeader}>
+        <Text style={securityMobileStyles.sectionTitle}>Live Visitor Monitoring</Text>
+        <Text style={securityMobileStyles.sectionCount}>{mobileVisibleVisitors.length}</Text>
+      </View>
+      {mobileVisibleVisitors.length ? (
+        mobileVisibleVisitors.slice(0, 30).map((visitor) => renderMobileVisitorCard(visitor))
+      ) : (
+        <MobileEmptyState icon="pulse-outline" title="No visitors found" message="Try changing the status, date, location, or search filter." />
+      )}
+    </>
+  );
+
+  const renderMobileLogs = () => (
+    <>
+      <View style={securityMobileStyles.compactHeader}>
+        <Text style={securityMobileStyles.compactTitle}>Access Log Feed</Text>
+        <Text style={securityMobileStyles.compactSubtitle}>Recent NFC, visitor, and checkpoint activity.</Text>
+      </View>
+      <MobileSearchField value={searchQuery} onChangeText={setSearchQuery} placeholder="Search logs..." />
+      <View style={securityMobileStyles.feedList}>
+        {mobileLogItems.length ? (
+          mobileLogItems.slice(0, 60).map((log, index) => (
+            <View key={log._id || `${log.timestamp}-${index}`} style={securityMobileStyles.logCard}>
+              <View style={securityMobileStyles.logIcon}>
+                <Ionicons name={String(log.status).toLowerCase() === "denied" ? "close-circle-outline" : "radio-outline"} size={18} color={String(log.status).toLowerCase() === "denied" ? BRAND.danger : BRAND.blue} />
+              </View>
+              <View style={securityMobileStyles.logCopy}>
+                <Text style={securityMobileStyles.logTitle} numberOfLines={1}>
+                  {log.visitorName || log.userName || log.userEmail || "Access Event"}
+                </Text>
+                <Text style={securityMobileStyles.logMessage} numberOfLines={2}>
+                  {titleCase(log.activityType || log.accessType || "activity")} at {log.location || "Campus checkpoint"}
+                </Text>
+                <Text style={securityMobileStyles.logTime}>{formatDateTime(log.timestamp || log.createdAt)}</Text>
+              </View>
+              <MobileStatusBadge status={log.status || "granted"} />
+            </View>
+          ))
+        ) : (
+          <MobileEmptyState icon="list-outline" title="No logs found" message="NFC and access events will appear here." />
+        )}
+      </View>
+    </>
+  );
+
+  const renderMobileAlerts = () => (
+    <>
+      <View style={securityMobileStyles.compactHeader}>
+        <Text style={securityMobileStyles.compactTitle}>Alerts & Reports</Text>
+        <Text style={securityMobileStyles.compactSubtitle}>Review warnings and file reports for active visitors.</Text>
+      </View>
+      {alerts.length ? (
+        alerts.map((alert) => (
+          <View key={alert._id} style={securityMobileStyles.alertCard}>
+            <View style={securityMobileStyles.alertTop}>
+              <Ionicons name="warning-outline" size={20} color={BRAND.danger} />
+              <View style={securityMobileStyles.alertCopy}>
+                <Text style={securityMobileStyles.alertTitle}>{alert.title || "Security Alert"}</Text>
+                <Text style={securityMobileStyles.alertMessage}>{alert.message || "No alert details provided."}</Text>
+                <Text style={securityMobileStyles.alertTime}>{formatDateTime(alert.createdAt)}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[securityMobileStyles.resolveButton, resolvingAlertId === alert._id && securityMobileStyles.disabled]}
+              onPress={() => handleResolveAlert(alert)}
+              disabled={resolvingAlertId === alert._id}
+            >
+              <Text style={securityMobileStyles.resolveButtonText}>Resolve Alert</Text>
+            </TouchableOpacity>
+          </View>
+        ))
+      ) : (
+        <MobileEmptyState icon="shield-checkmark-outline" title="No active alerts" message="Warnings and unread security alerts will appear here." />
+      )}
+
+      <View style={securityMobileStyles.sectionHeader}>
+        <Text style={securityMobileStyles.sectionTitle}>Quick Report</Text>
+      </View>
+      {checkedInVisitors.length ? (
+        checkedInVisitors.slice(0, 5).map((visitor) => (
+          <TouchableOpacity
+            key={visitor._id}
+            style={[
+              securityMobileStyles.reportPickCard,
+              String(reportForm.visitorId) === String(visitor._id) && securityMobileStyles.reportPickCardActive,
+            ]}
+            onPress={() => setReportForm((current) => ({ ...current, visitorId: visitor._id }))}
+          >
+            <Text style={securityMobileStyles.reportPickName}>{visitor.fullName}</Text>
+            <Text style={securityMobileStyles.reportPickMeta}>{visitor.assignedOffice || visitor.host || "Campus access"}</Text>
+          </TouchableOpacity>
+        ))
+      ) : (
+        <MobileEmptyState icon="person-remove-outline" title="No checked-in visitors" message="A visitor must be inside before filing a report." />
+      )}
+      <TextInput
+        style={securityMobileStyles.reportInput}
+        placeholder="Describe the warning or incident..."
+        placeholderTextColor="#94A3B8"
+        multiline
+        value={reportForm.details}
+        onChangeText={(text) => setReportForm((current) => ({ ...current, details: text }))}
+      />
+      <TouchableOpacity style={securityMobileStyles.submitReportButton} onPress={submitSecurityReportForm} disabled={isSubmitting}>
+        {isSubmitting ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={securityMobileStyles.submitReportButtonText}>Submit Security Report</Text>}
+      </TouchableOpacity>
+    </>
+  );
+
+  const renderMobileTracking = () => (
+    <>
+      <View style={securityMobileStyles.compactHeader}>
+        <Text style={securityMobileStyles.compactTitle}>Visitor Location Tracking</Text>
+        <Text style={securityMobileStyles.compactSubtitle}>Live checkpoint updates grouped by floor and office.</Text>
+      </View>
+      <MobileFilterChips
+        options={floors.map((floor) => ({ key: floor.id, label: floor.name }))}
+        value={selectedFloor}
+        onChange={(floorId) => {
+          setSelectedFloor(floorId);
+          setSelectedOffice("all");
+        }}
+      />
+      <View style={securityMobileStyles.feedList}>
+        {getFilteredVisitorLocations().length ? (
+          getFilteredVisitorLocations().map((locationItem) => (
+            <TouchableOpacity key={locationItem.id} style={securityMobileStyles.locationCard} onPress={() => handleVisitorSelect(locationItem)}>
+              <View style={securityMobileStyles.locationPin}>
+                <Ionicons name="location-outline" size={18} color="#FFFFFF" />
+              </View>
+              <View style={securityMobileStyles.locationCopy}>
+                <Text style={securityMobileStyles.locationName}>{locationItem.name}</Text>
+                <Text style={securityMobileStyles.locationMeta}>{locationItem.location?.office || "Campus checkpoint"}</Text>
+                <Text style={securityMobileStyles.locationMeta}>
+                  Expected: {locationItem.expectedDestination || "Assigned destination"}
+                </Text>
+                {locationItem.wrongLocationAlerts?.length ? (
+                  <Text style={[securityMobileStyles.locationFreshness, { color: BRAND.danger }]}>
+                    Wrong-office alert: {locationItem.wrongLocationAlerts[0]?.actualLocation || "Unknown office"}
+                  </Text>
+                ) : null}
+                <Text style={securityMobileStyles.locationFreshness}>{getFreshnessLabel(locationItem.location?.timestamp)}</Text>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          ))
+        ) : (
+          <MobileEmptyState icon="map-outline" title="No live locations" message="Visitor location updates will appear after NFC checkpoint taps." />
+        )}
+      </View>
+    </>
+  );
+
+  const renderMobileProfile = () => (
+    <>
+      <View style={securityMobileStyles.compactHeader}>
+        <Text style={securityMobileStyles.compactTitle}>Security Profile</Text>
+        <Text style={securityMobileStyles.compactSubtitle}>Guard account and current operational status.</Text>
+      </View>
+      <View style={securityMobileStyles.profileCard}>
+        <View style={securityMobileStyles.profileTop}>
+          <View style={securityMobileStyles.profileAvatar}>
+            <Text style={securityMobileStyles.profileAvatarText}>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</Text>
+          </View>
+          <View style={securityMobileStyles.profileCopy}>
+            <Text style={securityMobileStyles.profileName}>{user.firstName} {user.lastName}</Text>
+            <Text style={securityMobileStyles.profileRole}>{String(user.role || "security").toUpperCase()}</Text>
+          </View>
+        </View>
+        {[
+          ["Badge", user.badgeNumber || user.employeeId || "SEC-0000"],
+          ["Shift", user.shift || "On duty"],
+          ["Department", user.department || "Security Department"],
+          ["Email", user.email],
+        ].map(([label, value]) => (
+          <View key={label} style={securityMobileStyles.profileRow}>
+            <Text style={securityMobileStyles.profileLabel}>{label}</Text>
+            <Text style={securityMobileStyles.profileValue}>{value}</Text>
+          </View>
+        ))}
+      </View>
+      <TouchableOpacity style={securityMobileStyles.logoutButton} onPress={handleLogoutPress}>
+        <Ionicons name="log-out-outline" size={18} color={BRAND.danger} />
+        <Text style={securityMobileStyles.logoutButtonText}>Sign Out</Text>
+      </TouchableOpacity>
+    </>
+  );
+
+  const renderMobileVisitorDetailModal = () => (
+    <Modal visible={showDetailModal} transparent animationType="slide" onRequestClose={() => setShowDetailModal(false)}>
+      <View style={securityMobileStyles.modalOverlay}>
+        <View style={securityMobileStyles.detailSheet}>
+          <View style={securityMobileStyles.detailHeader}>
+            <View>
+              <Text style={securityMobileStyles.detailTitle}>{selectedVisitor?.fullName || "Visitor Details"}</Text>
+              <Text style={securityMobileStyles.detailSubtitle}>{selectedVisitor?.purposeOfVisit || "No purpose provided"}</Text>
+            </View>
+            <TouchableOpacity style={securityMobileStyles.closeButton} onPress={() => setShowDetailModal(false)}>
+              <Ionicons name="close" size={20} color="#475569" />
+            </TouchableOpacity>
+          </View>
+          {selectedVisitor ? (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={securityMobileStyles.detailBody}>
+              <MobileStatusBadge status={getStatusBadge(selectedVisitor).label.toLowerCase()} label={getStatusBadge(selectedVisitor).label} />
+              {[
+                ["Phone", selectedVisitor.phoneNumber || "No phone"],
+                ["Email", selectedVisitor.email || "No email"],
+                ["Office", getVisitorAssignedDestination(selectedVisitor).officeName],
+                ["Schedule", `${formatDate(selectedVisitor.visitDate)} at ${formatTime(selectedVisitor.visitTime)}`],
+                ["Checked In", formatDateTime(selectedVisitor.checkedInAt)],
+                ["Checked Out", formatDateTime(selectedVisitor.checkedOutAt)],
+              ].map(([label, value]) => (
+                <View key={label} style={securityMobileStyles.detailRow}>
+                  <Text style={securityMobileStyles.detailLabel}>{label}</Text>
+                  <Text style={securityMobileStyles.detailValue}>{value}</Text>
+                </View>
+              ))}
+              <View style={securityMobileStyles.detailActions}>
+                {hasApprovedVisitWindow(selectedVisitor) && selectedVisitor.status !== "checked_out" ? (
+                  <TouchableOpacity
+                    style={securityMobileStyles.detailPrimaryButton}
+                    onPress={() => {
+                      setShowDetailModal(false);
+                      selectedVisitor.status === "checked_in" ? handleCheckOut(selectedVisitor) : handleCheckIn(selectedVisitor);
+                    }}
+                  >
+                    <Text style={securityMobileStyles.detailPrimaryButtonText}>
+                      {selectedVisitor.status === "checked_in" ? "Check Out" : "Check In"}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  style={securityMobileStyles.detailDangerButton}
+                  onPress={() => {
+                    setShowDetailModal(false);
+                    handleReportVisitor(selectedVisitor);
+                  }}
+                >
+                  <Text style={securityMobileStyles.detailDangerButtonText}>Flag Visitor</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderMobileSecurityScreen = () => {
+    const content =
+      securityMobileTab === "logs"
+        ? renderMobileLogs()
+        : securityMobileTab === "alerts"
+          ? renderMobileAlerts()
+          : securityMobileTab === "track"
+            ? renderMobileTracking()
+            : securityMobileTab === "profile"
+              ? renderMobileProfile()
+              : renderMobileMonitor();
+
+    return (
+      <SafeAreaView style={securityMobileStyles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor={BRAND.page} />
+        <ScrollView
+          style={securityMobileStyles.scroll}
+          contentContainerStyle={securityMobileStyles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshData} tintColor={BRAND.blue} />}
+        >
+          {content}
+        </ScrollView>
+        <MobileBottomNav tabs={securityMobileTabs} activeTab={securityMobileTab} onChange={setSecurityMobileTab} />
+        {renderMobileVisitorDetailModal()}
+      </SafeAreaView>
+    );
+  };
+
   // ============ LOADING STATE ============
   if (isLoading) {
-    return (
+    return isMobileLayout ? (
+      <MobileLoadingState message="Loading security operations..." />
+    ) : (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={styles.loadingText}>Loading security operations...</Text>
@@ -3735,6 +4244,10 @@ export default function SecurityDashboardScreen({ navigation }) {
   }
 
   const selectedSubmoduleMeta = getSelectedSubmoduleMeta();
+
+  if (isMobileLayout) {
+    return renderMobileSecurityScreen();
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -4427,3 +4940,611 @@ export default function SecurityDashboardScreen({ navigation }) {
     </SafeAreaView>
   );
 }
+
+const securityMobileStyles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: BRAND.page,
+  },
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 22,
+  },
+  header: {
+    borderRadius: 24,
+    padding: 18,
+    backgroundColor: "#041E42",
+    marginBottom: 12,
+  },
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#BAE6FD",
+    textTransform: "uppercase",
+  },
+  headerTitle: {
+    marginTop: 6,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  headerSubtitle: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#DCEBFF",
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  headerButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  dotBadge: {
+    position: "absolute",
+    top: 9,
+    right: 9,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: BRAND.danger,
+  },
+  metricGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 12,
+  },
+  metricCard: {
+    width: "48.5%",
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  metricIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  metricValue: {
+    marginTop: 10,
+    fontSize: 24,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  metricLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  quickActions: {
+    flexDirection: "row",
+    gap: 9,
+    marginBottom: 12,
+  },
+  quickAction: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#DCE5F1",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  quickActionPrimary: {
+    backgroundColor: BRAND.blue,
+    borderColor: BRAND.blue,
+  },
+  quickActionText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  quickActionPrimaryText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  toolbar: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  sectionCount: {
+    minWidth: 30,
+    textAlign: "center",
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: "#EEF5FF",
+    color: BRAND.blue,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  compactHeader: {
+    borderRadius: 22,
+    padding: 17,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 12,
+  },
+  compactTitle: {
+    fontSize: 23,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  compactSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: BRAND.muted,
+  },
+  visitorCard: {
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 10,
+  },
+  visitorTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  visitorIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+  visitorCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  visitorName: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  visitorMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "700",
+    color: BRAND.muted,
+  },
+  visitorPurpose: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#475569",
+  },
+  visitorChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 11,
+  },
+  metaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#F8FBFE",
+  },
+  metaChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#475569",
+  },
+  visitorActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  visitorActionPrimary: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 13,
+    backgroundColor: BRAND.blue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  visitorActionPrimaryText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  visitorActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  feedList: {
+    marginTop: 12,
+  },
+  logCard: {
+    flexDirection: "row",
+    gap: 10,
+    padding: 13,
+    borderRadius: 17,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 10,
+  },
+  logIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F8FBFE",
+  },
+  logCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  logTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  logMessage: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: BRAND.muted,
+  },
+  logTime: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+  },
+  alertCard: {
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    marginBottom: 10,
+  },
+  alertTop: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  alertCopy: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  alertMessage: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#475569",
+  },
+  alertTime: {
+    marginTop: 7,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+  },
+  resolveButton: {
+    marginTop: 12,
+    minHeight: 42,
+    borderRadius: 13,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resolveButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: BRAND.danger,
+  },
+  reportPickCard: {
+    padding: 13,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 8,
+  },
+  reportPickCardActive: {
+    borderColor: BRAND.blue,
+    backgroundColor: "#EEF5FF",
+  },
+  reportPickName: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  reportPickMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    color: BRAND.muted,
+  },
+  reportInput: {
+    minHeight: 108,
+    textAlignVertical: "top",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#DCE5F1",
+    backgroundColor: "#FFFFFF",
+    padding: 13,
+    fontSize: 14,
+    color: BRAND.ink,
+    marginTop: 6,
+  },
+  submitReportButton: {
+    marginTop: 10,
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: BRAND.danger,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitReportButtonText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  locationCard: {
+    flexDirection: "row",
+    gap: 11,
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 10,
+  },
+  locationPin: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: BRAND.blue,
+  },
+  locationCopy: {
+    flex: 1,
+  },
+  locationName: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  locationMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    color: BRAND.muted,
+  },
+  locationFreshness: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.success,
+  },
+  profileCard: {
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  profileTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  profileAvatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#041E42",
+  },
+  profileAvatarText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  profileCopy: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  profileRole: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  profileRow: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#EEF2F7",
+  },
+  profileLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  profileValue: {
+    marginTop: 5,
+    fontSize: 14,
+    fontWeight: "800",
+    color: BRAND.ink,
+  },
+  logoutButton: {
+    marginTop: 12,
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  logoutButtonText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.danger,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "flex-end",
+  },
+  detailSheet: {
+    maxHeight: "88%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+  },
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  detailTitle: {
+    fontSize: 21,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  detailSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: BRAND.muted,
+  },
+  closeButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  detailBody: {
+    paddingBottom: 20,
+  },
+  detailRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+  detailLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  detailValue: {
+    marginTop: 5,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "800",
+    color: BRAND.ink,
+  },
+  detailActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  detailPrimaryButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    backgroundColor: BRAND.blue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailPrimaryButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  detailDangerButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailDangerButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: BRAND.danger,
+  },
+});

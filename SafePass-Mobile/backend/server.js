@@ -9,6 +9,8 @@ const Notification = require("./models/Notification");
 const User = require("./models/User");
 const AccessLog = require("./models/AccessLog");
 const AttendanceRecord = require("./models/AttendanceRecord");
+const VisitorMovementLog = require("./models/VisitorMovementLog");
+const NfcCheckpoint = require("./models/NfcCheckpoint");
 const SmsNotificationLog = require("./models/SmsNotificationLog");
 const AppSettings = require("./models/AppSettings");
 const Counter = require("./models/Counter");
@@ -1364,6 +1366,16 @@ const CHECKPOINT_LOCATIONS = {
     office: "Cashier",
     coordinates: { x: 15.2, y: 28.5 },
   },
+  cashier_reader: {
+    floor: "ground",
+    office: "Cashier",
+    coordinates: { x: 15.2, y: 28.5 },
+  },
+  clinic_reader: {
+    floor: "ground",
+    office: "Clinic",
+    coordinates: { x: 78.6, y: 32.5 },
+  },
   staff: {
     floor: "ground",
     office: "Staff",
@@ -1374,7 +1386,27 @@ const CHECKPOINT_LOCATIONS = {
     office: "Administration",
     coordinates: { x: 62, y: 40 },
   },
+  admin: {
+    floor: "ground",
+    office: "Administration",
+    coordinates: { x: 62, y: 40 },
+  },
+  admin_reader: {
+    floor: "ground",
+    office: "Administration",
+    coordinates: { x: 62, y: 40 },
+  },
   registrar: {
+    floor: "ground",
+    office: "Registrar's Office",
+    coordinates: { x: 26.9, y: 46.8 },
+  },
+  registrar_reader: {
+    floor: "ground",
+    office: "Registrar's Office",
+    coordinates: { x: 26.9, y: 46.8 },
+  },
+  reg_reader: {
     floor: "ground",
     office: "Registrar's Office",
     coordinates: { x: 26.9, y: 46.8 },
@@ -1450,6 +1482,11 @@ const CHECKPOINT_LOCATIONS = {
     coordinates: { x: 47, y: 45 },
   },
   faculty_room: {
+    floor: "first",
+    office: "Faculty Room",
+    coordinates: { x: 61.8, y: 38 },
+  },
+  faculty_reader: {
     floor: "first",
     office: "Faculty Room",
     coordinates: { x: 61.8, y: 38 },
@@ -1764,7 +1801,11 @@ const isGateCheckpoint = (location = {}) =>
   GATE_CHECKPOINT_IDS.has(normalizeCheckpointId(location.checkpointId || location.office));
 
 const getAssignedAppointmentOffice = (visitor = {}) =>
-  visitor.appointmentDepartment || visitor.assignedOffice || visitor.host || "";
+  visitor.currentDestination?.office ||
+  visitor.appointmentDepartment ||
+  visitor.assignedOffice ||
+  visitor.host ||
+  "";
 
 const isWrongAppointmentOfficeScan = (visitor = {}, location = {}) => {
   if (!visitor || !location || isGateCheckpoint(location)) return false;
@@ -1772,6 +1813,108 @@ const isWrongAppointmentOfficeScan = (visitor = {}, location = {}) => {
   const assignedOffice = normalizeDepartmentValue(getAssignedAppointmentOffice(visitor));
   const scannedOffice = normalizeDepartmentValue(location.office || location.checkpointId);
   return Boolean(assignedOffice && scannedOffice && assignedOffice !== scannedOffice);
+};
+
+const getOfficeLocationFromValue = (value = "") => {
+  const checkpointId = normalizeCheckpointId(value);
+  const knownLocation = CHECKPOINT_LOCATIONS[checkpointId];
+  if (knownLocation) {
+    return {
+      checkpointId,
+      floor: knownLocation.floor,
+      office: knownLocation.office,
+      coordinates: knownLocation.coordinates,
+      source: "office_reader",
+    };
+  }
+
+  const normalizedDepartment = normalizeDepartmentValue(value);
+  const matchedEntry = Object.entries(CHECKPOINT_LOCATIONS).find(([, location]) =>
+    normalizeDepartmentValue(location.office) === normalizedDepartment,
+  );
+
+  if (matchedEntry) {
+    const [matchedCheckpointId, location] = matchedEntry;
+    return {
+      checkpointId: matchedCheckpointId,
+      floor: location.floor,
+      office: location.office,
+      coordinates: location.coordinates,
+      source: "office_reader",
+    };
+  }
+
+  return {
+    checkpointId,
+    floor: "",
+    office: String(value || "").trim(),
+    coordinates: { x: null, y: null },
+    source: "office_reader",
+  };
+};
+
+const createVisitorMovementLog = async ({
+  visitor,
+  visitorUser = null,
+  nfcCardId = "",
+  tapLocation = {},
+  expectedDestination = "",
+  status = "correct_location",
+  handledBy = null,
+  message = "",
+  metadata = {},
+  tappedAt = new Date(),
+}) => VisitorMovementLog.create({
+  visitorId: visitor._id,
+  visitorName: visitor.fullName,
+  appointmentId: visitor._id,
+  relatedUser: visitorUser?._id || null,
+  nfcCardId,
+  readerId: tapLocation.checkpointId || "",
+  checkpointId: tapLocation.checkpointId || "",
+  officeName: tapLocation.office || "Unknown Office",
+  floor: tapLocation.floor || "",
+  expectedDestination,
+  actualLocation: tapLocation.office || "Unknown Office",
+  status,
+  message,
+  handledBy: handledBy?._id || handledBy || null,
+  coordinates: tapLocation.coordinates || { x: null, y: null },
+  metadata,
+  tappedAt,
+});
+
+const notifyVisitorLocationResult = async ({
+  visitor,
+  visitorUser = null,
+  tapLocation,
+  expectedDestination,
+  status,
+}) => {
+  const wrongLocation = status === "wrong_location";
+  const title = wrongLocation ? "Wrong Office Warning" : "Location Updated";
+  const message = wrongLocation
+    ? `Warning: This is not your assigned destination. Please proceed to ${expectedDestination} or ask staff for assistance.`
+    : `Location updated: You are now checked in at ${tapLocation.office}.`;
+
+  await createRoleNotification({
+    title,
+    message,
+    type: wrongLocation ? "warning" : "info",
+    severity: wrongLocation ? "high" : "low",
+    targetRole: "visitor",
+    targetUser: visitorUser?._id || null,
+    relatedVisitor: visitor._id,
+    relatedUser: visitorUser?._id || null,
+    metadata: {
+      activityType: wrongLocation ? "office_wrong_location" : "office_correct_location",
+      expectedDestination,
+      actualLocation: tapLocation.office,
+      checkpointId: tapLocation.checkpointId,
+      floor: tapLocation.floor,
+      status,
+    },
+  });
 };
 
 const createWrongOfficeScanNotifications = async ({
@@ -1863,6 +2006,21 @@ const validateDeviceKey = (req, res, next) => {
   }
 
   next();
+};
+
+const officeTapAccessMiddleware = (req, res, next) => {
+  const expectedKey = String(process.env.ARDUINO_DEVICE_KEY || "").trim();
+  const providedKey = req.header("x-device-key") || req.body?.deviceKey;
+
+  if (expectedKey && providedKey === expectedKey) {
+    req.officeTapActor = { type: "device" };
+    return next();
+  }
+
+  return authMiddleware(req, res, () => {
+    req.officeTapActor = { type: "user", user: req.user };
+    next();
+  });
 };
 
 // ========== EMAIL DELIVERY ==========
@@ -3063,6 +3221,284 @@ app.post(
   },
 );
 
+app.post("/api/nfc/office-tap", officeTapAccessMiddleware, async (req, res) => {
+  try {
+    const cardId = String(
+      req.body?.nfcCardId ||
+        req.body?.cardId ||
+        req.body?.uid ||
+        req.body?.tagId ||
+        "",
+    )
+      .trim()
+      .toUpperCase();
+    const normalizedCardId = normalizeNfcCardId(cardId);
+    let tapLocation = getTapLocationFromRequest({
+      ...req.body,
+      source: req.body?.source || "office_nfc_reader",
+    });
+    const configuredCheckpoint = await NfcCheckpoint.findOne({
+      isActive: true,
+      $or: [
+        { checkpointId: tapLocation.checkpointId },
+        { readerId: tapLocation.checkpointId },
+      ],
+    }).lean();
+    if (configuredCheckpoint) {
+      tapLocation = {
+        checkpointId: configuredCheckpoint.checkpointId,
+        floor: configuredCheckpoint.floor,
+        office: configuredCheckpoint.officeName,
+        coordinates: configuredCheckpoint.coordinates || { x: null, y: null },
+        source: "office_nfc_reader",
+      };
+    }
+    const deviceId = String(req.body?.deviceId || tapLocation.checkpointId || "office-reader").trim();
+    const tappedAt = new Date();
+
+    if (!normalizedCardId && !req.body?.visitorId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_VISITOR_CARD",
+        message: "Missing NFC card ID or visitor ID.",
+      });
+    }
+
+    if (!tapLocation.checkpointId || !tapLocation.office) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_OFFICE_READER",
+        message: "Missing office NFC reader/checkpoint.",
+      });
+    }
+
+    const visitorUser = normalizedCardId
+      ? await User.findOne({
+          nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
+          role: "visitor",
+        }).select("_id email firstName lastName nfcCardId role status")
+      : null;
+
+    const visitorQuery = req.body?.visitorId
+      ? { _id: req.body.visitorId }
+      : visitorUser
+        ? { email: visitorUser.email }
+        : null;
+
+    const visitor = visitorQuery
+      ? await Visitor.findOne({
+          ...visitorQuery,
+          status: { $ne: "checked_out" },
+        }).sort({ checkedInAt: -1, visitDate: -1, registeredAt: -1 })
+      : null;
+
+    if (!visitor) {
+      await AccessLog.create({
+        userEmail: visitorUser?.email || "",
+        userName: visitorUser ? getFullName(visitorUser) || visitorUser.email : "Unknown Visitor NFC",
+        actorRole: req.officeTapActor?.type || "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "office_invalid_tap",
+        status: "denied",
+        nfcCardId: normalizedCardId,
+        relatedUser: visitorUser?._id || null,
+        metadata: { deviceId, tapLocation },
+        notes: `Office tap at ${tapLocation.office} could not be matched to an active visitor appointment.`,
+      });
+
+      return res.status(404).json({
+        success: false,
+        code: "NO_ACTIVE_APPOINTMENT",
+        message: "No active appointment was found for this NFC tap.",
+      });
+    }
+
+    await applyAppointmentLifecycleIfNeeded(visitor);
+
+    const appointmentStatus = String(visitor.appointmentStatus || "").toLowerCase();
+    const hasApprovedAppointment =
+      visitor.requestCategory === "appointment" &&
+      ["approved", "adjusted"].includes(appointmentStatus);
+
+    if (!hasApprovedAppointment || visitor.status !== "checked_in") {
+      await createVisitorMovementLog({
+        visitor,
+        visitorUser,
+        nfcCardId: normalizedCardId,
+        tapLocation,
+        expectedDestination: getAssignedAppointmentOffice(visitor) || "Approved appointment",
+        status: "invalid_tap",
+        message: "Visitor must have an approved, checked-in appointment before office tracking works.",
+        metadata: {
+          deviceId,
+          appointmentStatus: visitor.appointmentStatus,
+          visitorStatus: visitor.status,
+        },
+        tappedAt,
+      });
+
+      await AccessLog.create({
+        userId: visitorUser?._id || null,
+        userEmail: visitor.email,
+        userName: visitor.fullName,
+        actorRole: req.officeTapActor?.type || "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "office_invalid_tap",
+        status: "denied",
+        nfcCardId: normalizedCardId,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          deviceId,
+          tapLocation,
+          appointmentStatus: visitor.appointmentStatus,
+          visitorStatus: visitor.status,
+        },
+        notes: `${visitor.fullName} tapped at ${tapLocation.office}, but office tracking is not active for this appointment.`,
+      });
+
+      return res.status(409).json({
+        success: false,
+        code: "OFFICE_TRACKING_NOT_ACTIVE",
+        message: "Visitor must be checked in with an approved appointment before office tracking works.",
+      });
+    }
+
+    const expectedDestination = getAssignedAppointmentOffice(visitor) || "Assigned destination";
+    const expectedNormalized = normalizeDepartmentValue(expectedDestination);
+    const actualNormalized = normalizeDepartmentValue(tapLocation.office || tapLocation.checkpointId);
+    const isCorrectLocation = Boolean(expectedNormalized && actualNormalized && expectedNormalized === actualNormalized);
+    const movementStatus = isCorrectLocation
+      ? visitor.currentDestination?.status === "redirected"
+        ? "redirected"
+        : "correct_location"
+      : "wrong_location";
+    const statusLabel = isCorrectLocation
+      ? `Inside ${tapLocation.office}`
+      : `Wrong office tap at ${tapLocation.office}`;
+
+    const movementLog = await createVisitorMovementLog({
+      visitor,
+      visitorUser,
+      nfcCardId: normalizedCardId,
+      tapLocation,
+      expectedDestination,
+      status: movementStatus,
+      handledBy: visitor.currentDestination?.updatedBy || null,
+      message: isCorrectLocation
+        ? `Location updated: ${visitor.fullName} is now at ${tapLocation.office}.`
+        : `${visitor.fullName} tapped at ${tapLocation.office}, but their assigned destination is ${expectedDestination}.`,
+      metadata: {
+        deviceId,
+        source: "office_nfc_reader",
+        currentDestination: visitor.currentDestination || null,
+      },
+      tappedAt,
+    });
+
+    if (isCorrectLocation) {
+      visitor.updateCurrentLocation(tapLocation, {
+        deviceId,
+        action: "office_location_update",
+        statusLabel,
+      });
+      await visitor.save();
+    }
+
+    await AccessLog.create({
+      userId: visitorUser?._id || null,
+      userEmail: visitor.email,
+      userName: visitor.fullName,
+      actorRole: req.officeTapActor?.type || "device",
+      location: tapLocation.office,
+      accessType: "system",
+      activityType: isCorrectLocation ? "office_correct_location" : "office_wrong_location",
+      status: isCorrectLocation ? "granted" : "denied",
+      nfcCardId: normalizedCardId,
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        deviceId,
+        tapLocation,
+        expectedDestination,
+        actualLocation: tapLocation.office,
+        movementStatus,
+        movementLogId: movementLog._id,
+        currentLocation: visitor.currentLocation,
+      },
+      notes: isCorrectLocation
+        ? `${visitor.fullName} tapped at the correct office: ${tapLocation.office}.`
+        : `${visitor.fullName} tapped at ${tapLocation.office}, but their assigned destination is ${expectedDestination}.`,
+    });
+
+    await notifyVisitorLocationResult({
+      visitor,
+      visitorUser,
+      tapLocation,
+      expectedDestination,
+      status: isCorrectLocation ? "correct_location" : "wrong_location",
+    });
+
+    await Promise.all([
+      createRoleNotification({
+        title: isCorrectLocation ? "Visitor Entered Correct Office" : "Wrong Office Alert",
+        message: isCorrectLocation
+          ? `${visitor.fullName} entered ${tapLocation.office}, matching their assigned destination.`
+          : `Visitor ${visitor.fullName} tapped at ${tapLocation.office}, but their assigned destination is ${expectedDestination}.`,
+        type: isCorrectLocation ? "info" : "alert",
+        severity: isCorrectLocation ? "low" : "high",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: isCorrectLocation ? "office_correct_location" : "office_wrong_location",
+          expectedDestination,
+          actualLocation: tapLocation.office,
+          movementLogId: movementLog._id,
+        },
+      }),
+      createRoleNotification({
+        title: isCorrectLocation ? "Visitor Office Location Updated" : "Visitor Wrong Office Alert",
+        message: isCorrectLocation
+          ? `${visitor.fullName} is now at ${tapLocation.office}.`
+          : `${visitor.fullName} tapped at ${tapLocation.office}, expected ${expectedDestination}.`,
+        type: isCorrectLocation ? "info" : "alert",
+        severity: isCorrectLocation ? "low" : "medium",
+        targetRole: "admin",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: isCorrectLocation ? "office_correct_location" : "office_wrong_location",
+          expectedDestination,
+          actualLocation: tapLocation.office,
+          movementLogId: movementLog._id,
+        },
+      }),
+    ]);
+
+    return res.json({
+      success: isCorrectLocation,
+      code: isCorrectLocation ? "LOCATION_UPDATED" : "WRONG_OFFICE_LOCATION",
+      status: movementStatus,
+      message: isCorrectLocation
+        ? `Location updated: You are now checked in at ${tapLocation.office}.`
+        : `Warning: This is not your assigned destination. Please proceed to ${expectedDestination} or ask staff for assistance.`,
+      expectedDestination,
+      actualLocation: tapLocation.office,
+      currentLocation: visitor.currentLocation,
+      movementLog,
+    });
+  } catch (error) {
+    console.error("Office NFC tap error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process office NFC tap.",
+    });
+  }
+});
+
 app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
@@ -3195,6 +3631,8 @@ const normalizeDepartmentValue = (value = "") => {
     "student services": "guidance",
     administration: "administration",
     "administration office": "administration",
+    admin: "administration",
+    "admin office": "administration",
     admissions: "admissions",
     "admissions office": "admissions",
     "flight operations": "flight operations",
@@ -3203,6 +3641,8 @@ const normalizeDepartmentValue = (value = "") => {
     "i.t room": "i.t room",
     "it room": "i.t room",
     "faculty room": "faculty room",
+    "faculty office": "faculty room",
+    clinic: "clinic",
     "information desk": "information desk",
     lobby: "information desk",
     "front desk": "information desk",
@@ -3287,6 +3727,21 @@ const APPOINTMENT_TIMEZONE_OFFSET_MINUTES = Number.isFinite(
   ? Number(process.env.APPOINTMENT_TIMEZONE_OFFSET_MINUTES)
   : 8 * 60;
 
+const SCHOOL_OFFICE_HOURS = {
+  openHour: Number.isFinite(Number(process.env.SCHOOL_OFFICE_OPEN_HOUR))
+    ? Number(process.env.SCHOOL_OFFICE_OPEN_HOUR)
+    : 8,
+  openMinute: Number.isFinite(Number(process.env.SCHOOL_OFFICE_OPEN_MINUTE))
+    ? Number(process.env.SCHOOL_OFFICE_OPEN_MINUTE)
+    : 0,
+  closeHour: Number.isFinite(Number(process.env.SCHOOL_OFFICE_CLOSE_HOUR))
+    ? Number(process.env.SCHOOL_OFFICE_CLOSE_HOUR)
+    : 18,
+  closeMinute: Number.isFinite(Number(process.env.SCHOOL_OFFICE_CLOSE_MINUTE))
+    ? Number(process.env.SCHOOL_OFFICE_CLOSE_MINUTE)
+    : 0,
+};
+
 const getAppointmentTimezoneParts = (value) => {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
@@ -3327,6 +3782,77 @@ const createAppointmentTimezoneDate = ({ year, month, day, hour = 0, minute = 0 
     APPOINTMENT_TIMEZONE_OFFSET_MINUTES * 60 * 1000;
   const date = new Date(utcTimestamp);
   return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getNextSchoolOfficeOpenAt = (value = new Date()) => {
+  const submittedParts = getAppointmentTimezoneParts(value);
+  if (!submittedParts) return null;
+
+  let candidate = createAppointmentTimezoneDate({
+    ...submittedParts,
+    hour: SCHOOL_OFFICE_HOURS.openHour,
+    minute: SCHOOL_OFFICE_HOURS.openMinute,
+  });
+  if (!candidate) return null;
+
+  if (candidate <= value) {
+    const nextParts = getAppointmentTimezoneParts(candidate);
+    if (!nextParts) return null;
+    candidate = createAppointmentTimezoneDate({
+      ...nextParts,
+      day: nextParts.day + 1,
+      hour: SCHOOL_OFFICE_HOURS.openHour,
+      minute: SCHOOL_OFFICE_HOURS.openMinute,
+    });
+  }
+
+  while (candidate && !isAppointmentServiceDay(candidate)) {
+    const parts = getAppointmentTimezoneParts(candidate);
+    if (!parts) return null;
+    candidate = createAppointmentTimezoneDate({
+      ...parts,
+      day: parts.day + 1,
+      hour: SCHOOL_OFFICE_HOURS.openHour,
+      minute: SCHOOL_OFFICE_HOURS.openMinute,
+    });
+  }
+
+  return candidate;
+};
+
+const getAfterHoursAppointmentNotice = (submittedAt = new Date()) => {
+  const submittedParts = getAppointmentTimezoneParts(submittedAt);
+  if (!submittedParts) return { isAfterHours: false };
+
+  const openAt = createAppointmentTimezoneDate({
+    ...submittedParts,
+    hour: SCHOOL_OFFICE_HOURS.openHour,
+    minute: SCHOOL_OFFICE_HOURS.openMinute,
+  });
+  const closedAt = createAppointmentTimezoneDate({
+    ...submittedParts,
+    hour: SCHOOL_OFFICE_HOURS.closeHour,
+    minute: SCHOOL_OFFICE_HOURS.closeMinute,
+  });
+  const isSchoolDay = isAppointmentServiceDay(submittedAt);
+  const isOutsideOfficeHours =
+    !isSchoolDay ||
+    (openAt && submittedAt < openAt) ||
+    (closedAt && submittedAt >= closedAt);
+
+  if (!isOutsideOfficeHours) {
+    return { isAfterHours: false };
+  }
+
+  const nextOfficeOpenAt = getNextSchoolOfficeOpenAt(submittedAt);
+  return {
+    isAfterHours: true,
+    title: "Appointment Request Received",
+    message:
+      "Your appointment request has been submitted successfully. Since it was sent after school hours, it will be reviewed once the office reopens on the next school day.",
+    nextOfficeOpenAt,
+    officeHours: SCHOOL_OFFICE_HOURS,
+  };
 };
 
 const getAppointmentDayOfWeek = (value) => {
@@ -3676,6 +4202,12 @@ const buildVisitorProfilePayload = async (visitorUser) => {
 
 const buildLiveVisitorLocationPayload = (visitor = {}) => {
   const currentLocation = visitor.currentLocation || {};
+  const expectedDestination =
+    visitor.currentDestination?.office ||
+    visitor.appointmentDepartment ||
+    visitor.assignedOffice ||
+    visitor.host ||
+    "Campus";
   const coordinates = currentLocation.coordinates || {};
   const lastScanTime =
     currentLocation.lastSeenAt ||
@@ -3695,6 +4227,10 @@ const buildLiveVisitorLocationPayload = (visitor = {}) => {
     phone: visitor.phoneNumber,
     purpose: visitor.purposeOfVisit,
     office: currentLocation.office || visitor.assignedOffice || visitor.host || "Campus",
+    currentLocation: currentLocation.office || "",
+    lastTappedOffice: currentLocation.office || "",
+    expectedDestination,
+    currentDestination: visitor.currentDestination || null,
     checkpointId: currentLocation.checkpointId || "",
     floor: currentLocation.floor || "ground",
     coordinates: {
@@ -3706,6 +4242,8 @@ const buildLiveVisitorLocationPayload = (visitor = {}) => {
     statusLabel,
     source: currentLocation.source || "checkpoint",
     checkedInAt: visitor.checkedInAt,
+    movementHistory: visitor.recentMovementHistory || [],
+    wrongLocationAlerts: visitor.recentWrongLocationAlerts || [],
   };
 };
 
@@ -7354,6 +7892,140 @@ app.get("/api/my-attendance", authMiddleware, async (req, res) => {
   }
 });
 
+app.post("/api/my-attendance/tap", authMiddleware, async (req, res) => {
+  try {
+    const normalizedRole = normalizeUserRoleValue(req.user?.role);
+    const allowedSelfTapRoles = ["student", "teacher", "staff"];
+
+    if (!allowedSelfTapRoles.includes(normalizedRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Self check-in is only available for student, teacher, and staff accounts.",
+      });
+    }
+
+    const requestedAction = String(req.body?.action || "")
+      .trim()
+      .toLowerCase();
+    const action = requestedAction === "checkout" ? "check_out" : requestedAction;
+
+    if (!["check_in", "check_out"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Choose check_in or check_out.",
+      });
+    }
+
+    const now = new Date();
+    const dayStart = getStartOfDay(now);
+    const dayEnd = getEndOfDay(now);
+    const latestAttendance = await AttendanceRecord.findOne({
+      userId: req.user._id,
+      attendanceDate: { $gte: dayStart, $lt: dayEnd },
+      module: getAttendanceModuleForRole(normalizedRole, req.user),
+    }).sort({ createdAt: -1 });
+    const hasOpenAttendance = Boolean(
+      latestAttendance?.checkInTime && !latestAttendance?.checkOutTime,
+    );
+
+    if (action === "check_in" && hasOpenAttendance) {
+      return res.status(409).json({
+        success: false,
+        message: "You are already checked in.",
+        attendance: latestAttendance,
+      });
+    }
+
+    if (action === "check_out" && !hasOpenAttendance) {
+      return res.status(400).json({
+        success: false,
+        message: "You need to check in before checking out.",
+      });
+    }
+
+    const source = String(req.body?.source || "mobile_app").trim().toLowerCase();
+    const isStaffVirtualCard = normalizedRole === "staff" && source === "virtual_nfc_card";
+    const nfcCardId = isStaffVirtualCard
+      ? normalizeNfcCardId(req.user?.nfcCardId || req.body?.nfcCardId || "")
+      : normalizeNfcCardId(req.body?.nfcCardId || req.user?.nfcCardId || "");
+
+    if (isStaffVirtualCard && !nfcCardId) {
+      return res.status(400).json({
+        success: false,
+        message: "No NFC card is assigned to this staff account yet.",
+      });
+    }
+
+    const tapLocation = {
+      floor: String(req.body?.floor || "Mobile").trim(),
+      office: String(
+        req.body?.office ||
+          (isStaffVirtualCard ? "Staff Virtual NFC Card" : "Mobile Checkpoint"),
+      ).trim(),
+      checkpointId: String(
+        req.body?.checkpointId ||
+          (isStaffVirtualCard ? "staff-virtual-nfc" : "mobile-self-check"),
+      ).trim(),
+    };
+    const deviceId = String(
+      req.body?.deviceId ||
+        (isStaffVirtualCard ? "staff-virtual-nfc-card" : "mobile-self-check"),
+    ).trim();
+    const attendanceRecord = await upsertAttendanceRecordForTap({
+      user: req.user,
+      action,
+      tapLocation,
+      timestamp: now,
+      nfcCardId,
+      deviceId,
+    });
+    const userName = getFullName(req.user) || req.user.email || "Campus user";
+
+    await AccessLog.create({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      userName,
+      actorRole: normalizedRole,
+      location: tapLocation.office,
+      accessType: action === "check_out" ? "exit" : "entry",
+      activityType: `self_${normalizedRole}_${action}`,
+      status: "granted",
+      nfcCardId,
+      relatedUser: req.user._id,
+      metadata: {
+        action,
+        source,
+        tapLocation,
+        attendanceRecordId: attendanceRecord._id,
+      },
+      notes: `${userName} used ${isStaffVirtualCard ? "the staff virtual NFC card" : "mobile self check"} to ${action.replace("_", " ")}.`,
+    });
+
+    if (normalizedRole === "student") {
+      await sendStudentGuardianAttendanceSms({
+        user: req.user,
+        action,
+        timestamp: now,
+        status: attendanceRecord.status,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: action === "check_in" ? "Check-in recorded." : "Check-out recorded.",
+      action,
+      attendance: attendanceRecord,
+      nfcCardId,
+    });
+  } catch (error) {
+    console.error("Self attendance tap error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to record your attendance tap.",
+    });
+  }
+});
+
 app.get(
   "/api/security/live-visitor-locations",
   authMiddleware,
@@ -7365,11 +8037,34 @@ app.get(
         ? Math.min(Math.max(requestedLimit, 1), 300)
         : 200;
       const activeVisitors = await getActiveLiveVisitors(limit);
+      const visitorIds = activeVisitors.map((visitor) => visitor._id).filter(Boolean);
+      const recentMovements = visitorIds.length
+        ? await VisitorMovementLog.find({ visitorId: { $in: visitorIds } })
+            .sort({ tappedAt: -1 })
+            .limit(visitorIds.length * 10)
+            .lean()
+        : [];
+      const movementsByVisitor = recentMovements.reduce((groups, movement) => {
+        const key = String(movement.visitorId || "");
+        if (!groups[key]) groups[key] = [];
+        if (groups[key].length < 8) groups[key].push(movement);
+        return groups;
+      }, {});
+      const enrichedVisitors = activeVisitors.map((visitor) => {
+        const movementHistory = movementsByVisitor[String(visitor._id)] || [];
+        return {
+          ...visitor,
+          recentMovementHistory: movementHistory,
+          recentWrongLocationAlerts: movementHistory.filter(
+            (movement) => movement.status === "wrong_location",
+          ),
+        };
+      });
 
       res.json({
         success: true,
         generatedAt: new Date(),
-        visitors: activeVisitors.map((visitor) => buildLiveVisitorLocationPayload(visitor)),
+        visitors: enrichedVisitors.map((visitor) => buildLiveVisitorLocationPayload(visitor)),
       });
     } catch (error) {
       console.error("Get live visitor locations error:", error);
@@ -7440,6 +8135,226 @@ app.get(
       res.status(500).json({
         success: false,
         message: "Failed to fetch live presence",
+      });
+    }
+  },
+);
+
+app.get("/api/visitor/current-destination", authMiddleware, requireRoles("visitor"), async (req, res) => {
+  try {
+    const visitor = await Visitor.findOne({
+      email: req.user.email,
+      status: { $ne: "checked_out" },
+    }).sort({ checkedInAt: -1, visitDate: -1, registeredAt: -1 });
+
+    if (!visitor) {
+      return res.status(404).json({
+        success: false,
+        message: "No active visitor appointment found.",
+      });
+    }
+
+    res.json({
+      success: true,
+      destination: {
+        office: getAssignedAppointmentOffice(visitor) || "Assigned destination pending",
+        currentDestination: visitor.currentDestination || null,
+        currentLocation: visitor.currentLocation || null,
+        status: visitor.status,
+        appointmentStatus: visitor.appointmentStatus,
+      },
+    });
+  } catch (error) {
+    console.error("Get current visitor destination error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load current destination.",
+    });
+  }
+});
+
+app.get("/api/visitor/:visitorId/movement-history", authMiddleware, async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.visitorId);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Visitor not found." });
+    }
+
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const isOwner =
+      requesterRole === "visitor" &&
+      String(visitor.email || "").toLowerCase() === String(req.user.email || "").toLowerCase();
+    const canView = isOwner || ["admin", "security", "guard", "staff"].includes(requesterRole);
+
+    if (!canView) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    const query = { visitorId: visitor._id };
+    applyDateRangeFilter(query, "tappedAt", req.query);
+    if (req.query.status && req.query.status !== "all") {
+      query.status = String(req.query.status);
+    }
+
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 300);
+    const movementHistory = await VisitorMovementLog.find(query)
+      .sort({ tappedAt: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json({
+      success: true,
+      visitor: {
+        _id: visitor._id,
+        fullName: visitor.fullName,
+        currentLocation: visitor.currentLocation,
+        currentDestination: visitor.currentDestination,
+      },
+      movementHistory,
+    });
+  } catch (error) {
+    console.error("Get visitor movement history error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load visitor movement history.",
+    });
+  }
+});
+
+app.patch(
+  "/api/staff/visitors/:visitorId/destination",
+  authMiddleware,
+  requireRoles("staff", "admin"),
+  async (req, res) => {
+    try {
+      const visitor = await Visitor.findById(req.params.visitorId);
+      if (!visitor) {
+        return res.status(404).json({ success: false, message: "Visitor not found." });
+      }
+
+      if (visitor.requestCategory !== "appointment") {
+        return res.status(400).json({
+          success: false,
+          message: "Only appointment visitors can be redirected to another office.",
+        });
+      }
+
+      if (!["approved", "adjusted"].includes(String(visitor.appointmentStatus || "").toLowerCase())) {
+        return res.status(409).json({
+          success: false,
+          message: "Only approved or adjusted appointments can be redirected.",
+        });
+      }
+
+      const requestedOffice = String(
+        req.body?.office ||
+          req.body?.destination ||
+          req.body?.nextDestination ||
+          req.body?.appointmentDepartment ||
+          "",
+      ).trim();
+
+      if (!requestedOffice) {
+        return res.status(400).json({
+          success: false,
+          message: "Next destination office is required.",
+        });
+      }
+
+      const location = getOfficeLocationFromValue(req.body?.checkpointId || requestedOffice);
+      const destinationOffice = location.office || requestedOffice;
+      visitor.updateNextDestination({
+        office: destinationOffice,
+        floor: req.body?.floor || location.floor,
+        checkpointId: req.body?.checkpointId || location.checkpointId,
+        reason: req.body?.reason || "Visitor redirected by staff.",
+        staffUser: req.user,
+      });
+      await visitor.save();
+      const visitorAccount = await User.findOne({
+        email: String(visitor.email || "").toLowerCase(),
+        role: "visitor",
+      }).select("_id email");
+
+      const movementLog = await createVisitorMovementLog({
+        visitor,
+        visitorUser: null,
+        tapLocation: {
+          ...location,
+          office: destinationOffice,
+          source: "staff_redirect",
+        },
+        expectedDestination: destinationOffice,
+        status: "redirected",
+        handledBy: req.user,
+        message: `${visitor.fullName} was redirected to ${destinationOffice} by ${getFullName(req.user) || req.user.email}.`,
+        metadata: {
+          reason: req.body?.reason || "",
+          previousDestination: visitor.destinationHistory?.at?.(-1)?.fromOffice || "",
+        },
+      });
+
+      await Promise.all([
+        createRoleNotification({
+          title: "Destination Updated",
+          message: `Please proceed to ${destinationOffice}. Staff updated your next destination.`,
+          type: "info",
+          severity: "medium",
+          targetRole: "visitor",
+          targetUser: visitorAccount?._id || null,
+          relatedVisitor: visitor._id,
+          relatedUser: visitorAccount?._id || null,
+          metadata: {
+            activityType: "visitor_destination_redirected",
+            destinationOffice,
+            movementLogId: movementLog._id,
+          },
+        }),
+        createRoleNotification({
+          title: "Visitor Redirected",
+          message: `${visitor.fullName} was redirected to ${destinationOffice} by ${getFullName(req.user) || req.user.email}.`,
+          type: "info",
+          severity: "medium",
+          targetRole: "security",
+          relatedVisitor: visitor._id,
+          relatedUser: req.user._id,
+          metadata: {
+            activityType: "visitor_destination_redirected",
+            destinationOffice,
+            movementLogId: movementLog._id,
+          },
+        }),
+      ]);
+
+      await AccessLog.create({
+        userId: req.user._id,
+        userEmail: req.user.email,
+        userName: getFullName(req.user) || req.user.email,
+        actorRole: req.user.role,
+        location: destinationOffice,
+        accessType: "system",
+        activityType: "visitor_destination_redirected",
+        status: "granted",
+        relatedVisitor: visitor._id,
+        relatedUser: req.user._id,
+        metadata: {
+          destination: visitor.currentDestination,
+          movementLogId: movementLog._id,
+        },
+        notes: `${visitor.fullName} was redirected to ${destinationOffice}.`,
+      });
+
+      res.json({
+        success: true,
+        message: `Visitor destination updated to ${destinationOffice}.`,
+        visitor,
+        movementLog,
+      });
+    } catch (error) {
+      console.error("Update visitor destination error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to update visitor destination.",
       });
     }
   },
@@ -8465,6 +9380,8 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
+    const afterHoursNotice = getAfterHoursAppointmentNotice(new Date());
+
     res.json({
       success: true,
       message: createdVisitors.length > 1
@@ -8472,6 +9389,16 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         : "Appointment request submitted successfully",
       visitor: createdVisitors[0]?.visitor,
       visitors: createdVisitors.map(({ visitor }) => visitor),
+      appointmentStatus: "pending",
+      afterHours: afterHoursNotice.isAfterHours,
+      afterHoursNotice: afterHoursNotice.isAfterHours
+        ? {
+            title: afterHoursNotice.title,
+            message: afterHoursNotice.message,
+            nextOfficeOpenAt: afterHoursNotice.nextOfficeOpenAt,
+            officeHours: afterHoursNotice.officeHours,
+          }
+        : null,
       idValidationStatus: idReview.status,
       idValidationMessage: idReview.message,
       idValidationConfidence: idReview.confidence,

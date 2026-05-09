@@ -1059,6 +1059,18 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async submitMyAttendanceTap(tapData = {}) {
+    try {
+      return await this.fetch("/my-attendance/tap", {
+        method: "POST",
+        body: tapData,
+      });
+    } catch (error) {
+      console.error("Submit my attendance tap error:", error);
+      throw error;
+    }
+  }
+
   async submitCheckpointTap(tapData) {
     try {
       return await this.fetch("/nfc/station/tap", {
@@ -1067,6 +1079,51 @@ async verifyCredentials(email, password) {
       });
     } catch (error) {
       console.error("Submit checkpoint tap error:", error);
+      throw error;
+    }
+  }
+
+  async submitOfficeTap(tapData) {
+    try {
+      return await this.fetch("/nfc/office-tap", {
+        method: "POST",
+        body: tapData,
+      });
+    } catch (error) {
+      console.error("Submit office tap error:", error);
+      throw error;
+    }
+  }
+
+  async getCurrentVisitorDestination() {
+    try {
+      return await this.fetch("/visitor/current-destination");
+    } catch (error) {
+      console.error("Get current visitor destination error:", error);
+      throw error;
+    }
+  }
+
+  async updateVisitorDestination(visitorId, destinationData = {}) {
+    try {
+      return await this.fetch(`/staff/visitors/${visitorId}/destination`, {
+        method: "PATCH",
+        body: destinationData,
+      });
+    } catch (error) {
+      console.error("Update visitor destination error:", error);
+      throw error;
+    }
+  }
+
+  async getVisitorMovementHistory(visitorId, filters = {}) {
+    try {
+      const queryString = new URLSearchParams(filters).toString();
+      return await this.fetch(
+        `/visitor/${visitorId}/movement-history${queryString ? `?${queryString}` : ""}`,
+      );
+    } catch (error) {
+      console.error("Get visitor movement history error:", error);
       throw error;
     }
   }
