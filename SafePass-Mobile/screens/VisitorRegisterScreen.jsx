@@ -321,6 +321,65 @@ const DataPrivacyModal = ({
     </Modal>
   );
 };
+
+const AnimatedFieldCard = ({ children, focused, style }) => {
+  const motionAnim = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const hoverRef = useRef(false);
+
+  const animateTo = (toValue) => {
+    Animated.spring(motionAnim, {
+      toValue,
+      friction: 8,
+      tension: 90,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  };
+
+  useEffect(() => {
+    animateTo(focused || hoverRef.current ? 1 : 0);
+  }, [focused]);
+
+  const handleHoverIn = () => {
+    hoverRef.current = true;
+    animateTo(1);
+  };
+
+  const handleHoverOut = () => {
+    hoverRef.current = false;
+    if (!focused) animateTo(0);
+  };
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          transform: [
+            {
+              translateY: motionAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, -7],
+              }),
+            },
+            {
+              scale: motionAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 1.015],
+              }),
+            },
+          ],
+        },
+      ]}
+      {...(Platform.OS === "web" && {
+        onMouseEnter: handleHoverIn,
+        onMouseLeave: handleHoverOut,
+      })}
+    >
+      {children}
+    </Animated.View>
+  );
+};
+
 export default function VisitorRegisterScreen({ navigation }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isCompactRegister = viewportWidth <= 420;
@@ -1357,16 +1416,18 @@ export default function VisitorRegisterScreen({ navigation }) {
                     field === "password" ? showPassword : showConfirmPassword;
                   const togglePasswordVisibility =
                     field === "password" ? setShowPassword : setShowConfirmPassword;
+                  const isFocused = focusedField === field;
 
                   return (
-                  <View
+                  <AnimatedFieldCard
                     key={field}
                     style={[
                       visitorRegisterStyles.formCard,
                       formCardResponsiveStyle,
-                      focusedField === field && visitorRegisterStyles.formCardFocused,
+                      isFocused && visitorRegisterStyles.formCardFocused,
                       errors[field] && visitorRegisterStyles.formCardError,
                     ]}
+                    focused={isFocused}
                   >
                     <View style={visitorRegisterStyles.cardHeader}>
                       <View
@@ -1383,7 +1444,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                     <View
                       style={[
                         visitorRegisterStyles.inputContainer,
-                        focusedField === field && visitorRegisterStyles.inputContainerFocused,
+                        isFocused && visitorRegisterStyles.inputContainerFocused,
                         errors[field] && visitorRegisterStyles.inputContainerError,
                       ]}
                     >
@@ -1491,7 +1552,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                         </View>
                       </View>
                     ) : null}
-                  </View>
+                  </AnimatedFieldCard>
                   );
                 })}
               </View>
