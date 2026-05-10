@@ -220,7 +220,8 @@ class ApiService {
     await AsyncStorage.multiRemove([
       "currentUser",
       "isNewRegistration",
-      "lastActivityAt"
+      "lastActivityAt",
+      "rememberedEmail"
     ]);
   }
 
@@ -408,7 +409,7 @@ async register(userData) {
       if (error?.data?.requiresOtpVerification || error?.status === 403) {
         throw new Error(
           error?.data?.message ||
-            "Your account is not yet verified. Please verify your account using OTP first."
+            "Please verify your email to continue."
         );
       }
 
@@ -514,7 +515,6 @@ async verifyCredentials(email, password) {
     });
     
     const trustedDevice = await this.isTrustedDeviceActive();
-    
     // Check if user is pending
     if (loginResponse.user?.status === 'pending') {
       return {
@@ -552,6 +552,12 @@ async verifyCredentials(email, password) {
       'admin@test.com': { password: 'admin123', role: 'admin', status: 'active' },
       'security@test.com': { password: 'security123', role: 'security', status: 'active' },
       'visitor@test.com': { password: 'visitor123', role: 'visitor', status: 'active' },
+      'student@test.com': { password: 'student123', role: 'student', status: 'active' },
+      'student1@sapphire.edu': { password: 'Student123!', role: 'student', status: 'active' },
+      'student2@sapphire.edu': { password: 'Student123!', role: 'student', status: 'active' },
+      'student3@sapphire.edu': { password: 'Student123!', role: 'student', status: 'active' },
+      'student4@sapphire.edu': { password: 'Student123!', role: 'student', status: 'active' },
+      'student5@sapphire.edu': { password: 'Student123!', role: 'student', status: 'active' },
       'pending@test.com': { password: 'pending123', role: 'visitor', status: 'pending' }
     };
     

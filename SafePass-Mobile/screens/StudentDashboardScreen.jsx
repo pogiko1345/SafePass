@@ -150,6 +150,8 @@ export default function StudentDashboardScreen({ navigation }) {
   const roleLabel = String(user?.role || "").toLowerCase() === "teacher" ? "Teacher" : "Student";
   const studentName = getStudentName(user);
   const smsEnabled = Boolean(user?.smsOptIn && user?.guardianPhone);
+  const guardianEmailEnabled = Boolean(user?.guardianEmail);
+  const guardianNoticeEnabled = smsEnabled || guardianEmailEnabled;
   const todayStatus = isCheckedIn
     ? "inside"
     : todayRecord?.checkOutTime
@@ -230,7 +232,7 @@ export default function StudentDashboardScreen({ navigation }) {
       </View>
       <Text style={styles.eyebrow}>{roleLabel} Mobile</Text>
       <Text style={styles.title}>Hi, {studentName.split(" ")[0]}</Text>
-      <Text style={styles.subtitle}>Your SafePass attendance and guardian SMS status are ready here.</Text>
+      <Text style={styles.subtitle}>Your SafePass attendance, campus ID, and parent notification status are ready here.</Text>
     </View>
   );
 
@@ -333,9 +335,15 @@ export default function StudentDashboardScreen({ navigation }) {
 
       <View style={styles.infoGrid}>
         <View style={styles.infoCard}>
-          <Ionicons name={smsEnabled ? "chatbubble-ellipses-outline" : "chatbubble-outline"} size={20} color={smsEnabled ? BRAND.success : BRAND.muted} />
-          <Text style={styles.infoTitle}>Guardian SMS</Text>
-          <Text style={styles.infoText}>{smsEnabled ? `Enabled for ${user?.guardianPhone}` : "Not configured"}</Text>
+          <Ionicons name={guardianNoticeEnabled ? "mail-unread-outline" : "mail-outline"} size={20} color={guardianNoticeEnabled ? BRAND.success : BRAND.muted} />
+          <Text style={styles.infoTitle}>Parent Alerts</Text>
+          <Text style={styles.infoText}>
+            {guardianEmailEnabled
+              ? `Email enabled for ${user.guardianEmail}`
+              : smsEnabled
+                ? `SMS enabled for ${user.guardianPhone}`
+                : "Not configured"}
+          </Text>
         </View>
         <TouchableOpacity style={styles.infoCard} onPress={() => setActiveTab("profile")}>
           <Ionicons name="person-circle-outline" size={20} color={BRAND.blue} />
@@ -428,7 +436,7 @@ export default function StudentDashboardScreen({ navigation }) {
     <>
       <View style={styles.compactHeader}>
         <Text style={styles.compactTitle}>My Profile</Text>
-        <Text style={styles.compactSubtitle}>Your student details used for attendance and guardian notifications.</Text>
+        <Text style={styles.compactSubtitle}>Your student details used for attendance and parent notifications.</Text>
       </View>
       <View style={styles.profileCard}>
         <View style={styles.profileHero}>
@@ -446,8 +454,9 @@ export default function StudentDashboardScreen({ navigation }) {
           ["Course / Section", formatProfileDetail(user?.course, user?.yearLevel, user?.section)],
           ["NFC Card", user?.nfcCardId || "Virtual mobile check only"],
           ["Guardian", user?.guardianName || "Not configured"],
+          ["Parent Email", user?.guardianEmail || "Not configured"],
           ["Guardian Phone", user?.guardianPhone || "Not configured"],
-          ["SMS Alerts", smsEnabled ? "Enabled" : "Not configured"],
+          ["Parent Alerts", guardianNoticeEnabled ? "Enabled" : "Not configured"],
         ].map(([label, value]) => (
           <View key={label} style={styles.profileRow}>
             <Text style={styles.profileLabel}>{label}</Text>

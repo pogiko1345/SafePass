@@ -45,8 +45,12 @@ const SESSION_EXPIRED_MESSAGE = "You were inactive for 30 minutes. Please login 
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
-  const { role, initialEmail = "", initialPassword = "" } = route?.params || { role: "visitor" };
-  const effectiveRole = IS_VISITOR_ONLY_APP ? "visitor" : role;
+  const {
+    role = IS_VISITOR_ONLY_APP ? "visitor" : "campus",
+    initialEmail = "",
+    initialPassword = "",
+  } = route?.params || {};
+  const effectiveRole = IS_VISITOR_ONLY_APP ? "visitor" : normalizeRole(role) || "campus";
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const isCompactLogin = viewportWidth <= 420;
   const isTabletLogin = viewportWidth >= 768;
@@ -271,6 +275,16 @@ export default function LoginScreen({ navigation, route }) {
 
   const normalizeResetEmailValue = (value) => String(value || "").trim().toLowerCase();
 
+  const isSchoolManagedIdentifier = (value) => {
+    const identifier = normalizeResetEmailValue(value);
+    return (
+      identifier.endsWith("@sapphire.edu") ||
+      identifier.endsWith("@sapphireaviationacademy.edu.ph") ||
+      /^(student|staff|teacher|admin|security|guard)[\w.-]*@/.test(identifier) ||
+      /^(student|staff|teacher|admin|security|guard)[\w.-]*$/.test(identifier)
+    );
+  };
+
   const normalizeResetOtpValue = (value) =>
     String(value || "").replace(/[^0-9]/g, "").slice(0, 6);
 
@@ -284,7 +298,6 @@ export default function LoginScreen({ navigation, route }) {
   useEffect(() => {
     if (initialEmail) {
       setEmail(initialEmail);
-      setRememberMe(true);
     }
     if (initialPassword) {
       setPassword(initialPassword);
@@ -389,13 +402,7 @@ export default function LoginScreen({ navigation, route }) {
         await Storage.removeItem(AUTH_NOTICE_KEY);
       }
 
-      if (!initialEmail) {
-        const rememberedEmail = await Storage.getItem("rememberedEmail");
-        if (rememberedEmail) {
-          setEmail(rememberedEmail);
-          setRememberMe(true);
-        }
-      }
+      await Storage.removeItem("rememberedEmail");
       
       const isNewRegistration = await Storage.getItem('isNewRegistration');
       
@@ -411,12 +418,9 @@ export default function LoginScreen({ navigation, route }) {
       if (token && user) {
         const rememberedSessionActive = await ApiService.isRememberedSessionActive();
         if (!rememberedSessionActive) {
-          const rememberedEmail = await Storage.getItem("rememberedEmail");
           await ApiService.clearAuth();
-          if (rememberedEmail) {
-            setEmail(rememberedEmail);
-            setRememberMe(true);
-          }
+          setEmail("");
+          setRememberMe(false);
           setLoginError(SESSION_EXPIRED_MESSAGE);
           return;
         }
@@ -428,12 +432,9 @@ export default function LoginScreen({ navigation, route }) {
           lastActivityAt > 0 &&
           Date.now() - lastActivityAt >= IDLE_LOGOUT_MS
         ) {
-          const rememberedEmail = await Storage.getItem("rememberedEmail");
           await ApiService.clearAuth();
-          if (rememberedEmail) {
-            setEmail(rememberedEmail);
-            setRememberMe(true);
-          }
+          setEmail("");
+          setRememberMe(false);
           setLoginError(SESSION_EXPIRED_MESSAGE);
           return;
         }
@@ -611,11 +612,11 @@ export default function LoginScreen({ navigation, route }) {
     await Storage.setItem("currentUser", JSON.stringify(normalizedUser));
     await ApiService.rememberCurrentSession();
 
+    await Storage.removeItem("rememberedEmail");
+
     if (rememberEmail) {
-      await Storage.setItem("rememberedEmail", email.trim());
       await ApiService.trustDevice();
     } else {
-      await Storage.removeItem("rememberedEmail");
       await ApiService.clearTrustedDevice();
     }
 
@@ -1056,20 +1057,27 @@ export default function LoginScreen({ navigation, route }) {
     } catch (error) {
       const errorMessage = String(error?.message || "");
       
-      if (
-        error?.data?.requiresOtpVerification ||
-        errorMessage.includes("not yet verified") ||
-        errorMessage.toLowerCase().includes("otp")
-      ) {
-        const otpEmail = normalizeResetEmailValue(email);
+      const otpEmail = normalizeResetEmailValue(email);
+      const shouldOfferVisitorActivation =
+        error?.data?.requiresOtpVerification === true &&
+        !isSchoolManagedIdentifier(otpEmail);
+
+      if (shouldOfferVisitorActivation) {
         setPendingVisitorOtpEmail(otpEmail);
         setLoginOtpCode("");
         setLoginOtpError("");
         setLoginOtpResendAvailableAt(null);
-        setLoginError("Your account is not yet verified. Please verify your account using OTP first.");
+        setLoginError("Please verify your email to continue.");
+      } else if (error?.data?.requiresOtpVerification === true) {
+        setPendingVisitorOtpEmail("");
+        setLoginError("This campus account is not activated correctly. Please ask an admin to verify the student or staff account role.");
       } else if (errorMessage.includes("pending")) {
         setLoginError("Your account is pending approval. Please wait for admin approval.");
-      } else if (errorMessage.includes("Invalid email") || errorMessage.includes("password")) {
+      } else if (
+        errorMessage.toLowerCase().includes("invalid email") ||
+        errorMessage.toLowerCase().includes("invalid username") ||
+        errorMessage.toLowerCase().includes("password")
+      ) {
         setLoginError("Incorrect email or password. Please try again.");
       } else if (errorMessage.includes("Network request failed")) {
         setLoginError("Cannot connect to server. Please check your connection.");
@@ -1086,12 +1094,12 @@ export default function LoginScreen({ navigation, route }) {
     switch (effectiveRole) {
       case "visitor":
         return {
-          label: "Visitor Access",
-          title: "Continue Your Visit Journey",
+          label: "Visitor Portal",
+          title: "Visitor Pass Sign-In",
           subtitle: "Track approvals, manage appointments, and keep your Sapphire visit details in one secure place.",
           icon: "person-outline",
           accent: brandColors.blue,
-          panel: "Visitor Coordination",
+          panel: "Campus Visitor Pass",
         };
       case "security":
       case "guard":
@@ -1106,11 +1114,11 @@ export default function LoginScreen({ navigation, route }) {
       case "staff":
         return {
           label: "Staff Access",
-          title: "Appointment Desk Sign-In",
-          subtitle: "Review visitor appointments, adjust schedules, and respond to requests from the staff dashboard.",
+          title: "Staff Campus Sign-In",
+          subtitle: "Open your staff dashboard for virtual NFC attendance, office presence, and assigned office access.",
           icon: "briefcase-outline",
           accent: brandColors.blue,
-          panel: "Staff Coordination",
+          panel: "Staff NFC Console",
         };
       case "student":
       case "teacher":
@@ -1119,11 +1127,21 @@ export default function LoginScreen({ navigation, route }) {
           title: effectiveRole === "teacher" ? "Teacher Attendance Sign-In" : "Student Attendance Sign-In",
           subtitle:
             effectiveRole === "teacher"
-              ? "Review your latest attendance records and campus checkpoint activity."
-              : "Check your attendance history, latest NFC activity, and guardian SMS status.",
+              ? "Review your latest attendance records, campus checkpoint activity, and virtual campus ID."
+              : "Check your attendance history, latest NFC activity, and parent notification status.",
           icon: effectiveRole === "teacher" ? "school-outline" : "id-card-outline",
           accent: brandColors.blue,
-          panel: "Attendance Console",
+          panel: "Campus ID Console",
+        };
+      case "campus":
+        return {
+          label: "Campus Access",
+          title: "Sign In to SafePass",
+          subtitle:
+            "Use your visitor, student, staff, security, or admin account to open the correct campus dashboard.",
+          icon: "id-card-outline",
+          accent: brandColors.blue,
+          panel: "Smart Campus Platform",
         };
       case "admin":
         return {
@@ -1198,7 +1216,7 @@ export default function LoginScreen({ navigation, route }) {
 
   const roleConfig = getRoleConfig();
   const showVisitorRegisterEntry =
-    IS_VISITOR_ONLY_APP || normalizeRole(effectiveRole) === "visitor";
+    IS_VISITOR_ONLY_APP || ["visitor", "campus"].includes(normalizeRole(effectiveRole));
   const resetStepTitle =
     resetStep === 1
       ? "Reset Password"
@@ -1446,9 +1464,9 @@ export default function LoginScreen({ navigation, route }) {
                           <Ionicons name="mail-unread-outline" size={18} color={brandColors.blue} />
                         </View>
                         <View style={loginStyles.visitorOtpHeaderCopy}>
-                          <Text style={loginStyles.visitorOtpTitle}>Verify Visitor Account</Text>
+                          <Text style={loginStyles.visitorOtpTitle}>Verify Campus Account</Text>
                           <Text style={loginStyles.visitorOtpSubtitle} numberOfLines={2}>
-                            Enter the OTP sent to {pendingVisitorOtpEmail}.
+                            Enter the verification code sent to your email.
                           </Text>
                         </View>
                       </View>
@@ -1475,7 +1493,7 @@ export default function LoginScreen({ navigation, route }) {
                         <Text style={loginStyles.errorText}>{loginOtpError}</Text>
                       ) : (
                         <Text style={loginStyles.visitorOtpHint}>
-                          The OTP expires after 10 minutes. Verified visitors can continue to appointments.
+                          The OTP expires after 10 minutes. Verified accounts can continue to the correct campus dashboard.
                         </Text>
                       )}
                       <View style={loginStyles.visitorOtpActions}>

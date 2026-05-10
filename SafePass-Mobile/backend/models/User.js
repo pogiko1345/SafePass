@@ -40,6 +40,7 @@ const userSchema = new mongoose.Schema({
     trim: true,
   },
   guardianName: { type: String, default: "", trim: true },
+  guardianEmail: { type: String, default: "", trim: true, lowercase: true },
   guardianPhone: { type: String, default: "", trim: true },
   smsOptIn: { type: Boolean, default: false },
   course: { type: String, default: "", trim: true },

@@ -107,7 +107,7 @@ export default function VisitorScreen({ navigation, route }) {
     try {
       await Share.share({
         message: `Visitor Pass for ${visitor.fullName}\nID: ${visitor.id}\nValid Until: ${formatDate(visitor.validUntil)}`,
-        title: 'Visitor Access Pass',
+        title: 'Visitor Pass',
       });
     } catch (error) {
       Alert.alert("Error", "Failed to share pass");

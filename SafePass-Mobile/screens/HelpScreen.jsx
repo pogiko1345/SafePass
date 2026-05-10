@@ -50,7 +50,7 @@ const CONTACT_OPTIONS = [
 const QUICK_GUIDES = [
   {
     id: "visitor",
-    title: "Visitor Access",
+    title: "Visitor Passes",
     description:
       "Register, wait for admin approval, then sign in to view your visitor pass and status.",
     icon: "person-outline",

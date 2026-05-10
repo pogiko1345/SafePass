@@ -28,58 +28,40 @@ const getExpoExtra = () => {
 };
 
 const resolveVariant = () => {
-  if (Platform.OS === "web") {
-    return APP_VARIANTS.FULL;
-  }
-
-  const extra = getExpoExtra();
-  return normalizeVariant(process.env.EXPO_PUBLIC_APP_VARIANT || extra.appVariant);
+  return APP_VARIANTS.FULL;
 };
 
 export const APP_VARIANT = resolveVariant();
 export const IS_VISITOR_ONLY_APP = APP_VARIANT === APP_VARIANTS.VISITOR;
 export const APP_VARIANT_LABEL = IS_VISITOR_ONLY_APP ? "Visitor" : "Full";
-export const APP_DISPLAY_NAME = IS_VISITOR_ONLY_APP ? "SafePass Visitor" : "SafePass";
+export const APP_DISPLAY_NAME = "SafePass Smart Campus";
 export const APP_ORGANIZATION_NAME =
   "Sapphire International Aviation Academy";
 
 export const normalizeAppRole = (role) => String(role || "").toLowerCase().trim();
 
 export const isRoleAllowedInCurrentVariant = (role) => {
-  const normalizedRole = normalizeAppRole(role);
-  if (!IS_VISITOR_ONLY_APP) {
-    return true;
-  }
-
-  return normalizedRole === "visitor";
+  return true;
 };
 
 export const getVariantInitialRoute = ({ currentUser, isNewRegistration }) => {
   if (currentUser) {
-    return "VisitorDashboard";
-  }
-
-  if (IS_VISITOR_ONLY_APP) {
-    return isNewRegistration ? "Login" : "Login";
+    const role = normalizeAppRole(currentUser.role);
+    if (role === "admin") return "AdminDashboard";
+    if (role === "staff") return "StaffDashboard";
+    if (role === "security" || role === "guard") return "SecurityDashboard";
+    if (role === "student" || role === "teacher") return "StudentDashboard";
+    if (role === "visitor") return "VisitorDashboard";
+    return "RoleSelect";
   }
 
   return "RoleSelect";
 };
 
 export const getVariantBlockedRoleMessage = (role) => {
-  const normalizedRole = normalizeAppRole(role);
-
-  if (!IS_VISITOR_ONLY_APP) {
-    return "";
-  }
-
-  if (!normalizedRole) {
-    return "This app is configured for visitor accounts only.";
-  }
-
-  return `This app is for visitor accounts only. Please use the main SafePass app for ${normalizedRole} access.`;
+  return "";
 };
 
 export const getVisitorBuildNavigationParams = () => ({
-  role: "visitor",
+  role: "campus",
 });

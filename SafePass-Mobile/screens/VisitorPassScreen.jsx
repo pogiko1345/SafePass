@@ -85,7 +85,7 @@ export default function VisitorPassScreen({ navigation, route }) {
     try {
       await Share.share({
         message: `Visitor Pass for ${visitor.fullName}\nID: ${visitor._id}\nDate: ${formatDate(visitor.visitDate)} at ${formatTime(visitor.visitTime)}\nPurpose: ${visitor.purposeOfVisit}`,
-        title: 'Visitor Access Pass',
+        title: 'Visitor Pass',
       });
     } catch (error) {
       Alert.alert("Error", "Failed to share pass");

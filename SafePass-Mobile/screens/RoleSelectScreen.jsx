@@ -112,7 +112,7 @@ export default function RoleSelectScreen({ navigation, route }) {
 
     if (Platform.OS !== "web") {
       AccessibilityInfo.announceForAccessibility(
-        "Role selection screen. Choose visitor registration or login to access your account."
+        "Role selection screen. Choose visitor registration or campus login to access your account."
       );
     }
 
@@ -276,11 +276,11 @@ export default function RoleSelectScreen({ navigation, route }) {
                 Sapphire International Aviation Academy
               </Text>
               <Text style={roleSelectStyles.heroSubtitle}>
-                Secure Arrival and Access Control
+                Smart Campus Access Platform
               </Text>
 
               <Text style={roleSelectStyles.heroDescription}>
-                Visitor access and checkpoint sign-in in one secure entry flow.
+                Visitor passes, student attendance, staff office presence, and checkpoint sign-in in one secure flow.
               </Text>
               <View style={roleSelectStyles.flightAccent}>
                 <View style={roleSelectStyles.flightAccentLine} />
@@ -302,8 +302,8 @@ export default function RoleSelectScreen({ navigation, route }) {
         >
           <Text style={roleSelectStyles.sectionTitle}>Welcome to SafePass</Text>
           <Text style={roleSelectStyles.sectionSubtitle}>
-            Choose how you want to enter the system and continue with visitor registration or secure
-            sign-in.
+            Choose visitor registration or sign in with your student, staff, security, admin, or approved
+            visitor account.
           </Text>
 
           <View
@@ -446,8 +446,8 @@ export default function RoleSelectScreen({ navigation, route }) {
                 onPressIn={() => animateCardPress(loginPressAnim, 0.98)}
                 onPressOut={() => animateCardPress(loginPressAnim, 1)}
                 activeOpacity={0.7}
-                accessibilityLabel="Login"
-                accessibilityHint="Go to the login screen for your account"
+                accessibilityLabel="Campus login"
+                accessibilityHint="Go to the login screen for your campus account"
                 accessibilityRole="button"
                 {...(isWeb && {
                   onMouseEnter: () => animateCardHover(loginHoverAnim, 1),
@@ -469,23 +469,23 @@ export default function RoleSelectScreen({ navigation, route }) {
                     </LinearGradient>
                   </View>
                   <View style={roleSelectStyles.cardContent}>
-                    <Text style={roleSelectStyles.cardTitle}>Login</Text>
+                    <Text style={roleSelectStyles.cardTitle}>Campus Login</Text>
                     <Text style={roleSelectStyles.cardDescription}>
-                      Sign in to review approvals, open your dashboard, manage appointments, and
-                      continue your access flow.
+                      Sign in as student, staff, security, admin, or approved visitor and open the
+                      correct SafePass dashboard.
                     </Text>
                     <View style={roleSelectStyles.cardFeatures}>
                       <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="checkmark-circle-outline" size={12} color={brandColors.blue} />
-                        <Text style={roleSelectStyles.featurePillText}>Check Status</Text>
+                        <Ionicons name="id-card-outline" size={12} color={brandColors.blue} />
+                        <Text style={roleSelectStyles.featurePillText}>Student NFC</Text>
+                      </View>
+                      <View style={roleSelectStyles.featurePill}>
+                        <Ionicons name="briefcase-outline" size={12} color={brandColors.blue} />
+                        <Text style={roleSelectStyles.featurePillText}>Staff Offices</Text>
                       </View>
                       <View style={roleSelectStyles.featurePill}>
                         <Ionicons name="shield-checkmark-outline" size={12} color={brandColors.blue} />
                         <Text style={roleSelectStyles.featurePillText}>Secure Access</Text>
-                      </View>
-                      <View style={roleSelectStyles.featurePill}>
-                        <Ionicons name="settings-outline" size={12} color={brandColors.blue} />
-                        <Text style={roleSelectStyles.featurePillText}>Manage Visit</Text>
                       </View>
                     </View>
                   </View>
