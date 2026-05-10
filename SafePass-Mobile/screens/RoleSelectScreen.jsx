@@ -63,6 +63,8 @@ export default function RoleSelectScreen({ navigation }) {
   const mobileFeatureAnim = useRef(new Animated.Value(0)).current;
   const mobileVisitorAnim = useRef(new Animated.Value(0)).current;
   const desktopFeatureAnim = useRef(new Animated.Value(0)).current;
+  const schoolCardFloatAnim = useRef(new Animated.Value(0)).current;
+  const mobileBadgePulseAnim = useRef(new Animated.Value(0)).current;
   const buttonPressAnim = useRef(new Animated.Value(1)).current;
   const mobileLoginPressAnim = useRef(new Animated.Value(1)).current;
   const mobileContactPressAnim = useRef(new Animated.Value(1)).current;
@@ -98,10 +100,46 @@ export default function RoleSelectScreen({ navigation }) {
       ]),
     ]).start();
 
+    const schoolFloat = Animated.loop(
+      Animated.sequence([
+        Animated.timing(schoolCardFloatAnim, {
+          toValue: 1,
+          duration: 2600,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(schoolCardFloatAnim, {
+          toValue: 0,
+          duration: 2600,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    );
+    const badgePulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(mobileBadgePulseAnim, {
+          toValue: 1,
+          duration: 1800,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(mobileBadgePulseAnim, {
+          toValue: 0,
+          duration: 1800,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    );
+    schoolFloat.start();
+    badgePulse.start();
+
     if (Platform.OS === "web" && typeof document !== "undefined") {
       document.title = "SafePass Smart Campus | Sapphire International Aviation Academy";
     }
-  }, [desktopFeatureAnim, heroAnim, mobileFeatureAnim, mobileVisitorAnim]);
+
+    return () => {
+      schoolFloat.stop();
+      badgePulse.stop();
+    };
+  }, [desktopFeatureAnim, heroAnim, mobileBadgePulseAnim, mobileFeatureAnim, mobileVisitorAnim, schoolCardFloatAnim]);
 
   const handleLogin = () => {
     navigation.navigate("Login", {
@@ -227,6 +265,26 @@ export default function RoleSelectScreen({ navigation }) {
       },
     ],
   };
+  const schoolCardFloatStyle = {
+    transform: [
+      {
+        translateY: schoolCardFloatAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -8],
+        }),
+      },
+    ],
+  };
+  const mobileBadgePulseStyle = {
+    transform: [
+      {
+        scale: mobileBadgePulseAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.025],
+        }),
+      },
+    ],
+  };
 
   const loginButtonMotion = {
     transform: [
@@ -280,10 +338,10 @@ export default function RoleSelectScreen({ navigation }) {
               </View>
             </View>
 
-            <View style={roleSelectStyles.mobileHeroBadge}>
+            <Animated.View style={[roleSelectStyles.mobileHeroBadge, mobileBadgePulseStyle]}>
               <Ionicons name="shield-checkmark-outline" size={14} color="#D8E8FF" />
               <Text style={roleSelectStyles.mobileHeroBadgeText}>Secure campus portal</Text>
-            </View>
+            </Animated.View>
 
             <Text style={roleSelectStyles.mobileTitle}>Smart Campus Access</Text>
             <Text style={roleSelectStyles.mobileSubtitle}>
@@ -485,11 +543,12 @@ export default function RoleSelectScreen({ navigation }) {
               </Animated.View>
             </View>
 
-            <View
+            <Animated.View
               style={[
                 roleSelectStyles.heroVisual,
                 !isWide && roleSelectStyles.heroVisualCentered,
                 isPhone && roleSelectStyles.heroVisualPhone,
+                schoolCardFloatStyle,
               ]}
             >
               <View style={roleSelectStyles.schoolCard}>
@@ -502,7 +561,7 @@ export default function RoleSelectScreen({ navigation }) {
                   <Text style={roleSelectStyles.statusText}>Server-connected campus workflow</Text>
                 </View>
               </View>
-            </View>
+            </Animated.View>
           </View>
 
           <View style={[roleSelectStyles.metricDock, isCompact && roleSelectStyles.metricDockCompact]}>
@@ -525,13 +584,13 @@ export default function RoleSelectScreen({ navigation }) {
 
           <View style={roleSelectStyles.featureGrid}>
             {platformHighlights.map((item) => (
-              <View key={item.title} style={roleSelectStyles.featureCard}>
+              <Animated.View key={item.title} style={[roleSelectStyles.featureCard, desktopFeatureEntranceStyle]}>
                 <View style={roleSelectStyles.featureIcon}>
                   <Ionicons name={item.icon} size={22} color={brandColors.blue} />
                 </View>
                 <Text style={roleSelectStyles.featureTitle}>{item.title}</Text>
                 <Text style={roleSelectStyles.featureText}>{item.description}</Text>
-              </View>
+              </Animated.View>
             ))}
           </View>
         </Animated.View>
