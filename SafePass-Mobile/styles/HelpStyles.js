@@ -1,4 +1,5 @@
 import { StyleSheet, Platform, Dimensions } from "react-native";
+import { brandColors } from "./brandColors";
 
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
@@ -11,7 +12,7 @@ const webHover = (styles) => (isWeb ? styles : {});
 export default StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F8FC",
+    backgroundColor: brandColors.background,
   },
 
   scrollContainer: {
@@ -20,9 +21,9 @@ export default StyleSheet.create({
   },
 
   hero: {
-    paddingTop: Platform.select({ ios: 58, android: 44, web: 44 }),
+    paddingTop: Platform.select({ ios: 58, android: 42, web: 44 }),
     paddingHorizontal: isWide ? 44 : 20,
-    paddingBottom: 28,
+    paddingBottom: isWide ? 34 : 28,
     borderBottomLeftRadius: 22,
     borderBottomRightRadius: 22,
     overflow: "hidden",
@@ -45,6 +46,47 @@ export default StyleSheet.create({
     ...webHover({ cursor: "pointer" }),
   },
 
+  heroBrandCard: {
+    marginTop: 18,
+    width: "100%",
+    maxWidth: 720,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 14,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+
+  heroLogo: {
+    width: isSmallPhone ? 54 : 62,
+    height: isSmallPhone ? 54 : 62,
+    borderRadius: isSmallPhone ? 27 : 31,
+    backgroundColor: "#FFFFFF",
+  },
+
+  heroBrandCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  heroBrandTitle: {
+    fontSize: isWide ? 18 : isSmallPhone ? 15 : 16,
+    lineHeight: isWide ? 24 : 21,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  heroBrandSubtitle: {
+    marginTop: 3,
+    fontSize: isSmallPhone ? 12 : 13,
+    lineHeight: 18,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.78)",
+  },
+
   heroBadge: {
     marginTop: 22,
     alignSelf: isWide ? "flex-start" : "center",
@@ -62,7 +104,7 @@ export default StyleSheet.create({
   heroBadgeText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#EEF5FF",
+    color: brandColors.blueSoft,
   },
 
   heroBody: {
@@ -85,7 +127,7 @@ export default StyleSheet.create({
   },
 
   heroTitle: {
-    fontSize: isWide ? 42 : isSmallPhone ? 28 : 34,
+    fontSize: isWide ? 42 : isSmallPhone ? 29 : 34,
     lineHeight: isWide ? 48 : isSmallPhone ? 34 : 40,
     fontWeight: "800",
     color: "#FFFFFF",
@@ -135,7 +177,7 @@ export default StyleSheet.create({
   heroStatLabel: {
     fontSize: 12,
     color: "rgba(255,255,255,0.74)",
-    textAlign: "center",
+    textAlign: isWide ? "left" : "center",
   },
 
   pageShell: {
@@ -152,10 +194,10 @@ export default StyleSheet.create({
     padding: isWide ? 28 : 20,
     marginTop: 18,
     borderWidth: 1,
-    borderColor: "#DCE6EE",
+    borderColor: brandColors.border,
     ...Platform.select({
       ios: {
-        shadowColor: "#0F172A",
+        shadowColor: brandColors.text,
         shadowOffset: { width: 0, height: 14 },
         shadowOpacity: 0.08,
         shadowRadius: 24,
@@ -179,14 +221,14 @@ export default StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1,
     textTransform: "uppercase",
-    color: "#0A3D91",
+    color: brandColors.blue,
     marginBottom: 8,
   },
 
   sectionTitle: {
     fontSize: isSmallPhone ? 22 : 26,
     fontWeight: "800",
-    color: "#0F172A",
+    color: brandColors.text,
     marginBottom: 8,
     textAlign: isWide ? "left" : "center",
   },
@@ -194,7 +236,7 @@ export default StyleSheet.create({
   sectionSubtitle: {
     fontSize: 14,
     lineHeight: 22,
-    color: "#64748B",
+    color: brandColors.textMuted,
     maxWidth: 720,
     textAlign: isWide ? "left" : "center",
   },
@@ -209,14 +251,18 @@ export default StyleSheet.create({
   contactCard: {
     flex: 1,
     minWidth: isWide ? 0 : isTablet ? 280 : "100%",
-    backgroundColor: "#F8FBFC",
+    backgroundColor: brandColors.surfaceSoft,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#DDEAF0",
+    borderColor: brandColors.border,
     padding: 18,
-    minHeight: 220,
+    minHeight: isTablet ? 222 : 190,
     justifyContent: "space-between",
     ...webHover({ cursor: "pointer" }),
+    ...webHover({
+      transitionDuration: "180ms",
+      transitionProperty: "transform, box-shadow, border-color",
+    }),
   },
 
   contactCardContent: {
@@ -235,7 +281,7 @@ export default StyleSheet.create({
   contactLabel: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#0F172A",
+    color: brandColors.text,
     marginBottom: 6,
   },
 
@@ -249,7 +295,7 @@ export default StyleSheet.create({
   contactHelper: {
     fontSize: 13,
     lineHeight: 20,
-    color: "#64748B",
+    color: brandColors.textMuted,
     minHeight: isTablet ? 60 : 40,
   },
 
@@ -261,7 +307,7 @@ export default StyleSheet.create({
     gap: 6,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: brandColors.border,
   },
 
   contactLinkText: {
@@ -279,9 +325,9 @@ export default StyleSheet.create({
     flex: 1,
     padding: 18,
     borderRadius: 8,
-    backgroundColor: "#F8FBFE",
+    backgroundColor: brandColors.surfaceSoft,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: brandColors.border,
     minHeight: 172,
   },
 
@@ -297,14 +343,14 @@ export default StyleSheet.create({
   guideTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#0F172A",
+    color: brandColors.text,
     marginBottom: 8,
   },
 
   guideDescription: {
     fontSize: 13,
     lineHeight: 20,
-    color: "#64748B",
+    color: brandColors.textMuted,
   },
 
   faqList: {
@@ -312,10 +358,10 @@ export default StyleSheet.create({
   },
 
   faqItem: {
-    backgroundColor: "#F8FBFE",
+    backgroundColor: brandColors.surfaceSoft,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: brandColors.border,
     paddingHorizontal: 16,
     paddingVertical: 15,
     ...webHover({ cursor: "pointer" }),
@@ -339,7 +385,7 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: "700",
-    color: "#0F172A",
+    color: brandColors.text,
     lineHeight: 20,
   },
 
@@ -347,10 +393,10 @@ export default StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: brandColors.border,
     fontSize: 13,
     lineHeight: 21,
-    color: "#64748B",
+    color: brandColors.textMuted,
   },
 
   ctaCard: {
@@ -358,7 +404,7 @@ export default StyleSheet.create({
     borderRadius: 8,
     padding: isWide ? 28 : 20,
     borderWidth: 1,
-    borderColor: "#DCE6EE",
+    borderColor: brandColors.border,
   },
 
   ctaTextWrap: {
@@ -370,7 +416,7 @@ export default StyleSheet.create({
   ctaTitle: {
     fontSize: isSmallPhone ? 22 : 26,
     fontWeight: "800",
-    color: "#0F172A",
+    color: brandColors.text,
     marginBottom: 8,
     textAlign: isWide ? "left" : "center",
   },
@@ -414,7 +460,7 @@ export default StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: "#0A3D91",
+    backgroundColor: brandColors.blue,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -443,7 +489,7 @@ export default StyleSheet.create({
 
   footerSubtext: {
     fontSize: 12,
-    color: "#64748B",
+    color: brandColors.textMuted,
     textAlign: "center",
   },
 });
