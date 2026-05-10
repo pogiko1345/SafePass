@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   Modal,
@@ -12,6 +11,7 @@ import {
   Platform,
   RefreshControl,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
 import visitorManagementStyles from "../styles/VisitorManagementStyles";

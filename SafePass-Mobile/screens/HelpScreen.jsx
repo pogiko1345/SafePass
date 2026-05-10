@@ -4,7 +4,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   Linking,
@@ -12,6 +11,7 @@ import {
   Alert,
   Image,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import helpStyles from "../styles/HelpStyles";

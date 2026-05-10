@@ -1,11 +1,9 @@
-// SecurityDashboardScreen.jsx (Complete with Working Tab Navigation)
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Modal,
@@ -22,6 +20,7 @@ import {
   Pressable,
   StyleSheet,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -56,6 +55,7 @@ import {
 
 const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
 const SECURITY_LIVE_REFRESH_INTERVAL_MS = 10000;
+const SECURITY_OPERATIONAL_REFRESH_INTERVAL_MS = 60000;
 const SECURITY_NOTIFICATION_REFRESH_INTERVAL_MS = 30000;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -115,6 +115,18 @@ const getAppointmentTimeSortValue = (appointment) => {
   return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
 };
 
+const formatDate = (date) => {
+  if (!date) return "N/A";
+  const parsedDate = new Date(date);
+  if (Number.isNaN(parsedDate.getTime())) return "N/A";
+
+  return parsedDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
 const compareAppointmentsBySchedule = (left, right) => {
   const dateDifference = getAppointmentDateSortValue(left) - getAppointmentDateSortValue(right);
   if (dateDifference !== 0) return dateDifference;
@@ -154,9 +166,9 @@ const titleCase = (value = "") =>
 
 const securityMobileTabs = [
   { key: "monitor", label: "Monitor", icon: "pulse-outline", activeIcon: "pulse" },
+  { key: "map", label: "Map", icon: "map-outline", activeIcon: "map" },
   { key: "logs", label: "Logs", icon: "list-outline", activeIcon: "list" },
   { key: "alerts", label: "Alerts", icon: "warning-outline", activeIcon: "warning" },
-  { key: "track", label: "Track", icon: "location-outline", activeIcon: "location" },
   { key: "profile", label: "Profile", icon: "person-outline", activeIcon: "person" },
 ];
 
@@ -193,8 +205,10 @@ export default function SecurityDashboardScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const sidebarAnim = useRef(new Animated.Value(isDesktop ? 1 : 0)).current;
+  const fullscreenMapAnim = useRef(new Animated.Value(0)).current;
   const liveMapRefreshRef = useRef(false);
   const securityLiveRefreshRef = useRef(false);
+  const lastOperationalRefreshAtRef = useRef(0);
   const operationalDataSignatureRef = useRef("");
   const notificationDataSignatureRef = useRef("");
   
@@ -422,7 +436,26 @@ export default function SecurityDashboardScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+    if (!showMapModal) {
+      fullscreenMapAnim.setValue(0);
+      return;
+    }
+
+    Animated.spring(fullscreenMapAnim, {
+      toValue: 1,
+      useNativeDriver: Platform.OS !== "web",
+      tension: 90,
+      friction: 13,
+    }).start();
+  }, [fullscreenMapAnim, showMapModal]);
+
+  useEffect(() => {
+    const isNewArchitectureEnabled = Boolean(globalThis?.nativeFabricUIManager);
+    if (
+      Platform.OS === "android" &&
+      !isNewArchitectureEnabled &&
+      UIManager.setLayoutAnimationEnabledExperimental
+    ) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
   }, []);
@@ -439,6 +472,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         loadSecurityLivePresence(),
         loadNotifications(currentUser, { force: true }),
       ]);
+      lastOperationalRefreshAtRef.current = Date.now();
 
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -584,7 +618,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     );
     const approved = all.filter(
       (visitor) =>
-        hasApprovedVisitWindow(visitor) &&
+        isCheckInAllowedNow(visitor) &&
         visitor.status !== 'checked_in' &&
         visitor.status !== 'checked_out',
     );
@@ -1282,6 +1316,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         loadSecurityLivePresence(),
         loadNotifications(user, { force: true }),
       ]);
+      lastOperationalRefreshAtRef.current = Date.now();
     } finally {
       setRefreshing(false);
     }
@@ -1291,11 +1326,19 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (securityLiveRefreshRef.current) return;
     securityLiveRefreshRef.current = true;
     try {
-      await Promise.all([
-        loadOperationalData(),
+      const shouldRefreshOperationalData =
+        Date.now() - lastOperationalRefreshAtRef.current >= SECURITY_OPERATIONAL_REFRESH_INTERVAL_MS;
+      const refreshTasks = [
         loadLiveVisitorLocations(),
         loadSecurityLivePresence(),
-      ]);
+      ];
+
+      if (shouldRefreshOperationalData) {
+        lastOperationalRefreshAtRef.current = Date.now();
+        refreshTasks.push(loadOperationalData());
+      }
+
+      await Promise.all(refreshTasks);
     } finally {
       securityLiveRefreshRef.current = false;
     }
@@ -1378,6 +1421,47 @@ export default function SecurityDashboardScreen({ navigation }) {
     return approvalStatus === "approved";
   };
 
+  const getVisitDayRelation = (visitor) => {
+    const visitDateValue = visitor?.visitDate || visitor?.visitTime;
+    if (!visitDateValue) return "unknown";
+
+    const visitDate = new Date(visitDateValue);
+    if (Number.isNaN(visitDate.getTime())) return "unknown";
+
+    const visitDayStart = new Date(visitDate);
+    visitDayStart.setHours(0, 0, 0, 0);
+    const visitDayEnd = new Date(visitDayStart);
+    visitDayEnd.setDate(visitDayEnd.getDate() + 1);
+
+    const now = new Date();
+    if (now < visitDayStart) return "future";
+    if (now >= visitDayEnd) return "past";
+    return "today";
+  };
+
+  const isCheckInAllowedNow = (visitor) => {
+    if (!hasApprovedVisitWindow(visitor)) return false;
+    const visitStatus = String(visitor?.status || "").toLowerCase();
+    if (["checked_in", "checked_out", "expired", "cancelled", "rejected", "no_show"].includes(visitStatus)) {
+      return false;
+    }
+    if (visitor?.visitExpiredAt || visitor?.noShowMarkedAt) return false;
+
+    const relation = getVisitDayRelation(visitor);
+    return relation === "today" || relation === "unknown";
+  };
+
+  const getCheckInBlockedLabel = (visitor) => {
+    const relation = getVisitDayRelation(visitor);
+    if (String(visitor?.status || "").toLowerCase() === "expired" || visitor?.visitExpiredAt || relation === "past") {
+      return "Expired - new appointment needed";
+    }
+    if (relation === "future") {
+      return "Scheduled for later";
+    }
+    return "Not ready for check-in";
+  };
+
   const getStatusBadge = (visitor) => {
     const visitStatus = String(visitor?.status || "").toLowerCase();
     const appointmentStatus = String(visitor?.appointmentStatus || "").toLowerCase();
@@ -1402,6 +1486,8 @@ export default function SecurityDashboardScreen({ navigation }) {
       (!appointmentStatus && approvalStatus === 'pending')
     ) {
       return { bg: '#FEF3C7', text: '#D97706', label: 'PENDING' };
+    } else if (hasApprovedVisitWindow(visitor) && getVisitDayRelation(visitor) === "past") {
+      return { bg: '#E5E7EB', text: '#4B5563', label: 'EXPIRED' };
     } else if (hasApprovedVisitWindow(visitor)) {
       return { bg: '#EEF5FF', text: '#1C6DD0', label: 'APPROVED' };
     }
@@ -1575,6 +1661,11 @@ export default function SecurityDashboardScreen({ navigation }) {
 
     if (visitor.status === 'checked_out') {
       Alert.alert("Visit Completed", `${visitor.fullName} has already checked out.`);
+      return;
+    }
+
+    if (!isCheckInAllowedNow(visitor)) {
+      Alert.alert("Cannot Check In", getCheckInBlockedLabel(visitor));
       return;
     }
 
@@ -1813,6 +1904,28 @@ export default function SecurityDashboardScreen({ navigation }) {
       return true;
     });
   }, [filteredVisitors, mobileDateFilter, mobileLocationFilter]);
+
+  const mobileNeedsAttentionVisitors = useMemo(() => {
+    const actionableVisitors = [
+      ...(visitors.active || []),
+      ...(visitors.approved || []),
+    ].filter((visitor) => visitor?.status !== "checked_out");
+
+    return actionableVisitors.sort((left, right) => {
+      const leftAlertCount = left?.wrongLocationAlerts?.length || 0;
+      const rightAlertCount = right?.wrongLocationAlerts?.length || 0;
+      if (leftAlertCount !== rightAlertCount) return rightAlertCount - leftAlertCount;
+
+      const leftCheckedIn = left?.status === "checked_in" ? 1 : 0;
+      const rightCheckedIn = right?.status === "checked_in" ? 1 : 0;
+      if (leftCheckedIn !== rightCheckedIn) return rightCheckedIn - leftCheckedIn;
+
+      return (
+        new Date(left?.visitDate || left?.checkedInAt || 0).getTime() -
+        new Date(right?.visitDate || right?.checkedInAt || 0).getTime()
+      );
+    });
+  }, [visitors.active, visitors.approved]);
 
   const mobileLogItems = useMemo(() => {
     const normalizedSearch = String(searchQuery || "").trim().toLowerCase();
@@ -3822,27 +3935,26 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
       </View>
       <Text style={securityMobileStyles.headerSubtitle}>
-        Quick scanning, visitor tracking, alerts, and access activity for campus security.
+        Scan arrivals, open the map, or review items that need attention.
       </Text>
     </View>
   );
 
   const renderMobileMetrics = () => (
-    <View style={securityMobileStyles.metricGrid}>
-      {[
-        { label: "Inside", value: visitorStats.activeNow, icon: "walk-outline", color: BRAND.success },
-        { label: "On Site", value: livePresenceSummary?.total || 0, icon: "people-outline", color: BRAND.blue },
-        { label: "Alerts", value: alerts.length, icon: "warning-outline", color: BRAND.danger },
-        { label: "Logs", value: accessLogs.length, icon: "list-outline", color: BRAND.warning },
-      ].map((item) => (
-        <View key={item.label} style={securityMobileStyles.metricCard}>
-          <View style={[securityMobileStyles.metricIcon, { backgroundColor: `${item.color}16` }]}>
-            <Ionicons name={item.icon} size={18} color={item.color} />
-          </View>
-          <Text style={securityMobileStyles.metricValue}>{item.value}</Text>
-          <Text style={securityMobileStyles.metricLabel}>{item.label}</Text>
-        </View>
-      ))}
+    <View style={securityMobileStyles.statusCard}>
+      <View style={securityMobileStyles.statusCardIcon}>
+        <Ionicons name="shield-checkmark-outline" size={22} color={BRAND.success} />
+      </View>
+      <View style={securityMobileStyles.statusCardCopy}>
+        <Text style={securityMobileStyles.statusCardTitle}>Current Status</Text>
+        <Text style={securityMobileStyles.statusCardSubtitle}>
+          {visitorStats.activeNow} inside · {alerts.length} alert{alerts.length === 1 ? "" : "s"}
+        </Text>
+      </View>
+      <View style={securityMobileStyles.statusCardCount}>
+        <Text style={securityMobileStyles.statusCardCountText}>{livePresenceSummary?.total || 0}</Text>
+        <Text style={securityMobileStyles.statusCardCountLabel}>On site</Text>
+      </View>
     </View>
   );
 
@@ -3852,9 +3964,9 @@ export default function SecurityDashboardScreen({ navigation }) {
         <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
         <Text style={securityMobileStyles.quickActionPrimaryText}>NFC Scan</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={securityMobileStyles.quickAction} onPress={() => setSecurityMobileTab("track")}>
-        <Ionicons name="location-outline" size={20} color={BRAND.blue} />
-        <Text style={securityMobileStyles.quickActionText}>Track</Text>
+      <TouchableOpacity style={securityMobileStyles.quickAction} onPress={() => setSecurityMobileTab("map")}>
+        <Ionicons name="map-outline" size={20} color={BRAND.blue} />
+        <Text style={securityMobileStyles.quickActionText}>Map</Text>
       </TouchableOpacity>
       <TouchableOpacity style={securityMobileStyles.quickAction} onPress={() => setSecurityMobileTab("alerts")}>
         <Ionicons name="flag-outline" size={20} color={BRAND.danger} />
@@ -3904,7 +4016,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               </View>
             </View>
             <View style={securityMobileStyles.visitorActions}>
-              {hasApprovedVisitWindow(visitor) && visitor.status !== "checked_out" ? (
+              {(isCheckedIn || isCheckInAllowedNow(visitor)) && visitor.status !== "checked_out" ? (
                 <TouchableOpacity
                   style={[securityMobileStyles.visitorActionPrimary, isProcessing && securityMobileStyles.disabled]}
                   onPress={() => (isCheckedIn ? handleCheckOut(visitor) : handleCheckIn(visitor))}
@@ -3925,7 +4037,44 @@ export default function SecurityDashboardScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </>
-        ) : null}
+        ) : (
+          <View style={securityMobileStyles.compactVisitorActions}>
+            {visitor.status === "checked_in" ? (
+              <TouchableOpacity
+                style={[securityMobileStyles.releaseButton, isProcessing && securityMobileStyles.disabled]}
+                onPress={() => handleCheckOut(visitor)}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="log-out-outline" size={16} color="#FFFFFF" />
+                    <Text style={securityMobileStyles.releaseButtonText}>Release</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : isCheckInAllowedNow(visitor) ? (
+              <TouchableOpacity
+                style={[securityMobileStyles.compactCheckInButton, isProcessing && securityMobileStyles.disabled]}
+                onPress={() => handleCheckIn(visitor)}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator size="small" color={BRAND.blue} />
+                ) : (
+                  <>
+                    <Ionicons name="log-in-outline" size={16} color={BRAND.blue} />
+                    <Text style={securityMobileStyles.compactCheckInButtonText}>Check In</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={securityMobileStyles.compactDetailsButton} onPress={() => handleViewDetails(visitor)}>
+              <Text style={securityMobileStyles.compactDetailsButtonText}>Details</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -3948,16 +4097,29 @@ export default function SecurityDashboardScreen({ navigation }) {
       {renderMobileHeader()}
       {renderMobileMetrics()}
       {renderMobileQuickActions()}
-      {renderMobileToolbar()}
+      {alerts.length ? (
+        <TouchableOpacity style={securityMobileStyles.simpleAlertCard} onPress={() => setSecurityMobileTab("alerts")}>
+          <Ionicons name="warning-outline" size={20} color={BRAND.danger} />
+          <View style={securityMobileStyles.simpleAlertCopy}>
+            <Text style={securityMobileStyles.simpleAlertTitle}>Review active alerts</Text>
+            <Text style={securityMobileStyles.simpleAlertText}>{alerts.length} item{alerts.length === 1 ? "" : "s"} waiting</Text>
+          </View>
+          <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+        </TouchableOpacity>
+      ) : null}
       <View style={securityMobileStyles.sectionHeader}>
-        <Text style={securityMobileStyles.sectionTitle}>Live Visitor Monitoring</Text>
-        <Text style={securityMobileStyles.sectionCount}>{mobileVisibleVisitors.length}</Text>
+        <Text style={securityMobileStyles.sectionTitle}>Incoming Visitors</Text>
+        <Text style={securityMobileStyles.sectionCount}>{mobileNeedsAttentionVisitors.length}</Text>
       </View>
-      {mobileVisibleVisitors.length ? (
-        mobileVisibleVisitors.slice(0, 30).map((visitor) => renderMobileVisitorCard(visitor))
+      {mobileNeedsAttentionVisitors.length ? (
+        mobileNeedsAttentionVisitors.slice(0, 5).map((visitor) => renderMobileVisitorCard(visitor, true))
       ) : (
-        <MobileEmptyState icon="pulse-outline" title="No visitors found" message="Try changing the status, date, location, or search filter." />
+        <MobileEmptyState icon="person-add-outline" title="No incoming visitors" message="Approved arrivals and active visits will appear here." />
       )}
+      <TouchableOpacity style={securityMobileStyles.viewAllButton} onPress={() => setSecurityMobileTab("map")}>
+        <Text style={securityMobileStyles.viewAllButtonText}>Open full tracking map</Text>
+        <Ionicons name="map-outline" size={18} color={BRAND.blue} />
+      </TouchableOpacity>
     </>
   );
 
@@ -4057,6 +4219,128 @@ export default function SecurityDashboardScreen({ navigation }) {
       </TouchableOpacity>
     </>
   );
+
+  const renderMobileMap = () => {
+    const liveVisitors = getFilteredVisitorLocations();
+    const priorityVisitors = [...liveVisitors].sort((left, right) => {
+      const leftAlertCount = left?.wrongLocationAlerts?.length || 0;
+      const rightAlertCount = right?.wrongLocationAlerts?.length || 0;
+      if (leftAlertCount !== rightAlertCount) return rightAlertCount - leftAlertCount;
+
+      return (
+        new Date(right?.location?.timestamp || 0).getTime() -
+        new Date(left?.location?.timestamp || 0).getTime()
+      );
+    });
+
+    return (
+      <>
+        <View style={securityMobileStyles.compactHeader}>
+          <Text style={securityMobileStyles.compactTitle}>Monitoring Map</Text>
+          <Text style={securityMobileStyles.compactSubtitle}>
+            View active visitor positions by floor and open a full-screen map when you need more room.
+          </Text>
+        </View>
+        <MobileFilterChips
+          options={floors.map((floor) => ({ key: floor.id, label: floor.name }))}
+          value={selectedFloor}
+          onChange={(floorId) => {
+            setSelectedFloor(floorId);
+            setSelectedOffice("all");
+          }}
+        />
+        <View style={securityMobileStyles.mobileMapCard}>
+          <SharedMonitoringMap
+            title="Live Visitor Map"
+            iconName="map-outline"
+            iconColor={BRAND.success}
+            actionLabel="Full Screen"
+            onActionPress={() => setShowMapModal(true)}
+            visitors={liveVisitors}
+            floors={floors}
+            offices={offices}
+            selectedFloor={selectedFloor}
+            selectedOffice={selectedOffice}
+            mapBlueprints={mapBlueprints}
+            officePositions={officePositions}
+            onFloorChange={(floorId) => {
+              setSelectedFloor(floorId);
+              setSelectedOffice("all");
+            }}
+            onVisitorHover={handleVisitorHover}
+            onVisitorLeave={handleVisitorLeave}
+            onVisitorSelect={handleVisitorSelect}
+            hoveredVisitor={hoveredVisitor}
+            renderHoverCard={renderHoverCard}
+            initialScale={1.75}
+            backgroundColor="#FFFFFF"
+            borderColor="#E2E8F0"
+            mapBackgroundColor="#F8FBFE"
+            summaryItems={[
+              { label: "Live", value: liveVisitors.length || 0, color: BRAND.success },
+              { label: "Approved", value: visitors.approved.length || 0, color: BRAND.blue },
+              { label: "Inside", value: visitors.active.length || 0, color: BRAND.warning },
+            ]}
+            statusLabel="Security map"
+            showFloorNavigation={false}
+            containerStyle={securityMobileStyles.mobileMapContainer}
+            mapWrapperStyle={securityMobileStyles.mobileMapWrapper}
+          />
+        </View>
+        <View style={securityMobileStyles.mapActionRow}>
+          <TouchableOpacity style={securityMobileStyles.mapActionButtonPrimary} onPress={() => navigation.navigate("NFCScan")}>
+            <Ionicons name="scan-outline" size={18} color="#FFFFFF" />
+            <Text style={securityMobileStyles.mapActionButtonPrimaryText}>Scan</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={securityMobileStyles.mapActionButton} onPress={refreshData}>
+            <Ionicons name="refresh-outline" size={18} color={BRAND.blue} />
+            <Text style={securityMobileStyles.mapActionButtonText}>Refresh</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={securityMobileStyles.mapActionButton} onPress={() => setSecurityMobileTab("alerts")}>
+            <Ionicons name="flag-outline" size={18} color={BRAND.danger} />
+            <Text style={securityMobileStyles.mapActionButtonText}>Report</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={securityMobileStyles.sectionHeader}>
+          <Text style={securityMobileStyles.sectionTitle}>Needs Attention</Text>
+          <Text style={securityMobileStyles.sectionCount}>{liveVisitors.length}</Text>
+        </View>
+        {priorityVisitors.length ? (
+          priorityVisitors.slice(0, 8).map((visitor) => (
+            <TouchableOpacity
+              key={visitor.id}
+              style={[
+                securityMobileStyles.locationCard,
+                visitor.wrongLocationAlerts?.length && securityMobileStyles.locationCardAlert,
+              ]}
+              onPress={() => handleVisitorSelect(visitor)}
+            >
+              <View style={securityMobileStyles.locationPin}>
+                <Ionicons
+                  name={visitor.wrongLocationAlerts?.length ? "warning-outline" : "location-outline"}
+                  size={18}
+                  color="#FFFFFF"
+                />
+              </View>
+              <View style={securityMobileStyles.locationCopy}>
+                <Text style={securityMobileStyles.locationName}>{visitor.name}</Text>
+                <Text style={securityMobileStyles.locationMeta}>{visitor.location?.office || "Campus checkpoint"}</Text>
+                {visitor.wrongLocationAlerts?.length ? (
+                  <Text style={[securityMobileStyles.locationFreshness, { color: BRAND.danger }]}>
+                    Expected: {visitor.expectedDestination || "Assigned destination"}
+                  </Text>
+                ) : null}
+                <Text style={securityMobileStyles.locationFreshness}>{getFreshnessLabel(visitor.location?.timestamp)}</Text>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          ))
+        ) : (
+          <MobileEmptyState icon="map-outline" title="No live markers" message="Visitor markers will appear after NFC checkpoint taps." />
+        )}
+      </>
+    );
+  };
 
   const renderMobileTracking = () => (
     <>
@@ -4167,12 +4451,15 @@ export default function SecurityDashboardScreen({ navigation }) {
                 </View>
               ))}
               <View style={securityMobileStyles.detailActions}>
-                {hasApprovedVisitWindow(selectedVisitor) && selectedVisitor.status !== "checked_out" ? (
+                {(selectedVisitor.status === "checked_in" || isCheckInAllowedNow(selectedVisitor)) &&
+                selectedVisitor.status !== "checked_out" ? (
                   <TouchableOpacity
                     style={securityMobileStyles.detailPrimaryButton}
                     onPress={() => {
                       setShowDetailModal(false);
-                      selectedVisitor.status === "checked_in" ? handleCheckOut(selectedVisitor) : handleCheckIn(selectedVisitor);
+                      selectedVisitor.status === "checked_in"
+                        ? handleCheckOut(selectedVisitor)
+                        : handleCheckIn(selectedVisitor);
                     }}
                   >
                     <Text style={securityMobileStyles.detailPrimaryButtonText}>
@@ -4197,14 +4484,98 @@ export default function SecurityDashboardScreen({ navigation }) {
     </Modal>
   );
 
+  const renderFullscreenMapModal = () => (
+    <Modal
+      visible={showMapModal}
+      transparent={false}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+      onRequestClose={() => setShowMapModal(false)}
+    >
+      <Animated.View
+        style={[
+          styles.fullscreenModal,
+          {
+            opacity: fullscreenMapAnim,
+            transform: [
+              {
+                translateY: fullscreenMapAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [24, 0],
+                }),
+              },
+              {
+                scale: fullscreenMapAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.985, 1],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View style={styles.fullscreenModalHeader}>
+          <Text style={styles.fullscreenModalTitle}>Live Visitor Tracking</Text>
+          <TouchableOpacity
+            style={styles.fullscreenMinimizeButton}
+            onPress={() => setShowMapModal(false)}
+            activeOpacity={0.82}
+          >
+            <Ionicons name="contract-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.fullscreenMinimizeButtonText}>Minimize</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.fullscreenMapContainer}>
+          <SharedMonitoringMap
+            title="Live Visitor Tracking"
+            subtitle="Monitor approved visitors, check-ins, and on-site movement from one shared monitoring map."
+            iconName="map-outline"
+            iconColor="#10B981"
+            visitors={getFilteredVisitorLocations()}
+            floors={floors}
+            offices={offices}
+            selectedFloor={selectedFloor}
+            selectedOffice={selectedOffice}
+            mapBlueprints={mapBlueprints}
+            officePositions={officePositions}
+            onFloorChange={(floorId) => {
+              setSelectedFloor(floorId);
+              setSelectedOffice("all");
+            }}
+            onVisitorHover={handleVisitorHover}
+            onVisitorLeave={handleVisitorLeave}
+            onVisitorSelect={handleVisitorSelect}
+            hoveredVisitor={hoveredVisitor}
+            renderHoverCard={renderHoverCard}
+            fullscreen
+            initialScale={1.35}
+            backgroundColor="#111827"
+            borderColor="#374151"
+            mapBackgroundColor="#111827"
+            textPrimary="#FFFFFF"
+            textSecondary="#CBD5E1"
+            summaryItems={[
+              { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
+              { label: "Approved", value: visitors.approved.length || 0, color: "#8EC5FF" },
+              { label: "Checked In", value: visitors.active.length || 0, color: "#FBBF24" },
+            ]}
+            statusLabel="Security monitoring"
+            showFloorNavigation={false}
+          />
+        </View>
+      </Animated.View>
+    </Modal>
+  );
+
   const renderMobileSecurityScreen = () => {
     const content =
       securityMobileTab === "logs"
         ? renderMobileLogs()
         : securityMobileTab === "alerts"
           ? renderMobileAlerts()
-          : securityMobileTab === "track"
-            ? renderMobileTracking()
+          : securityMobileTab === "map"
+            ? renderMobileMap()
             : securityMobileTab === "profile"
               ? renderMobileProfile()
               : renderMobileMonitor();
@@ -4222,6 +4593,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         </ScrollView>
         <MobileBottomNav tabs={securityMobileTabs} activeTab={securityMobileTab} onChange={setSecurityMobileTab} />
         {renderMobileVisitorDetailModal()}
+        {renderFullscreenMapModal()}
       </SafeAreaView>
     );
   };
@@ -4383,58 +4755,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       </Modal>
 
       {/* Full Screen Map Modal */}
-      <Modal
-        visible={showMapModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowMapModal(false)}
-      >
-        <View style={styles.fullscreenModal}>
-          <View style={styles.fullscreenModalHeader}>
-            <Text style={styles.fullscreenModalTitle}>Live Visitor Tracking</Text>
-            <TouchableOpacity onPress={() => setShowMapModal(false)}>
-              <Ionicons name="close" size={28} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.fullscreenMapContainer}>
-            <SharedMonitoringMap
-              title="Live Visitor Tracking"
-              subtitle="Monitor approved visitors, check-ins, and on-site movement from one shared monitoring map."
-              iconName="map-outline"
-              iconColor="#10B981"
-              visitors={getFilteredVisitorLocations()}
-              floors={floors}
-              offices={offices}
-              selectedFloor={selectedFloor}
-              selectedOffice={selectedOffice}
-              mapBlueprints={mapBlueprints}
-              officePositions={officePositions}
-              onFloorChange={(floorId) => {
-                setSelectedFloor(floorId);
-                setSelectedOffice('all');
-              }}
-              onVisitorHover={handleVisitorHover}
-              onVisitorLeave={handleVisitorLeave}
-              onVisitorSelect={handleVisitorSelect}
-              hoveredVisitor={hoveredVisitor}
-              renderHoverCard={renderHoverCard}
-              fullscreen
-              backgroundColor="#111827"
-              borderColor="#374151"
-              mapBackgroundColor="#111827"
-              textPrimary="#FFFFFF"
-              textSecondary="#CBD5E1"
-              summaryItems={[
-                { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
-                { label: "Approved", value: visitors.approved.length || 0, color: "#8EC5FF" },
-                { label: "Checked In", value: visitors.active.length || 0, color: "#FBBF24" },
-              ]}
-              statusLabel="Security monitoring"
-              showFloorNavigation={false}
-            />
-          </View>
-        </View>
-      </Modal>
+      {renderFullscreenMapModal()}
 
       {/* Register Visitor Modal */}
       <Modal
@@ -4798,7 +5119,8 @@ export default function SecurityDashboardScreen({ navigation }) {
                 </View>
 
                 <View style={styles.detailActions}>
-                  {hasApprovedVisitWindow(selectedVisitor) && selectedVisitor.status !== 'checked_out' && (
+                  {(selectedVisitor.status === 'checked_in' || isCheckInAllowedNow(selectedVisitor)) &&
+                  selectedVisitor.status !== 'checked_out' && (
                     <TouchableOpacity 
                       style={[
                         styles.detailActionButton,
@@ -5005,36 +5327,56 @@ const securityMobileStyles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: BRAND.danger,
   },
-  metricGrid: {
+  statusCard: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 12,
-  },
-  metricCard: {
-    width: "48.5%",
+    alignItems: "center",
+    gap: 12,
     borderRadius: 18,
-    padding: 14,
+    padding: 15,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    marginBottom: 12,
   },
-  metricIcon: {
-    width: 36,
-    height: 36,
+  statusCardIcon: {
+    width: 42,
+    height: 42,
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#ECFDF5",
   },
-  metricValue: {
-    marginTop: 10,
-    fontSize: 24,
+  statusCardCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statusCardTitle: {
+    fontSize: 15,
     fontWeight: "900",
     color: BRAND.ink,
   },
-  metricLabel: {
-    marginTop: 2,
-    fontSize: 11,
+  statusCardSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "700",
+    color: BRAND.muted,
+  },
+  statusCardCount: {
+    minWidth: 62,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    paddingVertical: 8,
+    backgroundColor: "#F8FBFE",
+  },
+  statusCardCountText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: BRAND.blue,
+  },
+  statusCardCountLabel: {
+    marginTop: 1,
+    fontSize: 10,
     fontWeight: "900",
     color: BRAND.muted,
     textTransform: "uppercase",
@@ -5069,6 +5411,48 @@ const securityMobileStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     color: "#FFFFFF",
+  },
+  simpleAlertCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 13,
+    borderRadius: 17,
+    backgroundColor: "#FFF7F7",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    marginBottom: 12,
+  },
+  simpleAlertCopy: {
+    flex: 1,
+  },
+  simpleAlertTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  simpleAlertText: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "700",
+    color: BRAND.muted,
+  },
+  viewAllButton: {
+    minHeight: 48,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#DCE5F1",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 2,
+  },
+  viewAllButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: BRAND.blue,
   },
   toolbar: {
     gap: 10,
@@ -5207,11 +5591,129 @@ const securityMobileStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  compactVisitorActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  releaseButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 13,
+    backgroundColor: BRAND.success,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  releaseButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  compactCheckInButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "#DCE5F1",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  compactCheckInButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: BRAND.blue,
+  },
+  compactBlockedStatus: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 13,
+    paddingHorizontal: 10,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  compactBlockedStatusText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+  compactDetailsButton: {
+    minWidth: 84,
+    minHeight: 42,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F8FBFE",
+  },
+  compactDetailsButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#475569",
+  },
   disabled: {
     opacity: 0.5,
   },
   feedList: {
     marginTop: 12,
+  },
+  mobileMapCard: {
+    marginTop: 12,
+    marginBottom: 14,
+  },
+  mobileMapContainer: {
+    borderRadius: 18,
+    padding: 12,
+  },
+  mobileMapWrapper: {
+    borderRadius: 16,
+    minHeight: 620,
+  },
+  mapActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+  mapActionButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F1",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  mapActionButtonPrimary: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: BRAND.blue,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  mapActionButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  mapActionButtonPrimaryText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   logCard: {
     flexDirection: "row",
@@ -5355,6 +5857,10 @@ const securityMobileStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     marginBottom: 10,
+  },
+  locationCardAlert: {
+    borderColor: "#FECACA",
+    backgroundColor: "#FFF7F7",
   },
   locationPin: {
     width: 42,

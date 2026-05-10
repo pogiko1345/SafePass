@@ -3474,10 +3474,39 @@ export default StyleSheet.create({
     fontSize: fontSize.xl,
     fontWeight: "700",
     color: colors.white,
+    flex: 1,
+    marginRight: spacing.md,
+  },
+
+  fullscreenMinimizeButton: {
+    minHeight: 42,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    backgroundColor: "rgba(255, 255, 255, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.28)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    ...webHover({
+      cursor: "pointer",
+      transition: "background-color 0.18s ease",
+      ":hover": {
+        backgroundColor: "rgba(255, 255, 255, 0.24)",
+      },
+    }),
+  },
+
+  fullscreenMinimizeButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.white,
   },
 
   fullscreenMapContainer: {
     flex: 1,
+    minHeight: 0,
   },
 
   // ============ NOTIFICATION MODAL ============

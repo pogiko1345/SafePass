@@ -83,6 +83,7 @@ const CampusMap = ({
   hoveredVisitor,
   renderHoverCard,
   fullscreen = false,
+  initialScale = 1,
   mapBlueprints = null,
   mapLabels = {},
   officePositions = {}, 
@@ -90,18 +91,22 @@ const CampusMap = ({
   showFloorNavigation = true,
 }) => {
   const defaultFloorId = floors[0]?.id || "ground";
-  const [mapScale, setMapScale] = useState(1);
+  const safeInitialScale = Math.max(0.5, Math.min(Number(initialScale) || 1, 3));
+  const [mapScale, setMapScale] = useState(safeInitialScale);
   const [mapPan, setMapPan] = useState({ x: 0, y: 0 });
   const [activeFloor, setActiveFloor] = useState(selectedFloor || defaultFloorId);
   const [imageError, setImageError] = useState(false);
   const [hoveredVisitorGroupKey, setHoveredVisitorGroupKey] = useState(null);
   
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(safeInitialScale)).current;
   const panAnim = useRef(new Animated.ValueXY()).current;
   const floorFadeAnim = useRef(new Animated.Value(1)).current;
   const routePulseAnim = useRef(new Animated.Value(0)).current;
-  const mapScaleRef = useRef(1);
+  const mapScaleRef = useRef(safeInitialScale);
   const mapPanRef = useRef({ x: 0, y: 0 });
+  const gestureStartPanRef = useRef({ x: 0, y: 0 });
+  const gestureStartScaleRef = useRef(safeInitialScale);
+  const gestureStartDistanceRef = useRef(null);
   const mapSizeRef = useRef({ width: 0, height: 500 });
   const hasMountedRef = useRef(false);
 
@@ -140,30 +145,68 @@ const CampusMap = ({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4,
-      onPanResponderGrant: () => {
-        panAnim.stopAnimation();
+      onMoveShouldSetPanResponder: (event, gestureState) => {
+        const touchCount = event.nativeEvent?.touches?.length || 0;
+        const movedEnough = Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4;
+        return touchCount >= 2 || (fullscreen && movedEnough) || (mapScaleRef.current > 1 && movedEnough);
       },
-      onPanResponderMove: (_, gestureState) => {
-        const nextPan = clampPan({
-          x: mapPanRef.current.x + gestureState.dx,
-          y: mapPanRef.current.y + gestureState.dy,
-        });
+      onPanResponderGrant: (event) => {
+        panAnim.stopAnimation();
+        scaleAnim.stopAnimation();
+        gestureStartPanRef.current = mapPanRef.current;
+        gestureStartScaleRef.current = mapScaleRef.current;
+        gestureStartDistanceRef.current = getTouchDistance(event.nativeEvent?.touches);
+      },
+      onPanResponderMove: (event, gestureState) => {
+        const touches = event.nativeEvent?.touches || [];
+        let nextScale = mapScaleRef.current;
+
+        if (touches.length >= 2) {
+          const nextDistance = getTouchDistance(touches);
+          if (nextDistance) {
+            if (!gestureStartDistanceRef.current) {
+              gestureStartDistanceRef.current = nextDistance;
+              gestureStartScaleRef.current = mapScaleRef.current;
+            }
+            nextScale = clampScale(
+              gestureStartScaleRef.current * (nextDistance / gestureStartDistanceRef.current),
+            );
+            scaleAnim.setValue(nextScale);
+          }
+        }
+
+        const nextPan = clampPan(
+          {
+            x: gestureStartPanRef.current.x + gestureState.dx,
+            y: gestureStartPanRef.current.y + gestureState.dy,
+          },
+          nextScale,
+        );
         panAnim.setValue(nextPan);
       },
       onPanResponderRelease: (_, gestureState) => {
+        const nextScale = clampScale(scaleAnim.__getValue?.() ?? mapScaleRef.current);
+        mapScaleRef.current = nextScale;
+        setMapScale(nextScale);
+        scaleAnim.setValue(nextScale);
         setPanPosition({
-          x: mapPanRef.current.x + gestureState.dx,
-          y: mapPanRef.current.y + gestureState.dy,
+          x: gestureStartPanRef.current.x + gestureState.dx,
+          y: gestureStartPanRef.current.y + gestureState.dy,
         });
+        gestureStartDistanceRef.current = null;
       },
       onPanResponderTerminate: (_, gestureState) => {
+        const nextScale = clampScale(scaleAnim.__getValue?.() ?? mapScaleRef.current);
+        mapScaleRef.current = nextScale;
+        setMapScale(nextScale);
+        scaleAnim.setValue(nextScale);
         setPanPosition({
-          x: mapPanRef.current.x + gestureState.dx,
-          y: mapPanRef.current.y + gestureState.dy,
+          x: gestureStartPanRef.current.x + gestureState.dx,
+          y: gestureStartPanRef.current.y + gestureState.dy,
         });
+        gestureStartDistanceRef.current = null;
       },
+      onShouldBlockNativeResponder: () => fullscreen,
     }),
   ).current;
 
@@ -214,11 +257,11 @@ const CampusMap = ({
   }, [defaultFloorId, selectedFloor]);
 
   const resetMapView = () => {
-    mapScaleRef.current = 1;
+    mapScaleRef.current = safeInitialScale;
     mapPanRef.current = { x: 0, y: 0 };
-    setMapScale(1);
+    setMapScale(safeInitialScale);
     setMapPan({ x: 0, y: 0 });
-    scaleAnim.setValue(1);
+    scaleAnim.setValue(safeInitialScale);
     panAnim.setValue({ x: 0, y: 0 });
   };
 
@@ -325,6 +368,16 @@ const CampusMap = ({
       top: `${y}%`,
       transform: [{ translateX: -9 }, { translateY: -9 }],
     };
+  };
+
+  const clampScale = (scale) => Math.max(0.5, Math.min(3, scale));
+
+  const getTouchDistance = (touches = []) => {
+    if (!touches || touches.length < 2) return null;
+    const [firstTouch, secondTouch] = touches;
+    const deltaX = firstTouch.pageX - secondTouch.pageX;
+    const deltaY = firstTouch.pageY - secondTouch.pageY;
+    return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
   };
 
   // Get visitor status color
@@ -504,7 +557,9 @@ const CampusMap = ({
     if (!labels.length) return null;
 
     return labels.map((label) => {
-      const fontSize = Math.min(Number(label.size) || 6, 7);
+      const labelText = String(label.text || "");
+      const lineCount = Math.max(1, label.numberOfLines || labelText.split("\n").length);
+      const fontSize = Math.min(Number(label.size) || 6, lineCount > 1 ? 6.5 : 7);
       const left =
         typeof label.x === "number" && typeof label.width === "number"
           ? `${label.x - label.width / 2}%`
@@ -524,6 +579,7 @@ const CampusMap = ({
               left,
               top,
               width,
+              minHeight: Math.max(10, lineCount * (fontSize + 1)),
             },
             label.emphasis && styles.mapTextLabelEmphasis,
             label.style,
@@ -536,11 +592,12 @@ const CampusMap = ({
               label.color ? { color: label.color } : null,
               label.textStyle,
             ]}
-            numberOfLines={label.numberOfLines || 1}
+            numberOfLines={lineCount}
             adjustsFontSizeToFit
             minimumFontScale={0.35}
+            allowFontScaling={false}
           >
-            {label.text}
+            {labelText}
           </Text>
         </View>
       );
@@ -786,13 +843,13 @@ const CampusMap = ({
   };
 
   const handleReset = () => {
-    mapScaleRef.current = 1;
+    mapScaleRef.current = safeInitialScale;
     mapPanRef.current = { x: 0, y: 0 };
-    setMapScale(1);
+    setMapScale(safeInitialScale);
     setMapPan({ x: 0, y: 0 });
     Animated.parallel([
       Animated.spring(scaleAnim, {
-        toValue: 1,
+        toValue: safeInitialScale,
         useNativeDriver: Platform.OS !== "web",
       }),
       Animated.spring(panAnim, {

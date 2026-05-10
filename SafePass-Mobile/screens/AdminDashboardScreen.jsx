@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Pressable,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Alert,
@@ -20,6 +19,7 @@ import {
   LayoutAnimation,
   UIManager,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import DateTimePicker from "@react-native-community/datetimepicker";

@@ -27,6 +27,7 @@ export default function SharedMonitoringMap({
   hoveredVisitor,
   renderHoverCard,
   fullscreen = false,
+  initialScale = 1,
   backgroundColor = "#FFFFFF",
   borderColor = "#E2E8F0",
   mapBackgroundColor = "#FFFFFF",
@@ -106,6 +107,7 @@ export default function SharedMonitoringMap({
           hoveredVisitor={hoveredVisitor}
           renderHoverCard={renderHoverCard}
           fullscreen={fullscreen}
+          initialScale={initialScale}
           showFloorNavigation={showFloorNavigation}
         />
       </View>
@@ -124,6 +126,7 @@ const styles = StyleSheet.create({
     padding: 0,
     borderWidth: 0,
     backgroundColor: "transparent",
+    flex: 1,
   },
   header: {
     flexDirection: "row",
@@ -199,6 +202,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   mapWrapperFullscreen: {
-    borderRadius: 20,
+    borderRadius: 0,
+    flex: 1,
+    minHeight: 0,
   },
 });

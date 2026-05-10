@@ -45,6 +45,7 @@ const API_BASE_URL_CANDIDATES = [
 
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
+const API_DEBUG_ENABLED = process.env.EXPO_PUBLIC_API_DEBUG === "true";
 const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const REMEMBERED_SESSION_DURATION_MS = TRUST_DEVICE_DURATION_MS;
 const HEALTH_CHECK_TIMEOUT_MS = 20000;
@@ -1956,9 +1957,11 @@ generateRandomPassword(length = 10) {
 
 ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, options = {}) {
   const token = await this.getToken();
-  console.log(
-    `[ApiService] FETCH ${url}, Method: ${options.method || "GET"}, Has Token: ${!!token}`
-  );
+  if (API_DEBUG_ENABLED) {
+    console.log(
+      `[ApiService] FETCH ${url}, Method: ${options.method || "GET"}, Has Token: ${!!token}`
+    );
+  }
 
   const headers = {
     "Content-Type": "application/json",
@@ -1980,7 +1983,9 @@ ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, option
 
   for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
     try {
-      console.log(`[ApiService] Sending request to: ${baseUrl}${url}`);
+      if (API_DEBUG_ENABLED) {
+        console.log(`[ApiService] Sending request to: ${baseUrl}${url}`);
+      }
       const response = await fetch(`${baseUrl}${url}`, config);
       const contentType = response.headers.get("content-type");
       let data;

@@ -11,12 +11,12 @@ import {
   Platform,
   StatusBar,
   Modal,
-  SafeAreaView,
   Animated,
   Image,
   Linking,
   useWindowDimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import loginStyles from "../styles/LoginStyles";
 import { brandColors } from "../styles/brandColors";
 import { Ionicons } from "@expo/vector-icons";
