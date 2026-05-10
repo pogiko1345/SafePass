@@ -77,6 +77,77 @@ export default function VerificationScreen({ navigation, route }) {
   const [phoneError, setPhoneError] = useState("");
   const [otpError, setOtpError] = useState("");
 
+  const userRole = normalizeRole(userData?.role) || "visitor";
+
+  const getVerificationConfig = (role) => {
+    switch (normalizeRole(role)) {
+      case "student":
+      case "teacher":
+        return {
+          badge: "Campus ID Verification",
+          title: "Verify Campus Account",
+          subtitle: "Confirm your identity before opening your student campus dashboard and virtual NFC ID.",
+          roleLabel: role === "teacher" ? "Teacher" : "Student",
+          icon: "id-card-outline",
+          setupTitle: "Confirm your mobile number",
+          setupSubtitle: "We will send a one-time code before opening your attendance and campus access tools.",
+          message: "A quick verification protects your virtual campus ID and attendance records.",
+          securityNote: "Your campus ID access is encrypted and verified securely.",
+        };
+      case "staff":
+        return {
+          badge: "Staff Account Verification",
+          title: "Verify Staff Account",
+          subtitle: "Confirm your identity before opening staff attendance, office presence, and NFC access.",
+          roleLabel: "Staff",
+          icon: "briefcase-outline",
+          setupTitle: "Confirm your mobile number",
+          setupSubtitle: "We will send a one-time code before opening your staff dashboard.",
+          message: "A quick verification protects staff attendance and office access records.",
+          securityNote: "Your staff access is encrypted and verified securely.",
+        };
+      case "security":
+      case "guard":
+        return {
+          badge: "Security Account Verification",
+          title: "Verify Security Account",
+          subtitle: "Confirm your identity before opening checkpoint monitoring and access validation.",
+          roleLabel: "Security",
+          icon: "shield-checkmark-outline",
+          setupTitle: "Confirm your mobile number",
+          setupSubtitle: "We will send a one-time code before opening security operations.",
+          message: "A quick verification protects campus monitoring and checkpoint controls.",
+          securityNote: "Your security access is encrypted and verified securely.",
+        };
+      case "admin":
+        return {
+          badge: "Admin Account Verification",
+          title: "Verify Admin Account",
+          subtitle: "Confirm your identity before opening admin controls, reports, and account management.",
+          roleLabel: "Admin",
+          icon: "settings-outline",
+          setupTitle: "Confirm your mobile number",
+          setupSubtitle: "We will send a one-time code before opening the admin dashboard.",
+          message: "A quick verification protects administrative controls and campus records.",
+          securityNote: "Your admin access is encrypted and verified securely.",
+        };
+      default:
+        return {
+          badge: "Campus Account Verification",
+          title: "Verify Campus Account",
+          subtitle: "Confirm your identity before opening the correct SafePass campus dashboard.",
+          roleLabel: "Visitor",
+          icon: "person-outline",
+          setupTitle: "Confirm your mobile number",
+          setupSubtitle: "We will send a one-time code before opening your SafePass access.",
+          message: "A quick verification protects your SafePass account and campus access.",
+          securityNote: "Your SafePass access is encrypted and verified securely.",
+        };
+    }
+  };
+
+  const verificationConfig = getVerificationConfig(userRole);
+
   // Animations on mount
   useEffect(() => {
     Animated.parallel([
@@ -290,11 +361,12 @@ export default function VerificationScreen({ navigation, route }) {
       await ApiService.rememberCurrentSession();
       
       // Treat remember-me as a trusted device so future logins can follow the faster path.
+      if (email) {
+        await Storage.removeItem("rememberedEmail");
+      }
       if (rememberMe && email) {
-        await storeData("rememberedEmail", email);
         await ApiService.trustDevice();
       } else if (email) {
-        await Storage.removeItem("rememberedEmail");
         await ApiService.clearTrustedDevice();
       }
       
@@ -354,8 +426,6 @@ export default function VerificationScreen({ navigation, route }) {
         style={verificationStyles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={verificationStyles.backgroundOrbTop} />
-        <View style={verificationStyles.backgroundOrbBottom} />
         <ScrollView
           style={verificationStyles.scrollView}
           contentContainerStyle={verificationStyles.scrollContent}
@@ -393,8 +463,6 @@ export default function VerificationScreen({ navigation, route }) {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <View style={verificationStyles.heroGlowOne} />
-                <View style={verificationStyles.heroGlowTwo} />
                 <TouchableOpacity
                   style={verificationStyles.backButton}
                   onPress={handleBack}
@@ -405,7 +473,7 @@ export default function VerificationScreen({ navigation, route }) {
 
                 <View style={verificationStyles.heroBadge}>
                   <Ionicons name="shield-checkmark-outline" size={14} color="#EEF5FF" />
-                  <Text style={verificationStyles.heroBadgeText}>Two-Step Verification</Text>
+                  <Text style={verificationStyles.heroBadgeText}>{verificationConfig.badge}</Text>
                 </View>
 
                 <View
@@ -433,7 +501,7 @@ export default function VerificationScreen({ navigation, route }) {
                       isPhoneWidth && { fontSize: 24, lineHeight: 30 },
                     ]}
                   >
-                    Verify Your Identity
+                    {verificationConfig.title}
                   </Text>
                   <Text
                     style={[
@@ -442,7 +510,7 @@ export default function VerificationScreen({ navigation, route }) {
                       isDesktopLayout && { textAlign: "left", paddingHorizontal: 0 },
                     ]}
                   >
-                    Secure access to your SafePass account with a one-time verification code.
+                    {verificationConfig.subtitle}
                   </Text>
                   <View
                     style={[
@@ -481,7 +549,7 @@ export default function VerificationScreen({ navigation, route }) {
                       <Ionicons name="phone-portrait-outline" size={14} color="#FFFFFF" />
                     </View>
                     <Text style={[verificationStyles.progressLabel, verificationStyles.progressLabelActive]}>
-                      Setup
+                      Phone
                     </Text>
                   </View>
                   <View style={[verificationStyles.progressLine, otpSent && verificationStyles.progressLineActive]} />
@@ -490,7 +558,7 @@ export default function VerificationScreen({ navigation, route }) {
                       <Ionicons name="key-outline" size={14} color={otpSent ? "#FFFFFF" : "#94A3B8"} />
                     </View>
                     <Text style={[verificationStyles.progressLabel, otpSent && verificationStyles.progressLabelActive]}>
-                      Confirm
+                      Code
                     </Text>
                   </View>
                   <View style={[verificationStyles.progressLine, otpVerified && verificationStyles.progressLineActive]} />
@@ -525,9 +593,18 @@ export default function VerificationScreen({ navigation, route }) {
                       isCompactWidth && { width: "100%" },
                     ]}
                   >
+                    <Text style={verificationStyles.panelMetaLabel}>Role</Text>
+                    <Text style={verificationStyles.panelMetaValue}>{verificationConfig.roleLabel}</Text>
+                  </View>
+                  <View
+                    style={[
+                      verificationStyles.panelMetaCard,
+                      isCompactWidth && { width: "100%" },
+                    ]}
+                  >
                     <Text style={verificationStyles.panelMetaLabel}>Method</Text>
                     <Text style={verificationStyles.panelMetaValue}>
-                      {otpSent ? "Text Message" : "Phone Setup"}
+                      {otpSent ? "Text Message" : "Phone Verification"}
                     </Text>
                   </View>
                 </View>
@@ -540,13 +617,13 @@ export default function VerificationScreen({ navigation, route }) {
                           colors={['#EEF5FF', '#D8E8FF']}
                           style={verificationStyles.avatarGradient}
                         >
-                          <Ionicons name="person" size={28} color="#0A3D91" />
+                          <Ionicons name={verificationConfig.icon} size={28} color="#0A3D91" />
                         </LinearGradient>
                       </View>
                       <View style={verificationStyles.userInfoCopy}>
                         <Text style={verificationStyles.userEmail}>{email || "User"}</Text>
                         <Text style={verificationStyles.userMessage}>
-                          We need a quick verification before opening your dashboard.
+                          {verificationConfig.message}
                         </Text>
                       </View>
                     </View>
@@ -554,9 +631,9 @@ export default function VerificationScreen({ navigation, route }) {
                     {showPhoneInput ? (
                       <View style={verificationStyles.card}>
                         <View style={verificationStyles.panelHeader}>
-                          <Text style={verificationStyles.sectionTitle}>Verify with Phone</Text>
+                          <Text style={verificationStyles.sectionTitle}>{verificationConfig.setupTitle}</Text>
                           <Text style={verificationStyles.sectionSubtitle}>
-                            Enter your mobile number and we will send your one-time access code by text.
+                            {verificationConfig.setupSubtitle}
                           </Text>
                         </View>
 
@@ -588,7 +665,7 @@ export default function VerificationScreen({ navigation, route }) {
                             <Text style={verificationStyles.errorText}>{phoneError}</Text>
                           ) : (
                             <Text style={verificationStyles.helperText}>
-                              Enter your 10-digit mobile number to receive a secure OTP code.
+                              Enter your 10-digit mobile number to receive a secure verification code.
                             </Text>
                           )}
                         </View>
@@ -623,7 +700,7 @@ export default function VerificationScreen({ navigation, route }) {
                           </LinearGradient>
                           <Text style={verificationStyles.otpTitle}>Enter Verification Code</Text>
                           <Text style={verificationStyles.otpSubtitle}>
-                            We sent a 6-digit code to
+                            We sent a 6-digit verification code to
                           </Text>
                           <Text style={verificationStyles.phoneNumberDisplay}>
                             {formatPhoneDisplay(phoneNumber)}
@@ -723,7 +800,7 @@ export default function VerificationScreen({ navigation, route }) {
                 <View style={verificationStyles.securityNote}>
                   <Ionicons name="shield-checkmark-outline" size={14} color="#64748B" />
                   <Text style={verificationStyles.securityNoteText}>
-                    Your information is encrypted and verified securely.
+                    {verificationConfig.securityNote}
                   </Text>
                 </View>
               </Animated.View>

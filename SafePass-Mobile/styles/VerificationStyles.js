@@ -31,26 +31,6 @@ export default StyleSheet.create({
     flex: 1,
   },
 
-  backgroundOrbTop: {
-    position: "absolute",
-    top: -120,
-    right: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: "rgba(79,70,229,0.12)",
-  },
-
-  backgroundOrbBottom: {
-    position: "absolute",
-    bottom: -110,
-    left: -70,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "rgba(59,130,246,0.10)",
-  },
-
   pageShell: {
     flex: 1,
     width: "100%",
@@ -141,26 +121,6 @@ export default StyleSheet.create({
     alignItems: "center",
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.28)",
-  },
-
-  heroGlowOne: {
-    position: "absolute",
-    top: -26,
-    right: -14,
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    backgroundColor: "rgba(255,255,255,0.09)",
-  },
-
-  heroGlowTwo: {
-    position: "absolute",
-    bottom: -52,
-    left: -28,
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    backgroundColor: "rgba(56,189,248,0.12)",
   },
 
   logoImage: {

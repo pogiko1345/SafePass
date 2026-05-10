@@ -477,6 +477,8 @@ export default function VisitorRegisterScreen({ navigation }) {
   const formAnim = useRef(new Animated.Value(0)).current;
   const iconFloatAnim = useRef(new Animated.Value(0)).current;
   const progressFloatAnim = useRef(new Animated.Value(0)).current;
+  const topBackPressAnim = useRef(new Animated.Value(1)).current;
+  const topBackHoverAnim = useRef(new Animated.Value(0)).current;
   const secondaryPressAnim = useRef(new Animated.Value(1)).current;
   const continuePressAnim = useRef(new Animated.Value(1)).current;
   const secondaryHoverAnim = useRef(new Animated.Value(0)).current;
@@ -494,6 +496,18 @@ export default function VisitorRegisterScreen({ navigation }) {
           },
         },
       ],
+    });
+  };
+
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "RoleSelect" }],
     });
   };
 
@@ -1233,6 +1247,23 @@ export default function VisitorRegisterScreen({ navigation }) {
       },
     ],
   });
+  const topBackMotionStyle = {
+    transform: [
+      {
+        translateX: topBackHoverAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -3],
+        }),
+      },
+      {
+        translateY: topBackHoverAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -2],
+        }),
+      },
+      { scale: topBackPressAnim },
+    ],
+  };
 
   return (
     <SafeAreaView style={visitorRegisterStyles.safeArea}>
@@ -1257,13 +1288,21 @@ export default function VisitorRegisterScreen({ navigation }) {
               style={[visitorRegisterStyles.header, headerResponsiveStyle]}
             >
             <View style={[visitorRegisterStyles.headerButtons, headerButtonsResponsiveStyle]}>
-              <TouchableOpacity
-                style={visitorRegisterStyles.backButton}
-                onPress={() => goToVisitorLogin()}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-              </TouchableOpacity>
+              <Animated.View style={topBackMotionStyle}>
+                <TouchableOpacity
+                  style={visitorRegisterStyles.backButton}
+                  onPress={handleBack}
+                  onPressIn={() => animatePress(topBackPressAnim, 0.94)}
+                  onPressOut={() => animatePress(topBackPressAnim, 1)}
+                  activeOpacity={0.7}
+                  {...(Platform.OS === "web" && {
+                    onMouseEnter: () => animateHover(topBackHoverAnim, 1),
+                    onMouseLeave: () => animateHover(topBackHoverAnim, 0),
+                  })}
+                >
+                  <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+              </Animated.View>
             </View>
             <View style={[visitorRegisterStyles.headerContent, headerContentResponsiveStyle]}>
               <View style={visitorRegisterStyles.headerBadge}>
@@ -1567,7 +1606,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                 >
                   <TouchableOpacity
                     style={visitorRegisterStyles.secondaryActionButton}
-                    onPress={() => goToVisitorLogin()}
+                    onPress={handleBack}
                     onPressIn={() => animatePress(secondaryPressAnim, 0.98)}
                     onPressOut={() => animatePress(secondaryPressAnim, 1)}
                     activeOpacity={0.8}
@@ -1578,7 +1617,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                   >
                     <Ionicons name="arrow-back" size={18} color="#475569" />
                     <Text style={visitorRegisterStyles.secondaryActionText}>
-                      Back to Login
+                      Back
                     </Text>
                   </TouchableOpacity>
                 </Animated.View>

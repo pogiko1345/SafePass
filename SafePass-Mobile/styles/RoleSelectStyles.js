@@ -1,549 +1,875 @@
-import { StyleSheet, Platform, Dimensions } from "react-native";
+import { Dimensions, Platform, StyleSheet } from "react-native";
 import { brandColors } from "./brandColors";
 
 const { width } = Dimensions.get("window");
+const isSmallPhone = width <= 380;
 const isWeb = Platform.OS === "web";
-
-const isSmallPhone = width <= 375;
-const isTablet = width >= 768 && width < 1024;
-const shadowColor = brandColors.text;
-
-const fontSizes = {
-  xs: isSmallPhone ? 11 : 12,
-  sm: isSmallPhone ? 13 : 14,
-  base: isSmallPhone ? 15 : 16,
-  lg: isSmallPhone ? 18 : 20,
-  xl: isSmallPhone ? 22 : 24,
-  xxl: isSmallPhone ? 28 : 32,
-};
-
-const spacing = {
-  xs: isSmallPhone ? 6 : 8,
-  sm: isSmallPhone ? 12 : 16,
-  base: isSmallPhone ? 16 : 20,
-  md: isSmallPhone ? 18 : 22,
-  lg: isSmallPhone ? 20 : 24,
-  xl: isSmallPhone ? 24 : 32,
-  xxl: isSmallPhone ? 32 : 40,
-};
+const shadowColor = "#020617";
 
 export default StyleSheet.create({
+  mobileSafeArea: {
+    flex: 1,
+    backgroundColor: brandColors.navy,
+  },
+
+  mobilePage: {
+    flex: 1,
+    backgroundColor: brandColors.background,
+  },
+
+  mobileScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
+  },
+
+  mobileHero: {
+    backgroundColor: brandColors.navy,
+    paddingHorizontal: 20,
+    paddingTop: Platform.select({
+      ios: 58,
+      android: 34,
+      web: 28,
+      default: 34,
+    }),
+    paddingBottom: 26,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
+  },
+
+  mobileBrandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 24,
+  },
+
+  mobileLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.32)",
+  },
+
+  mobileBrandCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  mobileSchoolName: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "900",
+  },
+
+  mobilePlatform: {
+    color: "#D8E8FF",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+
+  mobileHeroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderWidth: 1,
+    borderColor: "rgba(216,232,255,0.28)",
+    backgroundColor: "rgba(238,245,255,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    marginBottom: 14,
+  },
+
+  mobileHeroBadgeText: {
+    color: "#D8E8FF",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  mobileTitle: {
+    color: "#FFFFFF",
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+
+  mobileSubtitle: {
+    color: "#D7E4F7",
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "600",
+    marginTop: 10,
+  },
+
+  mobileActionStack: {
+    marginTop: 20,
+    gap: 10,
+  },
+
+  mobilePrimaryButton: {
+    minHeight: 50,
+    borderRadius: 8,
+    backgroundColor: brandColors.blue,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+
+  mobilePrimaryText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  mobileSecondaryButton: {
+    minHeight: 50,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: brandColors.blueBorder,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+
+  mobileSecondaryText: {
+    color: brandColors.blue,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  mobileSection: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+  },
+
+  mobileVisitorCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: brandColors.border,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    marginBottom: 18,
+  },
+
+  mobileVisitorIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: brandColors.blueSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mobileVisitorCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  mobileVisitorTitle: {
+    color: brandColors.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  mobileVisitorText: {
+    color: brandColors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+
+  mobileVisitorButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: brandColors.blue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mobileSectionKicker: {
+    color: brandColors.blue,
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+
+  mobileSectionTitle: {
+    color: brandColors.text,
+    fontSize: 18,
+    fontWeight: "900",
+    marginBottom: 12,
+  },
+
+  mobileFeatureList: {
+    gap: 9,
+  },
+
+  mobileFeatureItem: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: brandColors.border,
+    padding: 13,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  mobileFeatureIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: brandColors.blueSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mobileFeatureCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  mobileFeatureTitle: {
+    color: brandColors.text,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  mobileFeatureText: {
+    color: brandColors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+
+  mobileFooter: {
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 18,
+  },
+
+  mobileVersionText: {
+    color: brandColors.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 10,
+  },
+
   safeArea: {
+    flex: 1,
+    backgroundColor: brandColors.background,
+  },
+
+  page: {
     flex: 1,
     backgroundColor: brandColors.background,
   },
 
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: spacing.lg,
+    paddingBottom: 28,
   },
 
-  heroWrapper: {
-    width: "100%",
-  },
-
-  hero: {
-    paddingTop: Platform.select({
-      ios: 52,
-      android: 44,
-      web: 46,
-    }),
-    paddingBottom: 62,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    ...Platform.select({
-      ios: {
-        shadowColor: brandColors.navy,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.22,
-        shadowRadius: 20,
-      },
-      android: { elevation: 8 },
-      web: { boxShadow: "0px 14px 34px rgba(4, 30, 66, 0.24)" },
-    }),
-  },
-
-  heroGlowOne: {
-    position: "absolute",
-    top: -26,
-    right: -14,
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    display: "none",
-  },
-
-  heroGlowTwo: {
-    position: "absolute",
-    bottom: -52,
-    left: -28,
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    display: "none",
-  },
-
-  heroContent: {
-    alignItems: "center",
-    width: "100%",
-    maxWidth: 760,
-    paddingHorizontal: spacing.base,
-    zIndex: 1,
-  },
-
-  brandBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "center",
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    borderRadius: 999,
-    paddingVertical: 7,
-    paddingHorizontal: 11,
-    marginBottom: 14,
-    ...Platform.select({
-      web: { backdropFilter: "blur(10px)" },
-    }),
-  },
-
-  brandBadgeLogo: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginRight: 8,
-    backgroundColor: brandColors.surface,
-  },
-
-  brandBadgeTextWrap: {
-    justifyContent: "center",
-  },
-
-  brandBadgeEyebrow: {
-    fontSize: fontSizes.xs,
-    color: "rgba(255,255,255,0.78)",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    fontWeight: "700",
-  },
-
-  brandBadgeTitle: {
-    fontSize: 13,
-    color: brandColors.surface,
-    fontWeight: "700",
-  },
-
-  logoContainer: {
-    marginBottom: 12,
-  },
-
-  logoImage: {
-    width: isSmallPhone ? 78 : 92,
-    height: isSmallPhone ? 78 : 92,
-    borderRadius: isSmallPhone ? 39 : 46,
-    borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.28)",
-    backgroundColor: brandColors.surface,
-  },
-
-  heroTitle: {
-    fontSize: isSmallPhone ? 18 : isTablet ? 24 : 22,
-    fontWeight: "800",
-    color: brandColors.surface,
-    textAlign: "center",
-    lineHeight: isSmallPhone ? 24 : 28,
-    letterSpacing: 0,
-    marginBottom: 8,
-    maxWidth: 520,
-  },
-
-  heroSubtitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.94)",
-    textAlign: "center",
-    marginTop: 0,
-    marginBottom: 14,
-    lineHeight: 19,
-    maxWidth: 380,
-  },
-
-  heroDescription: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.86)",
-    fontWeight: "500",
-    textAlign: "center",
-    lineHeight: 19,
-    maxWidth: 380,
-    marginBottom: 14,
-  },
-
-  flightAccent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-
-  flightAccentLine: {
-    width: 34,
-    height: 1.5,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.34)",
-  },
-
-  flightAccentDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: "rgba(255,255,255,0.78)",
-  },
-
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.base,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-    maxWidth: 1040,
-    alignSelf: "center",
-    width: "100%",
-  },
-
-  sectionTitle: {
-    fontSize: fontSizes.xl,
-    fontWeight: "800",
-    color: brandColors.text,
-    textAlign: "center",
-    marginBottom: spacing.xs,
-    letterSpacing: -0.4,
-  },
-
-  sectionSubtitle: {
-    fontSize: fontSizes.base,
-    color: brandColors.textMuted,
-    textAlign: "center",
-    marginBottom: spacing.xl,
-    lineHeight: 24,
-    maxWidth: 620,
-    alignSelf: "center",
-  },
-
-  cardsContainer: {
-    flexDirection: "column",
-    gap: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-
-  cardsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: spacing.lg,
-  },
-
-  cardWrapper: {
-    flex: 1,
-    minWidth: 280,
-  },
-
-  cardWrapperRow: {
-    flex: 1,
-    maxWidth: isTablet ? 350 : 400,
-  },
-
-  card: {
-    borderRadius: 8,
-    overflow: "hidden",
-    height: "100%",
-    ...Platform.select({
-      ios: {
-        shadowColor,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 18,
-      },
-      android: { elevation: 4 },
-      web: {
-        boxShadow: "0px 10px 28px rgba(15, 23, 42, 0.08)",
-        cursor: "pointer",
-        transition: "transform 0.25s ease, box-shadow 0.25s ease",
-      },
-    }),
-  },
-
-  cardGradient: {
-    padding: spacing.lg,
-    backgroundColor: brandColors.surface,
-    minHeight: isSmallPhone ? 290 : 330,
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: brandColors.border,
-  },
-
-  cardIconWrapper: {
-    marginBottom: spacing.md,
-    alignItems: "center",
-  },
-
-  cardIconGradient: {
-    width: isSmallPhone ? 58 : 68,
-    height: isSmallPhone ? 58 : 68,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  cardContent: {
-    flex: 1,
-    marginBottom: spacing.md,
-  },
-
-  cardTitle: {
-    fontSize: fontSizes.lg,
-    fontWeight: "800",
-    color: brandColors.text,
-    marginBottom: 8,
-    textAlign: "center",
-    letterSpacing: -0.2,
-  },
-
-  cardDescription: {
-    fontSize: fontSizes.sm,
-    color: brandColors.textMuted,
-    marginBottom: spacing.md,
-    lineHeight: 21,
-    textAlign: "center",
-  },
-
-  cardFeatures: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-  },
-
-  featurePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: brandColors.surfaceSoft,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: 999,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: brandColors.border,
-  },
-
-  featurePillText: {
-    fontSize: fontSizes.xs,
-    color: brandColors.textMuted,
-    fontWeight: "600",
-  },
-
-  cardArrow: {
-    alignSelf: "center",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: brandColors.blueSoft,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: spacing.xs,
-  },
-
-  infoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-
-  infoCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: brandColors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 999,
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: brandColors.border,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-      },
-      android: { elevation: 1 },
-      web: { boxShadow: "0px 2px 6px rgba(0,0,0,0.04)" },
-    }),
-  },
-
-  infoCardText: {
-    fontSize: fontSizes.xs,
-    color: brandColors.textMuted,
-    fontWeight: "600",
-  },
-
-  helpLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-    gap: spacing.xs,
-    ...(isWeb && {
-      cursor: "pointer",
-      transition: "opacity 0.2s ease",
-    }),
-  },
-
-  helpText: {
-    fontSize: fontSizes.sm,
-    color: brandColors.textMuted,
-    fontWeight: "600",
-  },
-
-  contactCard: {
-    marginTop: spacing.md,
-    backgroundColor: brandColors.surface,
-    borderRadius: 8,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: brandColors.border,
-    width: "100%",
-    maxWidth: 760,
-    alignSelf: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.05,
-        shadowRadius: 18,
-      },
-      android: { elevation: 2 },
-      web: { boxShadow: "0px 10px 26px rgba(15, 23, 42, 0.06)" },
-    }),
-  },
-
-  contactHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: spacing.sm,
-  },
-
-  contactHeaderIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: brandColors.blueSoft,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-
-  contactHeaderText: {
-    flex: 1,
-  },
-
-  contactTitle: {
-    fontSize: fontSizes.base,
-    color: brandColors.text,
-    fontWeight: "800",
-  },
-
-  contactSubtitle: {
-    fontSize: fontSizes.sm,
-    color: brandColors.textMuted,
-    marginTop: 3,
-    fontWeight: "500",
-  },
-
-  contactList: {
-    gap: 8,
-    marginBottom: spacing.sm,
-  },
-
-  contactRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    paddingVertical: 8,
+  navShell: {
+    backgroundColor: brandColors.navy,
     borderBottomWidth: 1,
-    borderBottomColor: brandColors.border,
+    borderBottomColor: "rgba(255,255,255,0.08)",
   },
 
-  contactLabel: {
-    fontSize: fontSizes.sm,
-    color: brandColors.textMuted,
-    fontWeight: "600",
-    minWidth: isSmallPhone ? 78 : 92,
-  },
-
-  contactValue: {
-    flex: 1,
-    fontSize: fontSizes.sm,
-    color: brandColors.text,
-    fontWeight: "700",
-    textAlign: "right",
-  },
-
-  contactLinkRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-    justifyContent: "flex-start",
-  },
-
-  contactLinkChip: {
+  navBar: {
+    width: "100%",
+    maxWidth: 1240,
+    alignSelf: "center",
+    minHeight: 72,
+    paddingHorizontal: isSmallPhone ? 16 : 28,
+    paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 999,
-    backgroundColor: brandColors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: brandColors.border,
+    justifyContent: "space-between",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+
+  navBarPhone: {
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    paddingTop: 18,
+    paddingBottom: 16,
+    gap: 12,
+  },
+
+  navBrand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexShrink: 1,
+    maxWidth: isSmallPhone ? "100%" : 520,
+  },
+
+  navBrandHidden: {
+    display: "none",
+  },
+
+  navLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+  },
+
+  navBrandTitle: {
+    color: "#FFFFFF",
+    fontSize: isSmallPhone ? 13 : 15,
+    fontWeight: "900",
+    lineHeight: isSmallPhone ? 17 : 20,
+  },
+
+  navBrandSubtitle: {
+    color: "#96A6C2",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+
+  navActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginLeft: "auto",
+  },
+
+  navActionsPhone: {
+    width: "100%",
+    marginLeft: 0,
+    justifyContent: "center",
+    gap: 14,
+  },
+
+  navLink: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    justifyContent: "center",
     ...(isWeb && { cursor: "pointer" }),
   },
 
-  contactLinkText: {
-    fontSize: fontSizes.xs,
-    color: brandColors.blue,
-    fontWeight: "700",
+  navLinkText: {
+    color: "#D7E4F7",
+    fontSize: 13,
+    fontWeight: "800",
   },
 
-  contactCopyright: {
-    marginTop: spacing.sm,
-    fontSize: fontSizes.xs,
-    color: brandColors.textMuted,
-    fontWeight: "600",
+  navLoginButton: {
+    backgroundColor: brandColors.blue,
+    borderRadius: 8,
+    minHeight: 44,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    justifyContent: "center",
+    ...(isWeb && { cursor: "pointer" }),
+  },
+
+  navLoginText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  heroSection: {
+    width: "100%",
+    maxWidth: "100%",
+    alignSelf: "stretch",
+    paddingHorizontal: isSmallPhone ? 18 : 32,
+    paddingTop: isSmallPhone ? 44 : 70,
+    paddingBottom: 34,
+    backgroundColor: brandColors.navy,
+  },
+
+  heroSectionPhone: {
+    paddingHorizontal: 16,
+    paddingTop: 28,
+    paddingBottom: 26,
+  },
+
+  heroGrid: {
+    minHeight: 520,
+    width: "100%",
+    maxWidth: 1240,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 42,
+  },
+
+  heroGridStacked: {
+    minHeight: 0,
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 24,
+  },
+
+  heroCopy: {
+    flex: 1,
+    maxWidth: 690,
+  },
+
+  heroCopyCentered: {
+    width: "100%",
+    maxWidth: 760,
+    alignItems: "center",
+  },
+
+  heroEyebrow: {
+    color: "#D8E8FF",
+    fontSize: 13,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: isSmallPhone ? 12 : 18,
     textAlign: "left",
   },
 
-  versionText: {
-    textAlign: "center",
-    fontSize: fontSizes.xs,
-    color: brandColors.textMuted,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
+  heroTitle: {
+    color: "#FFFFFF",
+    fontSize: isSmallPhone ? 28 : 58,
+    lineHeight: isSmallPhone ? 34 : 66,
+    fontWeight: "900",
+    letterSpacing: 0,
+    maxWidth: 780,
+    textAlign: "left",
   },
 
-  ...(isWeb && {
-    content: {
-      maxWidth: 1040,
-      marginHorizontal: "auto",
-      width: "100%",
-    },
-  }),
+  heroDescription: {
+    color: "#D7E4F7",
+    fontSize: isSmallPhone ? 15 : 18,
+    lineHeight: isSmallPhone ? 23 : 28,
+    fontWeight: "600",
+    maxWidth: 620,
+    marginTop: isSmallPhone ? 16 : 24,
+    textAlign: "left",
+  },
+
+  heroTextCentered: {
+    textAlign: "center",
+  },
+
+  heroActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 14,
+    marginTop: isSmallPhone ? 24 : 34,
+  },
+
+  heroActionsCentered: {
+    justifyContent: "center",
+  },
+
+  heroActionsPhone: {
+    width: "100%",
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
+
+  heroButtonPhone: {
+    width: "100%",
+  },
+
+  primaryButton: {
+    minHeight: 52,
+    borderRadius: 8,
+    backgroundColor: brandColors.blue,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 24,
+    ...(isWeb && {
+      cursor: "pointer",
+      transition: "background-color 0.2s ease, transform 0.2s ease",
+    }),
+  },
+
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  secondaryButton: {
+    minHeight: 52,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: brandColors.blueBorder,
+    backgroundColor: "rgba(238,245,255,0.14)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 22,
+    ...(isWeb && {
+      cursor: "pointer",
+      transition: "border-color 0.2s ease, transform 0.2s ease",
+    }),
+  },
+
+  secondaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  visitorLink: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+    minHeight: 42,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(216,232,255,0.34)",
+    backgroundColor: "rgba(238,245,255,0.1)",
+    ...(isWeb && {
+      cursor: "pointer",
+      transition: "border-color 0.2s ease, background-color 0.2s ease",
+    }),
+  },
+
+  visitorLinkCentered: {
+    alignSelf: "center",
+    justifyContent: "center",
+  },
+
+  visitorLinkText: {
+    color: "#D8E8FF",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  heroVisual: {
+    width: "100%",
+    maxWidth: 390,
+    alignItems: "center",
+  },
+
+  heroVisualCentered: {
+    alignSelf: "center",
+  },
+
+  heroVisualPhone: {
+    maxWidth: "100%",
+  },
+
+  schoolCard: {
+    width: "100%",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(216,232,255,0.38)",
+    backgroundColor: "rgba(238,245,255,0.13)",
+    padding: isSmallPhone ? 18 : 28,
+    ...Platform.select({
+      ios: {
+        shadowColor,
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.22,
+        shadowRadius: 28,
+      },
+      android: { elevation: 8 },
+      web: {
+        boxShadow: "0px 24px 70px rgba(0,0,0,0.35)",
+        backdropFilter: "blur(12px)",
+      },
+    }),
+  },
+
+  schoolLogo: {
+    width: isSmallPhone ? 82 : 104,
+    height: isSmallPhone ? 82 : 104,
+    borderRadius: isSmallPhone ? 41 : 52,
+    backgroundColor: "#FFFFFF",
+    marginBottom: isSmallPhone ? 18 : 26,
+  },
+
+  schoolCardLabel: {
+    color: "#D8E8FF",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+
+  schoolCardTitle: {
+    color: "#FFFFFF",
+    fontSize: isSmallPhone ? 22 : 28,
+    lineHeight: isSmallPhone ? 28 : 34,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+
+  schoolCardDivider: {
+    height: 1,
+    backgroundColor: "rgba(216,232,255,0.24)",
+    marginVertical: 22,
+  },
+
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: brandColors.success,
+  },
+
+  statusText: {
+    flex: 1,
+    color: "#EEF5FF",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
+  },
+
+  metricDock: {
+    marginTop: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(216,232,255,0.26)",
+    backgroundColor: "rgba(238,245,255,0.12)",
+    padding: 10,
+    flexDirection: "row",
+    alignSelf: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+
+  metricDockCompact: {
+    width: "100%",
+    maxWidth: 390,
+    justifyContent: "center",
+  },
+
+  metricItem: {
+    minWidth: 124,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(216,232,255,0.14)",
+    alignItems: "center",
+  },
+
+  metricValue: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  metricLabel: {
+    color: "#96A6C2",
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+
+  platformSection: {
+    backgroundColor: brandColors.background,
+    paddingHorizontal: isSmallPhone ? 18 : 32,
+    paddingTop: isSmallPhone ? 34 : 50,
+    paddingBottom: isSmallPhone ? 34 : 48,
+    alignItems: "center",
+  },
+
+  sectionKicker: {
+    color: brandColors.blue,
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+
+  sectionTitle: {
+    color: brandColors.text,
+    fontSize: isSmallPhone ? 26 : 34,
+    lineHeight: isSmallPhone ? 32 : 40,
+    fontWeight: "900",
+    textAlign: "center",
+    letterSpacing: 0,
+  },
+
+  sectionSubtitle: {
+    color: brandColors.textMuted,
+    fontSize: 15,
+    lineHeight: 23,
+    fontWeight: "600",
+    textAlign: "center",
+    maxWidth: 680,
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 30,
+  },
+
+  featureGrid: {
+    width: "100%",
+    maxWidth: 1080,
+    alignSelf: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 16,
+  },
+
+  featureCard: {
+    width: isSmallPhone ? "100%" : 200,
+    maxWidth: isSmallPhone ? 360 : undefined,
+    minHeight: 196,
+    backgroundColor: brandColors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: brandColors.border,
+    padding: 18,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.06)" },
+    }),
+  },
+
+  featureIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: brandColors.blueSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+
+  featureTitle: {
+    color: brandColors.text,
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+
+  featureText: {
+    color: brandColors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+  },
+
+  footerBand: {
+    marginTop: 0,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: brandColors.border,
+    paddingHorizontal: isSmallPhone ? 18 : 32,
+    paddingVertical: 26,
+    alignItems: "center",
+  },
+
+  footerCard: {
+    width: "100%",
+    maxWidth: 1080,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 18,
+    flexWrap: "wrap",
+  },
+
+  footerTextWrap: {
+    flex: 1,
+    minWidth: 280,
+    maxWidth: 620,
+    alignItems: "flex-start",
+  },
+
+  footerTitle: {
+    color: brandColors.text,
+    fontSize: 18,
+    fontWeight: "900",
+    textAlign: "left",
+  },
+
+  footerText: {
+    color: brandColors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+    marginTop: 5,
+    textAlign: "left",
+  },
+
+  footerButton: {
+    minHeight: 44,
+    borderRadius: 8,
+    backgroundColor: brandColors.blueSoft,
+    borderWidth: 1,
+    borderColor: brandColors.blueBorder,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    ...(isWeb && { cursor: "pointer" }),
+  },
+
+  footerButtonText: {
+    color: brandColors.blue,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  socialWrap: {
+    backgroundColor: brandColors.background,
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingTop: 22,
+  },
+
+  versionText: {
+    color: brandColors.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 10,
+  },
 });

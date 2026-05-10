@@ -1407,7 +1407,7 @@ export default function LoginScreen({ navigation, route }) {
                     })}
                   >
                     <Ionicons name="arrow-back" size={20} color={brandColors.navy} />
-                    <Text style={loginStyles.backToRoleText}>Change Role</Text>
+                    <Text style={loginStyles.backToRoleText}>Home</Text>
                   </TouchableOpacity>
                 )}
 
