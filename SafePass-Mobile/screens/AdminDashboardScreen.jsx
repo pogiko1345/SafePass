@@ -3447,7 +3447,7 @@ const loadDashboardData = useCallback(async () => {
         onLogout();
       }
 
-      navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+      navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
     } catch (error) {
       console.error("Logout error:", error);
       setIsLoading(false);
@@ -11522,7 +11522,7 @@ const loadDashboardData = useCallback(async () => {
             <Ionicons name="log-out-outline" size={48} color="#EF4444" />
             <Text style={[styles.confirmTitle, isDarkMode && styles.darkText]}>Sign Out</Text>
             <Text style={[styles.confirmMessage, isDarkMode && styles.darkTextSecondary]}>
-              Do you really want to sign out of the admin dashboard?
+              Would you like to sign out?
             </Text>
             <View style={styles.confirmButtons}>
               <TouchableOpacity
@@ -11530,7 +11530,7 @@ const loadDashboardData = useCallback(async () => {
                 onPress={() => setShowLogoutConfirmModal(false)}
                 disabled={isLoading}
               >
-                <Text style={[styles.confirmCancelText, isDarkMode && styles.darkTextSecondary]}>Cancel</Text>
+                <Text style={[styles.confirmCancelText, isDarkMode && styles.darkTextSecondary]}>Stay Signed In</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmButton, { backgroundColor: "#EF4444" }]}

@@ -345,11 +345,11 @@ export default function VerificationScreen({ navigation, route }) {
         await Storage.removeItem("currentUser");
         Alert.alert("Visitor App Only", getVariantBlockedRoleMessage(userRole), [
           {
-            text: "Back to Login",
+            text: "Back Home",
             onPress: () =>
               navigation.reset({
                 index: 0,
-                routes: [{ name: "Login" }],
+                routes: [{ name: "RoleSelect" }],
               }),
           },
         ]);
@@ -384,7 +384,7 @@ export default function VerificationScreen({ navigation, route }) {
       }, 500);
     } catch (error) {
       console.error("Complete login error:", error);
-      Alert.alert("Error", "Login failed. Please try again.");
+      Alert.alert("Error", "Unable to complete sign in. Please try again.");
     } finally {
       setIsLoading(false);
     }

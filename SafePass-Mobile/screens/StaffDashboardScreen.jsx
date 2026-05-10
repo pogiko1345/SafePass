@@ -1250,7 +1250,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     } finally {
       setShowLogoutModal(false);
       if (typeof onLogout === "function") onLogout();
-      navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+      navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
     }
   };
 
@@ -3135,7 +3135,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             </View>
             <Text style={styles.logoutModalTitle}>Sign out?</Text>
             <Text style={styles.logoutModalSubtitle}>
-              You will return to the login screen and need to sign in again to access the staff dashboard.
+              Would you like to sign out?
             </Text>
             <View style={styles.logoutModalActionRow}>
               <TouchableOpacity

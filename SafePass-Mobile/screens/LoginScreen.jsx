@@ -22,6 +22,7 @@ import { brandColors } from "../styles/brandColors";
 import { Ionicons } from "@expo/vector-icons";
 import SocialDock from "../components/SocialDock";
 import * as LocalAuthentication from "expo-local-authentication";
+import * as SecureStore from "expo-secure-store";
 import ApiService from "../utils/ApiService";
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
 import {
@@ -38,10 +39,19 @@ const Storage = Platform.OS === "web"
   : require("@react-native-async-storage/async-storage").default;
 const BIOMETRIC_LOGIN_EMAIL_KEY = "biometricLoginEmail";
 const BIOMETRIC_LOGIN_PASSWORD_KEY = "biometricLoginPassword";
+const getBiometricCredential = async (key) => {
+  if (Platform.OS === "web") return Storage.getItem(key);
+  return (await SecureStore.getItemAsync(key)) || Storage.getItem(key);
+};
+const setBiometricCredential = async (key, value) => {
+  if (Platform.OS === "web") return Storage.setItem(key, value);
+  await SecureStore.setItemAsync(key, value);
+  await Storage.removeItem(key);
+};
 const LAST_ACTIVITY_AT_KEY = "lastActivityAt";
 const AUTH_NOTICE_KEY = "authNotice";
-const IDLE_LOGOUT_MS = 30 * 60 * 1000;
-const SESSION_EXPIRED_MESSAGE = "You were inactive for 30 minutes. Please login again.";
+const TRUSTED_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_EXPIRED_MESSAGE = "Your trusted session has expired after 30 days. Please sign in again.";
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
@@ -373,8 +383,8 @@ export default function LoginScreen({ navigation, route }) {
       try {
         const [enabled, storedEmail, storedPassword, hasHardware, enrolled] = await Promise.all([
           Storage.getItem("biometricEnabled"),
-          Storage.getItem(BIOMETRIC_LOGIN_EMAIL_KEY),
-          Storage.getItem(BIOMETRIC_LOGIN_PASSWORD_KEY),
+          getBiometricCredential(BIOMETRIC_LOGIN_EMAIL_KEY),
+          getBiometricCredential(BIOMETRIC_LOGIN_PASSWORD_KEY),
           LocalAuthentication.hasHardwareAsync(),
           LocalAuthentication.isEnrolledAsync(),
         ]);
@@ -461,7 +471,7 @@ export default function LoginScreen({ navigation, route }) {
         if (
           Number.isFinite(lastActivityAt) &&
           lastActivityAt > 0 &&
-          Date.now() - lastActivityAt >= IDLE_LOGOUT_MS
+          Date.now() - lastActivityAt >= TRUSTED_SESSION_MS
         ) {
           await ApiService.clearAuth();
           setEmail("");
@@ -570,7 +580,7 @@ export default function LoginScreen({ navigation, route }) {
   const handleResendVisitorOtp = async () => {
     const otpEmail = normalizeResetEmailValue(pendingVisitorOtpEmail || email);
     if (!otpEmail) {
-      setLoginOtpError("Enter your visitor email first.");
+      setLoginOtpError("Enter your email first.");
       return;
     }
 
@@ -584,8 +594,8 @@ export default function LoginScreen({ navigation, route }) {
         setLoginOtpResendAvailableAt(new Date(Date.now() + 60 * 1000).toISOString());
         setLoginSuccessMessage(
           response.otpDeliveryMode === "backend_log"
-            ? "A new OTP was generated. For local testing, check the backend terminal."
-            : "A new OTP was sent to your email.",
+            ? "A new verification code was generated. For local testing, check the backend terminal."
+            : "A new verification code was sent to your email.",
         );
         return;
       }
@@ -602,11 +612,11 @@ export default function LoginScreen({ navigation, route }) {
     const otpCode = normalizeResetOtpValue(loginOtpCode);
 
     if (!otpEmail) {
-      setLoginOtpError("Enter your visitor email first.");
+      setLoginOtpError("Enter your email first.");
       return;
     }
     if (otpCode.length !== 6) {
-      setLoginOtpError("Enter the 6-digit OTP code.");
+      setLoginOtpError("Enter the 6-digit verification code.");
       return;
     }
 
@@ -660,8 +670,8 @@ export default function LoginScreen({ navigation, route }) {
     try {
       const enabled = await Storage.getItem("biometricEnabled");
       if (enabled === "true" && loginIdentifier && loginPassword) {
-        await Storage.setItem(BIOMETRIC_LOGIN_EMAIL_KEY, loginIdentifier);
-        await Storage.setItem(BIOMETRIC_LOGIN_PASSWORD_KEY, loginPassword);
+        await setBiometricCredential(BIOMETRIC_LOGIN_EMAIL_KEY, loginIdentifier);
+        await setBiometricCredential(BIOMETRIC_LOGIN_PASSWORD_KEY, loginPassword);
         setBiometricLoginReady(true);
       }
     } catch (error) {
@@ -968,8 +978,8 @@ export default function LoginScreen({ navigation, route }) {
         return;
       }
 
-      const storedEmail = await Storage.getItem(BIOMETRIC_LOGIN_EMAIL_KEY);
-      const storedPassword = await Storage.getItem(BIOMETRIC_LOGIN_PASSWORD_KEY);
+      const storedEmail = await getBiometricCredential(BIOMETRIC_LOGIN_EMAIL_KEY);
+      const storedPassword = await getBiometricCredential(BIOMETRIC_LOGIN_PASSWORD_KEY);
 
       if (!storedEmail || !storedPassword) {
         setBiometricLoginReady(false);
@@ -998,25 +1008,16 @@ export default function LoginScreen({ navigation, route }) {
         return;
       }
 
-      if (verifyResponse.requires2FA === false) {
-        await persistAuthenticatedSession({
-          token: verifyResponse.tempToken,
-          user: normalizedUser,
-          rememberEmail: true,
-        });
-        navigation.reset({
-          index: 0,
-          routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(normalizedUser) }],
-        });
-        return;
-      }
-
-      navigation.navigate("Verification", {
-        email: storedEmail,
-        password: storedPassword,
-        rememberMe: true,
-        tempToken: verifyResponse.tempToken,
+      await persistAuthenticatedSession({
+        token: verifyResponse.tempToken,
         user: normalizedUser,
+        rememberEmail: true,
+      });
+      await ApiService.trustDevice();
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(normalizedUser) }],
       });
     } catch (error) {
       setLoginError(error?.message || "Biometric login failed. Please try your password.");

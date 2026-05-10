@@ -380,11 +380,11 @@ export default function SecurityDashboardScreen({ navigation }) {
     try {
       await ApiService.logout();
       await ApiService.clearAuth();
-      navigation.replace("Login");
+      navigation.replace("RoleSelect");
     } catch (error) {
       console.error("Logout error:", error);
       await ApiService.clearAuth();
-      navigation.replace("Login");
+      navigation.replace("RoleSelect");
     } finally {
       setIsLoggingOut(false);
     }
@@ -4355,7 +4355,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             </View>
             <Text style={styles.modalTitle}>Sign Out</Text>
             <Text style={styles.modalMessage}>
-              Are you sure you want to sign out of your account?
+              Would you like to sign out?
             </Text>
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity
@@ -4363,7 +4363,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 onPress={cancelLogout}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Stay Signed In</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmButton}

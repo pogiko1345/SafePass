@@ -46,7 +46,7 @@ const API_BASE_URL_CANDIDATES = [
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
 const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
-const REMEMBERED_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const REMEMBERED_SESSION_DURATION_MS = TRUST_DEVICE_DURATION_MS;
 const HEALTH_CHECK_TIMEOUT_MS = 20000;
 const REMEMBERED_SESSION_EXPIRES_AT_KEY = "rememberedSessionExpiresAt";
 const SENSITIVE_STORAGE_KEYS = [

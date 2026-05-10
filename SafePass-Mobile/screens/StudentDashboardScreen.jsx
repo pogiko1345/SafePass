@@ -168,7 +168,7 @@ export default function StudentDashboardScreen({ navigation }) {
       console.error("Student logout error:", error);
     } finally {
       await ApiService.clearAuth();
-      navigation.replace("Login");
+      navigation.replace("RoleSelect");
     }
   };
 

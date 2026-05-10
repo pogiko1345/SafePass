@@ -23,6 +23,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as LocalAuthentication from "expo-local-authentication";
+import * as SecureStore from "expo-secure-store";
 import ApiService from "../utils/ApiService";
 import {
   PHILIPPINE_MOBILE_NUMBER_MESSAGE,
@@ -32,6 +33,16 @@ import {
 
 const Storage =
   Platform.OS === "web" ? require("../utils/webStorage").default : AsyncStorage;
+const setBiometricCredential = async (key, value) => {
+  if (Platform.OS === "web") return Storage.setItem(key, value);
+  await SecureStore.setItemAsync(key, value);
+  await Storage.removeItem(key);
+};
+const removeBiometricCredential = async (key) => {
+  if (Platform.OS === "web") return Storage.removeItem(key);
+  await SecureStore.deleteItemAsync(key);
+  await Storage.removeItem(key);
+};
 
 const DEFAULT_PROFILE = {
   _id: "",
@@ -400,8 +411,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         confirmPassword: "",
       });
       if (biometricEnabled && currentProfile?.email) {
-        await Storage.setItem(BIOMETRIC_LOGIN_EMAIL_KEY, currentProfile.email);
-        await Storage.setItem(BIOMETRIC_LOGIN_PASSWORD_KEY, newPassword);
+        await setBiometricCredential(BIOMETRIC_LOGIN_EMAIL_KEY, currentProfile.email);
+        await setBiometricCredential(BIOMETRIC_LOGIN_PASSWORD_KEY, newPassword);
       }
       Alert.alert("Password Updated", response?.message || "Your password was changed successfully.");
     } catch (e) {
@@ -478,8 +489,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       return;
     }
     if (!value) {
-      await Storage.removeItem(BIOMETRIC_LOGIN_EMAIL_KEY);
-      await Storage.removeItem(BIOMETRIC_LOGIN_PASSWORD_KEY);
+      await removeBiometricCredential(BIOMETRIC_LOGIN_EMAIL_KEY);
+      await removeBiometricCredential(BIOMETRIC_LOGIN_PASSWORD_KEY);
       await Storage.removeItem("biometricUserEmail");
       return setBiometricEnabled(false);
     }
@@ -497,7 +508,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         fallbackLabel: "Use passcode",
       });
       if (result.success) {
-        await Storage.setItem(BIOMETRIC_LOGIN_EMAIL_KEY, currentProfile?.email || "");
+        await setBiometricCredential(BIOMETRIC_LOGIN_EMAIL_KEY, currentProfile?.email || "");
         await Storage.setItem("biometricUserEmail", currentProfile?.email || "");
         setBiometricEnabled(true);
         Alert.alert(
@@ -550,10 +561,10 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
     try {
       await ApiService.logout();
       if (onLogout) onLogout();
-      navigation.replace("Login");
+      navigation.replace("RoleSelect");
     } catch {
       if (onLogout) onLogout();
-      navigation.replace("Login");
+      navigation.replace("RoleSelect");
     } finally {
       setIsLoggingOut(false);
     }
@@ -1078,14 +1089,14 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Sign Out</Text>
             <Text style={styles.modalText}>
-              Do you want to end your current SafePass session?
+              Would you like to sign out?
             </Text>
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalSecondary}
                 onPress={() => setShowLogoutModal(false)}
               >
-                <Text style={styles.modalSecondaryText}>Cancel</Text>
+                <Text style={styles.modalSecondaryText}>Stay Signed In</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalPrimary}

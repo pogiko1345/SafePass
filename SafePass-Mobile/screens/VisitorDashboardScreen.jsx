@@ -3188,12 +3188,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const handleLogout = async () => {
     await stopNfcReading();
     showVisitorAlert(
-      "Logout",
-      "Are you sure you want to logout?",
+      "Sign Out",
+      "Would you like to sign out?",
       [
         { text: "Cancel", style: "cancel" },
         { 
-          text: "Logout", 
+          text: "Sign Out",
           style: "destructive",
           onPress: async () => {
             try {
@@ -3210,7 +3210,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               if (onLogout) onLogout();
               navigation.reset({
                 index: 0,
-                routes: [{ name: "Login" }],
+                routes: [{ name: "RoleSelect" }],
               });
             }
           }

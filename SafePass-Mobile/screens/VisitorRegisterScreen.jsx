@@ -68,8 +68,8 @@ const SuccessModal = ({
             {isVerified
               ? "Your account is verified. Continue to sign in to your visitor account."
               : otpDeliveryMode === "backend_log"
-                ? "Email delivery is not available right now. For local testing, enter the 6-digit OTP shown in the backend terminal."
-                : "Enter the 6-digit OTP sent to your email. Your visitor account stays locked until this code is verified."}
+                ? "Email delivery is not available right now. For local testing, enter the 6-digit verification code shown in the backend terminal."
+                : "Enter the 6-digit verification code sent to your email. Your visitor account stays locked until this code is verified."}
           </Text>
           {account?.email ? (
             <View style={visitorRegisterStyles.otpEmailPill}>
@@ -81,7 +81,7 @@ const SuccessModal = ({
           ) : null}
           {!isVerified ? (
             <View style={visitorRegisterStyles.otpVerifyBox}>
-              <Text style={visitorRegisterStyles.otpLabel}>OTP Code</Text>
+              <Text style={visitorRegisterStyles.otpLabel}>Verification Code</Text>
               <TextInput
                 style={[
                   visitorRegisterStyles.otpInput,
@@ -89,7 +89,7 @@ const SuccessModal = ({
                 ]}
                 value={otpValue}
                 onChangeText={(value) => onOtpChange(String(value || "").replace(/\D/g, "").slice(0, 6))}
-                placeholder="6-digit OTP"
+                placeholder="6-digit code"
                 placeholderTextColor="#94A3B8"
                 keyboardType="number-pad"
                 maxLength={6}
@@ -122,7 +122,7 @@ const SuccessModal = ({
                     ? "Verifying..."
                     : isVerified
                       ? "Account Verified"
-                      : "Verify OTP"}
+                      : "Verify Code"}
                 </Text>
                 <Ionicons
                   name={isVerified ? "checkmark-circle-outline" : "keypad-outline"}
@@ -142,7 +142,7 @@ const SuccessModal = ({
               disabled={!canResendOtp || isVerifying}
             >
               <Text style={visitorRegisterStyles.resendOtpButtonText}>
-                {canResendOtp ? "Resend OTP" : `Resend in ${otpTimerLabel}`}
+                {canResendOtp ? "Resend Code" : `Resend in ${otpTimerLabel}`}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -160,7 +160,7 @@ const SuccessModal = ({
               style={visitorRegisterStyles.successGradient}
             >
               <Text style={visitorRegisterStyles.successButtonText}>
-                {isVerified ? "Continue to Sign In" : "Verify OTP First"}
+                {isVerified ? "Continue to Sign In" : "Verify Code First"}
               </Text>
               <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
             </LinearGradient>
@@ -1002,12 +1002,12 @@ export default function VisitorRegisterScreen({ navigation }) {
     const otpCode = String(registrationOtp || "").replace(/\D/g, "").slice(0, 6);
 
     if (!email || !otpCode) {
-      setRegistrationOtpError("Please enter the 6-digit OTP code.");
+      setRegistrationOtpError("Please enter the 6-digit verification code.");
       return;
     }
 
     if (otpCode.length !== 6) {
-      setRegistrationOtpError("The OTP must be exactly 6 digits.");
+      setRegistrationOtpError("The verification code must be exactly 6 digits.");
       return;
     }
 
@@ -1027,14 +1027,14 @@ export default function VisitorRegisterScreen({ navigation }) {
       }
 
       Alert.alert(
-        "OTP Verification Failed",
-        response?.message || "Unable to verify the OTP. Please try again.",
+        "Verification Failed",
+        response?.message || "Unable to verify the code. Please try again.",
       );
     } catch (error) {
-      setRegistrationOtpError(error?.message || "Please try again or request a new OTP.");
+      setRegistrationOtpError(error?.message || "Please try again or request a new code.");
       Alert.alert(
-        "Unable to Verify OTP",
-        error?.message || "Please try again or request a new OTP.",
+        "Unable to Verify Code",
+        error?.message || "Please try again or request a new code.",
       );
     } finally {
       setIsVerifyingAccount(false);
@@ -1044,7 +1044,7 @@ export default function VisitorRegisterScreen({ navigation }) {
   const handleResendRegistrationOtp = async () => {
     const email = registeredVisitor?.email || formData.email;
     if (!email) {
-      Alert.alert("Email Missing", "Unable to find the visitor email for OTP resend.");
+      Alert.alert("Email Missing", "Unable to find the visitor email for code resend.");
       return;
     }
 
@@ -1062,15 +1062,15 @@ export default function VisitorRegisterScreen({ navigation }) {
         Alert.alert(
           "Verification Code Sent",
           response.otpDeliveryMode === "backend_log"
-            ? "A new OTP has been generated. For local testing, check the backend terminal for the code."
-            : "A new OTP has been sent to your email. Please also check your spam folder just in case.",
+            ? "A new verification code has been generated. For local testing, check the backend terminal for the code."
+            : "A new verification code has been sent to your email. Please also check your spam folder just in case.",
         );
         return;
       }
 
-      Alert.alert("Unable to Resend OTP", response?.message || "Please try again.");
+      Alert.alert("Unable to Resend Code", response?.message || "Please try again.");
     } catch (error) {
-      Alert.alert("Unable to Resend OTP", error?.message || "Please try again.");
+      Alert.alert("Unable to Resend Code", error?.message || "Please try again.");
     } finally {
       setIsVerifyingAccount(false);
     }
