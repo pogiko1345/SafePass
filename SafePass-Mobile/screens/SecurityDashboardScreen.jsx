@@ -185,6 +185,13 @@ const securityDateFilters = [
   { key: "week", label: "This Week" },
 ];
 
+const securityLogFilters = [
+  { key: "all", label: "All" },
+  { key: "arrival", label: "Arrivals" },
+  { key: "departure", label: "Departures" },
+  { key: "denied", label: "Denied" },
+];
+
 export default function SecurityDashboardScreen({ navigation }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isDesktop = viewportWidth >= 1024;
@@ -268,6 +275,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileDateFilter, setMobileDateFilter] = useState('all');
   const [mobileLocationFilter, setMobileLocationFilter] = useState('all');
+  const [mobileLogFilter, setMobileLogFilter] = useState('all');
   const [appointmentRecordsPage, setAppointmentRecordsPage] = useState(1);
   const [showVisitorModal, setShowVisitorModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -1948,6 +1956,24 @@ export default function SecurityDashboardScreen({ navigation }) {
   const mobileLogItems = useMemo(() => {
     const normalizedSearch = String(searchQuery || "").trim().toLowerCase();
     return (accessLogs || []).filter((log) => {
+      const normalizedStatus = String(log.status || "").toLowerCase();
+      const normalizedType = String(log.activityType || log.accessType || "").toLowerCase();
+      if (
+        mobileLogFilter === "arrival" &&
+        !["entry", "checkin", "check_in", "security_checkin"].some((keyword) => normalizedType.includes(keyword))
+      ) {
+        return false;
+      }
+      if (
+        mobileLogFilter === "departure" &&
+        !["exit", "checkout", "check_out", "security_checkout"].some((keyword) => normalizedType.includes(keyword))
+      ) {
+        return false;
+      }
+      if (mobileLogFilter === "denied" && normalizedStatus !== "denied") {
+        return false;
+      }
+
       if (!normalizedSearch) return true;
       return [
         log.visitorName,
@@ -1960,7 +1986,48 @@ export default function SecurityDashboardScreen({ navigation }) {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedSearch));
     });
-  }, [accessLogs, searchQuery]);
+  }, [accessLogs, mobileLogFilter, searchQuery]);
+
+  const getMobileLogDisplay = (log = {}) => {
+    const normalizedStatus = String(log.status || "").toLowerCase();
+    const normalizedType = String(log.activityType || log.accessType || "").toLowerCase();
+    const person = log.visitorName || log.userName || log.userEmail || "Visitor";
+    const place = log.location || "Campus checkpoint";
+
+    if (normalizedStatus === "denied") {
+      return {
+        icon: "close-circle-outline",
+        color: BRAND.danger,
+        title: `${person} was blocked`,
+        message: place,
+      };
+    }
+
+    if (["exit", "checkout", "check_out", "security_checkout"].some((keyword) => normalizedType.includes(keyword))) {
+      return {
+        icon: "log-out-outline",
+        color: BRAND.success,
+        title: `${person} departed`,
+        message: place,
+      };
+    }
+
+    if (["entry", "checkin", "check_in", "security_checkin"].some((keyword) => normalizedType.includes(keyword))) {
+      return {
+        icon: "log-in-outline",
+        color: BRAND.blue,
+        title: `${person} arrived`,
+        message: place,
+      };
+    }
+
+    return {
+      icon: "radio-outline",
+      color: BRAND.warning,
+      title: person,
+      message: `${titleCase(log.activityType || log.accessType || "activity")} at ${place}`,
+    };
+  };
 
   const appointmentRecordsItemsPerPage = 6;
   const checkedInVisitors = useMemo(
@@ -4172,33 +4239,37 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderMobileLogs = () => (
     <>
       <View style={securityMobileStyles.compactHeader}>
-        <Text style={securityMobileStyles.compactTitle}>Access Log Feed</Text>
-        <Text style={securityMobileStyles.compactSubtitle}>Recent NFC, visitor, and checkpoint activity.</Text>
+        <Text style={securityMobileStyles.compactTitle}>Recent Activity</Text>
+        <Text style={securityMobileStyles.compactSubtitle}>A short, friendly view of arrivals, departures, and blocked access.</Text>
       </View>
-      <MobileSearchField value={searchQuery} onChangeText={setSearchQuery} placeholder="Search logs..." />
+      <View style={securityMobileStyles.logToolbar}>
+        <MobileFilterChips options={securityLogFilters} value={mobileLogFilter} onChange={setMobileLogFilter} />
+        <MobileSearchField value={searchQuery} onChangeText={setSearchQuery} placeholder="Search activity..." />
+      </View>
       <View style={securityMobileStyles.feedList}>
         {mobileLogItems.length ? (
-          mobileLogItems.slice(0, 60).map((log, index) => (
-            <View key={log._id || `${log.timestamp}-${index}`} style={securityMobileStyles.logCard}>
-              <View style={securityMobileStyles.logIcon}>
-                <Ionicons name={String(log.status).toLowerCase() === "denied" ? "close-circle-outline" : "radio-outline"} size={18} color={String(log.status).toLowerCase() === "denied" ? BRAND.danger : BRAND.blue} />
+          mobileLogItems.slice(0, 12).map((log, index) => {
+            const display = getMobileLogDisplay(log);
+            return (
+              <View key={log._id || `${log.timestamp}-${index}`} style={securityMobileStyles.logCard}>
+                <View style={[securityMobileStyles.logIcon, { backgroundColor: `${display.color}16` }]}>
+                  <Ionicons name={display.icon} size={18} color={display.color} />
+                </View>
+                <View style={securityMobileStyles.logCopy}>
+                  <Text style={securityMobileStyles.logTitle} numberOfLines={1}>{display.title}</Text>
+                  <Text style={securityMobileStyles.logMessage} numberOfLines={1}>{display.message}</Text>
+                  <Text style={securityMobileStyles.logTime}>{formatDateTime(log.timestamp || log.createdAt)}</Text>
+                </View>
               </View>
-              <View style={securityMobileStyles.logCopy}>
-                <Text style={securityMobileStyles.logTitle} numberOfLines={1}>
-                  {log.visitorName || log.userName || log.userEmail || "Access Event"}
-                </Text>
-                <Text style={securityMobileStyles.logMessage} numberOfLines={2}>
-                  {titleCase(log.activityType || log.accessType || "activity")} at {log.location || "Campus checkpoint"}
-                </Text>
-                <Text style={securityMobileStyles.logTime}>{formatDateTime(log.timestamp || log.createdAt)}</Text>
-              </View>
-              <MobileStatusBadge status={log.status || "granted"} />
-            </View>
-          ))
+            );
+          })
         ) : (
-          <MobileEmptyState icon="list-outline" title="No logs found" message="NFC and access events will appear here." />
+          <MobileEmptyState icon="list-outline" title="No activity found" message="Try another filter or search term." />
         )}
       </View>
+      {mobileLogItems.length > 12 ? (
+        <Text style={securityMobileStyles.logFooterNote}>Showing latest 12 items. Use search or filters to narrow the list.</Text>
+      ) : null}
     </>
   );
 
@@ -5750,6 +5821,9 @@ const securityMobileStyles = StyleSheet.create({
   feedList: {
     marginTop: 12,
   },
+  logToolbar: {
+    gap: 10,
+  },
   mobileMapCard: {
     marginTop: 12,
     marginBottom: 14,
@@ -5837,6 +5911,15 @@ const securityMobileStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#94A3B8",
+  },
+  logFooterNote: {
+    marginTop: 4,
+    marginBottom: 12,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    color: BRAND.muted,
+    textAlign: "center",
   },
   alertCard: {
     padding: 14,
