@@ -1012,7 +1012,7 @@ export default function LoginScreen({ navigation, route }) {
         setPendingVisitorOtpEmail("");
         setLoginOtpCode("");
         setLoginOtpError("");
-        setLoginOtpExpiresAt(null);
+        setLoginOtpResendAvailableAt(null);
         const normalizedUser = {
           ...verifyResponse.user,
           role: normalizeRole(verifyResponse.user?.role) || "visitor",
