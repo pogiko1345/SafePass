@@ -405,8 +405,28 @@ export default StyleSheet.create({
     fontSize: isSmallPhone ? 14 : 15,
     color: brandColors.textMuted,
     textAlign: "center",
-    marginBottom: 24,
+    marginBottom: 18,
     lineHeight: 21,
+  },
+
+  roleDetectedPill: {
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: brandColors.blueSoft,
+    borderWidth: 1,
+    borderColor: brandColors.blueBorder,
+    marginBottom: 18,
+  },
+
+  roleDetectedText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: brandColors.blue,
   },
 
   inputBox: {
@@ -466,6 +486,28 @@ export default StyleSheet.create({
     fontWeight: "600",
   },
 
+  loginAlert: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    marginTop: -6,
+    marginBottom: 18,
+  },
+
+  loginAlertText: {
+    flex: 1,
+    color: "#B91C1C",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
+  },
+
   helperText: {
     fontSize: 12,
     color: brandColors.textMuted,
@@ -482,7 +524,8 @@ export default StyleSheet.create({
 
   rememberBox: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
+    flexShrink: 1,
     ...(isWeb && { cursor: "pointer" }),
   },
 
@@ -507,6 +550,19 @@ export default StyleSheet.create({
     fontSize: 14,
     color: brandColors.text,
     fontWeight: "600",
+  },
+
+  trustDeviceCopy: {
+    flexShrink: 1,
+  },
+
+  trustDeviceHint: {
+    marginTop: 2,
+    fontSize: 11,
+    lineHeight: 15,
+    color: brandColors.textMuted,
+    fontWeight: "500",
+    maxWidth: 240,
   },
 
   forgotText: {

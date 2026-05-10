@@ -285,6 +285,37 @@ export default function LoginScreen({ navigation, route }) {
     );
   };
 
+  const inferCampusRoleFromIdentifier = (value) => {
+    const identifier = normalizeResetEmailValue(value);
+    if (!identifier) return "campus";
+    if (/^(student|student\d+)(@|$)/.test(identifier) || identifier.includes(".student@")) return "student";
+    if (identifier.includes(".staff@") || /(^|[._-])staff(@|[._-]|$)/.test(identifier)) return "staff";
+    if (/^(security|guard)(@|$)/.test(identifier) || /(^|[._-])(security|guard)(@|[._-]|$)/.test(identifier)) return "security";
+    if (/^(admin|administrator)(@|$)/.test(identifier) || /(^|[._-])admin(@|[._-]|$)/.test(identifier)) return "admin";
+    if (!isSchoolManagedIdentifier(identifier)) return "visitor";
+    return "campus";
+  };
+
+  const getRoleDisplayName = (role) => {
+    switch (normalizeRole(role)) {
+      case "student":
+        return "Student";
+      case "teacher":
+        return "Teacher";
+      case "staff":
+        return "Staff";
+      case "security":
+      case "guard":
+        return "Security";
+      case "admin":
+        return "Admin";
+      case "visitor":
+        return "Visitor";
+      default:
+        return "Campus";
+    }
+  };
+
   const normalizeResetOtpValue = (value) =>
     String(value || "").replace(/[^0-9]/g, "").slice(0, 6);
 
@@ -998,12 +1029,18 @@ export default function LoginScreen({ navigation, route }) {
     if (!validateForm()) return;
 
     setIsLoading(true);
-    setLoginSplashMessage(apiConnected ? "Signing you in..." : "Connecting to SafePass...");
+    const normalizedIdentifier = normalizeLoginIdentifier(email);
+    const inferredLoginRole =
+      effectiveRole === "campus" ? inferCampusRoleFromIdentifier(normalizedIdentifier) : effectiveRole;
+    setLoginSplashMessage(
+      apiConnected
+        ? `Checking ${getRoleDisplayName(inferredLoginRole).toLowerCase()} account...`
+        : "Connecting to SafePass...",
+    );
     setLoginError("");
     setLoginSuccessMessage("");
     
     try {
-      const normalizedIdentifier = normalizeLoginIdentifier(email);
       setEmail(normalizedIdentifier);
       const verifyResponse = await ApiService.verifyCredentials(normalizedIdentifier, password);
       
@@ -1031,6 +1068,7 @@ export default function LoginScreen({ navigation, route }) {
         }
 
         if (verifyResponse.requires2FA === false) {
+          setLoginSplashMessage(`Opening ${getRoleDisplayName(normalizedUser.role).toLowerCase()} dashboard...`);
           await persistAuthenticatedSession({
             token: verifyResponse.tempToken,
             user: normalizedUser,
@@ -1045,6 +1083,7 @@ export default function LoginScreen({ navigation, route }) {
           return;
         }
 
+        setLoginSplashMessage("Opening two-step verification...");
         navigation.navigate("Verification", {
           email: normalizedIdentifier,
           password: password,
@@ -1079,10 +1118,14 @@ export default function LoginScreen({ navigation, route }) {
         errorMessage.toLowerCase().includes("password")
       ) {
         setLoginError("Incorrect email or password. Please try again.");
-      } else if (errorMessage.includes("Network request failed")) {
-        setLoginError("Cannot connect to server. Please check your connection.");
+      } else if (
+        errorMessage.includes("Network request failed") ||
+        errorMessage.toLowerCase().includes("cannot connect") ||
+        errorMessage.toLowerCase().includes("server")
+      ) {
+        setLoginError("Server unavailable. Please try again.");
       } else {
-        setLoginError("Login failed. Please try again.");
+        setLoginError(errorMessage || "Unable to sign in. Please try again.");
       }
     } finally {
       setShowLoginSplash(false);
@@ -1090,8 +1133,8 @@ export default function LoginScreen({ navigation, route }) {
     }
   };
 
-  const getRoleConfig = () => {
-    switch (effectiveRole) {
+  const getRoleConfig = (roleForDisplay = effectiveRole) => {
+    switch (roleForDisplay) {
       case "visitor":
         return {
           label: "Visitor Portal",
@@ -1123,13 +1166,13 @@ export default function LoginScreen({ navigation, route }) {
       case "student":
       case "teacher":
         return {
-          label: effectiveRole === "teacher" ? "Teacher Access" : "Student Access",
-          title: effectiveRole === "teacher" ? "Teacher Attendance Sign-In" : "Student Attendance Sign-In",
+          label: roleForDisplay === "teacher" ? "Teacher Access" : "Student Access",
+          title: roleForDisplay === "teacher" ? "Teacher Attendance Sign-In" : "Student Attendance Sign-In",
           subtitle:
-            effectiveRole === "teacher"
+            roleForDisplay === "teacher"
               ? "Review your latest attendance records, campus checkpoint activity, and virtual campus ID."
               : "Check your attendance history, latest NFC activity, and parent notification status.",
-          icon: effectiveRole === "teacher" ? "school-outline" : "id-card-outline",
+          icon: roleForDisplay === "teacher" ? "school-outline" : "id-card-outline",
           accent: brandColors.blue,
           panel: "Campus ID Console",
         };
@@ -1214,9 +1257,22 @@ export default function LoginScreen({ navigation, route }) {
     );
   }
 
-  const roleConfig = getRoleConfig();
+  const inferredRole = inferCampusRoleFromIdentifier(email);
+  const displayRole = effectiveRole === "campus" ? inferredRole : effectiveRole;
+  const roleConfig = getRoleConfig(displayRole);
+  const shouldShowRoleHint =
+    normalizeLoginIdentifier(email).length >= 3 &&
+    !["campus", "visitor"].includes(normalizeRole(displayRole));
+  const roleHintLabel = `${getRoleDisplayName(displayRole)} account detected`;
   const showVisitorRegisterEntry =
-    IS_VISITOR_ONLY_APP || ["visitor", "campus"].includes(normalizeRole(effectiveRole));
+    IS_VISITOR_ONLY_APP || ["visitor", "campus"].includes(normalizeRole(displayRole));
+  const loginButtonLabel = isLoading
+    ? loginSplashMessage.includes("verification")
+      ? "Opening verification..."
+      : loginSplashMessage.includes("dashboard")
+        ? "Opening dashboard..."
+        : "Checking account..."
+    : "SIGN IN";
   const resetStepTitle =
     resetStep === 1
       ? "Reset Password"
@@ -1313,7 +1369,7 @@ export default function LoginScreen({ navigation, route }) {
                     Sapphire International{"\n"}Aviation Academy
                   </Text>
                   <Text style={loginStyles.headerTagline}>
-                    Secure campus access and visitor sign-in
+                    Smart campus access for students, staff, visitors, and security
                   </Text>
                   <View style={loginStyles.flightAccent}>
                     <View style={loginStyles.flightAccentLine} />
@@ -1331,7 +1387,7 @@ export default function LoginScreen({ navigation, route }) {
                   ]}>
                     <View style={loginStyles.statusDot} />
                     <Text style={loginStyles.statusText}>
-                      {apiConnected ? 'SYSTEM ONLINE' : 'SERVER OFFLINE'}
+                      {apiConnected ? "SERVER CONNECTED" : "SERVER CHECK FAILED"}
                     </Text>
                   </Animated.View>
                 </View>
@@ -1378,6 +1434,15 @@ export default function LoginScreen({ navigation, route }) {
                   {roleConfig.subtitle}
                 </Text>
 
+                {shouldShowRoleHint ? (
+                  <View style={loginStyles.roleDetectedPill}>
+                    <Ionicons name="sparkles-outline" size={15} color={brandColors.blue} />
+                    <Text style={loginStyles.roleDetectedText}>
+                      {roleHintLabel}
+                    </Text>
+                  </View>
+                ) : null}
+
                 {/* STANDARD LOGIN FORM */}
                 <>
                   {/* Username / Email Input */}
@@ -1423,7 +1488,7 @@ export default function LoginScreen({ navigation, route }) {
                     <Text style={loginStyles.label}>Password</Text>
                     <View style={[
                       loginStyles.inputContainer,
-                      (errors.password || loginError) && loginStyles.inputError
+                      errors.password && loginStyles.inputError
                     ]}>
                       <Ionicons name="lock-closed-outline" size={20} color={brandColors.textMuted} />
                       <TextInput
@@ -1450,12 +1515,14 @@ export default function LoginScreen({ navigation, route }) {
                     {errors.password && (
                       <Text style={loginStyles.errorText}>{errors.password}</Text>
                     )}
-                    {loginError && !errors.password && (
-                      <Text style={[loginStyles.errorText, loginStyles.loginErrorText]}>
-                        {loginError}
-                      </Text>
-                    )}
                   </View>
+
+                  {loginError && !errors.password ? (
+                    <View style={loginStyles.loginAlert}>
+                      <Ionicons name="alert-circle-outline" size={18} color={brandColors.danger} />
+                      <Text style={loginStyles.loginAlertText}>{loginError}</Text>
+                    </View>
+                  ) : null}
 
                   {pendingVisitorOtpEmail ? (
                     <View style={loginStyles.visitorOtpPanel}>
@@ -1543,7 +1610,12 @@ export default function LoginScreen({ navigation, route }) {
                       ]}>
                         {rememberMe && <Ionicons name="checkmark" size={12} color={brandColors.surface} />}
                       </View>
-                      <Text style={loginStyles.rememberText}>Remember me</Text>
+                      <View style={loginStyles.trustDeviceCopy}>
+                        <Text style={loginStyles.rememberText}>Trust this device</Text>
+                        <Text style={loginStyles.trustDeviceHint}>
+                          Skip extra verification on this device when allowed.
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                     
                     <TouchableOpacity onPress={handleForgotPassword}>
@@ -1614,12 +1686,15 @@ export default function LoginScreen({ navigation, route }) {
                       })}
                     >
                       {isLoading ? (
-                        <ActivityIndicator color={brandColors.surface} />
+                        <>
+                          <ActivityIndicator color={brandColors.surface} />
+                          <Text style={loginStyles.loginButtonText}>{loginButtonLabel}</Text>
+                        </>
                       ) : (
                         <>
                           <Ionicons name="log-in-outline" size={20} color={brandColors.surface} />
                           <Text style={loginStyles.loginButtonText}>
-                            SIGN IN
+                            {loginButtonLabel}
                           </Text>
                         </>
                       )}
@@ -1655,7 +1730,7 @@ export default function LoginScreen({ navigation, route }) {
                           marginBottom: 4,
                         }}
                       >
-                        New Visitor?
+                        Need visitor access?
                       </Text>
                       <Text
                         style={{
@@ -1666,7 +1741,7 @@ export default function LoginScreen({ navigation, route }) {
                           marginBottom: 12,
                         }}
                       >
-                        Create your visitor account here in the app before signing in.
+                        Create a visitor account before requesting or tracking appointments.
                       </Text>
                       <TouchableOpacity
                         style={{

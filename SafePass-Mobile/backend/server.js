@@ -9846,7 +9846,7 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
     }
 
     const appointments = await Visitor.find(query)
-      .sort({ appointmentRequestedAt: -1, visitDate: 1 })
+      .sort({ visitDate: -1, visitTime: -1, appointmentRequestedAt: -1, updatedAt: -1 })
       .limit(parseInt(limit, 10))
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");

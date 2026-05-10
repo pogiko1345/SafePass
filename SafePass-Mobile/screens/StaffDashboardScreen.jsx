@@ -250,6 +250,24 @@ const compareAppointmentsBySchedule = (left, right) => {
   return String(left?._id || "").localeCompare(String(right?._id || ""));
 };
 
+const getAppointmentLatestSortValue = (appointment) => {
+  const scheduleValue =
+    appointment?.visitTime ||
+    appointment?.visitDate ||
+    appointment?.appointmentRequestedAt ||
+    appointment?.updatedAt ||
+    appointment?.createdAt;
+  const date = scheduleValue ? new Date(scheduleValue) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+};
+
+const compareAppointmentsByLatestSchedule = (left, right) => {
+  const dateDifference = getAppointmentLatestSortValue(right) - getAppointmentLatestSortValue(left);
+  if (dateDifference !== 0) return dateDifference;
+
+  return String(right?._id || "").localeCompare(String(left?._id || ""));
+};
+
 const groupAppointmentsByDate = (appointments = []) => {
   const groupedAppointments = appointments.reduce((groups, appointment) => {
     const dateKey = getAppointmentDateKey(appointment);
@@ -538,6 +556,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
     return nextAppointments.filter((item) => matchesAppointmentSearch(item, recordSearchTerm));
   }, [appointmentRecords, filter, recordSearchTerm]);
+
+  const mobileHistoryAppointments = useMemo(
+    () => [...filteredAppointments].sort(compareAppointmentsByLatestSchedule),
+    [filteredAppointments],
+  );
 
   const stats = useMemo(
     () => ({
@@ -1675,74 +1698,13 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </View>
       </LinearGradient>
 
-      <View style={staffVirtualStyles.card}>
-        <View style={staffVirtualStyles.cardTopRow}>
-          <View style={staffVirtualStyles.nfcIcon}>
-            <Ionicons name="radio-outline" size={26} color="#FFFFFF" />
-          </View>
-          <View style={staffVirtualStyles.cardCopy}>
-            <Text style={staffVirtualStyles.eyebrow}>Staff Virtual NFC Card</Text>
-            <Text style={staffVirtualStyles.title}>
-              {isStaffCheckedIn ? "Currently Checked In" : "Ready for Check In"}
-            </Text>
-            <Text style={staffVirtualStyles.meta}>
-              Card ID: {user?.nfcCardId || "Not assigned"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={staffVirtualStyles.statusRow}>
-          <View style={staffVirtualStyles.statusPill}>
-            <Ionicons
-              name={isStaffCheckedIn ? "checkmark-circle-outline" : "ellipse-outline"}
-              size={16}
-              color={isStaffCheckedIn ? "#047857" : "#64748B"}
-            />
-            <Text style={[
-              staffVirtualStyles.statusText,
-              { color: isStaffCheckedIn ? "#047857" : "#64748B" },
-            ]}>
-              {isStaffCheckedIn ? "Inside campus" : "Outside campus"}
-            </Text>
-          </View>
-          <Text style={staffVirtualStyles.timeText}>
-            In {formatTime(latestAttendanceRecord?.checkInTime)} • Out {formatTime(latestAttendanceRecord?.checkOutTime)}
+      <View style={staffVirtualStyles.webNotice}>
+        <Ionicons name="phone-portrait-outline" size={20} color="#0A3D91" />
+        <View style={staffVirtualStyles.webNoticeCopy}>
+          <Text style={staffVirtualStyles.webNoticeTitle}>Mobile NFC attendance</Text>
+          <Text style={staffVirtualStyles.webNoticeText}>
+            Staff check-in and check-out are available in the mobile app only.
           </Text>
-        </View>
-
-        <View style={staffVirtualStyles.actionRow}>
-          <TouchableOpacity
-            style={[staffVirtualStyles.actionButton, isStaffCheckedIn && staffVirtualStyles.disabledButton]}
-            onPress={() => handleStaffAttendanceTap("check_in")}
-            disabled={isStaffCheckedIn || Boolean(attendanceTapLoading)}
-          >
-            {attendanceTapLoading === "check_in" ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
-                <Text style={staffVirtualStyles.actionText}>Check In</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              staffVirtualStyles.actionButton,
-              staffVirtualStyles.exitButton,
-              !isStaffCheckedIn && staffVirtualStyles.disabledButton,
-            ]}
-            onPress={() => handleStaffAttendanceTap("check_out")}
-            disabled={!isStaffCheckedIn || Boolean(attendanceTapLoading)}
-          >
-            {attendanceTapLoading === "check_out" ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
-                <Text style={staffVirtualStyles.actionText}>Check Out</Text>
-              </>
-            )}
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -2806,7 +2768,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     <>
       <View style={staffMobileStyles.compactHeader}>
         <Text style={staffMobileStyles.compactTitle}>Appointment History</Text>
-        <Text style={staffMobileStyles.compactSubtitle}>Search previous approvals, adjustments, rejections, and completed visits.</Text>
+        <Text style={staffMobileStyles.compactSubtitle}>
+          Latest registrar and office appointments from the database, sorted by appointment date.
+        </Text>
       </View>
       <View style={staffMobileStyles.toolbar}>
         <MobileSearchField
@@ -2816,8 +2780,16 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         />
         <MobileFilterChips options={historyFilterOptions} value={filter} onChange={setFilter} />
       </View>
-      {filteredAppointments.length ? (
-        filteredAppointments.slice(0, 40).map((appointment) => renderMobileAppointmentCard(appointment, "history"))
+      {mobileHistoryAppointments.length ? (
+        <>
+          <View style={staffMobileStyles.sectionHeader}>
+            <Text style={staffMobileStyles.sectionTitle}>Latest by Date</Text>
+            <Text style={staffMobileStyles.sectionLink}>{mobileHistoryAppointments.length} records</Text>
+          </View>
+          {mobileHistoryAppointments
+            .slice(0, 40)
+            .map((appointment) => renderMobileAppointmentCard(appointment, "history"))}
+        </>
       ) : (
         <MobileEmptyState icon="archive-outline" title="No history found" message="Try a different search or status filter." />
       )}
@@ -3197,6 +3169,32 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 }
 
 const staffVirtualStyles = StyleSheet.create({
+  webNotice: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  webNoticeCopy: {
+    flex: 1,
+  },
+  webNoticeTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  webNoticeText: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#64748B",
+  },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 18,

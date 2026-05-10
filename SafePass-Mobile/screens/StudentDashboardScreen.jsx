@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -90,6 +91,22 @@ export default function StudentDashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tapActionLoading, setTapActionLoading] = useState("");
+  const [accountMode, setAccountMode] = useState("view");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    username: "",
+    phone: "",
+    emergencyContact: "",
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
   const loadData = useCallback(async () => {
     const [profileResponse, attendanceResponse] = await Promise.all([
@@ -122,6 +139,19 @@ export default function StudentDashboardScreen({ navigation }) {
     run();
   }, [loadData]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    setProfileForm({
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      email: user?.email || "",
+      username: user?.username || "",
+      phone: user?.phone || "",
+      emergencyContact: user?.emergencyContact || "",
+    });
+  }, [user]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -131,7 +161,7 @@ export default function StudentDashboardScreen({ navigation }) {
     }
   };
 
-  const handleLogout = async () => {
+  const performLogout = async () => {
     try {
       await ApiService.logout();
     } catch (error) {
@@ -140,6 +170,17 @@ export default function StudentDashboardScreen({ navigation }) {
       await ApiService.clearAuth();
       navigation.replace("Login");
     }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Sign Out",
+      "Would you like to sign out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Sign Out", style: "destructive", onPress: performLogout },
+      ],
+    );
   };
 
   const todayRecord = useMemo(
@@ -217,6 +258,117 @@ export default function StudentDashboardScreen({ navigation }) {
       Alert.alert("Attendance Error", error?.message || "Unable to record your attendance.");
     } finally {
       setTapActionLoading("");
+    }
+  };
+
+  const handleProfileInputChange = (field, value) => {
+    setProfileForm((currentValue) => ({ ...currentValue, [field]: value }));
+  };
+
+  const handlePasswordInputChange = (field, value) => {
+    setPasswordForm((currentValue) => ({ ...currentValue, [field]: value }));
+  };
+
+  const handleCancelProfileEdit = () => {
+    setProfileForm({
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      email: user?.email || "",
+      username: user?.username || "",
+      phone: user?.phone || "",
+      emergencyContact: user?.emergencyContact || "",
+    });
+    setAccountMode("view");
+  };
+
+  const handleSaveProfile = async () => {
+    const firstName = profileForm.firstName.trim();
+    const lastName = profileForm.lastName.trim();
+    const email = profileForm.email.trim().toLowerCase();
+    const username = profileForm.username.trim().toLowerCase();
+    const phone = String(profileForm.phone || "").replace(/[^\d+]/g, "");
+    const emergencyContact = profileForm.emergencyContact.trim();
+
+    if (!firstName || !lastName) {
+      Alert.alert("Missing Details", "First name and last name are required.");
+      return;
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
+    if (!username) {
+      Alert.alert("Missing Username", "Username is required.");
+      return;
+    }
+
+    if (phone && !/^(?:\+63|0)\d{10}$/.test(phone)) {
+      Alert.alert(
+        "Invalid Contact Number",
+        "Please enter a valid Philippine mobile number like 09XXXXXXXXX or +639XXXXXXXXX.",
+      );
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const response = await ApiService.updateProfile({
+        firstName,
+        lastName,
+        email,
+        username,
+        phone,
+        emergencyContact,
+      });
+
+      if (response?.user) {
+        setUser(response.user);
+      }
+
+      setAccountMode("view");
+      Alert.alert("Profile Updated", "Your account details were updated successfully.");
+    } catch (error) {
+      Alert.alert("Update Failed", error?.message || "Could not update your profile.");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      Alert.alert("Missing Details", "Please complete all password fields.");
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      Alert.alert("Password Mismatch", "New password and confirm password do not match.");
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      Alert.alert("Weak Password", "New password must be at least 6 characters.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await ApiService.changePassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setAccountMode("view");
+      Alert.alert("Password Updated", "Your password was changed successfully.");
+    } catch (error) {
+      Alert.alert("Password Update Failed", error?.message || "Could not change password.");
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -436,7 +588,7 @@ export default function StudentDashboardScreen({ navigation }) {
     <>
       <View style={styles.compactHeader}>
         <Text style={styles.compactTitle}>My Profile</Text>
-        <Text style={styles.compactSubtitle}>Your student details used for attendance and parent notifications.</Text>
+        <Text style={styles.compactSubtitle}>Manage your campus account, contact details, and password.</Text>
       </View>
       <View style={styles.profileCard}>
         <View style={styles.profileHero}>
@@ -448,21 +600,203 @@ export default function StudentDashboardScreen({ navigation }) {
             <Text style={styles.profileRole}>{roleLabel} Access</Text>
           </View>
         </View>
-        {[
-          ["Email", user?.email],
-          ["Student ID", user?.studentId || user?.teacherId || "Not assigned"],
-          ["Course / Section", formatProfileDetail(user?.course, user?.yearLevel, user?.section)],
-          ["NFC Card", user?.nfcCardId || "Virtual mobile check only"],
-          ["Guardian", user?.guardianName || "Not configured"],
-          ["Parent Email", user?.guardianEmail || "Not configured"],
-          ["Guardian Phone", user?.guardianPhone || "Not configured"],
-          ["Parent Alerts", guardianNoticeEnabled ? "Enabled" : "Not configured"],
-        ].map(([label, value]) => (
-          <View key={label} style={styles.profileRow}>
-            <Text style={styles.profileLabel}>{label}</Text>
-            <Text style={styles.profileValue}>{value}</Text>
+
+        <View style={styles.accountTabs}>
+          {[
+            ["view", "Overview", "id-card-outline"],
+            ["edit", "Edit", "create-outline"],
+            ["password", "Password", "lock-closed-outline"],
+          ].map(([key, label, icon]) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.accountTab, accountMode === key && styles.accountTabActive]}
+              onPress={() => setAccountMode(key)}
+            >
+              <Ionicons name={icon} size={15} color={accountMode === key ? "#FFFFFF" : BRAND.blue} />
+              <Text style={[styles.accountTabText, accountMode === key && styles.accountTabTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {accountMode === "view" ? (
+          <>
+            {[
+              ["Email", user?.email],
+              ["Username", user?.username || "Not assigned"],
+              ["Contact Number", user?.phone || "Not configured"],
+              ["Emergency Contact", user?.emergencyContact || "Not configured"],
+              ["Student ID", user?.studentId || user?.teacherId || "Not assigned"],
+              ["Course / Section", formatProfileDetail(user?.course, user?.yearLevel, user?.section)],
+              ["NFC Card", user?.nfcCardId || "Virtual mobile check only"],
+              ["Guardian", user?.guardianName || "Not configured"],
+              ["Parent Email", user?.guardianEmail || "Not configured"],
+              ["Guardian Phone", user?.guardianPhone || "Not configured"],
+              ["Parent Alerts", guardianNoticeEnabled ? "Enabled" : "Not configured"],
+            ].map(([label, value]) => (
+              <View key={label} style={styles.profileRow}>
+                <Text style={styles.profileLabel}>{label}</Text>
+                <Text style={styles.profileValue}>{value}</Text>
+              </View>
+            ))}
+            <View style={styles.accountNotice}>
+              <Ionicons name="information-circle-outline" size={18} color={BRAND.blue} />
+              <Text style={styles.accountNoticeText}>
+                Student ID, course, NFC card, and parent contacts are managed by the school office.
+              </Text>
+            </View>
+          </>
+        ) : null}
+
+        {accountMode === "edit" ? (
+          <View style={styles.formSection}>
+            <Text style={styles.formTitle}>Personal Details</Text>
+            <Text style={styles.formSubtitle}>Update the contact details used for your SafePass account.</Text>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>First Name</Text>
+              <TextInput
+                value={profileForm.firstName}
+                onChangeText={(value) => handleProfileInputChange("firstName", value)}
+                placeholder="First name"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+              />
+            </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Last Name</Text>
+              <TextInput
+                value={profileForm.lastName}
+                onChangeText={(value) => handleProfileInputChange("lastName", value)}
+                placeholder="Last name"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+              />
+            </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Email</Text>
+              <TextInput
+                value={profileForm.email}
+                onChangeText={(value) => handleProfileInputChange("email", value)}
+                placeholder="Email address"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+            </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Username</Text>
+              <TextInput
+                value={profileForm.username}
+                onChangeText={(value) => handleProfileInputChange("username", value)}
+                placeholder="Username"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Contact Number</Text>
+              <TextInput
+                value={profileForm.phone}
+                onChangeText={(value) => handleProfileInputChange("phone", value)}
+                placeholder="09XXXXXXXXX"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+                keyboardType="phone-pad"
+              />
+            </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Emergency Contact</Text>
+              <TextInput
+                value={profileForm.emergencyContact}
+                onChangeText={(value) => handleProfileInputChange("emergencyContact", value)}
+                placeholder="Emergency contact"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+              />
+            </View>
+
+            <View style={styles.formActions}>
+              <TouchableOpacity style={styles.secondaryButton} onPress={handleCancelProfileEdit}>
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryButton, profileSaving && styles.disabledButton]}
+                onPress={handleSaveProfile}
+                disabled={profileSaving}
+              >
+                {profileSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        ))}
+        ) : null}
+
+        {accountMode === "password" ? (
+          <View style={styles.formSection}>
+            <Text style={styles.formTitle}>Password & Security</Text>
+            <Text style={styles.formSubtitle}>Change your password to keep your campus account secure.</Text>
+
+            <View style={styles.securityTip}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={BRAND.blue} />
+              <Text style={styles.securityTipText}>
+                Use at least 6 characters. Avoid passwords used on shared devices.
+              </Text>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Current Password</Text>
+              <TextInput
+                value={passwordForm.currentPassword}
+                onChangeText={(value) => handlePasswordInputChange("currentPassword", value)}
+                placeholder="Current password"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>New Password</Text>
+              <TextInput
+                value={passwordForm.newPassword}
+                onChangeText={(value) => handlePasswordInputChange("newPassword", value)}
+                placeholder="New password"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Confirm Password</Text>
+              <TextInput
+                value={passwordForm.confirmPassword}
+                onChangeText={(value) => handlePasswordInputChange("confirmPassword", value)}
+                placeholder="Confirm password"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+                secureTextEntry
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryButton, styles.fullWidthButton, passwordSaving && styles.disabledButton]}
+              onPress={handleChangePassword}
+              disabled={passwordSaving}
+            >
+              {passwordSaving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Update Password</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </View>
       <TouchableOpacity style={styles.logoutFullButton} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={18} color="#DC2626" />
@@ -862,6 +1196,34 @@ const styles = StyleSheet.create({
     color: BRAND.muted,
     textTransform: "uppercase",
   },
+  accountTabs: {
+    flexDirection: "row",
+    gap: 8,
+    padding: 5,
+    borderRadius: 16,
+    backgroundColor: "#F1F5F9",
+    marginBottom: 12,
+  },
+  accountTab: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 5,
+  },
+  accountTabActive: {
+    backgroundColor: BRAND.blue,
+  },
+  accountTabText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.blue,
+  },
+  accountTabTextActive: {
+    color: "#FFFFFF",
+  },
   profileRow: {
     paddingVertical: 12,
     borderTopWidth: 1,
@@ -878,6 +1240,113 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     color: BRAND.ink,
+  },
+  accountNotice: {
+    marginTop: 12,
+    borderRadius: 16,
+    padding: 12,
+    backgroundColor: "#EEF5FF",
+    flexDirection: "row",
+    gap: 9,
+    alignItems: "flex-start",
+  },
+  accountNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#475569",
+    fontWeight: "700",
+  },
+  formSection: {
+    borderTopWidth: 1,
+    borderTopColor: "#EEF2F7",
+    paddingTop: 14,
+  },
+  formTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  formSubtitle: {
+    marginTop: 4,
+    marginBottom: 12,
+    fontSize: 12,
+    lineHeight: 17,
+    color: BRAND.muted,
+  },
+  fieldGroup: {
+    marginBottom: 11,
+  },
+  fieldLabel: {
+    marginBottom: 6,
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  fieldInput: {
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D8E4F2",
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 13,
+    fontSize: 14,
+    fontWeight: "800",
+    color: BRAND.ink,
+  },
+  formActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  primaryButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: BRAND.blue,
+  },
+  fullWidthButton: {
+    width: "100%",
+    marginTop: 4,
+  },
+  primaryButtonText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  secondaryButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#BBD3F3",
+    backgroundColor: "#FFFFFF",
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.blue,
+  },
+  securityTip: {
+    marginBottom: 12,
+    borderRadius: 16,
+    padding: 12,
+    backgroundColor: "#EEF5FF",
+    flexDirection: "row",
+    gap: 9,
+    alignItems: "flex-start",
+  },
+  securityTipText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#475569",
+    fontWeight: "700",
   },
   logoutFullButton: {
     marginTop: 12,
