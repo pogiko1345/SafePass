@@ -20,7 +20,7 @@ export default StyleSheet.create({
 
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 28,
+    paddingBottom: isSmallPhone ? 18 : 28,
   },
 
   splashContainer: {
@@ -169,16 +169,16 @@ export default StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 7,
     paddingHorizontal: 11,
-    marginBottom: 14,
+    marginBottom: isSmallPhone ? 12 : 14,
     ...Platform.select({
       web: { backdropFilter: "blur(10px)" },
     }),
   },
 
   brandBadgeLogo: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: isSmallPhone ? 24 : 28,
+    height: isSmallPhone ? 24 : 28,
+    borderRadius: isSmallPhone ? 12 : 14,
     marginRight: 8,
     backgroundColor: brandColors.surface,
   },
@@ -209,23 +209,23 @@ export default StyleSheet.create({
 
   brandBadgeEyebrow: {
     color: "rgba(255,255,255,0.78)",
-    fontSize: 10,
+    fontSize: isSmallPhone ? 9 : 10,
     fontWeight: "700",
-    letterSpacing: 0.8,
+    letterSpacing: 0,
     textTransform: "uppercase",
   },
 
   brandBadgeTitle: {
     color: brandColors.surface,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 
   logoImage: {
     width: isSmallPhone ? 78 : 92,
     height: isSmallPhone ? 78 : 92,
     borderRadius: isSmallPhone ? 39 : 46,
-    marginBottom: 12,
+    marginBottom: isSmallPhone ? 10 : 12,
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.28)",
     backgroundColor: brandColors.surface,
@@ -247,18 +247,18 @@ export default StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
     lineHeight: isSmallPhone ? 24 : 28,
-    marginBottom: 8,
+    marginBottom: 7,
     letterSpacing: 0,
   },
 
   headerTagline: {
     color: "rgba(255,255,255,0.86)",
-    fontSize: 13,
+    fontSize: isSmallPhone ? 12 : 13,
     fontWeight: "500",
     textAlign: "center",
     lineHeight: 19,
     maxWidth: 380,
-    marginBottom: 14,
+    marginBottom: isSmallPhone ? 10 : 14,
   },
 
   flightAccent: {
@@ -266,7 +266,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginBottom: 14,
+    marginBottom: isSmallPhone ? 10 : 14,
   },
 
   flightAccentLine: {
@@ -284,8 +284,8 @@ export default StyleSheet.create({
   },
 
   statusBadge: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: isSmallPhone ? 6 : 8,
+    paddingHorizontal: isSmallPhone ? 12 : 16,
     borderRadius: 999,
     flexDirection: "row",
     alignItems: "center",
@@ -302,7 +302,7 @@ export default StyleSheet.create({
 
   statusText: {
     color: "#FFFFFF",
-    fontSize: 11,
+    fontSize: isSmallPhone ? 10 : 11,
     fontWeight: "800",
     letterSpacing: 0.3,
   },
@@ -311,7 +311,7 @@ export default StyleSheet.create({
     backgroundColor: "#FFFFFF",
     marginTop: -32,
     marginHorizontal: isSmallPhone ? 16 : 20,
-    padding: isSmallPhone ? 20 : 24,
+    padding: isSmallPhone ? 16 : 24,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: brandColors.border,
@@ -405,7 +405,7 @@ export default StyleSheet.create({
     fontSize: isSmallPhone ? 14 : 15,
     color: brandColors.textMuted,
     textAlign: "center",
-    marginBottom: 18,
+    marginBottom: isSmallPhone ? 14 : 18,
     lineHeight: 21,
   },
 
@@ -430,7 +430,7 @@ export default StyleSheet.create({
   },
 
   inputBox: {
-    marginBottom: 20,
+    marginBottom: isSmallPhone ? 16 : 20,
   },
 
   label: {
@@ -497,7 +497,7 @@ export default StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
     marginTop: -6,
-    marginBottom: 18,
+    marginBottom: isSmallPhone ? 14 : 18,
   },
 
   loginAlertText: {
@@ -509,7 +509,7 @@ export default StyleSheet.create({
   },
 
   helperText: {
-    fontSize: 12,
+    fontSize: isSmallPhone ? 11 : 12,
     color: brandColors.textMuted,
     marginTop: 5,
     marginLeft: 4,
@@ -519,7 +519,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: isSmallPhone ? 18 : 24,
   },
 
   rememberBox: {
@@ -592,13 +592,13 @@ export default StyleSheet.create({
 
   loginButton: {
     backgroundColor: brandColors.blue,
-    paddingVertical: 16,
+    paddingVertical: isSmallPhone ? 14 : 16,
     borderRadius: 8,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
     gap: 8,
-    marginBottom: 16,
+    marginBottom: isSmallPhone ? 12 : 16,
     ...Platform.select({
       web: {
         cursor: "pointer",
@@ -609,7 +609,7 @@ export default StyleSheet.create({
 
   loginButtonText: {
     color: brandColors.surface,
-    fontSize: 16,
+    fontSize: isSmallPhone ? 15 : 16,
     fontWeight: "800",
     letterSpacing: 0.4,
   },
@@ -627,7 +627,7 @@ export default StyleSheet.create({
     backgroundColor: brandColors.blueSoft,
     borderRadius: 8,
     gap: 8,
-    marginBottom: 16,
+    marginBottom: isSmallPhone ? 12 : 16,
     borderWidth: 1,
     borderColor: brandColors.blueBorder,
   },
@@ -636,6 +636,74 @@ export default StyleSheet.create({
     fontSize: 13,
     color: brandColors.blue,
     fontWeight: "600",
+  },
+
+  visitorAccessCard: {
+    marginBottom: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: brandColors.blueBorder,
+    backgroundColor: brandColors.surfaceSoft,
+    paddingHorizontal: isSmallPhone ? 13 : 16,
+    paddingVertical: isSmallPhone ? 13 : 16,
+  },
+
+  visitorAccessHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  visitorAccessIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: brandColors.blueSoft,
+    borderWidth: 1,
+    borderColor: brandColors.blueBorder,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  visitorAccessCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  visitorAccessTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: brandColors.text,
+    marginBottom: 3,
+  },
+
+  visitorAccessText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: brandColors.textMuted,
+    fontWeight: "600",
+  },
+
+  visitorAccessButton: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: brandColors.blueBorder,
+    backgroundColor: brandColors.blueSoft,
+    borderRadius: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    ...(isWeb && { cursor: "pointer" }),
+  },
+
+  visitorAccessButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: brandColors.blue,
   },
 
   visitorOtpPanel: {

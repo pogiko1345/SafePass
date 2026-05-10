@@ -61,35 +61,35 @@ export default function LoginScreen({ navigation, route }) {
   );
   const headerResponsiveStyle = {
     paddingHorizontal: isCompactLogin ? 18 : isTabletLogin ? 28 : 24,
-    paddingBottom: isCompactLogin ? 56 : isTabletLogin ? 68 : 62,
+    paddingBottom: isCompactLogin ? 42 : isTabletLogin ? 68 : 58,
   };
   const logoResponsiveStyle = {
-    width: isCompactLogin ? 74 : isTabletLogin ? 100 : 92,
-    height: isCompactLogin ? 74 : isTabletLogin ? 100 : 92,
-    borderRadius: isCompactLogin ? 37 : isTabletLogin ? 50 : 46,
+    width: isCompactLogin ? 62 : isTabletLogin ? 92 : 82,
+    height: isCompactLogin ? 62 : isTabletLogin ? 92 : 82,
+    borderRadius: isCompactLogin ? 31 : isTabletLogin ? 46 : 41,
   };
   const appNameResponsiveStyle = {
-    fontSize: isCompactLogin ? 18 : isTabletLogin ? 24 : 22,
-    lineHeight: isCompactLogin ? 24 : isTabletLogin ? 30 : 28,
+    fontSize: isCompactLogin ? 22 : isTabletLogin ? 28 : 26,
+    lineHeight: isCompactLogin ? 28 : isTabletLogin ? 34 : 32,
   };
   const cardResponsiveStyle = {
     marginHorizontal: loginHorizontalPadding,
-    marginTop: isCompactLogin ? -26 : -32,
-    padding: isCompactLogin ? 18 : 24,
+    marginTop: isCompactLogin ? -20 : -30,
+    padding: isCompactLogin ? 16 : 24,
     ...(isWeb ? { maxWidth: loginMaxContentWidth } : null),
   };
   const roleHeroResponsiveStyle = isCompactLogin
-    ? { padding: 12, alignItems: "flex-start" }
+    ? { padding: 12, alignItems: "center", marginBottom: 14 }
     : null;
   const roleIconResponsiveStyle = isCompactLogin
     ? { width: 42, height: 42, borderRadius: 8, marginRight: 10 }
     : null;
   const welcomeTitleResponsiveStyle = {
-    fontSize: isCompactLogin ? 24 : isTabletLogin ? 30 : 28,
-    lineHeight: isCompactLogin ? 30 : 34,
+    fontSize: isCompactLogin ? 22 : isTabletLogin ? 30 : 28,
+    lineHeight: isCompactLogin ? 28 : 34,
   };
   const welcomeSubtitleResponsiveStyle = {
-    marginBottom: isCompactLogin ? 20 : 24,
+    marginBottom: isCompactLogin ? 16 : 24,
   };
   const authRowResponsiveStyle = isCompactLogin
     ? { flexDirection: "column", alignItems: "flex-start", gap: 12, marginBottom: 20 }
@@ -1137,9 +1137,9 @@ export default function LoginScreen({ navigation, route }) {
     switch (roleForDisplay) {
       case "visitor":
         return {
-          label: "Visitor Portal",
-          title: "Visitor Pass Sign-In",
-          subtitle: "Track approvals, manage appointments, and keep your Sapphire visit details in one secure place.",
+          label: "Visitor Access",
+          title: "Visitor Sign-In",
+          subtitle: "Track approvals, manage appointments, and keep your Sapphire visit details secure.",
           icon: "person-outline",
           accent: brandColors.blue,
           panel: "Campus Visitor Pass",
@@ -1148,8 +1148,8 @@ export default function LoginScreen({ navigation, route }) {
       case "guard":
         return {
           label: "Security Access",
-          title: "Checkpoint Team Sign-In",
-          subtitle: "Enter the secure operations workspace for approvals, arrival monitoring, and access validation.",
+          title: "Security Sign-In",
+          subtitle: "Open checkpoint tools for arrival monitoring, access validation, and campus logs.",
           icon: "shield-checkmark-outline",
           accent: brandColors.blue,
           panel: "Operations Console",
@@ -1157,8 +1157,8 @@ export default function LoginScreen({ navigation, route }) {
       case "staff":
         return {
           label: "Staff Access",
-          title: "Staff Campus Sign-In",
-          subtitle: "Open your staff dashboard for virtual NFC attendance, office presence, and assigned office access.",
+          title: "Staff Sign-In",
+          subtitle: "Open staff tools for NFC attendance, office presence, and assigned access.",
           icon: "briefcase-outline",
           accent: brandColors.blue,
           panel: "Staff NFC Console",
@@ -1167,11 +1167,11 @@ export default function LoginScreen({ navigation, route }) {
       case "teacher":
         return {
           label: roleForDisplay === "teacher" ? "Teacher Access" : "Student Access",
-          title: roleForDisplay === "teacher" ? "Teacher Attendance Sign-In" : "Student Attendance Sign-In",
+          title: roleForDisplay === "teacher" ? "Teacher Sign-In" : "Student Sign-In",
           subtitle:
             roleForDisplay === "teacher"
-              ? "Review your latest attendance records, campus checkpoint activity, and virtual campus ID."
-              : "Check your attendance history, latest NFC activity, and parent notification status.",
+              ? "Review attendance records, campus checkpoint activity, and your virtual campus ID."
+              : "Open your virtual campus ID, attendance history, and latest NFC activity.",
           icon: roleForDisplay === "teacher" ? "school-outline" : "id-card-outline",
           accent: brandColors.blue,
           panel: "Campus ID Console",
@@ -1181,7 +1181,7 @@ export default function LoginScreen({ navigation, route }) {
           label: "Campus Access",
           title: "Sign In to SafePass",
           subtitle:
-            "Use your visitor, student, staff, security, or admin account to open the correct campus dashboard.",
+            "Use your student, staff, visitor, security, or admin account to open the correct dashboard.",
           icon: "id-card-outline",
           accent: brandColors.blue,
           panel: "Smart Campus Platform",
@@ -1189,8 +1189,8 @@ export default function LoginScreen({ navigation, route }) {
       case "admin":
         return {
           label: "Administrative Access",
-          title: "Command and Oversight Login",
-          subtitle: "Open the administrative control center for user review, access supervision, and reporting.",
+          title: "Admin Sign-In",
+          subtitle: "Open the control center for users, approvals, reports, and campus supervision.",
           icon: "settings-outline",
           accent: brandColors.sky,
           panel: "Admin Control",
@@ -1355,8 +1355,8 @@ export default function LoginScreen({ navigation, route }) {
                       resizeMode="contain"
                     />
                     <View style={loginStyles.brandBadgeTextWrap}>
-                      <Text style={loginStyles.brandBadgeEyebrow}>Secure Login Portal</Text>
-                      <Text style={loginStyles.brandBadgeTitle}>SafePass Command Center</Text>
+                      <Text style={loginStyles.brandBadgeEyebrow}>Sapphire International Aviation Academy</Text>
+                      <Text style={loginStyles.brandBadgeTitle}>SafePass Smart Campus</Text>
                     </View>
                   </View>
 
@@ -1366,10 +1366,10 @@ export default function LoginScreen({ navigation, route }) {
                     resizeMode="contain"
                   />
                   <Text style={[loginStyles.appName, appNameResponsiveStyle]}>
-                    Sapphire International{"\n"}Aviation Academy
+                    Campus Login
                   </Text>
                   <Text style={loginStyles.headerTagline}>
-                    Smart campus access for students, staff, visitors, and security
+                    Secure access for students, staff, visitors, security, and admins.
                   </Text>
                   <View style={loginStyles.flightAccent}>
                     <View style={loginStyles.flightAccentLine} />
@@ -1710,65 +1710,25 @@ export default function LoginScreen({ navigation, route }) {
                   </View>
 
                   {showVisitorRegisterEntry ? (
-                    <View
-                      style={{
-                        marginBottom: 16,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: brandColors.border,
-                        backgroundColor: brandColors.surfaceSoft,
-                        paddingHorizontal: isCompactLogin ? 14 : 16,
-                        paddingVertical: isCompactLogin ? 14 : 16,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          fontWeight: "800",
-                          color: brandColors.text,
-                          textAlign: "center",
-                          marginBottom: 4,
-                        }}
-                      >
-                        Need visitor access?
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          lineHeight: 19,
-                          color: brandColors.textMuted,
-                          textAlign: "center",
-                          marginBottom: 12,
-                        }}
-                      >
-                        Create a visitor account before requesting or tracking appointments.
-                      </Text>
+                    <View style={loginStyles.visitorAccessCard}>
+                      <View style={loginStyles.visitorAccessHeader}>
+                        <View style={loginStyles.visitorAccessIcon}>
+                          <Ionicons name="person-add-outline" size={17} color={brandColors.blue} />
+                        </View>
+                        <View style={loginStyles.visitorAccessCopy}>
+                          <Text style={loginStyles.visitorAccessTitle}>Need visitor access?</Text>
+                          <Text style={loginStyles.visitorAccessText}>
+                            Create a visitor account before requesting or tracking appointments.
+                          </Text>
+                        </View>
+                      </View>
                       <TouchableOpacity
-                        style={{
-                          borderWidth: 1,
-                          borderColor: brandColors.blueBorder,
-                          backgroundColor: brandColors.blueSoft,
-                          borderRadius: 8,
-                          paddingVertical: 13,
-                          paddingHorizontal: 16,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 8,
-                        }}
+                        style={loginStyles.visitorAccessButton}
                         onPress={() => navigation.navigate("VisitorRegister")}
                         activeOpacity={0.85}
                       >
-                        <Ionicons name="person-add-outline" size={18} color={brandColors.blue} />
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: "800",
-                            color: brandColors.blue,
-                          }}
-                        >
-                          Create Account
-                        </Text>
+                        <Text style={loginStyles.visitorAccessButtonText}>Create Account</Text>
+                        <Ionicons name="arrow-forward-outline" size={16} color={brandColors.blue} />
                       </TouchableOpacity>
                     </View>
                   ) : null}

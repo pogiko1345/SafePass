@@ -19,34 +19,39 @@ export default StyleSheet.create({
 
   mobileScrollContent: {
     flexGrow: 1,
-    paddingBottom: 24,
+    paddingBottom: 26,
   },
 
   mobileHero: {
-    backgroundColor: brandColors.navy,
-    paddingHorizontal: 20,
+    paddingHorizontal: isSmallPhone ? 18 : 20,
     paddingTop: Platform.select({
-      ios: 58,
-      android: 34,
+      ios: 56,
+      android: 32,
       web: 28,
-      default: 34,
+      default: 32,
     }),
-    paddingBottom: 26,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
+    paddingBottom: isSmallPhone ? 22 : 26,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: "hidden",
   },
 
   mobileBrandRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 24,
+    gap: 11,
+    marginBottom: 18,
+    padding: 11,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.11)",
   },
 
   mobileLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: isSmallPhone ? 40 : 44,
+    height: isSmallPhone ? 40 : 44,
+    borderRadius: isSmallPhone ? 20 : 22,
     backgroundColor: "#FFFFFF",
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.32)",
@@ -59,8 +64,8 @@ export default StyleSheet.create({
 
   mobileSchoolName: {
     color: "#FFFFFF",
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: isSmallPhone ? 12 : 13,
+    lineHeight: isSmallPhone ? 16 : 17,
     fontWeight: "900",
   },
 
@@ -83,7 +88,7 @@ export default StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 11,
     paddingVertical: 7,
-    marginBottom: 14,
+    marginBottom: 13,
   },
 
   mobileHeroBadgeText: {
@@ -96,29 +101,56 @@ export default StyleSheet.create({
 
   mobileTitle: {
     color: "#FFFFFF",
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: isSmallPhone ? 27 : 30,
+    lineHeight: isSmallPhone ? 33 : 36,
     fontWeight: "900",
     letterSpacing: 0,
   },
 
   mobileSubtitle: {
     color: "#D7E4F7",
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: isSmallPhone ? 12 : 13,
+    lineHeight: isSmallPhone ? 19 : 20,
     fontWeight: "600",
-    marginTop: 10,
+    marginTop: 9,
+    maxWidth: 330,
+  },
+
+  mobileTrustGrid: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+  },
+
+  mobileTrustPill: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 5,
+    paddingHorizontal: 7,
+  },
+
+  mobileTrustText: {
+    color: "#FFFFFF",
+    fontSize: isSmallPhone ? 10 : 11,
+    fontWeight: "800",
   },
 
   mobileActionStack: {
-    marginTop: 20,
+    marginTop: 16,
     gap: 10,
   },
 
   mobilePrimaryButton: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: 8,
-    backgroundColor: brandColors.blue,
+    backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -126,7 +158,7 @@ export default StyleSheet.create({
   },
 
   mobilePrimaryText: {
-    color: "#FFFFFF",
+    color: brandColors.blue,
     fontSize: 15,
     fontWeight: "900",
   },
@@ -134,9 +166,9 @@ export default StyleSheet.create({
   mobileSecondaryButton: {
     minHeight: 50,
     borderRadius: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
-    borderColor: brandColors.blueBorder,
+    borderColor: "rgba(255,255,255,0.22)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -144,14 +176,14 @@ export default StyleSheet.create({
   },
 
   mobileSecondaryText: {
-    color: brandColors.blue,
+    color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "900",
   },
 
   mobileSection: {
-    paddingHorizontal: 16,
-    paddingTop: 18,
+    paddingHorizontal: isSmallPhone ? 14 : 16,
+    paddingTop: 16,
   },
 
   mobileVisitorCard: {
@@ -161,9 +193,18 @@ export default StyleSheet.create({
     borderColor: brandColors.border,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    padding: 14,
+    gap: 11,
+    padding: isSmallPhone ? 13 : 14,
     marginBottom: 18,
+    ...Platform.select({
+      ios: {
+        shadowColor,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+      },
+      android: { elevation: 2 },
+    }),
   },
 
   mobileVisitorIcon: {
@@ -209,18 +250,20 @@ export default StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 0.6,
-    marginBottom: 4,
+    textAlign: "center",
+    marginBottom: 5,
   },
 
   mobileSectionTitle: {
     color: brandColors.text,
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: "900",
-    marginBottom: 12,
+    marginBottom: 13,
+    textAlign: "center",
   },
 
   mobileFeatureList: {
-    gap: 9,
+    gap: 10,
   },
 
   mobileFeatureItem: {
@@ -228,7 +271,7 @@ export default StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: brandColors.border,
-    padding: 13,
+    padding: isSmallPhone ? 12 : 14,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
@@ -250,14 +293,14 @@ export default StyleSheet.create({
 
   mobileFeatureTitle: {
     color: brandColors.text,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "900",
   },
 
   mobileFeatureText: {
     color: brandColors.textMuted,
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
     fontWeight: "600",
     marginTop: 4,
   },

@@ -9,3 +9,5 @@ SafePass-Mobile/backend/.env.*
 SafePass-Mobile/.gradle-local/
 SafePass-Mobile/.gradle-codex/
 SafePass-Mobile/visitor-build.log
+SafePass-Mobile/static/
+SafePass-Mobile/dist-android-check/

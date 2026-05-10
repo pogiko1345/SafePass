@@ -13,9 +13,10 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import SocialDock from "../components/SocialDock";
 import roleSelectStyles from "../styles/RoleSelectStyles";
-import { brandColors } from "../styles/brandColors";
+import { brandColors, sapphireGradient } from "../styles/brandColors";
 import Logo from "../assets/LogoSapphire.jpg";
 
 const isWeb = Platform.OS === "web";
@@ -329,7 +330,13 @@ export default function RoleSelectScreen({ navigation }) {
           contentContainerStyle={roleSelectStyles.mobileScrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <Animated.View style={[roleSelectStyles.mobileHero, entranceStyle]}>
+          <Animated.View style={entranceStyle}>
+            <LinearGradient
+              colors={sapphireGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={roleSelectStyles.mobileHero}
+            >
             <View style={roleSelectStyles.mobileBrandRow}>
               <Image source={Logo} style={roleSelectStyles.mobileLogo} resizeMode="contain" />
               <View style={roleSelectStyles.mobileBrandCopy}>
@@ -348,6 +355,21 @@ export default function RoleSelectScreen({ navigation }) {
               One portal for campus ID, attendance, visitor access, and security monitoring.
             </Text>
 
+            <View style={roleSelectStyles.mobileTrustGrid}>
+              <View style={roleSelectStyles.mobileTrustPill}>
+                <Ionicons name="id-card-outline" size={15} color="#FFFFFF" />
+                <Text style={roleSelectStyles.mobileTrustText}>Campus ID</Text>
+              </View>
+              <View style={roleSelectStyles.mobileTrustPill}>
+                <Ionicons name="radio-outline" size={15} color="#FFFFFF" />
+                <Text style={roleSelectStyles.mobileTrustText}>NFC Ready</Text>
+              </View>
+              <View style={roleSelectStyles.mobileTrustPill}>
+                <Ionicons name="shield-checkmark-outline" size={15} color="#FFFFFF" />
+                <Text style={roleSelectStyles.mobileTrustText}>Secure</Text>
+              </View>
+            </View>
+
             <View style={roleSelectStyles.mobileActionStack}>
               <Animated.View style={{ transform: [{ scale: mobileLoginPressAnim }] }}>
                 <TouchableOpacity
@@ -357,7 +379,7 @@ export default function RoleSelectScreen({ navigation }) {
                   onPressOut={() => animatePressValue(mobileLoginPressAnim, 1)}
                   activeOpacity={0.86}
                 >
-                  <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
+                  <Ionicons name="log-in-outline" size={18} color={brandColors.blue} />
                   <Text style={roleSelectStyles.mobilePrimaryText}>Login</Text>
                 </TouchableOpacity>
               </Animated.View>
@@ -369,11 +391,12 @@ export default function RoleSelectScreen({ navigation }) {
                   onPressOut={() => animatePressValue(mobileContactPressAnim, 1)}
                   activeOpacity={0.84}
                 >
-                  <Ionicons name="chatbubbles-outline" size={18} color={brandColors.blue} />
+                  <Ionicons name="chatbubbles-outline" size={18} color="#FFFFFF" />
                   <Text style={roleSelectStyles.mobileSecondaryText}>Contact Help</Text>
                 </TouchableOpacity>
               </Animated.View>
             </View>
+            </LinearGradient>
           </Animated.View>
 
           <Animated.View style={[roleSelectStyles.mobileSection, mobileFeatureEntranceStyle]}>
