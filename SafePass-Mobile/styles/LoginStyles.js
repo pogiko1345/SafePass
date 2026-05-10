@@ -307,6 +307,102 @@ export default StyleSheet.create({
     letterSpacing: 0.3,
   },
 
+  loginStage: {
+    width: "100%",
+  },
+
+  loginStageDesktop: {
+    maxWidth: 1320,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 34,
+    paddingBottom: 10,
+    position: "relative",
+    overflow: "hidden",
+  },
+
+  desktopLoginDesign: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: -18,
+    bottom: 4,
+    zIndex: 0,
+  },
+
+  desktopColorWashLeft: {
+    position: "absolute",
+    left: 36,
+    top: 24,
+    width: 320,
+    height: 430,
+    borderRadius: 8,
+    backgroundColor: "rgba(183, 213, 246, 0.22)",
+    ...Platform.select({
+      web: {
+        backgroundImage: "linear-gradient(145deg, rgba(183,213,246,0.34), rgba(244,248,252,0))",
+      },
+    }),
+  },
+
+  desktopColorWashRight: {
+    position: "absolute",
+    right: 36,
+    top: 64,
+    width: 320,
+    height: 390,
+    borderRadius: 8,
+    backgroundColor: "rgba(238, 245, 255, 0.72)",
+    ...Platform.select({
+      web: {
+        backgroundImage: "linear-gradient(145deg, rgba(238,245,255,0), rgba(28,109,208,0.12))",
+      },
+    }),
+  },
+
+  desktopDesignRail: {
+    position: "absolute",
+    top: 90,
+    width: 280,
+    gap: 26,
+    opacity: 0.42,
+  },
+
+  desktopDesignRailLeft: {
+    left: 42,
+    alignItems: "flex-end",
+  },
+
+  desktopDesignRailRight: {
+    right: 42,
+    alignItems: "flex-start",
+  },
+
+  desktopDesignLineLong: {
+    width: 260,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: brandColors.blueBorder,
+    transform: [{ rotate: "-12deg" }],
+  },
+
+  desktopDesignLineMedium: {
+    width: 190,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: "#D8E8FF",
+    transform: [{ rotate: "-12deg" }],
+  },
+
+  desktopDesignLineShort: {
+    width: 128,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: brandColors.blueSoft,
+    transform: [{ rotate: "-12deg" }],
+  },
+
   card: {
     backgroundColor: "#FFFFFF",
     marginTop: -32,
@@ -315,6 +411,7 @@ export default StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: brandColors.border,
+    zIndex: 2,
     ...Platform.select({
       ios: {
         shadowColor,

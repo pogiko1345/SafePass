@@ -1304,6 +1304,7 @@ export default function LoginScreen({ navigation, route }) {
       onPress: () => openExternalLink("https://www.youtube.com/@sapphireaviation5105"),
     },
   ];
+  const showDesktopLoginDesign = isWeb && viewportWidth >= 1080;
   const logoPulseStyle = {
     transform: [
       {
@@ -1393,8 +1394,31 @@ export default function LoginScreen({ navigation, route }) {
                 </View>
               </View>
 
-              {/* Login Card */}
-              <Animated.View style={[loginStyles.card, cardResponsiveStyle, cardEntranceStyle]}>
+              {/* Login Stage */}
+              <View
+                style={[
+                  loginStyles.loginStage,
+                  showDesktopLoginDesign && loginStyles.loginStageDesktop,
+                ]}
+              >
+                {showDesktopLoginDesign ? (
+                  <View pointerEvents="none" style={loginStyles.desktopLoginDesign}>
+                    <View style={loginStyles.desktopColorWashLeft} />
+                    <View style={loginStyles.desktopColorWashRight} />
+                    <View style={[loginStyles.desktopDesignRail, loginStyles.desktopDesignRailLeft]}>
+                      <View style={loginStyles.desktopDesignLineLong} />
+                      <View style={loginStyles.desktopDesignLineShort} />
+                      <View style={loginStyles.desktopDesignLineMedium} />
+                    </View>
+                    <View style={[loginStyles.desktopDesignRail, loginStyles.desktopDesignRailRight]}>
+                      <View style={loginStyles.desktopDesignLineMedium} />
+                      <View style={loginStyles.desktopDesignLineLong} />
+                      <View style={loginStyles.desktopDesignLineShort} />
+                    </View>
+                  </View>
+                ) : null}
+
+                <Animated.View style={[loginStyles.card, cardResponsiveStyle, cardEntranceStyle]}>
                 {/* Back to Role Select */}
                 {!IS_VISITOR_ONLY_APP && (
                   <TouchableOpacity
@@ -1743,7 +1767,9 @@ export default function LoginScreen({ navigation, route }) {
                     </Text>
                   </View>
                 )}
-              </Animated.View>
+                </Animated.View>
+
+              </View>
 
               {/* Footer */}
               <View style={[loginStyles.footer, footerResponsiveStyle]}>
