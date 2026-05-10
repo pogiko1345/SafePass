@@ -234,6 +234,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     active: [],
     pending: [],
     approved: [],
+    notReady: [],
     completed: [],
     all: [],
   });
@@ -622,6 +623,13 @@ export default function SecurityDashboardScreen({ navigation }) {
         visitor.status !== 'checked_in' &&
         visitor.status !== 'checked_out',
     );
+    const notReady = all.filter(
+      (visitor) =>
+        hasApprovedVisitWindow(visitor) &&
+        !isCheckInAllowedNow(visitor) &&
+        visitor.status !== 'checked_in' &&
+        visitor.status !== 'checked_out',
+    );
     const completed = all.filter(
       (visitor) =>
         visitor.status === 'checked_out' &&
@@ -631,7 +639,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       (a, b) => new Date(b.updatedAt || b.createdAt || b.visitDate) - new Date(a.updatedAt || a.createdAt || a.visitDate)
     );
 
-    return { active, pending, approved, completed, all: allVisible };
+    return { active, pending, approved, notReady, completed, all: allVisible };
   };
 
   const deriveVisitorStats = (all = [], active = [], pending = []) => {
@@ -1187,11 +1195,11 @@ export default function SecurityDashboardScreen({ navigation }) {
     },
     {
       key: 'campus-activity',
-      label: 'Campus Presence',
+      label: 'Visitor Monitoring',
       icon: 'walk-outline',
       color: '#0A3D91',
       submodules: [
-        { key: 'checked-in-visitors', label: 'Campus Presence', badge: dashboardStats.activeUsers || visitors.active.length || 0 },
+        { key: 'checked-in-visitors', label: 'Arrival and Departure', badge: dashboardStats.activeUsers || visitors.active.length || 0 },
       ],
     },
     {
@@ -1238,8 +1246,8 @@ export default function SecurityDashboardScreen({ navigation }) {
         return { title: 'Appointment Records', subtitle: 'Review appointment records in a read-only security view.' };
       case 'checked-in-visitors':
         return {
-          title: 'Campus Presence',
-          subtitle: 'See visitor arrivals, live attendance presence, and recent departures in one security view.',
+          title: 'Arrival and Departure',
+          subtitle: 'Monitor visitor arrivals, active campus presence, and completed departures in one security view.',
         };
       case 'report-file':
         return { title: 'File a Report', subtitle: 'Submit a security report and review recently filed incidents.' };
@@ -1665,7 +1673,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
 
     if (!isCheckInAllowedNow(visitor)) {
-      Alert.alert("Cannot Check In", getCheckInBlockedLabel(visitor));
+      Alert.alert("Cannot Mark Arrived", getCheckInBlockedLabel(visitor));
       return;
     }
 
@@ -1714,12 +1722,12 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
 
     Alert.alert(
-      "Confirm Check-out",
-      `Check out ${visitor.fullName}?`,
+      "Confirm Release",
+      `Release ${visitor.fullName} from campus?`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Check Out",
+          text: "Release",
           onPress: performCheckOut
         }
       ]
@@ -1926,6 +1934,16 @@ export default function SecurityDashboardScreen({ navigation }) {
       );
     });
   }, [visitors.active, visitors.approved]);
+
+  const mobileNotReadyVisitors = useMemo(
+    () =>
+      [...(visitors.notReady || [])].sort(
+        (left, right) =>
+          new Date(left?.visitDate || left?.visitTime || 0).getTime() -
+          new Date(right?.visitDate || right?.visitTime || 0).getTime(),
+      ),
+    [visitors.notReady],
+  );
 
   const mobileLogItems = useMemo(() => {
     const normalizedSearch = String(searchQuery || "").trim().toLowerCase();
@@ -2378,14 +2396,14 @@ export default function SecurityDashboardScreen({ navigation }) {
             <View style={styles.sectionTitleContainer}>
               <Ionicons name="people-outline" size={20} color="#0A3D91" />
               <View>
-                <Text style={styles.sectionTitle}>Campus Presence</Text>
+                <Text style={styles.sectionTitle}>Visitor Monitoring</Text>
                 <Text style={styles.securitySectionSubtitle}>
-                  Live on-site attendance across students, teachers, staff, security, and visitors.
+                  Visitor arrival, active presence, and departure activity in one place.
                 </Text>
               </View>
             </View>
             <TouchableOpacity onPress={() => selectGuardSubmodule('checked-in-visitors')}>
-              <Text style={styles.viewAll}>Open Presence</Text>
+              <Text style={styles.viewAll}>Open Arrivals</Text>
             </TouchableOpacity>
           </View>
 
@@ -2837,7 +2855,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         <View style={[styles.sectionHeader, { marginTop: 16 }]}>
           <View style={styles.sectionTitleContainer}>
             <Ionicons name="people-outline" size={18} color="#0A3D91" />
-            <Text style={styles.sectionTitle}>All Live Campus Presence</Text>
+            <Text style={styles.sectionTitle}>Live Visitor Monitoring</Text>
           </View>
           <Text style={styles.securitySectionSubtitle}>
             {livePresenceSummary?.total || 0} active attendance record{livePresenceSummary?.total === 1 ? '' : 's'}
@@ -3547,7 +3565,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                     color="#FFFFFF" 
                   />
                   <Text style={styles.visitorCardActionText}>
-                    {isCheckedIn ? 'Check Out' : 'Check In'}
+                    {isCheckedIn ? 'Release' : 'Arrived'}
                   </Text>
                 </>
               )}
@@ -4025,7 +4043,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                   {isProcessing ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={securityMobileStyles.visitorActionPrimaryText}>{isCheckedIn ? "Check Out" : "Check In"}</Text>
+                    <Text style={securityMobileStyles.visitorActionPrimaryText}>{isCheckedIn ? "Release" : "Arrived"}</Text>
                   )}
                 </TouchableOpacity>
               ) : null}
@@ -4065,7 +4083,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 ) : (
                   <>
                     <Ionicons name="log-in-outline" size={16} color={BRAND.blue} />
-                    <Text style={securityMobileStyles.compactCheckInButtonText}>Check In</Text>
+                    <Text style={securityMobileStyles.compactCheckInButtonText}>Arrived</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -4116,6 +4134,34 @@ export default function SecurityDashboardScreen({ navigation }) {
       ) : (
         <MobileEmptyState icon="person-add-outline" title="No incoming visitors" message="Approved arrivals and active visits will appear here." />
       )}
+      {mobileNotReadyVisitors.length ? (
+        <View style={securityMobileStyles.notReadySection}>
+          <View style={securityMobileStyles.sectionHeader}>
+            <Text style={securityMobileStyles.sectionTitle}>Not Ready</Text>
+            <Text style={securityMobileStyles.sectionCount}>{mobileNotReadyVisitors.length}</Text>
+          </View>
+          {mobileNotReadyVisitors.slice(0, 3).map((visitor) => (
+            <TouchableOpacity
+              key={visitor._id}
+              style={securityMobileStyles.notReadyCard}
+              onPress={() => handleViewDetails(visitor)}
+            >
+              <View style={securityMobileStyles.notReadyIcon}>
+                <Ionicons
+                  name={getVisitDayRelation(visitor) === "past" ? "time-outline" : "calendar-outline"}
+                  size={17}
+                  color="#64748B"
+                />
+              </View>
+              <View style={securityMobileStyles.notReadyCopy}>
+                <Text style={securityMobileStyles.notReadyName} numberOfLines={1}>{visitor.fullName || "Visitor"}</Text>
+                <Text style={securityMobileStyles.notReadyReason} numberOfLines={1}>{getCheckInBlockedLabel(visitor)}</Text>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={17} color="#94A3B8" />
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
       <TouchableOpacity style={securityMobileStyles.viewAllButton} onPress={() => setSecurityMobileTab("map")}>
         <Text style={securityMobileStyles.viewAllButtonText}>Open full tracking map</Text>
         <Ionicons name="map-outline" size={18} color={BRAND.blue} />
@@ -4463,7 +4509,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                     }}
                   >
                     <Text style={securityMobileStyles.detailPrimaryButtonText}>
-                      {selectedVisitor.status === "checked_in" ? "Check Out" : "Check In"}
+                      {selectedVisitor.status === "checked_in" ? "Release" : "Arrived"}
                     </Text>
                   </TouchableOpacity>
                 ) : null}
@@ -5147,7 +5193,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                             color="#FFFFFF" 
                           />
                           <Text style={styles.detailActionText}>
-                            {selectedVisitor.status === 'checked_in' ? 'Check Out' : 'Check In'}
+                            {selectedVisitor.status === 'checked_in' ? 'Release' : 'Arrived'}
                           </Text>
                         </>
                       )}
@@ -5453,6 +5499,44 @@ const securityMobileStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900",
     color: BRAND.blue,
+  },
+  notReadySection: {
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  notReadyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 8,
+  },
+  notReadyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "#EEF2F7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notReadyCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  notReadyName: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  notReadyReason: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
   },
   toolbar: {
     gap: 10,
