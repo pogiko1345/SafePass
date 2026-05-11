@@ -50,8 +50,14 @@ const setBiometricCredential = async (key, value) => {
 };
 const LAST_ACTIVITY_AT_KEY = "lastActivityAt";
 const AUTH_NOTICE_KEY = "authNotice";
-const TRUSTED_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
-const SESSION_EXPIRED_MESSAGE = "Your trusted session has expired after 30 days. Please sign in again.";
+const MOBILE_IDLE_SESSION_MS = 30 * 60 * 1000;
+const WEB_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+const SESSION_RESTORE_TIMEOUT_MS =
+  Platform.OS === "web" ? WEB_SESSION_MS : MOBILE_IDLE_SESSION_MS;
+const SESSION_EXPIRED_MESSAGE =
+  Platform.OS === "web"
+    ? "Your web session has expired after 7 days. Please sign in again."
+    : "You were inactive for 30 minutes. Please sign in again.";
 
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
@@ -471,7 +477,7 @@ export default function LoginScreen({ navigation, route }) {
         if (
           Number.isFinite(lastActivityAt) &&
           lastActivityAt > 0 &&
-          Date.now() - lastActivityAt >= TRUSTED_SESSION_MS
+          Date.now() - lastActivityAt >= SESSION_RESTORE_TIMEOUT_MS
         ) {
           await ApiService.clearAuth();
           setEmail("");

@@ -192,6 +192,15 @@ const securityLogFilters = [
   { key: "denied", label: "Denied" },
 ];
 
+const buildSecurityProfileForm = (profile = {}) => ({
+  firstName: profile.firstName || "",
+  lastName: profile.lastName || "",
+  username: profile.username || "",
+  email: profile.email || "",
+  phone: profile.phone || "",
+  emergencyContact: profile.emergencyContact || "",
+});
+
 export default function SecurityDashboardScreen({ navigation }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isDesktop = viewportWidth >= 1024;
@@ -200,6 +209,9 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   // ============ STATE MANAGEMENT ============
   const [user, setUser] = useState(null);
+  const [securityProfileForm, setSecurityProfileForm] = useState(buildSecurityProfileForm());
+  const [securityProfileEditing, setSecurityProfileEditing] = useState(false);
+  const [securityProfileSaving, setSecurityProfileSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(isDesktop);
@@ -1018,6 +1030,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       }
       const normalizedUser = { ...currentUser, role: normalizedRole };
       setUser(normalizedUser);
+      setSecurityProfileForm(buildSecurityProfileForm(normalizedUser));
       return normalizedUser;
     } catch (error) {
       console.error("Load user error:", error);
@@ -3471,6 +3484,72 @@ export default function SecurityDashboardScreen({ navigation }) {
     return 'Stale update';
   };
 
+  const updateSecurityProfileField = (field, value) => {
+    setSecurityProfileForm((currentValue) => ({
+      ...currentValue,
+      [field]: value,
+    }));
+  };
+
+  const cancelSecurityProfileEdit = () => {
+    setSecurityProfileForm(buildSecurityProfileForm(user));
+    setSecurityProfileEditing(false);
+  };
+
+  const saveSecurityProfile = async () => {
+    const firstName = String(securityProfileForm.firstName || "").trim();
+    const lastName = String(securityProfileForm.lastName || "").trim();
+    const username = String(securityProfileForm.username || "").trim().toLowerCase();
+    const email = String(securityProfileForm.email || "").trim().toLowerCase();
+    const phone = String(securityProfileForm.phone || "").trim();
+
+    if (!firstName || !lastName) {
+      Alert.alert("Missing Name", "Please enter your first and last name.");
+      return;
+    }
+
+    if (!username) {
+      Alert.alert("Missing Username", "Please enter your username.");
+      return;
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
+    if (phone && !isValidPhilippineMobileNumber(phone)) {
+      Alert.alert("Invalid Contact Number", PHILIPPINE_MOBILE_NUMBER_MESSAGE);
+      return;
+    }
+
+    setSecurityProfileSaving(true);
+    try {
+      const response = await ApiService.updateProfile({
+        firstName,
+        lastName,
+        username,
+        email,
+        phone: phone ? normalizePhilippineMobileNumber(phone) : "",
+        emergencyContact: String(securityProfileForm.emergencyContact || "").trim(),
+      });
+
+      const updatedUser = {
+        ...user,
+        ...(response?.user || {}),
+        role: normalizeRole(response?.user?.role || user?.role),
+      };
+      setUser(updatedUser);
+      setSecurityProfileForm(buildSecurityProfileForm(updatedUser));
+      setSecurityProfileEditing(false);
+      Alert.alert("Profile Updated", "Your security profile was updated successfully.");
+    } catch (error) {
+      Alert.alert("Unable To Save", error?.message || "Please try updating your profile again.");
+    } finally {
+      setSecurityProfileSaving(false);
+    }
+  };
+
   // Render Hover Card
   const renderHoverCard = (groupVisitors = null) => {
     const hoverVisitors = Array.isArray(groupVisitors) && groupVisitors.length > 0
@@ -4503,40 +4582,113 @@ export default function SecurityDashboardScreen({ navigation }) {
     </>
   );
 
-  const renderMobileProfile = () => (
-    <>
-      <View style={securityMobileStyles.compactHeader}>
-        <Text style={securityMobileStyles.compactTitle}>Security Profile</Text>
-        <Text style={securityMobileStyles.compactSubtitle}>Guard account and current operational status.</Text>
+  const renderMobileProfile = () => {
+    const renderProfileInput = (label, field, options = {}) => (
+      <View style={securityMobileStyles.profileField} key={field}>
+        <Text style={securityMobileStyles.profileLabel}>{label}</Text>
+        <TextInput
+          style={securityMobileStyles.profileInput}
+          value={securityProfileForm[field]}
+          onChangeText={(value) => updateSecurityProfileField(field, value)}
+          placeholder={label}
+          placeholderTextColor="#94A3B8"
+          autoCapitalize={options.autoCapitalize || "words"}
+          keyboardType={options.keyboardType || "default"}
+          editable={!securityProfileSaving}
+        />
       </View>
-      <View style={securityMobileStyles.profileCard}>
-        <View style={securityMobileStyles.profileTop}>
-          <View style={securityMobileStyles.profileAvatar}>
-            <Text style={securityMobileStyles.profileAvatarText}>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</Text>
-          </View>
-          <View style={securityMobileStyles.profileCopy}>
-            <Text style={securityMobileStyles.profileName}>{user.firstName} {user.lastName}</Text>
-            <Text style={securityMobileStyles.profileRole}>{String(user.role || "security").toUpperCase()}</Text>
+    );
+
+    const profileRows = [
+      ["Badge", user.badgeNumber || user.employeeId || "SEC-0000"],
+      ["Shift", user.shift || "On duty"],
+      ["Department", user.department || "Security Department"],
+      ["Email", user.email],
+      ["Phone", user.phone || "Not set"],
+    ];
+
+    return (
+      <>
+        <View style={securityMobileStyles.compactHeader}>
+          <View style={securityMobileStyles.profileHeaderRow}>
+            <View style={securityMobileStyles.profileHeaderCopy}>
+              <Text style={securityMobileStyles.compactTitle}>Security Account</Text>
+              <Text style={securityMobileStyles.compactSubtitle}>Manage your contact details and operational profile.</Text>
+            </View>
+            <TouchableOpacity
+              style={securityMobileStyles.profileEditButton}
+              onPress={() => {
+                if (securityProfileEditing) {
+                  cancelSecurityProfileEdit();
+                } else {
+                  setSecurityProfileForm(buildSecurityProfileForm(user));
+                  setSecurityProfileEditing(true);
+                }
+              }}
+              disabled={securityProfileSaving}
+            >
+              <Ionicons
+                name={securityProfileEditing ? "close-outline" : "create-outline"}
+                size={18}
+                color={BRAND.blue}
+              />
+              <Text style={securityMobileStyles.profileEditButtonText}>
+                {securityProfileEditing ? "Cancel" : "Edit"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-        {[
-          ["Badge", user.badgeNumber || user.employeeId || "SEC-0000"],
-          ["Shift", user.shift || "On duty"],
-          ["Department", user.department || "Security Department"],
-          ["Email", user.email],
-        ].map(([label, value]) => (
-          <View key={label} style={securityMobileStyles.profileRow}>
-            <Text style={securityMobileStyles.profileLabel}>{label}</Text>
-            <Text style={securityMobileStyles.profileValue}>{value}</Text>
+        <View style={securityMobileStyles.profileCard}>
+          <View style={securityMobileStyles.profileTop}>
+            <View style={securityMobileStyles.profileAvatar}>
+              <Text style={securityMobileStyles.profileAvatarText}>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</Text>
+            </View>
+            <View style={securityMobileStyles.profileCopy}>
+              <Text style={securityMobileStyles.profileName}>{user.firstName} {user.lastName}</Text>
+              <Text style={securityMobileStyles.profileRole}>{String(user.role || "security").toUpperCase()}</Text>
+            </View>
           </View>
-        ))}
-      </View>
-      <TouchableOpacity style={securityMobileStyles.logoutButton} onPress={handleLogoutPress}>
-        <Ionicons name="log-out-outline" size={18} color={BRAND.danger} />
-        <Text style={securityMobileStyles.logoutButtonText}>Sign Out</Text>
-      </TouchableOpacity>
-    </>
-  );
+          {securityProfileEditing ? (
+            <>
+              <View style={securityMobileStyles.profileFormGrid}>
+                {renderProfileInput("First Name", "firstName")}
+                {renderProfileInput("Last Name", "lastName")}
+                {renderProfileInput("Username", "username", { autoCapitalize: "none" })}
+                {renderProfileInput("Email", "email", { autoCapitalize: "none", keyboardType: "email-address" })}
+                {renderProfileInput("Phone", "phone", { keyboardType: "phone-pad" })}
+                {renderProfileInput("Emergency Contact", "emergencyContact", { keyboardType: "phone-pad" })}
+              </View>
+              <TouchableOpacity
+                style={[securityMobileStyles.saveProfileButton, securityProfileSaving && securityMobileStyles.disabled]}
+                onPress={saveSecurityProfile}
+                disabled={securityProfileSaving}
+              >
+                {securityProfileSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
+                    <Text style={securityMobileStyles.saveProfileButtonText}>Save Changes</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            profileRows.map(([label, value]) => (
+              <View key={label} style={securityMobileStyles.profileRow}>
+                <Text style={securityMobileStyles.profileLabel}>{label}</Text>
+                <Text style={securityMobileStyles.profileValue}>{value}</Text>
+              </View>
+            ))
+          )}
+        </View>
+        <TouchableOpacity style={securityMobileStyles.logoutButton} onPress={handleLogoutPress}>
+          <Ionicons name="log-out-outline" size={18} color={BRAND.danger} />
+          <Text style={securityMobileStyles.logoutButtonText}>Sign Out</Text>
+        </TouchableOpacity>
+      </>
+    );
+  };
 
   const renderMobileVisitorDetailModal = () => (
     <Modal visible={showDetailModal} transparent animationType="slide" onRequestClose={() => setShowDetailModal(false)}>
@@ -5640,21 +5792,48 @@ const securityMobileStyles = StyleSheet.create({
   compactHeader: {
     borderRadius: 22,
     padding: 17,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#041E42",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#041E42",
     marginBottom: 12,
   },
   compactTitle: {
     fontSize: 23,
     fontWeight: "900",
-    color: BRAND.ink,
+    color: "#FFFFFF",
   },
   compactSubtitle: {
     marginTop: 6,
     fontSize: 13,
     lineHeight: 19,
-    color: BRAND.muted,
+    color: "#DCEBFF",
+  },
+  profileHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  profileHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  profileEditButton: {
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.28)",
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  profileEditButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.blue,
   },
   visitorCard: {
     padding: 14,
@@ -6102,17 +6281,51 @@ const securityMobileStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#EEF2F7",
   },
+  profileFormGrid: {
+    gap: 12,
+    paddingTop: 4,
+  },
+  profileField: {
+    gap: 6,
+  },
   profileLabel: {
     fontSize: 11,
     fontWeight: "900",
     color: BRAND.muted,
     textTransform: "uppercase",
   },
+  profileInput: {
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F1",
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontWeight: "700",
+    color: BRAND.ink,
+  },
   profileValue: {
     marginTop: 5,
     fontSize: 14,
     fontWeight: "800",
     color: BRAND.ink,
+  },
+  saveProfileButton: {
+    marginTop: 14,
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: BRAND.blue,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  saveProfileButtonText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   logoutButton: {
     marginTop: 12,

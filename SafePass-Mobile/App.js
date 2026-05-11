@@ -59,10 +59,16 @@ const SecurityLogsScreen = lazy(() => import("./screens/SecurityLogsScreen"));
 const SettingsScreen = lazy(() => import("./screens/SettingsScreen"));
 const APP_NAME = APP_DISPLAY_NAME;
 const APP_ORGANIZATION = APP_ORGANIZATION_NAME;
-const IDLE_LOGOUT_MS = 30 * 60 * 1000;
+const MOBILE_IDLE_LOGOUT_MS = 30 * 60 * 1000;
+const WEB_SESSION_LOGOUT_MS = 7 * 24 * 60 * 60 * 1000;
+const IDLE_LOGOUT_MS =
+  Platform.OS === "web" ? WEB_SESSION_LOGOUT_MS : MOBILE_IDLE_LOGOUT_MS;
 const LAST_ACTIVITY_AT_KEY = "lastActivityAt";
 const AUTH_NOTICE_KEY = "authNotice";
-const SESSION_EXPIRED_MESSAGE = "You were inactive for 30 minutes. Please login again.";
+const SESSION_EXPIRED_MESSAGE =
+  Platform.OS === "web"
+    ? "Your web session has expired after 7 days. Please login again."
+    : "You were inactive for 30 minutes. Please login again.";
 const WEB_ROUTE_TITLES = {
   RoleSelect: `Access Portal | ${APP_ORGANIZATION}`,
   Login: `Login | ${APP_ORGANIZATION}`,
