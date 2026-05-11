@@ -1249,7 +1249,12 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   }, [allUsers, isCreateEmployeeIdManuallyEdited, newUserData.role]);
 
   useEffect(() => {
-    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+    const isNewArchitectureEnabled = Boolean(globalThis?.nativeFabricUIManager);
+    if (
+      Platform.OS === "android" &&
+      !isNewArchitectureEnabled &&
+      UIManager.setLayoutAnimationEnabledExperimental
+    ) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
   }, []);

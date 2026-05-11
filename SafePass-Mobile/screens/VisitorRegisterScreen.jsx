@@ -170,6 +170,42 @@ const SuccessModal = ({
     </Modal>
   );
 };
+
+const ExistingAccountModal = ({ visible, email, onLogin, onEditEmail }) => (
+  <Modal visible={visible} transparent animationType="fade" onRequestClose={onEditEmail}>
+    <View style={visitorRegisterStyles.modalOverlay}>
+      <View style={visitorRegisterStyles.existingAccountModal}>
+        <LinearGradient colors={["#EEF5FF", "#FFFFFF"]} style={visitorRegisterStyles.existingAccountHeader}>
+          <View style={visitorRegisterStyles.existingAccountIcon}>
+            <Ionicons name="person-circle-outline" size={30} color="#0A3D91" />
+          </View>
+          <Text style={visitorRegisterStyles.existingAccountTitle}>Account Found</Text>
+          <Text style={visitorRegisterStyles.existingAccountMessage}>
+            This email is already registered. Sign in to your visitor account to request or manage appointments.
+          </Text>
+          {email ? (
+            <View style={visitorRegisterStyles.existingAccountEmailPill}>
+              <Ionicons name="mail-outline" size={15} color="#0A3D91" />
+              <Text style={visitorRegisterStyles.existingAccountEmailText} numberOfLines={1}>
+                {email}
+              </Text>
+            </View>
+          ) : null}
+        </LinearGradient>
+        <View style={visitorRegisterStyles.existingAccountActions}>
+          <TouchableOpacity style={visitorRegisterStyles.existingAccountLoginButton} onPress={onLogin}>
+            <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
+            <Text style={visitorRegisterStyles.existingAccountLoginText}>Go to Login</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={visitorRegisterStyles.existingAccountEditButton} onPress={onEditEmail}>
+            <Text style={visitorRegisterStyles.existingAccountEditText}>Edit Email</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  </Modal>
+);
+
 // ================= DATA PRIVACY MODAL =================
 const DataPrivacyModal = ({
   visible,
@@ -444,6 +480,7 @@ export default function VisitorRegisterScreen({ navigation }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDataPrivacy, setShowDataPrivacy] = useState(false);
+  const [existingAccountEmail, setExistingAccountEmail] = useState("");
   const [privacySubmissionError, setPrivacySubmissionError] = useState("");
   const [formData, setFormData] = useState({
     fullName: "",
@@ -887,9 +924,9 @@ export default function VisitorRegisterScreen({ navigation }) {
         normalizedMessage.includes("email already") ||
         normalizedMessage.includes("with this email already exists")
       ) {
-        setPrivacySubmissionError(
-          "A visitor account with this email already exists. Edit the email or go to the login page.",
-        );
+        setPrivacySubmissionError("");
+        setShowDataPrivacy(false);
+        setExistingAccountEmail(formData.email);
         setErrors((previous) => ({
           ...previous,
           email: "A visitor account with this email already exists.",
@@ -898,21 +935,6 @@ export default function VisitorRegisterScreen({ navigation }) {
           ...previous,
           email: true,
         }));
-        Alert.alert(
-          "Email Already Registered",
-          "A visitor account with this email already exists. Please log in instead.",
-          [
-            {
-              text: "Go to Login",
-              onPress: () =>
-                goToVisitorLogin({
-                  role: "visitor",
-                  initialEmail: formData.email,
-                }),
-            },
-            { text: "OK", style: "cancel" },
-          ],
-        );
       } else if (errorField === "username" || normalizedMessage.includes("username")) {
         setPrivacySubmissionError(
           "That username is already taken. Edit your details and choose another username.",
@@ -933,24 +955,9 @@ export default function VisitorRegisterScreen({ navigation }) {
         normalizedMessage.includes("already exists") ||
         normalizedMessage.includes("duplicate")
       ) {
-        setPrivacySubmissionError(
-          "A visitor account with these details already exists. Edit the details or log in instead.",
-        );
-        Alert.alert(
-          "Account Already Exists",
-          "A visitor account with this email already exists. Please log in instead.",
-          [
-            {
-              text: "Go to Login",
-              onPress: () =>
-                goToVisitorLogin({
-                  role: "visitor",
-                  initialEmail: formData.email,
-                }),
-            },
-            { text: "OK", style: "cancel" },
-          ],
-        );
+        setPrivacySubmissionError("");
+        setShowDataPrivacy(false);
+        setExistingAccountEmail(formData.email);
       } else if (
         normalizedMessage.includes("network request failed") ||
         normalizedMessage.includes("cannot connect to backend")
@@ -1669,6 +1676,22 @@ export default function VisitorRegisterScreen({ navigation }) {
         onDecline={handlePrivacyDecline}
         isSubmitting={isSubmitting}
         submissionError={privacySubmissionError}
+      />
+      <ExistingAccountModal
+        visible={Boolean(existingAccountEmail)}
+        email={existingAccountEmail}
+        onLogin={() => {
+          const email = existingAccountEmail || formData.email;
+          setExistingAccountEmail("");
+          goToVisitorLogin({
+            role: "visitor",
+            initialEmail: email,
+          });
+        }}
+        onEditEmail={() => {
+          setExistingAccountEmail("");
+          setShowDataPrivacy(false);
+        }}
       />
       <SuccessModal
         visible={showSuccess}

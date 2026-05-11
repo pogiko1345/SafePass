@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   TextInput,
   Platform,
@@ -19,6 +20,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import ApiService from "../utils/ApiService";
@@ -378,6 +380,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     email: "",
     username: "",
     phone: "",
+    profilePhoto: null,
   });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -457,7 +460,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   }, [loadData]);
 
   useEffect(() => {
-    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+    const isNewArchitectureEnabled = Boolean(globalThis?.nativeFabricUIManager);
+    if (
+      Platform.OS === "android" &&
+      !isNewArchitectureEnabled &&
+      UIManager.setLayoutAnimationEnabledExperimental
+    ) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
   }, []);
@@ -632,6 +640,41 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     [appointments],
   );
 
+  const staffMobileFocusState = useMemo(() => {
+    if (stats.pending > 0) {
+      return {
+        title: "Requests need review",
+        message: `${stats.pending} appointment request${stats.pending === 1 ? "" : "s"} waiting for action.`,
+        icon: "mail-unread-outline",
+        color: BRAND.warning,
+        actionLabel: "Review",
+        targetTab: "requests",
+      };
+    }
+
+    if (checkedInNowCount > 0) {
+      return {
+        title: "Visitors currently inside",
+        message: `${checkedInNowCount} visitor${checkedInNowCount === 1 ? "" : "s"} checked in for your office.`,
+        icon: "walk-outline",
+        color: BRAND.success,
+        actionLabel: "View",
+        targetTab: "visitors",
+      };
+    }
+
+    return {
+      title: "Office queue is clear",
+      message: nextUpcomingAppointment
+        ? `Next visitor: ${nextUpcomingAppointment.fullName || "Visitor"} at ${formatTime(nextUpcomingAppointment.visitTime || nextUpcomingAppointment.visitDate)}.`
+        : "No urgent staff actions right now.",
+      icon: "checkmark-circle-outline",
+      color: BRAND.success,
+      actionLabel: "Schedule",
+      targetTab: "visitors",
+    };
+  }, [checkedInNowCount, nextUpcomingAppointment, stats.pending]);
+
   useEffect(() => {
     setProfileForm({
       firstName: user?.firstName || "",
@@ -639,6 +682,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       email: user?.email || "",
       username: user?.username || "",
       phone: user?.phone || user?.phoneNumber || user?.contactNumber || "",
+      profilePhoto: user?.profilePhoto || null,
     });
   }, [user]);
 
@@ -789,6 +833,45 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     setPasswordForm((currentValue) => ({ ...currentValue, [field]: value }));
   };
 
+  const handleStaffProfilePhotoPress = async () => {
+    if (accountMode !== "edit" || profileSaving) return;
+
+    try {
+      const launchPicker = async (source) => {
+        const result =
+          source === "camera"
+            ? await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              })
+            : await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+
+        if (!result.canceled) {
+          handleProfileInputChange("profilePhoto", result.assets[0].uri);
+        }
+      };
+
+      if (Platform.OS === "web") {
+        await launchPicker("gallery");
+        return;
+      }
+
+      Alert.alert("Update Photo", "Choose how you want to update your photo.", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Take Photo", onPress: () => launchPicker("camera") },
+        { text: "Choose from Gallery", onPress: () => launchPicker("gallery") },
+      ]);
+    } catch (error) {
+      Alert.alert("Photo Update Failed", "Could not update your profile photo.");
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!profileForm.firstName.trim() || !profileForm.lastName.trim()) {
       Alert.alert("Missing Details", "First name and last name are required.");
@@ -817,6 +900,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         email: profileForm.email.trim(),
         username: profileForm.username.trim(),
         phone: cleanedPhone,
+        profilePhoto: profileForm.profilePhoto || null,
       });
 
       if (response?.user) {
@@ -1263,27 +1347,42 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     );
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     if (isSigningOut) return;
     setShowLogoutModal(true);
-  };
+  }, [isSigningOut]);
 
-  const closeLogoutModal = () => {
+  const closeLogoutModal = useCallback(() => {
     if (isSigningOut) return;
     setShowLogoutModal(false);
-  };
+  }, [isSigningOut]);
 
-  const confirmLogout = async () => {
+  const confirmLogout = useCallback(async () => {
     if (isSigningOut) return;
     setIsSigningOut(true);
+    setShowLogoutModal(false);
+
     try {
       await ApiService.logout();
-    } finally {
-      setShowLogoutModal(false);
-      if (typeof onLogout === "function") onLogout();
-      navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
+      await ApiService.clearAuth();
+    } catch (error) {
+      console.log("Staff logout API error ignored:", error);
+      await ApiService.clearAuth();
     }
-  };
+
+    if (typeof onLogout === "function") {
+      onLogout();
+    }
+
+    try {
+      navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
+    } catch (error) {
+      console.error("Staff logout navigation error:", error);
+      setShowLogoutModal(false);
+      setIsSigningOut(false);
+      Alert.alert("Signed Out", "You have been signed out. Please return to the login screen.");
+    }
+  }, [isSigningOut, navigation, onLogout]);
 
   const buildAppointmentPrintRows = (records) =>
     (records || []).map((appointment) => ({
@@ -2606,6 +2705,18 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       <Text style={staffMobileStyles.headerSubtitle}>
         Review requests, track today&apos;s visitors, and keep your office queue moving.
       </Text>
+      <View style={staffMobileStyles.headerStats}>
+        {[
+          ["Pending", stats.pending],
+          ["Today", todaysSchedule.length],
+          ["Inside", checkedInNowCount],
+        ].map(([label, value]) => (
+          <View key={label} style={staffMobileStyles.headerStatItem}>
+            <Text style={staffMobileStyles.headerStatValue}>{value}</Text>
+            <Text style={staffMobileStyles.headerStatLabel}>{label}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 
@@ -2622,6 +2733,24 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           <Text style={staffMobileStyles.statLabel}>{item.label}</Text>
         </View>
       ))}
+    </View>
+  );
+
+  const renderMobileFocusPanel = () => (
+    <View style={staffMobileStyles.focusPanel}>
+      <View style={[staffMobileStyles.focusIcon, { backgroundColor: `${staffMobileFocusState.color}16` }]}>
+        <Ionicons name={staffMobileFocusState.icon} size={19} color={staffMobileFocusState.color} />
+      </View>
+      <View style={staffMobileStyles.focusCopy}>
+        <Text style={staffMobileStyles.focusTitle}>{staffMobileFocusState.title}</Text>
+        <Text style={staffMobileStyles.focusText}>{staffMobileFocusState.message}</Text>
+      </View>
+      <TouchableOpacity
+        style={staffMobileStyles.focusAction}
+        onPress={() => setMobileTab(staffMobileFocusState.targetTab)}
+      >
+        <Text style={staffMobileStyles.focusActionText}>{staffMobileFocusState.actionLabel}</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -2714,6 +2843,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     <>
       {renderMobileHeader()}
       {renderMobileStats()}
+      {renderMobileFocusPanel()}
       <View style={staffVirtualStyles.card}>
         <View style={staffVirtualStyles.cardTopRow}>
           <View style={staffVirtualStyles.nfcIcon}>
@@ -2860,40 +2990,124 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     </>
   );
 
-  const renderMobileProfile = () => (
-    <>
-      <View style={staffMobileStyles.compactHeader}>
-        <Text style={staffMobileStyles.compactTitle}>Staff Profile</Text>
-        <Text style={staffMobileStyles.compactSubtitle}>Your office assignment and staff account details.</Text>
+  const renderMobileProfile = () => {
+    const isEditingProfile = accountMode === "edit";
+    const renderProfileInput = (label, field, options = {}) => (
+      <View style={staffMobileStyles.profileField} key={field}>
+        <Text style={staffMobileStyles.profileLabel}>{label}</Text>
+        <TextInput
+          style={staffMobileStyles.profileInput}
+          value={profileForm[field] || ""}
+          onChangeText={(value) => handleProfileInputChange(field, value)}
+          placeholder={label}
+          placeholderTextColor="#94A3B8"
+          autoCapitalize={options.autoCapitalize || "words"}
+          keyboardType={options.keyboardType || "default"}
+          editable={!profileSaving}
+        />
       </View>
-      <View style={staffMobileStyles.profileCard}>
-        <View style={staffMobileStyles.profileTop}>
-          <View style={staffMobileStyles.profileAvatar}>
-            <Text style={staffMobileStyles.profileAvatarText}>{profileInitials}</Text>
-          </View>
-          <View style={staffMobileStyles.profileCopy}>
-            <Text style={staffMobileStyles.profileName}>{profileName}</Text>
-            <Text style={staffMobileStyles.profileRole}>Staff Panel</Text>
+    );
+
+    return (
+      <>
+        <View style={staffMobileStyles.compactHeader}>
+          <View style={staffMobileStyles.profileHeaderRow}>
+            <View style={staffMobileStyles.profileHeaderCopy}>
+              <Text style={staffMobileStyles.compactTitle}>Staff Profile</Text>
+              <Text style={staffMobileStyles.compactSubtitle}>Update your photo, contact details, and staff account.</Text>
+            </View>
+            <TouchableOpacity
+              style={staffMobileStyles.profileEditButton}
+              onPress={() => {
+                if (isEditingProfile) {
+                  setProfileForm({
+                    firstName: user?.firstName || "",
+                    lastName: user?.lastName || "",
+                    email: user?.email || "",
+                    username: user?.username || "",
+                    phone: user?.phone || user?.phoneNumber || user?.contactNumber || "",
+                    profilePhoto: user?.profilePhoto || null,
+                  });
+                  setAccountMode("view");
+                } else {
+                  setAccountMode("edit");
+                }
+              }}
+              disabled={profileSaving}
+            >
+              <Ionicons name={isEditingProfile ? "close-outline" : "create-outline"} size={18} color={BRAND.blue} />
+              <Text style={staffMobileStyles.profileEditButtonText}>{isEditingProfile ? "Cancel" : "Edit"}</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        {[
-          ["Email", user?.email],
-          ["Department", user?.department || "Not assigned"],
-          ["Staff ID", user?.staffId || user?.employeeId || "Not assigned"],
-          ["Contact", user?.phone || user?.phoneNumber || "Not configured"],
-        ].map(([label, value]) => (
-          <View key={label} style={staffMobileStyles.profileRow}>
-            <Text style={staffMobileStyles.profileLabel}>{label}</Text>
-            <Text style={staffMobileStyles.profileValue}>{value}</Text>
+        <View style={staffMobileStyles.profileCard}>
+          <View style={staffMobileStyles.profileTop}>
+            <TouchableOpacity
+              style={staffMobileStyles.profileAvatar}
+              onPress={handleStaffProfilePhotoPress}
+              activeOpacity={isEditingProfile ? 0.82 : 1}
+            >
+              {(isEditingProfile ? profileForm.profilePhoto : user?.profilePhoto) ? (
+                <Image source={{ uri: isEditingProfile ? profileForm.profilePhoto : user?.profilePhoto }} style={staffMobileStyles.profileAvatarImage} />
+              ) : (
+                <Text style={staffMobileStyles.profileAvatarText}>{profileInitials}</Text>
+              )}
+              {isEditingProfile ? (
+                <View style={staffMobileStyles.profileCameraBadge}>
+                  <Ionicons name="camera-outline" size={15} color="#FFFFFF" />
+                </View>
+              ) : null}
+            </TouchableOpacity>
+            <View style={staffMobileStyles.profileCopy}>
+              <Text style={staffMobileStyles.profileName}>{profileName}</Text>
+              <Text style={staffMobileStyles.profileRole}>Staff Panel</Text>
+            </View>
           </View>
-        ))}
-      </View>
-      <TouchableOpacity style={staffMobileStyles.logoutFullButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-        <Text style={staffMobileStyles.logoutFullButtonText}>Sign Out</Text>
-      </TouchableOpacity>
-    </>
-  );
+          {isEditingProfile ? (
+            <>
+              <View style={staffMobileStyles.profileFormGrid}>
+                {renderProfileInput("First Name", "firstName")}
+                {renderProfileInput("Last Name", "lastName")}
+                {renderProfileInput("Username", "username", { autoCapitalize: "none" })}
+                {renderProfileInput("Email", "email", { autoCapitalize: "none", keyboardType: "email-address" })}
+                {renderProfileInput("Contact", "phone", { keyboardType: "phone-pad" })}
+              </View>
+              <TouchableOpacity
+                style={[staffMobileStyles.saveProfileButton, profileSaving && staffMobileStyles.disabledButton]}
+                onPress={handleSaveProfile}
+                disabled={profileSaving}
+              >
+                {profileSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
+                    <Text style={staffMobileStyles.saveProfileButtonText}>Save Changes</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            [
+              ["Email", user?.email],
+              ["Department", user?.department || "Not assigned"],
+              ["Staff ID", user?.staffId || user?.employeeId || "Not assigned"],
+              ["Contact", user?.phone || user?.phoneNumber || "Not configured"],
+            ].map(([label, value]) => (
+              <View key={label} style={staffMobileStyles.profileRow}>
+                <Text style={staffMobileStyles.profileLabel}>{label}</Text>
+                <Text style={staffMobileStyles.profileValue}>{value}</Text>
+              </View>
+            ))
+          )}
+        </View>
+        <TouchableOpacity style={staffMobileStyles.logoutFullButton} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+          <Text style={staffMobileStyles.logoutFullButtonText}>Sign Out</Text>
+        </TouchableOpacity>
+      </>
+    );
+  };
 
   const renderMobileDetailModal = () => (
     <Modal visible={Boolean(detailAppointment)} transparent animationType="slide" onRequestClose={() => setDetailAppointment(null)}>
@@ -2943,6 +3157,45 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     </Modal>
   );
 
+  const renderMobileLogoutModal = () => (
+    <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={closeLogoutModal}>
+      <View style={staffMobileStyles.modalOverlay}>
+        <View style={staffMobileStyles.logoutSheet}>
+          <View style={staffMobileStyles.logoutSheetIcon}>
+            <Ionicons name="log-out-outline" size={24} color={BRAND.danger} />
+          </View>
+          <Text style={staffMobileStyles.logoutSheetTitle}>Sign out?</Text>
+          <Text style={staffMobileStyles.logoutSheetText}>
+            You will return to the role selection screen and need to sign in again.
+          </Text>
+          <View style={staffMobileStyles.logoutSheetActions}>
+            <TouchableOpacity
+              style={staffMobileStyles.logoutSheetCancel}
+              onPress={closeLogoutModal}
+              disabled={isSigningOut}
+            >
+              <Text style={staffMobileStyles.logoutSheetCancelText}>Stay Signed In</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[staffMobileStyles.logoutSheetConfirm, isSigningOut && staffMobileStyles.disabledButton]}
+              onPress={confirmLogout}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="log-out-outline" size={17} color="#FFFFFF" />
+              )}
+              <Text style={staffMobileStyles.logoutSheetConfirmText}>
+                {isSigningOut ? "Signing Out..." : "Sign Out"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const renderMobileStaffScreen = () => {
     const content =
       mobileTab === "requests"
@@ -2969,6 +3222,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </ScrollView>
         <MobileBottomNav tabs={staffMobileTabs} activeTab={mobileTab} onChange={setMobileTab} />
         {renderMobileDetailModal()}
+        {renderMobileLogoutModal()}
       </SafeAreaView>
     );
   };
@@ -3231,7 +3485,6 @@ const staffVirtualStyles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
     padding: 18,
-    marginTop: 16,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#E2E8F0",
@@ -3396,6 +3649,32 @@ const staffMobileStyles = StyleSheet.create({
     lineHeight: 19,
     color: "#DBEAFE",
   },
+  headerStats: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 15,
+  },
+  headerStatItem: {
+    flex: 1,
+    borderRadius: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 9,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+  },
+  headerStatValue: {
+    fontSize: 19,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  headerStatLabel: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#BFDBFE",
+    textTransform: "uppercase",
+  },
   statsGrid: {
     flexDirection: "row",
     gap: 10,
@@ -3422,6 +3701,53 @@ const staffMobileStyles = StyleSheet.create({
     color: BRAND.muted,
     textTransform: "uppercase",
   },
+  focusPanel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    padding: 13,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 12,
+  },
+  focusIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  focusCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  focusTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  focusText: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+    color: BRAND.muted,
+  },
+  focusAction: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#EEF5FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  focusActionText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.blue,
+  },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -3442,21 +3768,21 @@ const staffMobileStyles = StyleSheet.create({
   compactHeader: {
     borderRadius: 21,
     padding: 17,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#123B6D",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#123B6D",
     marginBottom: 12,
   },
   compactTitle: {
     fontSize: 23,
     fontWeight: "900",
-    color: BRAND.ink,
+    color: "#FFFFFF",
   },
   compactSubtitle: {
     marginTop: 6,
     fontSize: 13,
     lineHeight: 19,
-    color: BRAND.muted,
+    color: "#DBEAFE",
   },
   toolbar: {
     gap: 10,
@@ -3623,6 +3949,31 @@ const staffMobileStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
+  profileHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  profileHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  profileEditButton: {
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 13,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  profileEditButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.blue,
+  },
   profileTop: {
     flexDirection: "row",
     alignItems: "center",
@@ -3636,11 +3987,30 @@ const staffMobileStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#123B6D",
+    overflow: "visible",
+  },
+  profileAvatarImage: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
   },
   profileAvatarText: {
     fontSize: 18,
     fontWeight: "900",
     color: "#FFFFFF",
+  },
+  profileCameraBadge: {
+    position: "absolute",
+    right: -4,
+    bottom: -4,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#0F172A",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
   },
   profileCopy: {
     flex: 1,
@@ -3662,17 +4032,51 @@ const staffMobileStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#EEF2F7",
   },
+  profileFormGrid: {
+    gap: 12,
+    paddingTop: 4,
+  },
+  profileField: {
+    gap: 6,
+  },
   profileLabel: {
     fontSize: 11,
     fontWeight: "900",
     color: BRAND.muted,
     textTransform: "uppercase",
   },
+  profileInput: {
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F1",
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontWeight: "700",
+    color: BRAND.ink,
+  },
   profileValue: {
     marginTop: 5,
     fontSize: 14,
     fontWeight: "800",
     color: BRAND.ink,
+  },
+  saveProfileButton: {
+    marginTop: 14,
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: BRAND.blue,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  saveProfileButtonText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   logoutFullButton: {
     marginTop: 12,
@@ -3702,6 +4106,76 @@ const staffMobileStyles = StyleSheet.create({
     borderTopRightRadius: 24,
     backgroundColor: "#FFFFFF",
     padding: 16,
+  },
+  logoutSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 28,
+    alignItems: "center",
+  },
+  logoutSheetIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: "#FEF2F2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  logoutSheetTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  logoutSheetText: {
+    marginTop: 8,
+    maxWidth: 290,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "700",
+    color: BRAND.muted,
+    textAlign: "center",
+  },
+  logoutSheetActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 20,
+    width: "100%",
+  },
+  logoutSheetCancel: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  logoutSheetCancelText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: BRAND.ink,
+    textAlign: "center",
+  },
+  logoutSheetConfirm: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: BRAND.danger,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 7,
+    paddingHorizontal: 12,
+  },
+  logoutSheetConfirmText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    textAlign: "center",
   },
   detailHeader: {
     flexDirection: "row",

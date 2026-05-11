@@ -6045,8 +6045,9 @@ app.post("/api/visitors/register", async (req, res) => {
 
     const existingEmailUser = await User.findOne({ email: normalizedEmail });
     if (existingEmailUser) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
+        code: "ACCOUNT_EXISTS",
         field: "email",
         message: "An account with this email already exists. Please log in instead.",
       });

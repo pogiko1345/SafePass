@@ -402,6 +402,11 @@ if (Platform.OS !== 'web') {
   }
 }
 
+const isNullNativeNfcError = (error) => {
+  const message = String(error?.message || error || "").toLowerCase();
+  return message.includes("cannot convert null value to object") || message.includes("null value");
+};
+
 export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const isWideVisitorDashboard = viewportWidth >= 960;
@@ -494,8 +499,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [tapCount, setTapCount] = useState(0);
   const [lastTapTime, setLastTapTime] = useState(0);
   const isVisitorHomeSection = selectedVisitorSection === "home";
+  const isVisitorAccountSection = selectedVisitorSection === "account";
+  const isVisitorMapSection = selectedVisitorSection === "map";
+  const shouldShowVisitorCommandDeck = isVisitorHomeSection;
   const nfcListenerRef = useRef(null);
   const nfcTapProcessingRef = useRef(false);
+  const nativeNfcUnavailableRef = useRef(false);
+  const nativeNfcUnavailableLoggedRef = useRef(false);
   const lastVisitorStatusRef = useRef(null);
   const hasLoadedVisitorRef = useRef(false);
   const visitorProfileSignatureRef = useRef("");
@@ -613,6 +623,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const approvalPending =
       visitorRecord?.status === "pending" || visitorRecord?.approvalStatus === "pending";
     const normalizedStatus = String(visitorRecord?.status || "").toLowerCase();
+    const visitPassed = hasVisitorSchedulePassed(visitorRecord);
     const pendingStaffReview =
       !approvalPending &&
       visitorRecord?.approvalFlow === "staff" &&
@@ -620,6 +631,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
     return (
       !approvalPending &&
+      !visitPassed &&
       !pendingStaffReview &&
       (normalizedStatus === "approved" || normalizedStatus === "checked_in")
     );
@@ -1500,6 +1512,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         role: currentUser?.role,
         status: currentUser?.status,
         nfcCardId: currentUser?.nfcCardId,
+        profilePhoto: currentUser?.profilePhoto,
         updatedAt: currentUser?.updatedAt,
       });
 
@@ -1606,6 +1619,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       };
     }
 
+    if (nativeNfcUnavailableRef.current) {
+      setIsNfcSupported(false);
+      setIsNfcEnabled(false);
+      return {
+        moduleAvailable: false,
+        supported: false,
+        enabled: false,
+      };
+    }
+
     const hasNativeNfcApi =
       NfcManager &&
       typeof NfcManager.isSupported === "function" &&
@@ -1664,7 +1687,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       };
     } catch (error) {
       const errorMessage = String(error?.message || error || "");
-      console.log("NFC check unavailable:", errorMessage);
+      if (isNullNativeNfcError(error)) {
+        nativeNfcUnavailableRef.current = true;
+        if (!nativeNfcUnavailableLoggedRef.current) {
+          console.log("NFC native module unavailable in this build. Falling back to virtual card flow.");
+          nativeNfcUnavailableLoggedRef.current = true;
+        }
+      } else {
+        console.log("NFC check unavailable:", errorMessage);
+      }
       setIsNfcSupported(false);
       setIsNfcEnabled(false);
       return {
@@ -1959,11 +1990,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         try {
           await NfcManager.unregisterTagEvent();
         } catch (error) {
-          console.log("NFC unregister skipped:", error?.message || error);
+          if (isNullNativeNfcError(error)) {
+            nativeNfcUnavailableRef.current = true;
+          } else {
+            console.log("NFC unregister skipped:", error?.message || error);
+          }
         }
 
-        NfcManager.setEventListener(NfcEvents.DiscoverTag, () => {});
-        NfcManager.setEventListener(NfcEvents.SessionClosed, () => {});
+        if (!nativeNfcUnavailableRef.current) {
+          NfcManager.setEventListener(NfcEvents.DiscoverTag, () => {});
+          NfcManager.setEventListener(NfcEvents.SessionClosed, () => {});
+        }
       }
     } catch (error) {
       console.error("Stop NFC error:", error);
@@ -1975,6 +2012,29 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const date = new Date(dateString);
     if (Number.isNaN(date.getTime())) return null;
     return date;
+  };
+
+  const getVisitorScheduleDateTime = (record = visitor) => {
+    const visitDate = getValidDate(record?.visitDate);
+    if (!visitDate) return null;
+
+    const scheduledAt = new Date(visitDate);
+    const visitTime = getValidDate(record?.visitTime);
+    if (visitTime) {
+      scheduledAt.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+    }
+
+    return scheduledAt;
+  };
+
+  const hasVisitorSchedulePassed = (record = visitor) => {
+    const visitStatus = String(record?.status || "").toLowerCase();
+    if (["checked_in", "checked_out", "expired", "no_show", "rejected", "cancelled"].includes(visitStatus)) {
+      return false;
+    }
+
+    const scheduledAt = getVisitorScheduleDateTime(record);
+    return Boolean(scheduledAt && scheduledAt.getTime() < Date.now());
   };
 
   const formatAppointmentTimeValue = (dateValue) => {
@@ -3046,14 +3106,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const getTimeRemaining = () => {
-    if (!visitor?.visitDate) return null;
+    const scheduledAt = getVisitorScheduleDateTime(visitor);
+    if (!scheduledAt) return null;
     
     const now = new Date();
-    const visitTime = new Date(visitor.visitDate);
-    const diffMs = visitTime - now;
+    const diffMs = scheduledAt - now;
     
     if (diffMs < 0) {
-      return { text: 'Visit time passed', color: '#EF4444', icon: 'time' };
+      return null;
     }
     
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -3072,6 +3132,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const getStatusColor = () => {
+    if (hasVisitorSchedulePassed(visitor)) return "#EF4444";
     if (visitor?.approvalStatus === "pending") return "#F59E0B";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "#F59E0B";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "#D97706";
@@ -3091,6 +3152,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const getStatusText = () => {
+    if (hasVisitorSchedulePassed(visitor)) return "Visit Time Passed";
     if (visitor?.approvalStatus === "pending") return "Pending Admin Approval";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "Pending";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "Reschedule Requested";
@@ -3110,6 +3172,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const getStatusIcon = () => {
+    if (hasVisitorSchedulePassed(visitor)) return "time-outline";
     if (visitor?.approvalStatus === "pending") return "time-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "briefcase-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "refresh-circle-outline";
@@ -3472,6 +3535,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     visitor?.fullName ||
     [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") ||
     "Visitor";
+  const visitorAvatarUri =
+    currentUser?.profilePhoto ||
+    currentUser?.avatar ||
+    currentUser?.photoURL ||
+    visitor?.profilePhoto ||
+    visitor?.avatar ||
+    null;
+  const visitorInitials = (visitor?.fullName || displayName || "Visitor")
+    .split(" ")
+    .filter(Boolean)
+    .map((name) => name[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase() || "V";
   const journeyTitle = isPendingApproval
     ? "Registration Review In Progress"
     : isPendingStaffReview
@@ -3983,14 +4060,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={[visitorDashboardStyles.accountHeroTopRow, isCompactVisitorDashboard && visitorDashboardStyles.accountHeroTopRowMobile]}>
           <View style={visitorDashboardStyles.accountHeroIdentity}>
             <View style={[visitorDashboardStyles.accountHeroAvatar, isCompactVisitorDashboard && visitorDashboardStyles.accountHeroAvatarMobile]}>
-              <Text style={visitorDashboardStyles.accountHeroInitials}>
-                {(visitor?.fullName || displayName || "Visitor")
-                  .split(" ")
-                  .map((name) => name[0])
-                  .join("")
-                  .substring(0, 2)
-                  .toUpperCase()}
-              </Text>
+              {visitorAvatarUri ? (
+                <Image source={{ uri: visitorAvatarUri }} style={visitorDashboardStyles.accountHeroAvatarImage} />
+              ) : (
+                <Text style={visitorDashboardStyles.accountHeroInitials}>{visitorInitials}</Text>
+              )}
             </View>
             <View style={visitorDashboardStyles.accountHeroCopy}>
               <Text style={[visitorDashboardStyles.accountHeroName, isCompactVisitorDashboard && visitorDashboardStyles.accountHeroNameMobile]}>
@@ -4808,20 +4882,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     <View style={[visitorDashboardStyles.appointmentScreenShell, dashboardSectionResponsiveStyle]}>
       <View style={visitorDashboardStyles.appointmentScreenCard}>
         <LinearGradient
-          colors={["#FFFDF8", "#FFFFFF"]}
+          colors={["#EAF3FF", "#FFFFFF"]}
           style={visitorDashboardStyles.appointmentModalHeader}
         >
           <View style={visitorDashboardStyles.appointmentModalHeaderContent}>
             <View style={visitorDashboardStyles.appointmentModalHeaderCopy}>
               <Text style={visitorDashboardStyles.appointmentModalTitle}>Appointment Request</Text>
               <Text style={visitorDashboardStyles.appointmentModalSubtitle}>
-                Send your preferred schedule directly to the office staff.
-              </Text>
-            </View>
-            <View style={visitorDashboardStyles.appointmentRequestInfoPill}>
-              <Ionicons name="flash-outline" size={14} color="#0A3D91" />
-              <Text style={visitorDashboardStyles.appointmentRequestInfoPillText}>
-                Smart form
+                Choose a schedule, office, and ID for staff review.
               </Text>
             </View>
           </View>
@@ -4856,28 +4924,36 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
           <View style={visitorDashboardStyles.appointmentQuickInfoRow}>
             <View style={visitorDashboardStyles.appointmentQuickInfoCard}>
+              <Ionicons name="calendar-clear-outline" size={17} color="#0A3D91" />
               <Text style={visitorDashboardStyles.appointmentQuickInfoLabel}>Availability</Text>
               <Text style={visitorDashboardStyles.appointmentQuickInfoValue}>Per time slot</Text>
             </View>
             <View style={visitorDashboardStyles.appointmentQuickInfoCard}>
+              <Ionicons name="briefcase-outline" size={17} color="#0A3D91" />
               <Text style={visitorDashboardStyles.appointmentQuickInfoLabel}>Days</Text>
               <Text style={visitorDashboardStyles.appointmentQuickInfoValue}>Mon - Sat</Text>
             </View>
             <View style={visitorDashboardStyles.appointmentQuickInfoCard}>
+              <Ionicons name="shield-checkmark-outline" size={17} color="#0A3D91" />
               <Text style={visitorDashboardStyles.appointmentQuickInfoLabel}>Review</Text>
               <Text style={visitorDashboardStyles.appointmentQuickInfoValue}>Staff approval</Text>
             </View>
           </View>
 
-          <View style={visitorDashboardStyles.visitorFlowChecklist}>
+          <View style={visitorDashboardStyles.appointmentStepStrip}>
             {[
-              "Choose your purpose. If you select Other, type the exact reason.",
-              "Select one or more offices you want to visit and keep your chosen schedule while updating other fields.",
-              "Pick your preferred date and time before sending the request.",
-            ].map((item) => (
-              <View key={item} style={visitorDashboardStyles.visitorFlowChecklistRow}>
-                <Ionicons name="checkmark-circle-outline" size={18} color="#0A3D91" />
-                <Text style={visitorDashboardStyles.visitorFlowChecklistText}>{item}</Text>
+              ["Schedule", "Date and time"],
+              ["Office", "Destination"],
+              ["ID", "Valid ID photo"],
+            ].map(([title, text], index) => (
+              <View key={title} style={visitorDashboardStyles.appointmentStepPill}>
+                <View style={visitorDashboardStyles.appointmentStepNumber}>
+                  <Text style={visitorDashboardStyles.appointmentStepNumberText}>{index + 1}</Text>
+                </View>
+                <View style={visitorDashboardStyles.appointmentStepCopy}>
+                  <Text style={visitorDashboardStyles.appointmentStepTitle}>{title}</Text>
+                  <Text style={visitorDashboardStyles.appointmentStepText}>{text}</Text>
+                </View>
               </View>
             ))}
           </View>
@@ -5597,6 +5673,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={visitorDashboardStyles.appointmentHistoryBody}>
           {renderAppointmentSegmentBar("history")}
 
+          <View style={visitorDashboardStyles.appointmentHistorySummaryRow}>
+            {[
+              ["Total", appointmentDisplayEntries.length],
+              ["Pending", pendingAppointmentCount],
+              ["Approved", approvedAppointmentCount],
+            ].map(([label, value]) => (
+              <View key={label} style={visitorDashboardStyles.appointmentHistorySummaryCard}>
+                <Text style={visitorDashboardStyles.appointmentHistorySummaryValue}>{value}</Text>
+                <Text style={visitorDashboardStyles.appointmentHistorySummaryLabel}>{label}</Text>
+              </View>
+            ))}
+          </View>
+
           {appointmentDisplayEntries.length ? (
             isCompactHistoryLayout ? (
               <View style={visitorDashboardStyles.appointmentHistoryCards}>
@@ -5929,12 +6018,27 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   colors={["rgba(255,255,255,0.24)", "rgba(255,255,255,0.1)"]}
                   style={visitorDashboardStyles.profileGradient}
                 >
-                  <Text style={visitorDashboardStyles.profileInitials}>
-                    {visitor?.fullName?.charAt(0) || "V"}
-                  </Text>
+                  {visitorAvatarUri ? (
+                    <Image source={{ uri: visitorAvatarUri }} style={visitorDashboardStyles.profileImage} />
+                  ) : (
+                    <Text style={visitorDashboardStyles.profileInitials}>{visitorInitials}</Text>
+                  )}
                 </LinearGradient>
               </AnimatedPressable>
             </View>
+          </View>
+
+          <View style={visitorDashboardStyles.headerStatsRow}>
+            {[
+              ["Approved", approvedAppointmentCount],
+              ["Pending", pendingAppointmentCount],
+              ["SafePass", visitorSafePassId ? "Ready" : "Setup"],
+            ].map(([label, value]) => (
+              <View key={label} style={visitorDashboardStyles.headerStatPill}>
+                <Text style={visitorDashboardStyles.headerStatValue} numberOfLines={1}>{value}</Text>
+                <Text style={visitorDashboardStyles.headerStatLabel}>{label}</Text>
+              </View>
+            ))}
           </View>
 
           <View style={[visitorDashboardStyles.statusCard, { backgroundColor: `${statusColor}15` }]}>
@@ -5964,8 +6068,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             style={[
               visitorDashboardStyles.miniBrandHeader,
               {
-                backgroundColor: isVisitorDarkMode ? "#0F172A" : sectionIntro.accentSoft,
-                borderColor: `${sectionIntro.accent}26`,
+                backgroundColor: isVisitorDarkMode ? "#0F172A" : "#0A3D91",
+                borderColor: isVisitorDarkMode ? "#1E293B" : "rgba(255,255,255,0.16)",
               },
               isVisitorDarkMode && visitorDashboardStyles.darkMiniBrandHeader,
             ]}
@@ -5974,7 +6078,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View
                 style={[
                   visitorDashboardStyles.miniBrandLogoWrap,
-                  { backgroundColor: `${sectionIntro.accent}18` },
+                  { backgroundColor: "rgba(255,255,255,0.14)" },
                 ]}
               >
                 <Image
@@ -5984,8 +6088,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 />
               </View>
               <View style={visitorDashboardStyles.miniBrandCopy}>
-                <Text style={[visitorDashboardStyles.miniBrandTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>SafePass</Text>
-                <Text style={[visitorDashboardStyles.miniBrandSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
+                <Text style={[visitorDashboardStyles.miniBrandTitle, !isVisitorDarkMode && visitorDashboardStyles.miniBrandTitleOnDark, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>SafePass</Text>
+                <Text style={[visitorDashboardStyles.miniBrandSubtitle, !isVisitorDarkMode && visitorDashboardStyles.miniBrandSubtitleOnDark, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
                   {sectionIntro.title}
                 </Text>
               </View>
@@ -5994,14 +6098,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View
                 style={[
                   visitorDashboardStyles.miniBrandSectionPill,
-                  { backgroundColor: `${sectionIntro.accent}14`, borderColor: `${sectionIntro.accent}24` },
+                  { backgroundColor: "rgba(255,255,255,0.14)", borderColor: "rgba(255,255,255,0.2)" },
                 ]}
               >
-                <Ionicons name={sectionIntro.icon} size={14} color={sectionIntro.accent} />
+                <Ionicons name={sectionIntro.icon} size={14} color="#DBEAFE" />
                 <Text
                   style={[
                     visitorDashboardStyles.miniBrandSectionPillText,
-                    { color: sectionIntro.accent },
+                    { color: "#FFFFFF" },
                   ]}
                 >
                   {sectionIntro.badge}
@@ -6011,18 +6115,22 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 onPress={() => handleVisitorRouteNavigation("Profile")}
                 style={[
                   visitorDashboardStyles.miniBrandProfileButton,
-                  { backgroundColor: `${sectionIntro.accent}14`, borderColor: `${sectionIntro.accent}26` },
+                  { backgroundColor: "rgba(255,255,255,0.14)", borderColor: "rgba(255,255,255,0.22)" },
                 ]}
                 activeOpacity={0.86}
               >
-                <Text
-                  style={[
+                {visitorAvatarUri ? (
+                  <Image source={{ uri: visitorAvatarUri }} style={visitorDashboardStyles.miniBrandProfileImage} />
+                ) : (
+                  <Text
+                    style={[
                     visitorDashboardStyles.miniBrandProfileText,
-                    { color: sectionIntro.accent },
+                    { color: "#FFFFFF" },
                   ]}
-                >
-                  {visitor?.fullName?.charAt(0) || "V"}
-                </Text>
+                  >
+                    {visitorInitials.substring(0, 1)}
+                  </Text>
+                )}
               </AnimatedPressable>
             </View>
           </View>
@@ -6049,17 +6157,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             dashboardShellResponsiveStyle,
           ]}
         >
-          <ScrollReveal
-            scrollY={dashboardScrollY}
-            viewportHeight={viewportHeight}
-            delay={0}
-          >
-            <Animated.View
-              style={[
-                visitorDashboardStyles.commandDeckAnimatedWrap,
-                dashboardHeroAnimatedStyle,
-              ]}
+          {shouldShowVisitorCommandDeck ? (
+            <ScrollReveal
+              scrollY={dashboardScrollY}
+              viewportHeight={viewportHeight}
+              delay={0}
             >
+              <Animated.View
+                style={[
+                  visitorDashboardStyles.commandDeckAnimatedWrap,
+                  dashboardHeroAnimatedStyle,
+                ]}
+              >
           <View
             style={[
               visitorDashboardStyles.commandDeckCard,
@@ -6085,6 +6194,26 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </Text>
               </View>
             </View>
+
+            {isVisitorHomeSection ? (
+              <View style={visitorDashboardStyles.mobileQuickActionStrip}>
+                {homeQuickCategories.slice(0, 3).map((item) => (
+                  <AnimatedPressable
+                    key={item.label}
+                    style={visitorDashboardStyles.mobileQuickActionItem}
+                    onPress={() => handleVisitorSectionChange(item.target)}
+                    activeOpacity={0.86}
+                  >
+                    <View style={[visitorDashboardStyles.mobileQuickActionIcon, { backgroundColor: item.accent }]}>
+                      <Ionicons name={item.icon} size={17} color={item.iconColor} />
+                    </View>
+                    <Text style={visitorDashboardStyles.mobileQuickActionLabel} numberOfLines={1}>
+                      {item.label}
+                    </Text>
+                  </AnimatedPressable>
+                ))}
+              </View>
+            ) : null}
 
             <View style={visitorDashboardStyles.commandMetricsGrid}>
               {commandMetrics.map((item) => (
@@ -6163,9 +6292,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             ) : null}
           </View>
             </Animated.View>
-          </ScrollReveal>
+            </ScrollReveal>
+          ) : null}
 
-          {!isVisitorHomeSection ? (
+          {!isVisitorHomeSection && !isVisitorAccountSection && !isVisitorMapSection ? (
             <Animated.View style={dashboardContentAnimatedStyle}>
               {renderSectionIntro()}
             </Animated.View>

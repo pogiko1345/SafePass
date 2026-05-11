@@ -247,17 +247,17 @@ export default StyleSheet.create({
   // ============ HEADER ============
   header: {
     paddingHorizontal: width <= 390 ? 16 : 20,
-    paddingTop: Platform.select({ ios: width <= 390 ? 38 : 46, android: 20, web: 12 }),
-    paddingBottom: width <= 390 ? 12 : 14,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingTop: Platform.select({ ios: width <= 390 ? 26 : 32, android: 14, web: 10 }),
+    paddingBottom: width <= 390 ? 8 : 10,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
 
   headerCompactHome: {
-    paddingTop: Platform.select({ ios: 36, android: 18, web: 10 }),
-    paddingBottom: 10,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingTop: Platform.select({ ios: 24, android: 12, web: 8 }),
+    paddingBottom: 8,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
   },
 
   headerTop: {
@@ -265,12 +265,12 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: width <= 390 ? 4 : 8,
+    gap: 8,
+    marginBottom: 2,
   },
 
   greeting: {
-    fontSize: 11,
+    fontSize: 10,
     color: "rgba(255,255,255,0.72)",
     fontWeight: "700",
     letterSpacing: 0.2,
@@ -280,28 +280,28 @@ export default StyleSheet.create({
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: width <= 390 ? 10 : 12,
-    paddingVertical: width <= 390 ? 5 : 7,
+    gap: 8,
+    paddingHorizontal: width <= 390 ? 8 : 10,
+    paddingVertical: width <= 390 ? 4 : 5,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.13)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
-    marginBottom: width <= 390 ? 5 : 8,
+    marginBottom: 4,
   },
 
   homeBrandLogoWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 9,
     backgroundColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
 
   homeBrandLogo: {
-    width: 18,
-    height: 18,
+    width: 15,
+    height: 15,
   },
 
   homeBrandCopy: {
@@ -309,14 +309,14 @@ export default StyleSheet.create({
   },
 
   homeBrandTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "900",
     color: "#FFFFFF",
     letterSpacing: -0.2,
   },
 
   homeBrandSubtitle: {
-    fontSize: 10,
+    fontSize: 8.5,
     fontWeight: "700",
     color: "rgba(255,255,255,0.76)",
     textTransform: "uppercase",
@@ -324,24 +324,24 @@ export default StyleSheet.create({
   },
 
   userName: {
-    fontSize: width <= 390 ? 18 : 20,
+    fontSize: width <= 390 ? 16 : 18,
     fontWeight: "900",
     color: "#FFFFFF",
     letterSpacing: -0.7,
   },
 
   headerSupportText: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 10,
+    lineHeight: 13,
     color: "rgba(255,255,255,0.82)",
-    marginTop: 4,
+    marginTop: 2,
     maxWidth: width <= 390 ? 210 : 250,
   },
 
   headerSupportTextCompact: {
-    maxWidth: 190,
-    fontSize: 10.5,
-    lineHeight: 14,
+    maxWidth: 185,
+    fontSize: 9.5,
+    lineHeight: 12,
   },
 
   headerActions: {
@@ -352,19 +352,19 @@ export default StyleSheet.create({
 
   miniBrandHeaderWrap: {
     paddingHorizontal: width <= 390 ? 16 : 20,
-    paddingTop: Platform.select({ ios: 24, android: 18, web: 12 }),
-    paddingBottom: 10,
+    paddingTop: Platform.select({ ios: 22, android: 14, web: 10 }),
+    paddingBottom: 8,
     backgroundColor: "#F4F7FB",
   },
 
   miniBrandHeader: {
-    minHeight: 62,
-    borderRadius: 22,
-    backgroundColor: "#FFFFFF",
+    minHeight: 58,
+    borderRadius: 20,
+    backgroundColor: "#0A3D91",
     borderWidth: 1,
-    borderColor: "#DCE7F4",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderColor: "rgba(255,255,255,0.16)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -383,21 +383,21 @@ export default StyleSheet.create({
   miniBrandIdentity: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     flex: 1,
   },
 
   miniBrandLogoWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
 
   miniBrandLogo: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
     borderRadius: 10,
   },
 
@@ -407,18 +407,26 @@ export default StyleSheet.create({
   },
 
   miniBrandTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "900",
     color: "#0F172A",
     letterSpacing: -0.2,
   },
 
+  miniBrandTitleOnDark: {
+    color: "#FFFFFF",
+  },
+
   miniBrandSubtitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
     color: "#64748B",
     textTransform: "uppercase",
     letterSpacing: 0.6,
+  },
+
+  miniBrandSubtitleOnDark: {
+    color: "#DBEAFE",
   },
 
   miniBrandHeaderRight: {
@@ -432,29 +440,30 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
   },
 
   miniBrandSectionPillText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.45,
   },
 
   miniBrandProfileButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: "#EEF5FF",
     borderWidth: 1,
     borderColor: "#D7E8FF",
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 12,
+    overflow: "hidden",
   },
 
   miniBrandProfileText: {
@@ -463,10 +472,16 @@ export default StyleSheet.create({
     color: "#0A3D91",
   },
 
+  miniBrandProfileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 18,
+  },
+
   profileButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.24)",
@@ -480,9 +495,49 @@ export default StyleSheet.create({
   },
 
   profileInitials: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 17,
+  },
+
+  headerStatsRow: {
+    flexDirection: "row",
+    gap: 7,
+    marginTop: 4,
+    marginBottom: 3,
+  },
+
+  headerStatPill: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    justifyContent: "center",
+  },
+
+  headerStatValue: {
+    fontSize: width <= 390 ? 12 : 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  headerStatLabel: {
+    marginTop: 1,
+    fontSize: 8,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.68)",
+    textTransform: "uppercase",
+    letterSpacing: 0.45,
   },
 
   // Status Card in Header
@@ -491,10 +546,11 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 16,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    marginTop: 6,
+    minHeight: 40,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 4,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
   },
@@ -506,15 +562,15 @@ export default StyleSheet.create({
   },
 
   statusIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
 
   statusValue: {
-    fontSize: 13.5,
+    fontSize: 12.5,
     fontWeight: "900",
   },
 
@@ -525,7 +581,7 @@ export default StyleSheet.create({
   },
 
   timerText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "500",
   },
 
@@ -662,6 +718,41 @@ export default StyleSheet.create({
   commandDeckBadgeText: {
     fontSize: 11,
     fontWeight: "800",
+  },
+
+  mobileQuickActionStrip: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+  },
+
+  mobileQuickActionItem: {
+    flex: 1,
+    minHeight: 58,
+    borderRadius: 16,
+    backgroundColor: "#F8FBFF",
+    borderWidth: 1,
+    borderColor: "#E4EDF8",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+
+  mobileQuickActionIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 5,
+  },
+
+  mobileQuickActionLabel: {
+    fontSize: width <= 390 ? 9 : 10,
+    fontWeight: "900",
+    color: "#0F172A",
+    textAlign: "center",
   },
 
   commandMetricsGrid: {
@@ -3669,15 +3760,15 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    gap: 16,
+    padding: width <= 390 ? 14 : 16,
+    gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#EDF1F4",
+    borderBottomColor: "#DDE7F3",
   },
 
   appointmentModalHeaderContent: {
     flex: 1,
-    gap: 8,
+    gap: 6,
   },
 
   appointmentModalHeaderCopy: {
@@ -3685,24 +3776,26 @@ export default StyleSheet.create({
   },
 
   appointmentHeaderBackButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F4F4F0",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
     alignItems: "center",
     justifyContent: "center",
   },
 
   appointmentModalTitle: {
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: width <= 390 ? 18 : 20,
+    fontWeight: "900",
     color: "#0F172A",
     marginBottom: 4,
   },
 
   appointmentModalSubtitle: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12.5,
+    lineHeight: 18,
     color: "#64748B",
   },
 
@@ -3739,8 +3832,8 @@ export default StyleSheet.create({
   },
 
   appointmentInlineBody: {
-    padding: width <= 390 ? 16 : 20,
-    gap: width <= 390 ? 14 : 18,
+    padding: width <= 390 ? 14 : 18,
+    gap: width <= 390 ? 12 : 16,
   },
 
   appointmentRequestInfoPill: {
@@ -3852,18 +3945,18 @@ export default StyleSheet.create({
   appointmentSegmentBar: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "#EEF5FF",
-    borderRadius: 999,
+    alignSelf: "stretch",
+    backgroundColor: "#F1F6FD",
+    borderRadius: 18,
     padding: 4,
-    gap: 6,
-    flexWrap: "wrap",
+    gap: 4,
   },
 
   appointmentSegmentButton: {
-    minHeight: 40,
-    paddingHorizontal: 16,
-    borderRadius: 999,
+    flex: 1,
+    minHeight: 38,
+    paddingHorizontal: 8,
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -4242,9 +4335,37 @@ export default StyleSheet.create({
   },
 
   appointmentHistoryBody: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 16,
+    paddingHorizontal: width <= 390 ? 14 : 20,
+    paddingBottom: width <= 390 ? 14 : 20,
+    gap: 12,
+  },
+  appointmentHistorySummaryRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  appointmentHistorySummaryCard: {
+    flex: 1,
+    minHeight: 58,
+    borderRadius: 16,
+    backgroundColor: "#F8FBFF",
+    borderWidth: 1,
+    borderColor: "#E2EAF4",
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    justifyContent: "center",
+  },
+  appointmentHistorySummaryValue: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  appointmentHistorySummaryLabel: {
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   appointmentHistoryTable: {
     borderRadius: 18,
@@ -4355,11 +4476,11 @@ export default StyleSheet.create({
 
   appointmentHistoryCardItem: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    borderRadius: 17,
     borderWidth: 1,
     borderColor: "#DDE7F3",
-    padding: 16,
-    gap: 12,
+    padding: width <= 390 ? 13 : 16,
+    gap: 10,
   },
 
   appointmentHistoryCardTop: {
@@ -4405,7 +4526,7 @@ export default StyleSheet.create({
   appointmentHistoryCardMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 8,
   },
 
   appointmentHistoryCardMetaItem: {
@@ -4413,11 +4534,11 @@ export default StyleSheet.create({
     alignItems: "center",
     gap: 6,
     backgroundColor: "#F8FBFF",
-    borderRadius: 12,
+    borderRadius: 11,
     borderWidth: 1,
     borderColor: "#E6EEF9",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
   },
 
   appointmentHistoryCardMetaText: {
@@ -4660,33 +4781,90 @@ export default StyleSheet.create({
   appointmentQuickInfoRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 7,
   },
 
   appointmentQuickInfoCard: {
     flexGrow: 1,
-    flexBasis: 160,
-    backgroundColor: "#FBFCF6",
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    flexBasis: width <= 390 ? "48%" : 160,
+    minWidth: 0,
+    backgroundColor: "#F8FBFF",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: "#ECEFDE",
+    borderColor: "#E2EAF4",
+    gap: 5,
   },
 
   appointmentQuickInfoLabel: {
-    fontSize: 10.5,
+    fontSize: 9,
     fontWeight: "800",
     color: "#94A3B8",
     textTransform: "uppercase",
     letterSpacing: 0.6,
-    marginBottom: 6,
+    marginBottom: 0,
   },
 
   appointmentQuickInfoValue: {
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: width <= 390 ? 11 : 13,
+    lineHeight: 16,
+    fontWeight: "900",
     color: "#0F172A",
+  },
+
+  appointmentStepStrip: {
+    gap: 6,
+    padding: 9,
+    borderRadius: 18,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  appointmentStepPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E6EEF9",
+  },
+
+  appointmentStepNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#0A3D91",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  appointmentStepNumberText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  appointmentStepCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  appointmentStepTitle: {
+    fontSize: 11.5,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  appointmentStepText: {
+    marginTop: 1,
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "#64748B",
   },
 
   appointmentPickerField: {
@@ -5874,8 +6052,8 @@ export default StyleSheet.create({
 
   appointmentStatusRowValue: {
     flex: 0.58,
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 11.5,
+    fontWeight: "800",
     color: "#0F172A",
     textAlign: "right",
   },
@@ -6077,6 +6255,7 @@ export default StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
 
   accountHeroAvatarMobile: {
@@ -6089,6 +6268,12 @@ export default StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#FFFFFF",
+  },
+
+  accountHeroAvatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 29,
   },
 
   accountHeroCopy: {

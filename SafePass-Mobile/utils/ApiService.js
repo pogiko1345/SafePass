@@ -853,7 +853,15 @@ async verifyCredentials(email, password) {
       
       return response;
     } catch (error) {
-      console.error("Visitor registration error:", error);
+      const isExistingAccount =
+        error?.data?.field === "email" ||
+        String(error?.data?.code || "").toUpperCase() === "ACCOUNT_EXISTS" ||
+        String(error?.message || "").toLowerCase().includes("already exists");
+      if (isExistingAccount) {
+        console.log("Visitor registration needs existing-account login:", error?.message);
+      } else {
+        console.error("Visitor registration error:", error);
+      }
       throw error;
     }
   }

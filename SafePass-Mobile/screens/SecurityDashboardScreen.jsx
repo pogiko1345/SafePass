@@ -199,6 +199,7 @@ const buildSecurityProfileForm = (profile = {}) => ({
   email: profile.email || "",
   phone: profile.phone || "",
   emergencyContact: profile.emergencyContact || "",
+  profilePhoto: profile.profilePhoto || null,
 });
 
 export default function SecurityDashboardScreen({ navigation }) {
@@ -1012,7 +1013,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   // ============ DATA LOADING FUNCTIONS ============
   const loadUserData = async () => {
     try {
-      const [currentUser, token] = await Promise.all([
+      const [cachedUser, token] = await Promise.all([
         ApiService.getCurrentUser(),
         ApiService.getToken(),
       ]);
@@ -1023,12 +1024,19 @@ export default function SecurityDashboardScreen({ navigation }) {
         return;
       }
 
-      const normalizedRole = normalizeRole(currentUser?.role);
-      if (!currentUser || !canAccessSecurityDashboard(normalizedRole)) {
+      const normalizedRole = normalizeRole(cachedUser?.role);
+      if (!cachedUser || !canAccessSecurityDashboard(normalizedRole)) {
         navigation.replace("Login");
         return null;
       }
-      const normalizedUser = { ...currentUser, role: normalizedRole };
+      let profileUser = null;
+      try {
+        const profileResponse = await ApiService.getProfile();
+        profileUser = profileResponse?.user || null;
+      } catch (profileError) {
+        console.log("Security profile refresh skipped:", profileError?.message || profileError);
+      }
+      const normalizedUser = { ...cachedUser, ...(profileUser || {}), role: normalizedRole };
       setUser(normalizedUser);
       setSecurityProfileForm(buildSecurityProfileForm(normalizedUser));
       return normalizedUser;
@@ -3504,6 +3512,45 @@ export default function SecurityDashboardScreen({ navigation }) {
     setSecurityProfileEditing(false);
   };
 
+  const handleSecurityProfilePhotoPress = async () => {
+    if (!securityProfileEditing || securityProfileSaving) return;
+
+    try {
+      const launchPicker = async (source) => {
+        const result =
+          source === "camera"
+            ? await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              })
+            : await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+
+        if (!result.canceled) {
+          updateSecurityProfileField("profilePhoto", result.assets[0].uri);
+        }
+      };
+
+      if (Platform.OS === "web") {
+        await launchPicker("gallery");
+        return;
+      }
+
+      Alert.alert("Update Photo", "Choose how you want to update your photo.", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Take Photo", onPress: () => launchPicker("camera") },
+        { text: "Choose from Gallery", onPress: () => launchPicker("gallery") },
+      ]);
+    } catch (error) {
+      Alert.alert("Photo Update Failed", "Could not update your profile photo.");
+    }
+  };
+
   const saveSecurityProfile = async () => {
     const firstName = String(securityProfileForm.firstName || "").trim();
     const lastName = String(securityProfileForm.lastName || "").trim();
@@ -3540,6 +3587,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         email,
         phone: phone ? normalizePhilippineMobileNumber(phone) : "",
         emergencyContact: String(securityProfileForm.emergencyContact || "").trim(),
+        profilePhoto: securityProfileForm.profilePhoto || null,
       });
 
       const updatedUser = {
@@ -4146,8 +4194,9 @@ export default function SecurityDashboardScreen({ navigation }) {
     </View>
   );
 
-  const renderMobileMetrics = () => (
-    <View style={securityMobileStyles.statusGrid}>
+  function renderMobileMetrics() {
+    return (
+      <View style={securityMobileStyles.statusGrid}>
       {[
         {
           label: "On Site",
@@ -4183,11 +4232,13 @@ export default function SecurityDashboardScreen({ navigation }) {
           <Text style={securityMobileStyles.statusMetricHelper}>{item.helper}</Text>
         </View>
       ))}
-    </View>
-  );
+      </View>
+    );
+  }
 
-  const renderMobileFocusPanel = () => (
-    <View style={securityMobileStyles.focusPanel}>
+  function renderMobileFocusPanel() {
+    return (
+      <View style={securityMobileStyles.focusPanel}>
       <View style={securityMobileStyles.focusIcon}>
         <Ionicons
           name={alerts.length || mobileWrongLocationCount ? "warning-outline" : "shield-checkmark-outline"}
@@ -4213,8 +4264,9 @@ export default function SecurityDashboardScreen({ navigation }) {
       >
         <Text style={securityMobileStyles.focusActionText}>{alerts.length ? "Review" : "Map"}</Text>
       </TouchableOpacity>
-    </View>
-  );
+      </View>
+    );
+  }
 
   const renderMobileQuickActions = () => (
     <View style={securityMobileStyles.quickActions}>
@@ -4725,9 +4777,22 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
         <View style={securityMobileStyles.profileCard}>
           <View style={securityMobileStyles.profileTop}>
-            <View style={securityMobileStyles.profileAvatar}>
-              <Text style={securityMobileStyles.profileAvatarText}>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</Text>
-            </View>
+            <TouchableOpacity
+              style={securityMobileStyles.profileAvatar}
+              onPress={handleSecurityProfilePhotoPress}
+              activeOpacity={securityProfileEditing ? 0.82 : 1}
+            >
+              {(securityProfileEditing ? securityProfileForm.profilePhoto : user.profilePhoto) ? (
+                <Image source={{ uri: securityProfileEditing ? securityProfileForm.profilePhoto : user.profilePhoto }} style={securityMobileStyles.profileAvatarImage} />
+              ) : (
+                <Text style={securityMobileStyles.profileAvatarText}>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</Text>
+              )}
+              {securityProfileEditing ? (
+                <View style={securityMobileStyles.profileCameraBadge}>
+                  <Ionicons name="camera-outline" size={15} color="#FFFFFF" />
+                </View>
+              ) : null}
+            </TouchableOpacity>
             <View style={securityMobileStyles.profileCopy}>
               <Text style={securityMobileStyles.profileName}>{user.firstName} {user.lastName}</Text>
               <Text style={securityMobileStyles.profileRole}>{String(user.role || "security").toUpperCase()}</Text>
@@ -6482,11 +6547,30 @@ const securityMobileStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#041E42",
+    overflow: "visible",
+  },
+  profileAvatarImage: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
   },
   profileAvatarText: {
     fontSize: 18,
     fontWeight: "900",
     color: "#FFFFFF",
+  },
+  profileCameraBadge: {
+    position: "absolute",
+    right: -4,
+    bottom: -4,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#0F172A",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
   },
   profileCopy: {
     flex: 1,
