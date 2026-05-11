@@ -462,6 +462,66 @@ const logPhoneOtpBackendFallback = ({ phoneNumber, otpCode, method, reason }) =>
   console.log("");
 };
 
+const SMART_TNT_DEFAULT_PREFIXES = [
+  "0907",
+  "0908",
+  "0909",
+  "0910",
+  "0911",
+  "0912",
+  "0913",
+  "0914",
+  "0918",
+  "0919",
+  "0920",
+  "0921",
+  "0928",
+  "0929",
+  "0930",
+  "0938",
+  "0939",
+  "0940",
+  "0946",
+  "0947",
+  "0948",
+  "0949",
+  "0950",
+  "0951",
+  "0961",
+  "0963",
+  "0968",
+  "0969",
+  "0970",
+  "0981",
+  "0989",
+  "0992",
+  "0998",
+  "0999",
+];
+
+const getSmartTntOtpBackendLogEnabled = () =>
+  String(process.env.SMART_TNT_OTP_BACKEND_LOG || "true")
+    .trim()
+    .toLowerCase() !== "false";
+
+const getSmartTntOtpPrefixes = () => {
+  const configuredPrefixes = String(process.env.SMART_TNT_OTP_PREFIXES || "")
+    .split(",")
+    .map((prefix) => prefix.trim())
+    .filter(Boolean);
+
+  return configuredPrefixes.length > 0
+    ? configuredPrefixes
+    : SMART_TNT_DEFAULT_PREFIXES;
+};
+
+const isSmartTntOtpNumber = (phoneNumber = "") => {
+  const normalizedPhone = normalizePhoneForOtp(phoneNumber);
+  return getSmartTntOtpPrefixes().some((prefix) =>
+    normalizedPhone.startsWith(prefix),
+  );
+};
+
 const sendSemaphoreOtp = async ({ phoneNumber, otpCode }) => {
   const apiKey = getSemaphoreApiKey();
   if (!apiKey) {
@@ -7255,6 +7315,18 @@ app.post("/api/auth/request-otp", async (req, res) => {
     const tempToken =
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
     let deliveryProvider = getPhoneOtpDeliveryProvider();
+    const shouldUseBackendLogForSmartTnt =
+      getSmartTntOtpBackendLogEnabled() && isSmartTntOtpNumber(cleanPhone);
+
+    if (shouldUseBackendLogForSmartTnt) {
+      deliveryProvider = "backend_log";
+      logPhoneOtpBackendFallback({
+        phoneNumber: cleanPhone,
+        otpCode,
+        method: method || "sms",
+        reason: "Smart/TNT OTP is configured for backend terminal delivery.",
+      });
+    }
 
     if (deliveryProvider !== "backend_log") {
       try {
