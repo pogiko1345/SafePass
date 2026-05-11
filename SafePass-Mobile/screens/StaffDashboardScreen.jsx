@@ -159,6 +159,9 @@ const getNotificationMeta = (notification) => {
   if (activityType.includes("rejected_appointment")) {
     return { label: "Rejected", icon: "close-circle-outline", accent: "#DC2626" };
   }
+  if (activityType.includes("appointment_no_show") || activityType.includes("no_show")) {
+    return { label: "No Show", icon: "alert-circle-outline", accent: "#B45309" };
+  }
   if (activityType.includes("completed_appointment")) {
     return { label: "Completed", icon: "flag-outline", accent: "#475569" };
   }
@@ -398,6 +401,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [rejectionReason, setRejectionReason] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const contentScrollRef = useRef(null);
   const webDateInputRef = useRef(null);
   const webTimeInputRef = useRef(null);
 
@@ -752,6 +756,31 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     }
   };
 
+  const handleNextArrivalPress = () => {
+    selectSubmodule("appointment-record");
+
+    if (nextUpcomingAppointment) {
+      setDetailAppointment(nextUpcomingAppointment);
+    }
+  };
+
+  const handleAssignedOfficePress = () => {
+    selectSubmodule("account-info");
+  };
+
+  const handleNotificationCenterPress = () => {
+    if (isPhoneLayout) {
+      setMobileTab("notifications");
+      return;
+    }
+
+    setSelectedSubmodule("home");
+    setExpandedModule("home");
+    requestAnimationFrame(() => {
+      contentScrollRef.current?.scrollToEnd?.({ animated: true });
+    });
+  };
+
   const handleProfileInputChange = (field, value) => {
     setProfileForm((currentValue) => ({ ...currentValue, [field]: value }));
   };
@@ -893,7 +922,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     if (
       activityType.includes("approved_appointment") ||
       activityType.includes("adjusted_appointment") ||
-      activityType.includes("completed_appointment")
+      activityType.includes("completed_appointment") ||
+      activityType.includes("appointment_no_show") ||
+      activityType.includes("no_show")
     ) {
       selectSubmodule("appointment-record");
       if (matchedAppointment) {
@@ -1709,7 +1740,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       </View>
 
       <View style={styles.homeInsightsGrid}>
-        <HomeHoverPressable style={styles.homeInsightCard}>
+        <HomeHoverPressable style={styles.homeInsightCard} onPress={handleNextArrivalPress}>
           <View style={styles.homeInsightIconWrap}>
             <Ionicons name="time-outline" size={18} color="#0A3D91" />
           </View>
@@ -1724,7 +1755,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </Text>
         </HomeHoverPressable>
 
-        <HomeHoverPressable style={styles.homeInsightCard}>
+        <HomeHoverPressable style={styles.homeInsightCard} onPress={handleAssignedOfficePress}>
           <View style={styles.homeInsightIconWrap}>
             <Ionicons name="business-outline" size={18} color="#047857" />
           </View>
@@ -1735,7 +1766,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </Text>
         </HomeHoverPressable>
 
-        <HomeHoverPressable style={styles.homeInsightCard}>
+        <HomeHoverPressable style={styles.homeInsightCard} onPress={handleNotificationCenterPress}>
           <View style={styles.homeInsightHeader}>
             <View style={styles.homeInsightIconWrap}>
               <Ionicons name="notifications-outline" size={18} color="#7C3AED" />
@@ -1751,7 +1782,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             {unreadNotificationsCount ? `${unreadNotificationsCount} new update${unreadNotificationsCount > 1 ? "s" : ""}` : "All caught up"}
           </Text>
           <Text style={styles.homeInsightMeta}>
-            Tap any item below to jump straight into the related appointment.
+            Open recent alerts and jump straight into related appointments.
           </Text>
         </HomeHoverPressable>
       </View>
@@ -2967,6 +2998,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
         <View style={styles.contentArea}>
           <ScrollView
+            ref={contentScrollRef}
             style={styles.contentScroll}
             refreshControl={
               <RefreshControl
