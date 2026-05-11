@@ -7315,6 +7315,7 @@ app.post("/api/auth/request-otp", async (req, res) => {
     const tempToken =
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
     let deliveryProvider = getPhoneOtpDeliveryProvider();
+    let backendLogPrinted = false;
     const shouldUseBackendLogForSmartTnt =
       getSmartTntOtpBackendLogEnabled() && isSmartTntOtpNumber(cleanPhone);
 
@@ -7326,6 +7327,17 @@ app.post("/api/auth/request-otp", async (req, res) => {
         method: method || "sms",
         reason: "Smart/TNT OTP is configured for backend terminal delivery.",
       });
+      backendLogPrinted = true;
+    }
+
+    if (deliveryProvider === "backend_log" && !backendLogPrinted) {
+      logPhoneOtpBackendFallback({
+        phoneNumber: cleanPhone,
+        otpCode,
+        method: method || "sms",
+        reason: "SMS provider is not configured; OTP is available in the backend terminal.",
+      });
+      backendLogPrinted = true;
     }
 
     if (deliveryProvider !== "backend_log") {
@@ -7342,6 +7354,7 @@ app.post("/api/auth/request-otp", async (req, res) => {
             method: method || "sms",
             reason: `${failedProvider} account is not ready for SMS sending.`,
           });
+          backendLogPrinted = true;
         } else {
           otpStore.delete(cleanPhone);
           return res.status(502).json({

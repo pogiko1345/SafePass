@@ -1966,6 +1966,14 @@ export default function SecurityDashboardScreen({ navigation }) {
     [visitors.notReady],
   );
 
+  const mobileWrongLocationCount = useMemo(
+    () =>
+      [...(visitors.active || []), ...(visitors.approved || [])].filter(
+        (visitor) => visitor?.wrongLocationAlerts?.length,
+      ).length,
+    [visitors.active, visitors.approved],
+  );
+
   const mobileLogItems = useMemo(() => {
     const normalizedSearch = String(searchQuery || "").trim().toLowerCase();
     return (accessLogs || []).filter((log) => {
@@ -4084,9 +4092,13 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderMobileHeader = () => (
     <View style={securityMobileStyles.header}>
       <View style={securityMobileStyles.headerTop}>
-        <View>
+        <View style={securityMobileStyles.headerCopy}>
           <Text style={securityMobileStyles.eyebrow}>Security Mobile</Text>
-          <Text style={securityMobileStyles.headerTitle}>Live Monitor</Text>
+          <Text style={securityMobileStyles.headerTitle}>Live Command</Text>
+          <View style={securityMobileStyles.headerStatusPill}>
+            <View style={securityMobileStyles.headerStatusDot} />
+            <Text style={securityMobileStyles.headerStatusText}>Checkpoint online</Text>
+          </View>
         </View>
         <View style={securityMobileStyles.headerActions}>
           <TouchableOpacity style={securityMobileStyles.headerButton} onPress={() => setShowNotificationModal(true)}>
@@ -4101,10 +4113,22 @@ export default function SecurityDashboardScreen({ navigation }) {
       <Text style={securityMobileStyles.headerSubtitle}>
         Scan arrivals, open the map, or review items that need attention.
       </Text>
+      <View style={securityMobileStyles.headerStats}>
+        {[
+          ["Inside", visitorStats.activeNow || 0],
+          ["Expected", visitors.approved?.length || 0],
+          ["Alerts", alerts.length || 0],
+        ].map(([label, value]) => (
+          <View key={label} style={securityMobileStyles.headerStatItem}>
+            <Text style={securityMobileStyles.headerStatValue}>{value}</Text>
+            <Text style={securityMobileStyles.headerStatLabel}>{label}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 
-  const renderMobileMetrics = () => (
+  const renderMobileStatusCard = () => (
     <View style={securityMobileStyles.statusCard}>
       <View style={securityMobileStyles.statusCardIcon}>
         <Ionicons name="shield-checkmark-outline" size={22} color={BRAND.success} />
@@ -4122,19 +4146,89 @@ export default function SecurityDashboardScreen({ navigation }) {
     </View>
   );
 
+  const renderMobileMetrics = () => (
+    <View style={securityMobileStyles.statusGrid}>
+      {[
+        {
+          label: "On Site",
+          value: livePresenceSummary?.total || visitorStats.activeNow || 0,
+          helper: "Live presence",
+          icon: "radio-outline",
+          color: BRAND.success,
+          bg: "#ECFDF5",
+        },
+        {
+          label: "Queue",
+          value: mobileNeedsAttentionVisitors.length,
+          helper: "Needs action",
+          icon: "people-outline",
+          color: BRAND.blue,
+          bg: "#EEF5FF",
+        },
+        {
+          label: "Wrong Area",
+          value: mobileWrongLocationCount,
+          helper: "Location flags",
+          icon: "navigate-outline",
+          color: mobileWrongLocationCount ? BRAND.danger : "#64748B",
+          bg: mobileWrongLocationCount ? "#FEF2F2" : "#F8FAFC",
+        },
+      ].map((item) => (
+        <View key={item.label} style={securityMobileStyles.statusMetricCard}>
+          <View style={[securityMobileStyles.statusMetricIcon, { backgroundColor: item.bg }]}>
+            <Ionicons name={item.icon} size={18} color={item.color} />
+          </View>
+          <Text style={securityMobileStyles.statusMetricValue}>{item.value}</Text>
+          <Text style={securityMobileStyles.statusMetricLabel}>{item.label}</Text>
+          <Text style={securityMobileStyles.statusMetricHelper}>{item.helper}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderMobileFocusPanel = () => (
+    <View style={securityMobileStyles.focusPanel}>
+      <View style={securityMobileStyles.focusIcon}>
+        <Ionicons
+          name={alerts.length || mobileWrongLocationCount ? "warning-outline" : "shield-checkmark-outline"}
+          size={19}
+          color={alerts.length || mobileWrongLocationCount ? BRAND.warning : BRAND.success}
+        />
+      </View>
+      <View style={securityMobileStyles.focusCopy}>
+        <Text style={securityMobileStyles.focusTitle}>
+          {alerts.length || mobileWrongLocationCount ? "Attention required" : "Operations normal"}
+        </Text>
+        <Text style={securityMobileStyles.focusText}>
+          {alerts.length
+            ? `${alerts.length} alert${alerts.length === 1 ? "" : "s"} waiting for review.`
+            : mobileWrongLocationCount
+              ? `${mobileWrongLocationCount} visitor${mobileWrongLocationCount === 1 ? "" : "s"} may be in the wrong area.`
+              : "No active alerts or wrong-area flags right now."}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={securityMobileStyles.focusAction}
+        onPress={() => setSecurityMobileTab(alerts.length ? "alerts" : "map")}
+      >
+        <Text style={securityMobileStyles.focusActionText}>{alerts.length ? "Review" : "Map"}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderMobileQuickActions = () => (
     <View style={securityMobileStyles.quickActions}>
       <TouchableOpacity style={[securityMobileStyles.quickAction, securityMobileStyles.quickActionPrimary]} onPress={() => navigation.navigate("NFCScan")}>
         <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
-        <Text style={securityMobileStyles.quickActionPrimaryText}>NFC Scan</Text>
+        <Text style={securityMobileStyles.quickActionPrimaryText}>Scan Card</Text>
       </TouchableOpacity>
       <TouchableOpacity style={securityMobileStyles.quickAction} onPress={() => setSecurityMobileTab("map")}>
         <Ionicons name="map-outline" size={20} color={BRAND.blue} />
-        <Text style={securityMobileStyles.quickActionText}>Map</Text>
+        <Text style={securityMobileStyles.quickActionText}>Track</Text>
       </TouchableOpacity>
       <TouchableOpacity style={securityMobileStyles.quickAction} onPress={() => setSecurityMobileTab("alerts")}>
         <Ionicons name="flag-outline" size={20} color={BRAND.danger} />
-        <Text style={securityMobileStyles.quickActionText}>Flag</Text>
+        <Text style={securityMobileStyles.quickActionText}>Report</Text>
       </TouchableOpacity>
     </View>
   );
@@ -4260,19 +4354,10 @@ export default function SecurityDashboardScreen({ navigation }) {
     <>
       {renderMobileHeader()}
       {renderMobileMetrics()}
+      {renderMobileFocusPanel()}
       {renderMobileQuickActions()}
-      {alerts.length ? (
-        <TouchableOpacity style={securityMobileStyles.simpleAlertCard} onPress={() => setSecurityMobileTab("alerts")}>
-          <Ionicons name="warning-outline" size={20} color={BRAND.danger} />
-          <View style={securityMobileStyles.simpleAlertCopy}>
-            <Text style={securityMobileStyles.simpleAlertTitle}>Review active alerts</Text>
-            <Text style={securityMobileStyles.simpleAlertText}>{alerts.length} item{alerts.length === 1 ? "" : "s"} waiting</Text>
-          </View>
-          <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
-        </TouchableOpacity>
-      ) : null}
       <View style={securityMobileStyles.sectionHeader}>
-        <Text style={securityMobileStyles.sectionTitle}>Incoming Visitors</Text>
+        <Text style={securityMobileStyles.sectionTitle}>Action Queue</Text>
         <Text style={securityMobileStyles.sectionCount}>{mobileNeedsAttentionVisitors.length}</Text>
       </View>
       {mobileNeedsAttentionVisitors.length ? (
@@ -5556,6 +5641,10 @@ const securityMobileStyles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   eyebrow: {
     fontSize: 12,
     fontWeight: "900",
@@ -5574,6 +5663,56 @@ const securityMobileStyles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: "#DCEBFF",
+  },
+  headerStatusPill: {
+    alignSelf: "flex-start",
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.18)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  headerStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#22C55E",
+  },
+  headerStatusText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  headerStats: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 15,
+  },
+  headerStatItem: {
+    flex: 1,
+    borderRadius: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 9,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+  },
+  headerStatValue: {
+    fontSize: 19,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  headerStatLabel: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#BAE6FD",
+    textTransform: "uppercase",
   },
   headerActions: {
     flexDirection: "row",
@@ -5649,6 +5788,94 @@ const securityMobileStyles = StyleSheet.create({
     fontWeight: "900",
     color: BRAND.muted,
     textTransform: "uppercase",
+  },
+  statusGrid: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  statusMetricCard: {
+    flex: 1,
+    minHeight: 116,
+    borderRadius: 18,
+    padding: 12,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  statusMetricIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 9,
+  },
+  statusMetricValue: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  statusMetricLabel: {
+    marginTop: 1,
+    fontSize: 11,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  statusMetricHelper: {
+    marginTop: 3,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "800",
+    color: BRAND.muted,
+  },
+  focusPanel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    padding: 13,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 12,
+  },
+  focusIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  focusCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  focusTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  focusText: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+    color: BRAND.muted,
+  },
+  focusAction: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#EEF5FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  focusActionText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: BRAND.blue,
   },
   quickActions: {
     flexDirection: "row",

@@ -240,10 +240,13 @@ export default function VerificationScreen({ navigation, route }) {
         setShowPhoneInput(false);
         setOtpTimer(60);
         setCanResend(false);
+        const isBackendLogOtp = response.deliveryMode === "backend_log";
         
         Alert.alert(
-          "Verification Code Sent",
-          `A 6-digit code has been sent to ${cleanPhone}\n\nCheck your terminal/console for the OTP code.`,
+          isBackendLogOtp ? "Verification Code Generated" : "Verification Code Sent",
+          isBackendLogOtp
+            ? `A 6-digit code was generated for ${cleanPhone}.\n\nCheck the backend terminal for the OTP code.`
+            : `A 6-digit code has been sent to ${cleanPhone}.`,
           [{ text: "OK" }]
         );
       } else {
