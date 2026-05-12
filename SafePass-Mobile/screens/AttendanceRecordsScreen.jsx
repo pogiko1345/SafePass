@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
+
+const SCHOOL_LOGO = require("../assets/LogoSapphire.jpg");
 
 const USER_TYPES = ["all", "student", "teacher", "staff", "security", "guard", "visitor"];
 const STATUS_TYPES = ["all", "present", "late", "inside", "checked_out", "completed", "expired", "no_show"];
@@ -166,6 +169,7 @@ export default function AttendanceRecordsScreen({ navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
+        <Image source={SCHOOL_LOGO} resizeMode="contain" style={{ width: 116, height: 58, marginBottom: 18 }} />
         <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={styles.loadingText}>Loading attendance records...</Text>
       </SafeAreaView>

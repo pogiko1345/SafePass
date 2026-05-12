@@ -3251,6 +3251,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       <MobileLoadingState dark={mobileDarkModeEnabled} message="Loading staff appointments..." />
     ) : (
       <SafeAreaView style={styles.loadingContainer}>
+        <Image
+          source={require("../assets/LogoSapphire.jpg")}
+          resizeMode="contain"
+          style={{ width: 116, height: 58, marginBottom: 18 }}
+        />
         <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={styles.loadingText}>Loading staff appointments...</Text>
         <Text style={styles.loadingSubtext}>Restoring requests, records, and notifications.</Text>

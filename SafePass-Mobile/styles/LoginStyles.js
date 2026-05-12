@@ -28,6 +28,24 @@ export default StyleSheet.create({
     backgroundColor: brandColors.navy,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 24,
+  },
+
+  splashLogoCard: {
+    width: 116,
+    height: 116,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+
+  splashLogo: {
+    width: 96,
+    height: 54,
   },
 
   splashText: {

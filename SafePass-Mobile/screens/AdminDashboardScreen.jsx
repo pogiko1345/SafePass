@@ -10645,6 +10645,11 @@ const loadDashboardData = useCallback(async () => {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
+        <Image
+          source={require("../assets/LogoSapphire.jpg")}
+          resizeMode="contain"
+          style={{ width: 116, height: 58, marginBottom: 18 }}
+        />
         <ActivityIndicator size="large" color="#1C6DD0" />
         <Text style={styles.loadingText}>Loading admin dashboard...</Text>
         <Text style={styles.loadingSubtext}>Restoring requests, users, reports, and live campus data.</Text>

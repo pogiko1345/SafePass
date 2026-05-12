@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,6 +10,8 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+
+const SCHOOL_LOGO = require("../../assets/LogoSapphire.jpg");
 
 export const BRAND = {
   blue: "#0A3D91",
@@ -65,6 +68,9 @@ export const MobileEmptyState = ({ icon = "file-tray-outline", title, message, a
 
 export const MobileLoadingState = ({ message = "Loading...", dark = false }) => (
   <View style={[mobileStyles.loadingState, dark && mobileStyles.darkPage]}>
+    <View style={[mobileStyles.loadingLogoCard, dark && mobileStyles.darkSurface]}>
+      <Image source={SCHOOL_LOGO} resizeMode="contain" style={mobileStyles.loadingLogo} />
+    </View>
     <ActivityIndicator size="large" color={BRAND.blue} />
     <Text style={[mobileStyles.loadingText, dark && mobileStyles.darkText]}>{message}</Text>
   </View>
@@ -142,6 +148,21 @@ export const mobileStyles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: BRAND.page,
     paddingHorizontal: 24,
+  },
+  loadingLogoCard: {
+    width: 112,
+    height: 112,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: BRAND.line,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+  loadingLogo: {
+    width: 92,
+    height: 54,
   },
   loadingText: {
     marginTop: 12,

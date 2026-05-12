@@ -31,6 +31,8 @@ import {
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
 
+const SCHOOL_LOGO = require("../assets/LogoSapphire.jpg");
+
 const Storage =
   Platform.OS === "web" ? require("../utils/webStorage").default : AsyncStorage;
 const setBiometricCredential = async (key, value) => {
@@ -589,6 +591,11 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
     return (
       <SafeAreaView style={styles.center}>
         <StatusBar barStyle="light-content" backgroundColor="#041E42" />
+        <Image
+          source={SCHOOL_LOGO}
+          resizeMode="contain"
+          style={{ width: 116, height: 58, marginBottom: 18 }}
+        />
         <ActivityIndicator size="large" color="#041E42" />
         <Text style={styles.loadingText}>Loading your profile...</Text>
       </SafeAreaView>

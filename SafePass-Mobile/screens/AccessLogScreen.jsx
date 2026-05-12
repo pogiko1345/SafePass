@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
   RefreshControl,
   StatusBar,
   Platform,
@@ -13,6 +14,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
 import accessLogStyles from "../styles/AccessLogStyles";
+
+const SCHOOL_LOGO = require("../assets/LogoSapphire.jpg");
 
 export default function AccessLogScreen({ navigation }) {
   const [filter, setFilter] = useState("all");
@@ -172,6 +175,7 @@ export default function AccessLogScreen({ navigation }) {
     return (
       <SafeAreaView style={accessLogStyles.loadingContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
+        <Image source={SCHOOL_LOGO} resizeMode="contain" style={{ width: 116, height: 58, marginBottom: 18 }} />
         <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={accessLogStyles.loadingText}>Loading access history...</Text>
       </SafeAreaView>

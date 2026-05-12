@@ -5074,6 +5074,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       <MobileLoadingState dark={mobileDarkModeEnabled} message="Loading security operations..." />
     ) : (
       <SafeAreaView style={styles.loadingContainer}>
+        <Image source={Logo} resizeMode="contain" style={{ width: 116, height: 58, marginBottom: 18 }} />
         <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={styles.loadingText}>Loading security operations...</Text>
         <Text style={styles.loadingSubtext}>Restoring live visitors, alerts, and access logs.</Text>

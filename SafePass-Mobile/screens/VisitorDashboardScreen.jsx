@@ -39,6 +39,7 @@ import {
 } from "../utils/mapSettingsUtils";
 
 const visitorBrandLogo = require("../assets/LogoSapphireAppIcon.png");
+const visitorSchoolLogo = require("../assets/LogoSapphire.jpg");
 const Storage =
   Platform.OS === "web" ? require("../utils/webStorage").default : AsyncStorage;
 
@@ -3732,6 +3733,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return (
       <SafeAreaView style={visitorDashboardStyles.loadingContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
+        <Image
+          source={visitorSchoolLogo}
+          resizeMode="contain"
+          style={{ width: 116, height: 58, marginBottom: 18 }}
+        />
         <ActivityIndicator size="large" color="#0A3D91" />
         <Text style={visitorDashboardStyles.loadingText}>Loading your visitor dashboard...</Text>
         <Text style={visitorDashboardStyles.loadingSubtext}>Restoring your pass, appointment, and campus map.</Text>

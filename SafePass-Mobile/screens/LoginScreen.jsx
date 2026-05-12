@@ -1258,6 +1258,9 @@ export default function LoginScreen({ navigation, route }) {
     return (
       <View style={loginStyles.splashContainer}>
         <StatusBar barStyle="light-content" backgroundColor={brandColors.navy} />
+        <View style={loginStyles.splashLogoCard}>
+          <Image source={Logo} resizeMode="contain" style={loginStyles.splashLogo} />
+        </View>
         <ActivityIndicator size="large" color={brandColors.surface} />
         <Text style={loginStyles.splashText}>Restoring your session...</Text>
       </View>
