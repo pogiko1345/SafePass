@@ -1927,6 +1927,15 @@ export default StyleSheet.create({
     color: "#0A3D91",
   },
 
+  darkHeaderMetaBadge: {
+    backgroundColor: "rgba(15, 23, 42, 0.32)",
+    borderColor: "rgba(191, 219, 254, 0.34)",
+  },
+
+  darkHeaderMetaText: {
+    color: "#DBEAFE",
+  },
+
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
@@ -2056,6 +2065,69 @@ export default StyleSheet.create({
     fontWeight: "800",
   },
 
+  dashboardOverviewPanel: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 18,
+    elevation: 2,
+  },
+
+  dashboardOverviewTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 14,
+    marginBottom: 16,
+  },
+
+  dashboardOverviewTextBlock: {
+    flex: 1,
+  },
+
+  dashboardOverviewEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: "#0A3D91",
+    marginBottom: 6,
+  },
+
+  dashboardOverviewTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 5,
+  },
+
+  dashboardOverviewText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+    maxWidth: 620,
+  },
+
+  dashboardOverviewRefresh: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+
+  dashboardOverviewRefreshText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
   hoverBubble: {
     ...Platform.select({
       web: {
@@ -2073,6 +2145,10 @@ export default StyleSheet.create({
     marginBottom: 18,
   },
 
+  dashboardStatsGridCompact: {
+    marginBottom: 0,
+  },
+
   dashboardStatCard: {
     borderWidth: 1,
     borderRadius: 12,
@@ -2082,6 +2158,13 @@ export default StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 18,
     elevation: 3,
+  },
+
+  dashboardStatCardCompact: {
+    padding: 14,
+    minHeight: 104,
+    shadowOpacity: 0,
+    elevation: 0,
   },
 
   dashboardStatHeader: {
@@ -2174,6 +2257,23 @@ export default StyleSheet.create({
     color: "#1C6DD0",
     textTransform: "uppercase",
     letterSpacing: 0.3,
+  },
+
+  dashboardSectionHeaderRow: {
+    marginBottom: 10,
+  },
+
+  dashboardSectionHeading: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  dashboardSectionSubtitle: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
   },
 
   dashboardSectionCard: {

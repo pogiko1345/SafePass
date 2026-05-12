@@ -1491,6 +1491,14 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
 
   const activeUsersList = useMemo(() => getUsersByStatus("active"), [getUsersByStatus]);
   const inactiveUsersList = useMemo(() => getUsersByStatus("inactive"), [getUsersByStatus]);
+  const studentUsers = useMemo(
+    () => allUsers.filter((userItem) => String(userItem?.role || "").toLowerCase() === "student"),
+    [allUsers],
+  );
+  const academicStaffUsers = useMemo(
+    () => allUsers.filter((userItem) => String(userItem?.role || "").toLowerCase() === "teacher"),
+    [allUsers],
+  );
   const userManagementUsers = useMemo(() => {
     if (userManagementStatusTab === "active") return activeUsersList;
     if (userManagementStatusTab === "inactive") return inactiveUsersList;
@@ -1981,10 +1989,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       case "account-create":
         return {
           title: "Creation of Account",
-          subtitle: "Create staff, security, and admin accounts from a cleaner modular control center.",
+          subtitle: "Create student, academic staff, admin services staff, and security accounts from one controlled workspace.",
           highlights: [
-            { label: "Staff", value: staffUsers.length, icon: "briefcase-outline", color: ADMIN_BLUE },
-            { label: "Security", value: guardUsers.length, icon: "shield-checkmark-outline", color: ADMIN_BLUE },
+            { label: "Campus", value: studentUsers.length + academicStaffUsers.length, icon: "school-outline", color: ADMIN_BLUE },
+            { label: "Operations", value: staffUsers.length + guardUsers.length, icon: "briefcase-outline", color: ADMIN_BLUE },
           ],
         };
       case "account-records":
@@ -2065,7 +2073,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       default:
         return {
           title: "Dashboard Overview",
-          subtitle: "Review the visitor pipeline, move into the right section quickly, and keep the whole campus flow on track.",
+          subtitle: "Review what needs attention today, then move into the right admin workspace.",
           highlights: [
             { label: "Pending", value: stats.pendingRequests, icon: "time-outline", color: ADMIN_BLUE },
             { label: "Live Map", value: stats.activeVisitors || stats.checkedInVisitors || 0, icon: "map-outline", color: ADMIN_BLUE },
@@ -2086,7 +2094,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     selectedSubmodule,
     settings.darkMode,
     settings.emailNotifications,
+    academicStaffUsers.length,
     staffUsers.length,
+    studentUsers.length,
     stats.completedVisits,
     stats.activeVisitors,
     stats.checkedInVisitors,
@@ -2104,9 +2114,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         icon: "people-circle-outline",
         color: ADMIN_BLUE,
         submodules: [
-          { key: "account-create", label: "Creation of Account", badge: 3 },
-          { key: "account-records", label: "Account Records", badge: allUsers.length },
-          { key: "data-management", label: "User Data Management", badge: allUsers.length },
+          { key: "account-create", label: "Creation of Account" },
+          { key: "account-records", label: "Account Records" },
+          { key: "data-management", label: "User Data Management" },
         ],
       },
       {
@@ -2115,10 +2125,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         icon: "map-outline",
         color: ADMIN_BLUE,
         submodules: [
-          { key: "map-ground", label: "Ground Floor", badge: managedRooms.filter((room) => room.floor === "ground").length },
-          { key: "map-mezzanine", label: "Mezzanine", badge: managedRooms.filter((room) => room.floor === "first").length },
-          { key: "map-second", label: "Second Floor", badge: managedRooms.filter((room) => room.floor === "second").length },
-          { key: "map-third", label: "Third Floor", badge: managedRooms.filter((room) => room.floor === "third").length },
+          { key: "map-ground", label: "Ground Floor" },
+          { key: "map-mezzanine", label: "Mezzanine" },
+          { key: "map-second", label: "Second Floor" },
+          { key: "map-third", label: "Third Floor" },
         ],
       },
       {
@@ -2127,7 +2137,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         icon: "calendar-outline",
         color: ADMIN_BLUE,
         submodules: [
-          { key: "appointment-records", label: "Appointment Records", badge: appointmentRecords.length },
+          { key: "appointment-records", label: "Appointment Records" },
           { key: "appointment-management", label: "Appointment Management", badge: pendingAppointmentRequests.length },
         ],
       },
@@ -2137,12 +2147,12 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         icon: "document-text-outline",
         color: ADMIN_BLUE,
         submodules: [
-          { key: "report-records", label: "Report Records", badge: visitorHistory.length },
-          { key: "security-report-records", label: "Security Reports", badge: securityReportRecords.length },
+          { key: "report-records", label: "Report Records" },
+          { key: "security-report-records", label: "Security Reports" },
         ],
       },
     ],
-    [allUsers.length, appointmentRecords.length, dataCollectionFields.length, managedRooms, pendingAppointmentRequests.length, securityReportRecords.length, visitorHistory.length],
+    [pendingAppointmentRequests.length],
   );
 
   const getFilteredHistory = useCallback(() => {
@@ -3185,11 +3195,6 @@ const loadDashboardData = useCallback(async () => {
     stats.tomorrowVisits,
   ]);
 
-  const issuedNfcCardsCount = useMemo(
-    () => allUsers.filter((userItem) => Boolean(userItem?.nfcCardId)).length,
-    [allUsers],
-  );
-
   const dashboardQuickActions = useMemo(() => ([
     {
       key: "requests",
@@ -3201,6 +3206,15 @@ const loadDashboardData = useCallback(async () => {
       action: "requests",
     },
     {
+      key: "create",
+      title: "Create Accounts",
+      subtitle: "Add student, academic staff, services staff, or security accounts.",
+      icon: "person-add-outline",
+      color: ADMIN_BLUE,
+      badge: "Admin only",
+      action: "account-create",
+    },
+    {
       key: "attendance",
       title: "Attendance",
       subtitle: "Open student, teacher, staff, and visitor attendance records.",
@@ -3208,51 +3222,6 @@ const loadDashboardData = useCallback(async () => {
       color: ADMIN_BLUE,
       badge: "Daily logs",
       action: "attendance",
-    },
-    {
-      key: "nfc",
-      title: "NFC System",
-      subtitle: "Open card provisioning, UID mapping, and tap coverage.",
-      icon: "scan-outline",
-      color: ADMIN_BLUE,
-      badge: `${issuedNfcCardsCount || 0} cards`,
-      action: "nfc",
-    },
-    {
-      key: "staff",
-      title: "Staff Directory",
-      subtitle: "Manage staff responders and appointment owners.",
-      icon: "briefcase-outline",
-      color: ADMIN_BLUE,
-      badge: `${staffUsers.length || 0} staff`,
-      action: "staff",
-    },
-    {
-      key: "security",
-      title: "Security Team",
-      subtitle: "Check the operational team covering arrivals.",
-      icon: "shield-checkmark-outline",
-      color: ADMIN_BLUE,
-      badge: `${guardUsers.length || 0} security`,
-      action: "security",
-    },
-    {
-      key: "users",
-      title: "All Users",
-      subtitle: "Audit account access across every role.",
-      icon: "people-circle-outline",
-      color: ADMIN_BLUE,
-      badge: `${allUsers.length || 0} total`,
-      action: "users",
-    },
-    {
-      key: "analytics",
-      title: "Analytics",
-      subtitle: "See daily trends and completed visit outcomes.",
-      icon: "stats-chart-outline",
-      color: ADMIN_BLUE,
-      badge: `${stats.todayVisits || 0} today`,
-      action: "analytics",
     },
     {
       key: "map",
@@ -3264,13 +3233,8 @@ const loadDashboardData = useCallback(async () => {
       action: "webmap",
     },
   ]), [
-    allUsers.length,
-    guardUsers.length,
-    issuedNfcCardsCount,
     monitoredMapVisitors.length,
-    staffUsers.length,
     stats.pendingRequests,
-    stats.todayVisits,
   ]);
 
   const adminMapFilters = useMemo(() => ([
@@ -5592,72 +5556,81 @@ const loadDashboardData = useCallback(async () => {
         />
       }
     >
-        <View style={styles.pageContainer}>
-          <View style={styles.pageHeader}>
-            <Text style={[styles.pageTitle, isDarkMode && styles.darkText]}>Dashboard Overview</Text>
-            <TouchableOpacity style={styles.pageRefreshButton} onPress={loadDashboardData}>
-              <Ionicons name="refresh-outline" size={22} color="#1C6DD0" />
-          </TouchableOpacity>
-        </View>
-
-        <LinearGradient
-          colors={isDarkMode ? ["#0F172A", "#1E293B"] : ["#0A3D91", "#1C6DD0"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+      <View style={styles.pageContainer}>
+        <View
           style={[
-            styles.dashboardHeroCard,
-            isDarkMode && { borderColor: "#334155" },
+            styles.dashboardOverviewPanel,
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.borderColor,
+            },
           ]}
         >
-          <View style={styles.dashboardHeroLeft}>
-            <Text style={styles.dashboardHeroEyebrow}>Admin Dashboard</Text>
-            <Text style={styles.dashboardHeroTitle}>
-              Welcome back, {user?.firstName || "Admin"}
-            </Text>
-            <Text style={styles.dashboardHeroSubtitle}>
-              Track campus activity, account operations, appointments, and live visitor movement from one command view.
-            </Text>
-          </View>
-          <HoverBubble
-            style={styles.dashboardHeroBadge}
-            onPress={() => setShowPendingRequestsModal(true)}
-            hoverScale={1.07}
-          >
-            <Ionicons name="time-outline" size={16} color={ADMIN_BLUE} />
-            <Text style={[styles.dashboardHeroBadgeText, isDarkMode && styles.darkTextSecondary]}>
-              {pendingRequests.length || stats.pendingRequests || 0} request alerts
-            </Text>
-          </HoverBubble>
-        </LinearGradient>
-
-        <View style={styles.dashboardStatsGrid}>
-          {[
-            { label: "Pending Requests", value: stats.pendingRequests || 0, icon: "time-outline", color: "#F59E0B" },
-            { label: "Today Visits", value: stats.todayVisits || 0, icon: "calendar-outline", color: "#1C6DD0" },
-            { label: "Live Visitors", value: monitoredMapVisitors.length || stats.activeVisitors || stats.checkedInVisitors || 0, icon: "locate-outline", color: "#10B981" },
-            { label: "Total Accounts", value: allUsers.length || stats.totalUsers || 0, icon: "people-outline", color: "#7C3AED" },
-          ].map((item) => (
-            <HoverBubble
-              key={item.label}
-              hoverScale={1.045}
+          <View style={styles.dashboardOverviewTop}>
+            <View style={styles.dashboardOverviewTextBlock}>
+              <Text style={styles.dashboardOverviewEyebrow}>Today at a glance</Text>
+              <Text style={[styles.dashboardOverviewTitle, { color: theme.textPrimary }]}>
+                {(pendingRequests.length || stats.pendingRequests || 0) > 0
+                  ? `${pendingRequests.length || stats.pendingRequests || 0} request${(pendingRequests.length || stats.pendingRequests || 0) > 1 ? "s" : ""} need review`
+                  : "Campus operations look clear"}
+              </Text>
+              <Text style={[styles.dashboardOverviewText, { color: theme.textSecondary }]}>
+                Start with the items that need action. Full records stay organized in the sidebar modules.
+              </Text>
+            </View>
+            <TouchableOpacity
               style={[
-                styles.dashboardStatCard,
+                styles.dashboardOverviewRefresh,
                 {
-                  width: width > 1100 ? "24%" : width > 760 ? "48%" : "100%",
-                  backgroundColor: theme.cardBackground,
+                  backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                   borderColor: theme.borderColor,
                 },
               ]}
+              onPress={loadDashboardData}
             >
-              <View style={styles.dashboardStatHeader}>
-                <Text style={[styles.dashboardStatLabel, { color: theme.textSecondary }]}>{item.label}</Text>
-                <View style={[styles.dashboardStatIcon, { backgroundColor: `${item.color}16` }]}>
-                  <Ionicons name={item.icon} size={18} color={item.color} />
+              <Ionicons name="refresh-outline" size={18} color={ADMIN_BLUE} />
+              <Text style={styles.dashboardOverviewRefreshText}>Refresh</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.dashboardStatsGrid, styles.dashboardStatsGridCompact]}>
+            {[
+              { label: "Pending Requests", value: stats.pendingRequests || 0, icon: "time-outline", color: "#F59E0B" },
+              { label: "Today Visits", value: stats.todayVisits || 0, icon: "calendar-outline", color: "#1C6DD0" },
+              { label: "Live Visitors", value: monitoredMapVisitors.length || stats.activeVisitors || stats.checkedInVisitors || 0, icon: "locate-outline", color: "#10B981" },
+            ].map((item) => (
+              <HoverBubble
+                key={item.label}
+                hoverScale={1.035}
+                style={[
+                  styles.dashboardStatCard,
+                  styles.dashboardStatCardCompact,
+                  {
+                    width: width > 760 ? "32%" : "100%",
+                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
+                    borderColor: theme.borderColor,
+                  },
+                ]}
+              >
+                <View style={styles.dashboardStatHeader}>
+                  <Text style={[styles.dashboardStatLabel, { color: theme.textSecondary }]}>{item.label}</Text>
+                  <View style={[styles.dashboardStatIcon, { backgroundColor: `${item.color}16` }]}>
+                    <Ionicons name={item.icon} size={18} color={item.color} />
+                  </View>
                 </View>
-              </View>
-              <Text style={[styles.dashboardStatValue, { color: theme.textPrimary }]}>{item.value}</Text>
-            </HoverBubble>
-          ))}
+                <Text style={[styles.dashboardStatValue, { color: theme.textPrimary }]}>{item.value}</Text>
+              </HoverBubble>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.dashboardSectionHeaderRow}>
+          <View>
+            <Text style={[styles.dashboardSectionHeading, { color: theme.textPrimary }]}>Priority actions</Text>
+            <Text style={[styles.dashboardSectionSubtitle, { color: theme.textSecondary }]}>
+              The tools admins usually need first.
+            </Text>
+          </View>
         </View>
 
         <View style={styles.quickActionsGrid}>
@@ -5688,36 +5661,6 @@ const loadDashboardData = useCallback(async () => {
             </HoverBubble>
           ))}
         </View>
-
-        <HoverBubble
-          hoverScale={1.04}
-          style={[
-            styles.dashboardNotificationCard,
-            { backgroundColor: theme.cardBackground, borderColor: theme.borderColor },
-          ]}
-          onPress={() => setShowPendingRequestsModal(true)}
-        >
-          <View style={styles.dashboardNotificationLeft}>
-            <View style={styles.dashboardNotificationIcon}>
-              <Ionicons name="notifications-outline" size={22} color={ADMIN_BLUE} />
-            </View>
-            <View style={styles.dashboardNotificationTextWrap}>
-              <Text style={[styles.dashboardNotificationTitle, { color: theme.textPrimary }]}>
-                Pending request notifications
-              </Text>
-              <Text style={[styles.dashboardNotificationText, { color: theme.textSecondary }]}>
-                {pendingRequests.length
-                  ? `${pendingRequests.length} visitor request${pendingRequests.length > 1 ? "s" : ""} need review.`
-                  : "No pending request alerts right now."}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.dashboardNotificationBadge}>
-            <Text style={styles.dashboardNotificationBadgeText}>Open</Text>
-          </View>
-        </HoverBubble>
-
-        {renderAdminMapWorkspace()}
       </View>
     </ScrollView>
   );
@@ -10100,7 +10043,7 @@ const loadDashboardData = useCallback(async () => {
                 <View><Text style={[styles.sidebarUserName, isDarkMode && styles.darkText]}>{user?.firstName} {user?.lastName}</Text><Text style={[styles.sidebarUserEmail, isDarkMode && { color: "rgba(255,255,255,0.5)" }]}>{user?.email}</Text></View>
               </View>
               <HoverBubble style={[styles.sidebarLogoutButton, isDarkMode && { backgroundColor: "rgba(239,68,68,0.2)" }]} onPress={handleLogout} hoverScale={1.035}>
-                <Ionicons name="log-out-outline" size={20} color="#DC2626" /><Text style={[styles.sidebarLogoutText, isDarkMode && { color: "#FCA5A5" }]}>Logout</Text>
+                <Ionicons name="log-out-outline" size={20} color="#DC2626" /><Text style={[styles.sidebarLogoutText, isDarkMode && { color: "#FCA5A5" }]}>Sign Out</Text>
               </HoverBubble>
             </View>
 
@@ -10124,19 +10067,19 @@ const loadDashboardData = useCallback(async () => {
                 {selectedSubmoduleMeta.subtitle}
               </Text>
               <View style={styles.headerMetaRow}>
-                <View style={[styles.headerMetaBadge, isDarkMode && { backgroundColor: "#FFFFFF", borderColor: "#B7D5F6" }]}>
-                  <Ionicons name="calendar-outline" size={14} color={ADMIN_BLUE_DARK} />
-                  <Text style={styles.headerMetaText}>
+                <View style={[styles.headerMetaBadge, isDarkMode && styles.darkHeaderMetaBadge]}>
+                  <Ionicons name="calendar-outline" size={14} color={isDarkMode ? "#DBEAFE" : ADMIN_BLUE_DARK} />
+                  <Text style={[styles.headerMetaText, isDarkMode && styles.darkHeaderMetaText]}>
                     {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </Text>
                 </View>
                 {selectedSubmoduleMeta.highlights.map((item) => (
                   <View
                     key={item.label}
-                    style={[styles.headerMetaBadge, isDarkMode && { backgroundColor: "#FFFFFF", borderColor: "#B7D5F6" }]}
+                    style={[styles.headerMetaBadge, isDarkMode && styles.darkHeaderMetaBadge]}
                   >
-                    <Ionicons name={item.icon} size={14} color={item.color} />
-                    <Text style={styles.headerMetaText}>
+                    <Ionicons name={item.icon} size={14} color={isDarkMode ? "#DBEAFE" : item.color} />
+                    <Text style={[styles.headerMetaText, isDarkMode && styles.darkHeaderMetaText]}>
                       {item.label}: {item.value}
                     </Text>
                   </View>
