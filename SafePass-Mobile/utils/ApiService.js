@@ -396,11 +396,12 @@ async register(userData) {
     }
   }
 
-  async createStudentUser(studentData) {
+  async createAcademicAccessUser(studentData) {
     try {
+      const role = String(studentData?.role || "student").toLowerCase() === "teacher" ? "teacher" : "student";
       const payload = {
         ...studentData,
-        role: "student",
+        role,
         status: studentData?.status || "inactive",
         isActive: studentData?.isActive ?? false,
       };
@@ -412,13 +413,17 @@ async register(userData) {
       const errorMessage = String(error?.message || "").toLowerCase();
       const message = errorMessage.includes("username already")
         ? "Username already registered. Please use another username."
-        : errorMessage.includes("student id already") || errorMessage.includes("studentid")
-          ? "Student ID already registered. Please use another student ID."
+        : errorMessage.includes("student id already") || errorMessage.includes("teacher id already") || errorMessage.includes("academic id") || errorMessage.includes("studentid") || errorMessage.includes("teacherid")
+          ? "Academic ID already registered. Please use another ID."
           : errorMessage.includes("email already")
             ? "Email already registered. Please use another email address."
-            : error?.message || "Failed to create student account";
+            : error?.message || "Failed to create academic access account";
       throw new Error(message);
     }
+  }
+
+  async createStudentUser(studentData) {
+    return this.createAcademicAccessUser({ ...studentData, role: "student" });
   }
 
   async login(email, password) {

@@ -491,6 +491,8 @@ const getRoleColor = (role) => {
       return "#2980B9";
     case "student":
       return "#0A3D91";
+    case "teacher":
+      return "#0A3D91";
     case "guard":
       return "#E67E22";
     case "security":
@@ -510,6 +512,8 @@ const getRoleIcon = (role) => {
       return "school-outline";
     case "student":
       return "id-card-outline";
+    case "teacher":
+      return "school-outline";
     case "guard":
       return "shield-outline";
     case "security":
@@ -531,6 +535,8 @@ const isUserActive = (user) => {
 
 const formatRoleLabel = (role) => {
   if (isSecurityRole(role)) return "Security";
+  if (String(role || "").toLowerCase() === "teacher") return "Academic Staff";
+  if (String(role || "").toLowerCase() === "staff") return "Admin Services Staff";
   if (!role) return "User";
   return role.charAt(0).toUpperCase() + role.slice(1);
 };
@@ -542,6 +548,7 @@ const sanitizeAccountEmailPart = (value = "") =>
 
 const getAccountEmailRolePart = (form = {}) => {
   if (String(form.role || "").toLowerCase() === "student") return "student";
+  if (String(form.role || "").toLowerCase() === "teacher") return "academic";
   if (isSecurityRole(form.role)) return "security";
   return sanitizeAccountEmailPart(form.department || form.position || "staff") || "staff";
 };
@@ -570,12 +577,12 @@ const generateAccountEmail = (form = {}, users = []) => {
 
 const generateAccountEmployeeId = (form = {}, users = []) => {
   const normalizedRole = String(form.role || "").toLowerCase();
-  const prefix = normalizedRole === "student" ? "STU" : isSecurityRole(form.role) ? "SEC" : "STF";
+  const prefix = normalizedRole === "student" ? "STU" : normalizedRole === "teacher" ? "TCH" : isSecurityRole(form.role) ? "SEC" : "STF";
   const year = new Date().getFullYear();
   const base = `${prefix}-${year}`;
   const existingIds = new Set(
     (users || [])
-      .map((userItem) => String(normalizedRole === "student" ? userItem?.studentId : userItem?.employeeId || "").trim().toUpperCase())
+      .map((userItem) => String(normalizedRole === "student" ? userItem?.studentId : normalizedRole === "teacher" ? userItem?.teacherId : userItem?.employeeId || "").trim().toUpperCase())
       .filter(Boolean),
   );
   let highestSequence = 0;
@@ -1166,11 +1173,12 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     email: "",
     phone: "",
     role,
-    department: role === "security" ? "Security Department" : role === "student" ? "Student Affairs" : "Admissions",
-    position: role === "security" ? "Security Personnel" : role === "student" ? "Student" : "Admissions Officer",
+    department: role === "security" ? "Security Department" : role === "student" ? "Student Affairs" : role === "teacher" ? "Academic Department" : "Admissions",
+    position: role === "security" ? "Security Personnel" : role === "student" ? "Student" : role === "teacher" ? "Academic Staff" : "Admissions Officer",
     shift: "",
     employeeId: "",
     studentId: "",
+    teacherId: "",
     course: "",
     yearLevel: "",
     section: "",
@@ -1234,6 +1242,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     () => generateAccountEmployeeId(newUserData, allUsers),
     [newUserData.role, allUsers],
   );
+  const isCreateAcademicAccessAccount = ["student", "teacher"].includes(String(newUserData.role || "").toLowerCase());
+  const isCreateTeacherAccount = String(newUserData.role || "").toLowerCase() === "teacher";
 
   useEffect(() => {
     if (isCreateEmailManuallyEdited) return;
@@ -3654,17 +3664,22 @@ const loadDashboardData = useCallback(async () => {
     const normalizedEmail = String(newUserData.email || generatedEmail || "").trim().toLowerCase();
     const normalizedUsername = normalizeUsernameInput(newUserData.username);
     const generatedEmployeeId = generateAccountEmployeeId(newUserData, allUsers);
-    const isStudentAccount = String(newUserData.role || "").toLowerCase() === "student";
-    const normalizedEmployeeId = String(newUserData.employeeId || (!isStudentAccount ? generatedEmployeeId : "") || "").trim();
+    const normalizedCreateRole = String(newUserData.role || "").toLowerCase();
+    const isStudentAccount = normalizedCreateRole === "student";
+    const isAcademicStaffAccount = normalizedCreateRole === "teacher";
+    const isAcademicAccessAccount = isStudentAccount || isAcademicStaffAccount;
+    const normalizedEmployeeId = String(newUserData.employeeId || (!isAcademicAccessAccount ? generatedEmployeeId : "") || "").trim();
     const normalizedStudentId = String(newUserData.studentId || (isStudentAccount ? generatedEmployeeId : "") || "").trim();
+    const normalizedTeacherId = String(newUserData.teacherId || (isAcademicStaffAccount ? generatedEmployeeId : "") || "").trim();
+    const normalizedAcademicId = isAcademicStaffAccount ? normalizedTeacherId : normalizedStudentId;
 
     if (!String(newUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(newUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
-    if (!["staff", "security", "guard", "student"].includes(String(newUserData.role || "").toLowerCase())) {
-      nextErrors.role = "Admin can only create student, staff, or security accounts here.";
+    if (!["staff", "security", "guard", "student", "teacher"].includes(normalizedCreateRole)) {
+      nextErrors.role = "Admin can only create student, academic staff, admin services staff, or security accounts here.";
     }
-    if (isStudentAccount) {
-      if (!normalizedStudentId) nextErrors.studentId = "Student ID is required.";
+    if (isAcademicAccessAccount) {
+      if (!normalizedAcademicId) nextErrors[isAcademicStaffAccount ? "teacherId" : "studentId"] = isAcademicStaffAccount ? "Academic staff ID is required." : "Student ID is required.";
     } else if (!normalizedEmployeeId) {
       nextErrors.employeeId = "Staff/Security number is required.";
     }
@@ -3672,12 +3687,16 @@ const loadDashboardData = useCallback(async () => {
     if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       nextErrors.email = "Enter a valid email address.";
     }
-    const normalizedPhone = newUserData.phone ? normalizePhilippineMobileNumber(newUserData.phone) : "";
-    if (String(newUserData.phone || "").trim() && !isValidPhilippineMobileNumber(newUserData.phone)) {
+    const normalizedPhone = isAcademicAccessAccount
+      ? ""
+      : newUserData.phone
+        ? normalizePhilippineMobileNumber(newUserData.phone)
+        : "";
+    if (!isAcademicAccessAccount && String(newUserData.phone || "").trim() && !isValidPhilippineMobileNumber(newUserData.phone)) {
       nextErrors.phone = PHILIPPINE_MOBILE_NUMBER_MESSAGE;
     }
 
-    if (!isSecurityRole(newUserData.role)) {
+    if (!isSecurityRole(newUserData.role) && !isAcademicAccessAccount) {
       if (!String(newUserData.department || "").trim()) nextErrors.department = "Department is required.";
     }
 
@@ -3704,12 +3723,14 @@ const loadDashboardData = useCallback(async () => {
         nextErrors.employeeId = "This Staff/Security number is already registered.";
       }
     }
-    if (normalizedStudentId) {
-      const existingStudentId = allUsers.find(
-        (userItem) => String(userItem?.studentId || "").trim().toLowerCase() === normalizedStudentId.toLowerCase(),
+    if (normalizedAcademicId) {
+      const existingAcademicId = allUsers.find(
+        (userItem) => String(isAcademicStaffAccount ? userItem?.teacherId : userItem?.studentId || "").trim().toLowerCase() === normalizedAcademicId.toLowerCase(),
       );
-      if (existingStudentId) {
-        nextErrors.studentId = "This student ID is already registered.";
+      if (existingAcademicId) {
+        nextErrors[isAcademicStaffAccount ? "teacherId" : "studentId"] = isAcademicStaffAccount
+          ? "This academic staff ID is already registered."
+          : "This student ID is already registered.";
       }
     }
 
@@ -3721,6 +3742,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedPhone,
       normalizedEmployeeId,
       normalizedStudentId,
+      normalizedTeacherId,
     };
   };
 
@@ -3742,6 +3764,7 @@ const loadDashboardData = useCallback(async () => {
       phone: currentValue.phone,
       employeeId: isCreateEmployeeIdManuallyEdited ? currentValue.employeeId : "",
       studentId: isCreateEmployeeIdManuallyEdited ? currentValue.studentId : "",
+      teacherId: isCreateEmployeeIdManuallyEdited ? currentValue.teacherId : "",
     }));
     setCreateUserErrors({});
     setStaffDropdownOpen(null);
@@ -3846,6 +3869,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedPhone,
       normalizedEmployeeId,
       normalizedStudentId,
+      normalizedTeacherId,
     } = validateCreateUserForm();
     if (!isValid) {
       Alert.alert("Validation Error", "Please review the highlighted fields before creating the account.");
@@ -3856,7 +3880,10 @@ const loadDashboardData = useCallback(async () => {
 
     try {
       const isSecurityAccount = isSecurityRole(newUserData.role);
-      const isStudentAccount = String(newUserData.role || "").toLowerCase() === "student";
+      const normalizedCreateRole = String(newUserData.role || "").toLowerCase();
+      const isStudentAccount = normalizedCreateRole === "student";
+      const isAcademicStaffAccount = normalizedCreateRole === "teacher";
+      const isAcademicAccessAccount = isStudentAccount || isAcademicStaffAccount;
       
       const userPayload = {
         firstName: newUserData.firstName.trim(),
@@ -3870,9 +3897,13 @@ const loadDashboardData = useCallback(async () => {
         isActive: false,
       };
 
-      if (isStudentAccount) {
+      if (isAcademicAccessAccount) {
         delete userPayload.employeeId;
-        userPayload.studentId = normalizedStudentId;
+        if (isAcademicStaffAccount) {
+          userPayload.teacherId = normalizedTeacherId;
+        } else {
+          userPayload.studentId = normalizedStudentId;
+        }
         userPayload.course = newUserData.course || "";
         userPayload.yearLevel = newUserData.yearLevel || "";
         userPayload.section = newUserData.section || "";
@@ -3895,12 +3926,12 @@ const loadDashboardData = useCallback(async () => {
             position: userPayload.position,
             shift: userPayload.shift,
           })
-        : isStudentAccount
-          ? await ApiService.createStudentUser(userPayload)
+        : isAcademicAccessAccount
+          ? await ApiService.createAcademicAccessUser(userPayload)
           : await ApiService.createStaffUser(userPayload);
 
       if (response && (response.success || response.user)) {
-        const roleDisplay = isSecurityAccount ? "SECURITY PERSONNEL" : isStudentAccount ? "STUDENT" : "STAFF MEMBER";
+        const roleDisplay = isSecurityAccount ? "SECURITY PERSONNEL" : isAcademicStaffAccount ? "ACADEMIC STAFF" : isStudentAccount ? "STUDENT" : "ADMIN SERVICES STAFF";
         const resolvedRole = isSecurityAccount ? "guard" : (response.user?.role || newUserData.role);
         const createdName = `${newUserData.firstName} ${newUserData.lastName}`.trim();
         
@@ -3914,6 +3945,7 @@ const loadDashboardData = useCallback(async () => {
           createdAt: new Date().toISOString(),
           employeeId: response.user?.employeeId || userPayload.employeeId,
           studentId: response.user?.studentId || userPayload.studentId,
+          teacherId: response.user?.teacherId || userPayload.teacherId,
         };
         
         setAllUsers(prev => [...prev, newUser]);
@@ -3939,13 +3971,21 @@ const loadDashboardData = useCallback(async () => {
           : emailDelivery.simulated
             ? `Account created. Activation email was simulated by the backend, so check the backend logs for the setup link.`
           : `Account created, but the activation email could not be sent. Check the backend mail logs before giving this account to the user.`;
+        const createdAccountId =
+          response.user?.teacherId ||
+          response.user?.studentId ||
+          response.user?.employeeId ||
+          userPayload.teacherId ||
+          userPayload.studentId ||
+          userPayload.employeeId;
 
         setCreatedUserSummary({
           name: createdName,
           email: normalizedEmail,
           username: newUser.username || "N/A",
           role: roleDisplay,
-          employeeId: response.user?.studentId || response.user?.employeeId || userPayload.studentId || userPayload.employeeId,
+          employeeId: createdAccountId,
+          idLabel: isAcademicStaffAccount ? "Academic Staff ID" : isStudentAccount ? "Student ID" : "Employee ID",
           status: "Pending activation",
           deliveryNote,
         });
@@ -3953,7 +3993,7 @@ const loadDashboardData = useCallback(async () => {
         setCreateUserErrors({});
         publishAdminNotice(
           "success",
-          `${isSecurityAccount ? "Security" : isStudentAccount ? "Student" : "Staff"} account created`,
+          `${isSecurityAccount ? "Security" : isAcademicStaffAccount ? "Academic staff" : isStudentAccount ? "Student" : "Admin services staff"} account created`,
           `${createdName} was created successfully and can now log in.`,
         );
       } else {
@@ -3989,6 +4029,7 @@ const loadDashboardData = useCallback(async () => {
       role: userItem.role || "staff",
       department: userItem.department || "",
       employeeId: userItem.employeeId || "",
+      teacherId: userItem.teacherId || "",
       shift: userItem.shift || "",
       position: userItem.position || "",
       studentId: userItem.studentId || "",
@@ -4121,6 +4162,12 @@ const loadDashboardData = useCallback(async () => {
 
       if (isEditingStudent) {
         updatePayload.studentId = editUserData.studentId;
+        updatePayload.course = editUserData.course;
+        updatePayload.yearLevel = editUserData.yearLevel;
+        updatePayload.section = editUserData.section;
+      }
+      if (String(editUserData.role || "").toLowerCase() === "teacher") {
+        updatePayload.teacherId = editUserData.teacherId;
         updatePayload.course = editUserData.course;
         updatePayload.yearLevel = editUserData.yearLevel;
         updatePayload.section = editUserData.section;
@@ -5848,18 +5895,67 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const renderAccountCreationContent = () => {
-    const isCreatingSecurity = isSecurityRole(newUserData.role);
-    const creationRoleColor = ADMIN_BLUE;
-    const creationRoleIcon = isCreatingSecurity ? "shield-checkmark-outline" : "briefcase-outline";
-    const creationRoleLabel = isCreatingSecurity ? "Security" : "Staff";
-    const creationRoleInitials = isCreatingSecurity ? "SE" : "ST";
+    const creationRole = String(newUserData.role || "staff").toLowerCase();
+    const isCreatingSecurity = isSecurityRole(creationRole);
+    const isCreatingStudent = creationRole === "student";
+    const isCreatingAcademicStaff = creationRole === "teacher";
+    const isCreatingAcademicAccess = isCreatingStudent || isCreatingAcademicStaff;
+    const creationRoleColor = getRoleColor(creationRole);
+    const creationRoleIcon = getRoleIcon(creationRole);
+    const creationRoleLabel = isCreatingSecurity
+      ? "Security"
+      : isCreatingAcademicStaff
+        ? "Academic Staff"
+        : isCreatingStudent
+          ? "Student"
+          : "Admin Services Staff";
+    const creationRoleInitials = isCreatingSecurity
+      ? "SE"
+      : isCreatingAcademicStaff
+        ? "AS"
+        : isCreatingStudent
+          ? "ST"
+          : "AD";
+    const creationRecords = isCreatingSecurity
+      ? guardUsers
+      : allUsers.filter((item) => String(item?.role || "").toLowerCase() === creationRole);
+    const accountCreationOptions = [
+      {
+        role: "student",
+        title: "Create Student",
+        label: "Student Account",
+        meta: `${allUsers.filter((item) => String(item?.role || "").toLowerCase() === "student").length} existing students`,
+        icon: "id-card-outline",
+      },
+      {
+        role: "teacher",
+        title: "Create Academic Staff",
+        label: "Teacher Account",
+        meta: `${allUsers.filter((item) => String(item?.role || "").toLowerCase() === "teacher").length} existing teachers`,
+        icon: "school-outline",
+      },
+      {
+        role: "staff",
+        title: "Create Admin Services",
+        label: "Admin Services Staff",
+        meta: `${staffUsers.length} existing staff`,
+        icon: "briefcase-outline",
+      },
+      {
+        role: "security",
+        title: "Create Security",
+        label: "Security Account",
+        meta: `${guardUsers.length} existing guards`,
+        icon: "shield-checkmark-outline",
+      },
+    ];
 
     return (
     <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.pageContainer}>
         <AdminSectionShell
           title="Creation of Account"
-          subtitle="Admins can create both staff and security accounts here from the same control area."
+          subtitle="Admins can create student, academic staff, admin services staff, and security accounts here."
           badge="Admin only"
           isDarkMode={isDarkMode}
           theme={theme}
@@ -5881,53 +5977,36 @@ const loadDashboardData = useCallback(async () => {
               Select the account you want to create. The form below will update for that user type.
             </Text>
             <View style={styles.managementQuickStatsRow}>
-              <TouchableOpacity
-                activeOpacity={0.88}
-                style={[
-                  styles.managementQuickStatCard,
-                  {
-                    backgroundColor: isDarkMode ? "#111827" : "#FFFFFF",
-                    borderColor: newUserData.role === "staff" ? ADMIN_BLUE : theme.borderColor,
-                    flex: 1,
-                  },
-                ]}
-                onPress={() => switchCreateUserRole("staff")}
-              >
-                <View style={[styles.managementQuickStatIcon, { backgroundColor: "rgba(16,185,129,0.14)" }]}>
-                  <Ionicons name="briefcase-outline" size={18} color={ADMIN_BLUE} />
-                </View>
-                <Text style={[styles.managementQuickStatValue, { color: ADMIN_BLUE }]}>Create Staff</Text>
-                <Text style={[styles.managementQuickStatLabel, isDarkMode && styles.darkTextSecondary]}>
-                  Staff Account
-                </Text>
-                <Text style={[styles.managementQuickStatMeta, isDarkMode && styles.darkTextSecondary]}>
-                  {staffUsers.length} existing staff
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.88}
-                style={[
-                  styles.managementQuickStatCard,
-                  {
-                    backgroundColor: isDarkMode ? "#111827" : "#FFFFFF",
-                    borderColor: isCreatingSecurity ? "#1C6DD0" : theme.borderColor,
-                    flex: 1,
-                  },
-                ]}
-                onPress={() => switchCreateUserRole("security")}
-              >
-                <View style={[styles.managementQuickStatIcon, { backgroundColor: "rgba(139,92,246,0.14)" }]}>
-                  <Ionicons name="shield-checkmark-outline" size={18} color="#1C6DD0" />
-                </View>
-                <Text style={[styles.managementQuickStatValue, { color: "#1C6DD0" }]}>Create Security</Text>
-                <Text style={[styles.managementQuickStatLabel, isDarkMode && styles.darkTextSecondary]}>
-                  Security Account
-                </Text>
-                <Text style={[styles.managementQuickStatMeta, isDarkMode && styles.darkTextSecondary]}>
-                  {guardUsers.length} existing guards
-                </Text>
-              </TouchableOpacity>
+              {accountCreationOptions.map((item) => {
+                const active = creationRole === item.role || (item.role === "security" && isCreatingSecurity);
+                const color = getRoleColor(item.role);
+                return (
+                  <TouchableOpacity
+                    key={item.role}
+                    activeOpacity={0.88}
+                    style={[
+                      styles.managementQuickStatCard,
+                      {
+                        backgroundColor: isDarkMode ? "#111827" : "#FFFFFF",
+                        borderColor: active ? color : theme.borderColor,
+                        flex: 1,
+                      },
+                    ]}
+                    onPress={() => switchCreateUserRole(item.role)}
+                  >
+                    <View style={[styles.managementQuickStatIcon, { backgroundColor: `${color}18` }]}>
+                      <Ionicons name={item.icon} size={18} color={color} />
+                    </View>
+                    <Text style={[styles.managementQuickStatValue, { color }]}>{item.title}</Text>
+                    <Text style={[styles.managementQuickStatLabel, isDarkMode && styles.darkTextSecondary]}>
+                      {item.label}
+                    </Text>
+                    <Text style={[styles.managementQuickStatMeta, isDarkMode && styles.darkTextSecondary]}>
+                      {item.meta}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
           <View style={styles.staffCreationLayout}>
@@ -6053,57 +6132,119 @@ const loadDashboardData = useCallback(async () => {
               </View>
 
               <View style={styles.userEditorSection}>
-                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Role & Department</Text>
+                <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>
+                  {isCreatingAcademicAccess ? "Academic Details" : "Role & Department"}
+                </Text>
                 <View style={styles.userEditorGrid}>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
-                      {isCreatingSecurity ? "Security Number *" : "Staff Number *"}
+                      {isCreatingAcademicStaff ? "Academic Staff ID *" : isCreatingStudent ? "Student ID *" : isCreatingSecurity ? "Security Number *" : "Staff Number *"}
                     </Text>
                     <TextInput
                       style={[
                         styles.input,
-                        createUserErrors.employeeId && styles.inputErrorState,
+                        (isCreatingAcademicStaff ? createUserErrors.teacherId : isCreatingStudent ? createUserErrors.studentId : createUserErrors.employeeId) && styles.inputErrorState,
                         isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
                       ]}
-                      value={newUserData.employeeId}
+                      value={isCreatingAcademicStaff ? newUserData.teacherId : isCreatingStudent ? newUserData.studentId : newUserData.employeeId}
                       onChangeText={(text) => {
                         setIsCreateEmployeeIdManuallyEdited(true);
-                        setNewUserData((currentValue) => ({ ...currentValue, employeeId: text }));
-                        setCreateUserErrors((currentValue) => ({ ...currentValue, employeeId: null }));
+                        const idField = isCreatingAcademicStaff ? "teacherId" : isCreatingStudent ? "studentId" : "employeeId";
+                        setNewUserData((currentValue) => ({ ...currentValue, [idField]: text }));
+                        setCreateUserErrors((currentValue) => ({ ...currentValue, [idField]: null }));
                       }}
-                      placeholder={generatedCreateUserEmployeeId || (isCreatingSecurity ? "SEC-2026-001" : "STF-2026-001")}
+                      placeholder={generatedCreateUserEmployeeId || (isCreatingAcademicStaff ? "TCH-2026-001" : isCreatingStudent ? "STU-2026-001" : isCreatingSecurity ? "SEC-2026-001" : "STF-2026-001")}
                       autoCapitalize="characters"
                       placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                     />
                     <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
                       Auto-generated and checked for duplicates. Admin can edit it when needed.
                     </Text>
-                    {renderCreateUserFieldError("employeeId")}
+                    {renderCreateUserFieldError(isCreatingAcademicStaff ? "teacherId" : isCreatingStudent ? "studentId" : "employeeId")}
                   </View>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Contact Number</Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        createUserErrors.phone && styles.inputErrorState,
-                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
-                      ]}
-                      value={newUserData.phone}
-                      onChangeText={(text) => {
-                        setNewUserData((currentValue) => ({ ...currentValue, phone: text }));
-                        setCreateUserErrors((currentValue) => ({ ...currentValue, phone: null }));
-                      }}
-                      placeholder="09123456789"
-                      keyboardType="phone-pad"
-                      maxLength={16}
-                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                    />
-                    {renderCreateUserFieldError("phone")}
+                    {isCreatingAcademicAccess ? (
+                      <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                        <Ionicons name="phone-portrait-outline" size={16} color="#64748B" />
+                        <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                          User will add phone number in profile
+                        </Text>
+                      </View>
+                    ) : (
+                      <>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            createUserErrors.phone && styles.inputErrorState,
+                            isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                          ]}
+                          value={newUserData.phone}
+                          onChangeText={(text) => {
+                            setNewUserData((currentValue) => ({ ...currentValue, phone: text }));
+                            setCreateUserErrors((currentValue) => ({ ...currentValue, phone: null }));
+                          }}
+                          placeholder="09123456789"
+                          keyboardType="phone-pad"
+                          maxLength={16}
+                          placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        />
+                        {renderCreateUserFieldError("phone")}
+                      </>
+                    )}
                   </View>
                 </View>
 
                 <View style={styles.userEditorGrid}>
-                  {isCreatingSecurity ? (
+                  {isCreatingAcademicAccess ? (
+                    <>
+                      <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                          {isCreatingAcademicStaff ? "Teaching Subject / Area" : "Program"}
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                          ]}
+                          value={newUserData.course}
+                          onChangeText={(text) => setNewUserData((currentValue) => ({ ...currentValue, course: text }))}
+                          placeholder={isCreatingAcademicStaff ? "Teaching subject or area" : "Program"}
+                          placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        />
+                      </View>
+                      <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                          {isCreatingAcademicStaff ? "Department / Grade Level" : "Year Level"}
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                          ]}
+                          value={newUserData.yearLevel}
+                          onChangeText={(text) => setNewUserData((currentValue) => ({ ...currentValue, yearLevel: text }))}
+                          placeholder={isCreatingAcademicStaff ? "Department or teaching level" : "Year level"}
+                          placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        />
+                      </View>
+                      <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                          {isCreatingAcademicStaff ? "Assigned Section" : "Section"}
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                          ]}
+                          value={newUserData.section}
+                          onChangeText={(text) => setNewUserData((currentValue) => ({ ...currentValue, section: text }))}
+                          placeholder="Section"
+                          placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        />
+                      </View>
+                    </>
+                  ) : isCreatingSecurity ? (
                     <>
                       <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                         <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Department</Text>
@@ -6168,7 +6309,13 @@ const loadDashboardData = useCallback(async () => {
                     <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
                       <Ionicons name="location-outline" size={16} color="#64748B" />
                       <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
-                        {isCreatingSecurity ? "Security Post / Gate Operations" : getStaffDepartmentOption(newUserData.department)?.area || "General Area"}
+                        {isCreatingAcademicStaff
+                          ? newUserData.course || "Teaching assignment"
+                          : isCreatingStudent
+                            ? newUserData.course || "Student program"
+                            : isCreatingSecurity
+                              ? "Security Post / Gate Operations"
+                              : getStaffDepartmentOption(newUserData.department)?.area || "General Area"}
                       </Text>
                     </View>
                   </View>
@@ -6222,12 +6369,22 @@ const loadDashboardData = useCallback(async () => {
                   {(isCreatingSecurity ? [
                     "Admin creates and assigns the security role automatically.",
                     "Email and security ID are checked for duplicates.",
-                    "Password can be entered manually or generated automatically.",
+                    "A secure activation link is emailed automatically.",
                     "Saved accounts appear immediately in Security Records.",
+                  ] : isCreatingAcademicStaff ? [
+                    "Admin creates the academic staff account.",
+                    "Email and academic staff ID are checked for duplicates.",
+                    "The teacher adds their phone number after activation.",
+                    "Academic staff opens the student-style campus tap dashboard.",
+                  ] : isCreatingStudent ? [
+                    "Admin creates the student account.",
+                    "Email and student ID are checked for duplicates.",
+                    "The student adds their phone number after activation.",
+                    "Student accounts use the virtual campus ID dashboard.",
                   ] : [
-                    "Admin creates and assigns the staff role automatically.",
+                    "Admin creates and assigns the admin services staff role automatically.",
                     "Email, username, and staff ID are checked for duplicates.",
-                    "Password and confirm password must match before saving.",
+                    "A secure activation link is emailed automatically.",
                     "Saved accounts appear immediately in Staff Records.",
                   ]).map((item) => (
                     <View key={item} style={styles.staffChecklistItem}>
@@ -6255,6 +6412,10 @@ const loadDashboardData = useCallback(async () => {
                     { label: "Security", value: guardUsers.length, color: ADMIN_BLUE },
                     { label: "Active", value: guardUsers.filter((item) => isUserActive(item)).length, color: ADMIN_BLUE },
                     { label: "Inactive", value: guardUsers.filter((item) => !isUserActive(item)).length, color: ADMIN_BLUE },
+                  ] : isCreatingAcademicAccess ? [
+                    { label: creationRoleLabel, value: creationRecords.length, color: creationRoleColor },
+                    { label: "Active", value: creationRecords.filter((item) => isUserActive(item)).length, color: creationRoleColor },
+                    { label: "Inactive", value: creationRecords.filter((item) => !isUserActive(item)).length, color: creationRoleColor },
                   ] : [
                     { label: "Staff", value: staffUsers.length, color: ADMIN_BLUE },
                     { label: "Active", value: staffUsers.filter((item) => isUserActive(item)).length, color: ADMIN_BLUE },
@@ -6280,7 +6441,7 @@ const loadDashboardData = useCallback(async () => {
 
                 <TouchableOpacity
                   style={[styles.managementSecondaryButton, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}
-                  onPress={() => selectAdminSubmodule("account-records", { accountMode: isCreatingSecurity ? "security" : "staff" })}
+                  onPress={() => selectAdminSubmodule("account-records", { accountMode: isCreatingSecurity ? "security" : isCreatingAcademicAccess ? "all" : "staff" })}
                 >
                   <Ionicons name="reader-outline" size={18} color={creationRoleColor} />
                   <Text style={[styles.managementSecondaryButtonText, { color: creationRoleColor }]}>
@@ -6305,12 +6466,21 @@ const loadDashboardData = useCallback(async () => {
     const infoItems = [
       { label: "Username", value: selectedUser?.username || "Not set", icon: "person-outline" },
       { label: "Phone", value: selectedUser?.phone || "No phone number", icon: "call-outline" },
-      { label: String(selectedUser?.role || "").toLowerCase() === "student" ? "Student ID" : "Employee ID", value: selectedUser?.studentId || selectedUser?.employeeId || "Not assigned", icon: "card-outline" },
+      {
+        label:
+          String(selectedUser?.role || "").toLowerCase() === "student"
+            ? "Student ID"
+            : String(selectedUser?.role || "").toLowerCase() === "teacher"
+              ? "Academic Staff ID"
+              : "Employee ID",
+        value: selectedUser?.studentId || selectedUser?.teacherId || selectedUser?.employeeId || "Not assigned",
+        icon: "card-outline",
+      },
       { label: "Department", value: selectedUser?.department || "General", icon: "business-outline" },
       { label: "Position", value: selectedUser?.position || (isSecurityRole(selectedUser?.role) ? "Security Personnel" : "Not set"), icon: "briefcase-outline" },
       { label: "Status", value: isUserActive(selectedUser) ? "Active" : "Inactive", icon: "checkmark-circle-outline" },
     ];
-    const isStudentUser = String(panelUser?.role || "").toLowerCase() === "student";
+    const isStudentUser = ["student", "teacher"].includes(String(panelUser?.role || "").toLowerCase());
 
     return (
       <View style={[styles.userDataBottomPanel, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
@@ -9782,11 +9952,11 @@ const loadDashboardData = useCallback(async () => {
         {/* Sidebar */}
         <View style={[styles.sidebar, isDarkMode && { backgroundColor: theme.sidebarBackground }]}>
           <ScrollView ref={sidebarScrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.sidebarContent}>
-            <View style={[styles.sidebarHeader, isDarkMode && { borderBottomColor: "#334155" }]}>
+            <View style={[styles.sidebarHeader, isDarkMode && styles.darkSidebarPanel]}>
               <Image source={require("../assets/LogoSapphire.jpg")} style={styles.sidebarLogoImage} />
               <Text style={[styles.sidebarBrand, isDarkMode && styles.darkText]}>Sapphire International Aviation Academy</Text>
-              <View style={[styles.sidebarRoleBadge, isDarkMode && { backgroundColor: "#1C6DD0" }]}><Text style={styles.sidebarRoleText}>ADMIN</Text></View>
-              <View style={[styles.sidebarStats, isDarkMode && { backgroundColor: "rgba(255,255,255,0.05)" }]}>
+              <View style={[styles.sidebarRoleBadge, isDarkMode && styles.darkSidebarRoleBadge]}><Text style={[styles.sidebarRoleText, isDarkMode && { color: "#DBEAFE" }]}>ADMIN</Text></View>
+              <View style={[styles.sidebarStats, isDarkMode && styles.darkSidebarStats]}>
                 <View style={styles.sidebarStat}><Text style={[styles.sidebarStatNumber, isDarkMode && styles.darkText]}>{stats.pendingRequests}</Text><Text style={[styles.sidebarStatLabel, isDarkMode && { color: "rgba(255,255,255,0.6)" }]}>Pending</Text></View>
                 <View style={[styles.sidebarStatDivider, isDarkMode && { backgroundColor: "rgba(255,255,255,0.1)" }]} />
                 <View style={styles.sidebarStat}><Text style={[styles.sidebarStatNumber, isDarkMode && styles.darkText]}>{stats.totalStaff}</Text><Text style={[styles.sidebarStatLabel, isDarkMode && { color: "rgba(255,255,255,0.6)" }]}>Staff</Text></View>
@@ -9799,11 +9969,13 @@ const loadDashboardData = useCallback(async () => {
               style={[
                 styles.sidebarOverviewButton,
                 selectedSubmodule === "dashboard" && styles.sidebarOverviewButtonActive,
+                isDarkMode && styles.darkSidebarButton,
+                isDarkMode && selectedSubmodule === "dashboard" && styles.darkSidebarButtonActive,
               ]}
               onPress={() => handleMenuAction("dashboard")}
               hoverScale={1.035}
             >
-              <View style={[styles.sidebarMenuIcon, { backgroundColor: "rgba(37,99,235,0.16)" }]}>
+              <View style={[styles.sidebarMenuIcon, { backgroundColor: isDarkMode ? "rgba(96,165,250,0.18)" : "rgba(37,99,235,0.16)" }]}>
                 <Ionicons name="grid-outline" size={20} color="#0A3D91" />
               </View>
               <Text style={[styles.sidebarMenuLabel, selectedSubmodule === "dashboard" && styles.sidebarMenuLabelActive, isDarkMode && styles.darkText]}>
@@ -9817,12 +9989,13 @@ const loadDashboardData = useCallback(async () => {
                 const hasSelectedChild = module.submodules.some((submodule) => submodule.key === selectedSubmodule);
 
                 return (
-                  <View key={module.key} style={styles.sidebarModuleCard}>
+                  <View key={module.key} style={[styles.sidebarModuleCard, isDarkMode && styles.darkSidebarCard]}>
                     <HoverBubble
                       style={[
                         styles.sidebarModuleButton,
                         hasSelectedChild && styles.sidebarModuleButtonActive,
-                        isDarkMode && hasSelectedChild && { backgroundColor: "rgba(139,92,246,0.18)", borderColor: "rgba(196,181,253,0.24)" },
+                        isDarkMode && styles.darkSidebarModuleButton,
+                        isDarkMode && hasSelectedChild && styles.darkSidebarButtonActive,
                       ]}
                       onPress={() => handleModuleToggle(module.key)}
                       hoverScale={1.025}
@@ -9834,14 +10007,14 @@ const loadDashboardData = useCallback(async () => {
                         <Text style={[styles.sidebarMenuLabel, hasSelectedChild && styles.sidebarMenuLabelActive, isDarkMode && styles.darkText]}>
                           {module.label}
                         </Text>
-                        <Text style={styles.sidebarModuleHint}>
+                        <Text style={[styles.sidebarModuleHint, isDarkMode && styles.darkSidebarMutedText]}>
                           {module.submodules.length} section{module.submodules.length === 1 ? "" : "s"}
                         </Text>
                       </View>
                       <Ionicons
                         name={isExpanded ? "chevron-up-outline" : "chevron-down-outline"}
                         size={18}
-                        color={hasSelectedChild ? module.color : "#64748B"}
+                        color={hasSelectedChild ? module.color : isDarkMode ? "#94A3B8" : "#64748B"}
                       />
                     </HoverBubble>
 
@@ -9856,6 +10029,8 @@ const loadDashboardData = useCallback(async () => {
                               style={[
                                 styles.sidebarSubmoduleButton,
                                 isSubmoduleActive && styles.sidebarSubmoduleButtonActive,
+                                isDarkMode && styles.darkSidebarSubmoduleButton,
+                                isDarkMode && isSubmoduleActive && styles.darkSidebarButtonActive,
                               ]}
                               onPress={() => selectAdminSubmodule(submodule.key)}
                               hoverScale={1.025}
@@ -9864,13 +10039,15 @@ const loadDashboardData = useCallback(async () => {
                                 style={[
                                   styles.sidebarSubmoduleLabel,
                                   isSubmoduleActive && styles.sidebarSubmoduleLabelActive,
+                                  isDarkMode && styles.darkSidebarMutedText,
+                                  isDarkMode && isSubmoduleActive && styles.darkText,
                                 ]}
                               >
                                 {submodule.label}
                               </Text>
                               {submodule.badge > 0 ? (
-                                <View style={styles.sidebarSubmoduleBadge}>
-                                  <Text style={styles.sidebarSubmoduleBadgeText}>{submodule.badge}</Text>
+                                <View style={[styles.sidebarSubmoduleBadge, isDarkMode && { backgroundColor: "#334155" }]}>
+                                  <Text style={[styles.sidebarSubmoduleBadgeText, isDarkMode && styles.darkText]}>{submodule.badge}</Text>
                                 </View>
                               ) : null}
                             </HoverBubble>
@@ -9887,11 +10064,13 @@ const loadDashboardData = useCallback(async () => {
               style={[
                 styles.sidebarUtilityButton,
                 selectedSubmodule === "settings" && styles.sidebarUtilityButtonActive,
+                isDarkMode && styles.darkSidebarButton,
+                isDarkMode && selectedSubmodule === "settings" && styles.darkSidebarButtonActive,
               ]}
               onPress={() => handleMenuAction("settings")}
               hoverScale={1.035}
             >
-              <View style={[styles.sidebarMenuIcon, { backgroundColor: "rgba(148,163,184,0.14)" }]}>
+              <View style={[styles.sidebarMenuIcon, { backgroundColor: isDarkMode ? "rgba(148,163,184,0.18)" : "rgba(148,163,184,0.14)" }]}>
                 <Ionicons name="settings-outline" size={20} color="#64748B" />
               </View>
               <Text style={[styles.sidebarMenuLabel, selectedSubmodule === "settings" && styles.sidebarMenuLabelActive, isDarkMode && styles.darkText]}>
@@ -9899,7 +10078,7 @@ const loadDashboardData = useCallback(async () => {
               </Text>
             </HoverBubble>
 
-            <View style={[styles.sidebarUserSection, isDarkMode && { borderTopColor: "#334155" }]}>
+            <View style={[styles.sidebarUserSection, isDarkMode && styles.darkSidebarPanel]}>
               <View style={styles.sidebarUserInfo}>
                 <View style={[styles.sidebarUserAvatar, isDarkMode && { backgroundColor: "#334155" }]}><Text style={[styles.sidebarUserAvatarText, isDarkMode && { color: "#1C6DD0" }]}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View>
                 <View><Text style={[styles.sidebarUserName, isDarkMode && styles.darkText]}>{user?.firstName} {user?.lastName}</Text><Text style={[styles.sidebarUserEmail, isDarkMode && { color: "rgba(255,255,255,0.5)" }]}>{user?.email}</Text></View>
@@ -10217,7 +10396,7 @@ const loadDashboardData = useCallback(async () => {
                   isDarkMode && styles.darkTextSecondary,
                 ]}
               >
-                Add a student, staff, or security account with a cleaner setup flow and
+                Add a student, academic staff, admin services staff, or security account with a cleaner setup flow and
                 live preview.
               </Text>
             </View>
@@ -10282,7 +10461,7 @@ const loadDashboardData = useCallback(async () => {
               </View>
 
               <View style={styles.roleCardRow}>
-                {["student", "staff", "security"].map((role) => {
+                {["student", "teacher", "staff", "security"].map((role) => {
                   const active = newUserData.role === role;
                   return (
                     <TouchableOpacity
@@ -10327,7 +10506,13 @@ const loadDashboardData = useCallback(async () => {
                           isDarkMode && styles.darkText,
                         ]}
                       >
-                        {role === "student" ? "Student" : role === "staff" ? "Staff Member" : "Security Personnel"}
+                        {role === "student"
+                          ? "Student"
+                          : role === "teacher"
+                            ? "Academic Staff"
+                            : role === "staff"
+                              ? "Admin Services Staff"
+                              : "Security Personnel"}
                       </Text>
 
                       <Text
@@ -10338,8 +10523,10 @@ const loadDashboardData = useCallback(async () => {
                       >
                         {role === "student"
                           ? "Virtual campus ID and attendance tap access."
+                          : role === "teacher"
+                            ? "Teacher access with student-style campus tap attendance."
                           : role === "staff"
-                            ? "Office staff, records, and appointment handling."
+                            ? "Admin services, records, and appointment handling."
                             : "Checkpoint, access control, and visitor verification."}
                       </Text>
                     </TouchableOpacity>
@@ -10464,30 +10651,44 @@ const loadDashboardData = useCallback(async () => {
                   {renderCreateUserFieldError("email")}
                 </View>
 
-                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
-                    Phone Number
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      createUserErrors.phone && styles.inputError,
-                      isDarkMode && {
-                        backgroundColor: "#111827",
-                        borderColor: theme.borderColor,
-                        color: "#F8FBFE",
-                      },
-                    ]}
-                    placeholder="Enter phone number"
-                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                    keyboardType="phone-pad"
-                    value={newUserData.phone}
-                    onChangeText={(text) =>
-                      setNewUserData((prev) => ({ ...prev, phone: text }))
-                    }
-                  />
-                  {renderCreateUserFieldError("phone")}
-                </View>
+                {!isCreateAcademicAccessAccount ? (
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                      Phone Number
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        createUserErrors.phone && styles.inputError,
+                        isDarkMode && {
+                          backgroundColor: "#111827",
+                          borderColor: theme.borderColor,
+                          color: "#F8FBFE",
+                        },
+                      ]}
+                      placeholder="Enter phone number"
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                      keyboardType="phone-pad"
+                      value={newUserData.phone}
+                      onChangeText={(text) =>
+                        setNewUserData((prev) => ({ ...prev, phone: text }))
+                      }
+                    />
+                    {renderCreateUserFieldError("phone")}
+                  </View>
+                ) : (
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                      Phone Number
+                    </Text>
+                    <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
+                      <Ionicons name="phone-portrait-outline" size={16} color={isDarkMode ? "#94A3B8" : "#64748B"} />
+                      <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                        User will add phone number in profile
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -10526,15 +10727,17 @@ const loadDashboardData = useCallback(async () => {
                 </View>
               </View>
 
-              {newUserData.role === "student" ? (
+              {newUserData.role === "student" || newUserData.role === "teacher" ? (
                 <>
                   <View style={styles.userEditorRow}>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Student ID</Text>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                        {newUserData.role === "teacher" ? "Academic Staff ID" : "Student ID"}
+                      </Text>
                       <TextInput
                         style={[
                           styles.input,
-                          createUserErrors.studentId && styles.inputError,
+                          (newUserData.role === "teacher" ? createUserErrors.teacherId : createUserErrors.studentId) && styles.inputError,
                           isDarkMode && {
                             backgroundColor: "#111827",
                             borderColor: theme.borderColor,
@@ -10543,16 +10746,21 @@ const loadDashboardData = useCallback(async () => {
                         ]}
                         placeholder={generatedCreateUserEmployeeId}
                         placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                        value={newUserData.studentId}
+                        value={newUserData.role === "teacher" ? newUserData.teacherId : newUserData.studentId}
                         onChangeText={(text) => {
                           setIsCreateEmployeeIdManuallyEdited(true);
-                          setNewUserData((prev) => ({ ...prev, studentId: text }));
+                          setNewUserData((prev) => ({
+                            ...prev,
+                            [newUserData.role === "teacher" ? "teacherId" : "studentId"]: text,
+                          }));
                         }}
                       />
-                      {renderCreateUserFieldError("studentId")}
+                      {renderCreateUserFieldError(newUserData.role === "teacher" ? "teacherId" : "studentId")}
                     </View>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Course / Program</Text>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                        {isCreateTeacherAccount ? "Teaching Subject / Area" : "Program"}
+                      </Text>
                       <TextInput
                         style={[
                           styles.input,
@@ -10562,7 +10770,7 @@ const loadDashboardData = useCallback(async () => {
                             color: "#F8FBFE",
                           },
                         ]}
-                        placeholder="Course or program"
+                        placeholder={isCreateTeacherAccount ? "e.g. Aircraft Maintenance" : "e.g. Aircraft Maintenance"}
                         placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                         value={newUserData.course}
                         onChangeText={(text) => setNewUserData((prev) => ({ ...prev, course: text }))}
@@ -10571,7 +10779,9 @@ const loadDashboardData = useCallback(async () => {
                   </View>
                   <View style={styles.userEditorRow}>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Year Level</Text>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                        {isCreateTeacherAccount ? "Department / Grade Level" : "Year Level"}
+                      </Text>
                       <TextInput
                         style={[
                           styles.input,
@@ -10581,14 +10791,16 @@ const loadDashboardData = useCallback(async () => {
                             color: "#F8FBFE",
                           },
                         ]}
-                        placeholder="Year level"
+                        placeholder={isCreateTeacherAccount ? "Department or teaching level" : "Year level"}
                         placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                         value={newUserData.yearLevel}
                         onChangeText={(text) => setNewUserData((prev) => ({ ...prev, yearLevel: text }))}
                       />
                     </View>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Section</Text>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                        {isCreateTeacherAccount ? "Assigned Section" : "Section"}
+                      </Text>
                       <TextInput
                         style={[
                           styles.input,
@@ -10831,7 +11043,7 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && styles.darkTextSecondary,
                     ]}
                   >
-                    A temporary password will be emailed automatically after the account is created.
+                    SafePass will generate a secure temporary credential and email the activation link automatically.
                   </Text>
                 </View>
               </View>
@@ -11236,10 +11448,14 @@ const loadDashboardData = useCallback(async () => {
                   </View>
                   <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
                     <Text style={styles.userProfileInfoLabel}>
-                      {String(selectedUser?.role || "").toLowerCase() === "student" ? "Student ID" : "Employee ID"}
+                      {String(selectedUser?.role || "").toLowerCase() === "student"
+                        ? "Student ID"
+                        : String(selectedUser?.role || "").toLowerCase() === "teacher"
+                          ? "Academic Staff ID"
+                          : "Employee ID"}
                     </Text>
                     <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
-                      {selectedUser?.studentId || selectedUser?.employeeId || "Not assigned"}
+                      {selectedUser?.studentId || selectedUser?.teacherId || selectedUser?.employeeId || "Not assigned"}
                     </Text>
                   </View>
                   <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
@@ -11430,7 +11646,7 @@ const loadDashboardData = useCallback(async () => {
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Role</Text>
                   <View style={styles.userEditorRoleWrap}>
-                    {["staff", "security", "student", "admin", "visitor"].map((role) => (
+                    {["staff", "teacher", "security", "student", "admin", "visitor"].map((role) => (
                       <TouchableOpacity
                         key={role}
                         style={[
@@ -11460,7 +11676,7 @@ const loadDashboardData = useCallback(async () => {
                         })}
                       >
                         <Text style={[styles.roleText, editUserData.role === role && styles.roleTextActive, isDarkMode && editUserData.role !== role && { color: "#CBD5E1" }]}>
-                          {role.charAt(0).toUpperCase() + role.slice(1)}
+                          {formatRoleLabel(role)}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -11497,44 +11713,54 @@ const loadDashboardData = useCallback(async () => {
                 </View>
               </View>
 
-              {editUserData.role === "student" && (
+              {(editUserData.role === "student" || editUserData.role === "teacher") && (
                 <View style={styles.userEditorSection}>
-                  <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Student Details</Text>
+                  <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>
+                    {editUserData.role === "teacher" ? "Academic Staff Details" : "Student Details"}
+                  </Text>
                   <View style={styles.userEditorGrid}>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Student ID</Text>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                        {editUserData.role === "teacher" ? "Academic Staff ID" : "Student ID"}
+                      </Text>
                       <TextInput
                         style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                        value={editUserData.studentId}
-                        onChangeText={(text) => setEditUserData({ ...editUserData, studentId: text })}
-                        placeholder="Student ID"
+                        value={editUserData.role === "teacher" ? editUserData.teacherId : editUserData.studentId}
+                        onChangeText={(text) => setEditUserData({ ...editUserData, [editUserData.role === "teacher" ? "teacherId" : "studentId"]: text })}
+                        placeholder={editUserData.role === "teacher" ? "Academic staff ID" : "Student ID"}
                         placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                       />
                     </View>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Course / Program</Text>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                        {editUserData.role === "teacher" ? "Teaching Subject / Area" : "Program"}
+                      </Text>
                       <TextInput
                         style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
                         value={editUserData.course}
                         onChangeText={(text) => setEditUserData({ ...editUserData, course: text })}
-                        placeholder="Course or program"
+                        placeholder={editUserData.role === "teacher" ? "Teaching subject or area" : "Program"}
                         placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                       />
                     </View>
                   </View>
                   <View style={styles.userEditorGrid}>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Year Level</Text>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                        {editUserData.role === "teacher" ? "Department / Grade Level" : "Year Level"}
+                      </Text>
                       <TextInput
                         style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
                         value={editUserData.yearLevel}
                         onChangeText={(text) => setEditUserData({ ...editUserData, yearLevel: text })}
-                        placeholder="Year level"
+                        placeholder={editUserData.role === "teacher" ? "Department or teaching level" : "Year level"}
                         placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                       />
                     </View>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Section</Text>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                        {editUserData.role === "teacher" ? "Assigned Section" : "Section"}
+                      </Text>
                       <TextInput
                         style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
                         value={editUserData.section}
@@ -11772,7 +11998,9 @@ const loadDashboardData = useCallback(async () => {
                 <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.role || "N/A"}</Text>
               </View>
               <View style={styles.createSuccessRow}>
-                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Employee ID</Text>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>
+                  {createdUserSummary?.idLabel || "Employee ID"}
+                </Text>
                 <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.employeeId || "N/A"}</Text>
               </View>
               <View style={styles.createSuccessRow}>

@@ -5126,7 +5126,7 @@ app.post("/api/login", async (req, res) => {
 
     // Only disclose account state after the password is valid.
     if (user.status === "inactive" || user.status === "suspended") {
-      const isActivationPending = ["staff", "security", "guard"].includes(String(user.role || "").toLowerCase()) &&
+      const isActivationPending = ["staff", "security", "guard", "student", "teacher"].includes(String(user.role || "").toLowerCase()) &&
         user.passwordResetTokenHash &&
         user.passwordResetExpiresAt &&
         user.passwordResetExpiresAt > new Date();
@@ -5619,7 +5619,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
     user.password = newPassword;
     if (
       hasValidResetToken &&
-      ["staff", "security", "guard"].includes(String(user.role || "").toLowerCase()) &&
+      ["staff", "security", "guard", "student", "teacher"].includes(String(user.role || "").toLowerCase()) &&
       (user.status === "inactive" || user.isActive === false)
     ) {
       user.status = "active";
@@ -7050,29 +7050,40 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
     const normalizedLastName = String(req.body.lastName || "").trim();
     let normalizedEmail = normalizeEmailValue(req.body.email);
     const normalizedUsername = normalizeUsernameValue(req.body.username);
-    const normalizedPhone = normalizePhoneValue(req.body.phone);
-    let normalizedStudentId = String(req.body.studentId || "").trim();
+    const requestedRole = normalizeUserRoleValue(req.body.role || "student");
+    if (!["student", "teacher"].includes(requestedRole)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only student and academic staff accounts can be created here.",
+        field: "role",
+      });
+    }
+
+    const isTeacherAccount = requestedRole === "teacher";
+    const academicIdField = isTeacherAccount ? "teacherId" : "studentId";
+    const academicLabel = isTeacherAccount ? "Academic Staff" : "Student";
+    let normalizedAcademicId = String(req.body[academicIdField] || req.body.studentId || "").trim();
 
     if (!normalizedEmail) {
       normalizedEmail = await generateUniqueAccountEmail({
         firstName: normalizedFirstName,
-        role: "student",
-        department: "student",
-        position: "student",
+        role: requestedRole,
+        department: requestedRole,
+        position: requestedRole,
       });
     }
 
-    if (!normalizedStudentId) {
-      normalizedStudentId = await generateUniqueAcademicId({ role: "student", fieldName: "studentId" });
+    if (!normalizedAcademicId) {
+      normalizedAcademicId = await generateUniqueAcademicId({ role: requestedRole, fieldName: academicIdField });
     }
 
-    const resolvedUsername = normalizedUsername || normalizeUsernameValue(normalizedStudentId || normalizedEmail.split("@")[0]);
+    const resolvedUsername = normalizedUsername || normalizeUsernameValue(normalizedAcademicId || normalizedEmail.split("@")[0]);
 
-    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedStudentId) {
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedAcademicId) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
-        required: ["firstName", "lastName", "studentId", "email"],
+        required: ["firstName", "lastName", academicIdField, "email"],
       });
     }
 
@@ -7080,12 +7091,8 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid email format", field: "email" });
     }
 
-    if (normalizedPhone && !isValidPhoneValue(normalizedPhone)) {
-      return res.status(400).json({ success: false, message: PHONE_VALIDATION_MESSAGE, field: "phone" });
-    }
-
     const existingUser = await User.findOne({
-      $or: [{ email: normalizedEmail }, { username: resolvedUsername }, { studentId: normalizedStudentId }],
+      $or: [{ email: normalizedEmail }, { username: resolvedUsername }, { [academicIdField]: normalizedAcademicId }],
     });
     if (existingUser) {
       const duplicateField =
@@ -7093,15 +7100,15 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
           ? "email"
           : existingUser.username === resolvedUsername
             ? "username"
-            : "studentId";
+            : academicIdField;
 
       return res.status(400).json({
         success: false,
         message:
           duplicateField === "username"
             ? "Username already registered"
-            : duplicateField === "studentId"
-              ? "Student ID already registered"
+            : duplicateField === academicIdField
+              ? `${academicLabel} ID already registered`
               : "Email already registered",
         field: duplicateField,
       });
@@ -7118,12 +7125,12 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       username: resolvedUsername,
       email: normalizedEmail,
       password: temporaryPassword,
-      phone: normalizedPhone || "",
-      role: "student",
+      phone: "",
+      role: requestedRole,
       status: "inactive",
       isActive: false,
       isVerified: false,
-      studentId: normalizedStudentId,
+      [academicIdField]: normalizedAcademicId,
       course: String(req.body.course || "").trim(),
       yearLevel: String(req.body.yearLevel || "").trim(),
       section: String(req.body.section || "").trim(),
@@ -7136,17 +7143,17 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
 
     const credentialEmail = await sendEmail(
       user.email,
-      "Activate Your Sapphire SafePass Student Account",
+      `Activate Your Sapphire SafePass ${academicLabel} Account`,
       [
         `Good day, ${user.firstName} ${user.lastName}.`,
         "",
-        "An administrator created your Sapphire SafePass student account.",
+        `An administrator created your Sapphire SafePass ${academicLabel.toLowerCase()} account.`,
         "",
         "Account details:",
         `Name: ${user.firstName} ${user.lastName}`,
-        "Assigned role: Student",
+        `Assigned role: ${academicLabel}`,
         `Login email: ${user.email}`,
-        `Student ID: ${user.studentId}`,
+        `${academicLabel} ID: ${user[academicIdField]}`,
         "",
         "To activate your account, open the secure setup link below and create your password:",
         setupLink,
@@ -7164,10 +7171,10 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
     res.status(201).json({
       success: true,
       message: credentialEmailDelivered
-        ? "Student account created successfully and credentials were emailed"
+        ? `${academicLabel} account created successfully and credentials were emailed`
         : credentialEmail?.simulated
-          ? "Student account created successfully and credential email was simulated"
-          : "Student account created, but credential email could not be sent",
+          ? `${academicLabel} account created successfully and credential email was simulated`
+          : `${academicLabel} account created, but credential email could not be sent`,
       user: userResponse,
       emailDelivery: {
         success: Boolean(credentialEmail?.success),
@@ -7178,7 +7185,7 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Create student account error:", error);
+    console.error("Create student/academic staff account error:", error);
     if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
       return res.status(400).json({
@@ -7186,14 +7193,14 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
         message:
           duplicateField === "username"
             ? "Username already registered"
-            : duplicateField === "studentId"
-              ? "Student ID already registered"
+            : duplicateField === "studentId" || duplicateField === "teacherId"
+              ? "Academic ID already registered"
               : "Email already registered",
         field: duplicateField,
       });
     }
 
-    res.status(500).json({ success: false, message: "Failed to create student account", error: error.message });
+    res.status(500).json({ success: false, message: "Failed to create student or academic staff account", error: error.message });
   }
 });
 // Get all security guards
@@ -11671,6 +11678,28 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
         }
 
         updates.studentId = normalizedStudentId;
+      }
+    }
+
+    if (updates.teacherId !== undefined) {
+      const normalizedTeacherId = String(updates.teacherId || "").trim();
+      if (!normalizedTeacherId) {
+        delete updates.teacherId;
+      } else {
+        const teacherIdConflict = await User.findOne({
+          teacherId: normalizedTeacherId,
+          _id: { $ne: req.params.id },
+        });
+
+        if (teacherIdConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Academic staff ID already registered",
+            field: "teacherId",
+          });
+        }
+
+        updates.teacherId = normalizedTeacherId;
       }
     }
 

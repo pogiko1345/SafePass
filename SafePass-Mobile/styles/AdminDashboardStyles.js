@@ -478,6 +478,39 @@ export default StyleSheet.create({
     fontSize: 9,
     color: "#CBD5E1",
   },
+  darkSidebarPanel: {
+    backgroundColor: "#111827",
+    borderColor: "#253248",
+  },
+  darkSidebarCard: {
+    backgroundColor: "#111827",
+    borderColor: "#253248",
+  },
+  darkSidebarButton: {
+    backgroundColor: "#111827",
+    borderColor: "#253248",
+  },
+  darkSidebarButtonActive: {
+    backgroundColor: "#1E293B",
+    borderColor: "#3B82F6",
+  },
+  darkSidebarModuleButton: {
+    backgroundColor: "#111827",
+  },
+  darkSidebarSubmoduleButton: {
+    backgroundColor: "#0F172A",
+  },
+  darkSidebarStats: {
+    backgroundColor: "#0F172A",
+    borderColor: "#253248",
+  },
+  darkSidebarRoleBadge: {
+    backgroundColor: "#1E3A8A",
+    borderColor: "#3B82F6",
+  },
+  darkSidebarMutedText: {
+    color: "#CBD5E1",
+  },
 
   // ============================================
   // 3. CONTENT AREA - Main content section
