@@ -30,10 +30,13 @@ import visitorDashboardStyles from "../styles/VisitorDashboardStyles";
 import {
   MONITORING_MAP_BLUEPRINTS,
   MONITORING_MAP_FLOORS,
-  MONITORING_MAP_LABELS,
   MONITORING_MAP_OFFICES,
   MONITORING_MAP_OFFICE_POSITIONS,
 } from "../utils/monitoringMapConfig";
+import {
+  buildManagedMapLabels,
+  normalizeMapSettingsPayload,
+} from "../utils/mapSettingsUtils";
 
 const visitorBrandLogo = require("../assets/LogoSapphireAppIcon.png");
 const Storage =
@@ -308,7 +311,11 @@ const VISITOR_OFFICE_MAP_ALIASES = {
   STO: "sto",
 };
 
-const getVisitorDestinationInfo = (visitorRecord = {}) => {
+const getVisitorDestinationInfo = (
+  visitorRecord = {},
+  mapRooms = MONITORING_MAP_OFFICES,
+  mapRoomPositions = MONITORING_MAP_OFFICE_POSITIONS,
+) => {
   const requestedOffice = String(
     visitorRecord?.currentDestination?.office ||
       visitorRecord?.appointmentDepartment ||
@@ -318,11 +325,11 @@ const getVisitorDestinationInfo = (visitorRecord = {}) => {
   ).trim();
   const officeId =
     VISITOR_OFFICE_MAP_ALIASES[requestedOffice] ||
-    MONITORING_MAP_OFFICES.find(
+    mapRooms.find(
       (office) => office.name.toLowerCase() === requestedOffice.toLowerCase(),
     )?.id ||
     "ground-lobby";
-  const office = MONITORING_MAP_OFFICES.find((item) => item.id === officeId) || MONITORING_MAP_OFFICES[0];
+  const office = mapRooms.find((item) => item.id === officeId) || mapRooms[0] || MONITORING_MAP_OFFICES[0];
   const floor = MONITORING_MAP_FLOORS.find((item) => item.id === office?.floor) || MONITORING_MAP_FLOORS[0];
 
   return {
@@ -331,7 +338,7 @@ const getVisitorDestinationInfo = (visitorRecord = {}) => {
     floorId: floor?.id || "ground",
     floorName: floor?.name || "Ground Floor",
     icon: office?.icon || "navigate-outline",
-    position: MONITORING_MAP_OFFICE_POSITIONS[officeId],
+    position: mapRoomPositions[officeId] || MONITORING_MAP_OFFICE_POSITIONS[officeId],
   };
 };
 
@@ -470,6 +477,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [selectedVisitorSection, setSelectedVisitorSection] = useState("home");
   const [selectedAppointmentScreen, setSelectedAppointmentScreen] = useState("menu");
   const [selectedVisitorMapFloor, setSelectedVisitorMapFloor] = useState("ground");
+  const [visitorMapRooms, setVisitorMapRooms] = useState(MONITORING_MAP_OFFICES);
+  const [visitorMapRoomPositions, setVisitorMapRoomPositions] = useState(MONITORING_MAP_OFFICE_POSITIONS);
   const visitorScreenRestoreReadyRef = useRef(false);
   const [appointmentFeedback, setAppointmentFeedback] = useState(null);
   const [appointmentHistory, setAppointmentHistory] = useState([]);
@@ -659,6 +668,31 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadVisitorMapSettings = async () => {
+      try {
+        const response = await ApiService.getMapSettings();
+        if (isMounted && response?.success) {
+          const nextMapSettings = normalizeMapSettingsPayload(response.mapSettings);
+          setVisitorMapRooms(nextMapSettings.rooms);
+          setVisitorMapRoomPositions(nextMapSettings.roomPositions);
+        }
+      } catch (error) {
+        console.log("Visitor map settings load skipped:", error?.message || error);
+      }
+    };
+
+    loadVisitorMapSettings();
+    const unsubscribe = navigation?.addListener?.("focus", loadVisitorMapSettings);
+
+    return () => {
+      isMounted = false;
+      unsubscribe?.();
+    };
+  }, [navigation]);
 
   useEffect(() => {
     if (!visitorScreenRestoreReadyRef.current) return;
@@ -3655,6 +3689,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
   };
 
+  const visitorMapLabels = useMemo(
+    () => buildManagedMapLabels(visitorMapRooms, visitorMapRoomPositions),
+    [visitorMapRooms, visitorMapRoomPositions],
+  );
+
   const handleLogout = async () => {
     await stopNfcReading();
     showVisitorAlert(
@@ -3919,7 +3958,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       }
       return String(left.label).localeCompare(String(right.label));
     });
-  const visitorDestinationInfo = getVisitorDestinationInfo(visitor);
+  const visitorDestinationInfo = getVisitorDestinationInfo(visitor, visitorMapRooms, visitorMapRoomPositions);
   const visitorRouteSteps = buildVisitorRouteSteps(visitorDestinationInfo);
   const visitorDestinationMarker = {
     id: "visitor-appointment-destination",
@@ -6269,15 +6308,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     <CampusMap
       visitors={[]}
       floors={MONITORING_MAP_FLOORS}
-      offices={MONITORING_MAP_OFFICES}
+      offices={visitorMapRooms}
       selectedFloor={activeVisitorMapFloor}
       selectedOffice="all"
       destinationMarkers={isCheckedOutVisitor ? [] : [visitorDestinationMarker]}
       showVisitorMarkers={false}
       showActiveVisitorsBadge={false}
       mapBlueprints={MONITORING_MAP_BLUEPRINTS}
-      mapLabels={MONITORING_MAP_LABELS}
-      officePositions={MONITORING_MAP_OFFICE_POSITIONS}
+      mapLabels={visitorMapLabels}
+      officePositions={visitorMapRoomPositions}
       onFloorChange={setSelectedVisitorMapFloor}
       showFloorNavigation={false}
       initialScale={fullscreen ? 1 : 1.25}

@@ -1837,6 +1837,29 @@ generateRandomPassword(length = 10) {
     }
   }
 
+  async getMapSettings() {
+    try {
+      const response = await this.fetch("/map-settings");
+      return response;
+    } catch (error) {
+      console.error("Get map settings error:", error);
+      throw error;
+    }
+  }
+
+  async updateAdminMapSettings(mapSettings) {
+    try {
+      const response = await this.fetch("/admin/map-settings", {
+        method: "PUT",
+        body: mapSettings,
+      });
+      return response;
+    } catch (error) {
+      console.error("Update map settings error:", error);
+      throw error;
+    }
+  }
+
   async getNotifications(filters = {}) {
     try {
       const queryString = new URLSearchParams(filters).toString();

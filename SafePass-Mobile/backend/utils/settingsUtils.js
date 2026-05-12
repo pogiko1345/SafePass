@@ -209,6 +209,44 @@ const sanitizeSystemSettings = (input = {}) => {
   return sanitized;
 };
 
+const sanitizeMapConfiguration = (input = {}) => {
+  const source = input?.mapConfiguration || input?.mapSettings || input?.settings || input || {};
+  const rooms = (Array.isArray(source.rooms) ? source.rooms : [])
+    .map((room) => ({
+      id: String(room?.id || "").trim(),
+      name: String(room?.name || "").trim().replace(/\s+/g, " "),
+      floor: String(room?.floor || "").trim(),
+      icon: String(room?.icon || "business-outline").trim() || "business-outline",
+    }))
+    .filter((room) => room.id && room.name && room.floor)
+    .slice(0, 250);
+
+  const sourcePositions =
+    source.roomPositions && typeof source.roomPositions === "object"
+      ? source.roomPositions
+      : source.positions && typeof source.positions === "object"
+        ? source.positions
+        : {};
+
+  const roomPositions = Object.entries(sourcePositions).reduce((nextPositions, [roomId, position]) => {
+    const id = String(roomId || "").trim();
+    const x = Number(position?.x);
+    const y = Number(position?.y);
+    if (id && Number.isFinite(x) && Number.isFinite(y)) {
+      nextPositions[id] = {
+        x: Math.max(0, Math.min(100, Math.round(x * 10) / 10)),
+        y: Math.max(0, Math.min(100, Math.round(y * 10) / 10)),
+      };
+    }
+    return nextPositions;
+  }, {});
+
+  return {
+    rooms,
+    roomPositions,
+  };
+};
+
 module.exports = {
   DEFAULT_SYSTEM_SETTINGS,
   DEFAULT_APPOINTMENT_OPTIONS,
@@ -217,4 +255,5 @@ module.exports = {
   DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS,
   sanitizeSystemSettings,
   sanitizeAppointmentOptions,
+  sanitizeMapConfiguration,
 };

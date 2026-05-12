@@ -53,6 +53,10 @@ import {
   MONITORING_MAP_OFFICES,
   MONITORING_MAP_OFFICE_POSITIONS,
 } from "../utils/monitoringMapConfig";
+import {
+  buildManagedMapLabels,
+  normalizeMapSettingsPayload,
+} from "../utils/mapSettingsUtils";
 
 const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
 const SECURITY_LIVE_REFRESH_INTERVAL_MS = 10000;
@@ -352,15 +356,21 @@ export default function SecurityDashboardScreen({ navigation }) {
     category: 'suspicious',
     details: '',
   });
+  const [mapRooms, setMapRooms] = useState(MONITORING_MAP_OFFICES);
+  const [mapRoomPositions, setMapRoomPositions] = useState(MONITORING_MAP_OFFICE_POSITIONS);
   
   // Floors and offices data
   const floors = MONITORING_MAP_FLOORS;
   
-  const offices = MONITORING_MAP_OFFICES;
+  const offices = mapRooms;
 
   const mapBlueprints = MONITORING_MAP_BLUEPRINTS;
 
-  const officePositions = MONITORING_MAP_OFFICE_POSITIONS;
+  const officePositions = mapRoomPositions;
+  const mapLabels = useMemo(
+    () => buildManagedMapLabels(mapRooms, mapRoomPositions),
+    [mapRooms, mapRoomPositions],
+  );
 
   const normalizeMapText = (value) =>
     String(value || "")
@@ -464,6 +474,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       if (nextState === "active") {
         refreshSecurityLiveData();
         loadNotifications();
+        loadMapSettings();
       }
     });
 
@@ -508,6 +519,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         loadOperationalData({ force: true }),
         loadSecurityLivePresence(),
         loadNotifications(currentUser, { force: true }),
+        loadMapSettings(),
       ]);
       lastOperationalRefreshAtRef.current = Date.now();
 
@@ -1133,6 +1145,21 @@ export default function SecurityDashboardScreen({ navigation }) {
       return true;
     } catch (error) {
       console.error("Load security live presence error:", error);
+      return false;
+    }
+  };
+
+  const loadMapSettings = async () => {
+    try {
+      const response = await ApiService.getMapSettings();
+      if (response?.success) {
+        const nextMapSettings = normalizeMapSettingsPayload(response.mapSettings);
+        setMapRooms(nextMapSettings.rooms);
+        setMapRoomPositions(nextMapSettings.roomPositions);
+      }
+      return true;
+    } catch (error) {
+      console.log("Security map settings load skipped:", error?.message || error);
       return false;
     }
   };
@@ -2683,6 +2710,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           selectedFloor={selectedFloor}
           selectedOffice={selectedOffice}
           mapBlueprints={mapBlueprints}
+          mapLabels={mapLabels}
           officePositions={officePositions}
           onFloorChange={(floorId) => {
             setSelectedFloor(floorId);
@@ -4610,6 +4638,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             selectedFloor={selectedFloor}
             selectedOffice={selectedOffice}
             mapBlueprints={mapBlueprints}
+            mapLabels={mapLabels}
             officePositions={officePositions}
             onFloorChange={(floorId) => {
               setSelectedFloor(floorId);
@@ -4972,6 +5001,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             selectedFloor={selectedFloor}
             selectedOffice={selectedOffice}
             mapBlueprints={mapBlueprints}
+            mapLabels={mapLabels}
             officePositions={officePositions}
             onFloorChange={(floorId) => {
               setSelectedFloor(floorId);
@@ -5003,6 +5033,14 @@ export default function SecurityDashboardScreen({ navigation }) {
   );
 
   const renderMobileSecurityScreen = () => {
+    const handleMobileTabChange = (tabKey) => {
+      if (tabKey === "profile") {
+        navigation.navigate("Profile");
+        return;
+      }
+      setSecurityMobileTab(tabKey);
+    };
+
     const content =
       securityMobileTab === "logs"
         ? renderMobileLogs()
@@ -5010,9 +5048,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           ? renderMobileAlerts()
           : securityMobileTab === "map"
             ? renderMobileMap()
-            : securityMobileTab === "profile"
-              ? renderMobileProfile()
-              : renderMobileMonitor();
+            : renderMobileMonitor();
 
     return (
       <SafeAreaView style={[securityMobileStyles.safeArea, mobileDarkModeEnabled && securityMobileStyles.darkSafeArea]}>
@@ -5025,7 +5061,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         >
           {content}
         </ScrollView>
-        <MobileBottomNav dark={mobileDarkModeEnabled} tabs={securityMobileTabs} activeTab={securityMobileTab} onChange={setSecurityMobileTab} />
+        <MobileBottomNav dark={mobileDarkModeEnabled} tabs={securityMobileTabs} activeTab={securityMobileTab} onChange={handleMobileTabChange} />
         {renderMobileVisitorDetailModal()}
         {renderFullscreenMapModal()}
       </SafeAreaView>

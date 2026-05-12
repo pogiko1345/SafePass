@@ -30,6 +30,7 @@ const {
   DEFAULT_APPOINTMENT_PURPOSE_OPTIONS,
   DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS,
   sanitizeSystemSettings,
+  sanitizeMapConfiguration,
 } = require("./utils/settingsUtils");
 const timestamp = Date.now();
 const randomString = Math.random().toString(36).substr(2, 10).toUpperCase();
@@ -12507,6 +12508,57 @@ app.put("/api/admin/settings", authMiddleware, async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to update settings" });
+  }
+});
+
+// Get shared campus map settings
+app.get("/api/map-settings", async (req, res) => {
+  try {
+    const settingsRecord = await getSystemSettingsRecord();
+    res.json({
+      success: true,
+      mapSettings: sanitizeMapConfiguration(settingsRecord?.mapConfiguration || {}),
+      updatedAt: settingsRecord?.updatedAt || null,
+    });
+  } catch (error) {
+    console.error("Get map settings error:", error);
+    res.status(500).json({ success: false, message: "Failed to get map settings" });
+  }
+});
+
+// Update shared campus map settings
+app.put("/api/admin/map-settings", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const mapSettings = sanitizeMapConfiguration(req.body || {});
+    await AppSettings.findOneAndUpdate(
+      { key: "system" },
+      { $set: { mapConfiguration: mapSettings, updatedAt: new Date() } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+
+    const accessLog = new AccessLog({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      userName: `${req.user.firstName} ${req.user.lastName}`,
+      location: "Admin Panel",
+      accessType: "system",
+      status: "granted",
+      notes: "Campus map settings updated",
+    });
+    await accessLog.save();
+
+    res.json({
+      success: true,
+      message: "Map settings updated successfully",
+      mapSettings,
+    });
+  } catch (error) {
+    console.error("Update map settings error:", error);
+    res.status(500).json({ success: false, message: "Failed to update map settings" });
   }
 });
 

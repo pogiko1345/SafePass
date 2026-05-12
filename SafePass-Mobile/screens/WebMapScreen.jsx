@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -15,10 +15,14 @@ import CampusMap from "../components/CampusMap";
 import {
   MONITORING_MAP_BLUEPRINTS,
   MONITORING_MAP_FLOORS,
-  MONITORING_MAP_LABELS,
   MONITORING_MAP_OFFICES,
   MONITORING_MAP_OFFICE_POSITIONS,
 } from "../utils/monitoringMapConfig";
+import ApiService from "../utils/ApiService";
+import {
+  buildManagedMapLabels,
+  normalizeMapSettingsPayload,
+} from "../utils/mapSettingsUtils";
 
 const CAMPUS_LOCATIONS = [
   {
@@ -154,6 +158,8 @@ export default function WebMapScreen({ navigation, route }) {
   const [selectedLocationName, setSelectedLocationName] = useState(
     findInitialDestinationName(route?.params?.destinationOffice)
   );
+  const [mapRooms, setMapRooms] = useState(MONITORING_MAP_OFFICES);
+  const [mapRoomPositions, setMapRoomPositions] = useState(MONITORING_MAP_OFFICE_POSITIONS);
   const { width } = useWindowDimensions();
 
   const isWideLayout = width >= 1080;
@@ -167,15 +173,46 @@ export default function WebMapScreen({ navigation, route }) {
     [selectedLocationName]
   );
 
+  const mapLabels = useMemo(
+    () => buildManagedMapLabels(mapRooms, mapRoomPositions),
+    [mapRooms, mapRoomPositions],
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    ApiService.getMapSettings()
+      .then((response) => {
+        if (isMounted && response?.success) {
+          const nextMapSettings = normalizeMapSettingsPayload(response.mapSettings);
+          setMapRooms(nextMapSettings.rooms);
+          setMapRoomPositions(nextMapSettings.roomPositions);
+        }
+      })
+      .catch((error) => {
+        console.log("Web map settings load skipped:", error?.message || error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const destinationMarker = useMemo(
     () => ({
       id: selectedLocation.name,
       floor: selectedLocation.floor,
       label: selectedLocation.name,
       icon: "navigate",
-      position: selectedLocation.mapPosition,
+      position:
+        mapRoomPositions[
+          mapRooms.find((office) =>
+            selectedLocation.name.toLowerCase().includes(office.name.toLowerCase()) ||
+            office.name.toLowerCase().includes(selectedLocation.name.toLowerCase().replace("'s", ""))
+          )?.id
+        ] || selectedLocation.mapPosition,
     }),
-    [selectedLocation]
+    [mapRoomPositions, mapRooms, selectedLocation]
   );
 
   return (
@@ -304,15 +341,15 @@ export default function WebMapScreen({ navigation, route }) {
             <CampusMap
               visitors={[]}
               floors={MONITORING_MAP_FLOORS}
-              offices={MONITORING_MAP_OFFICES}
+              offices={mapRooms}
               selectedFloor={selectedLocation.floor}
               selectedOffice="all"
               destinationMarkers={[destinationMarker]}
               showVisitorMarkers={false}
               showActiveVisitorsBadge={false}
               mapBlueprints={MONITORING_MAP_BLUEPRINTS}
-              mapLabels={MONITORING_MAP_LABELS}
-              officePositions={MONITORING_MAP_OFFICE_POSITIONS}
+              mapLabels={mapLabels}
+              officePositions={mapRoomPositions}
               onFloorChange={(floorId) => {
                 const firstLocationOnFloor = CAMPUS_LOCATIONS.find(
                   (location) => normalizeMapFloor(location.floor) === normalizeMapFloor(floorId),

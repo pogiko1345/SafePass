@@ -30,10 +30,15 @@ import { printRecordsTable, printUserList } from "../utils/printUtils";
 import {
   MONITORING_MAP_BLUEPRINTS,
   MONITORING_MAP_FLOORS,
-  MONITORING_MAP_LABELS,
   MONITORING_MAP_OFFICES,
   MONITORING_MAP_OFFICE_POSITIONS,
 } from "../utils/monitoringMapConfig";
+import {
+  buildManagedMapLabels,
+  normalizeMapRoomPositions,
+  normalizeMapRooms,
+  normalizeMapSettingsPayload,
+} from "../utils/mapSettingsUtils";
 import {
   PHILIPPINE_MOBILE_NUMBER_MESSAGE,
   isValidPhilippineMobileNumber,
@@ -808,14 +813,6 @@ const clampValue = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const normalizeMonitoringFloor = (floorId) => (floorId === "mezzanine" ? "first" : floorId);
 
-const formatRoomMapLabelText = (roomId, roomName) => {
-  const labelText = String(roomName || "").trim();
-  if (roomId === "ground-storage-small" && labelText.toLowerCase() === "storage room") {
-    return "Storage\nRoom";
-  }
-  return labelText;
-};
-
 const getMapTrackingSourceLabel = (item) => {
   const source = String(
     item?.trackingSource ||
@@ -1357,24 +1354,52 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           storageGetItem(DATA_FIELDS_STORAGE_KEY),
         ]);
 
+        let nextRooms = MONITORING_MAP_OFFICES;
+        let nextRoomPositions = MONITORING_MAP_OFFICE_POSITIONS;
+        let hasLocalMapSettings = false;
+
         if (storedRooms) {
           const parsedRooms = JSON.parse(storedRooms);
           if (Array.isArray(parsedRooms) && parsedRooms.length > 0) {
-            const savedRoomIds = new Set(parsedRooms.map((room) => room.id));
-            const newDefaultRooms = MONITORING_MAP_OFFICES.filter((room) => !savedRoomIds.has(room.id));
-            setManagedRooms([...parsedRooms, ...newDefaultRooms]);
+            nextRooms = normalizeMapRooms(parsedRooms);
+            hasLocalMapSettings = true;
           }
         }
 
         if (storedRoomPositions) {
           const parsedPositions = JSON.parse(storedRoomPositions);
           if (parsedPositions && typeof parsedPositions === "object") {
-            setManagedRoomPositions({
-              ...MONITORING_MAP_OFFICE_POSITIONS,
-              ...parsedPositions,
-            });
+            nextRoomPositions = normalizeMapRoomPositions(parsedPositions);
+            hasLocalMapSettings = true;
           }
         }
+
+        try {
+          const response = await ApiService.getMapSettings();
+          const rawMapSettings = response?.mapSettings || {};
+          const hasServerMapSettings =
+            (Array.isArray(rawMapSettings.rooms) && rawMapSettings.rooms.length > 0) ||
+            (rawMapSettings.roomPositions &&
+              typeof rawMapSettings.roomPositions === "object" &&
+              Object.keys(rawMapSettings.roomPositions).length > 0);
+          if (response?.success && hasServerMapSettings) {
+            const serverMapSettings = normalizeMapSettingsPayload(response.mapSettings);
+            nextRooms = serverMapSettings.rooms;
+            nextRoomPositions = serverMapSettings.roomPositions;
+          } else if (response?.success && hasLocalMapSettings) {
+            ApiService.updateAdminMapSettings({
+              rooms: nextRooms,
+              roomPositions: nextRoomPositions,
+            }).catch((syncError) => {
+              console.log("Local map migration skipped:", syncError?.message || syncError);
+            });
+          }
+        } catch (error) {
+          console.log("Shared map settings load skipped:", error?.message || error);
+        }
+
+        setManagedRooms(nextRooms);
+        setManagedRoomPositions(nextRoomPositions);
 
         if (storedFields) {
           const parsedFields = JSON.parse(storedFields);
@@ -2046,32 +2071,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   );
 
   const selectedMapModuleFloor = FLOOR_VIEW_TO_ID[selectedSubmodule] || "ground";
-  const managedMapLabels = useMemo(() => {
-    const roomNameById = managedRooms.reduce((lookup, room) => {
-      if (room?.id && room?.name) {
-        lookup[room.id] = formatRoomMapLabelText(room.id, room.name);
-      }
-      return lookup;
-    }, {});
-
-    return Object.entries(MONITORING_MAP_LABELS).reduce((nextLabels, [floorId, labels]) => {
-      nextLabels[floorId] = labels.map((label) => {
-        const renamedText = roomNameById[label.id];
-        const position = managedRoomPositions?.[label.id];
-        return {
-          ...label,
-          ...(renamedText ? { text: renamedText } : null),
-          ...(position
-            ? {
-                x: Number(position.x),
-                y: Number(position.y),
-              }
-            : null),
-        };
-      });
-      return nextLabels;
-    }, {});
-  }, [managedRoomPositions, managedRooms]);
+  const managedMapLabels = useMemo(
+    () => buildManagedMapLabels(managedRooms, managedRoomPositions),
+    [managedRoomPositions, managedRooms],
+  );
   const selectedFloorRooms = useMemo(
     () => managedRooms.filter((room) => room.floor === selectedMapModuleFloor),
     [managedRooms, selectedMapModuleFloor],
@@ -6263,6 +6266,29 @@ const loadDashboardData = useCallback(async () => {
     });
   };
 
+  const persistSharedMapSettings = async (nextRooms, nextRoomPositions) => {
+    await Promise.all([
+      storageSetItem(ROOM_STORAGE_KEY, JSON.stringify(nextRooms)),
+      storageSetItem(ROOM_POSITION_STORAGE_KEY, JSON.stringify(nextRoomPositions)),
+    ]);
+
+    try {
+      await ApiService.updateAdminMapSettings({
+        rooms: nextRooms,
+        roomPositions: nextRoomPositions,
+      });
+      return true;
+    } catch (error) {
+      console.error("Shared map sync error:", error);
+      publishAdminNotice(
+        "warning",
+        "Map saved locally",
+        "The map changed on this device, but the shared visitor and security map could not sync yet.",
+      );
+      return false;
+    }
+  };
+
   const handleDeleteRoom = (room) => {
     Alert.alert(
       "Delete Room",
@@ -6272,15 +6298,19 @@ const loadDashboardData = useCallback(async () => {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            setManagedRooms((currentRooms) => currentRooms.filter((item) => item.id !== room.id));
-            setManagedRoomPositions((currentPositions) => {
-              const nextPositions = { ...currentPositions };
-              delete nextPositions[room.id];
-              return nextPositions;
-            });
+          onPress: async () => {
+            const nextRooms = managedRooms.filter((item) => item.id !== room.id);
+            const nextPositions = { ...managedRoomPositions };
+            delete nextPositions[room.id];
+
+            setManagedRooms(nextRooms);
+            setManagedRoomPositions(nextPositions);
             if (editingRoomId === room.id) {
               resetRoomEditor(room.floor);
+            }
+            const synced = await persistSharedMapSettings(nextRooms, nextPositions);
+            if (synced) {
+              publishAdminNotice("success", "Room removed", `${room.name} was removed from the shared campus map.`);
             }
           },
         },
@@ -6288,7 +6318,7 @@ const loadDashboardData = useCallback(async () => {
     );
   };
 
-  const submitRoomDraft = () => {
+  const submitRoomDraft = async () => {
     if (!editingRoomId) {
       Alert.alert("Select a room", "Choose a room from the list first, then rename it.");
       return;
@@ -6319,18 +6349,18 @@ const loadDashboardData = useCallback(async () => {
       ...currentRoom,
       name: trimmedName,
     };
+    const roundedPosition = {
+      x: Math.round(nextX * 10) / 10,
+      y: Math.round(nextY * 10) / 10,
+    };
+    const nextRooms = managedRooms.map((room) => (room.id === roomId ? nextRoom : room));
+    const nextPositions = {
+      ...managedRoomPositions,
+      [roomId]: roundedPosition,
+    };
 
-    setManagedRooms((currentRooms) => {
-      return currentRooms.map((room) => (room.id === roomId ? nextRoom : room));
-    });
-
-    setManagedRoomPositions((currentPositions) => ({
-      ...currentPositions,
-      [roomId]: {
-        x: Math.round(nextX * 10) / 10,
-        y: Math.round(nextY * 10) / 10,
-      },
-    }));
+    setManagedRooms(nextRooms);
+    setManagedRoomPositions(nextPositions);
 
     setSelectedAdminMapFloor(nextRoom.floor);
     setSelectedAdminMapOffice("all");
@@ -6340,15 +6370,18 @@ const loadDashboardData = useCallback(async () => {
       name: trimmedName,
       floor: nextRoom.floor,
       icon: nextRoom.icon || currentDraft.icon || "business-outline",
-      x: String(Math.round(nextX * 10) / 10),
-      y: String(Math.round(nextY * 10) / 10),
+      x: String(roundedPosition.x),
+      y: String(roundedPosition.y),
     }));
 
-    publishAdminNotice(
-      "success",
-      "Room updated",
-      `${currentRoom.name} is now ${trimmedName} at X ${Math.round(nextX * 10) / 10}, Y ${Math.round(nextY * 10) / 10}. NFC markers that match this room use this position on the map.`,
-    );
+    const synced = await persistSharedMapSettings(nextRooms, nextPositions);
+    if (synced) {
+      publishAdminNotice(
+        "success",
+        "Room updated",
+        `${currentRoom.name} is now ${trimmedName} at X ${roundedPosition.x}, Y ${roundedPosition.y}. Visitor and security maps will use this shared position.`,
+      );
+    }
   };
 
   const handleFieldDraftChange = (field, value) => {
