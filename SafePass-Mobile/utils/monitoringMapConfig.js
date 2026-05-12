@@ -83,7 +83,7 @@ export const MONITORING_MAP_LABELS = {
     { id: "ground-accounting", text: "Acct'G", x: 21.8, y: 46.8, width: 6 },
     { id: "ground-registrar", text: "Registrar", x: 26.9, y: 46.8, width: 7 },
     { id: "ground-storage-main", text: "Storage", x: 33.1, y: 46.8, width: 7 },
-    { id: "ground-storage-small", text: "Storage", x: 38.7, y: 46.8, width: 5 },
+    { id: "ground-storage-small", text: "Storage\nRoom", x: 38.7, y: 46.8, width: 5 },
     { id: "ground-offices", text: "Offices", x: 62, y: 40, width: 10 },
     { id: "ground-pwd-cr", text: "PWD CR", x: 78.6, y: 32.5, width: 6 },
     { id: "ground-he-she", text: "HE, SHE", x: 78.9, y: 41.8, width: 6 },

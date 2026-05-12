@@ -757,6 +757,14 @@ const clampValue = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const normalizeMonitoringFloor = (floorId) => (floorId === "mezzanine" ? "first" : floorId);
 
+const formatRoomMapLabelText = (roomId, roomName) => {
+  const labelText = String(roomName || "").trim();
+  if (roomId === "ground-storage-small" && labelText.toLowerCase() === "storage room") {
+    return "Storage\nRoom";
+  }
+  return labelText;
+};
+
 const getMapTrackingSourceLabel = (item) => {
   const source = String(
     item?.trackingSource ||
@@ -1923,7 +1931,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const managedMapLabels = useMemo(() => {
     const roomNameById = managedRooms.reduce((lookup, room) => {
       if (room?.id && room?.name) {
-        lookup[room.id] = room.name;
+        lookup[room.id] = formatRoomMapLabelText(room.id, room.name);
       }
       return lookup;
     }, {});
@@ -5809,13 +5817,21 @@ const loadDashboardData = useCallback(async () => {
 
     setSelectedAdminMapFloor(nextRoom.floor);
     setSelectedAdminMapOffice("all");
+    setRoomDraft((currentDraft) => ({
+      ...currentDraft,
+      id: roomId,
+      name: trimmedName,
+      floor: nextRoom.floor,
+      icon: nextRoom.icon || currentDraft.icon || "business-outline",
+      x: String(Math.round(nextX * 10) / 10),
+      y: String(Math.round(nextY * 10) / 10),
+    }));
 
     publishAdminNotice(
       "success",
       "Room updated",
       `${currentRoom.name} is now ${trimmedName} at X ${Math.round(nextX * 10) / 10}, Y ${Math.round(nextY * 10) / 10}. NFC markers that match this room use this position on the map.`,
     );
-    resetRoomEditor(roomDraft.floor);
   };
 
   const handleFieldDraftChange = (field, value) => {
@@ -5936,7 +5952,7 @@ const loadDashboardData = useCallback(async () => {
       },
       {
         role: "staff",
-        title: "Create Admin Services",
+        title: "Create Admin Services Staff",
         label: "Admin Services Staff",
         meta: `${staffUsers.length} existing staff`,
         icon: "briefcase-outline",
