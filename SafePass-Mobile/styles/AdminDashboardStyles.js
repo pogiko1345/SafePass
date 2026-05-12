@@ -2276,6 +2276,128 @@ export default StyleSheet.create({
     color: "#64748B",
   },
 
+  attendanceToolbar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 16,
+  },
+
+  attendanceSearchBox: {
+    flex: 1,
+    minWidth: 260,
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#D8E6F5",
+    borderRadius: 14,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 14,
+  },
+
+  attendanceSearchInput: {
+    flex: 1,
+    minHeight: 44,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+    ...Platform.select({
+      web: { outlineStyle: "none" },
+    }),
+  },
+
+  attendanceFilterCluster: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "flex-end",
+  },
+
+  attendanceSegmentGroup: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D8E6F5",
+    backgroundColor: "#F8FBFE",
+    padding: 4,
+    gap: 4,
+  },
+
+  attendanceSegmentButton: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+
+  attendanceSegmentButtonActive: {
+    backgroundColor: "#0A3D91",
+  },
+
+  attendanceSegmentText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+
+  attendanceSegmentTextActive: {
+    color: "#FFFFFF",
+  },
+
+  attendanceSummaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 12,
+  },
+
+  attendanceSummaryCard: {
+    flexGrow: 1,
+    flexBasis: 180,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+  },
+
+  attendanceSummaryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+
+  attendanceSummaryValue: {
+    fontSize: 23,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  attendanceSummaryLabel: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  attendanceRangeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 2,
+  },
+
+  attendanceRangeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
   dashboardSectionCard: {
     marginTop: 14,
     borderRadius: 14,
@@ -5385,6 +5507,123 @@ export default StyleSheet.create({
     lineHeight: 16,
   },
 
+  analyticsAiCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 14px 30px rgba(15,23,42,0.06)" },
+    }),
+  },
+
+  analyticsAiHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+
+  analyticsAiIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  analyticsAiTitleBlock: {
+    flex: 1,
+  },
+
+  analyticsAiEyebrow: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
+
+  analyticsAiTitle: {
+    marginTop: 2,
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  analyticsAiConfidenceBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+
+  analyticsAiConfidenceText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+  },
+
+  analyticsAiSummary: {
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 14,
+  },
+
+  analyticsAiGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  analyticsAiPanel: {
+    flex: 1,
+    minWidth: 260,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    padding: 14,
+  },
+
+  analyticsAiPanelTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 10,
+  },
+
+  analyticsAiListItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 9,
+  },
+
+  analyticsAiBullet: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    marginTop: 6,
+  },
+
+  analyticsAiListText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
   analyticsSplitGrid: {
     flexDirection: "row",
     gap: 16,
@@ -5504,6 +5743,95 @@ export default StyleSheet.create({
   analyticsBarFill: {
     height: "100%",
     borderRadius: 999,
+  },
+
+  analyticsOfficeChart: {
+    minHeight: 280,
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+
+  analyticsOfficeYAxis: {
+    width: 34,
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    paddingRight: 8,
+  },
+
+  analyticsOfficeAxisText: {
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "right",
+    color: "#64748B",
+  },
+
+  analyticsOfficeBarsScroll: {
+    flexGrow: 1,
+    gap: 18,
+    paddingHorizontal: 6,
+    paddingTop: 8,
+  },
+
+  analyticsOfficeGroup: {
+    width: 92,
+    alignItems: "center",
+  },
+
+  analyticsOfficeBarsArea: {
+    height: 210,
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    gap: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+
+  analyticsOfficeBarWrap: {
+    width: 20,
+    height: "100%",
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+
+  analyticsOfficeBar: {
+    width: 16,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+
+  analyticsOfficeBarValue: {
+    minHeight: 16,
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+
+  analyticsOfficeLabel: {
+    marginTop: 10,
+    minHeight: 34,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800",
+    textAlign: "center",
+    color: "#0F172A",
+  },
+
+  analyticsOfficeEmpty: {
+    minHeight: 220,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 20,
+  },
+
+  analyticsOfficeEmptyText: {
+    maxWidth: 360,
+    textAlign: "center",
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
   },
 
   mainStatsGrid: {

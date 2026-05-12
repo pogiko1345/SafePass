@@ -24,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import ApiService from "../utils/ApiService";
+import AIService from "../utils/AIService";
 import SharedMonitoringMap from "../components/SharedMonitoringMap";
 import { printRecordsTable, printUserList } from "../utils/printUtils";
 import {
@@ -315,6 +316,18 @@ const createAppointmentFilterDraft = () => ({
   purpose: "all",
 });
 
+const ATTENDANCE_SCOPE_OPTIONS = [
+  { key: "students", label: "Students", roles: ["student", "teacher"] },
+  { key: "staff", label: "Staff", roles: ["staff", "security", "guard"] },
+];
+
+const ATTENDANCE_DATE_SHORTCUTS = [
+  { key: "today", label: "Today", days: 1 },
+  { key: "7d", label: "7 days", days: 7 },
+  { key: "30d", label: "30 days", days: 30 },
+  { key: "all", label: "All" },
+];
+
 const DEFAULT_ADMIN_SETTINGS = {
   emailNotifications: true,
   smsAlerts: true,
@@ -340,6 +353,8 @@ const ALL_ADMIN_SUBMODULES = [
   "map-third",
   "appointment-records",
   "appointment-management",
+  "attendance-records",
+  "analytics",
   "report-records",
   "security-report-records",
   "settings",
@@ -456,6 +471,42 @@ const formatFilterDateLabel = (date) => {
     day: "numeric",
     year: "numeric",
   });
+};
+
+const titleCaseLabel = (value = "") =>
+  String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase()) || "Unknown";
+
+const getAttendanceDateRange = (shortcut = "today") => {
+  const matchedShortcut = ATTENDANCE_DATE_SHORTCUTS.find((item) => item.key === shortcut);
+  if (!matchedShortcut?.days) return {};
+
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - (matchedShortcut.days - 1));
+
+  return {
+    dateFrom: formatDateInputValue(start),
+    dateTo: formatDateInputValue(end),
+  };
+};
+
+const getAttendanceStatusColor = (status = "") => {
+  const normalizedStatus = String(status || "").toLowerCase();
+  if (["inside", "present"].includes(normalizedStatus)) {
+    return { background: "#DCFCE7", text: "#166534" };
+  }
+  if (normalizedStatus === "late") {
+    return { background: "#FEF3C7", text: "#92400E" };
+  }
+  if (["checked_out", "completed"].includes(normalizedStatus)) {
+    return { background: "#E0F2FE", text: "#075985" };
+  }
+  if (["expired", "no_show"].includes(normalizedStatus)) {
+    return { background: "#FEE2E2", text: "#B91C1C" };
+  }
+  return { background: "#E2E8F0", text: "#475569" };
 };
 
 const getStatusColor = (status) => {
@@ -1112,6 +1163,12 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [editingAppointmentOption, setEditingAppointmentOption] = useState(null);
   const [isSavingAppointmentOptions, setIsSavingAppointmentOptions] = useState(false);
   const [activeAppointmentConfigTab, setActiveAppointmentConfigTab] = useState("offices");
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [attendanceSummary, setAttendanceSummary] = useState(null);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceScope, setAttendanceScope] = useState("students");
+  const [attendanceDateShortcut, setAttendanceDateShortcut] = useState("today");
+  const [attendanceSearchTerm, setAttendanceSearchTerm] = useState("");
 
   // Modal States
   const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
@@ -1499,6 +1556,59 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     () => allUsers.filter((userItem) => String(userItem?.role || "").toLowerCase() === "teacher"),
     [allUsers],
   );
+  const scopedAttendanceRecords = useMemo(() => {
+    const selectedScope = ATTENDANCE_SCOPE_OPTIONS.find((item) => item.key === attendanceScope) || ATTENDANCE_SCOPE_OPTIONS[0];
+    const allowedRoles = new Set(selectedScope.roles);
+    const query = normalizeSearchValue(attendanceSearchTerm);
+
+    return attendanceRecords.filter((record) => {
+      const recordType = String(record?.userType || record?.role || "").toLowerCase();
+      if (!allowedRoles.has(recordType)) return false;
+      if (!query) return true;
+
+      const searchableText = [
+        record?.name,
+        record?.userType,
+        record?.role,
+        record?.module,
+        record?.nfcCardId,
+        record?.sourceDeviceId,
+        record?.location,
+        record?.checkpointIn,
+        record?.checkpointOut,
+        formatDateInputValue(record?.attendanceDate),
+        formatDateTime(record?.attendanceDate),
+        formatDateTime(record?.checkInTime),
+        formatDateTime(record?.checkOutTime),
+        formatDateTime(record?.lastTapTime),
+        ...(Array.isArray(record?.checkpointHistory)
+          ? record.checkpointHistory.flatMap((checkpoint) => [
+              checkpoint?.checkpointId,
+              checkpoint?.checkpointName,
+              checkpoint?.office,
+              checkpoint?.floor,
+              formatDateTime(checkpoint?.tappedAt),
+            ])
+          : []),
+      ]
+        .filter(Boolean)
+        .map(normalizeSearchValue)
+        .join(" ");
+
+      return query.split(" ").filter(Boolean).every((token) => searchableText.includes(token));
+    });
+  }, [attendanceRecords, attendanceScope, attendanceSearchTerm]);
+  const attendanceQuickSummary = useMemo(() => {
+    const inside = scopedAttendanceRecords.filter((record) => ["inside", "present"].includes(String(record?.status || "").toLowerCase())).length;
+    const late = scopedAttendanceRecords.filter((record) => String(record?.status || "").toLowerCase() === "late").length;
+    const completed = scopedAttendanceRecords.filter((record) => ["completed", "checked_out"].includes(String(record?.status || "").toLowerCase())).length;
+    return {
+      total: scopedAttendanceRecords.length,
+      inside,
+      late,
+      completed,
+    };
+  }, [scopedAttendanceRecords]);
   const userManagementUsers = useMemo(() => {
     if (userManagementStatusTab === "active") return activeUsersList;
     if (userManagementStatusTab === "inactive") return inactiveUsersList;
@@ -2043,6 +2153,24 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
             { label: "Approved", value: approvedRequests.length, icon: "checkmark-circle-outline", color: ADMIN_BLUE },
           ],
         };
+      case "attendance-records":
+        return {
+          title: "Attendance Records",
+          subtitle: "Review staff and student attendance from NFC taps, names, dates, and campus IDs.",
+          highlights: [
+            { label: "Visible", value: scopedAttendanceRecords.length, icon: "list-outline", color: ADMIN_BLUE },
+            { label: "Late", value: attendanceQuickSummary.late, icon: "alert-circle-outline", color: ADMIN_BLUE },
+          ],
+        };
+      case "analytics":
+        return {
+          title: "Analytics",
+          subtitle: "Track visitor trends, most visited offices, and campus activity distribution.",
+          highlights: [
+            { label: "Today", value: stats.todayVisits, icon: "calendar-outline", color: ADMIN_BLUE },
+            { label: "Reports", value: visitorHistory.length, icon: "analytics-outline", color: ADMIN_BLUE },
+          ],
+        };
       case "report-records":
         return {
           title: "Report Records",
@@ -2095,6 +2223,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     settings.darkMode,
     settings.emailNotifications,
     academicStaffUsers.length,
+    attendanceQuickSummary.late,
+    scopedAttendanceRecords.length,
     staffUsers.length,
     studentUsers.length,
     stats.completedVisits,
@@ -2142,11 +2272,21 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         ],
       },
       {
+        key: "attendance",
+        label: "Attendance",
+        icon: "time-outline",
+        color: ADMIN_BLUE,
+        submodules: [
+          { key: "attendance-records", label: "Records" },
+        ],
+      },
+      {
         key: "reports",
         label: "Reports",
         icon: "document-text-outline",
         color: ADMIN_BLUE,
         submodules: [
+          { key: "analytics", label: "Analytics" },
           { key: "report-records", label: "Report Records" },
           { key: "security-report-records", label: "Security Reports" },
         ],
@@ -2792,6 +2932,30 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
   }, [handleAuthError]);
 
+  const loadAttendanceRecords = useCallback(async () => {
+    setAttendanceLoading(true);
+    try {
+      const dateRange = getAttendanceDateRange(attendanceDateShortcut);
+      const [attendanceResponse, summaryResponse] = await Promise.all([
+        ApiService.getAttendance({ ...dateRange, limit: 250 }),
+        ApiService.getAttendanceSummary(dateRange),
+      ]);
+
+      setAttendanceRecords(Array.isArray(attendanceResponse?.attendance) ? attendanceResponse.attendance : []);
+      setAttendanceSummary(summaryResponse?.summary || null);
+    } catch (error) {
+      console.error("Load attendance records error:", error);
+      if (isAuthError(error)) {
+        await handleAuthError();
+        return;
+      }
+      setAttendanceRecords([]);
+      setAttendanceSummary(null);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  }, [attendanceDateShortcut, handleAuthError]);
+
 const loadDashboardData = useCallback(async () => {
   authErrorHandledRef.current = false;
   setIsLoading(true);
@@ -2828,6 +2992,10 @@ const loadDashboardData = useCallback(async () => {
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  useEffect(() => {
+    loadAttendanceRecords();
+  }, [loadAttendanceRecords]);
 
   useEffect(() => {
     loadVisitorHistory();
@@ -3163,6 +3331,14 @@ const loadDashboardData = useCallback(async () => {
             { label: "Tomorrow", value: stats.tomorrowVisits, icon: "calendar-clear-outline", color: ADMIN_BLUE },
           ],
         };
+      case "attendance":
+        return {
+          subtitle: "Review campus attendance taps for students, teachers, and staff records.",
+          highlights: [
+            { label: "Records", value: scopedAttendanceRecords.length, icon: "time-outline", color: ADMIN_BLUE },
+            { label: "Late", value: attendanceQuickSummary.late, icon: "alert-circle-outline", color: ADMIN_BLUE },
+          ],
+        };
       case "settings":
         return {
           subtitle: "Control dashboard preferences and communication settings for the admin experience.",
@@ -3185,8 +3361,10 @@ const loadDashboardData = useCallback(async () => {
     activeUsersList.length,
     allUsers.length,
     approvedRequests.length,
+    attendanceQuickSummary.late,
     guardUsers,
     monitoredMapVisitors.length,
+    scopedAttendanceRecords.length,
     settings.darkMode,
     settings.emailNotifications,
     staffUsers,
@@ -3335,11 +3513,13 @@ const loadDashboardData = useCallback(async () => {
             ? "webmap"
             : submoduleKey === "appointment-records" || submoduleKey === "appointment-management"
               ? "requests"
-              : submoduleKey === "report-records" || submoduleKey === "security-report-records"
-                ? "analytics"
-                : submoduleKey === "settings"
-                  ? "settings"
-                  : "dashboard";
+              : submoduleKey === "attendance-records"
+                ? "attendance"
+                : submoduleKey === "analytics" || submoduleKey === "report-records" || submoduleKey === "security-report-records"
+                  ? "analytics"
+                  : submoduleKey === "settings"
+                    ? "settings"
+                    : "dashboard";
 
     applySidebarAnimation();
     setSelectedSubmodule(submoduleKey);
@@ -3398,10 +3578,10 @@ const loadDashboardData = useCallback(async () => {
         selectAdminSubmodule("account-records", { accountMode: "all" });
         break;
       case "analytics":
-        selectAdminSubmodule("report-records");
+        selectAdminSubmodule("analytics");
         break;
       case "attendance":
-        navigation.navigate("AttendanceRecords");
+        selectAdminSubmodule("attendance-records");
         break;
       case "nfc":
         navigation.navigate("NFCManagement");
@@ -5062,6 +5242,78 @@ const loadDashboardData = useCallback(async () => {
     );
   };
 
+  const renderMostVisitedOfficeChart = (items = []) => {
+    const max = Math.max(
+      1,
+      ...items.flatMap((item) => [
+        item.students || 0,
+        item.visitors || 0,
+        item.staff || 0,
+      ]),
+    );
+    const groupConfig = [
+      { key: "students", label: "Students", color: "#0A3D91" },
+      { key: "visitors", label: "Visitors", color: "#F97316" },
+      { key: "staff", label: "Staff", color: "#7C3AED" },
+    ];
+
+    if (!items.length) {
+      return (
+        <View style={styles.analyticsOfficeEmpty}>
+          <Ionicons name="business-outline" size={30} color={theme.textSecondary} />
+          <Text style={[styles.analyticsOfficeEmptyText, { color: theme.textSecondary }]}>
+            Office visit analytics will appear after student, visitor, or staff taps are recorded.
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.analyticsOfficeChart}>
+        <View style={styles.analyticsOfficeYAxis}>
+          {[max, Math.ceil(max * 0.75), Math.ceil(max * 0.5), Math.ceil(max * 0.25), 0].map((value, index) => (
+            <Text key={`${value}-${index}`} style={[styles.analyticsOfficeAxisText, { color: theme.textSecondary }]}>
+              {value}
+            </Text>
+          ))}
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.analyticsOfficeBarsScroll}>
+          {items.map((item) => (
+            <View key={item.key} style={styles.analyticsOfficeGroup}>
+              <View style={[styles.analyticsOfficeBarsArea, { borderBottomColor: theme.borderColor }]}>
+                {groupConfig.map((group) => {
+                  const value = item[group.key] || 0;
+                  const heightPercent = value === 0 ? 0 : Math.max(8, Math.round((value / max) * 100));
+                  return (
+                    <View key={group.key} style={styles.analyticsOfficeBarWrap}>
+                      <Text style={[styles.analyticsOfficeBarValue, { color: theme.textSecondary }]}>
+                        {value || ""}
+                      </Text>
+                      <View
+                        style={[
+                          styles.analyticsOfficeBar,
+                          {
+                            height: `${heightPercent}%`,
+                            minHeight: value > 0 ? 8 : 0,
+                            backgroundColor: group.color,
+                            opacity: value > 0 ? 1 : 0.16,
+                          },
+                        ]}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+              <Text style={[styles.analyticsOfficeLabel, { color: theme.textPrimary }]} numberOfLines={2}>
+                {item.label}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
   const handleFilterDateSelection = (event, date) => {
     if (Platform.OS !== "ios") {
       setActiveFilterDateField(null);
@@ -5541,6 +5793,218 @@ const loadDashboardData = useCallback(async () => {
     </View>
   );
 
+  const renderAttendanceRecordsContent = () => {
+    const dateRange = getAttendanceDateRange(attendanceDateShortcut);
+    const selectedScopeLabel =
+      ATTENDANCE_SCOPE_OPTIONS.find((item) => item.key === attendanceScope)?.label || "Attendance";
+
+    return (
+      <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.pageContainer}>
+          <AdminSectionShell
+            title="Attendance Records"
+            subtitle="Review student and staff attendance from campus NFC taps. Search updates instantly by name, ID, date, or location."
+            badge={`${scopedAttendanceRecords.length} visible`}
+            isDarkMode={isDarkMode}
+            theme={theme}
+            actions={
+              <TouchableOpacity
+                style={styles.pageRefreshButton}
+                onPress={loadAttendanceRecords}
+                disabled={attendanceLoading}
+              >
+                {attendanceLoading ? (
+                  <ActivityIndicator size="small" color={ADMIN_BLUE} />
+                ) : (
+                  <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
+                )}
+              </TouchableOpacity>
+            }
+          >
+            <View style={styles.attendanceToolbar}>
+              <View style={[styles.attendanceSearchBox, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                <Ionicons name="search-outline" size={18} color={isDarkMode ? "#94A3B8" : "#64748B"} />
+                <TextInput
+                  style={[styles.attendanceSearchInput, isDarkMode && styles.darkText]}
+                  placeholder="Search name, ID, date, or location"
+                  placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                  value={attendanceSearchTerm}
+                  onChangeText={setAttendanceSearchTerm}
+                />
+              </View>
+
+              <View style={styles.attendanceFilterCluster}>
+                <View style={[styles.attendanceSegmentGroup, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                  {ATTENDANCE_SCOPE_OPTIONS.map((option) => {
+                    const isActive = attendanceScope === option.key;
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
+                        style={[styles.attendanceSegmentButton, isActive && styles.attendanceSegmentButtonActive]}
+                        onPress={() => setAttendanceScope(option.key)}
+                      >
+                        <Text style={[styles.attendanceSegmentText, isActive && styles.attendanceSegmentTextActive, isDarkMode && !isActive && styles.darkTextSecondary]}>
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <View style={[styles.attendanceSegmentGroup, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                  {ATTENDANCE_DATE_SHORTCUTS.map((option) => {
+                    const isActive = attendanceDateShortcut === option.key;
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
+                        style={[styles.attendanceSegmentButton, isActive && styles.attendanceSegmentButtonActive]}
+                        onPress={() => setAttendanceDateShortcut(option.key)}
+                      >
+                        <Text style={[styles.attendanceSegmentText, isActive && styles.attendanceSegmentTextActive, isDarkMode && !isActive && styles.darkTextSecondary]}>
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.attendanceSummaryGrid}>
+              {[
+                { label: `${selectedScopeLabel} Records`, value: attendanceQuickSummary.total, icon: "list-outline", color: ADMIN_BLUE },
+                { label: "Inside / Present", value: attendanceQuickSummary.inside, icon: "log-in-outline", color: "#10B981" },
+                { label: "Late", value: attendanceQuickSummary.late, icon: "alert-circle-outline", color: "#F59E0B" },
+                { label: "Checked Out", value: attendanceQuickSummary.completed, icon: "log-out-outline", color: "#64748B" },
+              ].map((item) => (
+                <View
+                  key={item.label}
+                  style={[
+                    styles.attendanceSummaryCard,
+                    {
+                      backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
+                      borderColor: theme.borderColor,
+                    },
+                  ]}
+                >
+                  <View style={[styles.attendanceSummaryIcon, { backgroundColor: `${item.color}16` }]}>
+                    <Ionicons name={item.icon} size={18} color={item.color} />
+                  </View>
+                  <Text style={[styles.attendanceSummaryValue, { color: theme.textPrimary }]}>{item.value}</Text>
+                  <Text style={[styles.attendanceSummaryLabel, { color: theme.textSecondary }]}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.attendanceRangeRow}>
+              <Text style={[styles.attendanceRangeText, { color: theme.textSecondary }]}>
+                Showing {dateRange.dateFrom && dateRange.dateTo ? `${dateRange.dateFrom} to ${dateRange.dateTo}` : "all available dates"}
+              </Text>
+              {attendanceSummary?.total ? (
+                <Text style={[styles.attendanceRangeText, { color: theme.textSecondary }]}>
+                  {attendanceSummary.total} loaded from server
+                </Text>
+              ) : null}
+            </View>
+
+            {attendanceLoading ? (
+              <View style={[styles.modularEmptyState, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                <ActivityIndicator size="small" color={ADMIN_BLUE} />
+                <Text style={[styles.modularEmptyStateText, isDarkMode && styles.darkTextSecondary]}>
+                  Loading attendance records...
+                </Text>
+              </View>
+            ) : scopedAttendanceRecords.length === 0 ? (
+              <View style={[styles.modularEmptyState, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                <Ionicons name="calendar-clear-outline" size={24} color="#94A3B8" />
+                <Text style={[styles.modularEmptyStateText, isDarkMode && styles.darkTextSecondary]}>
+                  No attendance records match this filter.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.adminTableScroll}>
+                <View style={[styles.adminTable, { minWidth: 920, backgroundColor: isDarkMode ? "#0F172A" : "#FFFFFF", borderColor: theme.borderColor }]}>
+                  <View style={[styles.adminTableHeaderRow, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
+                    {["Name", "Type", "Date", "Check In", "Check Out", "Status", "Location"].map((heading) => (
+                      <View key={heading} style={[styles.adminTableCell, styles.adminTableHeaderCell, heading === "Name" ? { width: 210 } : styles.adminTableFlexCell]}>
+                        <Text style={[styles.adminTableHeaderText, isDarkMode && styles.darkTextSecondary]}>{heading}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {scopedAttendanceRecords.slice(0, 120).map((record, index) => {
+                    const statusColors = getAttendanceStatusColor(record?.status);
+                    const recordKey = record?._id || `${record?.name}-${record?.attendanceDate}-${index}`;
+                    return (
+                      <View
+                        key={recordKey}
+                        style={[
+                          styles.adminTableRow,
+                          {
+                            backgroundColor:
+                              isDarkMode
+                                ? index % 2 === 0
+                                  ? "#0F172A"
+                                  : "#111827"
+                                : index % 2 === 0
+                                  ? "#FFFFFF"
+                                  : "#F8FBFE",
+                            borderColor: theme.borderColor,
+                          },
+                        ]}
+                      >
+                        <View style={[styles.adminTableCell, { width: 210 }]}>
+                          <Text style={[styles.adminTablePrimaryText, isDarkMode && styles.darkText]} numberOfLines={1}>
+                            {record?.name || "Unnamed"}
+                          </Text>
+                          <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]} numberOfLines={1}>
+                            {record?.nfcCardId || record?.sourceDeviceId || "No card ID"}
+                          </Text>
+                        </View>
+                        <View style={[styles.adminTableCell, styles.adminTableFlexCell]}>
+                          <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                            {titleCaseLabel(record?.userType)}
+                          </Text>
+                        </View>
+                        <View style={[styles.adminTableCell, styles.adminTableFlexCell]}>
+                          <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                            {formatDateInputValue(record?.attendanceDate) || "N/A"}
+                          </Text>
+                        </View>
+                        <View style={[styles.adminTableCell, styles.adminTableFlexCell]}>
+                          <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                            {formatTime(record?.checkInTime)}
+                          </Text>
+                        </View>
+                        <View style={[styles.adminTableCell, styles.adminTableFlexCell]}>
+                          <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
+                            {formatTime(record?.checkOutTime)}
+                          </Text>
+                        </View>
+                        <View style={[styles.adminTableCell, styles.adminTableFlexCell]}>
+                          <View style={[styles.statusBadge, { alignSelf: "flex-start", backgroundColor: statusColors.background }]}>
+                            <Text style={[styles.statusText, { color: statusColors.text }]}>
+                              {titleCaseLabel(record?.status)}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={[styles.adminTableCell, styles.adminTableFlexCell]}>
+                          <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]} numberOfLines={1}>
+                            {record?.location || record?.checkpointIn || "No location"}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
+          </AdminSectionShell>
+        </View>
+      </ScrollView>
+    );
+  };
+
   const renderDashboardContent = () => (
     <ScrollView
       style={styles.contentScrollView}
@@ -5661,6 +6125,57 @@ const loadDashboardData = useCallback(async () => {
             </HoverBubble>
           ))}
         </View>
+
+        <View style={styles.dashboardSectionHeaderRow}>
+          <View>
+            <Text style={[styles.dashboardSectionHeading, { color: theme.textPrimary }]}>Analytics</Text>
+            <Text style={[styles.dashboardSectionSubtitle, { color: theme.textSecondary }]}>
+              A quick read of today's campus activity and account coverage.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.dashboardStatsGrid}>
+          {[
+            { label: "Total Accounts", value: allUsers.length || stats.totalUsers || 0, icon: "people-outline", color: "#7C3AED" },
+            { label: "Completed Visits", value: stats.completedVisits || 0, icon: "checkmark-done-outline", color: "#10B981" },
+            { label: "Approved Requests", value: approvedRequests.length || 0, icon: "shield-checkmark-outline", color: ADMIN_BLUE },
+            { label: "Security Reports", value: securityReportRecords.length || 0, icon: "document-text-outline", color: "#F59E0B" },
+          ].map((item) => (
+            <HoverBubble
+              key={item.label}
+              hoverScale={1.035}
+              style={[
+                styles.dashboardStatCard,
+                styles.dashboardStatCardCompact,
+                {
+                  width: width > 1100 ? "24%" : width > 760 ? "48%" : "100%",
+                  backgroundColor: theme.cardBackground,
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={styles.dashboardStatHeader}>
+                <Text style={[styles.dashboardStatLabel, { color: theme.textSecondary }]}>{item.label}</Text>
+                <View style={[styles.dashboardStatIcon, { backgroundColor: `${item.color}16` }]}>
+                  <Ionicons name={item.icon} size={18} color={item.color} />
+                </View>
+              </View>
+              <Text style={[styles.dashboardStatValue, { color: theme.textPrimary }]}>{item.value}</Text>
+            </HoverBubble>
+          ))}
+        </View>
+
+        <View style={styles.dashboardSectionHeaderRow}>
+          <View>
+            <Text style={[styles.dashboardSectionHeading, { color: theme.textPrimary }]}>Activity Monitoring</Text>
+            <Text style={[styles.dashboardSectionSubtitle, { color: theme.textSecondary }]}>
+              Monitor visitor movement, tap activity, and the campus map from the overview.
+            </Text>
+          </View>
+        </View>
+
+        {renderAdminMapWorkspace()}
       </View>
     </ScrollView>
   );
@@ -8723,6 +9238,65 @@ const loadDashboardData = useCallback(async () => {
         helper: "Approved future visits",
       },
     ];
+    const officeVisitMap = new Map();
+    const addOfficeVisit = (officeLabel, groupKey) => {
+      const label = String(officeLabel || "").trim();
+      const key = normalizeFilterValue(label);
+      if (!key || !["students", "visitors", "staff"].includes(groupKey)) return;
+
+      const current = officeVisitMap.get(key) || {
+        key,
+        label,
+        students: 0,
+        visitors: 0,
+        staff: 0,
+        total: 0,
+      };
+      current[groupKey] += 1;
+      current.total += 1;
+      officeVisitMap.set(key, current);
+    };
+
+    attendanceRecords.forEach((record) => {
+      const userType = String(record?.userType || record?.role || "").toLowerCase();
+      const office = record?.location ||
+        record?.checkpointIn ||
+        record?.checkpointOut ||
+        record?.checkpointHistory?.[record.checkpointHistory.length - 1]?.office;
+
+      if (["student", "teacher"].includes(userType)) {
+        addOfficeVisit(office, "students");
+      } else if (["staff", "security", "guard"].includes(userType)) {
+        addOfficeVisit(office, "staff");
+      }
+    });
+
+    (visitorHistory.length ? visitorHistory : visitRequests).forEach((visitor) => {
+      addOfficeVisit(
+        visitor?.currentLocation?.office ||
+          visitor?.assignedOffice ||
+          visitor?.appointmentDepartment ||
+          visitor?.host ||
+          visitor?.destination,
+        "visitors",
+      );
+    });
+
+    const mostVisitedOfficeItems = Array.from(officeVisitMap.values())
+      .sort((left, right) => right.total - left.total || left.label.localeCompare(right.label))
+      .slice(0, 8);
+    const topVisitedOffice = mostVisitedOfficeItems[0] || null;
+    const aiAnalyticsInsights = AIService.generateAnalyticsInsights({
+      topVisitedOffice,
+      mostVisitedOfficeItems,
+      stats,
+      distributionItems,
+      approvalRate,
+      chartPeakLabel,
+      chartPeakValue,
+      attendanceCount: attendanceRecords.length,
+      visitorCount: visitorHistory.length || visitRequests.length,
+    });
     const historyFilters = [
       { key: "all", label: "All" },
       { key: "pending", label: "Pending" },
@@ -8831,6 +9405,84 @@ const loadDashboardData = useCallback(async () => {
               </View>
             </View>
           ))}
+        </View>
+
+        <View style={[styles.analyticsAiCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+          <View style={styles.analyticsAiHeader}>
+            <View style={[styles.analyticsAiIcon, { backgroundColor: isDarkMode ? "#172554" : "#EFF6FF" }]}>
+              <Ionicons name="sparkles-outline" size={22} color={ADMIN_BLUE} />
+            </View>
+            <View style={styles.analyticsAiTitleBlock}>
+              <Text style={[styles.analyticsAiEyebrow, { color: ADMIN_BLUE }]}>AI Analytics Assistant</Text>
+              <Text style={[styles.analyticsAiTitle, { color: theme.textPrimary }]}>Operational insight</Text>
+            </View>
+            <View style={[styles.analyticsAiConfidenceBadge, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
+              <Text style={[styles.analyticsAiConfidenceText, { color: theme.textSecondary }]}>
+                {aiAnalyticsInsights.confidence} confidence
+              </Text>
+            </View>
+          </View>
+
+          <Text style={[styles.analyticsAiSummary, { color: theme.textPrimary }]}>
+            {aiAnalyticsInsights.summary}
+          </Text>
+
+          <View style={styles.analyticsAiGrid}>
+            <View style={[styles.analyticsAiPanel, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
+              <Text style={[styles.analyticsAiPanelTitle, { color: theme.textPrimary }]}>What AI noticed</Text>
+              {aiAnalyticsInsights.observations.map((item, index) => (
+                <View key={`ai-observation-${index}`} style={styles.analyticsAiListItem}>
+                  <View style={[styles.analyticsAiBullet, { backgroundColor: ADMIN_BLUE }]} />
+                  <Text style={[styles.analyticsAiListText, { color: theme.textSecondary }]}>{item}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={[styles.analyticsAiPanel, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
+              <Text style={[styles.analyticsAiPanelTitle, { color: theme.textPrimary }]}>Suggested actions</Text>
+              {aiAnalyticsInsights.actions.map((item, index) => (
+                <View key={`ai-action-${index}`} style={styles.analyticsAiListItem}>
+                  <Ionicons name="checkmark-circle-outline" size={15} color="#10B981" />
+                  <Text style={[styles.analyticsAiListText, { color: theme.textSecondary }]}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.mainStatCard, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor, marginBottom: 20 }]}>
+          <View style={styles.analyticsChartHeader}>
+            <View>
+              <Text style={[styles.distributionTitle, { color: theme.textPrimary, marginBottom: 4 }]}>Most Visited Offices</Text>
+              <Text style={[styles.analyticsChartSubtitle, { color: theme.textSecondary }]}>
+                Compare student, visitor, and staff office traffic from attendance taps and visit records.
+              </Text>
+            </View>
+            <View style={styles.analyticsMiniLegend}>
+              {[
+                { label: "Students", color: "#0A3D91" },
+                { label: "Visitors", color: "#F97316" },
+                { label: "Staff", color: "#7C3AED" },
+              ].map((item) => (
+                <View key={item.label} style={styles.analyticsMiniLegendItem}>
+                  <View style={[styles.analyticsMiniLegendDot, { backgroundColor: item.color }]} />
+                  <Text style={[styles.analyticsMiniLegendText, { color: theme.textSecondary }]}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={[styles.analyticsChartCallout, { backgroundColor: isDarkMode ? "#172554" : "#EFF6FF", borderColor: isDarkMode ? "#041E42" : "#B7D5F6" }]}>
+            <Ionicons name="business-outline" size={18} color={ADMIN_BLUE} />
+            <Text style={[styles.analyticsChartCalloutText, { color: isDarkMode ? "#B7D5F6" : "#1E40AF", flex: 1 }]}>
+              {topVisitedOffice
+                ? `${topVisitedOffice.label} is currently the most visited office with ${topVisitedOffice.total} recorded interaction${topVisitedOffice.total === 1 ? "" : "s"}.`
+                : "No office traffic has been recorded yet."}
+            </Text>
+          </View>
+
+          <View style={[styles.analyticsChartSurface, { backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE", borderColor: theme.borderColor }]}>
+            {renderMostVisitedOfficeChart(mostVisitedOfficeItems)}
+          </View>
         </View>
 
         <View style={[styles.analyticsSplitGrid, width < 1200 && styles.analyticsSplitGridStack]}>
@@ -9847,6 +10499,10 @@ const loadDashboardData = useCallback(async () => {
         return renderAppointmentRecordsContent();
       case "appointment-management":
         return renderAppointmentManagementContent();
+      case "attendance-records":
+        return renderAttendanceRecordsContent();
+      case "analytics":
+        return renderAnalyticsContent();
       case "report-records":
         return renderReportRecordsContent();
       case "security-report-records":
