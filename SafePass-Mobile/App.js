@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { AppState, View, Text, ActivityIndicator, Platform } from "react-native";
+import { AppState, View, Text, ActivityIndicator, Platform, Image } from "react-native";
 import {
   CommonActions,
   DefaultTheme,
@@ -41,6 +41,7 @@ const Storage =
     : require("@react-native-async-storage/async-storage").default;
 
 const Stack = createNativeStackNavigator();
+const SCHOOL_LOGO = require("./assets/LogoSapphire.jpg");
 const AdminDashboardScreen = lazy(() => import("./screens/AdminDashboardScreen"));
 const SecurityDashboardScreen = lazy(() => import("./screens/SecurityDashboardScreen"));
 const VisitorDashboardScreen = lazy(() => import("./screens/VisitorDashboardScreen"));
@@ -140,8 +141,18 @@ const ScreenFallback = () => (
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: brandColors.background,
+      paddingHorizontal: 24,
     }}
   >
+    <Image
+      source={SCHOOL_LOGO}
+      resizeMode="contain"
+      style={{
+        width: 116,
+        height: 54,
+        marginBottom: 18,
+      }}
+    />
     <ActivityIndicator size="large" color={brandColors.blue} />
   </View>
 );
@@ -446,6 +457,33 @@ export default function App() {
             elevation: 4,
           }}
         >
+          <View
+            style={{
+              width: 116,
+              height: 116,
+              borderRadius: 28,
+              backgroundColor: "#FFFFFF",
+              borderWidth: 1,
+              borderColor: "#E2E8F0",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 18,
+              shadowColor: brandColors.text,
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.08,
+              shadowRadius: 18,
+              elevation: 3,
+            }}
+          >
+            <Image
+              source={SCHOOL_LOGO}
+              resizeMode="contain"
+              style={{
+                width: 96,
+                height: 54,
+              }}
+            />
+          </View>
           <Text
             style={{
               fontSize: 24,

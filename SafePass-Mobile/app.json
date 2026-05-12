@@ -7,7 +7,7 @@
     "icon": "./assets/LogoSapphireAppIcon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-screen.png",
+      "image": "./assets/LogoSapphireAppIcon.png",
       "resizeMode": "contain",
       "backgroundColor": "#052044"
     },
