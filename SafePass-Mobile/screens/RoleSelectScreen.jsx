@@ -24,7 +24,7 @@ const isWeb = Platform.OS === "web";
 const platformHighlights = [
   {
     title: "Students",
-    description: "Virtual campus ID, attendance history, tap-in activity, and parent notifications.",
+    description: "Virtual campus ID, attendance history, and tap-in activity.",
     icon: "id-card-outline",
   },
   {

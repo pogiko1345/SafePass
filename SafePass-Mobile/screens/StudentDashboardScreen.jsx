@@ -379,9 +379,6 @@ export default function StudentDashboardScreen({ navigation }) {
   const isCheckedIn = latestTodayAction === "check_in" || Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
   const roleLabel = String(user?.role || "").toLowerCase() === "teacher" ? "Teacher" : "Student";
   const studentName = getStudentName(user);
-  const smsEnabled = Boolean(user?.smsOptIn && user?.guardianPhone);
-  const guardianEmailEnabled = Boolean(user?.guardianEmail);
-  const guardianNoticeEnabled = smsEnabled || guardianEmailEnabled;
   const todayStatus = isCheckedIn
     ? "inside"
     : todayRecord?.checkOutTime
@@ -782,16 +779,12 @@ export default function StudentDashboardScreen({ navigation }) {
   const renderNotificationCard = () => (
     <View style={styles.notificationCard}>
       <View style={styles.notificationIcon}>
-        <Ionicons name="notifications-outline" size={21} color={guardianNoticeEnabled ? BRAND.success : BRAND.muted} />
+        <Ionicons name="shield-checkmark-outline" size={21} color={BRAND.success} />
       </View>
       <View style={styles.notificationCopy}>
-        <Text style={styles.notificationTitle}>School notified on every tap</Text>
+        <Text style={styles.notificationTitle}>Campus monitoring is active</Text>
         <Text style={styles.notificationText}>
-          {guardianEmailEnabled
-            ? `Parent email enabled: ${user.guardianEmail}`
-            : smsEnabled
-              ? `Parent SMS enabled: ${user.guardianPhone}`
-              : "Parent notification is not configured yet."}
+          SafePass records each gate tap for attendance, campus security, and school admin review.
         </Text>
       </View>
     </View>
@@ -926,10 +919,6 @@ export default function StudentDashboardScreen({ navigation }) {
               ["Student ID", user?.studentId || user?.teacherId || "Not assigned"],
               ["Course / Section", formatProfileDetail(user?.course, user?.yearLevel, user?.section)],
               ["NFC Card", user?.nfcCardId || "Virtual mobile check only"],
-              ["Guardian", user?.guardianName || "Not configured"],
-              ["Parent Email", user?.guardianEmail || "Not configured"],
-              ["Guardian Phone", user?.guardianPhone || "Not configured"],
-              ["Parent Alerts", guardianNoticeEnabled ? "Enabled" : "Not configured"],
             ].map(([label, value]) => (
               <View key={label} style={styles.profileRow}>
                 <Text style={styles.profileLabel}>{label}</Text>
@@ -939,7 +928,7 @@ export default function StudentDashboardScreen({ navigation }) {
             <View style={styles.accountNotice}>
               <Ionicons name="information-circle-outline" size={18} color={BRAND.blue} />
               <Text style={styles.accountNoticeText}>
-                Student ID, course, NFC card, and parent contacts are managed by the school office.
+                Student ID, course, and NFC card are managed by the school office.
               </Text>
             </View>
           </>

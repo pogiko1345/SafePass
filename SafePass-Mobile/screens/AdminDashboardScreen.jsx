@@ -489,6 +489,8 @@ const getRoleColor = (role) => {
       return "#1B4F72";
     case "staff":
       return "#2980B9";
+    case "student":
+      return "#0A3D91";
     case "guard":
       return "#E67E22";
     case "security":
@@ -506,6 +508,8 @@ const getRoleIcon = (role) => {
       return "airplane-outline";
     case "staff":
       return "school-outline";
+    case "student":
+      return "id-card-outline";
     case "guard":
       return "shield-outline";
     case "security":
@@ -537,6 +541,7 @@ const sanitizeAccountEmailPart = (value = "") =>
     .replace(/[^a-z0-9]/g, "");
 
 const getAccountEmailRolePart = (form = {}) => {
+  if (String(form.role || "").toLowerCase() === "student") return "student";
   if (isSecurityRole(form.role)) return "security";
   return sanitizeAccountEmailPart(form.department || form.position || "staff") || "staff";
 };
@@ -564,12 +569,13 @@ const generateAccountEmail = (form = {}, users = []) => {
 };
 
 const generateAccountEmployeeId = (form = {}, users = []) => {
-  const prefix = isSecurityRole(form.role) ? "SEC" : "STF";
+  const normalizedRole = String(form.role || "").toLowerCase();
+  const prefix = normalizedRole === "student" ? "STU" : isSecurityRole(form.role) ? "SEC" : "STF";
   const year = new Date().getFullYear();
   const base = `${prefix}-${year}`;
   const existingIds = new Set(
     (users || [])
-      .map((userItem) => String(userItem?.employeeId || "").trim().toUpperCase())
+      .map((userItem) => String(normalizedRole === "student" ? userItem?.studentId : userItem?.employeeId || "").trim().toUpperCase())
       .filter(Boolean),
   );
   let highestSequence = 0;
@@ -1160,10 +1166,14 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     email: "",
     phone: "",
     role,
-    department: role === "security" ? "Security Department" : "Admissions",
-    position: role === "security" ? "Security Personnel" : "Admissions Officer",
+    department: role === "security" ? "Security Department" : role === "student" ? "Student Affairs" : "Admissions",
+    position: role === "security" ? "Security Personnel" : role === "student" ? "Student" : "Admissions Officer",
     shift: "",
     employeeId: "",
+    studentId: "",
+    course: "",
+    yearLevel: "",
+    section: "",
     status: "inactive",
   });
 
@@ -1180,10 +1190,6 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     department: "",
     employeeId: "",
     studentId: "",
-    guardianName: "",
-    guardianEmail: "",
-    guardianPhone: "",
-    smsOptIn: false,
     course: "",
     yearLevel: "",
     section: "",
@@ -3648,14 +3654,20 @@ const loadDashboardData = useCallback(async () => {
     const normalizedEmail = String(newUserData.email || generatedEmail || "").trim().toLowerCase();
     const normalizedUsername = normalizeUsernameInput(newUserData.username);
     const generatedEmployeeId = generateAccountEmployeeId(newUserData, allUsers);
-    const normalizedEmployeeId = String(newUserData.employeeId || generatedEmployeeId || "").trim();
+    const isStudentAccount = String(newUserData.role || "").toLowerCase() === "student";
+    const normalizedEmployeeId = String(newUserData.employeeId || (!isStudentAccount ? generatedEmployeeId : "") || "").trim();
+    const normalizedStudentId = String(newUserData.studentId || (isStudentAccount ? generatedEmployeeId : "") || "").trim();
 
     if (!String(newUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(newUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
-    if (!["staff", "security", "guard"].includes(String(newUserData.role || "").toLowerCase())) {
-      nextErrors.role = "Admin can only create staff or security accounts here.";
+    if (!["staff", "security", "guard", "student"].includes(String(newUserData.role || "").toLowerCase())) {
+      nextErrors.role = "Admin can only create student, staff, or security accounts here.";
     }
-    if (!normalizedEmployeeId) nextErrors.employeeId = "Staff/Security number is required.";
+    if (isStudentAccount) {
+      if (!normalizedStudentId) nextErrors.studentId = "Student ID is required.";
+    } else if (!normalizedEmployeeId) {
+      nextErrors.employeeId = "Staff/Security number is required.";
+    }
     if (!normalizedEmail) nextErrors.email = "Email address is required.";
     if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       nextErrors.email = "Enter a valid email address.";
@@ -3692,6 +3704,14 @@ const loadDashboardData = useCallback(async () => {
         nextErrors.employeeId = "This Staff/Security number is already registered.";
       }
     }
+    if (normalizedStudentId) {
+      const existingStudentId = allUsers.find(
+        (userItem) => String(userItem?.studentId || "").trim().toLowerCase() === normalizedStudentId.toLowerCase(),
+      );
+      if (existingStudentId) {
+        nextErrors.studentId = "This student ID is already registered.";
+      }
+    }
 
     setCreateUserErrors(nextErrors);
     return {
@@ -3700,6 +3720,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedUsername,
       normalizedPhone,
       normalizedEmployeeId,
+      normalizedStudentId,
     };
   };
 
@@ -3720,6 +3741,7 @@ const loadDashboardData = useCallback(async () => {
       email: isCreateEmailManuallyEdited ? currentValue.email : "",
       phone: currentValue.phone,
       employeeId: isCreateEmployeeIdManuallyEdited ? currentValue.employeeId : "",
+      studentId: isCreateEmployeeIdManuallyEdited ? currentValue.studentId : "",
     }));
     setCreateUserErrors({});
     setStaffDropdownOpen(null);
@@ -3823,6 +3845,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedUsername,
       normalizedPhone,
       normalizedEmployeeId,
+      normalizedStudentId,
     } = validateCreateUserForm();
     if (!isValid) {
       Alert.alert("Validation Error", "Please review the highlighted fields before creating the account.");
@@ -3833,6 +3856,7 @@ const loadDashboardData = useCallback(async () => {
 
     try {
       const isSecurityAccount = isSecurityRole(newUserData.role);
+      const isStudentAccount = String(newUserData.role || "").toLowerCase() === "student";
       
       const userPayload = {
         firstName: newUserData.firstName.trim(),
@@ -3846,7 +3870,13 @@ const loadDashboardData = useCallback(async () => {
         isActive: false,
       };
 
-      if (newUserData.role === "staff") {
+      if (isStudentAccount) {
+        delete userPayload.employeeId;
+        userPayload.studentId = normalizedStudentId;
+        userPayload.course = newUserData.course || "";
+        userPayload.yearLevel = newUserData.yearLevel || "";
+        userPayload.section = newUserData.section || "";
+      } else if (newUserData.role === "staff") {
         userPayload.department = newUserData.department || "General";
         userPayload.position = newUserData.position || "Staff Member";
       } else if (newUserData.role === "security" || newUserData.role === "guard") {
@@ -3865,10 +3895,12 @@ const loadDashboardData = useCallback(async () => {
             position: userPayload.position,
             shift: userPayload.shift,
           })
-        : await ApiService.createStaffUser(userPayload);
+        : isStudentAccount
+          ? await ApiService.createStudentUser(userPayload)
+          : await ApiService.createStaffUser(userPayload);
 
       if (response && (response.success || response.user)) {
-        const roleDisplay = isSecurityAccount ? "SECURITY PERSONNEL" : "STAFF MEMBER";
+        const roleDisplay = isSecurityAccount ? "SECURITY PERSONNEL" : isStudentAccount ? "STUDENT" : "STAFF MEMBER";
         const resolvedRole = isSecurityAccount ? "guard" : (response.user?.role || newUserData.role);
         const createdName = `${newUserData.firstName} ${newUserData.lastName}`.trim();
         
@@ -3881,6 +3913,7 @@ const loadDashboardData = useCallback(async () => {
           _id: response.user?._id || response.user?.id || Date.now().toString(),
           createdAt: new Date().toISOString(),
           employeeId: response.user?.employeeId || userPayload.employeeId,
+          studentId: response.user?.studentId || userPayload.studentId,
         };
         
         setAllUsers(prev => [...prev, newUser]);
@@ -3912,7 +3945,7 @@ const loadDashboardData = useCallback(async () => {
           email: normalizedEmail,
           username: newUser.username || "N/A",
           role: roleDisplay,
-          employeeId: response.user?.employeeId || userPayload.employeeId,
+          employeeId: response.user?.studentId || response.user?.employeeId || userPayload.studentId || userPayload.employeeId,
           status: "Pending activation",
           deliveryNote,
         });
@@ -3920,7 +3953,7 @@ const loadDashboardData = useCallback(async () => {
         setCreateUserErrors({});
         publishAdminNotice(
           "success",
-          `${isSecurityAccount ? "Security" : "Staff"} account created`,
+          `${isSecurityAccount ? "Security" : isStudentAccount ? "Student" : "Staff"} account created`,
           `${createdName} was created successfully and can now log in.`,
         );
       } else {
@@ -3959,10 +3992,6 @@ const loadDashboardData = useCallback(async () => {
       shift: userItem.shift || "",
       position: userItem.position || "",
       studentId: userItem.studentId || "",
-      guardianName: userItem.guardianName || "",
-      guardianEmail: userItem.guardianEmail || "",
-      guardianPhone: userItem.guardianPhone || "",
-      smsOptIn: Boolean(userItem.smsOptIn),
       course: userItem.course || "",
       yearLevel: userItem.yearLevel || "",
       section: userItem.section || "",
@@ -4007,7 +4036,6 @@ const loadDashboardData = useCallback(async () => {
     const normalizedEmail = String(editUserData.email || "").trim().toLowerCase();
     const normalizedUsername = normalizeUsernameInput(editUserData.username);
     const normalizedEmployeeId = String(editUserData.employeeId || "").trim().toLowerCase();
-    const normalizedGuardianEmail = String(editUserData.guardianEmail || "").trim().toLowerCase();
     const isEditingSecurity = isSecurityRole(editUserData.role);
     const isEditingStudent = String(editUserData.role || "").toLowerCase() === "student";
 
@@ -4028,16 +4056,6 @@ const loadDashboardData = useCallback(async () => {
 
     if (!isValidPhilippineMobileNumber(editUserData.phone)) {
       Alert.alert("Invalid Contact Number", PHILIPPINE_MOBILE_NUMBER_MESSAGE);
-      return;
-    }
-
-    if (normalizedGuardianEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedGuardianEmail)) {
-      Alert.alert("Invalid Parent Email", "Please enter a valid parent or guardian email address.");
-      return;
-    }
-
-    if (String(editUserData.guardianPhone || "").trim() && !isValidPhilippineMobileNumber(editUserData.guardianPhone)) {
-      Alert.alert("Invalid Parent Phone", PHILIPPINE_MOBILE_NUMBER_MESSAGE);
       return;
     }
 
@@ -4103,12 +4121,6 @@ const loadDashboardData = useCallback(async () => {
 
       if (isEditingStudent) {
         updatePayload.studentId = editUserData.studentId;
-        updatePayload.guardianName = editUserData.guardianName;
-        updatePayload.guardianEmail = normalizedGuardianEmail;
-        updatePayload.guardianPhone = editUserData.guardianPhone
-          ? normalizePhilippineMobileNumber(editUserData.guardianPhone)
-          : "";
-        updatePayload.smsOptIn = Boolean(editUserData.smsOptIn);
         updatePayload.course = editUserData.course;
         updatePayload.yearLevel = editUserData.yearLevel;
         updatePayload.section = editUserData.section;
@@ -10205,7 +10217,7 @@ const loadDashboardData = useCallback(async () => {
                   isDarkMode && styles.darkTextSecondary,
                 ]}
               >
-                Add a staff or security account with a cleaner setup flow and
+                Add a student, staff, or security account with a cleaner setup flow and
                 live preview.
               </Text>
             </View>
@@ -10270,7 +10282,7 @@ const loadDashboardData = useCallback(async () => {
               </View>
 
               <View style={styles.roleCardRow}>
-                {["staff", "security"].map((role) => {
+                {["student", "staff", "security"].map((role) => {
                   const active = newUserData.role === role;
                   return (
                     <TouchableOpacity
@@ -10315,7 +10327,7 @@ const loadDashboardData = useCallback(async () => {
                           isDarkMode && styles.darkText,
                         ]}
                       >
-                        {role === "staff" ? "Staff Member" : "Security Personnel"}
+                        {role === "student" ? "Student" : role === "staff" ? "Staff Member" : "Security Personnel"}
                       </Text>
 
                       <Text
@@ -10324,9 +10336,11 @@ const loadDashboardData = useCallback(async () => {
                           isDarkMode && styles.darkTextSecondary,
                         ]}
                       >
-                        {role === "staff"
-                          ? "Office staff, records, and appointment handling."
-                          : "Checkpoint, access control, and visitor verification."}
+                        {role === "student"
+                          ? "Virtual campus ID and attendance tap access."
+                          : role === "staff"
+                            ? "Office staff, records, and appointment handling."
+                            : "Checkpoint, access control, and visitor verification."}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -10507,12 +10521,92 @@ const loadDashboardData = useCallback(async () => {
                       isDarkMode && styles.darkTextSecondary,
                     ]}
                   >
-                    Assign role-specific work information.
+                    Assign role-specific account information.
                   </Text>
                 </View>
               </View>
 
-              {newUserData.role === "staff" ? (
+              {newUserData.role === "student" ? (
+                <>
+                  <View style={styles.userEditorRow}>
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Student ID</Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          createUserErrors.studentId && styles.inputError,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FBFE",
+                          },
+                        ]}
+                        placeholder={generatedCreateUserEmployeeId}
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.studentId}
+                        onChangeText={(text) => {
+                          setIsCreateEmployeeIdManuallyEdited(true);
+                          setNewUserData((prev) => ({ ...prev, studentId: text }));
+                        }}
+                      />
+                      {renderCreateUserFieldError("studentId")}
+                    </View>
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Course / Program</Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FBFE",
+                          },
+                        ]}
+                        placeholder="Course or program"
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.course}
+                        onChangeText={(text) => setNewUserData((prev) => ({ ...prev, course: text }))}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.userEditorRow}>
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Year Level</Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FBFE",
+                          },
+                        ]}
+                        placeholder="Year level"
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.yearLevel}
+                        onChangeText={(text) => setNewUserData((prev) => ({ ...prev, yearLevel: text }))}
+                      />
+                    </View>
+                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Section</Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          isDarkMode && {
+                            backgroundColor: "#111827",
+                            borderColor: theme.borderColor,
+                            color: "#F8FBFE",
+                          },
+                        ]}
+                        placeholder="Section"
+                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        value={newUserData.section}
+                        onChangeText={(text) => setNewUserData((prev) => ({ ...prev, section: text }))}
+                      />
+                    </View>
+                  </View>
+                </>
+              ) : newUserData.role === "staff" ? (
                 <>
                   <View style={styles.userEditorRow}>
                     {renderStaffDropdown({
@@ -11163,38 +11257,6 @@ const loadDashboardData = useCallback(async () => {
                 </View>
               </View>
 
-              {String(selectedUser?.role || "").toLowerCase() === "student" ? (
-                <View style={styles.userProfileSection}>
-                  <Text style={[styles.userProfileSectionTitle, isDarkMode && styles.darkText]}>Parent Notifications</Text>
-                  <View style={styles.userProfileInfoGrid}>
-                    <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                      <Text style={styles.userProfileInfoLabel}>Guardian</Text>
-                      <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
-                        {selectedUser?.guardianName || "Not configured"}
-                      </Text>
-                    </View>
-                    <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                      <Text style={styles.userProfileInfoLabel}>Parent Email</Text>
-                      <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
-                        {selectedUser?.guardianEmail || "Not configured"}
-                      </Text>
-                    </View>
-                    <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                      <Text style={styles.userProfileInfoLabel}>Parent Phone</Text>
-                      <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
-                        {selectedUser?.guardianPhone || "Not configured"}
-                      </Text>
-                    </View>
-                    <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                      <Text style={styles.userProfileInfoLabel}>SMS Alerts</Text>
-                      <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
-                        {selectedUser?.smsOptIn ? "Enabled" : "Disabled"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ) : null}
-
               <View
                 style={[
                   styles.userProfileCallout,
@@ -11437,7 +11499,7 @@ const loadDashboardData = useCallback(async () => {
 
               {editUserData.role === "student" && (
                 <View style={styles.userEditorSection}>
-                  <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Student & Parent Notifications</Text>
+                  <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Student Details</Text>
                   <View style={styles.userEditorGrid}>
                     <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                       <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Student ID</Text>
@@ -11480,59 +11542,6 @@ const loadDashboardData = useCallback(async () => {
                         placeholder="Section"
                         placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                       />
-                    </View>
-                  </View>
-                  <View style={styles.userEditorGrid}>
-                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent / Guardian Name</Text>
-                      <TextInput
-                        style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                        value={editUserData.guardianName}
-                        onChangeText={(text) => setEditUserData({ ...editUserData, guardianName: text })}
-                        placeholder="Parent or guardian name"
-                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                      />
-                    </View>
-                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email</Text>
-                      <TextInput
-                        style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                        value={editUserData.guardianEmail}
-                        onChangeText={(text) => setEditUserData({ ...editUserData, guardianEmail: text })}
-                        placeholder="parent@email.com"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                      />
-                    </View>
-                  </View>
-                  <View style={styles.userEditorGrid}>
-                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Phone</Text>
-                      <TextInput
-                        style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
-                        value={editUserData.guardianPhone}
-                        onChangeText={(text) => setEditUserData({ ...editUserData, guardianPhone: text })}
-                        placeholder="09123456789"
-                        keyboardType="phone-pad"
-                        maxLength={16}
-                        placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
-                      />
-                    </View>
-                    <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                      <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent SMS</Text>
-                      <TouchableOpacity
-                        style={[
-                          styles.roleOption,
-                          editUserData.smsOptIn && styles.roleOptionActive,
-                          isDarkMode && !editUserData.smsOptIn && { backgroundColor: "#334155", borderColor: "#475569" },
-                        ]}
-                        onPress={() => setEditUserData({ ...editUserData, smsOptIn: !editUserData.smsOptIn })}
-                      >
-                        <Text style={[styles.roleText, editUserData.smsOptIn && styles.roleTextActive, isDarkMode && !editUserData.smsOptIn && { color: "#CBD5E1" }]}>
-                          {editUserData.smsOptIn ? "SMS Enabled" : "Enable SMS Alerts"}
-                        </Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>

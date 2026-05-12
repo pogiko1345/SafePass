@@ -396,6 +396,31 @@ async register(userData) {
     }
   }
 
+  async createStudentUser(studentData) {
+    try {
+      const payload = {
+        ...studentData,
+        role: "student",
+        status: studentData?.status || "inactive",
+        isActive: studentData?.isActive ?? false,
+      };
+      return await this.fetch("/admin/students/create", {
+        method: "POST",
+        body: payload,
+      });
+    } catch (error) {
+      const errorMessage = String(error?.message || "").toLowerCase();
+      const message = errorMessage.includes("username already")
+        ? "Username already registered. Please use another username."
+        : errorMessage.includes("student id already") || errorMessage.includes("studentid")
+          ? "Student ID already registered. Please use another student ID."
+          : errorMessage.includes("email already")
+            ? "Email already registered. Please use another email address."
+            : error?.message || "Failed to create student account";
+      throw new Error(message);
+    }
+  }
+
   async login(email, password) {
     try {
       const response = await this.fetch("/login", {

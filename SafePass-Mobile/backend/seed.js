@@ -35,10 +35,6 @@ const userSchema = new mongoose.Schema({
   nfcCardId: { type: String, unique: true, sparse: true },
   studentId: String,
   employeeId: String,
-  guardianName: String,
-  guardianEmail: String,
-  guardianPhone: String,
-  smsOptIn: { type: Boolean, default: false },
   isActive: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
@@ -168,10 +164,6 @@ const seedDatabase = async () => {
         isActive: true,
         studentId: 'STU-DEMO-001',
         department: 'Aircraft Maintenance',
-        guardianName: 'Ana Student',
-        guardianEmail: 'ana.student@example.com',
-        guardianPhone: '09123456783',
-        smsOptIn: true,
         nfcCardId: `SAFEPASS-STU-${Date.now()}`,
       }
     ];

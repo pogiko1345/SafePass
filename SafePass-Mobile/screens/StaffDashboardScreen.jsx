@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   Platform,
+  StatusBar,
   LayoutAnimation,
   UIManager,
   Animated,

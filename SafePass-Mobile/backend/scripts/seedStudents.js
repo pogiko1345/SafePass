@@ -20,9 +20,6 @@ const studentAccounts = Array.from({ length: 5 }, (_, index) => {
     phone: `0918000000${number}`,
     studentId: `STU-${paddedNumber}`,
     nfcCardId: `SAFEPASS-STUDENT-${paddedNumber}`,
-    guardianName: `Guardian ${number}`,
-    guardianEmail: `guardian${number}@example.com`,
-    guardianPhone: `0919000000${number}`,
     course: "Aircraft Maintenance",
     yearLevel: "1st Year",
     section: `Section ${number}`,
@@ -69,10 +66,6 @@ const upsertStudent = async (account) => {
   user.isVerified = true;
   user.studentId = account.studentId;
   user.nfcCardId = account.nfcCardId;
-  user.guardianName = account.guardianName;
-  user.guardianEmail = account.guardianEmail;
-  user.guardianPhone = account.guardianPhone;
-  user.smsOptIn = true;
   user.course = account.course;
   user.yearLevel = account.yearLevel;
   user.section = account.section;

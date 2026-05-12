@@ -144,6 +144,11 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         icon: "briefcase-outline",
         gradients: ["#0A3D91", "#1C6DD0"],
       },
+      student: {
+        label: "Student Access",
+        icon: "school-outline",
+        gradients: ["#0A3D91", "#1C6DD0"],
+      },
       visitor: {
         label: "Visitor Account",
         icon: "person-outline",
@@ -608,11 +613,12 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
 
   const profileTabs = [
     ["overview", "Overview", "grid-outline"],
-    ["account", "Account", "person-circle-outline"],
-    ["access", "Access", "shield-checkmark-outline"],
-    ["security", "Security", "key-outline"],
-    ["preferences", "Preferences", "options-outline"],
+    ["account", "Details", "person-circle-outline"],
+    ["access", "Card", "shield-checkmark-outline"],
+    ["security", "Password", "key-outline"],
+    ["preferences", "Settings", "options-outline"],
   ];
+  const mobileSectionTabs = profileTabs.filter(([id]) => id !== "overview");
 
   const renderProfileTabs = () =>
     isDesktop ? (
@@ -651,48 +657,57 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
           );
         })}
       </ScrollView>
-    ) : (
-      <View style={[styles.mobileMenuCard, isDarkProfile && styles.darkCard]}>
-        {profileTabs.map(([id, label, icon]) => {
-          const active = tab === id;
-          return (
-            <TouchableOpacity
-              key={id}
-              style={[
-                styles.mobileMenuRow,
-                isDarkProfile && styles.darkPrefRow,
-                active && styles.mobileMenuRowActive,
-                isDarkProfile && active && styles.darkMobileMenuRowActive,
-              ]}
-              onPress={() => setTab(id)}
-              activeOpacity={0.86}
-            >
-              <View style={[styles.mobileMenuIcon, active && styles.mobileMenuIconActive]}>
-                <Ionicons name={icon} size={17} color={active ? "#FFFFFF" : "#64748B"} />
-              </View>
-              <Text
-                style={[
-                  styles.mobileMenuText,
-                  isDarkProfile && styles.darkText,
-                  isDarkProfile && active && styles.darkMobileMenuTextActive,
-                ]}
-              >
-                {label}
-              </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={isDarkProfile && active ? "#FFFFFF" : isDarkProfile ? "#CBD5E1" : "#64748B"}
-              />
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+    ) : null;
+
+  const renderMobileProfileMenu = () => (
+    <View style={[styles.mobileMenuCard, isDarkProfile && styles.darkCard]}>
+      {mobileSectionTabs.map(([id, label, icon], index) => (
+        <TouchableOpacity
+          key={id}
+          style={[
+            styles.mobileMenuRow,
+            isDarkProfile && styles.darkPrefRow,
+            index === mobileSectionTabs.length - 1 && styles.mobileMenuRowLast,
+          ]}
+          onPress={() => setTab(id)}
+          activeOpacity={0.86}
+        >
+          <View style={styles.mobileMenuIcon}>
+            <Ionicons name={icon} size={17} color="#0A3D91" />
+          </View>
+          <Text style={[styles.mobileMenuText, isDarkProfile && styles.darkText]}>
+            {label}
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={isDarkProfile ? "#CBD5E1" : "#64748B"}
+          />
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  const renderMobileSectionHeader = () => {
+    const active = profileTabs.find(([id]) => id === tab);
+    if (!active) return null;
+    return (
+      <TouchableOpacity
+        style={[styles.mobileSectionHeader, isDarkProfile && styles.darkCard]}
+        onPress={() => setTab("overview")}
+        activeOpacity={0.86}
+      >
+        <Ionicons name="chevron-back" size={18} color={isDarkProfile ? "#F8FAFC" : "#0A3D91"} />
+        <Text style={[styles.mobileSectionHeaderText, isDarkProfile && styles.darkText]}>
+          {active[1]}
+        </Text>
+      </TouchableOpacity>
     );
+  };
 
   const renderOverview = () => (
     <View style={styles.stack}>
-      <View style={[styles.grid, isDesktop && styles.gridDesktop]}>
+      <View style={[styles.grid, isDesktop && styles.gridDesktop, !isDesktop && styles.mobileMetricGrid]}>
         {[
           { l: "Profile Status", v: "Complete", h: "Ready for campus access" },
           {
@@ -706,19 +721,29 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
             h: "NFC credential status",
           },
         ].map((item) => (
-          <View key={item.l} style={[styles.metricCard, isDarkProfile && styles.darkCard]}>
-            <Text style={[styles.kicker, isDarkProfile && styles.darkKicker]}>{item.l}</Text>
-            <Text style={[styles.metricValue, isDarkProfile && styles.darkText]}>{item.v}</Text>
-            <Text style={[styles.muted, isDarkProfile && styles.darkMuted]}>{item.h}</Text>
+          <View key={item.l} style={[styles.metricCard, !isDesktop && styles.mobileMetricCard, isDarkProfile && styles.darkCard]}>
+            <Text style={[styles.kicker, !isDesktop && styles.mobileMetricKicker, isDarkProfile && styles.darkKicker]}>
+              {item.l}
+            </Text>
+            <Text style={[styles.metricValue, !isDesktop && styles.mobileMetricValue, isDarkProfile && styles.darkText]}>
+              {item.v}
+            </Text>
+            {isDesktop ? (
+              <Text style={[styles.muted, isDarkProfile && styles.darkMuted]}>{item.h}</Text>
+            ) : null}
           </View>
         ))}
       </View>
-      <View style={themedCardStyle}>
-        <Text style={themedTitleStyle}>Profile Overview</Text>
-        <Text style={themedMutedStyle}>
-          Manage your identity, contact details, photo, access ID, and sign-in preferences from one secure profile.
-        </Text>
-      </View>
+      {isDesktop ? (
+        <View style={themedCardStyle}>
+          <Text style={themedTitleStyle}>Account Summary</Text>
+          <Text style={themedMutedStyle}>
+            Keep your contact details, campus credential, and sign-in settings updated in one place.
+          </Text>
+        </View>
+      ) : (
+        renderMobileProfileMenu()
+      )}
     </View>
   );
 
@@ -958,58 +983,61 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                   isDesktop && isDarkProfile && styles.darkCard,
                 ]}
               >
-                <View style={styles.heroTop}>
+                <View style={[styles.heroTop, !isDesktop && styles.mobileHeroTop]}>
                   <TouchableOpacity
-                    style={[styles.iconBtn, isDesktop && styles.webHeroIconBtn]}
+                    style={[styles.iconBtn, isDesktop && styles.webHeroIconBtn, !isDesktop && styles.mobileIconBtn]}
                     onPress={() => navigation.goBack()}
                   >
                     <Ionicons name="arrow-back" size={20} color={isDesktop && !isDarkProfile ? "#0F172A" : "#FFFFFF"} />
                   </TouchableOpacity>
+                  {!isDesktop ? <Text style={styles.mobileHeroTitle}>Profile</Text> : null}
                   <View style={styles.heroActions}>
                     {!editMode && (
                       <>
+                        {isDesktop ? (
+                          <TouchableOpacity
+                            style={[styles.iconBtn, styles.webHeroIconBtn]}
+                            onPress={shareProfile}
+                          >
+                            <Ionicons
+                              name="share-social-outline"
+                              size={20}
+                              color={isDarkProfile ? "#FFFFFF" : "#0F172A"}
+                            />
+                          </TouchableOpacity>
+                        ) : null}
                         <TouchableOpacity
-                          style={[styles.iconBtn, isDesktop && styles.webHeroIconBtn]}
-                          onPress={shareProfile}
-                        >
-                          <Ionicons
-                            name="share-social-outline"
-                            size={20}
-                            color={isDesktop && !isDarkProfile ? "#0F172A" : "#FFFFFF"}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.editBtn}
+                          style={[styles.editBtn, !isDesktop && styles.mobileEditIconBtn]}
                           onPress={() => setEditMode(true)}
                         >
                           <Ionicons
                             name="create-outline"
-                            size={15}
-                            color="#0F172A"
+                            size={isDesktop ? 15 : 18}
+                            color={isDesktop ? "#0F172A" : "#FFFFFF"}
                           />
-                          <Text style={styles.editBtnText}>Edit</Text>
+                          {isDesktop ? <Text style={styles.editBtnText}>Edit</Text> : null}
                         </TouchableOpacity>
                       </>
                     )}
                   </View>
                 </View>
                 <TouchableOpacity
-                  style={styles.avatarWrap}
+                  style={[styles.avatarWrap, !isDesktop && styles.mobileAvatarWrap]}
                   onPress={handlePhotoPress}
                   activeOpacity={editMode ? 0.85 : 1}
                 >
                   {isUploadingPhoto ? (
-                    <View style={styles.avatar}>
+                    <View style={[styles.avatar, !isDesktop && styles.mobileAvatar]}>
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     </View>
                   ) : currentProfile.profilePhoto ? (
                     <Image
                       source={{ uri: currentProfile.profilePhoto }}
-                      style={styles.avatarImg}
+                      style={[styles.avatarImg, !isDesktop && styles.mobileAvatar]}
                     />
                   ) : (
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>{getInitials()}</Text>
+                    <View style={[styles.avatar, !isDesktop && styles.mobileAvatar]}>
+                      <Text style={[styles.avatarText, !isDesktop && styles.mobileAvatarText]}>{getInitials()}</Text>
                     </View>
                   )}
                   {editMode && (
@@ -1018,15 +1046,15 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     </View>
                   )}
                 </TouchableOpacity>
-                <Text style={[styles.heroKicker, isDesktop && styles.webHeroKicker]}>SafePass Profile</Text>
-                <Text style={[styles.heroName, isDesktop && !isDarkProfile && styles.webHeroName]}>
+                <Text style={[styles.heroKicker, isDesktop && styles.webHeroKicker, !isDesktop && styles.mobileHeroKicker]}>SafePass Profile</Text>
+                <Text style={[styles.heroName, isDesktop && !isDarkProfile && styles.webHeroName, !isDesktop && styles.mobileHeroName]}>
                   {currentProfile.firstName} {currentProfile.lastName}
                 </Text>
                 <View style={styles.rolePill}>
                   <Ionicons name={roleConfig.icon} size={14} color="#0F172A" />
                   <Text style={styles.rolePillText}>{roleConfig.label}</Text>
                 </View>
-                <Text style={[styles.heroSub, isDesktop && !isDarkProfile && styles.webHeroSub]}>{identityLine}</Text>
+                <Text style={[styles.heroSub, isDesktop && !isDarkProfile && styles.webHeroSub, !isDesktop && styles.mobileHeroSub]}>{identityLine}</Text>
               </LinearGradient>
             </View>
             <View style={[styles.shell, isDesktop && styles.shellDesktop]}>
@@ -1051,6 +1079,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                 </View>
               ) : null}
               <View style={[styles.main, isDesktop && styles.mainDesktop]}>
+                {!isDesktop && tab !== "overview" ? renderMobileSectionHeader() : null}
                 {!isDesktop ? renderProfileTabs() : null}
                 {tab === "overview" && renderOverview()}
                 {tab === "account" && renderAccount()}
@@ -1059,16 +1088,20 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                 {tab === "preferences" && renderPreferences()}
               </View>
               <View style={[styles.side, isDesktop && styles.sideDesktop]}>
-                <View style={themedCardStyle}>
-                  <Text style={themedTitleStyle}>Profile Actions</Text>
-                  <Text style={themedMutedStyle}>
-                    Save edits, refresh your account data, update security, or sign out.
-                  </Text>
-                  <View style={styles.actions}>
+                <View style={[themedCardStyle, !isDesktop && styles.mobileActionCard]}>
+                  {isDesktop ? (
+                    <>
+                      <Text style={themedTitleStyle}>Profile Actions</Text>
+                      <Text style={themedMutedStyle}>
+                        Save edits, refresh account data, update security, or sign out.
+                      </Text>
+                    </>
+                  ) : null}
+                  <View style={[styles.actions, !isDesktop && styles.mobileActions]}>
                     {editMode ? (
                       <>
                         <TouchableOpacity
-                          style={styles.primaryBtn}
+                          style={[styles.primaryBtn, !isDesktop && styles.mobilePrimaryAction]}
                           onPress={handleSave}
                           disabled={isSaving}
                         >
@@ -1076,49 +1109,46 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                             <ActivityIndicator size="small" color="#FFFFFF" />
                           ) : (
                             <>
-                              <Ionicons
-                                name="checkmark-circle-outline"
-                                size={18}
-                                color="#FFFFFF"
-                              />
-                              <Text style={styles.primaryBtnText}>
-                                Save Changes
-                              </Text>
+                              <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
+                              <Text style={styles.primaryBtnText}>Save</Text>
                             </>
                           )}
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={[styles.secondaryBtn, isDarkProfile && styles.darkSecondaryBtn]}
+                          style={[styles.secondaryBtn, isDarkProfile && styles.darkSecondaryBtn, !isDesktop && styles.mobileSecondaryAction]}
                           onPress={() => {
                             setEditedProfile(profile);
                             setEditMode(false);
                           }}
                         >
                           <Text style={[styles.secondaryBtnText, isDarkProfile && styles.darkText]}>
-                            Cancel Editing
+                            Cancel
                           </Text>
                         </TouchableOpacity>
                       </>
                     ) : (
                       <>
                         <TouchableOpacity
-                          style={[styles.secondaryBtn, isDarkProfile && styles.darkSecondaryBtn]}
+                          style={[styles.secondaryBtn, isDarkProfile && styles.darkSecondaryBtn, !isDesktop && styles.mobileSecondaryAction]}
                           onPress={() => setTab("security")}
                         >
+                          <Ionicons name="key-outline" size={16} color={isDarkProfile ? "#F8FAFC" : "#334155"} />
                           <Text style={[styles.secondaryBtnText, isDarkProfile && styles.darkText]}>
-                            Change Password
+                            Password
                           </Text>
                         </TouchableOpacity>
+                        {isDesktop ? (
+                          <TouchableOpacity
+                            style={[styles.secondaryBtn, isDarkProfile && styles.darkSecondaryBtn]}
+                            onPress={loadProfile}
+                          >
+                            <Text style={[styles.secondaryBtnText, isDarkProfile && styles.darkText]}>
+                              Refresh Profile
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
                         <TouchableOpacity
-                          style={[styles.secondaryBtn, isDarkProfile && styles.darkSecondaryBtn]}
-                          onPress={loadProfile}
-                        >
-                          <Text style={[styles.secondaryBtnText, isDarkProfile && styles.darkText]}>
-                            Refresh Profile
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.dangerBtn}
+                          style={[styles.dangerBtn, !isDesktop && styles.mobileDangerAction]}
                           onPress={() => setShowLogoutModal(true)}
                           disabled={isLoggingOut}
                         >
@@ -1126,11 +1156,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                             <ActivityIndicator size="small" color="#DC2626" />
                           ) : (
                             <>
-                              <Ionicons
-                                name="log-out-outline"
-                                size={18}
-                                color="#DC2626"
-                              />
+                              <Ionicons name="log-out-outline" size={18} color="#DC2626" />
                               <Text style={styles.dangerBtnText}>Sign Out</Text>
                             </>
                           )}
@@ -1139,6 +1165,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     )}
                   </View>
                 </View>
+                {isDesktop ? (
                 <View style={themedCardStyle}>
                   <Text style={themedTitleStyle}>Account Notes</Text>
                   <View style={styles.note}>
@@ -1165,6 +1192,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                   </View>
                   <Text style={[styles.version, isDarkProfile && styles.darkKicker]}>SafePass v2.1.0</Text>
                 </View>
+                ) : null}
               </View>
             </View>
           </ScrollView>
@@ -1354,9 +1382,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   mobileHero: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    borderRadius: 0,
+    marginHorizontal: 18,
+    marginTop: 10,
+    borderRadius: 24,
   },
   heroGradient: {
     paddingHorizontal: 20,
@@ -1375,17 +1403,29 @@ const styles = StyleSheet.create({
   },
   mobileHeroGradient: {
     paddingHorizontal: 18,
-    paddingTop: Platform.select({ ios: 52, android: 28, web: 28 }),
-    paddingBottom: 22,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
+    paddingTop: Platform.select({ ios: 36, android: 22, web: 22 }),
+    paddingBottom: 18,
+    borderRadius: 24,
+  },
+  mobileHeroTop: {
+    marginBottom: 16,
+  },
+  mobileHeroTitle: {
+    position: "absolute",
+    left: 54,
+    right: 54,
+    textAlign: "center",
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
   heroTop: {
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 18,
   },
   heroActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   iconBtn: {
@@ -1395,6 +1435,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  mobileIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.16)",
   },
   webHeroIconBtn: {
     backgroundColor: "#F8FBFE",
@@ -1412,6 +1458,7 @@ const styles = StyleSheet.create({
   },
   editBtnText: { fontSize: 13, fontWeight: "800", color: "#0F172A" },
   avatarWrap: { position: "relative", marginBottom: 14 },
+  mobileAvatarWrap: { marginBottom: 10 },
   avatarImg: {
     width: 108,
     height: 108,
@@ -1429,7 +1476,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  mobileEditIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  mobileAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
   avatarText: { fontSize: 34, fontWeight: "800", color: "#FFFFFF" },
+  mobileAvatarText: { fontSize: 24 },
   cameraBadge: {
     position: "absolute",
     right: -2,
@@ -1452,6 +1514,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   webHeroKicker: { color: "#0A3D91" },
+  mobileHeroKicker: {
+    fontSize: 10,
+    marginBottom: 4,
+    letterSpacing: 0.8,
+  },
   heroName: {
     fontSize: 30,
     lineHeight: 34,
@@ -1463,6 +1530,11 @@ const styles = StyleSheet.create({
   webHeroName: {
     color: "#0F172A",
     textAlign: "left",
+  },
+  mobileHeroName: {
+    fontSize: 23,
+    lineHeight: 28,
+    marginBottom: 8,
   },
   rolePill: {
     flexDirection: "row",
@@ -1484,6 +1556,10 @@ const styles = StyleSheet.create({
   webHeroSub: {
     color: "#64748B",
     textAlign: "left",
+  },
+  mobileHeroSub: {
+    fontSize: 12,
+    opacity: 0.92,
   },
   shell: { paddingHorizontal: 20, paddingTop: 18, gap: 18 },
   shellDesktop: {
@@ -1534,6 +1610,10 @@ const styles = StyleSheet.create({
   side: { width: "100%", gap: 18 },
   sideDesktop: { flex: 0.85, minWidth: 300 },
   tabs: { gap: 10 },
+  mobileTabs: {
+    gap: 8,
+    paddingBottom: 12,
+  },
   tabBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1548,6 +1628,27 @@ const styles = StyleSheet.create({
   tabBtnActive: { backgroundColor: "#041E42", borderColor: "#041E42" },
   tabText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
   tabTextActive: { color: "#FFFFFF" },
+  mobileTabBtn: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 13,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#DCE6F3",
+  },
+  mobileTabBtnActive: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+  mobileTabText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+  mobileTabTextActive: { color: "#FFFFFF" },
   mobileMenuCard: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -1566,6 +1667,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#EEF2F7",
   },
+  mobileMenuRowLast: { borderBottomWidth: 0 },
   mobileMenuRowActive: {
     backgroundColor: "#EEF5FF",
   },
@@ -1586,9 +1688,31 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#0F172A",
   },
+  mobileSectionHeader: {
+    minHeight: 44,
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#DCE6F3",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    ...shadow,
+  },
+  mobileSectionHeaderText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
   stack: { gap: 18 },
   grid: { gap: 14 },
   gridDesktop: { flexDirection: "row" },
+  mobileMetricGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
   metricCard: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -1597,6 +1721,14 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 18,
     ...shadow,
+  },
+  mobileMetricCard: {
+    minHeight: 82,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
   kicker: {
     fontSize: 11,
@@ -1611,6 +1743,18 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#0F172A",
     marginBottom: 6,
+  },
+  mobileMetricValue: {
+    fontSize: 13,
+    lineHeight: 17,
+    marginBottom: 0,
+    textAlign: "center",
+  },
+  mobileMetricKicker: {
+    fontSize: 10,
+    lineHeight: 13,
+    textAlign: "center",
+    marginBottom: 7,
   },
   muted: { fontSize: 13, lineHeight: 19, color: "#64748B" },
   card: {
@@ -1688,6 +1832,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#111827",
     borderColor: "#334155",
   },
+  mobileOverviewCard: {
+    padding: 16,
+    borderRadius: 18,
+  },
   darkTabBtn: {
     backgroundColor: "#111827",
     borderColor: "#334155",
@@ -1762,6 +1910,23 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   actions: { gap: 12, marginTop: 14 },
+  mobileActionCard: {
+    padding: 12,
+    borderRadius: 18,
+  },
+  mobileActions: {
+    marginTop: 0,
+    flexDirection: "row",
+    gap: 10,
+  },
+  mobilePrimaryAction: { flex: 1 },
+  mobileSecondaryAction: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 7,
+    paddingVertical: 12,
+  },
+  mobileDangerAction: { flex: 1, paddingVertical: 12 },
   primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
