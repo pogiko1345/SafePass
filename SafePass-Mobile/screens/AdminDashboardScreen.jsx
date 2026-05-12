@@ -4814,6 +4814,57 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
+  const handlePrintAttendanceRecords = async (recordsToPrint = scopedAttendanceRecords) => {
+    if (!recordsToPrint.length) {
+      Alert.alert("No Data", "There are no attendance records to print.");
+      return;
+    }
+
+    try {
+      const generatedAt = new Date();
+      const printedBy =
+        `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
+        user?.email ||
+        "Admin User";
+      const selectedScopeLabel =
+        ATTENDANCE_SCOPE_OPTIONS.find((item) => item.key === attendanceScope)?.label || "Attendance";
+      const dateRange = getAttendanceDateRange(attendanceDateShortcut);
+      const rangeLabel = dateRange.dateFrom && dateRange.dateTo
+        ? `${dateRange.dateFrom} to ${dateRange.dateTo}`
+        : "All available dates";
+
+      await printRecordsTable({
+        title: `${selectedScopeLabel} Attendance Records`,
+        subtitle: `Generated from Admin Attendance Records. Range: ${rangeLabel}. Search: ${attendanceSearchTerm || "None"}.`,
+        totalLabel: "attendance rows",
+        dialogTitle: "Print Attendance Records",
+        printedBy,
+        generatedAt,
+        columns: [
+          { key: "name", label: "Name" },
+          { key: "type", label: "Type" },
+          { key: "date", label: "Date" },
+          { key: "checkIn", label: "Check In" },
+          { key: "checkOut", label: "Check Out" },
+          { key: "status", label: "Status" },
+          { key: "location", label: "Location" },
+        ],
+        rows: recordsToPrint.map((record) => ({
+          name: record?.name || "Unnamed",
+          type: titleCaseLabel(record?.userType),
+          date: formatDateInputValue(record?.attendanceDate) || "-",
+          checkIn: formatTime(record?.checkInTime),
+          checkOut: formatTime(record?.checkOutTime),
+          status: titleCaseLabel(record?.status),
+          location: record?.location || record?.checkpointIn || "-",
+        })),
+      });
+    } catch (error) {
+      console.error("Print attendance records error:", error);
+      Alert.alert("Error", "Failed to generate the printable attendance records.");
+    }
+  };
+
   const renderRecordListPrintButton = ({ label = "Print Records", color = "#1C6DD0", onPress, disabled = false }) => (
     <TouchableOpacity
       style={[
@@ -5808,17 +5859,25 @@ const loadDashboardData = useCallback(async () => {
             isDarkMode={isDarkMode}
             theme={theme}
             actions={
-              <TouchableOpacity
-                style={styles.pageRefreshButton}
-                onPress={loadAttendanceRecords}
-                disabled={attendanceLoading}
-              >
-                {attendanceLoading ? (
-                  <ActivityIndicator size="small" color={ADMIN_BLUE} />
-                ) : (
-                  <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
-                )}
-              </TouchableOpacity>
+              <>
+                {renderRecordListPrintButton({
+                  label: "Print Records",
+                  color: ADMIN_BLUE,
+                  disabled: attendanceLoading || scopedAttendanceRecords.length === 0,
+                  onPress: () => handlePrintAttendanceRecords(scopedAttendanceRecords),
+                })}
+                <TouchableOpacity
+                  style={styles.pageRefreshButton}
+                  onPress={loadAttendanceRecords}
+                  disabled={attendanceLoading}
+                >
+                  {attendanceLoading ? (
+                    <ActivityIndicator size="small" color={ADMIN_BLUE} />
+                  ) : (
+                    <Ionicons name="refresh-outline" size={22} color={ADMIN_BLUE} />
+                  )}
+                </TouchableOpacity>
+              </>
             }
           >
             <View style={styles.attendanceToolbar}>
