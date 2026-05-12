@@ -606,6 +606,90 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
 
   if (!currentProfile) return null;
 
+  const profileTabs = [
+    ["overview", "Overview", "grid-outline"],
+    ["account", "Account", "person-circle-outline"],
+    ["access", "Access", "shield-checkmark-outline"],
+    ["security", "Security", "key-outline"],
+    ["preferences", "Preferences", "options-outline"],
+  ];
+
+  const renderProfileTabs = () =>
+    isDesktop ? (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabs}
+      >
+        {profileTabs.map(([id, label, icon]) => {
+          const active = tab === id;
+          return (
+            <TouchableOpacity
+              key={id}
+              style={[
+                styles.tabBtn,
+                isDarkProfile && styles.darkTabBtn,
+                active && styles.tabBtnActive,
+              ]}
+              onPress={() => setTab(id)}
+            >
+              <Ionicons
+                name={icon}
+                size={16}
+                color={active ? "#FFFFFF" : isDarkProfile ? "#CBD5E1" : "#64748B"}
+              />
+              <Text
+                style={[
+                  styles.tabText,
+                  isDarkProfile && styles.darkMuted,
+                  active && styles.tabTextActive,
+                ]}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    ) : (
+      <View style={[styles.mobileMenuCard, isDarkProfile && styles.darkCard]}>
+        {profileTabs.map(([id, label, icon]) => {
+          const active = tab === id;
+          return (
+            <TouchableOpacity
+              key={id}
+              style={[
+                styles.mobileMenuRow,
+                isDarkProfile && styles.darkPrefRow,
+                active && styles.mobileMenuRowActive,
+                isDarkProfile && active && styles.darkMobileMenuRowActive,
+              ]}
+              onPress={() => setTab(id)}
+              activeOpacity={0.86}
+            >
+              <View style={[styles.mobileMenuIcon, active && styles.mobileMenuIconActive]}>
+                <Ionicons name={icon} size={17} color={active ? "#FFFFFF" : "#64748B"} />
+              </View>
+              <Text
+                style={[
+                  styles.mobileMenuText,
+                  isDarkProfile && styles.darkText,
+                  isDarkProfile && active && styles.darkMobileMenuTextActive,
+                ]}
+              >
+                {label}
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={isDarkProfile && active ? "#FFFFFF" : isDarkProfile ? "#CBD5E1" : "#64748B"}
+              />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+
   const renderOverview = () => (
     <View style={styles.stack}>
       <View style={[styles.grid, isDesktop && styles.gridDesktop]}>
@@ -622,31 +706,30 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
             h: "NFC credential status",
           },
         ].map((item) => (
-          <View key={item.l} style={styles.metricCard}>
-            <Text style={styles.kicker}>{item.l}</Text>
-            <Text style={styles.metricValue}>{item.v}</Text>
-            <Text style={styles.muted}>{item.h}</Text>
+          <View key={item.l} style={[styles.metricCard, isDarkProfile && styles.darkCard]}>
+            <Text style={[styles.kicker, isDarkProfile && styles.darkKicker]}>{item.l}</Text>
+            <Text style={[styles.metricValue, isDarkProfile && styles.darkText]}>{item.v}</Text>
+            <Text style={[styles.muted, isDarkProfile && styles.darkMuted]}>{item.h}</Text>
           </View>
         ))}
       </View>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Quick Summary</Text>
-        <Text style={styles.muted}>
-          This profile keeps your identity, contact details, and access
-          credentials in one place for both mobile and web.
+      <View style={themedCardStyle}>
+        <Text style={themedTitleStyle}>Profile Overview</Text>
+        <Text style={themedMutedStyle}>
+          Manage your identity, contact details, photo, access ID, and sign-in preferences from one secure profile.
         </Text>
       </View>
     </View>
   );
 
   const renderAccount = () => (
-    <View style={styles.card}>
+    <View style={themedCardStyle}>
       {infoRows.map(([label, key, editable]) => (
         <View key={key} style={styles.field}>
-          <Text style={styles.kicker}>{label}</Text>
+          <Text style={[styles.kicker, isDarkProfile && styles.darkKicker]}>{label}</Text>
           {editMode && editable ? (
             <TextInput
-              style={styles.input}
+              style={[styles.input, isDarkProfile && styles.darkInputWrap, isDarkProfile && styles.darkInput]}
               value={editedProfile?.[key] || ""}
               onChangeText={(text) =>
                 setEditedProfile((prev) => ({ ...prev, [key]: text }))
@@ -665,7 +748,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
               maxLength={key === "phone" ? 16 : undefined}
             />
           ) : (
-            <Text style={styles.fieldValue}>
+            <Text style={[styles.fieldValue, isDarkProfile && styles.darkText]}>
               {currentProfile?.[key] || "Not set"}
             </Text>
           )}
@@ -685,7 +768,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
           Use this profile as your account reference for campus access services.
         </Text>
       </LinearGradient>
-      <View style={styles.card}>
+      <View style={themedCardStyle}>
         {[
           ["Role", roleConfig.label],
           ["Employee ID", currentProfile.employeeId || "Not assigned"],
@@ -693,8 +776,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
           ["Account Status", "Active"],
         ].map(([label, value]) => (
           <View key={label} style={styles.field}>
-            <Text style={styles.kicker}>{label}</Text>
-            <Text style={styles.fieldValue}>{value}</Text>
+            <Text style={[styles.kicker, isDarkProfile && styles.darkKicker]}>{label}</Text>
+            <Text style={[styles.fieldValue, isDarkProfile && styles.darkText]}>{value}</Text>
           </View>
         ))}
       </View>
@@ -756,7 +839,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
 
   const renderPreferences = () => (
     <View style={themedCardStyle}>
-      <View style={styles.prefRow}>
+      <View style={[styles.prefRow, isDarkProfile && styles.darkPrefRow]}>
         <View style={styles.prefText}>
           <Text style={[styles.prefTitle, isDarkProfile && styles.darkText]}>Push Notifications</Text>
           <Text style={themedMutedStyle}>
@@ -770,7 +853,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
           thumbColor="#FFFFFF"
         />
       </View>
-      <View style={styles.prefRow}>
+      <View style={[styles.prefRow, isDarkProfile && styles.darkPrefRow]}>
         <View style={styles.prefText}>
           <Text style={[styles.prefTitle, isDarkProfile && styles.darkText]}>Biometric Login</Text>
           <Text style={themedMutedStyle}>
@@ -787,7 +870,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
           thumbColor="#FFFFFF"
         />
       </View>
-      <View style={styles.prefRow}>
+      <View style={[styles.prefRow, isDarkProfile && styles.darkPrefRow]}>
         <View style={styles.prefText}>
           <Text style={[styles.prefTitle, isDarkProfile && styles.darkText]}>Dark Mode</Text>
           <Text style={themedMutedStyle}>
@@ -801,7 +884,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
           thumbColor="#FFFFFF"
         />
       </View>
-      <TouchableOpacity style={styles.prefRow} onPress={showLanguagePicker}>
+      <TouchableOpacity style={[styles.prefRow, isDarkProfile && styles.darkPrefRow]} onPress={showLanguagePicker}>
         <View style={styles.prefText}>
           <Text style={[styles.prefTitle, isDarkProfile && styles.darkText]}>Language</Text>
           <Text style={themedMutedStyle}>
@@ -845,31 +928,54 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                 </TouchableOpacity>
               </View>
             )}
-            <View style={styles.hero}>
+            {isDesktop ? (
+              <View style={[styles.webTopBar, isDarkProfile && styles.darkCard]}>
+                <View>
+                  <Text style={[styles.webPageKicker, isDarkProfile && styles.darkKicker]}>My Profile</Text>
+                  <Text style={[styles.webPageTitle, isDarkProfile && styles.darkText]}>SafePass Account</Text>
+                </View>
+                <View style={styles.webTopActions}>
+                  <TouchableOpacity style={[styles.webIconButton, isDarkProfile && styles.darkSecondaryBtn]} onPress={loadProfile}>
+                    <Ionicons name="refresh-outline" size={18} color={isDarkProfile ? "#F8FAFC" : "#0F172A"} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.webEditButton} onPress={() => setEditMode(true)}>
+                    <Text style={styles.webEditButtonText}>Edit</Text>
+                    <Ionicons name="create-outline" size={15} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={[styles.hero, isDesktop ? styles.webHero : styles.mobileHero]}>
               <LinearGradient
-                colors={roleConfig.gradients}
+                colors={isDesktop && !isDarkProfile ? ["#FFFFFF", "#FFFFFF"] : roleConfig.gradients}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.heroGradient}
+                style={[
+                  styles.heroGradient,
+                  isDesktop && styles.webHeroGradient,
+                  !isDesktop && styles.mobileHeroGradient,
+                  isDesktop && isDarkProfile && styles.darkCard,
+                ]}
               >
                 <View style={styles.heroTop}>
                   <TouchableOpacity
-                    style={styles.iconBtn}
+                    style={[styles.iconBtn, isDesktop && styles.webHeroIconBtn]}
                     onPress={() => navigation.goBack()}
                   >
-                    <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                    <Ionicons name="arrow-back" size={20} color={isDesktop && !isDarkProfile ? "#0F172A" : "#FFFFFF"} />
                   </TouchableOpacity>
                   <View style={styles.heroActions}>
                     {!editMode && (
                       <>
                         <TouchableOpacity
-                          style={styles.iconBtn}
+                          style={[styles.iconBtn, isDesktop && styles.webHeroIconBtn]}
                           onPress={shareProfile}
                         >
                           <Ionicons
                             name="share-social-outline"
                             size={20}
-                            color="#FFFFFF"
+                            color={isDesktop && !isDarkProfile ? "#0F172A" : "#FFFFFF"}
                           />
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -912,55 +1018,40 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     </View>
                   )}
                 </TouchableOpacity>
-                <Text style={styles.heroKicker}>SafePass Profile</Text>
-                <Text style={styles.heroName}>
+                <Text style={[styles.heroKicker, isDesktop && styles.webHeroKicker]}>SafePass Profile</Text>
+                <Text style={[styles.heroName, isDesktop && !isDarkProfile && styles.webHeroName]}>
                   {currentProfile.firstName} {currentProfile.lastName}
                 </Text>
                 <View style={styles.rolePill}>
                   <Ionicons name={roleConfig.icon} size={14} color="#0F172A" />
                   <Text style={styles.rolePillText}>{roleConfig.label}</Text>
                 </View>
-                <Text style={styles.heroSub}>{identityLine}</Text>
+                <Text style={[styles.heroSub, isDesktop && !isDarkProfile && styles.webHeroSub]}>{identityLine}</Text>
               </LinearGradient>
             </View>
             <View style={[styles.shell, isDesktop && styles.shellDesktop]}>
-              <View style={[styles.main, isDesktop && styles.mainDesktop]}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.tabs}
-                >
-                  {[
-                    ["overview", "Overview", "grid-outline"],
-                    ["account", "Account", "person-circle-outline"],
-                    ["access", "Access", "shield-checkmark-outline"],
-                    ["security", "Security", "key-outline"],
-                    ["preferences", "Preferences", "options-outline"],
-                  ].map(([id, label, icon]) => {
+              {isDesktop ? (
+                <View style={[styles.webSidebar, isDarkProfile && styles.darkCard]}>
+                  <Text style={[styles.webSidebarBrand, isDarkProfile && styles.darkText]}>SafePass</Text>
+                  {profileTabs.map(([id, label, icon]) => {
                     const active = tab === id;
                     return (
                       <TouchableOpacity
                         key={id}
-                        style={[styles.tabBtn, active && styles.tabBtnActive]}
+                        style={[styles.webSidebarItem, active && styles.webSidebarItemActive]}
                         onPress={() => setTab(id)}
                       >
-                        <Ionicons
-                          name={icon}
-                          size={16}
-                          color={active ? "#FFFFFF" : "#64748B"}
-                        />
-                        <Text
-                          style={[
-                            styles.tabText,
-                            active && styles.tabTextActive,
-                          ]}
-                        >
+                        <Ionicons name={icon} size={16} color={active ? "#FFFFFF" : isDarkProfile ? "#CBD5E1" : "#475569"} />
+                        <Text style={[styles.webSidebarText, isDarkProfile && styles.darkMuted, active && styles.webSidebarTextActive]}>
                           {label}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
-                </ScrollView>
+                </View>
+              ) : null}
+              <View style={[styles.main, isDesktop && styles.mainDesktop]}>
+                {!isDesktop ? renderProfileTabs() : null}
                 {tab === "overview" && renderOverview()}
                 {tab === "account" && renderAccount()}
                 {tab === "access" && renderAccess()}
@@ -968,10 +1059,10 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                 {tab === "preferences" && renderPreferences()}
               </View>
               <View style={[styles.side, isDesktop && styles.sideDesktop]}>
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Session Tools</Text>
-                  <Text style={styles.muted}>
-                    Manage edits, sync your profile, or sign out securely.
+                <View style={themedCardStyle}>
+                  <Text style={themedTitleStyle}>Profile Actions</Text>
+                  <Text style={themedMutedStyle}>
+                    Save edits, refresh your account data, update security, or sign out.
                   </Text>
                   <View style={styles.actions}>
                     {editMode ? (
@@ -997,13 +1088,13 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                           )}
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={styles.secondaryBtn}
+                          style={[styles.secondaryBtn, isDarkProfile && styles.darkSecondaryBtn]}
                           onPress={() => {
                             setEditedProfile(profile);
                             setEditMode(false);
                           }}
                         >
-                          <Text style={styles.secondaryBtnText}>
+                          <Text style={[styles.secondaryBtnText, isDarkProfile && styles.darkText]}>
                             Cancel Editing
                           </Text>
                         </TouchableOpacity>
@@ -1011,18 +1102,18 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     ) : (
                       <>
                         <TouchableOpacity
-                          style={styles.secondaryBtn}
+                          style={[styles.secondaryBtn, isDarkProfile && styles.darkSecondaryBtn]}
                           onPress={() => setTab("security")}
                         >
-                          <Text style={styles.secondaryBtnText}>
+                          <Text style={[styles.secondaryBtnText, isDarkProfile && styles.darkText]}>
                             Change Password
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={styles.secondaryBtn}
+                          style={[styles.secondaryBtn, isDarkProfile && styles.darkSecondaryBtn]}
                           onPress={loadProfile}
                         >
-                          <Text style={styles.secondaryBtnText}>
+                          <Text style={[styles.secondaryBtnText, isDarkProfile && styles.darkText]}>
                             Refresh Profile
                           </Text>
                         </TouchableOpacity>
@@ -1048,15 +1139,15 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     )}
                   </View>
                 </View>
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Account Notes</Text>
+                <View style={themedCardStyle}>
+                  <Text style={themedTitleStyle}>Account Notes</Text>
                   <View style={styles.note}>
                     <Ionicons
                       name="checkmark-circle-outline"
                       size={18}
                       color="#0A3D91"
                     />
-                    <Text style={styles.noteText}>
+                    <Text style={[styles.noteText, isDarkProfile && styles.darkMuted]}>
                       Keep your contact details updated for smoother account
                       recovery.
                     </Text>
@@ -1067,12 +1158,12 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                       size={18}
                       color="#0A3D91"
                     />
-                    <Text style={styles.noteText}>
+                    <Text style={[styles.noteText, isDarkProfile && styles.darkMuted]}>
                       Your mobile and web layouts now use the same responsive
                       profile structure.
                     </Text>
                   </View>
-                  <Text style={styles.version}>SafePass v2.1.0</Text>
+                  <Text style={[styles.version, isDarkProfile && styles.darkKicker]}>SafePass v2.1.0</Text>
                 </View>
               </View>
             </View>
@@ -1086,17 +1177,17 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         onRequestClose={() => setShowLogoutModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Sign Out</Text>
-            <Text style={styles.modalText}>
+          <View style={[styles.modalCard, isDarkProfile && styles.darkCard]}>
+            <Text style={[styles.modalTitle, isDarkProfile && styles.darkText]}>Sign Out</Text>
+            <Text style={[styles.modalText, isDarkProfile && styles.darkMuted]}>
               Would you like to sign out?
             </Text>
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={styles.modalSecondary}
+                style={[styles.modalSecondary, isDarkProfile && styles.darkSecondaryBtn]}
                 onPress={() => setShowLogoutModal(false)}
               >
-                <Text style={styles.modalSecondaryText}>Stay Signed In</Text>
+                <Text style={[styles.modalSecondaryText, isDarkProfile && styles.darkText]}>Stay Signed In</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalPrimary}
@@ -1197,6 +1288,57 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   cacheAction: { fontSize: 12, fontWeight: "800", color: "#041E42" },
+  webTopBar: {
+    maxWidth: 1280,
+    width: "100%",
+    alignSelf: "center",
+    marginTop: 18,
+    marginBottom: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    ...shadow,
+  },
+  webPageKicker: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0A3D91",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  webPageTitle: {
+    marginTop: 2,
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  webTopActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  webIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  webEditButton: {
+    minHeight: 42,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "#0A3D91",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  webEditButtonText: { fontSize: 13, fontWeight: "900", color: "#FFFFFF" },
   hero: {
     marginHorizontal: 20,
     marginTop: 18,
@@ -1204,11 +1346,39 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...shadow,
   },
+  webHero: {
+    maxWidth: 1280,
+    width: "100%",
+    alignSelf: "center",
+    marginTop: 0,
+    borderRadius: 18,
+  },
+  mobileHero: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderRadius: 0,
+  },
   heroGradient: {
     paddingHorizontal: 20,
     paddingTop: Platform.select({ ios: 56, android: 28, web: 28 }),
     paddingBottom: 24,
     alignItems: "center",
+  },
+  webHeroGradient: {
+    minHeight: 122,
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    alignItems: "flex-start",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+  },
+  mobileHeroGradient: {
+    paddingHorizontal: 18,
+    paddingTop: Platform.select({ ios: 52, android: 28, web: 28 }),
+    paddingBottom: 22,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
   },
   heroTop: {
     width: "100%",
@@ -1225,6 +1395,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  webHeroIconBtn: {
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
   editBtn: {
     flexDirection: "row",
@@ -1276,6 +1451,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.3,
     marginBottom: 6,
   },
+  webHeroKicker: { color: "#0A3D91" },
   heroName: {
     fontSize: 30,
     lineHeight: 34,
@@ -1283,6 +1459,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#FFFFFF",
     marginBottom: 10,
+  },
+  webHeroName: {
+    color: "#0F172A",
+    textAlign: "left",
   },
   rolePill: {
     flexDirection: "row",
@@ -1301,6 +1481,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     textAlign: "center",
   },
+  webHeroSub: {
+    color: "#64748B",
+    textAlign: "left",
+  },
   shell: { paddingHorizontal: 20, paddingTop: 18, gap: 18 },
   shellDesktop: {
     flexDirection: "row",
@@ -1308,6 +1492,42 @@ const styles = StyleSheet.create({
     maxWidth: 1280,
     alignSelf: "center",
     width: "100%",
+  },
+  webSidebar: {
+    width: 210,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 22,
+    padding: 14,
+    gap: 6,
+    ...shadow,
+  },
+  webSidebarBrand: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#0A3D91",
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  webSidebarItem: {
+    minHeight: 42,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  webSidebarItemActive: {
+    backgroundColor: "#0A3D91",
+  },
+  webSidebarText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#475569",
+  },
+  webSidebarTextActive: {
+    color: "#FFFFFF",
   },
   main: { width: "100%" },
   mainDesktop: { flex: 1.45, minWidth: 0 },
@@ -1328,6 +1548,44 @@ const styles = StyleSheet.create({
   tabBtnActive: { backgroundColor: "#041E42", borderColor: "#041E42" },
   tabText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
   tabTextActive: { color: "#FFFFFF" },
+  mobileMenuCard: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    overflow: "hidden",
+    marginBottom: 16,
+    ...shadow,
+  },
+  mobileMenuRow: {
+    minHeight: 52,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+  mobileMenuRowActive: {
+    backgroundColor: "#EEF5FF",
+  },
+  mobileMenuIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mobileMenuIconActive: {
+    backgroundColor: "#0A3D91",
+  },
+  mobileMenuText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
   stack: { gap: 18 },
   grid: { gap: 14 },
   gridDesktop: { flexDirection: "row" },
@@ -1429,6 +1687,24 @@ const styles = StyleSheet.create({
   darkInfoCard: {
     backgroundColor: "#111827",
     borderColor: "#334155",
+  },
+  darkTabBtn: {
+    backgroundColor: "#111827",
+    borderColor: "#334155",
+  },
+  darkSecondaryBtn: {
+    backgroundColor: "#111827",
+    borderColor: "#334155",
+  },
+  darkPrefRow: {
+    borderBottomColor: "#1F2A3A",
+  },
+  darkMobileMenuRowActive: {
+    backgroundColor: "#0A3D91",
+    borderBottomColor: "#0A3D91",
+  },
+  darkMobileMenuTextActive: {
+    color: "#FFFFFF",
   },
   securityNoteCard: {
     flexDirection: "row",

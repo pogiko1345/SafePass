@@ -840,6 +840,39 @@ const appendAttendanceCheckpoint = (attendanceRecord, tapLocation, action, times
   });
 };
 
+const calculateAttendanceDurationMinutes = (checkpointHistory = [], fallbackEnd = new Date()) => {
+  const sortedHistory = [...(Array.isArray(checkpointHistory) ? checkpointHistory : [])]
+    .filter((item) => item?.action === "check_in" || item?.action === "check_out")
+    .sort((left, right) => new Date(left.tappedAt || 0) - new Date(right.tappedAt || 0));
+
+  let openCheckIn = null;
+  let totalMinutes = 0;
+
+  sortedHistory.forEach((item) => {
+    const tappedAt = new Date(item.tappedAt || 0);
+    if (Number.isNaN(tappedAt.getTime())) return;
+
+    if (item.action === "check_in") {
+      openCheckIn = tappedAt;
+      return;
+    }
+
+    if (item.action === "check_out" && openCheckIn) {
+      totalMinutes += Math.max(0, Math.round((tappedAt.getTime() - openCheckIn.getTime()) / 60000));
+      openCheckIn = null;
+    }
+  });
+
+  if (openCheckIn) {
+    const endTime = new Date(fallbackEnd);
+    if (!Number.isNaN(endTime.getTime())) {
+      totalMinutes += Math.max(0, Math.round((endTime.getTime() - openCheckIn.getTime()) / 60000));
+    }
+  }
+
+  return totalMinutes;
+};
+
 const upsertAttendanceRecordForTap = async ({
   user = null,
   visitor = null,
@@ -885,7 +918,7 @@ const upsertAttendanceRecordForTap = async ({
   attendanceRecord.sourceDeviceId = deviceId || attendanceRecord.sourceDeviceId || "";
   appendAttendanceCheckpoint(attendanceRecord, tapLocation, action, timestamp);
 
-  if (action === "check_in" && !attendanceRecord.checkInTime) {
+  if (action === "check_in") {
     const basePayload = buildAttendanceBasePayload({
       user,
       visitor,
@@ -896,13 +929,16 @@ const upsertAttendanceRecordForTap = async ({
       deviceId,
       timestamp,
     });
-    Object.assign(attendanceRecord, {
-      checkInTime: timestamp,
-      checkpointIn: basePayload.checkpointIn,
-      status: basePayload.status,
-      isLate: basePayload.isLate,
-      lateMinutes: basePayload.lateMinutes,
-    });
+    if (!attendanceRecord.checkInTime) {
+      attendanceRecord.checkInTime = timestamp;
+      attendanceRecord.checkpointIn = basePayload.checkpointIn;
+      attendanceRecord.isLate = basePayload.isLate;
+      attendanceRecord.lateMinutes = basePayload.lateMinutes;
+    }
+    attendanceRecord.checkOutTime = null;
+    attendanceRecord.checkpointOut = "";
+    attendanceRecord.isCompleted = false;
+    attendanceRecord.status = visitor ? "inside" : basePayload.status === "late" ? "late" : "inside";
   }
 
   if (action === "check_out") {
@@ -910,14 +946,16 @@ const upsertAttendanceRecordForTap = async ({
     attendanceRecord.checkpointOut = tapLocation?.checkpointId || tapLocation?.office || "";
     attendanceRecord.isCompleted = true;
     attendanceRecord.status = normalizedRole === "visitor" ? "completed" : "checked_out";
-    attendanceRecord.sessionDurationMinutes = attendanceRecord.checkInTime
-      ? Math.max(0, Math.round((timestamp.getTime() - attendanceRecord.checkInTime.getTime()) / 60000))
-      : attendanceRecord.sessionDurationMinutes;
   }
 
   if (action === "location_update" && normalizedRole === "visitor") {
     attendanceRecord.status = attendanceRecord.checkOutTime ? "completed" : "inside";
   }
+
+  attendanceRecord.sessionDurationMinutes = calculateAttendanceDurationMinutes(
+    attendanceRecord.checkpointHistory,
+    timestamp,
+  );
 
   await attendanceRecord.save();
   return attendanceRecord;
@@ -1066,6 +1104,64 @@ const sendStudentGuardianAttendanceEmail = async ({ user, action, timestamp, sta
   ].join("\n");
 
   return sendEmail(guardianEmail, subject, body);
+};
+
+const sendStudentCampusTapNotifications = async ({
+  user,
+  action,
+  timestamp,
+  status,
+  tapLocation = {},
+  attendanceRecord = null,
+  deviceId = "",
+}) => {
+  const normalizedRole = normalizeUserRoleValue(user?.role);
+  if (normalizedRole !== "student" || !["check_in", "check_out"].includes(action)) {
+    return [];
+  }
+
+  const isCheckIn = action === "check_in";
+  const studentName = getFullName(user) || user?.email || "Student";
+  const locationLabel = tapLocation?.office || "campus checkpoint";
+  const activityType = isCheckIn ? "student_check_in" : "student_check_out";
+  const results = await Promise.allSettled([
+    sendStudentGuardianAttendanceSms({
+      user,
+      action,
+      timestamp,
+      status,
+    }),
+    sendStudentGuardianAttendanceEmail({
+      user,
+      action,
+      timestamp,
+      status,
+    }),
+    createRoleNotification({
+      title: isCheckIn ? "Student Entered Campus" : "Student Left Campus",
+      message: `${studentName} ${isCheckIn ? "entered" : "left"} campus at ${locationLabel}.`,
+      targetRole: "security",
+      relatedUser: user._id,
+      type: "info",
+      severity: isCheckIn ? "medium" : "low",
+      metadata: {
+        activityType,
+        action,
+        status,
+        tapLocation,
+        deviceId,
+        attendanceRecordId: attendanceRecord?._id || null,
+      },
+    }),
+  ]);
+
+  results.forEach((result) => {
+    if (result.status === "rejected") {
+      console.error("Student campus tap notification error:", result.reason);
+    }
+  });
+
+  return results;
 };
 
 // ========== ENHANCED CORS CONFIGURATION ==========
@@ -2596,14 +2692,15 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         notes: `${userDisplayName} ${action.replace("_", " ")} by NFC at ${tapLocation.office}`,
       });
 
-      if (normalizedUserRole === "student" && (action === "check_in" || action === "check_out")) {
-        await sendStudentGuardianAttendanceSms({
-          user: cardUser,
-          action,
-          timestamp: now,
-          status: attendanceRecord.status,
-        });
-      }
+      await sendStudentCampusTapNotifications({
+        user: cardUser,
+        action,
+        timestamp: now,
+        status: attendanceRecord.status,
+        tapLocation,
+        attendanceRecord,
+        deviceId,
+      });
 
       return res.json({
         success: true,
@@ -3074,14 +3171,15 @@ app.post(
           notes: `${operatorName} recorded ${userDisplayName} ${action.replace("_", " ")} at ${tapLocation.office}.`,
         });
 
-        if (normalizedUserRole === "student" && (action === "check_in" || action === "check_out")) {
-          await sendStudentGuardianAttendanceSms({
-            user: cardUser,
-            action,
-            timestamp: now,
-            status: attendanceRecord.status,
-          });
-        }
+        await sendStudentCampusTapNotifications({
+          user: cardUser,
+          action,
+          timestamp: now,
+          status: attendanceRecord.status,
+          tapLocation,
+          attendanceRecord,
+          deviceId,
+        });
 
         return res.json({
           success: true,
@@ -3759,10 +3857,10 @@ const formatDepartmentLabel = (value = "") =>
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
 const APPOINTMENT_SLOT_LIMIT = DEFAULT_APPOINTMENT_SLOT_LIMIT || 2;
-const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted", "rescheduled"];
+const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted", "adjustment_pending", "rescheduled"];
 const APPOINTMENT_PURPOSE_OPTIONS = DEFAULT_APPOINTMENT_PURPOSE_OPTIONS;
 const APPOINTMENT_DEPARTMENT_OPTIONS = DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS;
-const ACCOUNT_ROLE_OPTIONS = ["admin", "staff", "security", "guard", "visitor"];
+const ACCOUNT_ROLE_OPTIONS = ["admin", "staff", "security", "guard", "visitor", "student", "teacher"];
 const ACCOUNT_STATUS_OPTIONS = ["active", "inactive", "pending", "suspended"];
 
 const normalizeOptionValue = (value = "") =>
@@ -4034,6 +4132,39 @@ const getVisitorAccountPayload = (user = {}) => ({
   registeredAt: user.createdAt,
 });
 
+const getVisitorCardAccessAreas = (visitor = {}) => {
+  const areas = [
+    "main_gate",
+    "security_gate",
+    visitor.assignedOffice,
+    visitor.appointmentDepartment,
+    visitor.currentDestination?.office,
+  ];
+
+  return Array.from(
+    new Set(
+      areas
+        .map((area) => String(area || "").trim())
+        .filter(Boolean),
+    ),
+  );
+};
+
+const getVisitorCardTimeRestrictions = (visitor = {}) => {
+  const checkInWindow = getAppointmentCheckInWindow(visitor);
+  if (!checkInWindow?.scheduledAt || !checkInWindow?.graceUntil) return [];
+
+  return [
+    {
+      type: "appointment_window",
+      startsAt: checkInWindow.scheduledAt,
+      endsAt: checkInWindow.graceUntil,
+      visitDate: visitor.visitDate || null,
+      visitTime: visitor.visitTime || null,
+    },
+  ];
+};
+
 const activateVisitorSafePassCardForUser = async (user, visitor = {}) => {
   if (!user) return "";
 
@@ -4048,9 +4179,9 @@ const activateVisitorSafePassCardForUser = async (user, visitor = {}) => {
     user.visitorId = visitor._id;
   }
   user.accessPermissions = {
-    canAccess: user.accessPermissions?.canAccess || [],
+    canAccess: getVisitorCardAccessAreas(visitor),
     restrictedAreas: user.accessPermissions?.restrictedAreas || [],
-    timeRestrictions: user.accessPermissions?.timeRestrictions || [],
+    timeRestrictions: getVisitorCardTimeRestrictions(visitor),
     cardActive: true,
   };
 
@@ -4945,6 +5076,7 @@ const userData = {
   studentId: studentId || undefined,
   teacherId: teacherId || undefined,
   guardianName: String(req.body.guardianName || "").trim(),
+  guardianEmail: normalizeEmailValue(req.body.guardianEmail || ""),
   guardianPhone: normalizePhoneValue(req.body.guardianPhone || ""),
   smsOptIn: Boolean(req.body.smsOptIn),
   course: String(req.body.course || "").trim(),
@@ -8121,22 +8253,15 @@ app.post("/api/my-attendance/tap", authMiddleware, async (req, res) => {
       notes: `${userName} used ${isStaffVirtualCard ? "the staff virtual NFC card" : "mobile self check"} to ${action.replace("_", " ")}.`,
     });
 
-    if (normalizedRole === "student") {
-      await Promise.allSettled([
-        sendStudentGuardianAttendanceSms({
-          user: req.user,
-          action,
-          timestamp: now,
-          status: attendanceRecord.status,
-        }),
-        sendStudentGuardianAttendanceEmail({
-          user: req.user,
-          action,
-          timestamp: now,
-          status: attendanceRecord.status,
-        }),
-      ]);
-    }
+    await sendStudentCampusTapNotifications({
+      user: req.user,
+      action,
+      timestamp: now,
+      status: attendanceRecord.status,
+      tapLocation,
+      attendanceRecord,
+      deviceId: source,
+    });
 
     res.json({
       success: true,
@@ -9550,7 +9675,7 @@ const canVisitorManageAppointment = (visitor = {}) => {
   if (["checked_in", "checked_out", "expired", "no_show", "rejected", "cancelled"].includes(visitStatus)) return false;
   if (visitor.visitExpiredAt || visitor.noShowMarkedAt) return false;
   if (visitor.appointmentCompletedAt) return false;
-  return ["pending", "approved", "adjusted", "rescheduled"].includes(appointmentStatus);
+  return ["pending", "approved", "adjusted", "adjustment_pending", "rescheduled"].includes(appointmentStatus);
 };
 
 const isLatestVisitorAppointment = async (visitor = {}) => {
@@ -9561,6 +9686,125 @@ const isLatestVisitorAppointment = async (visitor = {}) => {
   const latestVisitor = getPrioritizedVisitor(visitorRecords);
   return Boolean(latestVisitor && isSameObjectId(latestVisitor._id, visitor._id));
 };
+
+app.put("/api/visitors/:id/appointment/accept-adjustment", authMiddleware, async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (!isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only confirm your own appointment.",
+      });
+    }
+
+    await applyAppointmentLifecycleIfNeeded(visitor);
+
+    if (String(visitor.appointmentStatus || "").toLowerCase() !== "adjustment_pending") {
+      return res.status(400).json({
+        success: false,
+        message: "There is no staff proposed schedule waiting for confirmation.",
+      });
+    }
+
+    if (!(await isLatestVisitorAppointment(visitor))) {
+      return res.status(400).json({
+        success: false,
+        message: "Only your latest appointment request can be confirmed.",
+      });
+    }
+
+    const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
+    visitor.acceptStaffAdjustment(req.user);
+    await visitor.save();
+
+    if (visitorUser) {
+      await activateVisitorSafePassCardForUser(visitorUser, visitor);
+    }
+
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+
+    await Promise.all([
+      createRoleNotification({
+        title: "Adjusted Appointment Confirmed",
+        message: `${visitor.fullName} accepted the staff proposed appointment for ${visitSchedule}.`,
+        type: "success",
+        severity: "low",
+        targetRole: "staff",
+        targetUser: visitor.assignedStaff || null,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_accepted_staff_adjustment",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+        },
+      }),
+      createRoleNotification({
+        title: "Visitor Appointment Confirmed",
+        message: `${visitor.fullName} confirmed the adjusted visit for ${visitSchedule}.`,
+        type: "success",
+        severity: "low",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_accepted_staff_adjustment",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+        },
+      }),
+      createRoleNotification({
+        title: "Visitor Appointment Confirmed",
+        message: `${visitor.fullName} confirmed the adjusted visit for ${visitSchedule}.`,
+        type: "success",
+        severity: "low",
+        targetRole: "admin",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_accepted_staff_adjustment",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+        },
+      }),
+    ]);
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "visitor_accepted_staff_adjustment",
+      status: "granted",
+      location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment Request",
+      notes: `${visitor.fullName} accepted the adjusted appointment for ${visitSchedule}.`,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
+    const [updatedVisitorPayload] = await attachSafePassIdsToVisitors([updatedVisitor]);
+
+    res.json({
+      success: true,
+      message: "Appointment confirmed. Your virtual SafePass card is now scheduled for that visit window.",
+      visitor: updatedVisitorPayload,
+    });
+  } catch (error) {
+    console.error("Accept staff adjustment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to confirm adjusted appointment.",
+    });
+  }
+});
 
 app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, res) => {
   try {
@@ -9649,6 +9893,8 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
     const originalVisitDate = visitor.visitDate;
     const originalVisitTime = visitor.visitTime;
     const wasApproved = ["approved", "adjusted"].includes(String(visitor.appointmentStatus || "").toLowerCase());
+    const wasStaffAdjustmentPending =
+      String(visitor.appointmentStatus || "").toLowerCase() === "adjustment_pending";
     const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
 
     visitor.rescheduleAppointmentByVisitor(req.user, {
@@ -9790,6 +10036,27 @@ app.put("/api/visitors/:id/appointment/cancel", authMiddleware, async (req, res)
       return res.status(400).json({
         success: false,
         message: "This appointment can no longer be cancelled.",
+      });
+    }
+
+    if (wasStaffAdjustmentPending && visitor.assignedStaff) {
+      await createRoleNotification({
+        title: "Staff Proposal Not Accepted",
+        message: `${visitor.fullName} requested a different schedule instead of accepting ${originalSchedule}. New request: ${newSchedule}.`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "staff",
+        targetUser: visitor.assignedStaff,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_declined_staff_adjustment",
+          originalVisitDate,
+          originalVisitTime,
+          newVisitDate: visitor.visitDate,
+          newVisitTime: visitor.visitTime,
+          reason,
+        },
       });
     }
 
@@ -10008,9 +10275,6 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
     await visitor.save();
 
     let visitorUser = await User.findOne({ email: visitor.email });
-    if (visitorUser) {
-      await activateVisitorSafePassCardForUser(visitorUser, visitor);
-    }
     const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     const updatedVisitor = await Visitor.findById(visitor._id)
       .populate("assignedStaff", "firstName lastName email department")
@@ -10035,7 +10299,7 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
     if (visitorUser) {
       await createRoleNotification({
         title: "Your Appointment Is Approved",
-        message: `Your visit on ${visitSchedule} has been approved. Please provide internet before going to the site.`,
+        message: `Your visit on ${visitSchedule} has been approved. Your virtual SafePass card will work during your scheduled visit window.`,
         type: "success",
         severity: "low",
         targetRole: "visitor",
@@ -10050,7 +10314,7 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
 
     await createRoleNotification({
       title: "Appointment Approved",
-      message: `${visitor.fullName}'s appointment for ${visitSchedule} has been approved and recorded.`,
+      message: `${visitor.fullName}'s appointment for ${visitSchedule} has been approved. Their virtual SafePass card is limited to the scheduled visit window and assigned destination.`,
       type: "success",
       severity: "low",
       targetRole: "admin",
@@ -10198,8 +10462,8 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     const [updatedVisitorPayload] = await attachSafePassIdsToVisitors([updatedVisitor]);
 
     await createRoleNotification({
-      title: "Appointment Time Adjusted",
-      message: `${getFullName(req.user)} adjusted ${visitor.fullName}'s appointment to ${visitSchedule}.`,
+      title: "Appointment Time Proposed",
+      message: `${getFullName(req.user)} proposed ${visitSchedule} for ${visitor.fullName}. Waiting for visitor confirmation.`,
       type: "warning",
       severity: "medium",
       targetRole: "security",
@@ -10215,8 +10479,8 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
 
     if (visitorUser) {
       await createRoleNotification({
-        title: "Appointment Time Updated",
-        message: `Your appointment was adjusted to ${visitSchedule}. Please provide internet before going to the site.`,
+        title: "Staff Proposed A New Time",
+        message: `Staff proposed ${visitSchedule}. Tap check if it works for you, or choose another schedule if it does not.`,
         type: "warning",
         severity: "medium",
         targetRole: "visitor",
@@ -10231,8 +10495,8 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     }
 
     await createRoleNotification({
-      title: "Appointment Time Adjusted",
-      message: `${visitor.fullName}'s appointment has been updated to ${visitSchedule}.`,
+      title: "Appointment Time Proposed",
+      message: `${visitor.fullName}'s appointment has a staff proposed time for ${visitSchedule}. Waiting for visitor confirmation.`,
       type: "warning",
       severity: "medium",
       targetRole: "admin",
@@ -11335,6 +11599,58 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       }
     }
 
+    if (updates.guardianName !== undefined) {
+      updates.guardianName = String(updates.guardianName || "").trim();
+    }
+
+    if (updates.guardianEmail !== undefined) {
+      updates.guardianEmail = normalizeEmailValue(updates.guardianEmail);
+      if (updates.guardianEmail && !isValidEmailValue(updates.guardianEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid parent or guardian email address.",
+          field: "guardianEmail",
+        });
+      }
+    }
+
+    if (updates.guardianPhone !== undefined) {
+      updates.guardianPhone = normalizePhoneValue(updates.guardianPhone);
+      if (updates.guardianPhone && !isValidPhoneValue(updates.guardianPhone)) {
+        return res.status(400).json({
+          success: false,
+          message: PHONE_VALIDATION_MESSAGE,
+          field: "guardianPhone",
+        });
+      }
+    }
+
+    if (updates.smsOptIn !== undefined) {
+      updates.smsOptIn = updates.smsOptIn === true;
+    }
+
+    if (updates.studentId !== undefined) {
+      const normalizedStudentId = String(updates.studentId || "").trim();
+      if (!normalizedStudentId) {
+        delete updates.studentId;
+      } else {
+        const studentIdConflict = await User.findOne({
+          studentId: normalizedStudentId,
+          _id: { $ne: req.params.id },
+        });
+
+        if (studentIdConflict) {
+          return res.status(400).json({
+            success: false,
+            message: "Student ID already registered",
+            field: "studentId",
+          });
+        }
+
+        updates.studentId = normalizedStudentId;
+      }
+    }
+
     if (updates.role !== undefined) {
       updates.role = String(updates.role || "").toLowerCase().trim();
       if (!ACCOUNT_ROLE_OPTIONS.includes(updates.role)) {
@@ -11364,6 +11680,18 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
 
     if (updates.position !== undefined) {
       updates.position = String(updates.position || "").trim();
+    }
+
+    if (updates.course !== undefined) {
+      updates.course = String(updates.course || "").trim();
+    }
+
+    if (updates.yearLevel !== undefined) {
+      updates.yearLevel = String(updates.yearLevel || "").trim();
+    }
+
+    if (updates.section !== undefined) {
+      updates.section = String(updates.section || "").trim();
     }
 
     if (updates.username !== undefined) {

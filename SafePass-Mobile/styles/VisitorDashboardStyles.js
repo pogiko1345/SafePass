@@ -4867,6 +4867,495 @@ export default StyleSheet.create({
     color: "#64748B",
   },
 
+  mobileSlotPickerCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#DDE7F3",
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    gap: 14,
+  },
+
+  mobileSlotPickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  mobileSlotPickerHint: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  mobileDateChipRow: {
+    gap: 10,
+    paddingVertical: 2,
+  },
+
+  mobileDateChip: {
+    width: 54,
+    minHeight: 58,
+    borderRadius: 18,
+    backgroundColor: "#F3F8FF",
+    borderWidth: 1,
+    borderColor: "#E2EAF4",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+  },
+
+  mobileDateChipSelected: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+
+  mobileDateChipMonth: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+
+  mobileDateChipDay: {
+    marginTop: 2,
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  mobileDateChipTextSelected: {
+    color: "#FFFFFF",
+  },
+
+  mobileCalendarCard: {
+    borderRadius: 18,
+    backgroundColor: "#F8FBFF",
+    borderWidth: 1,
+    borderColor: "#E2EAF4",
+    padding: 12,
+    gap: 10,
+  },
+
+  mobileCalendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  mobileCalendarMonth: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  mobileCalendarNav: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  mobileCalendarNavButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#EAF3FF",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mobileWeekdayRow: {
+    flexDirection: "row",
+  },
+
+  mobileWeekdayText: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#64748B",
+  },
+
+  mobileCalendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+
+  mobileCalendarDay: {
+    width: "14.285%",
+    aspectRatio: 1,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mobileCalendarDaySelected: {
+    backgroundColor: "#0A3D91",
+  },
+
+  mobileCalendarDayDisabled: {
+    opacity: 0.28,
+  },
+
+  mobileCalendarDayText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  mobileCalendarDayTextSelected: {
+    color: "#FFFFFF",
+  },
+
+  mobileCalendarDayTextDisabled: {
+    color: "#94A3B8",
+  },
+
+  mobileCalendarHolidayDot: {
+    position: "absolute",
+    bottom: 5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#DC2626",
+  },
+
+  mobileTimeGroupList: {
+    gap: 13,
+  },
+
+  mobileTimeGroup: {
+    gap: 8,
+  },
+
+  mobileTimeGroupLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  mobileTimeSlotGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  mobileTimeSlotButton: {
+    width: "31%",
+    minHeight: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D8E2EE",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+
+  mobileTimeSlotButtonUnavailable: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FDE2E2",
+  },
+
+  mobileTimeSlotButtonSelected: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+
+  mobileTimeSlotText: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+
+  mobileTimeSlotTextUnavailable: {
+    color: "#9CA3AF",
+  },
+
+  mobileTimeSlotTextSelected: {
+    color: "#FFFFFF",
+  },
+
+  mobileSlotLegendRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+
+  mobileSlotLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  mobileSlotLegendDot: {
+    width: 13,
+    height: 13,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    backgroundColor: "#FFFFFF",
+  },
+
+  mobileSlotLegendUnavailable: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+
+  mobileSlotLegendSelected: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+
+  mobileSlotLegendText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  mobileSelectedSlotRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+
+  mobileSelectedSlotLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  mobileSelectedSlotValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  webDateTimePanel: {
+    flexDirection: "row",
+    gap: 18,
+    borderRadius: 22,
+    backgroundColor: "#063D36",
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    ...Platform.select({
+      web: { boxShadow: "0px 18px 44px rgba(6,61,54,0.2)" },
+    }),
+  },
+
+  webCalendarPane: {
+    flex: 0.9,
+    minWidth: 300,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    padding: 16,
+  },
+
+  webCalendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+
+  webCalendarMonth: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  webCalendarNav: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  webCalendarNavButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+
+  webWeekdayRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+
+  webWeekdayText: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#DBEAFE",
+  },
+
+  webCalendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+
+  webCalendarDay: {
+    width: "14.285%",
+    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+  },
+
+  webCalendarDaySelected: {
+    backgroundColor: "#0EA5E9",
+  },
+
+  webCalendarDayDisabled: {
+    opacity: 0.32,
+  },
+
+  webCalendarDayText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  webCalendarDayTextSelected: {
+    color: "#FFFFFF",
+  },
+
+  webCalendarDayTextDisabled: {
+    color: "#94A3B8",
+  },
+
+  webTimePane: {
+    flex: 1.15,
+    minWidth: 360,
+    gap: 16,
+  },
+
+  webTimeHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  webTimeTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  webTimeSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#A7F3D0",
+  },
+
+  webTimeGroups: {
+    gap: 14,
+  },
+
+  webTimeGroup: {
+    gap: 9,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+
+  webTimeGroupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  webTimeGroupTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  webTimeSlotGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  webTimeSlotButton: {
+    minWidth: 86,
+    minHeight: 38,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+
+  webTimeSlotButtonUnavailable: {
+    backgroundColor: "rgba(254,242,242,0.18)",
+    opacity: 0.55,
+  },
+
+  webTimeSlotButtonSelected: {
+    backgroundColor: "#0EA5E9",
+  },
+
+  webTimeSlotText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  webTimeSlotTextUnavailable: {
+    color: "#CBD5E1",
+  },
+
+  webTimeSlotTextSelected: {
+    color: "#FFFFFF",
+  },
+
+  webSelectedSlotBar: {
+    marginTop: "auto",
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  webSelectedSlotLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#A7F3D0",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  webSelectedSlotValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
   appointmentPickerField: {
     flexDirection: "row",
     alignItems: "center",
@@ -6119,6 +6608,109 @@ export default StyleSheet.create({
     fontWeight: "600",
   },
 
+  visitorMapToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+
+  visitorMapToolbarCopy: {
+    flex: 1,
+  },
+
+  visitorMapToolbarTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 2,
+  },
+
+  visitorMapToolbarText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+
+  visitorMapFullscreenButton: {
+    minHeight: 40,
+    borderRadius: 14,
+    backgroundColor: "#0A3D91",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 14,
+  },
+
+  visitorMapFullscreenButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  visitorMapFullscreenModal: {
+    flex: 1,
+    backgroundColor: "#F8FBFE",
+  },
+
+  visitorMapFullscreenHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#D9E4F2",
+    backgroundColor: "#FFFFFF",
+  },
+
+  visitorMapFullscreenTitleWrap: {
+    flex: 1,
+  },
+
+  visitorMapFullscreenEyebrow: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#0A3D91",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+
+  visitorMapFullscreenTitle: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  visitorMapMinimizeButton: {
+    minHeight: 40,
+    borderRadius: 14,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+  },
+
+  visitorMapMinimizeButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+
+  visitorMapFullscreenBody: {
+    flex: 1,
+    padding: 10,
+  },
+
   visitorMapActionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -6701,8 +7293,42 @@ export default StyleSheet.create({
     borderColor: "#243244",
   },
 
+  darkSegmentBar: {
+    backgroundColor: "#0B1524",
+    borderColor: "#243244",
+  },
+
+  darkSegmentButton: {
+    backgroundColor: "#111C2E",
+    borderColor: "#2B3B52",
+  },
+
+  darkActionButton: {
+    backgroundColor: "#111C2E",
+    borderColor: "#2B3B52",
+  },
+
+  darkReadablePill: {
+    backgroundColor: "#18243A",
+    borderColor: "#334155",
+  },
+
+  darkDisabledPill: {
+    backgroundColor: "#1E293B",
+    borderColor: "#334155",
+    opacity: 1,
+  },
+
+  darkDisabledText: {
+    color: "#CBD5E1",
+  },
+
   darkMiniBrandHeader: {
     borderColor: "#243244",
+  },
+
+  darkMiniBrandHeaderWrap: {
+    backgroundColor: "#07111F",
   },
 
   darkPrimaryText: {
@@ -6711,6 +7337,29 @@ export default StyleSheet.create({
 
   darkMutedText: {
     color: "#CBD5E1",
+  },
+
+  darkKickerText: {
+    color: "#94A3B8",
+  },
+
+  darkFormControl: {
+    backgroundColor: "#0B1524",
+    borderColor: "#2B3B52",
+  },
+
+  darkDropdownMenu: {
+    backgroundColor: "#0F172A",
+    borderColor: "#2B3B52",
+  },
+
+  darkOptionItem: {
+    borderBottomColor: "#243244",
+  },
+
+  darkUploadCard: {
+    backgroundColor: "#0B1524",
+    borderColor: "#334155",
   },
 
   darkDividerBorder: {

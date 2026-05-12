@@ -20,6 +20,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -177,6 +178,8 @@ const getStatusMeta = (status) => {
       return { color: "#0A3D91", background: "#EEF5FF", label: "Approved" };
     case "adjusted":
       return { color: "#D97706", background: "#FEF3C7", label: "Adjusted" };
+    case "adjustment_pending":
+      return { color: "#7C3AED", background: "#F3E8FF", label: "Waiting Visitor" };
     case "rescheduled":
       return { color: "#D97706", background: "#FEF3C7", label: "Rescheduled" };
     case "cancelled":
@@ -362,6 +365,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [notifications, setNotifications] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [mobileTab, setMobileTab] = useState("dashboard");
+  const [mobileDarkModeEnabled, setMobileDarkModeEnabled] = useState(false);
   const [filter, setFilter] = useState("pending");
   const [expandedModule, setExpandedModule] = useState("home");
   const [selectedSubmodule, setSelectedSubmodule] = useState("home");
@@ -393,6 +397,19 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [detailAppointment, setDetailAppointment] = useState(null);
+
+  useEffect(() => {
+    const loadMobileTheme = async () => {
+      try {
+        const savedDarkMode = await AsyncStorage.getItem("darkModeEnabled");
+        setMobileDarkModeEnabled(savedDarkMode === "true");
+      } catch (error) {
+        console.log("Staff dark mode preference unavailable:", error?.message || error);
+      }
+    };
+
+    loadMobileTheme();
+  }, []);
   const itemsPerPage = 5;
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -540,7 +557,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const appointmentRecords = useMemo(
     () =>
       appointments.filter((item) =>
-        ["approved", "adjusted", "completed", "rejected"].includes(getAppointmentStatus(item)),
+        ["approved", "adjusted", "adjustment_pending", "completed", "rejected"].includes(getAppointmentStatus(item)),
       ),
     [appointments],
   );
@@ -2727,23 +2744,23 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         { label: "Today", value: todaysSchedule.length, icon: "today-outline", color: BRAND.blue },
         { label: "Inside", value: checkedInNowCount, icon: "walk-outline", color: BRAND.success },
       ].map((item) => (
-        <View key={item.label} style={staffMobileStyles.statCard}>
+        <View key={item.label} style={[staffMobileStyles.statCard, mobileDarkModeEnabled && staffMobileStyles.darkCard]}>
           <Ionicons name={item.icon} size={18} color={item.color} />
-          <Text style={staffMobileStyles.statValue}>{item.value}</Text>
-          <Text style={staffMobileStyles.statLabel}>{item.label}</Text>
+          <Text style={[staffMobileStyles.statValue, mobileDarkModeEnabled && staffMobileStyles.darkPrimaryText]}>{item.value}</Text>
+          <Text style={[staffMobileStyles.statLabel, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]}>{item.label}</Text>
         </View>
       ))}
     </View>
   );
 
   const renderMobileFocusPanel = () => (
-    <View style={staffMobileStyles.focusPanel}>
+    <View style={[staffMobileStyles.focusPanel, mobileDarkModeEnabled && staffMobileStyles.darkCard]}>
       <View style={[staffMobileStyles.focusIcon, { backgroundColor: `${staffMobileFocusState.color}16` }]}>
         <Ionicons name={staffMobileFocusState.icon} size={19} color={staffMobileFocusState.color} />
       </View>
       <View style={staffMobileStyles.focusCopy}>
-        <Text style={staffMobileStyles.focusTitle}>{staffMobileFocusState.title}</Text>
-        <Text style={staffMobileStyles.focusText}>{staffMobileFocusState.message}</Text>
+        <Text style={[staffMobileStyles.focusTitle, mobileDarkModeEnabled && staffMobileStyles.darkPrimaryText]}>{staffMobileFocusState.title}</Text>
+        <Text style={[staffMobileStyles.focusText, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]}>{staffMobileFocusState.message}</Text>
       </View>
       <TouchableOpacity
         style={staffMobileStyles.focusAction}
@@ -2767,7 +2784,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     return (
       <TouchableOpacity
         key={appointment._id}
-        style={staffMobileStyles.appointmentCard}
+        style={[staffMobileStyles.appointmentCard, mobileDarkModeEnabled && staffMobileStyles.darkCard]}
         onPress={() => setDetailAppointment(appointment)}
         activeOpacity={0.82}
       >
@@ -2776,10 +2793,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Ionicons name="person-outline" size={20} color={BRAND.blue} />
           </View>
           <View style={staffMobileStyles.appointmentMain}>
-            <Text style={staffMobileStyles.appointmentName} numberOfLines={1}>
+            <Text style={[staffMobileStyles.appointmentName, mobileDarkModeEnabled && staffMobileStyles.darkPrimaryText]} numberOfLines={1}>
               {appointment.fullName || "Visitor"}
             </Text>
-            <Text style={staffMobileStyles.appointmentPurpose} numberOfLines={2}>
+            <Text style={[staffMobileStyles.appointmentPurpose, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]} numberOfLines={2}>
               {appointment.purposeOfVisit || "No visit purpose provided"}
             </Text>
           </View>
@@ -2787,17 +2804,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </View>
 
         <View style={staffMobileStyles.metaRow}>
-          <View style={staffMobileStyles.metaPill}>
+          <View style={[staffMobileStyles.metaPill, mobileDarkModeEnabled && staffMobileStyles.darkPill]}>
             <Ionicons name="calendar-outline" size={14} color="#64748B" />
-            <Text style={staffMobileStyles.metaPillText}>{formatDate(appointment.visitDate)}</Text>
+            <Text style={[staffMobileStyles.metaPillText, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]}>{formatDate(appointment.visitDate)}</Text>
           </View>
-          <View style={staffMobileStyles.metaPill}>
+          <View style={[staffMobileStyles.metaPill, mobileDarkModeEnabled && staffMobileStyles.darkPill]}>
             <Ionicons name="time-outline" size={14} color="#64748B" />
-            <Text style={staffMobileStyles.metaPillText}>{formatTime(appointment.visitTime)}</Text>
+            <Text style={[staffMobileStyles.metaPillText, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]}>{formatTime(appointment.visitTime)}</Text>
           </View>
-          <View style={staffMobileStyles.metaPill}>
+          <View style={[staffMobileStyles.metaPill, mobileDarkModeEnabled && staffMobileStyles.darkPill]}>
             <Ionicons name="business-outline" size={14} color="#64748B" />
-            <Text style={staffMobileStyles.metaPillText} numberOfLines={1}>
+            <Text style={[staffMobileStyles.metaPillText, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]} numberOfLines={1}>
               {appointment.appointmentDepartment || appointment.assignedOffice || user?.department || "Office"}
             </Text>
           </View>
@@ -2876,7 +2893,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       </View>
 
       <View style={staffMobileStyles.sectionHeader}>
-        <Text style={staffMobileStyles.sectionTitle}>Today&apos;s Visitors</Text>
+        <Text style={[staffMobileStyles.sectionTitle, mobileDarkModeEnabled && staffMobileStyles.darkPrimaryText]}>Today&apos;s Visitors</Text>
         <TouchableOpacity onPress={() => setMobileTab("visitors")}>
           <Text style={staffMobileStyles.sectionLink}>View all</Text>
         </TouchableOpacity>
@@ -2884,7 +2901,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       {todaysSchedule.length ? (
         todaysSchedule.slice(0, 3).map((appointment) => renderMobileAppointmentCard(appointment, "visitor"))
       ) : (
-        <MobileEmptyState icon="calendar-outline" title="No visitors today" message="Approved visitors for today will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="calendar-outline" title="No visitors today" message="Approved visitors for today will appear here." />
       )}
     </>
   );
@@ -2896,17 +2913,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         <Text style={staffMobileStyles.compactSubtitle}>Approve, reject, or adjust incoming visitor requests.</Text>
       </View>
       <View style={staffMobileStyles.toolbar}>
-        <MobileSearchField
+        <MobileSearchField dark={mobileDarkModeEnabled}
           value={requestSearchTerm}
           onChangeText={setRequestSearchTerm}
           placeholder="Search visitor, office, purpose..."
         />
-        <MobileFilterChips options={requestFilterOptions} value={requestFilter} onChange={setRequestFilter} />
+        <MobileFilterChips dark={mobileDarkModeEnabled} options={requestFilterOptions} value={requestFilter} onChange={setRequestFilter} />
       </View>
       {filteredRequestAppointments.length ? (
         filteredRequestAppointments.slice(0, 30).map((appointment) => renderMobileAppointmentCard(appointment, "request"))
       ) : (
-        <MobileEmptyState icon="mail-open-outline" title="No matching requests" message="New appointment requests assigned to your office will show here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="mail-open-outline" title="No matching requests" message="New appointment requests assigned to your office will show here." />
       )}
     </>
   );
@@ -2920,7 +2937,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       {todaysSchedule.length ? (
         todaysSchedule.map((appointment) => renderMobileAppointmentCard(appointment, "visitor"))
       ) : (
-        <MobileEmptyState icon="people-outline" title="No scheduled visitors" message="Approved visitors scheduled for today will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="people-outline" title="No scheduled visitors" message="Approved visitors scheduled for today will appear here." />
       )}
     </>
   );
@@ -2934,12 +2951,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </Text>
       </View>
       <View style={staffMobileStyles.toolbar}>
-        <MobileSearchField
+        <MobileSearchField dark={mobileDarkModeEnabled}
           value={recordSearchTerm}
           onChangeText={setRecordSearchTerm}
           placeholder="Search appointment history..."
         />
-        <MobileFilterChips options={historyFilterOptions} value={filter} onChange={setFilter} />
+        <MobileFilterChips dark={mobileDarkModeEnabled} options={historyFilterOptions} value={filter} onChange={setFilter} />
       </View>
       {mobileHistoryAppointments.length ? (
         <>
@@ -2952,7 +2969,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             .map((appointment) => renderMobileAppointmentCard(appointment, "history"))}
         </>
       ) : (
-        <MobileEmptyState icon="archive-outline" title="No history found" message="Try a different search or status filter." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="archive-outline" title="No history found" message="Try a different search or status filter." />
       )}
     </>
   );
@@ -2969,23 +2986,23 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           return (
             <TouchableOpacity
               key={notification._id}
-              style={staffMobileStyles.notificationCard}
+              style={[staffMobileStyles.notificationCard, mobileDarkModeEnabled && staffMobileStyles.darkCard]}
               onPress={() => handleNotificationPress(notification)}
             >
               <View style={[staffMobileStyles.notificationIcon, { backgroundColor: `${meta.accent}16` }]}>
                 <Ionicons name={meta.icon} size={18} color={meta.accent} />
               </View>
               <View style={staffMobileStyles.notificationCopy}>
-                <Text style={staffMobileStyles.notificationTitle}>{notification.title || meta.label}</Text>
-                <Text style={staffMobileStyles.notificationMessage} numberOfLines={2}>{notification.message || "No message provided."}</Text>
-                <Text style={staffMobileStyles.notificationTime}>{formatRelativeTime(notification.createdAt)}</Text>
+                <Text style={[staffMobileStyles.notificationTitle, mobileDarkModeEnabled && staffMobileStyles.darkPrimaryText]}>{notification.title || meta.label}</Text>
+                <Text style={[staffMobileStyles.notificationMessage, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]} numberOfLines={2}>{notification.message || "No message provided."}</Text>
+                <Text style={[staffMobileStyles.notificationTime, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]}>{formatRelativeTime(notification.createdAt)}</Text>
               </View>
               {!isNotificationRead(notification) ? <View style={staffMobileStyles.notificationUnreadDot} /> : null}
             </TouchableOpacity>
           );
         })
       ) : (
-        <MobileEmptyState icon="notifications-off-outline" title="No notifications" message="Staff notifications will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="notifications-off-outline" title="No notifications" message="Staff notifications will appear here." />
       )}
     </>
   );
@@ -3040,7 +3057,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             </TouchableOpacity>
           </View>
         </View>
-        <View style={staffMobileStyles.profileCard}>
+        <View style={[staffMobileStyles.profileCard, mobileDarkModeEnabled && staffMobileStyles.darkCard]}>
           <View style={staffMobileStyles.profileTop}>
             <TouchableOpacity
               style={staffMobileStyles.profileAvatar}
@@ -3059,8 +3076,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               ) : null}
             </TouchableOpacity>
             <View style={staffMobileStyles.profileCopy}>
-              <Text style={staffMobileStyles.profileName}>{profileName}</Text>
-              <Text style={staffMobileStyles.profileRole}>Staff Panel</Text>
+              <Text style={[staffMobileStyles.profileName, mobileDarkModeEnabled && staffMobileStyles.darkPrimaryText]}>{profileName}</Text>
+              <Text style={[staffMobileStyles.profileRole, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]}>Staff Panel</Text>
             </View>
           </View>
           {isEditingProfile ? (
@@ -3101,7 +3118,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             ))
           )}
         </View>
-        <TouchableOpacity style={staffMobileStyles.logoutFullButton} onPress={handleLogout}>
+        <TouchableOpacity style={[staffMobileStyles.logoutFullButton, mobileDarkModeEnabled && staffMobileStyles.darkDangerButton]} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={18} color="#DC2626" />
           <Text style={staffMobileStyles.logoutFullButtonText}>Sign Out</Text>
         </TouchableOpacity>
@@ -3211,16 +3228,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                 : renderMobileDashboard();
 
     return (
-      <SafeAreaView style={staffMobileStyles.safeArea}>
+      <SafeAreaView style={[staffMobileStyles.safeArea, mobileDarkModeEnabled && staffMobileStyles.darkSafeArea]}>
+        <StatusBar barStyle={mobileDarkModeEnabled ? "light-content" : "dark-content"} backgroundColor={mobileDarkModeEnabled ? "#07111F" : BRAND.page} />
         <ScrollView
-          style={staffMobileStyles.scroll}
+          style={[staffMobileStyles.scroll, mobileDarkModeEnabled && staffMobileStyles.darkSafeArea]}
           contentContainerStyle={staffMobileStyles.content}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BRAND.blue} />}
         >
           {content}
         </ScrollView>
-        <MobileBottomNav tabs={staffMobileTabs} activeTab={mobileTab} onChange={setMobileTab} />
+        <MobileBottomNav dark={mobileDarkModeEnabled} tabs={staffMobileTabs} activeTab={mobileTab} onChange={setMobileTab} />
         {renderMobileDetailModal()}
         {renderMobileLogoutModal()}
       </SafeAreaView>
@@ -3229,7 +3247,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   if (loading) {
     return isPhoneLayout ? (
-      <MobileLoadingState message="Loading staff appointments..." />
+      <MobileLoadingState dark={mobileDarkModeEnabled} message="Loading staff appointments..." />
     ) : (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0A3D91" />
@@ -4222,5 +4240,26 @@ const staffMobileStyles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "800",
     color: BRAND.ink,
+  },
+  darkSafeArea: {
+    backgroundColor: "#07111F",
+  },
+  darkCard: {
+    backgroundColor: "#0F172A",
+    borderColor: "#243244",
+  },
+  darkPill: {
+    backgroundColor: "#18243A",
+    borderColor: "#334155",
+  },
+  darkPrimaryText: {
+    color: "#F8FAFC",
+  },
+  darkMutedText: {
+    color: "#CBD5E1",
+  },
+  darkDangerButton: {
+    backgroundColor: "#1E1118",
+    borderColor: "#7F1D1D",
   },
 });

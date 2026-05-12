@@ -117,8 +117,15 @@ const CampusMap = ({
   const clampPan = (pan, scale = mapScaleRef.current) => {
     const mapWidth = mapSizeRef.current.width || width || 320;
     const mapHeight = mapSizeRef.current.height || 500;
-    const limitX = Math.max(0, (mapWidth * (scale - 1)) / 2);
-    const limitY = Math.max(0, (mapHeight * (scale - 1)) / 2);
+    const expandedMapWidth = mapWidth * (fullscreen ? 1.6 : 1);
+    const expandedMapHeight = fullscreen
+      ? Math.max(
+          mapHeight,
+          expandedMapWidth / (FLOOR_BLUEPRINT_ASPECT_RATIOS[activeFloor] || 940 / 280),
+        )
+      : mapHeight;
+    const limitX = Math.max(0, (expandedMapWidth * scale - mapWidth) / 2);
+    const limitY = Math.max(0, (expandedMapHeight * scale - mapHeight) / 2);
 
     return {
       x: Math.max(-limitX, Math.min(limitX, pan.x)),
@@ -144,8 +151,16 @@ const CampusMap = ({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponder: (event) =>
+        fullscreen || (event.nativeEvent?.touches?.length || 0) >= 2,
+      onStartShouldSetPanResponderCapture: (event) =>
+        fullscreen || (event.nativeEvent?.touches?.length || 0) >= 2,
       onMoveShouldSetPanResponder: (event, gestureState) => {
+        const touchCount = event.nativeEvent?.touches?.length || 0;
+        const movedEnough = Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4;
+        return touchCount >= 2 || (fullscreen && movedEnough) || (mapScaleRef.current > 1 && movedEnough);
+      },
+      onMoveShouldSetPanResponderCapture: (event, gestureState) => {
         const touchCount = event.nativeEvent?.touches?.length || 0;
         const movedEnough = Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4;
         return touchCount >= 2 || (fullscreen && movedEnough) || (mapScaleRef.current > 1 && movedEnough);
@@ -171,6 +186,7 @@ const CampusMap = ({
             nextScale = clampScale(
               gestureStartScaleRef.current * (nextDistance / gestureStartDistanceRef.current),
             );
+            mapScaleRef.current = nextScale;
             scaleAnim.setValue(nextScale);
           }
         }
@@ -206,6 +222,7 @@ const CampusMap = ({
         });
         gestureStartDistanceRef.current = null;
       },
+      onPanResponderTerminationRequest: () => !fullscreen,
       onShouldBlockNativeResponder: () => fullscreen,
     }),
   ).current;
@@ -882,7 +899,7 @@ const CampusMap = ({
       {showFloorNavigation ? renderFloorNavigation() : null}
       
       <View
-        style={styles.mapCanvas}
+        style={[styles.mapCanvas, fullscreen && styles.mapCanvasFullscreen]}
         onLayout={(event) => {
           mapSizeRef.current = event.nativeEvent.layout;
           setPanPosition(mapPanRef.current, false);
@@ -892,6 +909,7 @@ const CampusMap = ({
           {...panResponder.panHandlers}
           style={[
             styles.mapZoomLayer,
+            fullscreen && styles.mapZoomLayerFullscreen,
             {
               opacity: floorFadeAnim,
               transform: [
@@ -904,7 +922,13 @@ const CampusMap = ({
         >
           {/* Floor Plan Image or Placeholder */}
           {hasBlueprint ? (
-            <View style={[styles.floorPlanStage, { aspectRatio: blueprintAspectRatio }]}>
+            <View
+              style={[
+                styles.floorPlanStage,
+                fullscreen && styles.floorPlanStageFullscreen,
+                { aspectRatio: blueprintAspectRatio },
+              ]}
+            >
               <Image
                 source={floorPlanImage}
                 style={styles.floorPlanImage}
@@ -966,7 +990,7 @@ const CampusMap = ({
         {/* Map Controls */}
         <View style={styles.mapControls}>
           <MapPressable
-            style={styles.mapControlButton}
+            style={[styles.mapControlButton, styles.mapControlButtonPrimary]}
             onPress={handleZoomIn}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
@@ -975,13 +999,13 @@ const CampusMap = ({
             style={styles.mapControlButton}
             onPress={handleZoomOut}
           >
-            <Ionicons name="remove" size={20} color="#FFFFFF" />
+            <Ionicons name="remove" size={20} color="#0A3D91" />
           </MapPressable>
           <MapPressable
             style={styles.mapControlButton}
             onPress={handleReset}
           >
-            <Ionicons name="compass" size={20} color="#FFFFFF" />
+            <Ionicons name="scan-outline" size={19} color="#0A3D91" />
           </MapPressable>
         </View>
         

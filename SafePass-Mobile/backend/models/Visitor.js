@@ -42,6 +42,10 @@ const deriveVisitProgressStatus = (visitor) => {
     if (visitor.appointmentStatus === "rescheduled") {
       return "pending";
     }
+
+    if (visitor.appointmentStatus === "adjustment_pending") {
+      return "pending";
+    }
   }
 
   if (visitor.approvalStatus === "approved") {
@@ -203,7 +207,16 @@ const visitorSchema = new mongoose.Schema({
   },
   appointmentStatus: {
     type: String,
-    enum: ["not_requested", "pending", "approved", "adjusted", "rescheduled", "cancelled", "rejected"],
+    enum: [
+      "not_requested",
+      "pending",
+      "approved",
+      "adjusted",
+      "adjustment_pending",
+      "rescheduled",
+      "cancelled",
+      "rejected",
+    ],
     default: "not_requested",
     index: true,
   },
@@ -799,13 +812,15 @@ visitorSchema.methods = {
     this.requestCategory = "appointment";
     this.approvalFlow = "staff";
     this.approvalStatus = "approved";
+    this.previousVisitDate = this.visitDate || null;
+    this.previousVisitTime = this.visitTime || null;
     if (visitDate) {
       this.visitDate = visitDate;
     }
     if (visitTime) {
       this.visitTime = visitTime;
     }
-    this.appointmentStatus = "adjusted";
+    this.appointmentStatus = "adjustment_pending";
     this.assignedStaff = staffUser?._id || null;
     this.assignedStaffName = staffUser
       ? `${staffUser.firstName || ""} ${staffUser.lastName || ""}`.trim()
@@ -817,6 +832,29 @@ visitorSchema.methods = {
     this.appointmentCompletedAt = null;
     this.appointmentCompletedBy = null;
     this.appointmentCompletionNote = "";
+    this.appointmentCancelledAt = null;
+    this.appointmentCancelledBy = null;
+    this.appointmentCancellationReason = "";
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
+    this.overstayAlertedAt = null;
+    this.checkedInAt = null;
+    this.checkedOutAt = null;
+    this.checkedInBy = null;
+    this.checkedOutBy = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  acceptStaffAdjustment(visitorUser) {
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.approvalStatus = "approved";
+    this.appointmentStatus = "adjusted";
+    this.appointmentRescheduledBy = visitorUser?._id || this.appointmentRescheduledBy || null;
+    this.appointmentRescheduledAt = new Date();
+    this.appointmentRescheduleReason = "Staff proposed schedule accepted by visitor.";
+    this.staffRejectionReason = "";
     this.appointmentCancelledAt = null;
     this.appointmentCancelledBy = null;
     this.appointmentCancellationReason = "";

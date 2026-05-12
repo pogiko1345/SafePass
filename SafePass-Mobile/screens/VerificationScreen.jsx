@@ -77,6 +77,14 @@ export default function VerificationScreen({ navigation, route }) {
   const [phoneError, setPhoneError] = useState("");
   const [otpError, setOtpError] = useState("");
 
+  const normalizeOtpLocalPhoneInput = (value = "") => {
+    const digitsOnly = String(value || "").replace(/[^0-9]/g, "");
+    const withoutCountryCode = digitsOnly.startsWith("63")
+      ? digitsOnly.slice(2)
+      : digitsOnly;
+    return withoutCountryCode.replace(/^0+/, "").slice(0, 10);
+  };
+
   const userRole = normalizeRole(userData?.role) || "visitor";
 
   const getVerificationConfig = (role) => {
@@ -200,17 +208,15 @@ export default function VerificationScreen({ navigation, route }) {
       return false;
     }
     
-    const cleanPhone = phoneNumber.replace(/[\s\.\-]/g, '');
+    const cleanPhone = normalizeOtpLocalPhoneInput(phoneNumber);
     const philippinePatterns = [
-      /^09\d{9}$/,
-      /^639\d{9}$/,
       /^9\d{9}$/,
     ];
     
     const isValid = philippinePatterns.some(pattern => pattern.test(cleanPhone));
     
     if (!isValid) {
-      setPhoneError("Enter a valid Philippine mobile number (e.g., 09123456789)");
+      setPhoneError("Enter a valid Philippine mobile number (e.g., 9123456789)");
       return false;
     }
     return true;
@@ -221,17 +227,7 @@ export default function VerificationScreen({ navigation, route }) {
     
     setIsLoading(true);
     try {
-      let cleanPhone = phoneNumber.replace(/[\s\.\-]/g, '');
-      
-      if (cleanPhone.startsWith('63')) {
-        cleanPhone = '0' + cleanPhone.slice(2);
-      } else if (cleanPhone.startsWith('9') && cleanPhone.length === 10) {
-        cleanPhone = '0' + cleanPhone;
-      }
-      
-      if (!cleanPhone.startsWith('09')) {
-        cleanPhone = '09' + cleanPhone.slice(-9);
-      }
+      const cleanPhone = `0${normalizeOtpLocalPhoneInput(phoneNumber)}`;
       
       const response = await ApiService.requestOtp(cleanPhone, "sms");
       
@@ -274,17 +270,7 @@ export default function VerificationScreen({ navigation, route }) {
 
     setIsLoading(true);
     try {
-      let cleanPhone = phoneNumber.replace(/[\s\.\-]/g, '');
-      
-      if (cleanPhone.startsWith('63')) {
-        cleanPhone = '0' + cleanPhone.slice(2);
-      } else if (cleanPhone.startsWith('9') && cleanPhone.length === 10) {
-        cleanPhone = '0' + cleanPhone;
-      }
-      
-      if (!cleanPhone.startsWith('09')) {
-        cleanPhone = '09' + cleanPhone.slice(-9);
-      }
+      const cleanPhone = `0${normalizeOtpLocalPhoneInput(phoneNumber)}`;
       
       const response = await ApiService.verifyOtp(cleanPhone, otpCode, tempToken);
       
@@ -655,7 +641,7 @@ export default function VerificationScreen({ navigation, route }) {
                               placeholderTextColor="#9CA3AF"
                               value={phoneNumber}
                               onChangeText={(text) => {
-                                const cleaned = text.replace(/[^0-9]/g, '');
+                                const cleaned = normalizeOtpLocalPhoneInput(text);
                                 setPhoneNumber(cleaned);
                                 setPhoneError("");
                               }}
@@ -668,7 +654,7 @@ export default function VerificationScreen({ navigation, route }) {
                             <Text style={verificationStyles.errorText}>{phoneError}</Text>
                           ) : (
                             <Text style={verificationStyles.helperText}>
-                              Enter your 10-digit mobile number to receive a secure verification code.
+                              Enter your mobile number without the first 0. If you type 0, we will remove it for you.
                             </Text>
                           )}
                         </View>

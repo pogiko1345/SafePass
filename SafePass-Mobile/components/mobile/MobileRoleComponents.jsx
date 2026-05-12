@@ -50,11 +50,11 @@ export const MobileStatusBadge = ({ status, label, style }) => {
   );
 };
 
-export const MobileEmptyState = ({ icon = "file-tray-outline", title, message, actionLabel, onAction }) => (
-  <View style={mobileStyles.emptyState}>
+export const MobileEmptyState = ({ icon = "file-tray-outline", title, message, actionLabel, onAction, dark = false }) => (
+  <View style={[mobileStyles.emptyState, dark && mobileStyles.darkSurface]}>
     <Ionicons name={icon} size={34} color="#94A3B8" />
-    <Text style={mobileStyles.emptyTitle}>{title}</Text>
-    {message ? <Text style={mobileStyles.emptyMessage}>{message}</Text> : null}
+    <Text style={[mobileStyles.emptyTitle, dark && mobileStyles.darkText]}>{title}</Text>
+    {message ? <Text style={[mobileStyles.emptyMessage, dark && mobileStyles.darkMuted]}>{message}</Text> : null}
     {actionLabel && onAction ? (
       <TouchableOpacity style={mobileStyles.emptyAction} onPress={onAction}>
         <Text style={mobileStyles.emptyActionText}>{actionLabel}</Text>
@@ -63,18 +63,18 @@ export const MobileEmptyState = ({ icon = "file-tray-outline", title, message, a
   </View>
 );
 
-export const MobileLoadingState = ({ message = "Loading..." }) => (
-  <View style={mobileStyles.loadingState}>
+export const MobileLoadingState = ({ message = "Loading...", dark = false }) => (
+  <View style={[mobileStyles.loadingState, dark && mobileStyles.darkPage]}>
     <ActivityIndicator size="large" color={BRAND.blue} />
-    <Text style={mobileStyles.loadingText}>{message}</Text>
+    <Text style={[mobileStyles.loadingText, dark && mobileStyles.darkText]}>{message}</Text>
   </View>
 );
 
-export const MobileSearchField = ({ value, onChangeText, placeholder = "Search", onClear }) => (
-  <View style={mobileStyles.searchField}>
+export const MobileSearchField = ({ value, onChangeText, placeholder = "Search", onClear, dark = false }) => (
+  <View style={[mobileStyles.searchField, dark && mobileStyles.darkControl]}>
     <Ionicons name="search-outline" size={18} color="#64748B" />
     <TextInput
-      style={mobileStyles.searchInput}
+      style={[mobileStyles.searchInput, dark && mobileStyles.darkText]}
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
@@ -89,7 +89,7 @@ export const MobileSearchField = ({ value, onChangeText, placeholder = "Search",
   </View>
 );
 
-export const MobileFilterChips = ({ options = [], value, onChange }) => (
+export const MobileFilterChips = ({ options = [], value, onChange, dark = false }) => (
   <ScrollView
     horizontal
     showsHorizontalScrollIndicator={false}
@@ -102,10 +102,10 @@ export const MobileFilterChips = ({ options = [], value, onChange }) => (
       return (
         <TouchableOpacity
           key={key}
-          style={[mobileStyles.filterChip, active && mobileStyles.filterChipActive]}
+          style={[mobileStyles.filterChip, dark && mobileStyles.darkChip, active && mobileStyles.filterChipActive]}
           onPress={() => onChange(key)}
         >
-          <Text style={[mobileStyles.filterChipText, active && mobileStyles.filterChipTextActive]}>
+          <Text style={[mobileStyles.filterChipText, dark && mobileStyles.darkMuted, active && mobileStyles.filterChipTextActive]}>
             {label}
           </Text>
         </TouchableOpacity>
@@ -114,8 +114,8 @@ export const MobileFilterChips = ({ options = [], value, onChange }) => (
   </ScrollView>
 );
 
-export const MobileBottomNav = ({ tabs = [], activeTab, onChange }) => (
-  <View style={mobileStyles.bottomNav}>
+export const MobileBottomNav = ({ tabs = [], activeTab, onChange, dark = false }) => (
+  <View style={[mobileStyles.bottomNav, dark && mobileStyles.darkBottomNav]}>
     {tabs.map((tab) => {
       const active = activeTab === tab.key;
       return (
@@ -125,8 +125,8 @@ export const MobileBottomNav = ({ tabs = [], activeTab, onChange }) => (
           onPress={() => onChange(tab.key)}
           activeOpacity={0.82}
         >
-          <Ionicons name={active ? tab.activeIcon || tab.icon : tab.icon} size={21} color={active ? BRAND.blue : "#94A3B8"} />
-          <Text style={[mobileStyles.bottomNavLabel, active && mobileStyles.bottomNavLabelActive]}>
+          <Ionicons name={active ? tab.activeIcon || tab.icon : tab.icon} size={21} color={active ? (dark ? "#FFFFFF" : BRAND.blue) : dark ? "#94A3B8" : "#94A3B8"} />
+          <Text style={[mobileStyles.bottomNavLabel, dark && mobileStyles.darkMuted, active && mobileStyles.bottomNavLabelActive, dark && active && mobileStyles.darkBottomNavLabelActive]}>
             {tab.label}
           </Text>
         </TouchableOpacity>
@@ -264,5 +264,33 @@ export const mobileStyles = StyleSheet.create({
   },
   bottomNavLabelActive: {
     color: BRAND.blue,
+  },
+  darkPage: {
+    backgroundColor: "#07111F",
+  },
+  darkSurface: {
+    backgroundColor: "#0F172A",
+    borderColor: "#243244",
+  },
+  darkControl: {
+    backgroundColor: "#0B1524",
+    borderColor: "#2B3B52",
+  },
+  darkChip: {
+    backgroundColor: "#111C2E",
+    borderColor: "#2B3B52",
+  },
+  darkText: {
+    color: "#F8FAFC",
+  },
+  darkMuted: {
+    color: "#CBD5E1",
+  },
+  darkBottomNav: {
+    backgroundColor: "#0F172A",
+    borderTopColor: "#243244",
+  },
+  darkBottomNavLabelActive: {
+    color: "#FFFFFF",
   },
 });

@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -282,6 +283,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   // UI State
   const [activeTab, setActiveTab] = useState('dashboard');
   const [securityMobileTab, setSecurityMobileTab] = useState('monitor');
+  const [mobileDarkModeEnabled, setMobileDarkModeEnabled] = useState(false);
   const [expandedModule, setExpandedModule] = useState('home');
   const [selectedSubmodule, setSelectedSubmodule] = useState('home-main');
   const [visitorFilter, setVisitorFilter] = useState('all');
@@ -293,6 +295,19 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [showVisitorModal, setShowVisitorModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+
+  useEffect(() => {
+    const loadMobileTheme = async () => {
+      try {
+        const savedDarkMode = await AsyncStorage.getItem("darkModeEnabled");
+        setMobileDarkModeEnabled(savedDarkMode === "true");
+      } catch (error) {
+        console.log("Security dark mode preference unavailable:", error?.message || error);
+      }
+    };
+
+    loadMobileTheme();
+  }, []);
   const [selectedVisitor, setSelectedVisitor] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -4177,13 +4192,13 @@ export default function SecurityDashboardScreen({ navigation }) {
   );
 
   const renderMobileStatusCard = () => (
-    <View style={securityMobileStyles.statusCard}>
+    <View style={[securityMobileStyles.statusCard, mobileDarkModeEnabled && securityMobileStyles.darkCard]}>
       <View style={securityMobileStyles.statusCardIcon}>
         <Ionicons name="shield-checkmark-outline" size={22} color={BRAND.success} />
       </View>
       <View style={securityMobileStyles.statusCardCopy}>
-        <Text style={securityMobileStyles.statusCardTitle}>Current Status</Text>
-        <Text style={securityMobileStyles.statusCardSubtitle}>
+        <Text style={[securityMobileStyles.statusCardTitle, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]}>Current Status</Text>
+        <Text style={[securityMobileStyles.statusCardSubtitle, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>
           {visitorStats.activeNow} inside · {alerts.length} alert{alerts.length === 1 ? "" : "s"}
         </Text>
       </View>
@@ -4223,13 +4238,13 @@ export default function SecurityDashboardScreen({ navigation }) {
           bg: mobileWrongLocationCount ? "#FEF2F2" : "#F8FAFC",
         },
       ].map((item) => (
-        <View key={item.label} style={securityMobileStyles.statusMetricCard}>
+        <View key={item.label} style={[securityMobileStyles.statusMetricCard, mobileDarkModeEnabled && securityMobileStyles.darkCard]}>
           <View style={[securityMobileStyles.statusMetricIcon, { backgroundColor: item.bg }]}>
             <Ionicons name={item.icon} size={18} color={item.color} />
           </View>
-          <Text style={securityMobileStyles.statusMetricValue}>{item.value}</Text>
-          <Text style={securityMobileStyles.statusMetricLabel}>{item.label}</Text>
-          <Text style={securityMobileStyles.statusMetricHelper}>{item.helper}</Text>
+          <Text style={[securityMobileStyles.statusMetricValue, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]}>{item.value}</Text>
+          <Text style={[securityMobileStyles.statusMetricLabel, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>{item.label}</Text>
+          <Text style={[securityMobileStyles.statusMetricHelper, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>{item.helper}</Text>
         </View>
       ))}
       </View>
@@ -4238,7 +4253,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   function renderMobileFocusPanel() {
     return (
-      <View style={securityMobileStyles.focusPanel}>
+      <View style={[securityMobileStyles.focusPanel, mobileDarkModeEnabled && securityMobileStyles.darkCard]}>
       <View style={securityMobileStyles.focusIcon}>
         <Ionicons
           name={alerts.length || mobileWrongLocationCount ? "warning-outline" : "shield-checkmark-outline"}
@@ -4247,10 +4262,10 @@ export default function SecurityDashboardScreen({ navigation }) {
         />
       </View>
       <View style={securityMobileStyles.focusCopy}>
-        <Text style={securityMobileStyles.focusTitle}>
+        <Text style={[securityMobileStyles.focusTitle, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]}>
           {alerts.length || mobileWrongLocationCount ? "Attention required" : "Operations normal"}
         </Text>
-        <Text style={securityMobileStyles.focusText}>
+        <Text style={[securityMobileStyles.focusText, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>
           {alerts.length
             ? `${alerts.length} alert${alerts.length === 1 ? "" : "s"} waiting for review.`
             : mobileWrongLocationCount
@@ -4274,13 +4289,13 @@ export default function SecurityDashboardScreen({ navigation }) {
         <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
         <Text style={securityMobileStyles.quickActionPrimaryText}>Scan Card</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={securityMobileStyles.quickAction} onPress={() => setSecurityMobileTab("map")}>
+      <TouchableOpacity style={[securityMobileStyles.quickAction, mobileDarkModeEnabled && securityMobileStyles.darkCard]} onPress={() => setSecurityMobileTab("map")}>
         <Ionicons name="map-outline" size={20} color={BRAND.blue} />
-        <Text style={securityMobileStyles.quickActionText}>Track</Text>
+        <Text style={[securityMobileStyles.quickActionText, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]}>Track</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={securityMobileStyles.quickAction} onPress={() => setSecurityMobileTab("alerts")}>
+      <TouchableOpacity style={[securityMobileStyles.quickAction, mobileDarkModeEnabled && securityMobileStyles.darkCard]} onPress={() => setSecurityMobileTab("alerts")}>
         <Ionicons name="flag-outline" size={20} color={BRAND.danger} />
-        <Text style={securityMobileStyles.quickActionText}>Report</Text>
+        <Text style={[securityMobileStyles.quickActionText, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]}>Report</Text>
       </TouchableOpacity>
     </View>
   );
@@ -4294,7 +4309,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     return (
       <TouchableOpacity
         key={visitor._id}
-        style={securityMobileStyles.visitorCard}
+        style={[securityMobileStyles.visitorCard, mobileDarkModeEnabled && securityMobileStyles.darkCard]}
         onPress={() => handleViewDetails(visitor)}
         activeOpacity={0.82}
       >
@@ -4303,8 +4318,8 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name={isCheckedIn ? "walk-outline" : "person-outline"} size={20} color={BRAND.blue} />
           </View>
           <View style={securityMobileStyles.visitorCopy}>
-            <Text style={securityMobileStyles.visitorName} numberOfLines={1}>{visitor.fullName || "Visitor"}</Text>
-            <Text style={securityMobileStyles.visitorMeta} numberOfLines={1}>
+            <Text style={[securityMobileStyles.visitorName, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]} numberOfLines={1}>{visitor.fullName || "Visitor"}</Text>
+            <Text style={[securityMobileStyles.visitorMeta, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]} numberOfLines={1}>
               {destination.officeName} • {destination.floorLabel}
             </Text>
           </View>
@@ -4312,17 +4327,17 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
         {!compact ? (
           <>
-            <Text style={securityMobileStyles.visitorPurpose} numberOfLines={2}>
+            <Text style={[securityMobileStyles.visitorPurpose, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]} numberOfLines={2}>
               {visitor.purposeOfVisit || "No purpose recorded"}
             </Text>
             <View style={securityMobileStyles.visitorChips}>
-              <View style={securityMobileStyles.metaChip}>
+              <View style={[securityMobileStyles.metaChip, mobileDarkModeEnabled && securityMobileStyles.darkPill]}>
                 <Ionicons name="calendar-outline" size={14} color="#64748B" />
-                <Text style={securityMobileStyles.metaChipText}>{formatDate(visitor.visitDate)}</Text>
+                <Text style={[securityMobileStyles.metaChipText, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>{formatDate(visitor.visitDate)}</Text>
               </View>
-              <View style={securityMobileStyles.metaChip}>
+              <View style={[securityMobileStyles.metaChip, mobileDarkModeEnabled && securityMobileStyles.darkPill]}>
                 <Ionicons name="time-outline" size={14} color="#64748B" />
-                <Text style={securityMobileStyles.metaChipText}>{formatTime(visitor.checkedInAt || visitor.visitTime)}</Text>
+                <Text style={[securityMobileStyles.metaChipText, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>{formatTime(visitor.checkedInAt || visitor.visitTime)}</Text>
               </View>
             </View>
             <View style={securityMobileStyles.visitorActions}>
@@ -4391,14 +4406,14 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const renderMobileToolbar = () => (
     <View style={securityMobileStyles.toolbar}>
-      <MobileSearchField
+      <MobileSearchField dark={mobileDarkModeEnabled}
         value={searchQuery}
         onChangeText={setSearchQuery}
         placeholder="Search name, status, location..."
       />
-      <MobileFilterChips options={securityStatusFilters} value={visitorFilter} onChange={setVisitorFilter} />
-      <MobileFilterChips options={securityDateFilters} value={mobileDateFilter} onChange={setMobileDateFilter} />
-      <MobileFilterChips options={mobileLocationOptions} value={mobileLocationFilter} onChange={setMobileLocationFilter} />
+      <MobileFilterChips dark={mobileDarkModeEnabled} options={securityStatusFilters} value={visitorFilter} onChange={setVisitorFilter} />
+      <MobileFilterChips dark={mobileDarkModeEnabled} options={securityDateFilters} value={mobileDateFilter} onChange={setMobileDateFilter} />
+      <MobileFilterChips dark={mobileDarkModeEnabled} options={mobileLocationOptions} value={mobileLocationFilter} onChange={setMobileLocationFilter} />
     </View>
   );
 
@@ -4415,7 +4430,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       {mobileNeedsAttentionVisitors.length ? (
         mobileNeedsAttentionVisitors.slice(0, 5).map((visitor) => renderMobileVisitorCard(visitor, true))
       ) : (
-        <MobileEmptyState icon="person-add-outline" title="No incoming visitors" message="Approved arrivals and active visits will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="person-add-outline" title="No incoming visitors" message="Approved arrivals and active visits will appear here." />
       )}
       {mobileNotReadyVisitors.length ? (
         <View style={securityMobileStyles.notReadySection}>
@@ -4459,28 +4474,28 @@ export default function SecurityDashboardScreen({ navigation }) {
         <Text style={securityMobileStyles.compactSubtitle}>A short, friendly view of arrivals, departures, and blocked access.</Text>
       </View>
       <View style={securityMobileStyles.logToolbar}>
-        <MobileFilterChips options={securityLogFilters} value={mobileLogFilter} onChange={setMobileLogFilter} />
-        <MobileSearchField value={searchQuery} onChangeText={setSearchQuery} placeholder="Search activity..." />
+        <MobileFilterChips dark={mobileDarkModeEnabled} options={securityLogFilters} value={mobileLogFilter} onChange={setMobileLogFilter} />
+        <MobileSearchField dark={mobileDarkModeEnabled} value={searchQuery} onChangeText={setSearchQuery} placeholder="Search activity..." />
       </View>
       <View style={securityMobileStyles.feedList}>
         {mobileLogItems.length ? (
           mobileLogItems.slice(0, 12).map((log, index) => {
             const display = getMobileLogDisplay(log);
             return (
-              <View key={log._id || `${log.timestamp}-${index}`} style={securityMobileStyles.logCard}>
+              <View key={log._id || `${log.timestamp}-${index}`} style={[securityMobileStyles.logCard, mobileDarkModeEnabled && securityMobileStyles.darkCard]}>
                 <View style={[securityMobileStyles.logIcon, { backgroundColor: `${display.color}16` }]}>
                   <Ionicons name={display.icon} size={18} color={display.color} />
                 </View>
                 <View style={securityMobileStyles.logCopy}>
-                  <Text style={securityMobileStyles.logTitle} numberOfLines={1}>{display.title}</Text>
-                  <Text style={securityMobileStyles.logMessage} numberOfLines={1}>{display.message}</Text>
-                  <Text style={securityMobileStyles.logTime}>{formatDateTime(log.timestamp || log.createdAt)}</Text>
+                  <Text style={[securityMobileStyles.logTitle, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]} numberOfLines={1}>{display.title}</Text>
+                  <Text style={[securityMobileStyles.logMessage, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]} numberOfLines={1}>{display.message}</Text>
+                  <Text style={[securityMobileStyles.logTime, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>{formatDateTime(log.timestamp || log.createdAt)}</Text>
                 </View>
               </View>
             );
           })
         ) : (
-          <MobileEmptyState icon="list-outline" title="No activity found" message="Try another filter or search term." />
+          <MobileEmptyState dark={mobileDarkModeEnabled} icon="list-outline" title="No activity found" message="Try another filter or search term." />
         )}
       </View>
       {mobileLogItems.length > 12 ? (
@@ -4497,13 +4512,13 @@ export default function SecurityDashboardScreen({ navigation }) {
       </View>
       {alerts.length ? (
         alerts.map((alert) => (
-          <View key={alert._id} style={securityMobileStyles.alertCard}>
+          <View key={alert._id} style={[securityMobileStyles.alertCard, mobileDarkModeEnabled && securityMobileStyles.darkCard]}>
             <View style={securityMobileStyles.alertTop}>
               <Ionicons name="warning-outline" size={20} color={BRAND.danger} />
               <View style={securityMobileStyles.alertCopy}>
-                <Text style={securityMobileStyles.alertTitle}>{alert.title || "Security Alert"}</Text>
-                <Text style={securityMobileStyles.alertMessage}>{alert.message || "No alert details provided."}</Text>
-                <Text style={securityMobileStyles.alertTime}>{formatDateTime(alert.createdAt)}</Text>
+                <Text style={[securityMobileStyles.alertTitle, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]}>{alert.title || "Security Alert"}</Text>
+                <Text style={[securityMobileStyles.alertMessage, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>{alert.message || "No alert details provided."}</Text>
+                <Text style={[securityMobileStyles.alertTime, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>{formatDateTime(alert.createdAt)}</Text>
               </View>
             </View>
             <TouchableOpacity
@@ -4516,7 +4531,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         ))
       ) : (
-        <MobileEmptyState icon="shield-checkmark-outline" title="No active alerts" message="Warnings and unread security alerts will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="shield-checkmark-outline" title="No active alerts" message="Warnings and unread security alerts will appear here." />
       )}
 
       <View style={securityMobileStyles.sectionHeader}>
@@ -4537,7 +4552,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           </TouchableOpacity>
         ))
       ) : (
-        <MobileEmptyState icon="person-remove-outline" title="No checked-in visitors" message="A visitor must be inside before filing a report." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="person-remove-outline" title="No checked-in visitors" message="A visitor must be inside before filing a report." />
       )}
       <TextInput
         style={securityMobileStyles.reportInput}
@@ -4669,7 +4684,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             </TouchableOpacity>
           ))
         ) : (
-          <MobileEmptyState icon="map-outline" title="No live markers" message="Visitor markers will appear after NFC checkpoint taps." />
+          <MobileEmptyState dark={mobileDarkModeEnabled} icon="map-outline" title="No live markers" message="Visitor markers will appear after NFC checkpoint taps." />
         )}
       </>
     );
@@ -4713,7 +4728,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             </TouchableOpacity>
           ))
         ) : (
-          <MobileEmptyState icon="map-outline" title="No live locations" message="Visitor location updates will appear after NFC checkpoint taps." />
+          <MobileEmptyState dark={mobileDarkModeEnabled} icon="map-outline" title="No live locations" message="Visitor location updates will appear after NFC checkpoint taps." />
         )}
       </View>
     </>
@@ -5000,17 +5015,17 @@ export default function SecurityDashboardScreen({ navigation }) {
               : renderMobileMonitor();
 
     return (
-      <SafeAreaView style={securityMobileStyles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor={BRAND.page} />
+      <SafeAreaView style={[securityMobileStyles.safeArea, mobileDarkModeEnabled && securityMobileStyles.darkSafeArea]}>
+        <StatusBar barStyle={mobileDarkModeEnabled ? "light-content" : "dark-content"} backgroundColor={mobileDarkModeEnabled ? "#07111F" : BRAND.page} />
         <ScrollView
-          style={securityMobileStyles.scroll}
+          style={[securityMobileStyles.scroll, mobileDarkModeEnabled && securityMobileStyles.darkSafeArea]}
           contentContainerStyle={securityMobileStyles.content}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshData} tintColor={BRAND.blue} />}
         >
           {content}
         </ScrollView>
-        <MobileBottomNav tabs={securityMobileTabs} activeTab={securityMobileTab} onChange={setSecurityMobileTab} />
+        <MobileBottomNav dark={mobileDarkModeEnabled} tabs={securityMobileTabs} activeTab={securityMobileTab} onChange={setSecurityMobileTab} />
         {renderMobileVisitorDetailModal()}
         {renderFullscreenMapModal()}
       </SafeAreaView>
@@ -5020,7 +5035,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   // ============ LOADING STATE ============
   if (isLoading) {
     return isMobileLayout ? (
-      <MobileLoadingState message="Loading security operations..." />
+      <MobileLoadingState dark={mobileDarkModeEnabled} message="Loading security operations..." />
     ) : (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0A3D91" />
@@ -6743,5 +6758,22 @@ const securityMobileStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900",
     color: BRAND.danger,
+  },
+  darkSafeArea: {
+    backgroundColor: "#07111F",
+  },
+  darkCard: {
+    backgroundColor: "#0F172A",
+    borderColor: "#243244",
+  },
+  darkPill: {
+    backgroundColor: "#18243A",
+    borderColor: "#334155",
+  },
+  darkPrimaryText: {
+    color: "#F8FAFC",
+  },
+  darkMutedText: {
+    color: "#CBD5E1",
   },
 });

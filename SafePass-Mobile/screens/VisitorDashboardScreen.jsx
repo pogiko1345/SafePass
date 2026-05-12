@@ -407,6 +407,57 @@ const isNullNativeNfcError = (error) => {
   return message.includes("cannot convert null value to object") || message.includes("null value");
 };
 
+const getValidDate = (dateString) => {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+};
+
+const getAppointmentHolidayInfo = (dateValue) => {
+  const date = getValidDate(dateValue);
+  if (!date) return null;
+
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const fixedHolidayMap = {
+    "1-1": "New Year's Day",
+    "4-9": "Araw ng Kagitingan",
+    "5-1": "Labor Day",
+    "6-12": "Independence Day",
+    "8-21": "Ninoy Aquino Day",
+    "11-1": "All Saints' Day",
+    "11-2": "All Souls' Day",
+    "11-30": "Bonifacio Day",
+    "12-8": "Feast of the Immaculate Conception",
+    "12-24": "Christmas Eve",
+    "12-25": "Christmas Day",
+    "12-30": "Rizal Day",
+    "12-31": "New Year's Eve",
+  };
+
+  const name = fixedHolidayMap[`${month}-${day}`];
+  return name ? { name } : null;
+};
+
+const isAppointmentDateUnavailable = (dateValue) => {
+  const date = getValidDate(dateValue);
+  if (!date) return true;
+  return date.getDay() === 0 || Boolean(getAppointmentHolidayInfo(date));
+};
+
+const getNextAvailableAppointmentDate = (inputDate = new Date()) => {
+  const nextDate = new Date(inputDate);
+  nextDate.setHours(12, 0, 0, 0);
+
+  while (isAppointmentDateUnavailable(nextDate)) {
+    nextDate.setDate(nextDate.getDate() + 1);
+    nextDate.setHours(12, 0, 0, 0);
+  }
+
+  return nextDate;
+};
+
 export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const isWideVisitorDashboard = viewportWidth >= 960;
@@ -424,6 +475,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [appointmentHistory, setAppointmentHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showVisitorMapFullscreen, setShowVisitorMapFullscreen] = useState(false);
   const [showAppointmentDatePicker, setShowAppointmentDatePicker] = useState(false);
   const [showAppointmentTimePicker, setShowAppointmentTimePicker] = useState(false);
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
@@ -485,6 +537,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [isAppointmentScreenTransitioning, setIsAppointmentScreenTransitioning] = useState(false);
   const [appointmentTransitionLabel, setAppointmentTransitionLabel] = useState("Loading appointment module...");
   const [visitorTransitionDirection, setVisitorTransitionDirection] = useState(1);
+  const [webAppointmentCalendarMonth, setWebAppointmentCalendarMonth] = useState(() => getNextAvailableAppointmentDate(new Date()));
   const [greeting, setGreeting] = useState("");
   const [isNfcSupported, setIsNfcSupported] = useState(false);
   const [isNfcEnabled, setIsNfcEnabled] = useState(false);
@@ -2007,13 +2060,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     }
   };
 
-  const getValidDate = (dateString) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return null;
-    return date;
-  };
-
   const getVisitorScheduleDateTime = (record = visitor) => {
     const visitDate = getValidDate(record?.visitDate);
     if (!visitDate) return null;
@@ -2041,17 +2087,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const date = getValidDate(dateValue);
     if (!date) return "";
     return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-  };
-
-  const getNextAvailableAppointmentDate = (inputDate = new Date()) => {
-    const nextDate = new Date(inputDate);
-    nextDate.setHours(12, 0, 0, 0);
-
-    while (nextDate.getDay() === 0) {
-      nextDate.setDate(nextDate.getDate() + 1);
-    }
-
-    return nextDate;
   };
 
   const getDefaultAppointmentDate = () => {
@@ -2252,6 +2287,363 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     applyAppointmentDateSelection(new Date(year, month - 1, day));
   };
 
+  const isSameAppointmentDay = (leftValue, rightValue) => {
+    const left = getValidDate(leftValue);
+    const right = getValidDate(rightValue);
+    if (!left || !right) return false;
+    return (
+      left.getFullYear() === right.getFullYear() &&
+      left.getMonth() === right.getMonth() &&
+      left.getDate() === right.getDate()
+    );
+  };
+
+  const getMobileAppointmentDateOptions = () => {
+    const options = [];
+    const cursor = getNextAvailableAppointmentDate(new Date());
+
+    while (options.length < 7) {
+      if (cursor.getDay() !== 0) {
+        options.push(new Date(cursor));
+      }
+      cursor.setDate(cursor.getDate() + 1);
+      cursor.setHours(12, 0, 0, 0);
+    }
+
+    return options;
+  };
+
+  const getWebAppointmentCalendarDays = () => {
+    const selectedDate = getValidDate(appointmentForm.preferredDate) || getDefaultAppointmentDate();
+    const monthDate = getValidDate(webAppointmentCalendarMonth) || selectedDate;
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const start = new Date(firstDay);
+    start.setDate(firstDay.getDate() - firstDay.getDay());
+    start.setHours(12, 0, 0, 0);
+
+    return Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      date.setHours(12, 0, 0, 0);
+      return {
+        date,
+        isCurrentMonth: date.getMonth() === month,
+        isSelected: isSameAppointmentDay(date, selectedDate),
+        isPast: date < getNextAvailableAppointmentDate(new Date()),
+        isSunday: date.getDay() === 0,
+        holiday: getAppointmentHolidayInfo(date),
+      };
+    });
+  };
+
+  const moveWebAppointmentCalendarMonth = (direction) => {
+    setWebAppointmentCalendarMonth((currentValue) => {
+      const current = getValidDate(currentValue) || getDefaultAppointmentDate();
+      const next = new Date(current);
+      next.setMonth(current.getMonth() + direction, 1);
+      next.setHours(12, 0, 0, 0);
+      return next;
+    });
+  };
+
+  const getAppointmentTimeGroups = () => [
+    {
+      label: "Morning",
+      options: appointmentTimeOptions.filter((option) => option.getHours() < 12),
+    },
+    {
+      label: "Afternoon",
+      options: appointmentTimeOptions.filter((option) => option.getHours() >= 12 && option.getHours() < 17),
+    },
+    {
+      label: "Evening",
+      options: appointmentTimeOptions.filter((option) => option.getHours() >= 17),
+    },
+  ].filter((group) => group.options.length);
+
+  const isSameAppointmentTime = (leftValue, rightValue) => {
+    const left = getValidDate(leftValue);
+    const right = getValidDate(rightValue);
+    if (!left || !right) return false;
+    return left.getHours() === right.getHours() && left.getMinutes() === right.getMinutes();
+  };
+
+  const handleAppointmentSlotTimeSelect = (timeOption) => {
+    if (isLoadingAppointmentSlots || isAppointmentTimeSlotFull(timeOption)) return;
+    setHasAppointmentDraft(true);
+    setAppointmentForm((prev) => ({ ...prev, preferredTime: timeOption }));
+  };
+
+  const renderMobileAppointmentSlotPicker = () => {
+    const selectedDate = getValidDate(appointmentForm.preferredDate) || getDefaultAppointmentDate();
+    const selectedTime = getValidDate(appointmentForm.preferredTime);
+    const selectedTimeLabel = selectedTime ? formatTime(selectedTime) : "Select a time";
+    const selectedDateLabel = selectedDate.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const hasDepartments = getSelectedAppointmentDepartments().length > 0;
+
+    return (
+      <View style={visitorDashboardStyles.mobileSlotPickerCard}>
+        <View style={visitorDashboardStyles.mobileSlotPickerHeader}>
+          <View>
+            <Text style={visitorDashboardStyles.appointmentFieldLabel}>Available Time Slots</Text>
+            <Text style={visitorDashboardStyles.mobileSlotPickerHint}>
+              {hasDepartments
+                ? "Full slots are disabled for the selected day."
+                : "Choose office(s) first to check slot limits."}
+            </Text>
+          </View>
+          {isLoadingAppointmentSlots ? <ActivityIndicator size="small" color="#0A3D91" /> : null}
+        </View>
+
+        <View style={visitorDashboardStyles.mobileCalendarCard}>
+          <View style={visitorDashboardStyles.mobileCalendarHeader}>
+            <Text style={visitorDashboardStyles.mobileCalendarMonth}>
+              {(getValidDate(webAppointmentCalendarMonth) || selectedDate).toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric",
+              })}
+            </Text>
+            <View style={visitorDashboardStyles.mobileCalendarNav}>
+              <TouchableOpacity style={visitorDashboardStyles.mobileCalendarNavButton} onPress={() => moveWebAppointmentCalendarMonth(-1)}>
+                <Ionicons name="chevron-back" size={16} color="#0A3D91" />
+              </TouchableOpacity>
+              <TouchableOpacity style={visitorDashboardStyles.mobileCalendarNavButton} onPress={() => moveWebAppointmentCalendarMonth(1)}>
+                <Ionicons name="chevron-forward" size={16} color="#0A3D91" />
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={visitorDashboardStyles.mobileWeekdayRow}>
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+              <Text key={day} style={visitorDashboardStyles.mobileWeekdayText}>{day}</Text>
+            ))}
+          </View>
+          <View style={visitorDashboardStyles.mobileCalendarGrid}>
+            {getWebAppointmentCalendarDays().map(({ date, isCurrentMonth, isSelected, isPast, isSunday, holiday }) => {
+              const isDisabled = !isCurrentMonth || isPast || isSunday || Boolean(holiday);
+              return (
+                <TouchableOpacity
+                  key={date.toISOString()}
+                  style={[
+                    visitorDashboardStyles.mobileCalendarDay,
+                    isSelected && visitorDashboardStyles.mobileCalendarDaySelected,
+                    isDisabled && visitorDashboardStyles.mobileCalendarDayDisabled,
+                  ]}
+                  disabled={isDisabled}
+                  onPress={() => applyAppointmentDateSelection(date)}
+                  activeOpacity={0.86}
+                >
+                  <Text
+                    style={[
+                      visitorDashboardStyles.mobileCalendarDayText,
+                      isSelected && visitorDashboardStyles.mobileCalendarDayTextSelected,
+                      isDisabled && visitorDashboardStyles.mobileCalendarDayTextDisabled,
+                    ]}
+                  >
+                    {date.getDate()}
+                  </Text>
+                  {holiday ? <View style={visitorDashboardStyles.mobileCalendarHolidayDot} /> : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={visitorDashboardStyles.mobileTimeGroupList}>
+          {getAppointmentTimeGroups().map((group) => (
+            <View key={group.label} style={visitorDashboardStyles.mobileTimeGroup}>
+              <Text style={visitorDashboardStyles.mobileTimeGroupLabel}>{group.label}</Text>
+              <View style={visitorDashboardStyles.mobileTimeSlotGrid}>
+                {group.options.map((option) => {
+                  const isSelected = isSameAppointmentTime(option, selectedTime);
+                  const isFull = isAppointmentTimeSlotFull(option);
+                  const isDisabled = isLoadingAppointmentSlots || isFull;
+                  return (
+                    <TouchableOpacity
+                      key={`${group.label}-${option.getHours()}-${option.getMinutes()}`}
+                      style={[
+                        visitorDashboardStyles.mobileTimeSlotButton,
+                        isFull && visitorDashboardStyles.mobileTimeSlotButtonUnavailable,
+                        isSelected && visitorDashboardStyles.mobileTimeSlotButtonSelected,
+                      ]}
+                      disabled={isDisabled}
+                      onPress={() => handleAppointmentSlotTimeSelect(option)}
+                      activeOpacity={0.85}
+                    >
+                      <Text
+                        style={[
+                          visitorDashboardStyles.mobileTimeSlotText,
+                          isFull && visitorDashboardStyles.mobileTimeSlotTextUnavailable,
+                          isSelected && visitorDashboardStyles.mobileTimeSlotTextSelected,
+                        ]}
+                      >
+                        {formatTime(option)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={visitorDashboardStyles.mobileSlotLegendRow}>
+          <View style={visitorDashboardStyles.mobileSlotLegendItem}>
+            <View style={[visitorDashboardStyles.mobileSlotLegendDot, visitorDashboardStyles.mobileSlotLegendUnavailable]} />
+            <Text style={visitorDashboardStyles.mobileSlotLegendText}>Not available</Text>
+          </View>
+          <View style={visitorDashboardStyles.mobileSlotLegendItem}>
+            <View style={visitorDashboardStyles.mobileSlotLegendDot} />
+            <Text style={visitorDashboardStyles.mobileSlotLegendText}>Available</Text>
+          </View>
+          <View style={visitorDashboardStyles.mobileSlotLegendItem}>
+            <View style={[visitorDashboardStyles.mobileSlotLegendDot, visitorDashboardStyles.mobileSlotLegendSelected]} />
+            <Text style={visitorDashboardStyles.mobileSlotLegendText}>Selected</Text>
+          </View>
+        </View>
+
+        <View style={visitorDashboardStyles.mobileSelectedSlotRow}>
+          <Text style={visitorDashboardStyles.mobileSelectedSlotLabel}>Appointment Time</Text>
+          <Text style={visitorDashboardStyles.mobileSelectedSlotValue}>
+            {selectedTimeLabel} - {selectedDateLabel}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderWebAppointmentDateTimePicker = () => {
+    const selectedDate = getValidDate(appointmentForm.preferredDate) || getDefaultAppointmentDate();
+    const selectedTime = getValidDate(appointmentForm.preferredTime);
+    const monthDate = getValidDate(webAppointmentCalendarMonth) || selectedDate;
+    const selectedLabel = selectedTime
+      ? `${formatTime(selectedTime)}, ${selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      : "Select a time";
+    const hasDepartments = getSelectedAppointmentDepartments().length > 0;
+
+    return (
+      <View style={visitorDashboardStyles.webDateTimePanel}>
+        <View style={visitorDashboardStyles.webCalendarPane}>
+          <View style={visitorDashboardStyles.webCalendarHeader}>
+            <Text style={visitorDashboardStyles.webCalendarMonth}>
+              {monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            </Text>
+            <View style={visitorDashboardStyles.webCalendarNav}>
+              <TouchableOpacity style={visitorDashboardStyles.webCalendarNavButton} onPress={() => moveWebAppointmentCalendarMonth(-1)}>
+                <Ionicons name="chevron-back" size={16} color="#DBEAFE" />
+              </TouchableOpacity>
+              <TouchableOpacity style={visitorDashboardStyles.webCalendarNavButton} onPress={() => moveWebAppointmentCalendarMonth(1)}>
+                <Ionicons name="chevron-forward" size={16} color="#DBEAFE" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={visitorDashboardStyles.webWeekdayRow}>
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+              <Text key={day} style={visitorDashboardStyles.webWeekdayText}>{day}</Text>
+            ))}
+          </View>
+
+          <View style={visitorDashboardStyles.webCalendarGrid}>
+            {getWebAppointmentCalendarDays().map(({ date, isCurrentMonth, isSelected, isPast, isSunday, holiday }) => {
+              const isDisabled = !isCurrentMonth || isPast || isSunday || Boolean(holiday);
+              return (
+                <TouchableOpacity
+                  key={date.toISOString()}
+                  style={[
+                    visitorDashboardStyles.webCalendarDay,
+                    isSelected && visitorDashboardStyles.webCalendarDaySelected,
+                    isDisabled && visitorDashboardStyles.webCalendarDayDisabled,
+                  ]}
+                  disabled={isDisabled}
+                  onPress={() => applyAppointmentDateSelection(date)}
+                >
+                  <Text
+                    style={[
+                      visitorDashboardStyles.webCalendarDayText,
+                      isSelected && visitorDashboardStyles.webCalendarDayTextSelected,
+                      isDisabled && visitorDashboardStyles.webCalendarDayTextDisabled,
+                    ]}
+                  >
+                    {date.getDate()}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={visitorDashboardStyles.webTimePane}>
+          <View style={visitorDashboardStyles.webTimeHeader}>
+            <View>
+              <Text style={visitorDashboardStyles.webTimeTitle}>
+                {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </Text>
+              <Text style={visitorDashboardStyles.webTimeSubtitle}>
+                {hasDepartments ? "Choose an available slot." : "Choose office(s) first to check slot limits."}
+              </Text>
+            </View>
+            {isLoadingAppointmentSlots ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+          </View>
+
+          <View style={visitorDashboardStyles.webTimeGroups}>
+            {getAppointmentTimeGroups().map((group) => (
+              <View key={group.label} style={visitorDashboardStyles.webTimeGroup}>
+                <View style={visitorDashboardStyles.webTimeGroupHeader}>
+                  <Ionicons
+                    name={group.label === "Morning" ? "sunny-outline" : group.label === "Afternoon" ? "partly-sunny-outline" : "moon-outline"}
+                    size={16}
+                    color="#BFDBFE"
+                  />
+                  <Text style={visitorDashboardStyles.webTimeGroupTitle}>{group.label}</Text>
+                </View>
+                <View style={visitorDashboardStyles.webTimeSlotGrid}>
+                  {group.options.map((option) => {
+                    const isSelected = isSameAppointmentTime(option, selectedTime);
+                    const isFull = isAppointmentTimeSlotFull(option);
+                    const isDisabled = isLoadingAppointmentSlots || isFull;
+                    return (
+                      <TouchableOpacity
+                        key={`${group.label}-${option.getHours()}-${option.getMinutes()}`}
+                        style={[
+                          visitorDashboardStyles.webTimeSlotButton,
+                          isFull && visitorDashboardStyles.webTimeSlotButtonUnavailable,
+                          isSelected && visitorDashboardStyles.webTimeSlotButtonSelected,
+                        ]}
+                        disabled={isDisabled}
+                        onPress={() => handleAppointmentSlotTimeSelect(option)}
+                      >
+                        <Text
+                          style={[
+                            visitorDashboardStyles.webTimeSlotText,
+                            isFull && visitorDashboardStyles.webTimeSlotTextUnavailable,
+                            isSelected && visitorDashboardStyles.webTimeSlotTextSelected,
+                          ]}
+                        >
+                          {formatTime(option)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </View>
+
+          <View style={visitorDashboardStyles.webSelectedSlotBar}>
+            <Text style={visitorDashboardStyles.webSelectedSlotLabel}>Selected</Text>
+            <Text style={visitorDashboardStyles.webSelectedSlotValue}>{selectedLabel}</Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const isAppointmentManageable = (record = visitor) => {
     const appointmentStatus = String(record?.appointmentStatus || "").toLowerCase();
     const visitStatus = String(record?.status || "").toLowerCase();
@@ -2263,8 +2655,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (currentAppointmentRecord?._id && record?._id && String(record._id) !== String(currentAppointmentRecord._id)) {
       return false;
     }
-    return ["pending", "approved", "adjusted", "rescheduled"].includes(appointmentStatus);
+    return ["pending", "approved", "adjusted", "adjustment_pending", "rescheduled"].includes(appointmentStatus);
   };
+
+  const isStaffAdjustmentPending = (record = visitor) =>
+    record?.approvalFlow === "staff" &&
+    String(record?.appointmentStatus || "").toLowerCase() === "adjustment_pending";
 
   const getAppointmentManageDisabledReason = (record = visitor) => {
     const appointmentStatus = String(record?.appointmentStatus || "").toLowerCase();
@@ -2334,13 +2730,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const selectedDate = getValidDate(selectedValue);
     if (!selectedDate) return;
     selectedDate.setHours(12, 0, 0, 0);
-    if (selectedDate.getDay() === 0) {
-      const adjustedDate = getNextAvailableAppointmentDate(selectedDate);
+    if (isAppointmentDateUnavailable(selectedDate)) {
+      const holiday = getAppointmentHolidayInfo(selectedDate);
       showVisitorAlert(
-        "Sunday Unavailable",
-        `Appointments are only available from Monday to Saturday. We moved your date to ${formatDate(adjustedDate)}.`,
+        holiday ? "Holiday Unavailable" : "Sunday Unavailable",
+        holiday
+          ? `${holiday.name} is unavailable for appointments. Please choose another date.`
+          : "Appointments are only available from Monday to Saturday. Please choose another date.",
       );
-      selectedDate.setTime(adjustedDate.getTime());
+      return;
     }
     setAppointmentEditForm((prev) => ({ ...prev, preferredDate: selectedDate }));
   };
@@ -2585,10 +2983,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
-    if (new Date(preferredDate).getDay() === 0) {
+    if (isAppointmentDateUnavailable(preferredDate)) {
+      const holiday = getAppointmentHolidayInfo(preferredDate);
       showVisitorAlert(
-        "Sunday Unavailable",
-        "Appointments are only available from Monday to Saturday. Please choose another date.",
+        holiday ? "Holiday Unavailable" : "Sunday Unavailable",
+        holiday
+          ? `${holiday.name} is unavailable for appointments. Please choose another date.`
+          : "Appointments are only available from Monday to Saturday. Please choose another date.",
       );
       return;
     }
@@ -3136,6 +3537,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (visitor?.approvalStatus === "pending") return "#F59E0B";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "#F59E0B";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "#D97706";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjustment_pending") return "#7C3AED";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "#0A3D91";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "cancelled") return "#6B7280";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "#DC2626";
@@ -3156,6 +3558,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (visitor?.approvalStatus === "pending") return "Pending Admin Approval";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "Pending";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "Reschedule Requested";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjustment_pending") return "Confirm Schedule";
     if (visitor?.approvalFlow === "staff" && ["approved", "adjusted"].includes(visitor?.appointmentStatus)) return "Approved";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "cancelled") return "Appointment Cancelled";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "Appointment Declined";
@@ -3176,6 +3579,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (visitor?.approvalStatus === "pending") return "time-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "briefcase-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "refresh-circle-outline";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjustment_pending") return "help-circle-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjusted") return "swap-horizontal-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "cancelled") return "ban-outline";
     if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "close-circle";
@@ -3194,6 +3598,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const getAppointmentStatusText = (record = {}) => {
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "Pending";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "Reschedule Requested";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjustment_pending") return "Needs Your Confirmation";
     if (record?.approvalFlow === "staff" && ["approved", "adjusted"].includes(record?.appointmentStatus)) return "Approved";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "cancelled") return "Cancelled";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "Declined";
@@ -3214,6 +3619,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (record?.approvalStatus === "pending") return "#F59E0B";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "#F59E0B";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "#D97706";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjustment_pending") return "#7C3AED";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjusted") return "#0A3D91";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "cancelled") return "#6B7280";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "#DC2626";
@@ -3233,6 +3639,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (record?.approvalStatus === "pending") return "time-outline";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "briefcase-outline";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "refresh-circle-outline";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjustment_pending") return "help-circle-outline";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjusted") return "swap-horizontal-outline";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "cancelled") return "ban-outline";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "close-circle";
@@ -3302,7 +3709,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const isPendingStaffReview =
     !isPendingApproval &&
     visitor?.approvalFlow === "staff" &&
-    ["pending", "rescheduled"].includes(String(visitor?.appointmentStatus || "").toLowerCase());
+    ["pending", "rescheduled", "adjustment_pending"].includes(String(visitor?.appointmentStatus || "").toLowerCase());
   const isAdjustedAppointment =
     visitor?.approvalFlow === "staff" &&
     visitor?.appointmentStatus === "adjusted" &&
@@ -3395,6 +3802,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       dateSortValue: getAppointmentDateSortValue(record),
       timeSortValue: getAppointmentTimeSortValue(record),
       description:
+        String(record?.appointmentStatus || "").toLowerCase() === "adjustment_pending"
+          ? `Staff proposed this schedule. Confirm it if you are available, or choose another date and time.`
+          :
         record?.appointmentCancellationReason ||
         record?.appointmentRescheduleReason ||
         record?.staffAdjustmentNote ||
@@ -3756,7 +4166,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   );
 
   const renderAppointmentSegmentBar = (activeScreen) => (
-    <View style={visitorDashboardStyles.appointmentSegmentBar}>
+    <View style={[visitorDashboardStyles.appointmentSegmentBar, isVisitorDarkMode && visitorDashboardStyles.darkSegmentBar]}>
       {appointmentScreenTabs.map((tab) => {
         const isActive = tab.id === activeScreen;
         const onPress =
@@ -3771,6 +4181,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             key={tab.id}
             style={[
               visitorDashboardStyles.appointmentSegmentButton,
+              isVisitorDarkMode && visitorDashboardStyles.darkSegmentButton,
               isActive && visitorDashboardStyles.appointmentSegmentButtonActive,
             ]}
             activeOpacity={0.88}
@@ -3779,11 +4190,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             <Ionicons
               name={tab.icon}
               size={16}
-              color={isActive ? "#FFFFFF" : "#475569"}
+              color={isActive ? "#FFFFFF" : isVisitorDarkMode ? "#CBD5E1" : "#475569"}
             />
             <Text
               style={[
                 visitorDashboardStyles.appointmentSegmentText,
+                isVisitorDarkMode && visitorDashboardStyles.darkMutedText,
                 isActive && visitorDashboardStyles.appointmentSegmentTextActive,
               ]}
             >
@@ -4007,6 +4419,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     </View>
   );
 
+  const accountDisplayName = visitor?.fullName || displayName || "Visitor";
+  const accountFirstName = accountDisplayName.split(" ")[0] || accountDisplayName;
+
   const renderAccountPanel = () => (
     <View
       style={[
@@ -4034,16 +4449,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText,
             ]}
           >
-            Your Visitor Account
-          </Text>
-          <Text
-            style={[
-              visitorDashboardStyles.visitorFlowPanelSubtitle,
-              isCompactVisitorDashboard && visitorDashboardStyles.accountMobileSubtitle,
-              isVisitorDarkMode && visitorDashboardStyles.darkMutedText,
-            ]}
-          >
-            Review your visitor details, open your profile, or sign out securely.
+            {`${accountFirstName}'s Account`}
           </Text>
         </View>
       </View>
@@ -4068,10 +4474,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </View>
             <View style={visitorDashboardStyles.accountHeroCopy}>
               <Text style={[visitorDashboardStyles.accountHeroName, isCompactVisitorDashboard && visitorDashboardStyles.accountHeroNameMobile]}>
-                {visitor?.fullName || displayName}
+                {accountDisplayName}
               </Text>
               <Text style={[visitorDashboardStyles.accountHeroSubtext, isCompactVisitorDashboard && visitorDashboardStyles.accountHeroSubtextMobile]}>
-                Manage your visitor profile, appointment status, and secure access session.
+                SafePass ID, account status, and profile access in one place.
               </Text>
             </View>
           </View>
@@ -4108,7 +4514,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         <View style={[visitorDashboardStyles.accountPanelRow, isCompactVisitorDashboard && visitorDashboardStyles.accountPanelRowMobile, isVisitorDarkMode && visitorDashboardStyles.darkDividerBorder]}>
           <Text style={visitorDashboardStyles.accountPanelLabel}>Full Name</Text>
           <Text style={[visitorDashboardStyles.accountPanelValue, isCompactVisitorDashboard && visitorDashboardStyles.accountPanelValueMobile, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
-            {visitor?.fullName || displayName}
+            {accountDisplayName}
           </Text>
         </View>
         <View style={[visitorDashboardStyles.accountPanelRow, isCompactVisitorDashboard && visitorDashboardStyles.accountPanelRowMobile, isVisitorDarkMode && visitorDashboardStyles.darkDividerBorder]}>
@@ -4129,74 +4535,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
       </View>
 
-      <View style={[visitorDashboardStyles.accountVisitSummaryCard, isCompactVisitorDashboard && visitorDashboardStyles.accountMobileCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
-        <Text style={visitorDashboardStyles.accountVisitSummaryEyebrow}>Visitor Pass</Text>
-        <Text style={[visitorDashboardStyles.accountVisitSummaryTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
-          {journeyTitle}
-        </Text>
-        <Text style={[visitorDashboardStyles.accountVisitSummaryText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
-          {journeySubtitle}
-        </Text>
-
-        <View style={visitorDashboardStyles.accountVisitSummaryBadge}>
-          <View
-            style={[
-              visitorDashboardStyles.accountVisitSummaryBadgeDot,
-              { backgroundColor: statusColor },
-            ]}
-          />
-          <Text style={[visitorDashboardStyles.accountVisitSummaryBadgeText, { color: statusColor }]}>
-            {statusText}
-          </Text>
-        </View>
-
-        <View style={visitorDashboardStyles.accountVisitSummaryGrid}>
-          <View style={[visitorDashboardStyles.accountVisitSummaryMetric, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
-            <Text style={visitorDashboardStyles.accountVisitSummaryMetricLabel}>Visit Date</Text>
-            <Text style={[visitorDashboardStyles.accountVisitSummaryMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
-              {visitor?.visitDate ? formatDate(visitor.visitDate) : "Not scheduled"}
-            </Text>
-          </View>
-          <View style={[visitorDashboardStyles.accountVisitSummaryMetric, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
-            <Text style={visitorDashboardStyles.accountVisitSummaryMetricLabel}>Visit Time</Text>
-            <Text style={[visitorDashboardStyles.accountVisitSummaryMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
-              {visitor?.visitTime ? formatTime(visitor.visitTime) : "Not scheduled"}
-            </Text>
-          </View>
-          <View style={[visitorDashboardStyles.accountVisitSummaryMetric, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
-            <Text style={visitorDashboardStyles.accountVisitSummaryMetricLabel}>Purpose</Text>
-            <Text style={[visitorDashboardStyles.accountVisitSummaryMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
-              {visitor?.purposeOfVisit || "Pending purpose"}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={[visitorDashboardStyles.accountActionGrid, isCompactVisitorDashboard && visitorDashboardStyles.accountActionGridMobile]}>
-        <View style={[visitorDashboardStyles.accountActionCard, isCompactVisitorDashboard && visitorDashboardStyles.accountActionCardMobile, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
-          <View style={[visitorDashboardStyles.accountActionIcon, isCompactVisitorDashboard && visitorDashboardStyles.accountActionCardMobileIcon]}>
-            <Ionicons name="mail-outline" size={18} color="#0A3D91" />
-          </View>
-          <View style={visitorDashboardStyles.accountActionCopy}>
-            <Text style={[visitorDashboardStyles.accountActionTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Verification</Text>
-            <Text style={[visitorDashboardStyles.accountActionText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
-              Keep your email active so appointment updates and approval notices reach you.
-            </Text>
-          </View>
-        </View>
-        <View style={[visitorDashboardStyles.accountActionCard, isCompactVisitorDashboard && visitorDashboardStyles.accountActionCardMobile, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
-          <View style={[visitorDashboardStyles.accountActionIcon, isCompactVisitorDashboard && visitorDashboardStyles.accountActionCardMobileIcon]}>
-            <Ionicons name="document-text-outline" size={18} color="#0A3D91" />
-          </View>
-          <View style={visitorDashboardStyles.accountActionCopy}>
-            <Text style={[visitorDashboardStyles.accountActionTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Appointment Records</Text>
-            <Text style={[visitorDashboardStyles.accountActionText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
-              Your active visit status and assigned office appear here once requests are processed.
-            </Text>
-          </View>
-        </View>
-      </View>
-
       <View style={visitorDashboardStyles.accountButtonDock}>
         <AnimatedPressable
           style={[visitorDashboardStyles.visitorFlowPrimaryButton, visitorDashboardStyles.accountDockPrimaryButton]}
@@ -4205,7 +4543,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         >
           <Ionicons name="create-outline" size={18} color="#FFFFFF" />
           <Text style={visitorDashboardStyles.visitorFlowPrimaryButtonText}>
-            Open Profile
+            Edit Profile
           </Text>
         </AnimatedPressable>
 
@@ -4352,7 +4690,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         style={[
           visitorDashboardStyles.sectionIntroCard,
           dashboardSectionResponsiveStyle,
-          { backgroundColor: sectionIntro.accentSoft },
+          isVisitorDarkMode
+            ? visitorDashboardStyles.darkSurfaceCard
+            : { backgroundColor: sectionIntro.accentSoft },
         ]}
       >
         <View style={visitorDashboardStyles.sectionIntroTopRow}>
@@ -4380,20 +4720,30 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <Text style={[visitorDashboardStyles.sectionIntroEyebrow, { color: sectionIntro.accent }]}>
             {sectionIntro.eyebrow}
           </Text>
-          <Text style={visitorDashboardStyles.sectionIntroTitle}>{sectionIntro.title}</Text>
-          <Text style={visitorDashboardStyles.sectionIntroSubtitle}>{sectionIntro.subtitle}</Text>
+          <Text style={[visitorDashboardStyles.sectionIntroTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+            {sectionIntro.title}
+          </Text>
+          <Text style={[visitorDashboardStyles.sectionIntroSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
+            {sectionIntro.subtitle}
+          </Text>
         </View>
 
         <View style={visitorDashboardStyles.sectionIntroHighlightRow}>
           {sectionIntro.highlights.map((item) => (
-            <View key={item} style={visitorDashboardStyles.sectionIntroHighlightPill}>
+            <View
+              key={item}
+              style={[
+                visitorDashboardStyles.sectionIntroHighlightPill,
+                isVisitorDarkMode && visitorDashboardStyles.darkReadablePill,
+              ]}
+            >
               <View
                 style={[
                   visitorDashboardStyles.sectionIntroHighlightDot,
                   { backgroundColor: sectionIntro.accent },
                 ]}
               />
-              <Text style={visitorDashboardStyles.sectionIntroHighlightText}>{item}</Text>
+              <Text style={[visitorDashboardStyles.sectionIntroHighlightText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>{item}</Text>
             </View>
           ))}
         </View>
@@ -4401,7 +4751,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     </ScrollReveal>
   );
 
-  const renderVisitorEmptyState = () => (
+  const renderVisitorEmptyState = () => {
+    if (isCheckedOutVisitor) return null;
+
+    return (
     <View style={visitorDashboardStyles.emptyState}>
       <View style={visitorDashboardStyles.emptyIconContainer}>
         <Ionicons name="id-card-outline" size={80} color="#9CA3AF" />
@@ -4424,18 +4777,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
       ) : null}
       <Text style={visitorDashboardStyles.emptyTitle}>
-        {isCheckedOutVisitor
-          ? "Your Visit Is Complete"
-          : canCreateFreshAppointment
-            ? "Request Your Next Visit"
-            : "No Active Visit Yet"}
+        {canCreateFreshAppointment ? "Request Your Next Visit" : "No Active Visit Yet"}
       </Text>
       <Text style={visitorDashboardStyles.emptyText}>
-        {isCheckedOutVisitor
-          ? "The NFC pass for that visit is now disabled. You can review your approval trail or request another appointment when you need to return."
-          : canCreateFreshAppointment
-            ? "Your visitor account is already active. Submit a new preferred date, time, and purpose here instead of registering again."
-            : "Your visitor account is active. Submit an appointment request so your approved pass can appear here."}
+        {canCreateFreshAppointment
+          ? "Your visitor account is already active. Submit a new preferred date, time, and purpose here instead of registering again."
+          : "Your visitor account is active. Submit an appointment request so your approved pass can appear here."}
       </Text>
       <AnimatedPressable
         style={visitorDashboardStyles.registerButton}
@@ -4460,7 +4807,51 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </LinearGradient>
       </AnimatedPressable>
     </View>
-  );
+    );
+  };
+
+  const submitStaffAdjustmentAcceptance = async (record = visitor) => {
+    if (!record?._id || isUpdatingAppointment) return;
+
+    if (!isStaffAdjustmentPending(record)) {
+      showVisitorAlert("No Proposal", "There is no staff proposed schedule waiting for confirmation.");
+      return;
+    }
+
+    setIsUpdatingAppointment(true);
+    try {
+      const response = await ApiService.acceptVisitorAppointmentAdjustment(record._id);
+      if (response?.success) {
+        showVisitorPushNotice({
+          title: "Appointment Confirmed",
+          message: response.message || "Your adjusted appointment has been confirmed.",
+          type: "success",
+        });
+        showVisitorAlert("Appointment Confirmed", response.message || "Your adjusted appointment has been confirmed.");
+        await loadVisitorData();
+        handleAppointmentScreenNavigation("history", "Refreshing appointment history...");
+        return;
+      }
+
+      showVisitorAlert("Confirm Failed", response?.message || "Failed to confirm the proposed appointment.");
+    } catch (error) {
+      console.error("Accept staff adjustment error:", error);
+      showVisitorAlert("Confirm Failed", error?.message || "Failed to confirm the proposed appointment.");
+    } finally {
+      setIsUpdatingAppointment(false);
+    }
+  };
+
+  const confirmStaffAdjustmentAcceptance = (record = visitor) => {
+    showVisitorAlert(
+      "Confirm Staff Schedule",
+      "Tap confirm if the proposed date and time works for you. Your virtual card will be scheduled for that visit window.",
+      [
+        { text: "Back", style: "cancel" },
+        { text: "Confirm", onPress: () => submitStaffAdjustmentAcceptance(record) },
+      ],
+    );
+  };
 
   const renderApprovedVisitorDashboard = () => (
     <>
@@ -4791,24 +5182,24 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const renderAppointmentNavigationSplash = () => (
     <View style={[visitorDashboardStyles.appointmentScreenShell, dashboardSectionResponsiveStyle]}>
-      <View style={visitorDashboardStyles.appointmentLoadingCard}>
+      <View style={[visitorDashboardStyles.appointmentLoadingCard, isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard]}>
         <View style={visitorDashboardStyles.appointmentLoadingIconWrap}>
           <ActivityIndicator size="small" color="#0A3D91" />
         </View>
-        <Text style={visitorDashboardStyles.appointmentLoadingTitle}>Preparing Appointment Module</Text>
-        <Text style={visitorDashboardStyles.appointmentLoadingText}>{appointmentTransitionLabel}</Text>
+        <Text style={[visitorDashboardStyles.appointmentLoadingTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Preparing Appointment Module</Text>
+        <Text style={[visitorDashboardStyles.appointmentLoadingText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>{appointmentTransitionLabel}</Text>
       </View>
     </View>
   );
 
   const renderAppointmentMenuPanel = () => (
     <View style={[visitorDashboardStyles.appointmentScreenShell, dashboardSectionResponsiveStyle]}>
-      <View style={visitorDashboardStyles.appointmentMenuHero}>
+      <View style={[visitorDashboardStyles.appointmentMenuHero, isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard]}>
         <View style={visitorDashboardStyles.appointmentMenuHeroTop}>
           <View style={visitorDashboardStyles.appointmentMenuHeroCopy}>
             <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Appointment Module</Text>
-            <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Manage Your Visit</Text>
-            <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
+            <Text style={[visitorDashboardStyles.visitorFlowPanelTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Manage Your Visit</Text>
+            <Text style={[visitorDashboardStyles.visitorFlowPanelSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
               Use a cleaner flow for new requests and keep your latest appointment progress in one place.
             </Text>
           </View>
@@ -4825,7 +5216,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
       <View style={visitorDashboardStyles.appointmentMenuGrid}>
         <TouchableOpacity
-          style={visitorDashboardStyles.appointmentMenuCard}
+          style={[visitorDashboardStyles.appointmentMenuCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}
           activeOpacity={0.9}
           onPress={openAppointmentRequestScreen}
         >
@@ -4835,18 +5226,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <View style={visitorDashboardStyles.appointmentMenuCardChip}>
             <Text style={visitorDashboardStyles.appointmentMenuCardChipText}>Start here</Text>
           </View>
-          <Text style={visitorDashboardStyles.appointmentMenuCardTitle}>Appointment Request</Text>
-          <Text style={visitorDashboardStyles.appointmentMenuCardText}>
+          <Text style={[visitorDashboardStyles.appointmentMenuCardTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Appointment Request</Text>
+          <Text style={[visitorDashboardStyles.appointmentMenuCardText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Open the full appointment form and submit a new campus visit request.
           </Text>
           <View style={visitorDashboardStyles.appointmentMenuCardFooter}>
-            <Text style={visitorDashboardStyles.appointmentMenuCardFooterText}>Purpose, office, date, time</Text>
+            <Text style={[visitorDashboardStyles.appointmentMenuCardFooterText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>Purpose, office, date, time</Text>
             <Ionicons name="arrow-forward-outline" size={18} color="#0A3D91" />
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={visitorDashboardStyles.appointmentMenuCard}
+          style={[visitorDashboardStyles.appointmentMenuCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}
           activeOpacity={0.9}
           onPress={() =>
             handleAppointmentScreenNavigation("history", "Loading appointment history...")
@@ -4865,12 +5256,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               Latest trail
             </Text>
           </View>
-          <Text style={visitorDashboardStyles.appointmentMenuCardTitle}>Appointment History</Text>
-          <Text style={visitorDashboardStyles.appointmentMenuCardText}>
+          <Text style={[visitorDashboardStyles.appointmentMenuCardTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Appointment History</Text>
+          <Text style={[visitorDashboardStyles.appointmentMenuCardText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Review older appointment records. History is read-only and cannot be edited or deleted.
           </Text>
           <View style={visitorDashboardStyles.appointmentMenuCardFooter}>
-            <Text style={visitorDashboardStyles.appointmentMenuCardFooterText}>Older records only</Text>
+            <Text style={[visitorDashboardStyles.appointmentMenuCardFooterText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>Older records only</Text>
             <Ionicons name="arrow-forward-outline" size={18} color="#0A3D91" />
           </View>
         </TouchableOpacity>
@@ -4880,15 +5271,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const renderAppointmentRequestPanel = () => (
     <View style={[visitorDashboardStyles.appointmentScreenShell, dashboardSectionResponsiveStyle]}>
-      <View style={visitorDashboardStyles.appointmentScreenCard}>
+      <View style={[visitorDashboardStyles.appointmentScreenCard, isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard]}>
         <LinearGradient
-          colors={["#EAF3FF", "#FFFFFF"]}
+          colors={isVisitorDarkMode ? ["#0F172A", "#111C2E"] : ["#EAF3FF", "#FFFFFF"]}
           style={visitorDashboardStyles.appointmentModalHeader}
         >
           <View style={visitorDashboardStyles.appointmentModalHeaderContent}>
             <View style={visitorDashboardStyles.appointmentModalHeaderCopy}>
-              <Text style={visitorDashboardStyles.appointmentModalTitle}>Appointment Request</Text>
-              <Text style={visitorDashboardStyles.appointmentModalSubtitle}>
+              <Text style={[visitorDashboardStyles.appointmentModalTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Appointment Request</Text>
+              <Text style={[visitorDashboardStyles.appointmentModalSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
                 Choose a schedule, office, and ID for staff review.
               </Text>
             </View>
@@ -4897,7 +5288,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             onPress={closeAppointmentRequestScreen}
             style={visitorDashboardStyles.appointmentHeaderBackButton}
           >
-            <Ionicons name="arrow-back-outline" size={20} color="#0F172A" />
+            <Ionicons name="arrow-back-outline" size={20} color={isVisitorDarkMode ? "#F8FAFC" : "#0F172A"} />
           </TouchableOpacity>
         </LinearGradient>
 
@@ -4905,16 +5296,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           {renderAppointmentSegmentBar("request")}
 
           {appointmentFeedback ? (
-            <View style={visitorDashboardStyles.appointmentSuccessCard}>
+            <View style={[visitorDashboardStyles.appointmentSuccessCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
               <View style={visitorDashboardStyles.appointmentSuccessHeader}>
                 <View style={visitorDashboardStyles.appointmentSuccessIconWrap}>
                   <Ionicons name="checkmark-circle" size={22} color="#0A3D91" />
                 </View>
                 <View style={visitorDashboardStyles.appointmentSuccessTextWrap}>
-                  <Text style={visitorDashboardStyles.appointmentSuccessTitle}>
+                  <Text style={[visitorDashboardStyles.appointmentSuccessTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
                     {appointmentFeedback.title}
                   </Text>
-                  <Text style={visitorDashboardStyles.appointmentSuccessText}>
+                  <Text style={[visitorDashboardStyles.appointmentSuccessText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
                     {appointmentFeedback.message}
                   </Text>
                 </View>
@@ -4923,219 +5314,225 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           ) : null}
 
           <View style={visitorDashboardStyles.appointmentQuickInfoRow}>
-            <View style={visitorDashboardStyles.appointmentQuickInfoCard}>
+            <View style={[visitorDashboardStyles.appointmentQuickInfoCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
               <Ionicons name="calendar-clear-outline" size={17} color="#0A3D91" />
-              <Text style={visitorDashboardStyles.appointmentQuickInfoLabel}>Availability</Text>
-              <Text style={visitorDashboardStyles.appointmentQuickInfoValue}>Per time slot</Text>
+              <Text style={[visitorDashboardStyles.appointmentQuickInfoLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Availability</Text>
+              <Text style={[visitorDashboardStyles.appointmentQuickInfoValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Per time slot</Text>
             </View>
-            <View style={visitorDashboardStyles.appointmentQuickInfoCard}>
+            <View style={[visitorDashboardStyles.appointmentQuickInfoCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
               <Ionicons name="briefcase-outline" size={17} color="#0A3D91" />
-              <Text style={visitorDashboardStyles.appointmentQuickInfoLabel}>Days</Text>
-              <Text style={visitorDashboardStyles.appointmentQuickInfoValue}>Mon - Sat</Text>
+              <Text style={[visitorDashboardStyles.appointmentQuickInfoLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Days</Text>
+              <Text style={[visitorDashboardStyles.appointmentQuickInfoValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Mon - Sat</Text>
             </View>
-            <View style={visitorDashboardStyles.appointmentQuickInfoCard}>
+            <View style={[visitorDashboardStyles.appointmentQuickInfoCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
               <Ionicons name="shield-checkmark-outline" size={17} color="#0A3D91" />
-              <Text style={visitorDashboardStyles.appointmentQuickInfoLabel}>Review</Text>
-              <Text style={visitorDashboardStyles.appointmentQuickInfoValue}>Staff approval</Text>
+              <Text style={[visitorDashboardStyles.appointmentQuickInfoLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Review</Text>
+              <Text style={[visitorDashboardStyles.appointmentQuickInfoValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Staff approval</Text>
             </View>
           </View>
 
-          <View style={visitorDashboardStyles.appointmentStepStrip}>
+          <View style={[visitorDashboardStyles.appointmentStepStrip, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
             {[
               ["Schedule", "Date and time"],
               ["Office", "Destination"],
               ["ID", "Valid ID photo"],
             ].map(([title, text], index) => (
-              <View key={title} style={visitorDashboardStyles.appointmentStepPill}>
+              <View key={title} style={[visitorDashboardStyles.appointmentStepPill, isVisitorDarkMode && visitorDashboardStyles.darkReadablePill]}>
                 <View style={visitorDashboardStyles.appointmentStepNumber}>
                   <Text style={visitorDashboardStyles.appointmentStepNumberText}>{index + 1}</Text>
                 </View>
                 <View style={visitorDashboardStyles.appointmentStepCopy}>
-                  <Text style={visitorDashboardStyles.appointmentStepTitle}>{title}</Text>
-                  <Text style={visitorDashboardStyles.appointmentStepText}>{text}</Text>
+                  <Text style={[visitorDashboardStyles.appointmentStepTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>{title}</Text>
+                  <Text style={[visitorDashboardStyles.appointmentStepText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>{text}</Text>
                 </View>
               </View>
             ))}
           </View>
 
-          <View style={appointmentFormRowResponsiveStyle}>
-          <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
-            <Text style={visitorDashboardStyles.appointmentFieldLabel}>Preferred Date</Text>
-            <TouchableOpacity
-              style={visitorDashboardStyles.appointmentPickerField}
-              onPress={handleAppointmentDatePress}
-              activeOpacity={0.85}
-            >
-              <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
-                <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
-                  <Ionicons name="calendar-outline" size={18} color="#0A3D91" />
-                </View>
-                <View>
-                  <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a date</Text>
-                  <Text style={visitorDashboardStyles.appointmentPickerValue}>
-                    {formatAppointmentPickerDate(appointmentForm.preferredDate)}
-                  </Text>
-                </View>
-              </View>
-              <Ionicons
-                name={Platform.OS === "web" ? "calendar-clear-outline" : showAppointmentDatePicker ? "chevron-up" : "chevron-down"}
-                size={18}
-                color="#94A3B8"
-              />
-            </TouchableOpacity>
-
-            {Platform.OS === "web" ? (
-              <input
-                ref={appointmentWebDateInputRef}
-                type="date"
-                value={getAppointmentWebDateValue()}
-                min={getAppointmentMinDateValue()}
-                onChange={handleAppointmentWebDateChange}
-                style={{
-                  position: "absolute",
-                  width: 1,
-                  height: 1,
-                  opacity: 0,
-                  pointerEvents: "none",
-                }}
-                aria-label="Preferred appointment date"
-              />
-            ) : null}
-
-            {Platform.OS !== "web" && showAppointmentDatePicker && DateTimePickerComponent ? (
-              <DateTimePickerComponent
-                value={getValidDate(appointmentForm.preferredDate) || getDefaultAppointmentDate()}
-                mode="date"
-                display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={handleAppointmentDateChange}
-                minimumDate={getNextAvailableAppointmentDate(new Date())}
-              />
-            ) : null}
-          </View>
-
-          <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
-            <Text style={visitorDashboardStyles.appointmentFieldLabel}>Preferred Time</Text>
-            <TouchableOpacity
-              style={visitorDashboardStyles.appointmentPickerField}
-              onPress={() => {
-                const shouldOpenTimePicker = !showAppointmentTimePicker;
-                closeAppointmentPopovers();
-                setShowAppointmentTimePicker(shouldOpenTimePicker);
-              }}
-              activeOpacity={0.85}
-            >
-              <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
-                <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
-                  <Ionicons name="time-outline" size={18} color="#0A3D91" />
-                </View>
-                <View>
-                  <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a time</Text>
-                  <Text style={visitorDashboardStyles.appointmentPickerValue}>
-                    {appointmentForm.preferredTime ? formatTime(appointmentForm.preferredTime) : "Select preferred time"}
-                  </Text>
-                  {appointmentForm.preferredTime ? (
-                    <Text
-                      style={[
-                        visitorDashboardStyles.appointmentPickerSubValue,
-                        isAppointmentTimeSlotFull(appointmentForm.preferredTime) &&
-                          visitorDashboardStyles.appointmentPickerSubValueError,
-                      ]}
-                    >
-                      {getAppointmentSlotStatusText(appointmentForm.preferredTime)}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-              <Ionicons
-                name={showAppointmentTimePicker ? "chevron-up" : "chevron-down"}
-                size={18}
-                color="#94A3B8"
-              />
-            </TouchableOpacity>
-
-            {showAppointmentTimePicker ? (
-              <View style={visitorDashboardStyles.pickerDropdownMenu}>
-                <ScrollView
-                  style={visitorDashboardStyles.pickerDropdownScroll}
-                  nestedScrollEnabled
-                  showsVerticalScrollIndicator={false}
+          {Platform.OS === "web" ? (
+            renderWebAppointmentDateTimePicker()
+          ) : isCompactVisitorDashboard ? (
+            renderMobileAppointmentSlotPicker()
+          ) : (
+            <View style={appointmentFormRowResponsiveStyle}>
+              <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
+                <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Preferred Date</Text>
+                <TouchableOpacity
+                  style={[visitorDashboardStyles.appointmentPickerField, isVisitorDarkMode && visitorDashboardStyles.darkFormControl]}
+                  onPress={handleAppointmentDatePress}
+                  activeOpacity={0.85}
                 >
-                  {appointmentTimeOptions.map((option) => {
-                    const isSelected =
-                      appointmentForm.preferredTime &&
-                      new Date(appointmentForm.preferredTime).getHours() === option.getHours() &&
-                      new Date(appointmentForm.preferredTime).getMinutes() === option.getMinutes();
-                    const slotInfo = getAppointmentSlotInfo(option);
-                    const isFull = Boolean(slotInfo?.isFull);
-                    return (
-                      <TouchableOpacity
-                        key={`${option.getHours()}-${option.getMinutes()}`}
-                        style={[
-                          visitorDashboardStyles.pickerOptionItem,
-                          isSelected && visitorDashboardStyles.pickerOptionItemActive,
-                          isFull && visitorDashboardStyles.pickerOptionItemDisabled,
-                        ]}
-                        disabled={isFull}
-                        onPress={() => {
-                          setHasAppointmentDraft(true);
-                          setAppointmentForm((prev) => ({ ...prev, preferredTime: option }));
-                          setShowAppointmentTimePicker(false);
-                        }}
-                      >
-                        <View>
-                          <Text
-                            style={[
-                              visitorDashboardStyles.pickerOptionText,
-                              isSelected && visitorDashboardStyles.pickerOptionTextActive,
-                              isFull && visitorDashboardStyles.pickerOptionTextDisabled,
-                            ]}
-                          >
-                            {formatTime(option)}
-                          </Text>
-                          <Text
-                            style={[
-                              visitorDashboardStyles.pickerOptionMeta,
-                              isFull && visitorDashboardStyles.pickerOptionMetaFull,
-                            ]}
-                          >
-                            {getAppointmentSlotStatusText(option)}
-                          </Text>
-                        </View>
-                        {isSelected ? (
-                          <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
-                        ) : isFull ? (
-                          <Ionicons name="lock-closed-outline" size={18} color="#DC2626" />
-                        ) : null}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : null}
+                  <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
+                    <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
+                      <Ionicons name="calendar-outline" size={18} color="#0A3D91" />
+                    </View>
+                    <View>
+                      <Text style={[visitorDashboardStyles.appointmentPickerLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Choose a date</Text>
+                      <Text style={[visitorDashboardStyles.appointmentPickerValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+                        {formatAppointmentPickerDate(appointmentForm.preferredDate)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons
+                    name={Platform.OS === "web" ? "calendar-clear-outline" : showAppointmentDatePicker ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
 
-            <Text
-              style={[
-                visitorDashboardStyles.appointmentAutoHint,
-                isAppointmentTimeSlotFull(appointmentForm.preferredTime) &&
-                  visitorDashboardStyles.appointmentAutoHintError,
-              ]}
-            >
-              {isAppointmentTimeSlotFull(appointmentForm.preferredTime)
-                ? "Slots are full please select another time or date."
-                : isLoadingAppointmentSlots
-                  ? "Checking staff slot availability..."
-                  : appointmentAvailability?.assignedStaff
-                    ? `Slots are limited by the selected time for ${appointmentAvailability.assignedStaff.name}.`
-                    : "Choose office(s) first so we can check available staff slots."}
-            </Text>
-          </View>
-          </View>
+                {Platform.OS === "web" ? (
+                  <input
+                    ref={appointmentWebDateInputRef}
+                    type="date"
+                    value={getAppointmentWebDateValue()}
+                    min={getAppointmentMinDateValue()}
+                    onChange={handleAppointmentWebDateChange}
+                    style={{
+                      position: "absolute",
+                      width: 1,
+                      height: 1,
+                      opacity: 0,
+                      pointerEvents: "none",
+                    }}
+                    aria-label="Preferred appointment date"
+                  />
+                ) : null}
+
+                {Platform.OS !== "web" && showAppointmentDatePicker && DateTimePickerComponent ? (
+                  <DateTimePickerComponent
+                    value={getValidDate(appointmentForm.preferredDate) || getDefaultAppointmentDate()}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    onChange={handleAppointmentDateChange}
+                    minimumDate={getNextAvailableAppointmentDate(new Date())}
+                  />
+                ) : null}
+              </View>
+
+              <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
+                <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Preferred Time</Text>
+                <TouchableOpacity
+                  style={[visitorDashboardStyles.appointmentPickerField, isVisitorDarkMode && visitorDashboardStyles.darkFormControl]}
+                  onPress={() => {
+                    const shouldOpenTimePicker = !showAppointmentTimePicker;
+                    closeAppointmentPopovers();
+                    setShowAppointmentTimePicker(shouldOpenTimePicker);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={visitorDashboardStyles.appointmentPickerFieldLeft}>
+                    <View style={visitorDashboardStyles.appointmentPickerIconWrap}>
+                      <Ionicons name="time-outline" size={18} color="#0A3D91" />
+                    </View>
+                    <View>
+                      <Text style={[visitorDashboardStyles.appointmentPickerLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Choose a time</Text>
+                      <Text style={[visitorDashboardStyles.appointmentPickerValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+                        {appointmentForm.preferredTime ? formatTime(appointmentForm.preferredTime) : "Select preferred time"}
+                      </Text>
+                      {appointmentForm.preferredTime ? (
+                        <Text
+                          style={[
+                            visitorDashboardStyles.appointmentPickerSubValue,
+                            isAppointmentTimeSlotFull(appointmentForm.preferredTime) &&
+                              visitorDashboardStyles.appointmentPickerSubValueError,
+                          ]}
+                        >
+                          {getAppointmentSlotStatusText(appointmentForm.preferredTime)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Ionicons
+                    name={showAppointmentTimePicker ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+
+                {showAppointmentTimePicker ? (
+                  <View style={[visitorDashboardStyles.pickerDropdownMenu, isVisitorDarkMode && visitorDashboardStyles.darkDropdownMenu]}>
+                    <ScrollView
+                      style={visitorDashboardStyles.pickerDropdownScroll}
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {appointmentTimeOptions.map((option) => {
+                        const isSelected = isSameAppointmentTime(appointmentForm.preferredTime, option);
+                        const isFull = isAppointmentTimeSlotFull(option);
+                        return (
+                          <TouchableOpacity
+                            key={`${option.getHours()}-${option.getMinutes()}`}
+                            style={[
+                              visitorDashboardStyles.pickerOptionItem,
+                              isVisitorDarkMode && visitorDashboardStyles.darkOptionItem,
+                              isSelected && visitorDashboardStyles.pickerOptionItemActive,
+                              isFull && visitorDashboardStyles.pickerOptionItemDisabled,
+                            ]}
+                            disabled={isFull}
+                            onPress={() => {
+                              setHasAppointmentDraft(true);
+                              setAppointmentForm((prev) => ({ ...prev, preferredTime: option }));
+                              setShowAppointmentTimePicker(false);
+                            }}
+                          >
+                            <View>
+                              <Text
+                                style={[
+                                  visitorDashboardStyles.pickerOptionText,
+                                  isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText,
+                                  isSelected && visitorDashboardStyles.pickerOptionTextActive,
+                                  isFull && visitorDashboardStyles.pickerOptionTextDisabled,
+                                ]}
+                              >
+                                {formatTime(option)}
+                              </Text>
+                              <Text
+                                style={[
+                                 visitorDashboardStyles.pickerOptionMeta,
+                                  isVisitorDarkMode && visitorDashboardStyles.darkMutedText,
+                                  isFull && visitorDashboardStyles.pickerOptionMetaFull,
+                                ]}
+                              >
+                                {getAppointmentSlotStatusText(option)}
+                              </Text>
+                            </View>
+                            {isSelected ? (
+                              <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
+                            ) : isFull ? (
+                              <Ionicons name="lock-closed-outline" size={18} color="#DC2626" />
+                            ) : null}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ) : null}
+
+                <Text
+                  style={[
+                    visitorDashboardStyles.appointmentAutoHint,
+                    isVisitorDarkMode && visitorDashboardStyles.darkMutedText,
+                    isAppointmentTimeSlotFull(appointmentForm.preferredTime) &&
+                      visitorDashboardStyles.appointmentAutoHintError,
+                  ]}
+                >
+                  {isAppointmentTimeSlotFull(appointmentForm.preferredTime)
+                    ? "Slots are full please select another time or date."
+                    : isLoadingAppointmentSlots
+                      ? "Checking staff slot availability..."
+                      : appointmentAvailability?.assignedStaff
+                        ? `Slots are limited by the selected time for ${appointmentAvailability.assignedStaff.name}.`
+                        : "Choose office(s) first so we can check available staff slots."}
+                </Text>
+              </View>
+            </View>
+          )}
 
           <View style={appointmentFormRowResponsiveStyle}>
           <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
-            <Text style={visitorDashboardStyles.appointmentFieldLabel}>Office to Visit</Text>
+            <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Office to Visit</Text>
             <TouchableOpacity
-              style={visitorDashboardStyles.appointmentPickerField}
+              style={[visitorDashboardStyles.appointmentPickerField, isVisitorDarkMode && visitorDashboardStyles.darkFormControl]}
               onPress={() => {
                 const shouldOpenDepartmentDropdown = !showDepartmentDropdown;
                 closeAppointmentPopovers();
@@ -5148,8 +5545,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Ionicons name="business-outline" size={18} color="#0A3D91" />
                 </View>
                 <View>
-                  <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose an office</Text>
-                  <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                  <Text style={[visitorDashboardStyles.appointmentPickerLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Choose an office</Text>
+                  <Text style={[visitorDashboardStyles.appointmentPickerValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
                     {getSelectedAppointmentDepartmentsLabel()}
                   </Text>
                 </View>
@@ -5162,7 +5559,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </TouchableOpacity>
 
             {showDepartmentDropdown ? (
-              <View style={visitorDashboardStyles.purposeDropdownMenu}>
+              <View style={[visitorDashboardStyles.purposeDropdownMenu, isVisitorDarkMode && visitorDashboardStyles.darkDropdownMenu]}>
                 {activeAppointmentDepartmentOptions.map((option) => {
                   const isSelected = getSelectedAppointmentDepartments().includes(option);
                   return (
@@ -5170,6 +5567,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       key={option}
                       style={[
                         visitorDashboardStyles.purposeOptionItem,
+                        isVisitorDarkMode && visitorDashboardStyles.darkOptionItem,
                         isSelected && visitorDashboardStyles.purposeOptionItemActive,
                       ]}
                       onPress={() => {
@@ -5189,6 +5587,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         <Text
                           style={[
                             visitorDashboardStyles.purposeOptionText,
+                            isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText,
                             isSelected && visitorDashboardStyles.purposeOptionTextActive,
                           ]}
                         >
@@ -5200,15 +5599,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 })}
               </View>
             ) : null}
-            <Text style={visitorDashboardStyles.appointmentAutoHint}>
+            <Text style={[visitorDashboardStyles.appointmentAutoHint, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
               Choose one or more offices. Each time slot follows the capacity set by admin.
             </Text>
           </View>
 
           <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
-            <Text style={visitorDashboardStyles.appointmentFieldLabel}>Purpose Of Visit</Text>
+            <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Purpose Of Visit</Text>
             <TouchableOpacity
-              style={visitorDashboardStyles.appointmentPickerField}
+              style={[visitorDashboardStyles.appointmentPickerField, isVisitorDarkMode && visitorDashboardStyles.darkFormControl]}
               onPress={() => {
                 const shouldOpenPurposeDropdown = !showPurposeDropdown;
                 closeAppointmentPopovers();
@@ -5221,8 +5620,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Ionicons name="list-outline" size={18} color="#0A3D91" />
                 </View>
                 <View>
-                  <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose a purpose</Text>
-                  <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                  <Text style={[visitorDashboardStyles.appointmentPickerLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Choose a purpose</Text>
+                  <Text style={[visitorDashboardStyles.appointmentPickerValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
                     {appointmentForm.purposeSelection || "Select purpose of visit"}
                   </Text>
                 </View>
@@ -5235,7 +5634,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </TouchableOpacity>
 
             {showPurposeDropdown ? (
-              <View style={visitorDashboardStyles.purposeDropdownMenu}>
+              <View style={[visitorDashboardStyles.purposeDropdownMenu, isVisitorDarkMode && visitorDashboardStyles.darkDropdownMenu]}>
                 {activeAppointmentPurposeOptions.map((option) => {
                   const isSelected = appointmentForm.purposeSelection === option;
                   return (
@@ -5243,6 +5642,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       key={option}
                       style={[
                         visitorDashboardStyles.purposeOptionItem,
+                        isVisitorDarkMode && visitorDashboardStyles.darkOptionItem,
                         isSelected && visitorDashboardStyles.purposeOptionItemActive,
                       ]}
                       onPress={() => {
@@ -5258,6 +5658,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       <Text
                         style={[
                           visitorDashboardStyles.purposeOptionText,
+                          isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText,
                           isSelected && visitorDashboardStyles.purposeOptionTextActive,
                         ]}
                       >
@@ -5274,7 +5675,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
             {appointmentForm.purposeSelection === "Other" ? (
               <TextInput
-                style={[visitorDashboardStyles.appointmentFieldInput, visitorDashboardStyles.appointmentFieldTextarea]}
+                style={[visitorDashboardStyles.appointmentFieldInput, visitorDashboardStyles.appointmentFieldTextarea, isVisitorDarkMode && visitorDashboardStyles.darkFormControl, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}
                 placeholder="Type your purpose of visit"
                 placeholderTextColor="#94A3B8"
                 value={appointmentForm.customPurpose}
@@ -5291,9 +5692,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
           <View style={appointmentFormRowResponsiveStyle}>
           <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
-            <Text style={visitorDashboardStyles.appointmentFieldLabel}>Valid ID To Present</Text>
+            <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Valid ID To Present</Text>
             <TouchableOpacity
-              style={visitorDashboardStyles.appointmentPickerField}
+              style={[visitorDashboardStyles.appointmentPickerField, isVisitorDarkMode && visitorDashboardStyles.darkFormControl]}
               onPress={() => {
                 const shouldOpenIdTypeDropdown = !showIdTypeDropdown;
                 closeAppointmentPopovers();
@@ -5306,8 +5707,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <Ionicons name="card-outline" size={18} color="#0A3D91" />
                 </View>
                 <View>
-                  <Text style={visitorDashboardStyles.appointmentPickerLabel}>Choose your ID type</Text>
-                  <Text style={visitorDashboardStyles.appointmentPickerValue}>
+                  <Text style={[visitorDashboardStyles.appointmentPickerLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Choose your ID type</Text>
+                  <Text style={[visitorDashboardStyles.appointmentPickerValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
                     {appointmentForm.idType || "Select the ID you will use"}
                   </Text>
                 </View>
@@ -5320,7 +5721,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </TouchableOpacity>
 
             {showIdTypeDropdown ? (
-              <View style={visitorDashboardStyles.purposeDropdownMenu}>
+              <View style={[visitorDashboardStyles.purposeDropdownMenu, isVisitorDarkMode && visitorDashboardStyles.darkDropdownMenu]}>
                 {APPOINTMENT_ID_TYPE_OPTIONS.map((option) => {
                   const isSelected = appointmentForm.idType === option;
                   return (
@@ -5328,6 +5729,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       key={option}
                       style={[
                         visitorDashboardStyles.purposeOptionItem,
+                        isVisitorDarkMode && visitorDashboardStyles.darkOptionItem,
                         isSelected && visitorDashboardStyles.purposeOptionItemActive,
                       ]}
                       onPress={() => {
@@ -5345,6 +5747,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       <Text
                         style={[
                           visitorDashboardStyles.purposeOptionText,
+                          isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText,
                           isSelected && visitorDashboardStyles.purposeOptionTextActive,
                         ]}
                       >
@@ -5358,15 +5761,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 })}
               </View>
             ) : null}
-            <Text style={visitorDashboardStyles.appointmentAutoHint}>
+            <Text style={[visitorDashboardStyles.appointmentAutoHint, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
               Select the ID you will bring on campus. The uploaded image must match this selected ID type.
             </Text>
           </View>
 
           <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
-            <Text style={visitorDashboardStyles.appointmentFieldLabel}>Valid ID Picture</Text>
+            <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Valid ID Picture</Text>
             <TouchableOpacity
-              style={visitorDashboardStyles.appointmentIdUploadCard}
+              style={[visitorDashboardStyles.appointmentIdUploadCard, isVisitorDarkMode && visitorDashboardStyles.darkUploadCard]}
               onPress={handlePickAppointmentIdImage}
               activeOpacity={0.85}
             >
@@ -5378,10 +5781,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               ) : (
                 <View style={visitorDashboardStyles.appointmentIdPlaceholder}>
                   <Ionicons name="image-outline" size={28} color="#64748B" />
-                  <Text style={visitorDashboardStyles.appointmentIdPlaceholderTitle}>
+                  <Text style={[visitorDashboardStyles.appointmentIdPlaceholderTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
                     Upload valid ID picture
                   </Text>
-                  <Text style={visitorDashboardStyles.appointmentIdPlaceholderText}>
+                  <Text style={[visitorDashboardStyles.appointmentIdPlaceholderText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
                     Use a clear school, government, or company ID image.
                   </Text>
                 </View>
@@ -5538,25 +5941,84 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (!record?._id) return null;
     const canManage = isAppointmentManageable(record);
     const normalizedAppointmentStatus = String(record?.appointmentStatus || "").toLowerCase();
+    const needsVisitorConfirmation = isStaffAdjustmentPending(record);
     const editLabel = ["approved", "adjusted"].includes(normalizedAppointmentStatus)
       ? "Request Changes"
+      : needsVisitorConfirmation
+        ? "Choose Another"
       : "Edit";
+
+    if (needsVisitorConfirmation) {
+      return (
+        <View style={visitorDashboardStyles.appointmentManageActionRow}>
+          <TouchableOpacity
+            style={[
+              visitorDashboardStyles.appointmentManageButton,
+              isVisitorDarkMode && visitorDashboardStyles.darkReadablePill,
+              !canManage && visitorDashboardStyles.appointmentManageButtonDisabled,
+              isVisitorDarkMode && !canManage && visitorDashboardStyles.darkDisabledPill,
+            ]}
+            activeOpacity={0.86}
+            disabled={!canManage || isUpdatingAppointment}
+            onPress={() => confirmStaffAdjustmentAcceptance(record)}
+          >
+            <Ionicons name="checkmark-circle-outline" size={15} color={canManage ? "#059669" : isVisitorDarkMode ? "#CBD5E1" : "#94A3B8"} />
+            <Text
+              style={[
+                visitorDashboardStyles.appointmentManageButtonText,
+                !canManage && visitorDashboardStyles.appointmentManageButtonTextDisabled,
+                isVisitorDarkMode && !canManage && visitorDashboardStyles.darkDisabledText,
+              ]}
+            >
+              Works For Me
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              visitorDashboardStyles.appointmentManageButton,
+              visitorDashboardStyles.appointmentManageDangerButton,
+              isVisitorDarkMode && visitorDashboardStyles.darkReadablePill,
+              !canManage && visitorDashboardStyles.appointmentManageButtonDisabled,
+              isVisitorDarkMode && !canManage && visitorDashboardStyles.darkDisabledPill,
+            ]}
+            activeOpacity={0.86}
+            disabled={!canManage || isUpdatingAppointment}
+            onPress={() => openEditAppointmentModal(record)}
+          >
+            <Ionicons name="close-circle-outline" size={15} color={canManage ? "#DC2626" : isVisitorDarkMode ? "#CBD5E1" : "#94A3B8"} />
+            <Text
+              style={[
+                visitorDashboardStyles.appointmentManageButtonText,
+                visitorDashboardStyles.appointmentManageDangerText,
+                !canManage && visitorDashboardStyles.appointmentManageButtonTextDisabled,
+                isVisitorDarkMode && !canManage && visitorDashboardStyles.darkDisabledText,
+              ]}
+            >
+              Choose Another
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
 
     return (
       <View style={visitorDashboardStyles.appointmentManageActionRow}>
         <TouchableOpacity
           style={[
             visitorDashboardStyles.appointmentManageButton,
+            isVisitorDarkMode && visitorDashboardStyles.darkReadablePill,
             !canManage && visitorDashboardStyles.appointmentManageButtonDisabled,
+            isVisitorDarkMode && !canManage && visitorDashboardStyles.darkDisabledPill,
           ]}
           activeOpacity={0.86}
           disabled={!canManage || isUpdatingAppointment}
           onPress={() => openEditAppointmentModal(record)}
         >
-          <Ionicons name="create-outline" size={15} color={canManage ? "#0A3D91" : "#94A3B8"} />
+          <Ionicons name="create-outline" size={15} color={canManage ? "#0A3D91" : isVisitorDarkMode ? "#CBD5E1" : "#94A3B8"} />
           <Text
             style={[
               visitorDashboardStyles.appointmentManageButtonText,
+              isVisitorDarkMode && !canManage && visitorDashboardStyles.darkDisabledText,
               !canManage && visitorDashboardStyles.appointmentManageButtonTextDisabled,
             ]}
           >
@@ -5567,17 +6029,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           style={[
             visitorDashboardStyles.appointmentManageButton,
             visitorDashboardStyles.appointmentManageDangerButton,
+            isVisitorDarkMode && visitorDashboardStyles.darkReadablePill,
             !canManage && visitorDashboardStyles.appointmentManageButtonDisabled,
+            isVisitorDarkMode && !canManage && visitorDashboardStyles.darkDisabledPill,
           ]}
           activeOpacity={0.86}
           disabled={!canManage || isUpdatingAppointment}
           onPress={() => openCancelAppointmentModal(record)}
         >
-          <Ionicons name="close-circle-outline" size={15} color={canManage ? "#DC2626" : "#94A3B8"} />
+          <Ionicons name="close-circle-outline" size={15} color={canManage ? "#DC2626" : isVisitorDarkMode ? "#CBD5E1" : "#94A3B8"} />
           <Text
             style={[
               visitorDashboardStyles.appointmentManageButtonText,
               visitorDashboardStyles.appointmentManageDangerText,
+              isVisitorDarkMode && !canManage && visitorDashboardStyles.darkDisabledText,
               !canManage && visitorDashboardStyles.appointmentManageButtonTextDisabled,
             ]}
           >
@@ -5591,10 +6056,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const renderCurrentAppointmentCard = () => {
     if (!currentAppointmentEntry) {
       return (
-        <View style={visitorDashboardStyles.appointmentHistoryEmpty}>
+        <View style={[visitorDashboardStyles.appointmentHistoryEmpty, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
           <Ionicons name="calendar-clear-outline" size={34} color="#94A3B8" />
-          <Text style={visitorDashboardStyles.appointmentHistoryEmptyTitle}>No current appointment</Text>
-          <Text style={visitorDashboardStyles.appointmentHistoryEmptyText}>
+          <Text style={[visitorDashboardStyles.appointmentHistoryEmptyTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>No current appointment</Text>
+          <Text style={[visitorDashboardStyles.appointmentHistoryEmptyText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Submit a new appointment request to start staff review.
           </Text>
         </View>
@@ -5603,14 +6068,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
     const entry = currentAppointmentEntry;
     return (
-      <View style={visitorDashboardStyles.appointmentHistoryCardItem}>
+      <View style={[visitorDashboardStyles.appointmentHistoryCardItem, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
         <View style={visitorDashboardStyles.appointmentHistoryCardTop}>
           <View style={visitorDashboardStyles.appointmentHistoryCardCopy}>
             <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Current / Latest Appointment</Text>
-            <Text style={visitorDashboardStyles.appointmentHistoryCardTitle} numberOfLines={2}>
+            <Text style={[visitorDashboardStyles.appointmentHistoryCardTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]} numberOfLines={2}>
               {entry.title}
             </Text>
-            <Text style={visitorDashboardStyles.appointmentHistoryCardOffice} numberOfLines={2}>
+            <Text style={[visitorDashboardStyles.appointmentHistoryCardOffice, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]} numberOfLines={2}>
               {entry.office}
             </Text>
           </View>
@@ -5631,17 +6096,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
 
         <View style={visitorDashboardStyles.appointmentHistoryCardMetaRow}>
-          <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+          <View style={[visitorDashboardStyles.appointmentHistoryCardMetaItem, isVisitorDarkMode && visitorDashboardStyles.darkReadablePill]}>
             <Ionicons name="calendar-outline" size={15} color="#0A3D91" />
-            <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>{entry.dateLabel}</Text>
+            <Text style={[visitorDashboardStyles.appointmentHistoryCardMetaText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>{entry.dateLabel}</Text>
           </View>
-          <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+          <View style={[visitorDashboardStyles.appointmentHistoryCardMetaItem, isVisitorDarkMode && visitorDashboardStyles.darkReadablePill]}>
             <Ionicons name="time-outline" size={15} color="#0A3D91" />
-            <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>{entry.timeLabel}</Text>
+            <Text style={[visitorDashboardStyles.appointmentHistoryCardMetaText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>{entry.timeLabel}</Text>
           </View>
         </View>
 
-        <Text style={visitorDashboardStyles.appointmentHistoryCardDescription} numberOfLines={3}>
+        <Text style={[visitorDashboardStyles.appointmentHistoryCardDescription, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]} numberOfLines={3}>
           {entry.description}
         </Text>
         {renderAppointmentManageActions(entry.record)}
@@ -5651,12 +6116,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const renderAppointmentHistoryPanel = () => (
     <View style={[visitorDashboardStyles.appointmentScreenShell, dashboardSectionResponsiveStyle]}>
-      <View style={visitorDashboardStyles.appointmentScreenCard}>
-        <View style={visitorDashboardStyles.appointmentHistoryHeader}>
+      <View style={[visitorDashboardStyles.appointmentScreenCard, isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard]}>
+        <View style={[visitorDashboardStyles.appointmentHistoryHeader, isVisitorDarkMode && visitorDashboardStyles.darkDividerBorder]}>
           <View style={visitorDashboardStyles.appointmentHistoryHeaderCopy}>
             <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Appointment Module</Text>
-            <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Appointment Records</Text>
-            <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
+            <Text style={[visitorDashboardStyles.visitorFlowPanelTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Appointment Records</Text>
+            <Text style={[visitorDashboardStyles.visitorFlowPanelSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
               All submitted appointments are grouped by date. Current appointment actions stay in Overview.
             </Text>
           </View>
@@ -5679,8 +6144,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               ["Pending", pendingAppointmentCount],
               ["Approved", approvedAppointmentCount],
             ].map(([label, value]) => (
-              <View key={label} style={visitorDashboardStyles.appointmentHistorySummaryCard}>
-                <Text style={visitorDashboardStyles.appointmentHistorySummaryValue}>{value}</Text>
+              <View key={label} style={[visitorDashboardStyles.appointmentHistorySummaryCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
+                <Text style={[visitorDashboardStyles.appointmentHistorySummaryValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>{value}</Text>
                 <Text style={visitorDashboardStyles.appointmentHistorySummaryLabel}>{label}</Text>
               </View>
             ))}
@@ -5696,13 +6161,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       <Text style={visitorDashboardStyles.appointmentHistoryDateGroupTitle}>{group.label}</Text>
                     </View>
                     {group.entries.map((entry) => (
-                      <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryCardItem}>
+                      <View key={entry.id} style={[visitorDashboardStyles.appointmentHistoryCardItem, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
                         <View style={visitorDashboardStyles.appointmentHistoryCardTop}>
                           <View style={visitorDashboardStyles.appointmentHistoryCardCopy}>
-                            <Text style={visitorDashboardStyles.appointmentHistoryCardTitle} numberOfLines={2}>
+                            <Text style={[visitorDashboardStyles.appointmentHistoryCardTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]} numberOfLines={2}>
                               {entry.title}
                             </Text>
-                            <Text style={visitorDashboardStyles.appointmentHistoryCardOffice} numberOfLines={2}>
+                            <Text style={[visitorDashboardStyles.appointmentHistoryCardOffice, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]} numberOfLines={2}>
                               {entry.office}
                             </Text>
                           </View>
@@ -5723,21 +6188,21 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         </View>
 
                         <View style={visitorDashboardStyles.appointmentHistoryCardMetaRow}>
-                          <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+                          <View style={[visitorDashboardStyles.appointmentHistoryCardMetaItem, isVisitorDarkMode && visitorDashboardStyles.darkReadablePill]}>
                             <Ionicons name="calendar-outline" size={15} color="#0A3D91" />
-                            <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
+                            <Text style={[visitorDashboardStyles.appointmentHistoryCardMetaText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
                               {entry.dateLabel}
                             </Text>
                           </View>
-                          <View style={visitorDashboardStyles.appointmentHistoryCardMetaItem}>
+                          <View style={[visitorDashboardStyles.appointmentHistoryCardMetaItem, isVisitorDarkMode && visitorDashboardStyles.darkReadablePill]}>
                             <Ionicons name="time-outline" size={15} color="#0A3D91" />
-                            <Text style={visitorDashboardStyles.appointmentHistoryCardMetaText}>
+                            <Text style={[visitorDashboardStyles.appointmentHistoryCardMetaText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
                               {entry.timeLabel}
                             </Text>
                           </View>
                         </View>
 
-                        <Text style={visitorDashboardStyles.appointmentHistoryCardDescription} numberOfLines={3}>
+                        <Text style={[visitorDashboardStyles.appointmentHistoryCardDescription, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]} numberOfLines={3}>
                           {entry.description}
                         </Text>
                       </View>
@@ -5746,8 +6211,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ))}
               </View>
             ) : (
-              <View style={visitorDashboardStyles.appointmentHistoryTable}>
-                <View style={visitorDashboardStyles.appointmentHistoryTableHeader}>
+              <View style={[visitorDashboardStyles.appointmentHistoryTable, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
+                <View style={[visitorDashboardStyles.appointmentHistoryTableHeader, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
                   <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryPurposeCell]}>Purpose</Text>
                   <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryOfficeCell]}>Office</Text>
                   <Text style={[visitorDashboardStyles.appointmentHistoryTableHeadText, visitorDashboardStyles.appointmentHistoryDateCell]}>Date</Text>
@@ -5758,20 +6223,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   <React.Fragment key={group.key}>
                     <View style={visitorDashboardStyles.appointmentHistoryTableDateRow}>
                       <Ionicons name="calendar-outline" size={14} color="#0A3D91" />
-                      <Text style={visitorDashboardStyles.appointmentHistoryTableDateText}>{group.label}</Text>
+                      <Text style={[visitorDashboardStyles.appointmentHistoryTableDateText, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>{group.label}</Text>
                     </View>
                     {group.entries.map((entry) => (
-                      <View key={entry.id} style={visitorDashboardStyles.appointmentHistoryTableRow}>
-                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryPurposeCell]} numberOfLines={2}>
+                      <View key={entry.id} style={[visitorDashboardStyles.appointmentHistoryTableRow, isVisitorDarkMode && visitorDashboardStyles.darkDividerBorder]}>
+                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryPurposeCell, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]} numberOfLines={2}>
                           {entry.title}
                         </Text>
-                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryOfficeCell]} numberOfLines={2}>
+                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryOfficeCell, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]} numberOfLines={2}>
                           {entry.office}
                         </Text>
-                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryDateCell]} numberOfLines={2}>
+                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryDateCell, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]} numberOfLines={2}>
                           {entry.dateLabel}
                         </Text>
-                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryTimeCell]} numberOfLines={1}>
+                        <Text style={[visitorDashboardStyles.appointmentHistoryTableText, visitorDashboardStyles.appointmentHistoryTimeCell, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]} numberOfLines={1}>
                           {entry.timeLabel}
                         </Text>
                         <View style={[visitorDashboardStyles.appointmentHistoryStatusCell, visitorDashboardStyles.appointmentHistoryStatusPillWrap]}>
@@ -5787,10 +6252,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
             )
           ) : (
-            <View style={visitorDashboardStyles.appointmentHistoryEmpty}>
+            <View style={[visitorDashboardStyles.appointmentHistoryEmpty, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
               <Ionicons name="calendar-clear-outline" size={34} color="#94A3B8" />
-              <Text style={visitorDashboardStyles.appointmentHistoryEmptyTitle}>No appointments yet</Text>
-              <Text style={visitorDashboardStyles.appointmentHistoryEmptyText}>
+              <Text style={[visitorDashboardStyles.appointmentHistoryEmptyTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>No appointments yet</Text>
+              <Text style={[visitorDashboardStyles.appointmentHistoryEmptyText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
                 Your submitted appointment records will appear here grouped by date.
               </Text>
             </View>
@@ -5800,29 +6265,49 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     </View>
   );
 
+  const renderVisitorCampusMap = ({ fullscreen = false } = {}) => (
+    <CampusMap
+      visitors={[]}
+      floors={MONITORING_MAP_FLOORS}
+      offices={MONITORING_MAP_OFFICES}
+      selectedFloor={activeVisitorMapFloor}
+      selectedOffice="all"
+      destinationMarkers={isCheckedOutVisitor ? [] : [visitorDestinationMarker]}
+      showVisitorMarkers={false}
+      showActiveVisitorsBadge={false}
+      mapBlueprints={MONITORING_MAP_BLUEPRINTS}
+      mapLabels={MONITORING_MAP_LABELS}
+      officePositions={MONITORING_MAP_OFFICE_POSITIONS}
+      onFloorChange={setSelectedVisitorMapFloor}
+      showFloorNavigation={false}
+      initialScale={fullscreen ? 1 : 1.25}
+      fullscreen={fullscreen}
+    />
+  );
+
   const renderVisitorMapPanel = () => (
-    <View style={[visitorDashboardStyles.visitorMapPanel, dashboardSectionResponsiveStyle]}>
+    <View style={[visitorDashboardStyles.visitorMapPanel, dashboardSectionResponsiveStyle, isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard]}>
       <View style={visitorDashboardStyles.visitorFlowPanelHeader}>
         <View style={visitorDashboardStyles.visitorFlowPanelIcon}>
           <Ionicons name="map-outline" size={22} color="#0A3D91" />
         </View>
         <View style={visitorDashboardStyles.visitorFlowPanelTitleWrap}>
           <Text style={visitorDashboardStyles.visitorFlowPanelEyebrow}>Map Module</Text>
-          <Text style={visitorDashboardStyles.visitorFlowPanelTitle}>Campus Map And Directions</Text>
-          <Text style={visitorDashboardStyles.visitorFlowPanelSubtitle}>
+          <Text style={[visitorDashboardStyles.visitorFlowPanelTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Campus Map And Directions</Text>
+          <Text style={[visitorDashboardStyles.visitorFlowPanelSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
             Follow your in-app route to the office assigned for your appointment.
           </Text>
         </View>
       </View>
 
-      <View style={visitorDashboardStyles.mapSummaryCard}>
+      <View style={[visitorDashboardStyles.mapSummaryCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
         <View style={visitorDashboardStyles.mapSummaryHeader}>
           <View style={visitorDashboardStyles.mapSummaryIconWrap}>
             <Ionicons name="compass-outline" size={18} color="#041E42" />
           </View>
           <View style={visitorDashboardStyles.mapSummaryCopy}>
-            <Text style={visitorDashboardStyles.mapSummaryTitle}>Arrival Guide</Text>
-            <Text style={visitorDashboardStyles.mapSummaryText}>
+            <Text style={[visitorDashboardStyles.mapSummaryTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Arrival Guide</Text>
+            <Text style={[visitorDashboardStyles.mapSummaryText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
               {isCheckedOutVisitor
                 ? "Your completed visit is no longer shown on the live map. Request another appointment to see a new route."
                 : "Review your assigned floor and route steps before arrival so you know exactly where to go."}
@@ -5831,29 +6316,29 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
 
         <View style={visitorDashboardStyles.mapSummaryMetricRow}>
-          <View style={visitorDashboardStyles.mapSummaryMetricCard}>
+          <View style={[visitorDashboardStyles.mapSummaryMetricCard, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
             <Text style={visitorDashboardStyles.mapSummaryMetricLabel}>Current Floor</Text>
-            <Text style={visitorDashboardStyles.mapSummaryMetricValue}>
+            <Text style={[visitorDashboardStyles.mapSummaryMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
               {visitorDestinationInfo.floorName}
             </Text>
           </View>
-          <View style={visitorDashboardStyles.mapSummaryMetricCard}>
+          <View style={[visitorDashboardStyles.mapSummaryMetricCard, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
             <Text style={visitorDashboardStyles.mapSummaryMetricLabel}>Assigned Office</Text>
-            <Text style={visitorDashboardStyles.mapSummaryMetricValue}>
+            <Text style={[visitorDashboardStyles.mapSummaryMetricValue, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
               {visitorDestinationInfo.officeName}
             </Text>
           </View>
         </View>
       </View>
 
-      <View style={visitorDashboardStyles.visitorRouteCard}>
+      <View style={[visitorDashboardStyles.visitorRouteCard, isVisitorDarkMode && visitorDashboardStyles.darkNestedCard]}>
         <View style={visitorDashboardStyles.visitorRouteHeader}>
           <View style={visitorDashboardStyles.visitorRouteIconWrap}>
             <Ionicons name="navigate" size={18} color="#FFFFFF" />
           </View>
           <View style={visitorDashboardStyles.visitorRouteHeaderCopy}>
-            <Text style={visitorDashboardStyles.visitorRouteTitle}>Directions To {visitorDestinationInfo.officeName}</Text>
-            <Text style={visitorDashboardStyles.visitorRouteSubtitle}>
+            <Text style={[visitorDashboardStyles.visitorRouteTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Directions To {visitorDestinationInfo.officeName}</Text>
+            <Text style={[visitorDashboardStyles.visitorRouteSubtitle, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
               {visitorDestinationInfo.floorName} route based on your latest appointment.
             </Text>
           </View>
@@ -5867,7 +6352,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.visitorRouteStepIndex}>
                 <Text style={visitorDashboardStyles.visitorRouteStepIndexText}>{index + 1}</Text>
               </View>
-              <Text style={visitorDashboardStyles.visitorRouteStepText}>{step}</Text>
+              <Text style={[visitorDashboardStyles.visitorRouteStepText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>{step}</Text>
             </View>
           ))}
         </View>
@@ -5889,6 +6374,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 key={floor.id}
                 style={[
                   visitorDashboardStyles.visitorFloorTab,
+                  isVisitorDarkMode && visitorDashboardStyles.darkSegmentButton,
                   isActive && visitorDashboardStyles.visitorFloorTabActive,
                 ]}
                 onPress={() => setSelectedVisitorMapFloor(floor.id)}
@@ -5897,11 +6383,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 <Ionicons
                   name={floor.icon}
                   size={15}
-                  color={isActive ? "#FFFFFF" : "#64748B"}
+                  color={isActive ? "#FFFFFF" : isVisitorDarkMode ? "#CBD5E1" : "#64748B"}
                 />
                 <Text
                   style={[
                     visitorDashboardStyles.visitorFloorTabText,
+                    isVisitorDarkMode && visitorDashboardStyles.darkMutedText,
                     isActive && visitorDashboardStyles.visitorFloorTabTextActive,
                   ]}
                 >
@@ -5913,25 +6400,26 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </View>
       </ScrollView>
 
-      <CampusMap
-        visitors={[]}
-        floors={MONITORING_MAP_FLOORS}
-        offices={MONITORING_MAP_OFFICES}
-        selectedFloor={activeVisitorMapFloor}
-        selectedOffice="all"
-        destinationMarkers={isCheckedOutVisitor ? [] : [visitorDestinationMarker]}
-        showVisitorMarkers={false}
-        showActiveVisitorsBadge={false}
-        mapBlueprints={MONITORING_MAP_BLUEPRINTS}
-        mapLabels={MONITORING_MAP_LABELS}
-        officePositions={MONITORING_MAP_OFFICE_POSITIONS}
-        onFloorChange={setSelectedVisitorMapFloor}
-        showFloorNavigation={false}
-      />
+      <View style={visitorDashboardStyles.visitorMapToolbar}>
+        <View style={visitorDashboardStyles.visitorMapToolbarCopy}>
+          <Text style={[visitorDashboardStyles.visitorMapToolbarTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Floor Plan</Text>
+          <Text style={[visitorDashboardStyles.visitorMapToolbarText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>Zoom, drag, or open full screen for a clearer route.</Text>
+        </View>
+        <AnimatedPressable
+          style={visitorDashboardStyles.visitorMapFullscreenButton}
+          onPress={() => setShowVisitorMapFullscreen(true)}
+          activeOpacity={0.88}
+        >
+          <Ionicons name="expand-outline" size={17} color="#FFFFFF" />
+          <Text style={visitorDashboardStyles.visitorMapFullscreenButtonText}>Full Screen</Text>
+        </AnimatedPressable>
+      </View>
 
-      <View style={visitorDashboardStyles.visitorMapNote}>
+      {renderVisitorCampusMap()}
+
+      <View style={[visitorDashboardStyles.visitorMapNote, isVisitorDarkMode && visitorDashboardStyles.darkInsetCard]}>
         <Ionicons name="information-circle-outline" size={18} color="#0A3D91" />
-        <Text style={visitorDashboardStyles.visitorMapNoteText}>
+        <Text style={[visitorDashboardStyles.visitorMapNoteText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
           Use pinch/zoom controls and drag the map to inspect the floor. The blue pin marks the office you should go to.
         </Text>
       </View>
@@ -5946,30 +6434,30 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <Text style={visitorDashboardStyles.visitorMapPrimaryActionText}>Start Navigation</Text>
         </AnimatedPressable>
         <AnimatedPressable
-          style={visitorDashboardStyles.visitorMapActionButton}
+          style={[visitorDashboardStyles.visitorMapActionButton, isVisitorDarkMode && visitorDashboardStyles.darkActionButton]}
           onPress={() => setSelectedVisitorMapFloor("ground")}
           activeOpacity={0.88}
         >
           <Ionicons name="refresh-outline" size={17} color="#0A3D91" />
-          <Text style={visitorDashboardStyles.visitorMapActionButtonText}>Reset Route</Text>
+          <Text style={[visitorDashboardStyles.visitorMapActionButtonText, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Reset Route</Text>
         </AnimatedPressable>
         <AnimatedPressable
-          style={visitorDashboardStyles.visitorMapActionButton}
+          style={[visitorDashboardStyles.visitorMapActionButton, isVisitorDarkMode && visitorDashboardStyles.darkActionButton]}
           onPress={openAppointmentRequestScreen}
           activeOpacity={0.88}
         >
           <Ionicons name="swap-horizontal-outline" size={17} color="#0A3D91" />
-          <Text style={visitorDashboardStyles.visitorMapActionButtonText}>Change Destination</Text>
+          <Text style={[visitorDashboardStyles.visitorMapActionButtonText, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Change Destination</Text>
         </AnimatedPressable>
       </View>
 
       <AnimatedPressable
-        style={visitorDashboardStyles.visitorFlowSecondaryButton}
+        style={[visitorDashboardStyles.visitorFlowSecondaryButton, isVisitorDarkMode && visitorDashboardStyles.darkActionButton]}
         onPress={() => handleVisitorRouteNavigation("WebMapScreen", { destinationOffice: visitorDestinationInfo.officeName })}
         activeOpacity={0.86}
       >
         <Ionicons name="navigate-outline" size={18} color="#0A3D91" />
-        <Text style={visitorDashboardStyles.visitorFlowSecondaryButtonText}>View Full In-App Directions</Text>
+        <Text style={[visitorDashboardStyles.visitorFlowSecondaryButtonText, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>View Full In-App Directions</Text>
       </AnimatedPressable>
     </View>
   );
@@ -6063,7 +6551,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       ) : null}
 
       {!isVisitorHomeSection ? (
-          <View style={visitorDashboardStyles.miniBrandHeaderWrap}>
+          <View style={[visitorDashboardStyles.miniBrandHeaderWrap, isVisitorDarkMode && visitorDashboardStyles.darkMiniBrandHeaderWrap]}>
           <View
             style={[
               visitorDashboardStyles.miniBrandHeader,
@@ -6342,6 +6830,39 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           <Ionicons name="close" size={16} color="#64748B" />
         </TouchableOpacity>
       ) : null}
+
+      <Modal
+        visible={showVisitorMapFullscreen}
+        transparent={false}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setShowVisitorMapFullscreen(false)}
+      >
+        <SafeAreaView style={[visitorDashboardStyles.visitorMapFullscreenModal, isVisitorDarkMode && visitorDashboardStyles.darkSafeArea]}>
+          <View style={[visitorDashboardStyles.visitorMapFullscreenHeader, isVisitorDarkMode && visitorDashboardStyles.darkSurfaceCard]}>
+            <View style={visitorDashboardStyles.visitorMapFullscreenTitleWrap}>
+              <Text style={visitorDashboardStyles.visitorMapFullscreenEyebrow}>
+                Campus Map
+              </Text>
+              <Text style={[visitorDashboardStyles.visitorMapFullscreenTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+                {visitorDestinationInfo.floorName}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[visitorDashboardStyles.visitorMapMinimizeButton, isVisitorDarkMode && visitorDashboardStyles.darkActionButton]}
+              onPress={() => setShowVisitorMapFullscreen(false)}
+              activeOpacity={0.86}
+            >
+              <Ionicons name="contract-outline" size={18} color="#0A3D91" />
+              <Text style={[visitorDashboardStyles.visitorMapMinimizeButtonText, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>Minimize</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={visitorDashboardStyles.visitorMapFullscreenBody}>
+            {renderVisitorCampusMap({ fullscreen: true })}
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       <Modal
         visible={showEditAppointmentModal}

@@ -28,23 +28,43 @@ const getExpoExtra = () => {
 };
 
 const resolveVariant = () => {
-  return APP_VARIANTS.FULL;
+  const extra = getExpoExtra();
+  const envVariant =
+    typeof process !== "undefined"
+      ? process.env?.EXPO_PUBLIC_APP_VARIANT
+      : "";
+
+  return normalizeVariant(extra.appVariant || envVariant);
 };
 
 export const APP_VARIANT = resolveVariant();
 export const IS_VISITOR_ONLY_APP = APP_VARIANT === APP_VARIANTS.VISITOR;
 export const APP_VARIANT_LABEL = IS_VISITOR_ONLY_APP ? "Visitor" : "Full";
-export const APP_DISPLAY_NAME = "SafePass Smart Campus";
+const APP_EXTRA = getExpoExtra();
+export const APP_DISPLAY_NAME =
+  APP_EXTRA.appDisplayName ||
+  (IS_VISITOR_ONLY_APP ? "SafePass Visitor" : "SafePass Smart Campus");
 export const APP_ORGANIZATION_NAME =
-  "Sapphire International Aviation Academy";
+  APP_EXTRA.appOrganization || "Sapphire International Aviation Academy";
 
 export const normalizeAppRole = (role) => String(role || "").toLowerCase().trim();
 
 export const isRoleAllowedInCurrentVariant = (role) => {
+  if (IS_VISITOR_ONLY_APP) {
+    return normalizeAppRole(role) === "visitor";
+  }
+
   return true;
 };
 
 export const getVariantInitialRoute = ({ currentUser, isNewRegistration }) => {
+  if (IS_VISITOR_ONLY_APP) {
+    if (!currentUser || isNewRegistration) return "Login";
+    return normalizeAppRole(currentUser.role) === "visitor"
+      ? "VisitorDashboard"
+      : "Login";
+  }
+
   if (currentUser) {
     const role = normalizeAppRole(currentUser.role);
     if (role === "admin") return "AdminDashboard";
@@ -59,9 +79,13 @@ export const getVariantInitialRoute = ({ currentUser, isNewRegistration }) => {
 };
 
 export const getVariantBlockedRoleMessage = (role) => {
+  if (IS_VISITOR_ONLY_APP) {
+    return "This portal is for visitor accounts only. Please use the main SafePass portal for staff, security, or admin access.";
+  }
+
   return "";
 };
 
 export const getVisitorBuildNavigationParams = () => ({
-  role: "campus",
+  role: "visitor",
 });

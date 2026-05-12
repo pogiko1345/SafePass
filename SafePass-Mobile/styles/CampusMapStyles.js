@@ -86,6 +86,17 @@ export default StyleSheet.create({
     minHeight: 500,
     overflow: "hidden",
     backgroundColor: "#F9FAFB",
+    ...Platform.select({
+      web: {
+        touchAction: "none",
+        cursor: "grab",
+      },
+    }),
+  },
+
+  mapCanvasFullscreen: {
+    flex: 1,
+    minHeight: height - 140,
   },
 
   mapZoomLayer: {
@@ -104,6 +115,11 @@ export default StyleSheet.create({
     width: "100%",
     maxHeight: "100%",
     overflow: "visible",
+  },
+
+  floorPlanStageFullscreen: {
+    width: "160%",
+    maxHeight: undefined,
   },
 
   floorPlanImage: {
@@ -205,6 +221,10 @@ export default StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  mapZoomLayerFullscreen: {
+    minHeight: height - 140,
   },
 
   visitorMarkerCountText: {
@@ -463,18 +483,33 @@ export default StyleSheet.create({
 
   mapControls: {
     position: "absolute",
-    bottom: 16,
+    top: 16,
     right: 16,
-    flexDirection: "column",
-    gap: 8,
+    flexDirection: "row",
+    gap: 6,
+    padding: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255, 255, 255, 0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(203, 213, 225, 0.9)",
     zIndex: 20,
+    ...Platform.select({
+      web: { boxShadow: "0px 8px 18px rgba(15,23,42,0.12)" },
+      android: { elevation: 3 },
+      ios: {
+        shadowColor: "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 18,
+      },
+    }),
   },
 
   mapControlButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#EEF5FF",
     justifyContent: "center",
     alignItems: "center",
     ...Platform.select({
@@ -482,16 +517,20 @@ export default StyleSheet.create({
         cursor: "pointer",
         transition: "all 0.2s ease",
         ":hover": {
-          backgroundColor: "rgba(0, 0, 0, 0.8)",
+          backgroundColor: "#DBEAFE",
           transform: "scale(1.05)",
         },
       },
     }),
   },
 
+  mapControlButtonPrimary: {
+    backgroundColor: "#0A3D91",
+  },
+
   activeVisitorsBadge: {
     position: "absolute",
-    top: 16,
+    top: 66,
     right: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -511,8 +550,9 @@ export default StyleSheet.create({
 
   zoomLevelBadge: {
     position: "absolute",
-    top: 56,
-    right: 16,
+    top: 18,
+    left: 16,
+    right: undefined,
     backgroundColor: "rgba(15, 23, 42, 0.72)",
     paddingHorizontal: 10,
     paddingVertical: 5,

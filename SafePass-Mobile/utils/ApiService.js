@@ -1173,6 +1173,18 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async acceptVisitorAppointmentAdjustment(visitorId) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/appointment/accept-adjustment`, {
+        method: "PUT",
+      });
+      return response;
+    } catch (error) {
+      console.error("Accept visitor appointment adjustment error:", error);
+      throw error;
+    }
+  }
+
   async cancelVisitorAppointment(visitorId, cancellationData) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/appointment/cancel`, {

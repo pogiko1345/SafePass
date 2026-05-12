@@ -80,6 +80,7 @@ role: {
   accessPermissions: {
     canAccess: { type: [String], default: [] },
     restrictedAreas: { type: [String], default: [] },
+    timeRestrictions: { type: [mongoose.Schema.Types.Mixed], default: [] },
     cardActive: { type: Boolean, default: true },
   },
 
