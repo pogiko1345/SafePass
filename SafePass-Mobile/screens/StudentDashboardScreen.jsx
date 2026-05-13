@@ -160,6 +160,7 @@ export default function StudentDashboardScreen({ navigation }) {
   const [attendance, setAttendance] = useState([]);
   const [activeTab, setActiveTab] = useState("home");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [tapActionLoading, setTapActionLoading] = useState("");
   const [isNfcReading, setIsNfcReading] = useState(false);
@@ -208,9 +209,11 @@ export default function StudentDashboardScreen({ navigation }) {
   useEffect(() => {
     const run = async () => {
       try {
+        setLoadError("");
         await loadData();
       } catch (error) {
         console.error("Load student dashboard error:", error);
+        setLoadError(error?.message || "Unable to load your student dashboard.");
         Alert.alert("Dashboard Error", error?.message || "Unable to load your student dashboard.");
       } finally {
         setLoading(false);
@@ -1094,6 +1097,32 @@ export default function StudentDashboardScreen({ navigation }) {
     return <MobileLoadingState message="Loading your student attendance..." />;
   }
 
+  if (loadError && !user) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.stateWrap}>
+          <MobileEmptyState
+            icon="cloud-offline-outline"
+            title="Dashboard unavailable"
+            message={loadError}
+            actionLabel="Try again"
+            onAction={async () => {
+              setLoading(true);
+              setLoadError("");
+              try {
+                await loadData();
+              } catch (error) {
+                setLoadError(error?.message || "Unable to load your student dashboard.");
+              } finally {
+                setLoading(false);
+              }
+            }}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -1120,6 +1149,11 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 22,
+  },
+  stateWrap: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 18,
   },
   header: {
     borderRadius: 22,

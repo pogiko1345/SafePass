@@ -18,6 +18,7 @@ import {
   Image,
   LayoutAnimation,
   UIManager,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -995,6 +996,8 @@ const getVisitorMonitorCoordinates = (visitor, index = 0) =>
       );
 
 export default function AdminDashboardScreen({ navigation, onLogout }) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const isAdminMobileLayout = viewportWidth < 900;
   const scrollY = useRef(new Animated.Value(0)).current;
   const mainScrollViewRef = useRef(null);
   const sidebarScrollViewRef = useRef(null);
@@ -1011,6 +1014,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [selectedSubmodule, setSelectedSubmodule] = useState("dashboard");
   const [accountRecordsMode, setAccountRecordsMode] = useState("all");
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showAdminMobileMenu, setShowAdminMobileMenu] = useState(false);
 
   // Visit Request States
   const [visitRequests, setVisitRequests] = useState([]);
@@ -3529,6 +3533,7 @@ const loadDashboardData = useCallback(async () => {
     setExpandedModule(parentModuleKey);
     setAccountRecordsMode(nextAccountMode);
     setSelectedAdminMapOffice("all");
+    setShowAdminMobileMenu(false);
 
     if (submoduleKey.startsWith("map-")) {
       setSelectedAdminMapFloor(FLOOR_VIEW_TO_ID[submoduleKey] || "ground");
@@ -3594,6 +3599,7 @@ const loadDashboardData = useCallback(async () => {
         setSelectedSubmodule("settings");
         setExpandedModule(null);
         syncLegacyMenuState("settings");
+        setShowAdminMobileMenu(false);
         break;
       default:
         if (ALL_ADMIN_SUBMODULES.includes(action)) {
@@ -4164,6 +4170,15 @@ const loadDashboardData = useCallback(async () => {
       } else if (message.toLowerCase().includes("username already")) {
         setCreateUserErrors((currentValue) => ({ ...currentValue, username: "This username is already in use." }));
         Alert.alert("Username Already Used", "This username is already registered. Please use another username.");
+      } else if (message.toLowerCase().includes("staff id already") || message.toLowerCase().includes("staff/security number")) {
+        setCreateUserErrors((currentValue) => ({ ...currentValue, employeeId: "This Staff/Security number is already registered." }));
+        Alert.alert("ID Already Used", "This Staff/Security number is already registered. Please use another ID.");
+      } else if (message.toLowerCase().includes("academic id") || message.toLowerCase().includes("student id") || message.toLowerCase().includes("teacher id")) {
+        setCreateUserErrors((currentValue) => ({
+          ...currentValue,
+          [isAcademicStaffAccount ? "teacherId" : "studentId"]: "This academic ID is already registered.",
+        }));
+        Alert.alert("ID Already Used", "This academic ID is already registered. Please use another ID.");
       } else {
         Alert.alert("Error", message || "Failed to create account");
       }
@@ -5660,7 +5675,7 @@ const loadDashboardData = useCallback(async () => {
                 {activeMapActivity.detail}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 8 }}>
-                {getMapTrackingSourceLabel(activeMapActivity)} · {getMapFreshnessLabel(activeMapActivity.lastUpdate)}
+                {getMapTrackingSourceLabel(activeMapActivity)} - {getMapFreshnessLabel(activeMapActivity.lastUpdate)}
               </Text>
             </View>
           ) : (
@@ -5801,7 +5816,7 @@ const loadDashboardData = useCallback(async () => {
                 {activeMapActivity.detail}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 8 }}>
-                {getMapTrackingSourceLabel(activeMapActivity)} · {getMapFreshnessLabel(activeMapActivity.lastUpdate)}
+                {getMapTrackingSourceLabel(activeMapActivity)} - {getMapFreshnessLabel(activeMapActivity.lastUpdate)}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4 }}>
                 {formatDateTime(activeMapActivity.lastUpdate)}
@@ -5883,54 +5898,44 @@ const loadDashboardData = useCallback(async () => {
               </>
             }
           >
-            <View style={styles.attendanceToolbar}>
-              <View style={[styles.attendanceSearchBox, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                <Ionicons name="search-outline" size={18} color={isDarkMode ? "#94A3B8" : "#64748B"} />
-                <TextInput
-                  style={[styles.attendanceSearchInput, isDarkMode && styles.darkText]}
-                  placeholder="Search name, ID, date, or location"
-                  placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
-                  value={attendanceSearchTerm}
-                  onChangeText={setAttendanceSearchTerm}
-                />
-              </View>
-
-              <View style={styles.attendanceFilterCluster}>
-                <View style={[styles.attendanceSegmentGroup, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                  {ATTENDANCE_SCOPE_OPTIONS.map((option) => {
-                    const isActive = attendanceScope === option.key;
-                    return (
-                      <TouchableOpacity
-                        key={option.key}
-                        style={[styles.attendanceSegmentButton, isActive && styles.attendanceSegmentButtonActive]}
-                        onPress={() => setAttendanceScope(option.key)}
-                      >
-                        <Text style={[styles.attendanceSegmentText, isActive && styles.attendanceSegmentTextActive, isDarkMode && !isActive && styles.darkTextSecondary]}>
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <View style={[styles.attendanceSegmentGroup, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                  {ATTENDANCE_DATE_SHORTCUTS.map((option) => {
-                    const isActive = attendanceDateShortcut === option.key;
-                    return (
-                      <TouchableOpacity
-                        key={option.key}
-                        style={[styles.attendanceSegmentButton, isActive && styles.attendanceSegmentButtonActive]}
-                        onPress={() => setAttendanceDateShortcut(option.key)}
-                      >
-                        <Text style={[styles.attendanceSegmentText, isActive && styles.attendanceSegmentTextActive, isDarkMode && !isActive && styles.darkTextSecondary]}>
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            </View>
+            {renderAdminRecordToolbar({
+              searchTitle: "Search Attendance",
+              searchValue: attendanceSearchTerm,
+              onSearchChange: setAttendanceSearchTerm,
+              searchPlaceholder: "Search name, ID, date, or location...",
+              searchSubtitle: "Find attendance by student, staff member, ID, date, location, or status.",
+              hasSearch: Boolean(attendanceSearchTerm),
+              onClearSearch: () => setAttendanceSearchTerm(""),
+              filterTitle: "Filters",
+              filterSubtitle: "Narrow attendance records by person type and date range.",
+              hasFilters: attendanceScope !== "students" || attendanceDateShortcut !== "today",
+              onResetFilters: () => {
+                setAttendanceScope("students");
+                setAttendanceDateShortcut("today");
+              },
+              filterGroups: [
+                {
+                  label: "Person Type",
+                  value: attendanceScope,
+                  icon: "people-outline",
+                  options: ATTENDANCE_SCOPE_OPTIONS.map((option) => ({
+                    label: option.label,
+                    value: option.key,
+                  })),
+                  onSelect: setAttendanceScope,
+                },
+                {
+                  label: "Date Range",
+                  value: attendanceDateShortcut,
+                  icon: "calendar-outline",
+                  options: ATTENDANCE_DATE_SHORTCUTS.map((option) => ({
+                    label: option.label,
+                    value: option.key,
+                  })),
+                  onSelect: setAttendanceDateShortcut,
+                },
+              ],
+            })}
 
             <View style={styles.attendanceSummaryGrid}>
               {[
@@ -7305,114 +7310,59 @@ const loadDashboardData = useCallback(async () => {
               Search or filter the account list, then choose View or Edit.
             </Text>
 
-            <View style={styles.dataManagementToolbar}>
-              <View style={[styles.dataManagementSearchBox, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
-                <Ionicons name="search-outline" size={17} color="#0A3D91" />
-                <TextInput
-                  style={[styles.dataManagementSearchInput, isDarkMode && styles.darkText]}
-                  placeholder="Search name, email, username, phone, staff ID..."
-                  placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
-                  value={userSearchTerm}
-                  onChangeText={setUserSearchTerm}
-                  returnKeyType="search"
-                  onSubmitEditing={() => {
-                    setUserSearchQuery(userSearchTerm.trim());
+            {renderAdminRecordToolbar({
+              searchTitle: "Search Users",
+              searchValue: userSearchTerm,
+              onSearchChange: (value) => {
+                setUserSearchTerm(value);
+                setUserSearchQuery(value.trim());
+                setDataManagementPage(1);
+              },
+              searchPlaceholder: "Search name, email, username, phone, staff ID...",
+              searchSubtitle: "Find by name, username, email, role, department, phone, or staff ID.",
+              hasSearch: Boolean(userSearchTerm || userSearchQuery),
+              onClearSearch: () => {
+                setUserSearchTerm("");
+                setUserSearchQuery("");
+                setDataManagementPage(1);
+              },
+              filterTitle: "Filters",
+              filterSubtitle: "Narrow users by role/status and department.",
+              hasFilters: userFilter !== "all" || userDepartmentFilter !== "all",
+              onResetFilters: () => {
+                setUserFilter("all");
+                setUserDepartmentFilter("all");
+                setDataManagementPage(1);
+              },
+              filterGroups: [
+                {
+                  label: "Role / Status",
+                  value: userFilter,
+                  icon: "people-outline",
+                  options: dataManagementRoleFilters.map((filterItem) => ({
+                    label: `${filterItem.label}${typeof filterItem.count === "number" ? ` (${filterItem.count})` : ""}`,
+                    value: filterItem.key,
+                  })),
+                  onSelect: (value) => {
+                    setUserFilter(value);
                     setDataManagementPage(1);
-                  }}
-                />
-                {userSearchTerm ? (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setUserSearchTerm("");
-                      setUserSearchQuery("");
-                      setDataManagementPage(1);
-                    }}
-                  >
-                    <Ionicons name="close-circle" size={18} color="#94A3B8" />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-              <TouchableOpacity
-                style={styles.dataManagementPrimaryButton}
-                onPress={() => {
-                  setUserSearchQuery(userSearchTerm.trim());
-                  setDataManagementPage(1);
-                }}
-              >
-                <Ionicons name="search-outline" size={15} color="#FFFFFF" />
-                <Text style={styles.dataManagementPrimaryButtonText}>Search</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dataManagementGhostButton, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}
-                onPress={() => {
-                  setUserSearchTerm("");
-                  setUserSearchQuery("");
-                  setUserFilter("all");
-                  setUserDepartmentFilter("all");
-                  setDataManagementPage(1);
-                }}
-              >
-                <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
-                <Text style={styles.dataManagementGhostButtonText}>Reset</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.dataManagementFilterBox, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-              <View style={styles.dataManagementFilterRow}>
-                <Text style={[styles.dataManagementFilterLabel, isDarkMode && styles.darkTextSecondary]}>Role</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dataManagementChipRow}>
-                  {dataManagementRoleFilters.map((filterItem) => {
-                    const isActive = userFilter === filterItem.key;
-                    return (
-                      <TouchableOpacity
-                        key={filterItem.key}
-                        style={[
-                          styles.dataManagementChip,
-                          isActive && styles.dataManagementChipActive,
-                          isDarkMode && !isActive && { backgroundColor: "#111827", borderColor: theme.borderColor },
-                        ]}
-                        onPress={() => {
-                          setUserFilter(filterItem.key);
-                          setDataManagementPage(1);
-                        }}
-                      >
-                        <Ionicons name={filterItem.icon} size={13} color={isActive ? "#FFFFFF" : "#0A3D91"} />
-                        <Text style={[styles.dataManagementChipText, isActive && styles.dataManagementChipTextActive]}>
-                          {filterItem.label} ({filterItem.count})
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-              <View style={styles.dataManagementFilterRow}>
-                <Text style={[styles.dataManagementFilterLabel, isDarkMode && styles.darkTextSecondary]}>Office</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dataManagementChipRow}>
-                  {dataManagementDepartmentFilterOptions.map((filterItem) => {
-                    const isActive = userDepartmentFilter === filterItem.key;
-                    return (
-                      <TouchableOpacity
-                        key={filterItem.key}
-                        style={[
-                          styles.dataManagementChip,
-                          isActive && styles.dataManagementChipActive,
-                          isDarkMode && !isActive && { backgroundColor: "#111827", borderColor: theme.borderColor },
-                        ]}
-                        onPress={() => {
-                          setUserDepartmentFilter(filterItem.key);
-                          setDataManagementPage(1);
-                        }}
-                      >
-                        <Ionicons name={filterItem.icon} size={13} color={isActive ? "#FFFFFF" : "#0A3D91"} />
-                        <Text style={[styles.dataManagementChipText, isActive && styles.dataManagementChipTextActive]}>
-                          {filterItem.label} ({filterItem.count})
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </View>
+                  },
+                },
+                {
+                  label: "Department",
+                  value: userDepartmentFilter,
+                  icon: "business-outline",
+                  options: dataManagementDepartmentFilterOptions.map((filterItem) => ({
+                    label: `${filterItem.label}${typeof filterItem.count === "number" ? ` (${filterItem.count})` : ""}`,
+                    value: filterItem.key,
+                  })),
+                  onSelect: (value) => {
+                    setUserDepartmentFilter(value);
+                    setDataManagementPage(1);
+                  },
+                },
+              ],
+            })}
 
             {renderAdminTable({
               rows: paginatedDataManagementUsers,
@@ -8264,16 +8214,19 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const renderAdminRecordToolbar = ({
+    searchTitle = "Search",
     searchValue,
     onSearchChange,
     searchPlaceholder,
     searchSubtitle = "Find records by visitor, office, purpose, date, reporter, or status.",
     hasSearch,
     onClearSearch,
-    filters = [],
+    filterTitle = "Filters",
+    filterGroups = [],
     filterSubtitle = "Keep the table focused without a long filter form.",
     hasFilters,
     onResetFilters,
+    filterFooter = null,
   }) => (
     <View style={styles.appointmentRecordsToolbar}>
       <View
@@ -8284,7 +8237,7 @@ const loadDashboardData = useCallback(async () => {
       >
         <View style={styles.appointmentToolbarHeader}>
           <View style={styles.appointmentToolbarHeaderCopy}>
-            <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>Search</Text>
+            <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>{searchTitle}</Text>
             <Text style={[styles.appointmentToolbarSubtitle, isDarkMode && styles.darkTextSecondary]}>
               {searchSubtitle}
             </Text>
@@ -8310,6 +8263,7 @@ const loadDashboardData = useCallback(async () => {
               placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
               value={searchValue}
               onChangeText={onSearchChange}
+              returnKeyType="search"
             />
           </View>
         </View>
@@ -8323,7 +8277,7 @@ const loadDashboardData = useCallback(async () => {
       >
         <View style={styles.appointmentToolbarHeader}>
           <View style={styles.appointmentToolbarHeaderCopy}>
-            <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>Filters</Text>
+            <Text style={[styles.appointmentToolbarTitle, isDarkMode && styles.darkText]}>{filterTitle}</Text>
             <Text style={[styles.appointmentToolbarSubtitle, isDarkMode && styles.darkTextSecondary]}>
               {filterSubtitle}
             </Text>
@@ -8336,31 +8290,17 @@ const loadDashboardData = useCallback(async () => {
           ) : null}
         </View>
         <View style={styles.appointmentToolbarFilterGrid}>
-          {filters.map((filter) => (
-            <TouchableOpacity
-              key={filter.key}
-              style={[
-                styles.recordsFilterChip,
-                filter.active && { backgroundColor: ADMIN_BLUE, borderColor: ADMIN_BLUE },
-                isDarkMode && !filter.active && { backgroundColor: "#111827", borderColor: theme.borderColor },
-              ]}
-              onPress={filter.onPress}
-            >
-              {filter.icon ? (
-                <Ionicons name={filter.icon} size={14} color={filter.active ? "#FFFFFF" : ADMIN_BLUE} />
-              ) : null}
-              <Text
-                style={[
-                  styles.recordsFilterChipText,
-                  filter.active && styles.recordsFilterChipTextActive,
-                  isDarkMode && !filter.active && styles.darkTextSecondary,
-                ]}
-              >
-                {filter.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {filterGroups.map((filterGroup) =>
+            renderAppointmentFilterDropdown({
+              label: filterGroup.label,
+              value: filterGroup.value,
+              icon: filterGroup.icon,
+              options: filterGroup.options,
+              onSelect: filterGroup.onSelect,
+            }),
+          )}
         </View>
+        {filterFooter ? <View style={styles.appointmentToolbarFooter}>{filterFooter}</View> : null}
       </View>
     </View>
   );
@@ -8941,25 +8881,43 @@ const loadDashboardData = useCallback(async () => {
             </View>
 
             {renderAdminRecordToolbar({
+              searchTitle: "Search Report Records",
               searchValue: reportSearchTerm,
-              onSearchChange: setReportSearchTerm,
-              searchPlaceholder: "Search visitor, office, purpose, date, or status",
+              onSearchChange: (value) => {
+                setReportSearchTerm(value);
+                setReportRecordsPage(1);
+              },
+              searchPlaceholder: "Search visitor, office, purpose, date, or status...",
+              searchSubtitle: "Find report rows by visitor, office, purpose, date, reporter, or status.",
               hasSearch: Boolean(reportSearchTerm),
               onClearSearch: () => {
                 setReportSearchTerm("");
                 setReportRecordsPage(1);
               },
+              filterTitle: "Filters",
+              filterSubtitle: "Narrow report records by status or security report type.",
               hasFilters: reportStatusFilter !== "all",
               onResetFilters: () => {
                 setReportStatusFilter("all");
                 setReportRecordsPage(1);
               },
-              filters: [
-                { key: "all", label: "All", icon: "layers-outline", active: reportStatusFilter === "all", onPress: () => { setReportStatusFilter("all"); setReportRecordsPage(1); } },
-                { key: "completed", label: "Completed", icon: "checkmark-circle-outline", active: reportStatusFilter === "completed", onPress: () => { setReportStatusFilter("completed"); setReportRecordsPage(1); } },
-                { key: "pending", label: "Pending", icon: "time-outline", active: reportStatusFilter === "pending", onPress: () => { setReportStatusFilter("pending"); setReportRecordsPage(1); } },
-                { key: "rejected", label: "Rejected", icon: "close-circle-outline", active: reportStatusFilter === "rejected", onPress: () => { setReportStatusFilter("rejected"); setReportRecordsPage(1); } },
-                { key: "reported", label: "Security Reports", icon: "shield-alert-outline", active: reportStatusFilter === "reported", onPress: () => { setReportStatusFilter("reported"); setReportRecordsPage(1); } },
+              filterGroups: [
+                {
+                  label: "Status",
+                  value: reportStatusFilter,
+                  icon: "layers-outline",
+                  options: [
+                    { label: "All", value: "all" },
+                    { label: "Completed", value: "completed" },
+                    { label: "Pending", value: "pending" },
+                    { label: "Rejected", value: "rejected" },
+                    { label: "Security Reports", value: "reported" },
+                  ],
+                  onSelect: (value) => {
+                    setReportStatusFilter(value);
+                    setReportRecordsPage(1);
+                  },
+                },
               ],
             })}
 
@@ -9137,23 +9095,41 @@ const loadDashboardData = useCallback(async () => {
           </View>
 
           {renderAdminRecordToolbar({
+            searchTitle: "Search Security Reports",
             searchValue: securityReportSearchTerm,
-            onSearchChange: setSecurityReportSearchTerm,
-            searchPlaceholder: "Search visitor, incident, office, reporter, or date",
+            onSearchChange: (value) => {
+              setSecurityReportSearchTerm(value);
+              setSecurityReportRecordsPage(1);
+            },
+            searchPlaceholder: "Search visitor, incident, office, reporter, or date...",
+            searchSubtitle: "Find security reports by visitor, incident, office, reporter, or date.",
             hasSearch: Boolean(securityReportSearchTerm),
             onClearSearch: () => {
               setSecurityReportSearchTerm("");
               setSecurityReportRecordsPage(1);
             },
+            filterTitle: "Filters",
+            filterSubtitle: "Narrow security reports by review status.",
             hasFilters: securityReportStatusFilter !== "all",
             onResetFilters: () => {
               setSecurityReportStatusFilter("all");
               setSecurityReportRecordsPage(1);
             },
-            filters: [
-              { key: "all", label: "All", icon: "layers-outline", active: securityReportStatusFilter === "all", onPress: () => { setSecurityReportStatusFilter("all"); setSecurityReportRecordsPage(1); } },
-              { key: "open", label: "Open", icon: "alert-circle-outline", active: securityReportStatusFilter === "open", onPress: () => { setSecurityReportStatusFilter("open"); setSecurityReportRecordsPage(1); } },
-              { key: "resolved", label: "Resolved", icon: "checkmark-circle-outline", active: securityReportStatusFilter === "resolved", onPress: () => { setSecurityReportStatusFilter("resolved"); setSecurityReportRecordsPage(1); } },
+            filterGroups: [
+              {
+                label: "Status",
+                value: securityReportStatusFilter,
+                icon: "shield-checkmark-outline",
+                options: [
+                  { label: "All", value: "all" },
+                  { label: "Open", value: "open" },
+                  { label: "Resolved", value: "resolved" },
+                ],
+                onSelect: (value) => {
+                  setSecurityReportStatusFilter(value);
+                  setSecurityReportRecordsPage(1);
+                },
+              },
             ],
           })}
 
@@ -9683,89 +9659,86 @@ const loadDashboardData = useCallback(async () => {
                 </View>
               </View>
 
-              <View style={styles.historyFilters}>
-                {renderRecordsSearchPanel({
-                  title: "Search Visitor History",
-                  subtitle: "Manual lookup for a visitor name, email, office, purpose, status, or exact date.",
-                  value: historySearchTerm,
-                  onChangeText: setHistorySearchTerm,
-                  onApply: () => setHistorySearchQuery(historySearchTerm.trim()),
-                  onClear: () => {
-                    setHistorySearchTerm("");
-                    setHistorySearchQuery("");
+              {renderAdminRecordToolbar({
+                searchTitle: "Search Visitor History",
+                searchValue: historySearchTerm,
+                onSearchChange: (value) => {
+                  setHistorySearchTerm(value);
+                  setHistorySearchQuery(value.trim());
+                },
+                searchPlaceholder: "Search visitor, email, office, purpose, status, or date...",
+                searchSubtitle: "Find visitor records by name, email, office, purpose, status, or exact date.",
+                hasSearch: Boolean(historySearchTerm || historySearchQuery),
+                onClearSearch: () => {
+                  setHistorySearchTerm("");
+                  setHistorySearchQuery("");
+                },
+                filterTitle: "Filters",
+                filterSubtitle: "Narrow visitor history by status, date, office, and time order.",
+                hasFilters:
+                  historyFilter !== "all" ||
+                  historyDateFilter !== "all" ||
+                  historyOfficeFilter !== "all" ||
+                  historySortOrder !== "newest" ||
+                  Boolean(historyDateRange.startDate || historyDateRange.endDate),
+                onResetFilters: () => {
+                  setHistoryFilter("all");
+                  setHistoryDateFilter("all");
+                  setHistoryOfficeFilter("all");
+                  setHistoryDateRange({ startDate: null, endDate: null });
+                  setHistorySortOrder("newest");
+                },
+                filterGroups: [
+                  {
+                    label: "Status",
+                    value: historyFilter,
+                    icon: "layers-outline",
+                    options: historyFilters.map((filter) => ({
+                      label: `${filter.label}${typeof filter.count === "number" ? ` (${filter.count})` : ""}`,
+                      value: filter.key,
+                    })),
+                    onSelect: setHistoryFilter,
                   },
-                  placeholder: "Example: April 18, 2026 or Document Request",
-                  accent: "#1C6DD0",
-                })}
-
-                {renderRecordsFilterPanel({
-                  title: "Filter Visitor History",
-                  subtitle: "Quick status, month, exact date range, office, and time order filters for narrowing records.",
-                  panelKey: "visitor-history",
-                  accent: "#1C6DD0",
-                  onReset: () => {
-                    setHistoryFilter("all");
-                    setHistoryDateFilter("all");
-                    setHistoryOfficeFilter("all");
-                    setHistoryDateRange({ startDate: null, endDate: null });
-                    setHistorySortOrder("newest");
+                  {
+                    label: "Date Range",
+                    value: historyDateFilter,
+                    icon: "calendar-outline",
+                    options: dateShortcutFilters.map((filter) => ({
+                      label: filter.label,
+                      value: filter.key,
+                    })),
+                    onSelect: setHistoryDateFilter,
                   },
-                  groups: [
-                    {
-                      key: "status",
-                      label: "Status",
-                      activeValue: historyFilter,
-                      onSelect: setHistoryFilter,
-                      filters: historyFilters.map((filter) => ({
-                        ...filter,
-                        icon: filter.key === "approved"
-                          ? "checkmark-circle-outline"
-                          : filter.key === "pending"
-                            ? "time-outline"
-                            : filter.key === "rejected"
-                              ? "close-circle-outline"
-                              : filter.key === "checked_in"
-                                ? "log-in-outline"
-                                : filter.key === "checked_out"
-                                  ? "log-out-outline"
-                                  : "apps-outline",
-                      })),
-                    },
-                    {
-                      key: "date",
-                      label: "Date Range",
-                      activeValue: historyDateFilter,
-                      onSelect: setHistoryDateFilter,
-                      filters: dateShortcutFilters,
-                    },
-                    {
-                      key: "office",
-                      label: "Office",
-                      activeValue: historyOfficeFilter,
-                      onSelect: setHistoryOfficeFilter,
-                      filters: historyOfficeFilterOptions,
-                    },
-                    {
-                      key: "order",
-                      label: "Time Order",
-                      activeValue: historySortOrder,
-                      onSelect: setHistorySortOrder,
-                      filters: [
-                        { key: "newest", label: "Newest First", icon: "arrow-down-outline" },
-                        { key: "oldest", label: "Oldest First", icon: "arrow-up-outline" },
-                      ],
-                    },
-                  ],
-                  footerContent: renderDateRangeControls({
-                    accent: "#1C6DD0",
-                    startDate: historyDateRange.startDate,
-                    endDate: historyDateRange.endDate,
-                    onPickStart: () => setActiveFilterDateField("history-start"),
-                    onPickEnd: () => setActiveFilterDateField("history-end"),
-                    onClear: () => setHistoryDateRange({ startDate: null, endDate: null }),
-                  }),
-                })}
-              </View>
+                  {
+                    label: "Office",
+                    value: historyOfficeFilter,
+                    icon: "business-outline",
+                    options: historyOfficeFilterOptions.map((filter) => ({
+                      label: `${filter.label}${typeof filter.count === "number" ? ` (${filter.count})` : ""}`,
+                      value: filter.key,
+                    })),
+                    onSelect: setHistoryOfficeFilter,
+                  },
+                  {
+                    label: "Time Order",
+                    value: historySortOrder,
+                    icon: "swap-vertical-outline",
+                    options: [
+                      { label: "Newest First", value: "newest" },
+                      { label: "Oldest First", value: "oldest" },
+                    ],
+                    onSelect: setHistorySortOrder,
+                  },
+                ],
+                filterFooter: renderDateRangeControls({
+                  accent: "#1C6DD0",
+                  startDate: historyDateRange.startDate,
+                  endDate: historyDateRange.endDate,
+                  onPickStart: () => setActiveFilterDateField("history-start"),
+                  onPickEnd: () => setActiveFilterDateField("history-end"),
+                  onClear: () => setHistoryDateRange({ startDate: null, endDate: null }),
+                }),
+              })}
 
               {filteredHistory.length === 0 ? (
                 <View style={styles.emptyHistoryState}>
@@ -10661,8 +10634,22 @@ const loadDashboardData = useCallback(async () => {
     <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? "#0F172A" : "#F4F8FC"} />
       <View style={[styles.mainContainer, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
+        {isAdminMobileLayout && showAdminMobileMenu ? (
+          <TouchableOpacity
+            style={styles.mobileSidebarBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowAdminMobileMenu(false)}
+          />
+        ) : null}
         {/* Sidebar */}
-        <View style={[styles.sidebar, isDarkMode && { backgroundColor: theme.sidebarBackground }]}>
+        {!isAdminMobileLayout || showAdminMobileMenu ? (
+        <View
+          style={[
+            styles.sidebar,
+            isAdminMobileLayout && styles.mobileSidebar,
+            isDarkMode && { backgroundColor: theme.sidebarBackground },
+          ]}
+        >
           <ScrollView ref={sidebarScrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.sidebarContent}>
             <View style={[styles.sidebarHeader, isDarkMode && styles.darkSidebarPanel]}>
               <Image source={require("../assets/LogoSapphire.jpg")} style={styles.sidebarLogoImage} />
@@ -10806,11 +10793,37 @@ const loadDashboardData = useCallback(async () => {
             </View>
           </ScrollView>
         </View>
+        ) : null}
 
         {/* Main Content */}
         <View style={styles.adminContentShell}>
         <View style={[styles.contentArea, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
-          <Animated.View style={[styles.header, { opacity: headerOpacity }, isDarkMode && { backgroundColor: ADMIN_BLUE_DARK, borderBottomColor: "#B7D5F6" }]}>
+          {isAdminMobileLayout ? (
+            <View style={[styles.mobileAdminTopBar, isDarkMode && styles.darkSidebarPanel]}>
+              <TouchableOpacity
+                style={[styles.mobileAdminMenuButton, isDarkMode && styles.darkSidebarButton]}
+                onPress={() => setShowAdminMobileMenu(true)}
+                activeOpacity={0.82}
+              >
+                <Ionicons name="menu-outline" size={22} color={isDarkMode ? "#DBEAFE" : ADMIN_BLUE_DARK} />
+                <Text style={[styles.mobileAdminMenuButtonText, isDarkMode && styles.darkText]}>
+                  Menu
+                </Text>
+              </TouchableOpacity>
+              <View style={styles.mobileAdminTopCopy}>
+                <Text style={[styles.mobileAdminTopTitle, isDarkMode && styles.darkText]} numberOfLines={1}>
+                  {selectedSubmoduleMeta.title}
+                </Text>
+                <Text style={[styles.mobileAdminTopSubtitle, isDarkMode && styles.darkTextSecondary]} numberOfLines={1}>
+                  Admin dashboard
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.mobileAdminProfileButton}>
+                <Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          <Animated.View style={[styles.header, isAdminMobileLayout && styles.headerMobileCompact, { opacity: headerOpacity }, isDarkMode && { backgroundColor: ADMIN_BLUE_DARK, borderBottomColor: "#B7D5F6" }]}>
             <View style={styles.headerTop}>
             <View style={styles.headerCopy}>
               <Text style={styles.headerTitle}>
@@ -10891,7 +10904,7 @@ const loadDashboardData = useCallback(async () => {
                 <View style={[styles.detailSection, isDarkMode && { borderBottomColor: theme.borderColor }]}>
                   <Text style={[styles.detailLabel, isDarkMode && styles.darkTextSecondary]}>Appointment Request Update</Text>
                   <Text style={[styles.detailValue, isDarkMode && styles.darkText]}>
-                    Current: {selectedRequest.assignedOffice || selectedRequest.appointmentDepartment || selectedRequest.host || "Unassigned"} · {formatDateTime(selectedRequest.visitDate)} · {formatTime(selectedRequest.visitTime)}
+                    Current: {selectedRequest.assignedOffice || selectedRequest.appointmentDepartment || selectedRequest.host || "Unassigned"} - {formatDateTime(selectedRequest.visitDate)} - {formatTime(selectedRequest.visitTime)}
                   </Text>
                   <TextInput
                     style={[

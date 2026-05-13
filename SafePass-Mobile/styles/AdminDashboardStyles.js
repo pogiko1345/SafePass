@@ -478,6 +478,27 @@ export default StyleSheet.create({
     fontSize: 9,
     color: "#CBD5E1",
   },
+
+  mobileSidebarBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
+    backgroundColor: "rgba(15, 23, 42, 0.42)",
+  },
+
+  mobileSidebar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 30,
+    width: Math.min(width - 36, sidebarWidth),
+    maxWidth: 320,
+    borderRightWidth: 1,
+  },
   darkSidebarPanel: {
     backgroundColor: "#111827",
     borderColor: "#253248",
@@ -519,6 +540,64 @@ export default StyleSheet.create({
   contentArea: {
     flex: 1,
     backgroundColor: "#F4F8FC",
+  },
+
+  mobileAdminTopBar: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    zIndex: 5,
+  },
+
+  mobileAdminMenuButton: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D8E6F5",
+    backgroundColor: "#F8FBFE",
+  },
+
+  mobileAdminMenuButtonText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
+  mobileAdminTopCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  mobileAdminTopTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  mobileAdminTopSubtitle: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  mobileAdminProfileButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#0A3D91",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   adminContentShell: {
@@ -1019,6 +1098,10 @@ export default StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "flex-start",
     gap: 10,
+  },
+
+  appointmentToolbarFooter: {
+    marginTop: 12,
   },
 
   appointmentToolbarField: {
@@ -1925,6 +2008,14 @@ export default StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#0A3D91",
+  },
+
+  headerMobileCompact: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
   },
 
   darkHeaderMetaBadge: {

@@ -295,6 +295,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [mobileDateFilter, setMobileDateFilter] = useState('all');
   const [mobileLocationFilter, setMobileLocationFilter] = useState('all');
   const [mobileLogFilter, setMobileLogFilter] = useState('all');
+  const [recordFilterDropdownOpen, setRecordFilterDropdownOpen] = useState(null);
   const [appointmentRecordsPage, setAppointmentRecordsPage] = useState(1);
   const [showVisitorModal, setShowVisitorModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -1076,9 +1077,21 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const loadOperationalData = async ({ force = false } = {}) => {
     try {
-      const allVisitorsRes = await ApiService.getVisitors({ limit: 500 });
-      const allVisitors = allVisitorsRes.visitors || [];
-      const nextSignature = buildOperationalDataSignature(allVisitors);
+      const [allVisitorsRes, accessLogsRes] = await Promise.allSettled([
+        ApiService.getVisitors({ limit: 500 }),
+        ApiService.getAccessLogs(1, 100, { all: true }),
+      ]);
+      if (allVisitorsRes.status === "rejected") {
+        throw allVisitorsRes.reason;
+      }
+      const allVisitors = allVisitorsRes.value?.visitors || [];
+      const realAccessLogs =
+        accessLogsRes.status === "fulfilled" && Array.isArray(accessLogsRes.value?.accessLogs)
+          ? accessLogsRes.value.accessLogs
+          : [];
+      const nextSignature = `${buildOperationalDataSignature(allVisitors)}::${realAccessLogs
+        .map((log) => [log?._id, log?.timestamp, log?.activityType, log?.status].join(":"))
+        .join("|")}`;
 
       if (!force && operationalDataSignatureRef.current === nextSignature) {
         return false;
@@ -1093,21 +1106,26 @@ export default function SecurityDashboardScreen({ navigation }) {
       );
       const operationalAnalytics = deriveAnalytics(collections.all);
       const derivedLogs = deriveAccessLogs(collections.all);
+      const combinedLogs = [...realAccessLogs, ...derivedLogs]
+        .filter((log, index, items) =>
+          index === items.findIndex((item) => String(item?._id) === String(log?._id)),
+        )
+        .sort((left, right) => new Date(right?.timestamp || 0) - new Date(left?.timestamp || 0));
       const derivedReports = deriveReports(collections.all);
 
       setVisitors(collections);
       setVisitorStats(stats);
       setAnalytics(operationalAnalytics);
       setVisitorLocations(deriveVisitorLocations(collections.active));
-      setAccessLogs(derivedLogs);
-      setLogsTotal(derivedLogs.length);
+      setAccessLogs(combinedLogs);
+      setLogsTotal(combinedLogs.length);
       setReports(derivedReports);
-      setRecentAccess(derivedLogs.slice(0, 10));
+      setRecentAccess(combinedLogs.slice(0, 10));
       setDashboardStats((current) => ({
         ...current,
         activeUsers: current.activeUsers || collections.active.length,
         totalVisitorsToday: stats.totalToday,
-        recentAccess: derivedLogs.length,
+        recentAccess: combinedLogs.length,
         occupancyRate: 0,
       }));
       return true;
@@ -2178,7 +2196,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderAppointmentPagination = () => (
     <View style={styles.appointmentRecordsPaginationRow}>
       <Text style={styles.appointmentRecordsPaginationInfo}>
-        Page {appointmentRecordsPage} of {appointmentRecordsPageCount} • {filteredVisitors.length} records
+        Page {appointmentRecordsPage} of {appointmentRecordsPageCount} - {filteredVisitors.length} records
       </Text>
       <View style={styles.appointmentRecordsPaginationActions}>
         <TouchableOpacity
@@ -2245,7 +2263,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   }) => (
     <View style={styles.appointmentRecordsPaginationRow}>
       <Text style={styles.appointmentRecordsPaginationInfo}>
-        Page {currentPage} of {totalPages} • {totalItems} {itemLabel}
+        Page {currentPage} of {totalPages} - {totalItems} {itemLabel}
       </Text>
       <View style={styles.appointmentRecordsPaginationActions}>
         <TouchableOpacity
@@ -2445,7 +2463,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <View style={styles.activityContent}>
                   <Text style={styles.activityTitle}>{visitor.fullName}</Text>
                   <Text style={styles.activityLocation}>
-                    {visitor.status === 'checked_in' ? 'Currently on site' : 'Ready for arrival'} • {visitor.assignedOffice || visitor.host || 'Campus access'}
+                    {visitor.status === 'checked_in' ? 'Currently on site' : 'Ready for arrival'} - {visitor.assignedOffice || visitor.host || 'Campus access'}
                   </Text>
                 </View>
                 <Text style={styles.activityTime}>
@@ -2459,7 +2477,12 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Ionicons name="pulse-outline" size={44} color="#D1D5DB" />
                 <Text style={styles.emptyStateTitle}>No live visitor activity</Text>
                 <Text style={styles.emptyStateSubtitle}>Approved arrivals and active check-ins will appear here automatically.</Text>
-                <TouchableOpacity style={styles.emptyRefreshButton} onPress={refreshData}>
+                <TouchableOpacity
+                  style={styles.emptyRefreshButton}
+                  onPress={refreshData}
+                  accessibilityRole="button"
+                  accessibilityLabel="Refresh dashboard"
+                >
                   <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
                   <Text style={styles.emptyRefreshButtonText}>Refresh dashboard</Text>
                 </TouchableOpacity>
@@ -2520,7 +2543,12 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Ionicons name="business-outline" size={48} color="#D1D5DB" />
                 <Text style={styles.emptyStateTitle}>No Office Traffic Yet</Text>
                 <Text style={styles.emptyStateSubtitle}>Visitor assignments will appear here once registrations come in</Text>
-                <TouchableOpacity style={styles.emptyRefreshButton} onPress={refreshData}>
+                <TouchableOpacity
+                  style={styles.emptyRefreshButton}
+                  onPress={refreshData}
+                  accessibilityRole="button"
+                  accessibilityLabel="Check office traffic again"
+                >
                   <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
                   <Text style={styles.emptyRefreshButtonText}>Check again</Text>
                 </TouchableOpacity>
@@ -2735,6 +2763,122 @@ export default function SecurityDashboardScreen({ navigation }) {
     </ScrollView>
   );
 
+  const renderRecordFilterDropdown = ({ id, label, value, options, onSelect, icon = "filter-outline" }) => {
+    const isOpen = recordFilterDropdownOpen === id;
+    const selectedOption = options.find((option) => option.value === value);
+
+    return (
+      <View style={styles.recordToolbarField}>
+        <Text style={styles.recordToolbarLabel}>{label}</Text>
+        <TouchableOpacity
+          style={styles.recordToolbarSelect}
+          onPress={() => setRecordFilterDropdownOpen(isOpen ? null : id)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`${label} filter`}
+        >
+          <View style={styles.recordToolbarSelectValue}>
+            <Ionicons name={icon} size={15} color="#64748B" />
+            <Text style={styles.recordToolbarSelectText} numberOfLines={1}>
+              {selectedOption?.label || "All"}
+            </Text>
+          </View>
+          <Ionicons name={isOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color="#64748B" />
+        </TouchableOpacity>
+        {isOpen ? (
+          <View style={styles.recordToolbarDropdownMenu}>
+            <ScrollView style={styles.recordToolbarDropdownScroll} nestedScrollEnabled>
+              {options.map((option) => {
+                const selected = option.value === value;
+                return (
+                  <TouchableOpacity
+                    key={`${id}-${option.value}`}
+                    style={[styles.recordToolbarDropdownOption, selected && styles.recordToolbarDropdownOptionActive]}
+                    onPress={() => {
+                      onSelect(option.value);
+                      setRecordFilterDropdownOpen(null);
+                    }}
+                  >
+                    <Text style={[styles.recordToolbarDropdownText, selected && styles.recordToolbarDropdownTextActive]} numberOfLines={1}>
+                      {option.label}
+                    </Text>
+                    {selected ? <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderRecordSearchFilterToolbar = ({
+    searchTitle,
+    searchSubtitle,
+    searchValue,
+    onSearchChange,
+    onClearSearch,
+    searchPlaceholder,
+    filterSubtitle,
+    hasFilters,
+    onResetFilters,
+    filterGroups,
+  }) => (
+    <View style={styles.recordToolbar}>
+      <View style={styles.recordToolbarCard}>
+        <View style={styles.recordToolbarHeader}>
+          <View style={styles.recordToolbarHeaderCopy}>
+            <Text style={styles.recordToolbarTitle}>{searchTitle}</Text>
+            <Text style={styles.recordToolbarSubtitle}>{searchSubtitle}</Text>
+          </View>
+          {searchValue ? (
+            <TouchableOpacity style={styles.recordToolbarClear} onPress={onClearSearch}>
+              <Text style={styles.recordToolbarClearText}>Clear</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={20} color="#9CA3AF" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={searchPlaceholder}
+            placeholderTextColor="#9CA3AF"
+            value={searchValue}
+            onChangeText={onSearchChange}
+            returnKeyType="search"
+          />
+        </View>
+      </View>
+
+      <View style={styles.recordToolbarCard}>
+        <View style={styles.recordToolbarHeader}>
+          <View style={styles.recordToolbarHeaderCopy}>
+            <Text style={styles.recordToolbarTitle}>Filters</Text>
+            <Text style={styles.recordToolbarSubtitle}>{filterSubtitle}</Text>
+          </View>
+          {hasFilters ? (
+            <TouchableOpacity style={styles.recordToolbarClear} onPress={onResetFilters}>
+              <Text style={styles.recordToolbarClearText}>Reset</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.recordToolbarFilterGrid}>
+          {filterGroups.map((group) =>
+            renderRecordFilterDropdown({
+              id: group.id,
+              label: group.label,
+              value: group.value,
+              icon: group.icon,
+              options: group.options,
+              onSelect: group.onSelect,
+            }),
+          )}
+        </View>
+      </View>
+    </View>
+  );
+
   // Render Visitors Tab
   const renderVisitorsTab = () => (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -2751,56 +2895,32 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={styles.recordToolbar}>
-          <View style={styles.recordToolbarCard}>
-            <View style={styles.recordToolbarHeader}>
-              <Text style={styles.recordToolbarTitle}>Search</Text>
-              {searchQuery !== '' ? (
-                <TouchableOpacity style={styles.recordToolbarClear} onPress={() => setSearchQuery('')}>
-                  <Text style={styles.recordToolbarClearText}>Clear</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <View style={styles.searchContainer}>
-              <Ionicons name="search-outline" size={20} color="#9CA3AF" />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Name, phone, email, purpose, or host"
-                placeholderTextColor="#9CA3AF"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-          </View>
-
-          <View style={styles.recordToolbarCard}>
-            <View style={styles.recordToolbarHeader}>
-              <Text style={styles.recordToolbarTitle}>Filters</Text>
-              {visitorFilter !== 'all' ? (
-                <TouchableOpacity style={styles.recordToolbarClear} onPress={() => setVisitorFilter('all')}>
-                  <Text style={styles.recordToolbarClearText}>Reset</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <View style={styles.filterTabs}>
-              {['all', 'active', 'approved', 'completed'].map((filter) => (
-                <TouchableOpacity
-                  key={filter}
-                  style={[styles.filterTab, visitorFilter === filter && styles.filterTabActive]}
-                  onPress={() => setVisitorFilter(filter)}
-                >
-                  <Text style={[styles.filterTabText, visitorFilter === filter && styles.filterTabTextActive]}>
-                    {filter === 'completed' ? 'Completed' : filter.charAt(0).toUpperCase() + filter.slice(1)}
-                    {filter === 'active' && ` (${visitors.active.length})`}
-                    {filter === 'approved' && ` (${visitors.approved.length})`}
-                    {filter === 'completed' && ` (${visitors.completed.length})`}
-                    {filter === 'all' && ` (${visitors.all.length})`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
+        {renderRecordSearchFilterToolbar({
+          searchTitle: "Search Appointments",
+          searchSubtitle: "Find by name, phone, email, purpose, or host.",
+          searchValue: searchQuery,
+          onSearchChange: setSearchQuery,
+          onClearSearch: () => setSearchQuery(''),
+          searchPlaceholder: "Search name, phone, email, purpose, or host...",
+          filterSubtitle: "Narrow appointment records by visitor status.",
+          hasFilters: visitorFilter !== 'all',
+          onResetFilters: () => setVisitorFilter('all'),
+          filterGroups: [
+            {
+              id: "security-visitor-status",
+              label: "Status",
+              value: visitorFilter,
+              icon: "layers-outline",
+              options: [
+                { value: "all", label: `All (${visitors.all.length})` },
+                { value: "active", label: `Active (${visitors.active.length})` },
+                { value: "approved", label: `Approved (${visitors.approved.length})` },
+                { value: "completed", label: `Completed (${visitors.completed.length})` },
+              ],
+              onSelect: setVisitorFilter,
+            },
+          ],
+        })}
 
         <View style={styles.readonlyInfoBanner}>
           <Ionicons name="shield-checkmark-outline" size={18} color="#0A3D91" />
@@ -3153,7 +3273,12 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name="time-outline" size={20} color="#0A3D91" />
             <Text style={styles.sectionTitle}>Access Logs</Text>
           </View>
-          <TouchableOpacity onPress={() => { setLogsPage(1); loadAccessLogs(); }}>
+          <TouchableOpacity
+            onPress={() => { setLogsPage(1); loadAccessLogs(); }}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh access logs"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <Ionicons name="refresh-outline" size={20} color="#0A3D91" />
           </TouchableOpacity>
         </View>
@@ -3189,8 +3314,8 @@ export default function SecurityDashboardScreen({ navigation }) {
         {accessLogs.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="time-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyStateTitle}>No Access Logs</Text>
-            <Text style={styles.emptyStateSubtitle}>Access records will appear here</Text>
+            <Text style={styles.emptyStateTitle}>No access logs</Text>
+            <Text style={styles.emptyStateSubtitle}>Student, staff, visitor, and checkpoint activity will appear here.</Text>
           </View>
         )}
       </View>
@@ -3394,51 +3519,31 @@ export default function SecurityDashboardScreen({ navigation }) {
         {reports.length > 0 && (
           <View style={styles.reportSection}>
             <Text style={styles.reportSectionTitle}>Recent Reports</Text>
-            <View style={styles.recordToolbar}>
-              <View style={styles.recordToolbarCard}>
-                <View style={styles.recordToolbarHeader}>
-                  <Text style={styles.recordToolbarTitle}>Search</Text>
-                  {reportSearchQuery ? (
-                    <TouchableOpacity style={styles.recordToolbarClear} onPress={() => setReportSearchQuery('')}>
-                      <Text style={styles.recordToolbarClearText}>Clear</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-                <View style={styles.searchContainer}>
-                  <Ionicons name="search-outline" size={20} color="#9CA3AF" />
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Incident, visitor, status, or date"
-                    placeholderTextColor="#9CA3AF"
-                    value={reportSearchQuery}
-                    onChangeText={setReportSearchQuery}
-                  />
-                </View>
-              </View>
-              <View style={styles.recordToolbarCard}>
-                <View style={styles.recordToolbarHeader}>
-                  <Text style={styles.recordToolbarTitle}>Filters</Text>
-                  {reportStatusFilter !== 'all' ? (
-                    <TouchableOpacity style={styles.recordToolbarClear} onPress={() => setReportStatusFilter('all')}>
-                      <Text style={styles.recordToolbarClearText}>Reset</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-                <View style={styles.filterTabs}>
-                  {['all', 'open', 'resolved'].map((status) => (
-                    <TouchableOpacity
-                      key={status}
-                      style={[styles.filterTab, reportStatusFilter === status && styles.filterTabActive]}
-                      onPress={() => setReportStatusFilter(status)}
-                    >
-                      <Text style={[styles.filterTabText, reportStatusFilter === status && styles.filterTabTextActive]}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
+            {renderRecordSearchFilterToolbar({
+              searchTitle: "Search Reports",
+              searchSubtitle: "Find by incident, visitor, status, or date.",
+              searchValue: reportSearchQuery,
+              onSearchChange: setReportSearchQuery,
+              onClearSearch: () => setReportSearchQuery(''),
+              searchPlaceholder: "Search incident, visitor, status, or date...",
+              filterSubtitle: "Narrow security reports by review status.",
+              hasFilters: reportStatusFilter !== 'all',
+              onResetFilters: () => setReportStatusFilter('all'),
+              filterGroups: [
+                {
+                  id: "security-report-status",
+                  label: "Status",
+                  value: reportStatusFilter,
+                  icon: "shield-checkmark-outline",
+                  options: [
+                    { value: "all", label: "All" },
+                    { value: "open", label: "Open" },
+                    { value: "resolved", label: "Resolved" },
+                  ],
+                  onSelect: setReportStatusFilter,
+                },
+              ],
+            })}
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.securityReportsTable}>
                 <View style={[styles.securityReportsTableRow, styles.securityReportsTableHeader]}>
@@ -4227,7 +4332,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       <View style={securityMobileStyles.statusCardCopy}>
         <Text style={[securityMobileStyles.statusCardTitle, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]}>Current Status</Text>
         <Text style={[securityMobileStyles.statusCardSubtitle, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]}>
-          {visitorStats.activeNow} inside · {alerts.length} alert{alerts.length === 1 ? "" : "s"}
+          {visitorStats.activeNow} inside - {alerts.length} alert{alerts.length === 1 ? "" : "s"}
         </Text>
       </View>
       <View style={securityMobileStyles.statusCardCount}>
@@ -4348,7 +4453,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           <View style={securityMobileStyles.visitorCopy}>
             <Text style={[securityMobileStyles.visitorName, mobileDarkModeEnabled && securityMobileStyles.darkPrimaryText]} numberOfLines={1}>{visitor.fullName || "Visitor"}</Text>
             <Text style={[securityMobileStyles.visitorMeta, mobileDarkModeEnabled && securityMobileStyles.darkMutedText]} numberOfLines={1}>
-              {destination.officeName} • {destination.floorLabel}
+              {destination.officeName} - {destination.floorLabel}
             </Text>
           </View>
           <MobileStatusBadge status={statusBadge.label.toLowerCase()} label={statusBadge.label} />
@@ -4499,7 +4604,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     <>
       <View style={securityMobileStyles.compactHeader}>
         <Text style={securityMobileStyles.compactTitle}>Recent Activity</Text>
-        <Text style={securityMobileStyles.compactSubtitle}>A short, friendly view of arrivals, departures, and blocked access.</Text>
+        <Text style={securityMobileStyles.compactSubtitle}>Arrivals, departures, and blocked access across campus.</Text>
       </View>
       <View style={securityMobileStyles.logToolbar}>
         <MobileFilterChips dark={mobileDarkModeEnabled} options={securityLogFilters} value={mobileLogFilter} onChange={setMobileLogFilter} />
@@ -4665,15 +4770,30 @@ export default function SecurityDashboardScreen({ navigation }) {
           />
         </View>
         <View style={securityMobileStyles.mapActionRow}>
-          <TouchableOpacity style={securityMobileStyles.mapActionButtonPrimary} onPress={() => navigation.navigate("NFCScan")}>
+          <TouchableOpacity
+            style={securityMobileStyles.mapActionButtonPrimary}
+            onPress={() => navigation.navigate("NFCScan")}
+            accessibilityRole="button"
+            accessibilityLabel="Open NFC scanner"
+          >
             <Ionicons name="scan-outline" size={18} color="#FFFFFF" />
             <Text style={securityMobileStyles.mapActionButtonPrimaryText}>Scan</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={securityMobileStyles.mapActionButton} onPress={refreshData}>
+          <TouchableOpacity
+            style={securityMobileStyles.mapActionButton}
+            onPress={refreshData}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh map"
+          >
             <Ionicons name="refresh-outline" size={18} color={BRAND.blue} />
             <Text style={securityMobileStyles.mapActionButtonText}>Refresh</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={securityMobileStyles.mapActionButton} onPress={() => setSecurityMobileTab("alerts")}>
+          <TouchableOpacity
+            style={securityMobileStyles.mapActionButton}
+            onPress={() => setSecurityMobileTab("alerts")}
+            accessibilityRole="button"
+            accessibilityLabel="Open report form"
+          >
             <Ionicons name="flag-outline" size={18} color={BRAND.danger} />
             <Text style={securityMobileStyles.mapActionButtonText}>Report</Text>
           </TouchableOpacity>

@@ -1026,7 +1026,7 @@ const sendGeneralSms = async ({ phoneNumber, message }) => {
   return { success: false, skipped: true, provider: "backend_log" };
 };
 
-const sendStudentCampusTapNotifications = async ({
+const sendCampusTapSecurityNotifications = async ({
   user,
   action,
   timestamp,
@@ -1036,25 +1036,32 @@ const sendStudentCampusTapNotifications = async ({
   deviceId = "",
 }) => {
   const normalizedRole = normalizeUserRoleValue(user?.role);
-  if (normalizedRole !== "student" || !["check_in", "check_out"].includes(action)) {
+  if (!["student", "teacher", "staff"].includes(normalizedRole) || !["check_in", "check_out"].includes(action)) {
     return [];
   }
 
   const isCheckIn = action === "check_in";
-  const studentName = getFullName(user) || user?.email || "Student";
+  const roleLabel =
+    normalizedRole === "teacher"
+      ? "Teacher"
+      : normalizedRole === "staff"
+        ? "Staff"
+        : "Student";
+  const personName = getFullName(user) || user?.email || roleLabel;
   const locationLabel = tapLocation?.office || "campus checkpoint";
-  const activityType = isCheckIn ? "student_check_in" : "student_check_out";
+  const activityType = `${normalizedRole}_${isCheckIn ? "check_in" : "check_out"}`;
   const results = await Promise.allSettled([
     createRoleNotification({
-      title: isCheckIn ? "Student Entered Campus" : "Student Left Campus",
-      message: `${studentName} ${isCheckIn ? "entered" : "left"} campus at ${locationLabel}.`,
+      title: `${roleLabel} ${isCheckIn ? "Entered Campus" : "Left Campus"}`,
+      message: `${personName} ${isCheckIn ? "entered" : "left"} campus at ${locationLabel}.`,
       targetRole: "security",
       relatedUser: user._id,
       type: "info",
-      severity: isCheckIn ? "medium" : "low",
+      severity: normalizedRole === "staff" || isCheckIn ? "medium" : "low",
       metadata: {
         activityType,
         action,
+        userType: normalizedRole,
         status,
         tapLocation,
         deviceId,
@@ -1065,7 +1072,7 @@ const sendStudentCampusTapNotifications = async ({
 
   results.forEach((result) => {
     if (result.status === "rejected") {
-      console.error("Student campus tap notification error:", result.reason);
+      console.error("Campus tap security notification error:", result.reason);
     }
   });
 
@@ -2600,7 +2607,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         notes: `${userDisplayName} ${action.replace("_", " ")} by NFC at ${tapLocation.office}`,
       });
 
-      await sendStudentCampusTapNotifications({
+      await sendCampusTapSecurityNotifications({
         user: cardUser,
         action,
         timestamp: now,
@@ -3079,7 +3086,7 @@ app.post(
           notes: `${operatorName} recorded ${userDisplayName} ${action.replace("_", " ")} at ${tapLocation.office}.`,
         });
 
-        await sendStudentCampusTapNotifications({
+        await sendCampusTapSecurityNotifications({
           user: cardUser,
           action,
           timestamp: now,
@@ -3680,6 +3687,10 @@ app.put("/api/visitors/:id/phone-location", authMiddleware, async (req, res) => 
 const normalizeEmailValue = (value = "") => String(value || "").toLowerCase().trim();
 const normalizeUsernameValue = (value = "") => String(value || "").toLowerCase().trim();
 const isValidEmailValue = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+const escapeRegExpValue = (value = "") => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const exactTextMatch = (value = "") => ({ $regex: `^${escapeRegExpValue(String(value || "").trim())}$`, $options: "i" });
+const sameNormalizedText = (left = "", right = "") =>
+  String(left || "").trim().toLowerCase() === String(right || "").trim().toLowerCase();
 const sanitizeAccountEmailPart = (value = "") =>
   String(value || "")
     .toLowerCase()
@@ -6756,17 +6767,17 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
     const duplicateChecks = [
       { email: normalizedEmail },
       { username: resolvedUsername },
-      { employeeId: normalizedEmployeeId },
+      { employeeId: exactTextMatch(normalizedEmployeeId) },
     ];
 
     const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
       const duplicateField =
-        existingUser.email === normalizedEmail
+        sameNormalizedText(existingUser.email, normalizedEmail)
           ? "email"
-          : existingUser.username === resolvedUsername
+          : sameNormalizedText(existingUser.username, resolvedUsername)
             ? "username"
-            : existingUser.employeeId === normalizedEmployeeId
+            : sameNormalizedText(existingUser.employeeId, normalizedEmployeeId)
               ? "employeeId"
             : "email";
 
@@ -6935,14 +6946,28 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: PHONE_VALIDATION_MESSAGE, field: "phone" });
     }
 
+    const resolvedUsername = normalizeUsernameValue(normalizedEmployeeId || normalizedEmail.split("@")[0]);
     const existingUser = await User.findOne({
-      $or: [{ email: normalizedEmail }, { employeeId: normalizedEmployeeId }],
+      $or: [
+        { email: normalizedEmail },
+        { username: resolvedUsername },
+        { employeeId: exactTextMatch(normalizedEmployeeId) },
+      ],
     });
     if (existingUser) {
-      const field = existingUser.email === normalizedEmail ? "email" : "employeeId";
+      const field = sameNormalizedText(existingUser.email, normalizedEmail)
+        ? "email"
+        : sameNormalizedText(existingUser.username, resolvedUsername)
+          ? "username"
+          : "employeeId";
       return res.status(400).json({
         success: false,
-        message: field === "employeeId" ? "Staff/Security number already registered" : "Email already registered",
+        message:
+          field === "username"
+            ? "Username already registered"
+            : field === "employeeId"
+              ? "Staff/Security number already registered"
+              : "Email already registered",
         field,
       });
     }
@@ -6957,7 +6982,7 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
     const user = new User({
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
-      username: normalizeUsernameValue(normalizedEmployeeId || normalizedEmail.split("@")[0]),
+      username: resolvedUsername,
       email: normalizedEmail,
       password: temporaryPassword,
       phone: normalizedPhone || "",
@@ -7029,9 +7054,12 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
       return res.status(400).json({
         success: false,
-        message: duplicateField === "employeeId"
-          ? "Staff/Security number already registered"
-          : "Email already registered",
+        message:
+          duplicateField === "username"
+            ? "Username already registered"
+            : duplicateField === "employeeId"
+              ? "Staff/Security number already registered"
+              : "Email already registered",
         field: duplicateField,
       });
     }
@@ -7093,13 +7121,17 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
     }
 
     const existingUser = await User.findOne({
-      $or: [{ email: normalizedEmail }, { username: resolvedUsername }, { [academicIdField]: normalizedAcademicId }],
+      $or: [
+        { email: normalizedEmail },
+        { username: resolvedUsername },
+        { [academicIdField]: exactTextMatch(normalizedAcademicId) },
+      ],
     });
     if (existingUser) {
       const duplicateField =
-        existingUser.email === normalizedEmail
+        sameNormalizedText(existingUser.email, normalizedEmail)
           ? "email"
-          : existingUser.username === resolvedUsername
+          : sameNormalizedText(existingUser.username, resolvedUsername)
             ? "username"
             : academicIdField;
 
@@ -8308,13 +8340,15 @@ app.post("/api/my-attendance/tap", authMiddleware, async (req, res) => {
       metadata: {
         action,
         source,
+        userType: normalizedRole,
+        securityVisible: true,
         tapLocation,
         attendanceRecordId: attendanceRecord._id,
       },
       notes: `${userName} used ${isStaffVirtualCard ? "the staff virtual NFC card" : "mobile self check"} to ${action.replace("_", " ")}.`,
     });
 
-    await sendStudentCampusTapNotifications({
+    await sendCampusTapSecurityNotifications({
       user: req.user,
       action,
       timestamp: now,

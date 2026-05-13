@@ -11,10 +11,6 @@ import { brandColors } from "./styles/brandColors";
 
 // ============ ONLY VISITOR, SECURITY, ADMIN SCREENS ============
 import LoginScreen from "./screens/LoginScreen";
-import VisitorRegisterScreen from "./screens/VisitorRegisterScreen";
-
-import HelpScreen from "./screens/HelpScreen";
-import VerificationScreen from "./screens/VerificationScreen";
 
 // Role Selection
 import RoleSelectScreen from "./screens/RoleSelectScreen";
@@ -50,6 +46,9 @@ const StudentDashboardScreen = lazy(() => import("./screens/StudentDashboardScre
 const ProfileScreen = lazy(() => import("./screens/ProfileScreenV2"));
 const AccessLogScreen = lazy(() => import("./screens/AccessLogScreen"));
 const NFCScanScreen = lazy(() => import("./screens/NFCScanScreen"));
+const VisitorRegisterScreen = lazy(() => import("./screens/VisitorRegisterScreen"));
+const HelpScreen = lazy(() => import("./screens/HelpScreen"));
+const VerificationScreen = lazy(() => import("./screens/VerificationScreen"));
 const VisitorPassScreen = lazy(() => import("./screens/VisitorPassScreen"));
 const WebMapScreen = lazy(() => import("./screens/WebMapScreen"));
 const VisitorManagementScreen = lazy(() => import("./screens/VisitorManagementScreen"));

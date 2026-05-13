@@ -59,7 +59,12 @@ export const MobileEmptyState = ({ icon = "file-tray-outline", title, message, a
     <Text style={[mobileStyles.emptyTitle, dark && mobileStyles.darkText]}>{title}</Text>
     {message ? <Text style={[mobileStyles.emptyMessage, dark && mobileStyles.darkMuted]}>{message}</Text> : null}
     {actionLabel && onAction ? (
-      <TouchableOpacity style={mobileStyles.emptyAction} onPress={onAction}>
+      <TouchableOpacity
+        style={mobileStyles.emptyAction}
+        onPress={onAction}
+        accessibilityRole="button"
+        accessibilityLabel={actionLabel}
+      >
         <Text style={mobileStyles.emptyActionText}>{actionLabel}</Text>
       </TouchableOpacity>
     ) : null}
@@ -88,7 +93,12 @@ export const MobileSearchField = ({ value, onChangeText, placeholder = "Search",
       autoCapitalize="none"
     />
     {value ? (
-      <TouchableOpacity onPress={onClear || (() => onChangeText(""))}>
+      <TouchableOpacity
+        onPress={onClear || (() => onChangeText(""))}
+        accessibilityRole="button"
+        accessibilityLabel="Clear search"
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
         <Ionicons name="close-circle" size={18} color="#94A3B8" />
       </TouchableOpacity>
     ) : null}
@@ -110,6 +120,9 @@ export const MobileFilterChips = ({ options = [], value, onChange, dark = false 
           key={key}
           style={[mobileStyles.filterChip, dark && mobileStyles.darkChip, active && mobileStyles.filterChipActive]}
           onPress={() => onChange(key)}
+          accessibilityRole="button"
+          accessibilityLabel={`Filter by ${label}`}
+          accessibilityState={{ selected: active }}
         >
           <Text style={[mobileStyles.filterChipText, dark && mobileStyles.darkMuted, active && mobileStyles.filterChipTextActive]}>
             {label}
@@ -130,6 +143,9 @@ export const MobileBottomNav = ({ tabs = [], activeTab, onChange, dark = false }
           style={mobileStyles.bottomNavItem}
           onPress={() => onChange(tab.key)}
           activeOpacity={0.82}
+          accessibilityRole="tab"
+          accessibilityLabel={tab.label}
+          accessibilityState={{ selected: active }}
         >
           <Ionicons name={active ? tab.activeIcon || tab.icon : tab.icon} size={21} color={active ? (dark ? "#FFFFFF" : BRAND.blue) : dark ? "#94A3B8" : "#94A3B8"} />
           <Text style={[mobileStyles.bottomNavLabel, dark && mobileStyles.darkMuted, active && mobileStyles.bottomNavLabelActive, dark && active && mobileStyles.darkBottomNavLabelActive]}>
