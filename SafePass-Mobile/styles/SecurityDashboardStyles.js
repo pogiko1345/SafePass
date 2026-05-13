@@ -715,6 +715,7 @@ export default StyleSheet.create({
     ...(isWeb && isDesktop
       ? {
           flexDirection: "row",
+          flexWrap: "wrap",
           alignItems: "flex-start",
           maxWidth: 1200,
           alignSelf: "center",
@@ -727,13 +728,25 @@ export default StyleSheet.create({
 
   securityWorkspacePrimary: {
     flex: 1.35,
+    minWidth: isWeb && isDesktop ? 0 : undefined,
+    flexBasis: isWeb && isDesktop ? 0 : undefined,
     minHeight: isWeb && isDesktop ? 440 : undefined,
   },
 
   securityWorkspaceSecondary: {
     flex: 0.95,
+    minWidth: isWeb && isDesktop ? 0 : undefined,
+    flexBasis: isWeb && isDesktop ? 0 : undefined,
     marginBottom: 0,
     minHeight: isWeb && isDesktop ? 440 : undefined,
+  },
+
+  securityWorkspaceFull: {
+    width: "100%",
+    flexBasis: "100%",
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: 0,
   },
 
   mapSectionFull: {
