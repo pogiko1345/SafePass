@@ -124,6 +124,7 @@ export const MobileBottomNav = ({ tabs = [], activeTab, onChange, dark = false }
   <View style={[mobileStyles.bottomNav, dark && mobileStyles.darkBottomNav]}>
     {tabs.map((tab) => {
       const active = activeTab === tab.key;
+      const badge = Number(tab.badge || 0);
       return (
         <TouchableOpacity
           key={tab.key}
@@ -131,7 +132,14 @@ export const MobileBottomNav = ({ tabs = [], activeTab, onChange, dark = false }
           onPress={() => onChange(tab.key)}
           activeOpacity={0.82}
         >
-          <Ionicons name={active ? tab.activeIcon || tab.icon : tab.icon} size={21} color={active ? (dark ? "#FFFFFF" : BRAND.blue) : dark ? "#94A3B8" : "#94A3B8"} />
+          <View>
+            <Ionicons name={active ? tab.activeIcon || tab.icon : tab.icon} size={21} color={active ? (dark ? "#FFFFFF" : BRAND.blue) : dark ? "#94A3B8" : "#94A3B8"} />
+            {badge > 0 ? (
+              <View style={mobileStyles.bottomNavBadge}>
+                <Text style={mobileStyles.bottomNavBadgeText}>{badge > 9 ? "9+" : badge}</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={[mobileStyles.bottomNavLabel, dark && mobileStyles.darkMuted, active && mobileStyles.bottomNavLabelActive, dark && active && mobileStyles.darkBottomNavLabelActive]}>
             {tab.label}
           </Text>
@@ -277,6 +285,26 @@ export const mobileStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 3,
+  },
+  bottomNavBadge: {
+    position: "absolute",
+    top: -8,
+    right: -12,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: BRAND.danger,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bottomNavBadgeText: {
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   bottomNavLabel: {
     fontSize: 10,

@@ -36,6 +36,7 @@ import {
   MobileSearchField,
   MobileStatusBadge,
 } from "../components/mobile/MobileRoleComponents";
+import ToastNotice from "../components/shared/ToastNotice";
 import styles from "../styles/StaffDashboardStyles";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -205,6 +206,18 @@ const getAppointmentStatus = (appointment) => {
   if (appointment.status === "expired") return "expired";
   if (appointment.status === "no_show") return "no_show";
   return String(appointment.appointmentStatus || "pending").toLowerCase();
+};
+
+const getStaffActionHint = (appointment) => {
+  const status = getAppointmentStatus(appointment);
+  if (status === "pending") return "Waiting for your decision";
+  if (status === "adjustment_pending") return "Waiting for visitor confirmation";
+  if (appointment?.status === "checked_in" && !appointment?.checkedOutAt) return "Visitor is currently inside";
+  if (status === "approved" || status === "adjusted") return "Scheduled for your office";
+  if (status === "completed") return "Visit completed";
+  if (status === "rejected") return "Request declined";
+  if (status === "no_show") return "Visitor did not arrive";
+  return getStatusMeta(status).label;
 };
 
 const matchesAppointmentSearch = (appointment, searchTerm) => {
@@ -398,6 +411,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [detailAppointment, setDetailAppointment] = useState(null);
+  const [toast, setToast] = useState({
+    visible: false,
+    type: "info",
+    title: "",
+    message: "",
+  });
 
   useEffect(() => {
     const loadMobileTheme = async () => {
@@ -493,6 +512,19 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     loadData();
   }, [loadData]);
 
+  const showStaffToast = useCallback((nextToast) => {
+    setToast({
+      visible: true,
+      type: nextToast.type || "info",
+      title: nextToast.title || "SafePass",
+      message: nextToast.message || "",
+    });
+  }, []);
+
+  const closeStaffToast = useCallback(() => {
+    setToast((currentToast) => ({ ...currentToast, visible: false }));
+  }, []);
+
   const handleStaffAttendanceTap = async (action) => {
     if (attendanceTapLoading) return;
 
@@ -515,10 +547,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
 
       await loadData();
-      Alert.alert(
-        action === "check_in" ? "Checked In" : "Checked Out",
-        response?.message || "Your staff attendance was recorded.",
-      );
+      showStaffToast({
+        type: "success",
+        title: action === "check_in" ? "Checked In" : "Checked Out",
+        message: response?.message || "Your staff attendance was recorded.",
+      });
     } catch (error) {
       Alert.alert("NFC Card Error", error?.message || "Unable to record your staff attendance.");
     } finally {
@@ -619,6 +652,15 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const unreadNotificationsCount = useMemo(
     () => (notifications || []).filter((item) => !isNotificationRead(item)).length,
     [notifications, isNotificationRead],
+  );
+
+  const staffMobileNavTabs = useMemo(
+    () =>
+      staffMobileTabs.map((tab) => {
+        if (tab.key === "requests") return { ...tab, badge: stats.pending };
+        return tab;
+      }),
+    [stats.pending],
   );
 
   const latestAttendanceRecord = attendance[0] || null;
@@ -1061,6 +1103,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               },
         ),
       );
+      showStaffToast({
+        type: "success",
+        title: "Notifications Cleared",
+        message: "All staff notifications are marked as read.",
+      });
     } catch (error) {
       Alert.alert("Notification Update Failed", error?.message || "Could not mark notifications as read.");
     }
@@ -1089,6 +1136,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         mergeAppointment(response.visitor);
       }
       await loadData();
+      showStaffToast({
+        type: "success",
+        title: "Request Approved",
+        message: `${appointment.fullName || "Visitor"} is now scheduled for your office.`,
+      });
     } catch (error) {
       Alert.alert("Approval Failed", error?.message || "Could not approve appointment.");
     } finally {
@@ -1229,6 +1281,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
       closeAdjustModal();
       await loadData();
+      showStaffToast({
+        type: "success",
+        title: "Schedule Adjusted",
+        message: `${selectedAppointment.fullName || "Visitor"} will receive the updated time.`,
+      });
     } catch (error) {
       Alert.alert("Update Failed", error?.message || "Could not adjust appointment.");
     } finally {
@@ -1259,6 +1316,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
       closeRejectModal();
       await loadData();
+      showStaffToast({
+        type: "info",
+        title: "Request Rejected",
+        message: `${selectedAppointment.fullName || "Visitor"} will see your reason for declining.`,
+      });
     } catch (error) {
       Alert.alert("Rejection Failed", error?.message || "Could not reject appointment.");
     } finally {
@@ -1277,10 +1339,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           mergeAppointment(response.visitor);
         }
         await loadData();
-        Alert.alert(
-          "Appointment Completed",
-          "Security, admin, and the visitor have been notified for checkout follow-up.",
-        );
+        showStaffToast({
+          type: "success",
+          title: "Appointment Completed",
+          message: "Security, admin, and the visitor have been notified for checkout follow-up.",
+        });
       } catch (error) {
         Alert.alert("Complete Failed", error?.message || "Could not complete appointment.");
       } finally {
@@ -1324,10 +1387,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
 
       await loadData();
-      Alert.alert(
-        "Destination Updated",
-        response?.message || `Visitor was redirected to ${office}.`,
-      );
+      showStaffToast({
+        type: "success",
+        title: "Destination Updated",
+        message: response?.message || `Visitor was redirected to ${office}.`,
+      });
     } catch (error) {
       Alert.alert("Redirect Failed", error?.message || "Could not update the visitor destination.");
     } finally {
@@ -2777,10 +2841,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     const isPending = appointmentStatus === "pending";
     const isProcessing = processingId === appointment._id;
     const canComplete =
-      mode === "history" &&
       appointment.status === "checked_in" &&
       !appointment.checkedOutAt &&
       !appointment.appointmentCompletedAt;
+    const actionHint = getStaffActionHint(appointment);
 
     return (
       <TouchableOpacity
@@ -2800,6 +2864,16 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Text style={[staffMobileStyles.appointmentPurpose, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]} numberOfLines={2}>
               {appointment.purposeOfVisit || "No visit purpose provided"}
             </Text>
+            <View style={staffMobileStyles.appointmentHintRow}>
+              <Ionicons
+                name={appointmentStatus === "pending" ? "alert-circle-outline" : "information-circle-outline"}
+                size={13}
+                color={appointmentStatus === "pending" ? BRAND.warning : BRAND.blue}
+              />
+              <Text style={[staffMobileStyles.appointmentHintText, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]} numberOfLines={1}>
+                {actionHint}
+              </Text>
+            </View>
           </View>
           <MobileStatusBadge status={appointmentStatus} label={getStatusMeta(appointmentStatus).label} />
         </View>
@@ -2828,9 +2902,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               onPress={() => handleApprove(appointment)}
               disabled={isProcessing}
             >
-              {isProcessing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={staffMobileStyles.approveButtonText}>Approve</Text>}
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
+                  <Text style={staffMobileStyles.approveButtonText}>Approve</Text>
+                </>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={staffMobileStyles.actionButton} onPress={() => openAdjustModal(appointment)} disabled={isProcessing}>
+              <Ionicons name="calendar-outline" size={15} color="#334155" />
               <Text style={staffMobileStyles.actionButtonText}>Adjust</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -2838,6 +2920,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               onPress={() => openRejectModal(appointment)}
               disabled={isProcessing}
             >
+              <Ionicons name="close-circle-outline" size={15} color={BRAND.danger} />
               <Text style={staffMobileStyles.rejectButtonText}>Reject</Text>
             </TouchableOpacity>
           </View>
@@ -2902,7 +2985,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       {todaysSchedule.length ? (
         todaysSchedule.slice(0, 3).map((appointment) => renderMobileAppointmentCard(appointment, "visitor"))
       ) : (
-        <MobileEmptyState dark={mobileDarkModeEnabled} icon="calendar-outline" title="No visitors today" message="Approved visitors for today will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="calendar-outline" title="No visitors today" message="Approved or adjusted visitors for your office will appear here." />
       )}
     </>
   );
@@ -2924,7 +3007,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       {filteredRequestAppointments.length ? (
         filteredRequestAppointments.slice(0, 30).map((appointment) => renderMobileAppointmentCard(appointment, "request"))
       ) : (
-        <MobileEmptyState dark={mobileDarkModeEnabled} icon="mail-open-outline" title="No matching requests" message="New appointment requests assigned to your office will show here." />
+        <MobileEmptyState
+          dark={mobileDarkModeEnabled}
+          icon="mail-open-outline"
+          title={requestSearchTerm || requestFilter !== "all" ? "No matching requests" : "No pending requests"}
+          message={requestSearchTerm || requestFilter !== "all" ? "Try clearing the search or choosing All." : "New appointment requests assigned to your office will show here."}
+          actionLabel={requestSearchTerm || requestFilter !== "all" ? "Clear filters" : undefined}
+          onAction={requestSearchTerm || requestFilter !== "all" ? () => {
+            setRequestSearchTerm("");
+            setRequestFilter("all");
+          } : undefined}
+        />
       )}
     </>
   );
@@ -2938,7 +3031,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       {todaysSchedule.length ? (
         todaysSchedule.map((appointment) => renderMobileAppointmentCard(appointment, "visitor"))
       ) : (
-        <MobileEmptyState dark={mobileDarkModeEnabled} icon="people-outline" title="No scheduled visitors" message="Approved visitors scheduled for today will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="people-outline" title="No scheduled visitors" message="Approved and adjusted visitors scheduled for today will appear here." />
       )}
     </>
   );
@@ -2970,7 +3063,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             .map((appointment) => renderMobileAppointmentCard(appointment, "history"))}
         </>
       ) : (
-        <MobileEmptyState dark={mobileDarkModeEnabled} icon="archive-outline" title="No history found" message="Try a different search or status filter." />
+        <MobileEmptyState
+          dark={mobileDarkModeEnabled}
+          icon="archive-outline"
+          title="No history found"
+          message="Try a different search or status filter."
+          actionLabel="Clear filters"
+          onAction={() => {
+            setRecordSearchTerm("");
+            setFilter("all");
+          }}
+        />
       )}
     </>
   );
@@ -3239,9 +3342,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         >
           {content}
         </ScrollView>
-        <MobileBottomNav dark={mobileDarkModeEnabled} tabs={staffMobileTabs} activeTab={mobileTab} onChange={setMobileTab} />
+        <MobileBottomNav dark={mobileDarkModeEnabled} tabs={staffMobileNavTabs} activeTab={mobileTab} onChange={setMobileTab} />
         {renderMobileDetailModal()}
         {renderMobileLogoutModal()}
+        <ToastNotice
+          visible={toast.visible}
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={closeStaffToast}
+          style={staffMobileStyles.toast}
+        />
       </SafeAreaView>
     );
   };
@@ -3300,6 +3411,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </ScrollView>
         </View>
       </View>
+
+      <ToastNotice
+        visible={toast.visible}
+        type={toast.type}
+        title={toast.title}
+        message={toast.message}
+        onClose={closeStaffToast}
+      />
 
       <Modal visible={showAdjustModal} transparent animationType="fade" onRequestClose={closeAdjustModal}>
         <View style={styles.modalOverlay}>
@@ -3848,6 +3967,20 @@ const staffMobileStyles = StyleSheet.create({
     lineHeight: 17,
     color: BRAND.muted,
   },
+  appointmentHintRow: {
+    marginTop: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  appointmentHintText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "900",
+    color: "#475569",
+  },
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -3879,6 +4012,8 @@ const staffMobileStyles = StyleSheet.create({
     flex: 1,
     minHeight: 42,
     borderRadius: 12,
+    flexDirection: "row",
+    gap: 5,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#EEF2F7",
@@ -4267,5 +4402,12 @@ const staffMobileStyles = StyleSheet.create({
   darkDangerButton: {
     backgroundColor: "#1E1118",
     borderColor: "#7F1D1D",
+  },
+  toast: {
+    top: 12,
+    left: 12,
+    right: 12,
+    width: undefined,
+    maxWidth: undefined,
   },
 });
