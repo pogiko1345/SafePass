@@ -577,10 +577,15 @@ export default StyleSheet.create({
 
   recordToolbarHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 12,
+  },
+
+  recordToolbarHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
   },
 
   recordToolbarTitle: {
@@ -589,6 +594,14 @@ export default StyleSheet.create({
     color: "#0F172A",
     textTransform: "uppercase",
     letterSpacing: 0.45,
+  },
+
+  recordToolbarSubtitle: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    color: "#64748B",
   },
 
   recordToolbarClear: {
@@ -604,6 +617,103 @@ export default StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#64748B",
+  },
+
+  recordToolbarFilterGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  recordToolbarField: {
+    flexGrow: 1,
+    flexBasis: width < 760 ? "100%" : 180,
+    minWidth: width < 760 ? "100%" : 160,
+    position: "relative",
+    zIndex: 2,
+  },
+
+  recordToolbarLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#64748B",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  recordToolbarSelect: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#DBE3F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 11,
+  },
+
+  recordToolbarSelectValue: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  recordToolbarSelectText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  recordToolbarDropdownMenu: {
+    position: Platform.OS === "web" ? "absolute" : "relative",
+    top: Platform.OS === "web" ? 68 : undefined,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    maxHeight: 210,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    padding: 6,
+  },
+
+  recordToolbarDropdownScroll: {
+    maxHeight: 196,
+  },
+
+  recordToolbarDropdownOption: {
+    minHeight: 38,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+
+  recordToolbarDropdownOptionActive: {
+    backgroundColor: "#0A3D91",
+  },
+
+  recordToolbarDropdownText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#334155",
+  },
+
+  recordToolbarDropdownTextActive: {
+    color: "#FFFFFF",
   },
 
   quickActionsGrid: {

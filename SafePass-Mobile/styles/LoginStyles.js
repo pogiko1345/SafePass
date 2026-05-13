@@ -187,7 +187,7 @@ export default StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 7,
     paddingHorizontal: 11,
-    marginBottom: isSmallPhone ? 12 : 14,
+    marginBottom: isSmallPhone ? 8 : 14,
     ...Platform.select({
       web: { backdropFilter: "blur(10px)" },
     }),
@@ -243,7 +243,7 @@ export default StyleSheet.create({
     width: isSmallPhone ? 78 : 92,
     height: isSmallPhone ? 78 : 92,
     borderRadius: isSmallPhone ? 39 : 46,
-    marginBottom: isSmallPhone ? 10 : 12,
+    marginBottom: isSmallPhone ? 7 : 12,
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.28)",
     backgroundColor: brandColors.surface,
@@ -276,7 +276,7 @@ export default StyleSheet.create({
     textAlign: "center",
     lineHeight: 19,
     maxWidth: 380,
-    marginBottom: isSmallPhone ? 10 : 14,
+    marginBottom: isSmallPhone ? 6 : 14,
   },
 
   flightAccent: {
@@ -284,7 +284,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginBottom: isSmallPhone ? 10 : 14,
+    marginBottom: isSmallPhone ? 7 : 14,
   },
 
   flightAccentLine: {
@@ -302,8 +302,8 @@ export default StyleSheet.create({
   },
 
   statusBadge: {
-    paddingVertical: isSmallPhone ? 6 : 8,
-    paddingHorizontal: isSmallPhone ? 12 : 16,
+    paddingVertical: isSmallPhone ? 5 : 8,
+    paddingHorizontal: isSmallPhone ? 10 : 16,
     borderRadius: 999,
     flexDirection: "row",
     alignItems: "center",
@@ -451,7 +451,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    marginBottom: 20,
+    marginBottom: isSmallPhone ? 12 : 20,
     paddingVertical: 9,
     paddingHorizontal: 14,
     backgroundColor: brandColors.surfaceSoft,
@@ -512,7 +512,7 @@ export default StyleSheet.create({
     fontWeight: "800",
     color: brandColors.text,
     textAlign: "center",
-    marginBottom: 6,
+    marginBottom: isSmallPhone ? 4 : 6,
     letterSpacing: 0,
   },
 
@@ -545,7 +545,7 @@ export default StyleSheet.create({
   },
 
   inputBox: {
-    marginBottom: isSmallPhone ? 16 : 20,
+    marginBottom: isSmallPhone ? 13 : 20,
   },
 
   label: {

@@ -387,7 +387,7 @@ async register(userData) {
       const errorMessage = String(error?.message || "").toLowerCase();
       const message = errorMessage.includes("username already")
         ? "Username already registered. Please use another username."
-        : errorMessage.includes("staff id already") || errorMessage.includes("employeeid")
+        : errorMessage.includes("staff id already") || errorMessage.includes("staff/security number") || errorMessage.includes("employeeid")
           ? "Staff ID already registered. Please use another staff ID."
           : errorMessage.includes("email already")
             ? "Email already registered. Please use another email address."
@@ -749,8 +749,17 @@ async verifyCredentials(email, password) {
 
   // ================= ACCESS LOG =================
 
-  async getAccessLogs(page = 1, limit = 50) {
-    return await this.fetch(`/access-logs?page=${page}&limit=${limit}`);
+  async getAccessLogs(page = 1, limit = 50, filters = {}) {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.set(key, String(value));
+      }
+    });
+    return await this.fetch(`/access-logs?${params.toString()}`);
   }
 
   async createAccessLog(data) {
@@ -1688,7 +1697,9 @@ async createSecurityGuard(guardData) {
       errorMessage.includes("email already");
     const message = errorMessage.includes("staff/security number") || errorMessage.includes("employeeid")
       ? "Staff/Security number already registered. Please use another ID."
-      : isDuplicateEmail
+      : errorMessage.includes("username already")
+      ? "Username already registered. Please use another username."
+      : errorMessage.includes("email already")
       ? "Email already registered. Please use another email address."
       : (error?.message || "Failed to create security account");
     throw new Error(message);

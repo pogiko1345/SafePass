@@ -14,6 +14,7 @@ import {
   Animated,
   Image,
   Linking,
+  LogBox,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -59,6 +60,12 @@ const SESSION_EXPIRED_MESSAGE =
     ? "Your web session has expired after 7 days. Please sign in again."
     : "You were inactive for 30 minutes. Please sign in again.";
 
+if (__DEV__) {
+  LogBox.ignoreLogs([
+    "Animated: `useNativeDriver` is not supported",
+  ]);
+}
+
 export default function LoginScreen({ navigation, route }) {
   // Get role from navigation params
   const {
@@ -76,26 +83,27 @@ export default function LoginScreen({ navigation, route }) {
     Math.max(viewportWidth - loginHorizontalPadding * 2, 280)
   );
   const headerResponsiveStyle = {
-    paddingHorizontal: isCompactLogin ? 18 : isTabletLogin ? 28 : 24,
-    paddingBottom: isCompactLogin ? 42 : isTabletLogin ? 68 : 58,
+    paddingHorizontal: isCompactLogin ? 16 : isTabletLogin ? 28 : 24,
+    paddingTop: isCompactLogin ? 30 : undefined,
+    paddingBottom: isCompactLogin ? 22 : isTabletLogin ? 68 : 58,
   };
   const logoResponsiveStyle = {
-    width: isCompactLogin ? 62 : isTabletLogin ? 92 : 82,
-    height: isCompactLogin ? 62 : isTabletLogin ? 92 : 82,
-    borderRadius: isCompactLogin ? 31 : isTabletLogin ? 46 : 41,
+    width: isCompactLogin ? 52 : isTabletLogin ? 92 : 82,
+    height: isCompactLogin ? 52 : isTabletLogin ? 92 : 82,
+    borderRadius: isCompactLogin ? 26 : isTabletLogin ? 46 : 41,
   };
   const appNameResponsiveStyle = {
-    fontSize: isCompactLogin ? 22 : isTabletLogin ? 28 : 26,
-    lineHeight: isCompactLogin ? 28 : isTabletLogin ? 34 : 32,
+    fontSize: isCompactLogin ? 20 : isTabletLogin ? 28 : 26,
+    lineHeight: isCompactLogin ? 25 : isTabletLogin ? 34 : 32,
   };
   const cardResponsiveStyle = {
     marginHorizontal: loginHorizontalPadding,
-    marginTop: isCompactLogin ? -20 : -30,
-    padding: isCompactLogin ? 16 : 24,
+    marginTop: isCompactLogin ? -12 : -30,
+    padding: isCompactLogin ? 14 : 24,
     ...(isWeb ? { maxWidth: loginMaxContentWidth } : null),
   };
   const roleHeroResponsiveStyle = isCompactLogin
-    ? { padding: 12, alignItems: "center", marginBottom: 14 }
+    ? { display: "none" }
     : null;
   const roleIconResponsiveStyle = isCompactLogin
     ? { width: 42, height: 42, borderRadius: 8, marginRight: 10 }
@@ -105,7 +113,8 @@ export default function LoginScreen({ navigation, route }) {
     lineHeight: isCompactLogin ? 28 : 34,
   };
   const welcomeSubtitleResponsiveStyle = {
-    marginBottom: isCompactLogin ? 16 : 24,
+    marginBottom: isCompactLogin ? 12 : 24,
+    ...(isCompactLogin ? { fontSize: 13, lineHeight: 18 } : null),
   };
   const authRowResponsiveStyle = isCompactLogin
     ? { flexDirection: "column", alignItems: "flex-start", gap: 12, marginBottom: 20 }

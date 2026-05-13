@@ -371,12 +371,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [expandedModule, setExpandedModule] = useState("home");
   const [selectedSubmodule, setSelectedSubmodule] = useState("home");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState(null);
   const [accountMode, setAccountMode] = useState("view");
   const [requestFilter, setRequestFilter] = useState("all");
   const [requestSearchTerm, setRequestSearchTerm] = useState("");
   const [recordSearchTerm, setRecordSearchTerm] = useState("");
+  const [recordFilterDropdownOpen, setRecordFilterDropdownOpen] = useState(null);
   const [requestPage, setRequestPage] = useState(1);
   const [recordPage, setRecordPage] = useState(1);
   const [profileForm, setProfileForm] = useState({
@@ -428,6 +430,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const loadData = useCallback(async () => {
     try {
+      setLoadError("");
       const profile = await ApiService.getProfile();
       const currentUser = profile?.user || (await ApiService.getCurrentUser());
       if (!currentUser || String(currentUser.role).toLowerCase() !== "staff") {
@@ -466,6 +469,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
     } catch (error) {
       console.error("Load staff dashboard error:", error);
+      setLoadError(error?.message || "Failed to load staff dashboard.");
       Alert.alert("Error", error?.message || "Failed to load staff dashboard.");
     } finally {
       setLoading(false);
@@ -2102,6 +2106,122 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     </>
   );
 
+  const renderRecordFilterDropdown = ({ id, label, value, options, onSelect, icon = "filter-outline" }) => {
+    const isOpen = recordFilterDropdownOpen === id;
+    const selectedOption = options.find((option) => option.value === value);
+
+    return (
+      <View style={styles.recordToolbarField}>
+        <Text style={styles.recordToolbarLabel}>{label}</Text>
+        <TouchableOpacity
+          style={styles.recordToolbarSelect}
+          onPress={() => setRecordFilterDropdownOpen(isOpen ? null : id)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`${label} filter`}
+        >
+          <View style={styles.recordToolbarSelectValue}>
+            <Ionicons name={icon} size={15} color="#64748B" />
+            <Text style={styles.recordToolbarSelectText} numberOfLines={1}>
+              {selectedOption?.label || "All"}
+            </Text>
+          </View>
+          <Ionicons name={isOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color="#64748B" />
+        </TouchableOpacity>
+        {isOpen ? (
+          <View style={styles.recordToolbarDropdownMenu}>
+            <ScrollView style={styles.recordToolbarDropdownScroll} nestedScrollEnabled>
+              {options.map((option) => {
+                const selected = option.value === value;
+                return (
+                  <TouchableOpacity
+                    key={`${id}-${option.value}`}
+                    style={[styles.recordToolbarDropdownOption, selected && styles.recordToolbarDropdownOptionActive]}
+                    onPress={() => {
+                      onSelect(option.value);
+                      setRecordFilterDropdownOpen(null);
+                    }}
+                  >
+                    <Text style={[styles.recordToolbarDropdownText, selected && styles.recordToolbarDropdownTextActive]} numberOfLines={1}>
+                      {option.label}
+                    </Text>
+                    {selected ? <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderRecordSearchFilterToolbar = ({
+    searchTitle,
+    searchSubtitle,
+    searchValue,
+    onSearchChange,
+    onClearSearch,
+    searchPlaceholder,
+    filterSubtitle,
+    hasFilters,
+    onResetFilters,
+    filterGroups,
+  }) => (
+    <View style={styles.recordToolbar}>
+      <View style={styles.recordToolbarCard}>
+        <View style={styles.recordToolbarHeader}>
+          <View style={styles.recordToolbarHeaderCopy}>
+            <Text style={styles.recordToolbarTitle}>{searchTitle}</Text>
+            <Text style={styles.recordToolbarSubtitle}>{searchSubtitle}</Text>
+          </View>
+          {searchValue ? (
+            <TouchableOpacity onPress={onClearSearch} style={styles.recordToolbarClear}>
+              <Text style={styles.recordToolbarClearText}>Clear</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={18} color="#64748B" />
+          <TextInput
+            value={searchValue}
+            onChangeText={onSearchChange}
+            placeholder={searchPlaceholder}
+            placeholderTextColor="#94A3B8"
+            style={styles.searchBarInput}
+            returnKeyType="search"
+          />
+        </View>
+      </View>
+
+      <View style={styles.recordToolbarCard}>
+        <View style={styles.recordToolbarHeader}>
+          <View style={styles.recordToolbarHeaderCopy}>
+            <Text style={styles.recordToolbarTitle}>Filters</Text>
+            <Text style={styles.recordToolbarSubtitle}>{filterSubtitle}</Text>
+          </View>
+          {hasFilters ? (
+            <TouchableOpacity onPress={onResetFilters} style={styles.recordToolbarClear}>
+              <Text style={styles.recordToolbarClearText}>Reset</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.recordToolbarFilterGrid}>
+          {filterGroups.map((group) =>
+            renderRecordFilterDropdown({
+              id: group.id,
+              label: group.label,
+              value: group.value,
+              icon: group.icon,
+              options: group.options,
+              onSelect: group.onSelect,
+            }),
+          )}
+        </View>
+      </View>
+    </View>
+  );
+
   const renderAppointmentRequestContent = () => (
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeader}>
@@ -2120,62 +2240,31 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </View>
       </View>
 
-      <View style={styles.recordToolbar}>
-        <View style={styles.recordToolbarCard}>
-          <View style={styles.recordToolbarHeader}>
-            <Text style={styles.recordToolbarTitle}>Search</Text>
-            {requestSearchTerm ? (
-              <TouchableOpacity onPress={() => setRequestSearchTerm("")} style={styles.recordToolbarClear}>
-                <Text style={styles.recordToolbarClearText}>Clear</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={18} color="#64748B" />
-            <TextInput
-              value={requestSearchTerm}
-              onChangeText={setRequestSearchTerm}
-              placeholder="Visitor, email, purpose, date, or office"
-              placeholderTextColor="#94A3B8"
-              style={styles.searchBarInput}
-            />
-          </View>
-        </View>
-
-        <View style={styles.recordToolbarCard}>
-          <View style={styles.recordToolbarHeader}>
-            <Text style={styles.recordToolbarTitle}>Filters</Text>
-            {requestFilter !== "all" ? (
-              <TouchableOpacity onPress={() => setRequestFilter("all")} style={styles.recordToolbarClear}>
-                <Text style={styles.recordToolbarClearText}>Reset</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          <View style={styles.filterRow}>
-            {[
-              { key: "all", label: `All (${appointmentRequests.length})` },
-              {
-                key: "today",
-                label: `Today (${appointmentRequests.filter((item) => isSameCalendarDay(item.visitDate)).length})`,
-              },
-              {
-                key: "this-week",
-                label: `This Week (${appointmentRequests.filter((item) => isWithinCurrentWeek(item.visitDate)).length})`,
-              },
-            ].map((item) => (
-              <TouchableOpacity
-                key={item.key}
-                style={[styles.filterChip, requestFilter === item.key && styles.filterChipActive]}
-                onPress={() => setRequestFilter(item.key)}
-              >
-                <Text style={[styles.filterChipText, requestFilter === item.key && styles.filterChipTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </View>
+      {renderRecordSearchFilterToolbar({
+        searchTitle: "Search Requests",
+        searchSubtitle: "Find by visitor, email, purpose, date, or office.",
+        searchValue: requestSearchTerm,
+        onSearchChange: setRequestSearchTerm,
+        onClearSearch: () => setRequestSearchTerm(""),
+        searchPlaceholder: "Search visitor, email, purpose, date, or office...",
+        filterSubtitle: "Narrow pending requests by schedule window.",
+        hasFilters: requestFilter !== "all",
+        onResetFilters: () => setRequestFilter("all"),
+        filterGroups: [
+          {
+            id: "staff-request-schedule",
+            label: "Schedule",
+            value: requestFilter,
+            icon: "calendar-outline",
+            options: [
+              { value: "all", label: `All (${appointmentRequests.length})` },
+              { value: "today", label: `Today (${appointmentRequests.filter((item) => isSameCalendarDay(item.visitDate)).length})` },
+              { value: "this-week", label: `This Week (${appointmentRequests.filter((item) => isWithinCurrentWeek(item.visitDate)).length})` },
+            ],
+            onSelect: setRequestFilter,
+          },
+        ],
+      })}
 
       {renderAppointmentTable(paginatedRequestAppointments, {
         mode: "requests",
@@ -2217,58 +2306,33 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
         </View>
 
-        <View style={styles.recordToolbar}>
-          <View style={styles.recordToolbarCard}>
-            <View style={styles.recordToolbarHeader}>
-              <Text style={styles.recordToolbarTitle}>Search</Text>
-              {recordSearchTerm ? (
-                <TouchableOpacity onPress={() => setRecordSearchTerm("")} style={styles.recordToolbarClear}>
-                  <Text style={styles.recordToolbarClearText}>Clear</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <View style={styles.searchBar}>
-              <Ionicons name="search-outline" size={18} color="#64748B" />
-              <TextInput
-                value={recordSearchTerm}
-                onChangeText={setRecordSearchTerm}
-                placeholder="Visitor, office, date, or purpose"
-                placeholderTextColor="#94A3B8"
-                style={styles.searchBarInput}
-              />
-            </View>
-          </View>
-
-          <View style={styles.recordToolbarCard}>
-            <View style={styles.recordToolbarHeader}>
-              <Text style={styles.recordToolbarTitle}>Filters</Text>
-              {filter !== "all" ? (
-                <TouchableOpacity onPress={() => setFilter("all")} style={styles.recordToolbarClear}>
-                  <Text style={styles.recordToolbarClearText}>Reset</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <View style={styles.filterRow}>
-              {[
-                { key: "all", label: `All (${appointmentRecords.length})` },
-                { key: "approved", label: `Approved (${stats.approved})` },
-                { key: "adjusted", label: `Adjusted (${stats.adjusted})` },
-                { key: "rejected", label: `Rejected (${stats.rejected})` },
-                { key: "completed", label: `Completed (${stats.completed})` },
-              ].map((item) => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[styles.filterChip, filter === item.key && styles.filterChipActive]}
-                  onPress={() => setFilter(item.key)}
-                >
-                  <Text style={[styles.filterChipText, filter === item.key && styles.filterChipTextActive]}>
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
+        {renderRecordSearchFilterToolbar({
+          searchTitle: "Search Records",
+          searchSubtitle: "Find by visitor, office, date, purpose, or status.",
+          searchValue: recordSearchTerm,
+          onSearchChange: setRecordSearchTerm,
+          onClearSearch: () => setRecordSearchTerm(""),
+          searchPlaceholder: "Search visitor, office, date, or purpose...",
+          filterSubtitle: "Narrow appointment records by status.",
+          hasFilters: filter !== "all",
+          onResetFilters: () => setFilter("all"),
+          filterGroups: [
+            {
+              id: "staff-record-status",
+              label: "Status",
+              value: filter,
+              icon: "layers-outline",
+              options: [
+                { value: "all", label: `All (${appointmentRecords.length})` },
+                { value: "approved", label: `Approved (${stats.approved})` },
+                { value: "adjusted", label: `Adjusted (${stats.adjusted})` },
+                { value: "rejected", label: `Rejected (${stats.rejected})` },
+                { value: "completed", label: `Completed (${stats.completed})` },
+              ],
+              onSelect: setFilter,
+            },
+          ],
+        })}
 
         {renderAppointmentTable(paginatedRecordAppointments, {
           mode: "records",
@@ -3263,6 +3327,39 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     );
   }
 
+  if (loadError && !user) {
+    return isPhoneLayout ? (
+      <SafeAreaView style={[staffMobileStyles.safeArea, mobileDarkModeEnabled && staffMobileStyles.darkSafeArea]}>
+        <View style={staffMobileStyles.stateWrap}>
+          <MobileEmptyState
+            dark={mobileDarkModeEnabled}
+            icon="cloud-offline-outline"
+            title="Staff dashboard unavailable"
+            message={loadError}
+            actionLabel="Try again"
+            onAction={() => {
+              setLoading(true);
+              loadData();
+            }}
+          />
+        </View>
+      </SafeAreaView>
+    ) : (
+      <SafeAreaView style={styles.loadingContainer}>
+        <MobileEmptyState
+          icon="cloud-offline-outline"
+          title="Staff dashboard unavailable"
+          message={loadError}
+          actionLabel="Try again"
+          onAction={() => {
+            setLoading(true);
+            loadData();
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+
   const selectedSubmoduleMeta = getSelectedSubmoduleMeta();
 
   if (isPhoneLayout) {
@@ -3607,6 +3704,11 @@ const staffMobileStyles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 22,
+  },
+  stateWrap: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 18,
   },
   header: {
     borderRadius: 24,

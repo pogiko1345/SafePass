@@ -5,16 +5,14 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
   Platform,
   Animated,
   Image,
   PanResponder,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import styles from "../styles/CampusMapStyles";
-
-const { width, height } = Dimensions.get("window");
 
 const TRACKING_FRESHNESS = {
   LIVE: "live",
@@ -37,7 +35,7 @@ const getCompactOfficeLabel = (label, maxLength = 16) => {
     return normalizedLabel;
   }
 
-  return `${normalizedLabel.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+  return `${normalizedLabel.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
 };
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
@@ -57,6 +55,7 @@ const MapPressable = ({ children, style, onPress, disabled = false, ...props }) 
     <AnimatedTouchableOpacity
       {...props}
       disabled={disabled}
+      accessibilityRole={props.accessibilityRole || "button"}
       activeOpacity={0.88}
       style={[style, { transform: [{ scale: pressAnim }] }]}
       onPress={onPress}
@@ -90,6 +89,7 @@ const CampusMap = ({
   onFloorChange,
   showFloorNavigation = true,
 }) => {
+  const { width: viewportWidth } = useWindowDimensions();
   const defaultFloorId = floors[0]?.id || "ground";
   const safeInitialScale = Math.max(0.5, Math.min(Number(initialScale) || 1, 3));
   const [mapScale, setMapScale] = useState(safeInitialScale);
@@ -115,7 +115,7 @@ const CampusMap = ({
   }, [mapScale]);
 
   const clampPan = (pan, scale = mapScaleRef.current) => {
-    const mapWidth = mapSizeRef.current.width || width || 320;
+    const mapWidth = mapSizeRef.current.width || viewportWidth || 320;
     const mapHeight = mapSizeRef.current.height || 500;
     const expandedMapWidth = mapWidth * (fullscreen ? 1.6 : 1);
     const expandedMapHeight = fullscreen
@@ -506,6 +506,8 @@ const CampusMap = ({
               activeFloor === floor.id && styles.floorButtonActive,
             ]}
             onPress={() => handleFloorSelect(floor.id)}
+            accessibilityLabel={`Show ${floor.name} map`}
+            accessibilityState={{ selected: activeFloor === floor.id }}
           >
             <Ionicons 
               name={floor.icon} 
@@ -557,6 +559,7 @@ const CampusMap = ({
             { left: position.x, top: position.y }
           ]}
           onPress={() => onVisitorSelect?.({ office: office.name })}
+          accessibilityLabel={`Office ${office.name}`}
         >
           <View style={styles.officeLabelContent}>
             <Ionicons name={office.icon} size={12} color="#FFFFFF" />
@@ -634,6 +637,8 @@ const CampusMap = ({
               key={visitor.id}
               style={styles.hoverVisitorTile}
               onPress={() => onVisitorSelect?.(visitor)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${visitor.name || "visitor"} details`}
             >
               <Text style={styles.hoverCardName} numberOfLines={1}>{visitor.name}</Text>
               <Text style={styles.hoverCardPurpose} numberOfLines={1}>{visitor.purpose || "On-site visitor"}</Text>
@@ -691,6 +696,12 @@ const CampusMap = ({
               { backgroundColor: statusColor }
             ]}
             onPress={() => groupVisitors.length === 1 && onVisitorSelect?.(visitor)}
+            accessibilityRole="button"
+            accessibilityLabel={
+              groupVisitors.length > 1
+                ? `${groupVisitors.length} visitors at this map marker`
+                : `Open ${visitor.name || "visitor"} map marker`
+            }
           >
             <View style={[styles.visitorMarkerPulse, { backgroundColor: statusColor + "40" }]} />
             {groupVisitors.length > 1 ? (
@@ -992,18 +1003,21 @@ const CampusMap = ({
           <MapPressable
             style={[styles.mapControlButton, styles.mapControlButtonPrimary]}
             onPress={handleZoomIn}
+            accessibilityLabel="Zoom map in"
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
           </MapPressable>
           <MapPressable
             style={styles.mapControlButton}
             onPress={handleZoomOut}
+            accessibilityLabel="Zoom map out"
           >
             <Ionicons name="remove" size={20} color="#0A3D91" />
           </MapPressable>
           <MapPressable
             style={styles.mapControlButton}
             onPress={handleReset}
+            accessibilityLabel="Reset map view"
           >
             <Ionicons name="scan-outline" size={19} color="#0A3D91" />
           </MapPressable>

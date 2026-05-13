@@ -4370,7 +4370,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   style={[visitorDashboardStyles.recentActivityItemMeta, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}
                   numberOfLines={2}
                 >
-                  {entry.office} · {entry.dateLabel} · {entry.timeLabel}
+                  {entry.office} - {entry.dateLabel} - {entry.timeLabel}
                 </Text>
               </View>
               <View
@@ -6674,7 +6674,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         ref={dashboardScrollRef}
         style={[visitorDashboardStyles.mainScrollView, isVisitorDarkMode && visitorDashboardStyles.darkMainScrollView]}
         showsVerticalScrollIndicator
-        contentContainerStyle={visitorDashboardStyles.scrollContent}
+        contentContainerStyle={[
+          visitorDashboardStyles.scrollContent,
+          { paddingBottom: isCompactVisitorDashboard ? 190 : 172 },
+        ]}
         onScroll={(event) => setDashboardScrollY(event.nativeEvent.contentOffset.y)}
         scrollEventThrottle={16}
         contentInsetAdjustmentBehavior="automatic"
