@@ -45,6 +45,12 @@ import {
   isValidPhilippineMobileNumber,
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
+import {
+  buildDepartmentFilterOptions,
+  countMapActivitiesByFilter,
+  filterAdminUsers,
+  getUserStatusGroups,
+} from "../utils/adminDashboardHelpers";
 import styles from "../styles/AdminDashboardStyles";
 
 const { width, height } = Dimensions.get("window");
@@ -1199,6 +1205,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [hoveredMapVisitor, setHoveredMapVisitor] = useState(null);
   const [showAdminMapModal, setShowAdminMapModal] = useState(false);
   const [adminMapFilter, setAdminMapFilter] = useState("all");
+  const [lastAdminMapRefreshAt, setLastAdminMapRefreshAt] = useState(null);
   const [selectedAdminMapFloor, setSelectedAdminMapFloor] = useState("ground");
   const [selectedAdminMapOffice, setSelectedAdminMapOffice] = useState("all");
   const [showAdminMapDock, setShowAdminMapDock] = useState(false);
@@ -1273,6 +1280,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
 
   const [newUserData, setNewUserData] = useState(createEmptyUserForm("staff"));
   const [createUserErrors, setCreateUserErrors] = useState({});
+  const [editUserErrors, setEditUserErrors] = useState({});
   const [staffDropdownOpen, setStaffDropdownOpen] = useState(null);
   const [isCreateEmailManuallyEdited, setIsCreateEmailManuallyEdited] = useState(false);
   const [isCreateEmployeeIdManuallyEdited, setIsCreateEmployeeIdManuallyEdited] = useState(false);
@@ -1308,6 +1316,41 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     () => generateAccountEmployeeId(newUserData, allUsers),
     [newUserData.role, allUsers],
   );
+  const createUserReadiness = useMemo(() => {
+    const role = String(newUserData.role || "").toLowerCase();
+    const isStudentAccount = role === "student";
+    const isAcademicStaffAccount = role === "teacher";
+    const isAcademicAccessAccount = isStudentAccount || isAcademicStaffAccount;
+    const needsAdminPhone = isSecurityRole(newUserData.role);
+    const resolvedEmail = String(newUserData.email || generatedCreateUserEmail || "").trim().toLowerCase();
+    const resolvedId = String(
+      isAcademicStaffAccount
+        ? newUserData.teacherId || generatedCreateUserEmployeeId
+        : isStudentAccount
+          ? newUserData.studentId || generatedCreateUserEmployeeId
+          : newUserData.employeeId || generatedCreateUserEmployeeId,
+    ).trim();
+    const issues = [];
+
+    if (!String(newUserData.firstName || "").trim()) issues.push("First name");
+    if (!String(newUserData.lastName || "").trim()) issues.push("Last name");
+    if (!resolvedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resolvedEmail)) issues.push("Valid email");
+    if (!resolvedId) issues.push(isAcademicStaffAccount ? "Academic staff ID" : isStudentAccount ? "Student ID" : "Staff/Security number");
+    if (needsAdminPhone && newUserData.phone && !isValidPhilippineMobileNumber(newUserData.phone)) {
+      issues.push("Valid Philippine contact number");
+    }
+    if (!isAcademicAccessAccount && !isSecurityRole(newUserData.role) && !String(newUserData.department || "").trim()) {
+      issues.push("Department");
+    }
+
+    return {
+      isReady: issues.length === 0,
+      issues,
+      email: resolvedEmail,
+      accountId: resolvedId,
+      idLabel: isAcademicStaffAccount ? "Academic Staff ID" : isStudentAccount ? "Student ID" : "Employee ID",
+    };
+  }, [generatedCreateUserEmail, generatedCreateUserEmployeeId, newUserData]);
   const isCreateAcademicAccessAccount = ["student", "teacher"].includes(String(newUserData.role || "").toLowerCase());
   const isCreateTeacherAccount = String(newUserData.role || "").toLowerCase() === "teacher";
 
@@ -1505,58 +1548,21 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     return getFilteredRequests().length;
   }, [getFilteredRequests]);
 
-  const getFilteredUsersList = useCallback(() => {
-    let filtered = [...allUsers];
-
-    if (accountRecordsMode === "staff") {
-      filtered = filtered.filter((u) => u.role === "staff");
-    } else if (accountRecordsMode === "security") {
-      filtered = filtered.filter((u) => isSecurityRole(u.role));
-    }
-
-    if (userDepartmentFilter !== "all") {
-      filtered = filtered.filter((u) => normalizeFilterValue(u.department || "General") === userDepartmentFilter);
-    }
-
-    if (userFilter !== "all" && userFilter !== "active" && userFilter !== "inactive") {
-      if (userFilter === "security") {
-        filtered = filtered.filter((u) => isSecurityRole(u.role));
-      } else {
-        filtered = filtered.filter((u) => u.role === userFilter);
-      }
-    }
-
-    if (userFilter === "active") {
-      filtered = filtered.filter((u) => isUserActive(u));
-    }
-    if (userFilter === "inactive") {
-      filtered = filtered.filter((u) => !isUserActive(u));
-    }
-
-    if (userSearchQuery.trim()) {
-      filtered = filtered.filter((u) =>
-        recordMatchesSearch(u, userSearchQuery, [
-          "firstName",
-          "lastName",
-          "username",
-          "email",
-          "phone",
-          "department",
-          "employeeId",
-          "role",
-          "status",
-          "nfcCardId",
-          (userItem) => `${userItem.firstName || ""} ${userItem.lastName || ""}`,
-        ]),
-      );
-    }
-
-    return filtered.sort((a, b) => {
-      const nameA = `${a?.firstName || ""} ${a?.lastName || ""}`.trim().toLowerCase();
-      const nameB = `${b?.firstName || ""} ${b?.lastName || ""}`.trim().toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-  }, [accountRecordsMode, allUsers, userDepartmentFilter, userFilter, userSearchQuery]);
+  const getFilteredUsersList = useCallback(
+    () =>
+      filterAdminUsers({
+        users: allUsers,
+        accountMode: accountRecordsMode,
+        roleFilter: userFilter,
+        departmentFilter: userDepartmentFilter,
+        searchQuery: userSearchQuery,
+        isSecurityRole,
+        isUserActive,
+        recordMatchesSearch,
+        normalizeFilterValue,
+      }),
+    [accountRecordsMode, allUsers, userDepartmentFilter, userFilter, userSearchQuery],
+  );
 
   const getFilteredUsersCount = useCallback(() => getFilteredUsersList().length, [getFilteredUsersList]);
 
@@ -1565,18 +1571,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [getFilteredUsersList, currentPage, itemsPerPage]);
 
-  const getUsersByStatus = useCallback((statusTab) => {
-    if (statusTab === "active") {
-      return allUsers.filter((u) => u.status === "active" || u.isActive === true);
-    }
-    if (statusTab === "inactive") {
-      return allUsers.filter((u) => u.status === "inactive" || u.isActive === false);
-    }
-    return allUsers;
-  }, [allUsers]);
-
-  const activeUsersList = useMemo(() => getUsersByStatus("active"), [getUsersByStatus]);
-  const inactiveUsersList = useMemo(() => getUsersByStatus("inactive"), [getUsersByStatus]);
+  const userStatusGroups = useMemo(() => getUserStatusGroups(allUsers, isUserActive), [allUsers]);
+  const activeUsersList = useMemo(() => userStatusGroups.active, [userStatusGroups]);
+  const inactiveUsersList = useMemo(() => userStatusGroups.inactive, [userStatusGroups]);
   const studentUsers = useMemo(
     () => allUsers.filter((userItem) => String(userItem?.role || "").toLowerCase() === "student"),
     [allUsers],
@@ -1785,91 +1782,30 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     ];
   }, [visitorHistory]);
 
-  const userDepartmentFilterOptions = useMemo(() => {
-    const departmentMap = new Map();
-    scopedUsers.forEach((userItem) => {
-      const label = userItem.department || "General";
-      const key = normalizeFilterValue(label);
-      departmentMap.set(key, {
-        key,
-        label,
-        count: (departmentMap.get(key)?.count || 0) + 1,
-        icon: "business-outline",
-      });
-    });
-    return [
-      { key: "all", label: "All Departments", count: scopedUsers.length, icon: "apps-outline" },
-      ...Array.from(departmentMap.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(0, 8),
-    ];
-  }, [scopedUsers]);
+  const userDepartmentFilterOptions = useMemo(
+    () => buildDepartmentFilterOptions({ users: scopedUsers, normalizeFilterValue, limit: 8 }),
+    [scopedUsers],
+  );
 
-  const dataManagementDepartmentFilterOptions = useMemo(() => {
-    const departmentMap = new Map();
-    allUsers.forEach((userItem) => {
-      const label = userItem.department || "General";
-      const key = normalizeFilterValue(label);
-      departmentMap.set(key, {
-        key,
-        label,
-        count: (departmentMap.get(key)?.count || 0) + 1,
-        icon: "business-outline",
-      });
-    });
-    return [
-      { key: "all", label: "All Departments", count: allUsers.length, icon: "apps-outline" },
-      ...Array.from(departmentMap.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(0, 10),
-    ];
-  }, [allUsers]);
+  const dataManagementDepartmentFilterOptions = useMemo(
+    () => buildDepartmentFilterOptions({ users: allUsers, normalizeFilterValue, limit: 10 }),
+    [allUsers],
+  );
 
-  const dataManagementUsers = useMemo(() => {
-    let filtered = [...allUsers];
-
-    if (userFilter !== "all" && userFilter !== "active" && userFilter !== "inactive") {
-      if (userFilter === "security") {
-        filtered = filtered.filter((userItem) => isSecurityRole(userItem.role));
-      } else {
-        filtered = filtered.filter((userItem) => userItem.role === userFilter);
-      }
-    }
-
-    if (userFilter === "active") {
-      filtered = filtered.filter((userItem) => isUserActive(userItem));
-    }
-
-    if (userFilter === "inactive") {
-      filtered = filtered.filter((userItem) => !isUserActive(userItem));
-    }
-
-    if (userDepartmentFilter !== "all") {
-      filtered = filtered.filter(
-        (userItem) => normalizeFilterValue(userItem.department || "General") === userDepartmentFilter,
-      );
-    }
-
-    if (userSearchQuery.trim()) {
-      filtered = filtered.filter((userItem) =>
-        recordMatchesSearch(userItem, userSearchQuery, [
-          "firstName",
-          "lastName",
-          "username",
-          "email",
-          "phone",
-          "department",
-          "employeeId",
-          "role",
-          "status",
-          "nfcCardId",
-          (item) => `${item.firstName || ""} ${item.lastName || ""}`,
-        ]),
-      );
-    }
-
-    return filtered.sort((a, b) => {
-      const nameA = `${a?.firstName || ""} ${a?.lastName || ""}`.trim().toLowerCase();
-      const nameB = `${b?.firstName || ""} ${b?.lastName || ""}`.trim().toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-  }, [allUsers, userDepartmentFilter, userFilter, userSearchQuery]);
+  const dataManagementUsers = useMemo(
+    () =>
+      filterAdminUsers({
+        users: allUsers,
+        roleFilter: userFilter,
+        departmentFilter: userDepartmentFilter,
+        searchQuery: userSearchQuery,
+        isSecurityRole,
+        isUserActive,
+        recordMatchesSearch,
+        normalizeFilterValue,
+      }),
+    [allUsers, userDepartmentFilter, userFilter, userSearchQuery],
+  );
 
   const dataManagementTotalPages = Math.max(
     1,
@@ -3092,6 +3028,7 @@ const loadDashboardData = useCallback(async () => {
         loadAllVisitRequests({ silent: true }),
         loadRecentActivities(),
       ]);
+      setLastAdminMapRefreshAt(new Date().toISOString());
     } finally {
       adminMapRefreshRef.current = false;
     }
@@ -3165,6 +3102,11 @@ const loadDashboardData = useCallback(async () => {
     if (adminMapFilter === "all") return mapActivities;
     return mapActivities.filter((activity) => getAdminMapFilterKey(activity?.activityType) === adminMapFilter);
   }, [adminMapFilter, mapActivities]);
+
+  const mapActivityCounts = useMemo(
+    () => countMapActivitiesByFilter(mapActivities, getAdminMapFilterKey),
+    [mapActivities],
+  );
 
   const findManagedRoomForVisitor = useCallback(
     (visitor) => {
@@ -3423,34 +3365,54 @@ const loadDashboardData = useCallback(async () => {
   ]);
 
   const adminMapFilters = useMemo(() => ([
-    { key: "all", label: "All", count: mapActivities.length },
+    { key: "all", label: "All", count: mapActivityCounts.all },
     {
       key: "requests",
       label: "Requests",
-      count: mapActivities.filter((activity) => getAdminMapFilterKey(activity?.activityType) === "requests").length,
+      count: mapActivityCounts.requests,
     },
     {
       key: "approvals",
       label: "Approvals",
-      count: mapActivities.filter((activity) => getAdminMapFilterKey(activity?.activityType) === "approvals").length,
+      count: mapActivityCounts.approvals,
     },
     {
       key: "movement",
       label: "Movement",
-      count: mapActivities.filter((activity) => getAdminMapFilterKey(activity?.activityType) === "movement").length,
+      count: mapActivityCounts.movement,
     },
     {
       key: "issues",
       label: "Issues",
-      count: mapActivities.filter((activity) => getAdminMapFilterKey(activity?.activityType) === "issues").length,
+      count: mapActivityCounts.issues,
     },
-  ]), [mapActivities]);
+  ]), [mapActivityCounts]);
 
   const adminMapSummaryItems = useMemo(() => ([
     { label: "Tracked", value: visibleAdminMapVisitors.length || 0, color: ADMIN_BLUE },
     { label: "Movement", value: adminMapFilters.find((item) => item.key === "movement")?.count || 0, color: "#0A3D91" },
     { label: "Issues", value: adminMapFilters.find((item) => item.key === "issues")?.count || 0, color: ADMIN_BLUE },
   ]), [adminMapFilters, visibleAdminMapVisitors.length]);
+
+  const latestAdminMapActivityAt = useMemo(() => {
+    const timestamps = [
+      lastAdminMapRefreshAt,
+      ...mapActivities.map((activity) => activity?.timestamp || activity?.createdAt || activity?.updatedAt),
+      ...monitoredMapVisitors.map((visitorItem) => visitorItem?.lastUpdate),
+    ]
+      .map((value) => new Date(value).getTime())
+      .filter(Number.isFinite);
+
+    if (!timestamps.length) return null;
+    return new Date(Math.max(...timestamps)).toISOString();
+  }, [lastAdminMapRefreshAt, mapActivities, monitoredMapVisitors]);
+
+  const adminMapLegendItems = useMemo(() => ([
+    { label: "Checked in", color: "#10B981", icon: "checkmark-circle" },
+    { label: "Movement", color: "#0A3D91", icon: "walk-outline" },
+    { label: "Requests", color: "#F59E0B", icon: "time-outline" },
+    { label: "Issues", color: "#EF4444", icon: "alert-circle-outline" },
+  ]), []);
 
   const applySidebarAnimation = () => {
     if (Platform.OS !== "web") {
@@ -3922,7 +3884,7 @@ const loadDashboardData = useCallback(async () => {
       lastName: currentValue.lastName,
       username: currentValue.username,
       email: isCreateEmailManuallyEdited ? currentValue.email : "",
-      phone: currentValue.phone,
+      phone: isSecurityRole(role) ? currentValue.phone : "",
       employeeId: isCreateEmployeeIdManuallyEdited ? currentValue.employeeId : "",
       studentId: isCreateEmployeeIdManuallyEdited ? currentValue.studentId : "",
       teacherId: isCreateEmployeeIdManuallyEdited ? currentValue.teacherId : "",
@@ -3934,6 +3896,84 @@ const loadDashboardData = useCallback(async () => {
   const renderCreateUserFieldError = (fieldKey) =>
     createUserErrors[fieldKey] ? (
       <Text style={styles.formErrorText}>{createUserErrors[fieldKey]}</Text>
+    ) : null;
+
+  const validateEditUserForm = ({ showErrors = true } = {}) => {
+    const nextErrors = {};
+    const selectedId = editUserData.id;
+    const normalizedEmail = String(editUserData.email || "").trim().toLowerCase();
+    const normalizedUsername = normalizeUsernameInput(editUserData.username);
+    const normalizedEmployeeId = String(editUserData.employeeId || "").trim().toLowerCase();
+    const normalizedRole = String(editUserData.role || "").toLowerCase();
+    const isEditingStudent = normalizedRole === "student";
+    const isEditingTeacher = normalizedRole === "teacher";
+    const academicId = String(isEditingTeacher ? editUserData.teacherId : editUserData.studentId || "").trim();
+
+    if (!String(editUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
+    if (!String(editUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      nextErrors.email = "Enter a valid email address.";
+    }
+    if (!["staff", "security", "guard", "student", "teacher", "admin", "visitor"].includes(normalizedRole)) {
+      nextErrors.role = "Select a valid role.";
+    }
+    if (!String(editUserData.phone || "").trim()) {
+      nextErrors.phone = "Contact number is required.";
+    } else if (!isValidPhilippineMobileNumber(editUserData.phone)) {
+      nextErrors.phone = PHILIPPINE_MOBILE_NUMBER_MESSAGE;
+    }
+    if (normalizedRole === "staff" && !String(editUserData.department || "").trim()) {
+      nextErrors.department = "Department is required for staff accounts.";
+    }
+    if ((isEditingStudent || isEditingTeacher) && !academicId) {
+      nextErrors[isEditingTeacher ? "teacherId" : "studentId"] = isEditingTeacher
+        ? "Academic staff ID is required."
+        : "Student ID is required.";
+    }
+    if (!["active", "inactive", "pending", "suspended"].includes(String(editUserData.status || "").toLowerCase())) {
+      nextErrors.status = "Select a valid account status.";
+    }
+
+    const duplicateEmail = allUsers.find(
+      (userItem) =>
+        String(userItem?._id || userItem?.id) !== String(selectedId) &&
+        String(userItem?.email || "").trim().toLowerCase() === normalizedEmail,
+    );
+    if (duplicateEmail) nextErrors.email = "This email address is already registered.";
+
+    if (normalizedUsername) {
+      const duplicateUsername = allUsers.find(
+        (userItem) =>
+          String(userItem?._id || userItem?.id) !== String(selectedId) &&
+          normalizeUsernameInput(userItem?.username) === normalizedUsername,
+      );
+      if (duplicateUsername) nextErrors.username = "This username is already in use.";
+    }
+
+    if (normalizedEmployeeId) {
+      const duplicateEmployeeId = allUsers.find(
+        (userItem) =>
+          String(userItem?._id || userItem?.id) !== String(selectedId) &&
+          String(userItem?.employeeId || "").trim().toLowerCase() === normalizedEmployeeId,
+      );
+      if (duplicateEmployeeId) nextErrors.employeeId = "This staff/security ID is already registered.";
+    }
+
+    if (showErrors) setEditUserErrors(nextErrors);
+    return {
+      isValid: Object.keys(nextErrors).length === 0,
+      errors: nextErrors,
+      normalizedEmail,
+      normalizedUsername,
+      normalizedEmployeeId,
+    };
+  };
+
+  const editUserReadiness = useMemo(() => validateEditUserForm({ showErrors: false }), [editUserData, allUsers]);
+
+  const renderEditUserFieldError = (fieldKey) =>
+    editUserErrors[fieldKey] ? (
+      <Text style={styles.formErrorText}>{editUserErrors[fieldKey]}</Text>
     ) : null;
 
   const renderStaffDropdown = ({
@@ -4189,6 +4229,7 @@ const loadDashboardData = useCallback(async () => {
 
   const handleEditUser = (userItem) => {
     setSelectedUser(userItem);
+    setEditUserErrors({});
     setEditUserData({
       id: userItem._id || userItem.id,
       firstName: userItem.firstName || "",
@@ -4244,34 +4285,17 @@ const loadDashboardData = useCallback(async () => {
   const confirmEditUser = async () => {
     if (!ensureAdminAccess()) return;
     const selectedId = editUserData.id;
-    const normalizedEmail = String(editUserData.email || "").trim().toLowerCase();
-    const normalizedUsername = normalizeUsernameInput(editUserData.username);
-    const normalizedEmployeeId = String(editUserData.employeeId || "").trim().toLowerCase();
+    const {
+      isValid,
+      normalizedEmail,
+      normalizedUsername,
+      normalizedEmployeeId,
+    } = validateEditUserForm();
     const isEditingSecurity = isSecurityRole(editUserData.role);
     const isEditingStudent = String(editUserData.role || "").toLowerCase() === "student";
 
-    if (!String(editUserData.firstName || "").trim() || !String(editUserData.lastName || "").trim()) {
-      Alert.alert("Missing Details", "First name and last name are required.");
-      return;
-    }
-
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
-      return;
-    }
-
-    if (!String(editUserData.phone || "").trim()) {
-      Alert.alert("Missing Contact Number", "Contact number is required.");
-      return;
-    }
-
-    if (!isValidPhilippineMobileNumber(editUserData.phone)) {
-      Alert.alert("Invalid Contact Number", PHILIPPINE_MOBILE_NUMBER_MESSAGE);
-      return;
-    }
-
-    if (String(editUserData.role || "").toLowerCase() === "staff" && !String(editUserData.department || "").trim()) {
-      Alert.alert("Missing Department", "Department is required for staff accounts.");
+    if (!isValid) {
+      Alert.alert("Validation Error", "Please review the highlighted fields before saving changes.");
       return;
     }
 
@@ -5541,20 +5565,129 @@ const loadDashboardData = useCallback(async () => {
       </ScrollView>
 
       <View style={styles.adminMapLegend}>
-        {[
-          { label: "Approvals", color: ADMIN_BLUE },
-          { label: "Requests", color: ADMIN_BLUE },
-          { label: "Issues", color: ADMIN_BLUE },
-          { label: "Movement", color: ADMIN_BLUE },
-        ].map((item) => (
+        {adminMapLegendItems.map((item) => (
           <View key={item.label} style={styles.adminMapLegendItem}>
-            <View style={[styles.adminMapLegendDot, { backgroundColor: item.color }]} />
+            <View style={[styles.adminMapLegendIcon, { backgroundColor: `${item.color}18` }]}>
+              <Ionicons name={item.icon} size={12} color={item.color} />
+            </View>
             <Text style={[styles.adminMapLegendText, isDarkMode && styles.darkTextSecondary]}>{item.label}</Text>
           </View>
         ))}
       </View>
     </View>
   );
+
+  const renderAdminMapOperationalStrip = () => (
+    <View
+      style={[
+        styles.adminMapOpsStrip,
+        {
+          backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
+          borderColor: theme.borderColor,
+        },
+      ]}
+    >
+      {[
+        {
+          label: "Last update",
+          value: latestAdminMapActivityAt ? getMapFreshnessLabel(latestAdminMapActivityAt) : "Waiting",
+          meta: latestAdminMapActivityAt ? formatDateTime(latestAdminMapActivityAt) : "No map sync yet",
+          icon: "radio-outline",
+        },
+        {
+          label: "Tracked now",
+          value: visibleAdminMapVisitors.length,
+          meta: `${monitoredMapVisitors.length} checked-in visitors`,
+          icon: "location-outline",
+        },
+        {
+          label: "Selected view",
+          value: ADMIN_MAP_FLOORS.find((floor) => floor.id === selectedAdminMapFloor)?.name || "Floor",
+          meta: selectedAdminMapOffice === "all" ? "All offices" : selectedAdminMapOffice,
+          icon: "layers-outline",
+        },
+      ].map((item) => (
+        <View key={item.label} style={styles.adminMapOpsItem}>
+          <View style={styles.adminMapOpsIcon}>
+            <Ionicons name={item.icon} size={16} color={ADMIN_BLUE} />
+          </View>
+          <View style={styles.adminMapOpsCopy}>
+            <Text style={[styles.adminMapOpsLabel, isDarkMode && styles.darkTextSecondary]}>{item.label}</Text>
+            <Text style={[styles.adminMapOpsValue, isDarkMode && styles.darkText]} numberOfLines={1}>
+              {item.value}
+            </Text>
+            <Text style={[styles.adminMapOpsMeta, isDarkMode && styles.darkTextSecondary]} numberOfLines={1}>
+              {item.meta}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderAdminMapEmptyState = ({ title, message, icon = "radio-outline" }) => (
+    <View
+      style={[
+        styles.adminMapEmptyState,
+        {
+          backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
+          borderColor: theme.borderColor,
+        },
+      ]}
+    >
+      <View style={styles.adminMapEmptyIcon}>
+        <Ionicons name={icon} size={20} color={ADMIN_BLUE} />
+      </View>
+      <View style={styles.adminMapEmptyCopy}>
+        <Text style={[styles.adminMapEmptyTitle, isDarkMode && styles.darkText]}>{title}</Text>
+        <Text style={[styles.adminMapEmptyText, isDarkMode && styles.darkTextSecondary]}>{message}</Text>
+      </View>
+    </View>
+  );
+
+  const renderAdminMapActivityItem = (activity, index, keySuffix = "activity") => {
+    const marker = visibleAdminMapVisitors[index];
+    const filterKey = getAdminMapFilterKey(activity?.activityType);
+    const tone =
+      filterKey === "issues" ? "#EF4444" :
+      filterKey === "movement" ? "#0A3D91" :
+      filterKey === "requests" ? "#F59E0B" :
+      "#10B981";
+
+    return (
+      <TouchableOpacity
+        key={activity._id || `${activity.activityType}-${index}-${keySuffix}`}
+        onPress={() => marker && setSelectedMapActivity(marker)}
+        style={[
+          styles.adminMapActivityItem,
+          index === 0 && { borderTopWidth: 0 },
+          index > 0 && { borderTopColor: theme.borderColor },
+        ]}
+      >
+        <View style={styles.adminMapActivityItemTop}>
+          <View style={[styles.adminMapActivityTone, { backgroundColor: `${tone}18` }]}>
+            <Ionicons name={filterKey === "issues" ? "alert-circle-outline" : filterKey === "movement" ? "walk-outline" : "radio-outline"} size={14} color={tone} />
+          </View>
+          <View style={styles.adminMapActivityCopy}>
+            <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: "800", marginBottom: 3 }}>
+              {getActivityLabel(activity.activityType)}
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
+              {activity.notes || activity.relatedVisitor?.fullName || "Recent system action"}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.adminMapActivityMetaRow}>
+          <Text style={[styles.adminMapActivityMeta, { color: theme.textSecondary }]}>
+            SafePass ID: {getVisitorSafePassId(activity)}
+          </Text>
+          <Text style={[styles.adminMapActivityMeta, { color: theme.textSecondary }]}>
+            {getMapFreshnessLabel(activity.timestamp || activity.createdAt)}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderAdminActivityFilters = () => (
     <View
@@ -5613,6 +5746,7 @@ const loadDashboardData = useCallback(async () => {
       </View>
 
       <ScrollView style={styles.adminMonitoringDockBody} showsVerticalScrollIndicator={false}>
+        {renderAdminMapOperationalStrip()}
         <SharedMonitoringMap
           title="Live Monitoring Map"
           subtitle="Dashboard monitoring panel for admin and security."
@@ -5679,38 +5813,23 @@ const loadDashboardData = useCallback(async () => {
               </Text>
             </View>
           ) : (
-            <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>
-              Select a marker or live activity to inspect it here.
-            </Text>
+            renderAdminMapEmptyState({
+              title: "No marker selected",
+              message: "Select a live visitor marker or activity row to inspect source, location, and freshness.",
+              icon: "scan-outline",
+            })
           )}
 
           {renderAdminActivityFilters()}
 
           <View style={styles.adminMapActivityList}>
-            {filteredMapActivities.length > 0 ? filteredMapActivities.slice(0, 6).map((activity, index) => {
-              const marker = visibleAdminMapVisitors[index];
-              return (
-                <TouchableOpacity
-                  key={activity._id || `${activity.activityType}-${index}-dock`}
-                  onPress={() => marker && setSelectedMapActivity(marker)}
-                  style={[styles.adminMapActivityItem, index === 0 && { borderTopWidth: 0 }, index > 0 && { borderTopColor: theme.borderColor }]}
-                >
-                  <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: "700", marginBottom: 3 }}>
-                    {getActivityLabel(activity.activityType)}
-                  </Text>
-                  <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
-                    {activity.notes || activity.relatedVisitor?.fullName || "Recent system action"}
-                  </Text>
-                  <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 4, fontWeight: "700" }}>
-                    SafePass ID: {getVisitorSafePassId(activity)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }) : (
-              <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>
-                No live activity for this filter yet.
-              </Text>
-            )}
+            {filteredMapActivities.length > 0
+              ? filteredMapActivities.slice(0, 6).map((activity, index) => renderAdminMapActivityItem(activity, index, "dock"))
+              : renderAdminMapEmptyState({
+                  title: "No activity in this filter",
+                  message: "Map sync is running. Try All activity or refresh after a visitor check-in or request update.",
+                  icon: "funnel-outline",
+                })}
           </View>
         </View>
       </ScrollView>
@@ -5721,6 +5840,7 @@ const loadDashboardData = useCallback(async () => {
     <View style={[styles.analyticsSplitGrid, width < 1200 && styles.analyticsSplitGridStack, { marginBottom: 14 }]}>
       <View style={styles.analyticsPrimaryColumn}>
         <View style={[styles.adminMapSection, { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+          {renderAdminMapOperationalStrip()}
           <SharedMonitoringMap
             title="Live Monitoring Map"
             subtitle="Track approvals, appointment requests, and gate activity with the same shared monitoring map used by security."
@@ -5823,39 +5943,23 @@ const loadDashboardData = useCallback(async () => {
               </Text>
             </View>
           ) : (
-            <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>
-              No live admin activity is available yet.
-            </Text>
+            renderAdminMapEmptyState({
+              title: "Select a live marker",
+              message: visibleAdminMapVisitors.length
+                ? "Markers are available on the map. Select one to view location source and last update."
+                : "No checked-in visitors match the current floor and office filters.",
+              icon: "location-outline",
+            })
           )}
 
           <View style={styles.adminMapActivityList}>
-            {filteredMapActivities.length > 0 ? filteredMapActivities.slice(0, 5).map((activity, index) => {
-              const marker = visibleAdminMapVisitors[index];
-              return (
-                <TouchableOpacity
-                  key={activity._id || `${activity.activityType}-${index}`}
-                  onPress={() => marker && setSelectedMapActivity(marker)}
-                  style={[styles.adminMapActivityItem, index === 0 && { borderTopWidth: 0 }, index > 0 && { borderTopColor: theme.borderColor }]}
-                >
-                  <Text style={{ color: theme.textPrimary, fontSize: 14, fontWeight: "700", marginBottom: 4 }}>
-                    {getActivityLabel(activity.activityType)}
-                  </Text>
-                  <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
-                    {activity.notes || activity.relatedVisitor?.fullName || "Recent system action"}
-                  </Text>
-                  <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4, fontWeight: "700" }}>
-                    SafePass ID: {getVisitorSafePassId(activity)}
-                  </Text>
-                  <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 6 }}>
-                    {formatDate(activity.timestamp)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }) : (
-              <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>
-                No live map activity is available for this filter yet.
-              </Text>
-            )}
+            {filteredMapActivities.length > 0
+              ? filteredMapActivities.slice(0, 5).map((activity, index) => renderAdminMapActivityItem(activity, index))
+              : renderAdminMapEmptyState({
+                  title: "No live activity for this view",
+                  message: "The selected activity type has no recent events. Switch filters or wait for the next map sync.",
+                  icon: "radio-outline",
+                })}
           </View>
         </View>
       </View>
@@ -6604,6 +6708,48 @@ const loadDashboardData = useCallback(async () => {
                 </View>
               </View>
 
+              <View style={[styles.createUserPreviewCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                <View style={styles.createUserPreviewHeader}>
+                  <Ionicons name="sparkles-outline" size={17} color={creationRoleColor} />
+                  <Text style={[styles.createUserPreviewTitle, isDarkMode && styles.darkText]}>
+                    Generated account details
+                  </Text>
+                </View>
+                <View style={styles.adminMapSummaryGrid}>
+                  {[
+                    { label: "Email", value: createUserReadiness.email || "Enter first name", icon: "mail-outline" },
+                    { label: createUserReadiness.idLabel, value: createUserReadiness.accountId || "Generating ID", icon: "card-outline" },
+                    { label: "Activation", value: "Email link", icon: "lock-closed-outline" },
+                  ].map((item) => (
+                    <View
+                      key={item.label}
+                      style={[
+                        styles.createUserPreviewInfoCard,
+                        styles.userDataInfoCard,
+                        isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor },
+                      ]}
+                    >
+                      <Ionicons name={item.icon} size={16} color={creationRoleColor} />
+                      <View style={styles.userDataInfoCopy}>
+                        <Text style={styles.userProfileInfoLabel}>{item.label}</Text>
+                        <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]} numberOfLines={1}>
+                          {item.value}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                {!createUserReadiness.isReady ? (
+                  <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                    Complete: {createUserReadiness.issues.join(", ")}
+                  </Text>
+                ) : (
+                  <Text style={[styles.inputHint, { color: creationRoleColor }]}>
+                    Ready to create. The account will remain inactive until the secure email setup is completed.
+                  </Text>
+                )}
+              </View>
+
               <View style={styles.userEditorSection}>
                 <Text style={[styles.userEditorSectionTitle, isDarkMode && styles.darkText]}>Basic Information</Text>
                 <View style={styles.userEditorGrid}>
@@ -6734,12 +6880,14 @@ const loadDashboardData = useCallback(async () => {
                     {renderCreateUserFieldError(isCreatingAcademicStaff ? "teacherId" : isCreatingStudent ? "studentId" : "employeeId")}
                   </View>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Contact Number</Text>
-                    {isCreatingAcademicAccess ? (
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                      Contact Number
+                    </Text>
+                    {!isCreatingSecurity ? (
                       <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
                         <Ionicons name="phone-portrait-outline" size={16} color="#64748B" />
                         <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
-                          User will add phone number in profile
+                          User will add phone number during profile setup
                         </Text>
                       </View>
                     ) : (
@@ -6760,6 +6908,9 @@ const loadDashboardData = useCallback(async () => {
                           maxLength={16}
                           placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                         />
+                        <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                          Optional. Leave blank if the guard will add it after activation.
+                        </Text>
                         {renderCreateUserFieldError("phone")}
                       </>
                     )}
@@ -6910,9 +7061,13 @@ const loadDashboardData = useCallback(async () => {
                   <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Reset</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.submitButton, { backgroundColor: creationRoleColor }]}
+                  style={[
+                    styles.submitButton,
+                    { backgroundColor: creationRoleColor },
+                    (!createUserReadiness.isReady || processingId === "create-user") && styles.submitButtonDisabled,
+                  ]}
                   onPress={handleCreateUser}
-                  disabled={processingId === "create-user"}
+                  disabled={!createUserReadiness.isReady || processingId === "create-user"}
                 >
                   {processingId === "create-user" ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -7244,9 +7399,12 @@ const loadDashboardData = useCallback(async () => {
                 <Text style={styles.dataManagementGhostButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.dataManagementPrimaryButton}
+                style={[
+                  styles.dataManagementPrimaryButton,
+                  (!editUserReadiness.isValid || processingId === "edit-user") && styles.submitButtonDisabled,
+                ]}
                 onPress={confirmEditUser}
-                disabled={processingId === "edit-user"}
+                disabled={!editUserReadiness.isValid || processingId === "edit-user"}
               >
                 <Ionicons name="save-outline" size={15} color="#FFFFFF" />
                 <Text style={styles.dataManagementPrimaryButtonText}>
@@ -11376,7 +11534,7 @@ const loadDashboardData = useCallback(async () => {
                   {renderCreateUserFieldError("email")}
                 </View>
 
-                {!isCreateAcademicAccessAccount ? (
+                {isSecurityRole(newUserData.role) ? (
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
                       Phone Number
@@ -11395,10 +11553,14 @@ const loadDashboardData = useCallback(async () => {
                       placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                       keyboardType="phone-pad"
                       value={newUserData.phone}
-                      onChangeText={(text) =>
-                        setNewUserData((prev) => ({ ...prev, phone: text }))
-                      }
+                      onChangeText={(text) => {
+                        setNewUserData((prev) => ({ ...prev, phone: text }));
+                        setCreateUserErrors((prev) => ({ ...prev, phone: null }));
+                      }}
                     />
+                    <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                      Optional. Leave blank if the guard will add it after activation.
+                    </Text>
                     {renderCreateUserFieldError("phone")}
                   </View>
                 ) : (
@@ -11409,7 +11571,7 @@ const loadDashboardData = useCallback(async () => {
                     <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
                       <Ionicons name="phone-portrait-outline" size={16} color={isDarkMode ? "#94A3B8" : "#64748B"} />
                       <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
-                        User will add phone number in profile
+                        User will add phone number during profile setup
                       </Text>
                     </View>
                   </View>
@@ -12296,22 +12458,38 @@ const loadDashboardData = useCallback(async () => {
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>First Name</Text>
                     <TextInput
-                      style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
+                      style={[
+                        styles.input,
+                        editUserErrors.firstName && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
                       value={editUserData.firstName}
-                      onChangeText={(text) => setEditUserData({ ...editUserData, firstName: text })}
+                      onChangeText={(text) => {
+                        setEditUserData({ ...editUserData, firstName: text });
+                        setEditUserErrors((currentValue) => ({ ...currentValue, firstName: null }));
+                      }}
                       placeholder="First Name"
                       placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                     />
+                    {renderEditUserFieldError("firstName")}
                   </View>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Last Name</Text>
                     <TextInput
-                      style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
+                      style={[
+                        styles.input,
+                        editUserErrors.lastName && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
                       value={editUserData.lastName}
-                      onChangeText={(text) => setEditUserData({ ...editUserData, lastName: text })}
+                      onChangeText={(text) => {
+                        setEditUserData({ ...editUserData, lastName: text });
+                        setEditUserErrors((currentValue) => ({ ...currentValue, lastName: null }));
+                      }}
                       placeholder="Last Name"
                       placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                     />
+                    {renderEditUserFieldError("lastName")}
                   </View>
                 </View>
               </View>
@@ -12322,13 +12500,21 @@ const loadDashboardData = useCallback(async () => {
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Username</Text>
                     <TextInput
-                      style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
+                      style={[
+                        styles.input,
+                        editUserErrors.username && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
                       value={editUserData.username}
-                      onChangeText={(text) => setEditUserData({ ...editUserData, username: normalizeUsernameInput(text) })}
+                      onChangeText={(text) => {
+                        setEditUserData({ ...editUserData, username: normalizeUsernameInput(text) });
+                        setEditUserErrors((currentValue) => ({ ...currentValue, username: null }));
+                      }}
                       placeholder="Username"
                       autoCapitalize="none"
                       placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                     />
+                    {renderEditUserFieldError("username")}
                   </View>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Email</Text>
@@ -12344,14 +12530,22 @@ const loadDashboardData = useCallback(async () => {
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Phone</Text>
                     <TextInput
-                      style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
+                      style={[
+                        styles.input,
+                        editUserErrors.phone && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
                       value={editUserData.phone}
-                      onChangeText={(text) => setEditUserData({ ...editUserData, phone: text })}
+                      onChangeText={(text) => {
+                        setEditUserData({ ...editUserData, phone: text });
+                        setEditUserErrors((currentValue) => ({ ...currentValue, phone: null }));
+                      }}
                       placeholder="09123456789"
                       keyboardType="phone-pad"
                       maxLength={16}
                       placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                     />
+                    {renderEditUserFieldError("phone")}
                   </View>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Staff ID</Text>
@@ -12556,7 +12750,14 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity style={[styles.cancelButton, isDarkMode && { backgroundColor: "#334155" }]} onPress={() => setShowEditUserModal(false)}>
                 <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.submitButton} onPress={confirmEditUser} disabled={processingId === "edit-user"}>
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  (!editUserReadiness.isValid || processingId === "edit-user") && styles.submitButtonDisabled,
+                ]}
+                onPress={confirmEditUser}
+                disabled={!editUserReadiness.isValid || processingId === "edit-user"}
+              >
                 {processingId === "edit-user" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Save Changes</Text>}
               </TouchableOpacity>
             </View>
@@ -12858,6 +13059,7 @@ const loadDashboardData = useCallback(async () => {
             </View>
 
             <ScrollView style={styles.adminMapModalBody} showsVerticalScrollIndicator={false}>
+              {renderAdminMapOperationalStrip()}
               <SharedMonitoringMap
                 title="Live Monitoring Map"
                 subtitle="Shared monitoring map for approved visitors, check-ins, and real-time administrative activity."
@@ -12901,33 +13103,13 @@ const loadDashboardData = useCallback(async () => {
 
                 {renderAdminActivityFilters()}
 
-                {filteredMapActivities.length > 0 ? filteredMapActivities.slice(0, 8).map((activity, index) => {
-                  const marker = visibleAdminMapVisitors[index];
-                  return (
-                    <TouchableOpacity
-                      key={activity._id || `${activity.activityType}-${index}-modal`}
-                      onPress={() => marker && setSelectedMapActivity(marker)}
-                      style={[styles.adminMapActivityItem, index === 0 && { borderTopWidth: 0 }, index > 0 && { borderTopColor: theme.borderColor }]}
-                    >
-                      <Text style={{ color: theme.textPrimary, fontSize: 14, fontWeight: "700", marginBottom: 4 }}>
-                        {getActivityLabel(activity.activityType)}
-                      </Text>
-                      <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19 }}>
-                        {activity.notes || activity.relatedVisitor?.fullName || "Recent system action"}
-                      </Text>
-                      <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4, fontWeight: "700" }}>
-                        SafePass ID: {getVisitorSafePassId(activity)}
-                      </Text>
-                      <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 6 }}>
-                        {formatDate(activity.timestamp)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                }) : (
-                  <Text style={[styles.dashboardSectionEmpty, { color: theme.textSecondary }]}>
-                    No live map activity is available for this filter yet.
-                  </Text>
-                )}
+                {filteredMapActivities.length > 0
+                  ? filteredMapActivities.slice(0, 8).map((activity, index) => renderAdminMapActivityItem(activity, index, "modal"))
+                  : renderAdminMapEmptyState({
+                      title: "No feed activity yet",
+                      message: "The live feed will populate after visitor requests, approvals, check-ins, or checkout events.",
+                      icon: "pulse-outline",
+                    })}
               </View>
             </ScrollView>
           </View>

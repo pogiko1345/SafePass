@@ -2614,6 +2614,14 @@ export default StyleSheet.create({
     borderRadius: 5,
   },
 
+  adminMapLegendIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   adminMapLegendText: {
     fontSize: 12,
     fontWeight: "600",
@@ -2626,6 +2634,60 @@ export default StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+  },
+
+  adminMapOpsStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 14,
+  },
+
+  adminMapOpsItem: {
+    flexGrow: 1,
+    flexBasis: 180,
+    minWidth: 160,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  adminMapOpsIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+
+  adminMapOpsCopy: {
+    flex: 1,
+  },
+
+  adminMapOpsLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  adminMapOpsValue: {
+    marginTop: 2,
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  adminMapOpsMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
   },
 
   adminMapSideCard: {
@@ -2666,6 +2728,73 @@ export default StyleSheet.create({
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
+  },
+
+  adminMapActivityItemTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  adminMapActivityTone: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  adminMapActivityCopy: {
+    flex: 1,
+  },
+
+  adminMapActivityMetaRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  adminMapActivityMeta: {
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  adminMapEmptyState: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginVertical: 8,
+  },
+
+  adminMapEmptyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+
+  adminMapEmptyCopy: {
+    flex: 1,
+  },
+
+  adminMapEmptyTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  adminMapEmptyText: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "600",
+    color: "#64748B",
   },
 
   adminMapModalContent: {
@@ -4954,6 +5083,10 @@ export default StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     backgroundColor: "#1C6DD0",
+  },
+
+  submitButtonDisabled: {
+    opacity: 0.55,
   },
 
   submitButtonText: {
