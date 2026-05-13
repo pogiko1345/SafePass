@@ -2529,7 +2529,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={[styles.securityPanelCard, { width: '100%' }]}>
+        <View style={[styles.securityPanelCard, styles.securityWorkspaceFull]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <Ionicons name="people-outline" size={20} color="#0A3D91" />
