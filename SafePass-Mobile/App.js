@@ -133,6 +133,106 @@ const WEB_LINKING = {
   },
 };
 
+const CHUNK_RELOAD_STORAGE_KEY = "safepass:lastChunkReloadAt";
+const CHUNK_RELOAD_COOLDOWN_MS = 2 * 60 * 1000;
+
+const isChunkLoadFailure = (error) => {
+  const message = `${error?.name || ""} ${error?.message || ""}`;
+  return (
+    /ChunkLoadError/i.test(message) ||
+    /Loading chunk \d+ failed/i.test(message) ||
+    /Failed to fetch dynamically imported module/i.test(message)
+  );
+};
+
+class ChunkLoadRecoveryBoundary extends React.Component {
+  state = { hasChunkError: false };
+
+  static getDerivedStateFromError(error) {
+    return isChunkLoadFailure(error) ? { hasChunkError: true } : null;
+  }
+
+  componentDidCatch(error) {
+    if (
+      Platform.OS !== "web" ||
+      typeof window === "undefined" ||
+      !isChunkLoadFailure(error)
+    ) {
+      throw error;
+    }
+
+    const lastReloadAt = Number(
+      window.sessionStorage?.getItem(CHUNK_RELOAD_STORAGE_KEY) || 0,
+    );
+    const canReload =
+      !Number.isFinite(lastReloadAt) ||
+      Date.now() - lastReloadAt > CHUNK_RELOAD_COOLDOWN_MS;
+
+    if (canReload) {
+      window.sessionStorage?.setItem(CHUNK_RELOAD_STORAGE_KEY, String(Date.now()));
+      window.location.reload();
+    }
+  }
+
+  render() {
+    if (!this.state.hasChunkError) {
+      return this.props.children;
+    }
+
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: brandColors.background,
+          paddingHorizontal: 24,
+        }}
+      >
+        <Image
+          source={SCHOOL_LOGO}
+          resizeMode="contain"
+          style={{ width: 116, height: 54, marginBottom: 18 }}
+        />
+        <Text
+          style={{
+            color: brandColors.text,
+            fontSize: 16,
+            fontWeight: "700",
+            textAlign: "center",
+            marginBottom: 8,
+          }}
+        >
+          SafePass was updated
+        </Text>
+        <Text
+          style={{
+            color: brandColors.textMuted,
+            fontSize: 14,
+            textAlign: "center",
+            marginBottom: 18,
+          }}
+        >
+          Refresh this page to load the latest staff dashboard.
+        </Text>
+        <Text
+          accessibilityRole="button"
+          onPress={() => window.location.reload()}
+          style={{
+            color: brandColors.blue,
+            fontSize: 14,
+            fontWeight: "700",
+            paddingHorizontal: 18,
+            paddingVertical: 10,
+          }}
+        >
+          Refresh now
+        </Text>
+      </View>
+    );
+  }
+}
+
 const ScreenFallback = () => (
   <View
     style={{
@@ -578,6 +678,7 @@ export default function App() {
             WEB_ROUTE_TITLES[route?.name] || `${APP_NAME} | ${APP_ORGANIZATION}`,
         }}
       >
+      <ChunkLoadRecoveryBoundary>
       <Suspense fallback={<ScreenFallback />}>
         <Stack.Navigator
           initialRouteName={initialRoute}
@@ -727,6 +828,7 @@ export default function App() {
         )}
         </Stack.Navigator>
       </Suspense>
+      </ChunkLoadRecoveryBoundary>
       </NavigationContainer>
     </View>
   );
