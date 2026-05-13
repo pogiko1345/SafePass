@@ -693,6 +693,7 @@ const CampusMap = ({
             style={[
               styles.visitorMarkerDot, 
               groupVisitors.length > 1 && styles.visitorMarkerDotCluster,
+              visitor.isSelfMarker && styles.visitorMarkerDotSelf,
               { backgroundColor: statusColor }
             ]}
             onPress={() => groupVisitors.length === 1 && onVisitorSelect?.(visitor)}
@@ -708,6 +709,13 @@ const CampusMap = ({
               <Text style={styles.visitorMarkerCountText}>{groupVisitors.length}</Text>
             ) : null}
           </TouchableOpacity>
+          {visitor.isSelfMarker ? (
+            <View style={styles.visitorMarkerSelfLabel}>
+              <Text style={styles.visitorMarkerSelfLabelText} numberOfLines={1}>
+                You
+              </Text>
+            </View>
+          ) : null}
           {isHovered && (renderHoverCard?.(groupVisitors, visitor) || renderDefaultHoverCard(groupVisitors))}
         </Animated.View>
       );

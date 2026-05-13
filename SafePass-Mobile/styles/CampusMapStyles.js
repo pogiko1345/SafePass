@@ -223,6 +223,33 @@ export default StyleSheet.create({
     justifyContent: "center",
   },
 
+  visitorMarkerDotSelf: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+
+  visitorMarkerSelfLabel: {
+    position: "absolute",
+    top: 14,
+    left: -17,
+    minWidth: 42,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(15, 23, 42, 0.84)",
+    alignItems: "center",
+    zIndex: 12,
+  },
+
+  visitorMarkerSelfLabelText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
   mapZoomLayerFullscreen: {
     minHeight: height - 140,
   },

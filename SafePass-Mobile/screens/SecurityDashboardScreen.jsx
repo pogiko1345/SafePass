@@ -1433,6 +1433,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       if (shouldRefreshOperationalData) {
         lastOperationalRefreshAtRef.current = Date.now();
         refreshTasks.push(loadOperationalData());
+        refreshTasks.push(loadMapSettings());
       }
 
       await Promise.all(refreshTasks);
@@ -1445,7 +1446,10 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (liveMapRefreshRef.current) return;
     liveMapRefreshRef.current = true;
     try {
-      const loaded = await loadLiveVisitorLocations();
+      const [loaded] = await Promise.all([
+        loadLiveVisitorLocations(),
+        loadMapSettings(),
+      ]);
       if (!loaded) {
         await loadOperationalData();
       }

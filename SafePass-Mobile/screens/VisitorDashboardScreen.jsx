@@ -343,6 +343,61 @@ const getVisitorDestinationInfo = (
   };
 };
 
+const getVisitorSelfLocationMarker = (
+  visitorRecord = {},
+  mapRooms = MONITORING_MAP_OFFICES,
+  mapRoomPositions = MONITORING_MAP_OFFICE_POSITIONS,
+) => {
+  const currentLocation = visitorRecord?.currentLocation || {};
+  const normalizedStatus = String(visitorRecord?.status || "").toLowerCase();
+  const isOnCampus =
+    ["checked_in", "active"].includes(normalizedStatus) &&
+    currentLocation?.isActive !== false &&
+    !visitorRecord?.checkedOutAt;
+
+  if (!isOnCampus) return null;
+
+  const officeName = String(
+    currentLocation.office ||
+      visitorRecord?.currentDestination?.office ||
+      visitorRecord?.appointmentDepartment ||
+      visitorRecord?.assignedOffice ||
+      visitorRecord?.host ||
+      "",
+  ).trim();
+  const matchedRoom =
+    mapRooms.find((room) => room.name.toLowerCase() === officeName.toLowerCase()) ||
+    mapRooms.find((room) => officeName.toLowerCase().includes(room.name.toLowerCase())) ||
+    mapRooms.find((room) => room.name.toLowerCase().includes(officeName.toLowerCase()));
+  const coordinates = currentLocation.coordinates || currentLocation || {};
+  const numericX = Number(coordinates.x);
+  const numericY = Number(coordinates.y);
+  const matchedPosition = matchedRoom ? mapRoomPositions[matchedRoom.id] : null;
+  const position =
+    Number.isFinite(numericX) && Number.isFinite(numericY)
+      ? { x: numericX, y: numericY }
+      : matchedPosition;
+
+  if (!position) return null;
+
+  return {
+    id: `visitor-self-${visitorRecord._id || visitorRecord.id || "current"}`,
+    name: "You are here",
+    status: "checked_in",
+    isSelfMarker: true,
+    purpose: officeName || "Your current campus location",
+    trackingSource: currentLocation.source || "visitor_self",
+    lastUpdate: currentLocation.lastSeenAt || visitorRecord.updatedAt || visitorRecord.checkedInAt,
+    location: {
+      floor: currentLocation.floor || matchedRoom?.floor || "ground",
+      office: officeName || matchedRoom?.name || "Campus",
+      coordinates: position,
+      timestamp: currentLocation.lastSeenAt || visitorRecord.updatedAt || visitorRecord.checkedInAt,
+      source: currentLocation.source || "visitor_self",
+    },
+  };
+};
+
 const isSchoolOfficeServiceDay = (dateValue = new Date()) => {
   const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
   if (Number.isNaN(date.getTime())) return false;
@@ -688,9 +743,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
     loadVisitorMapSettings();
     const unsubscribe = navigation?.addListener?.("focus", loadVisitorMapSettings);
+    const refreshTimer = setInterval(loadVisitorMapSettings, VISITOR_LIVE_REFRESH_INTERVAL_MS);
 
     return () => {
       isMounted = false;
+      clearInterval(refreshTimer);
       unsubscribe?.();
     };
   }, [navigation]);
@@ -3974,8 +4031,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     icon: "navigate",
     position: visitorDestinationInfo.position,
   };
+  const visitorSelfLocationMarker = getVisitorSelfLocationMarker(
+    visitor,
+    visitorMapRooms,
+    visitorMapRoomPositions,
+  );
   const activeVisitorMapFloor =
     MONITORING_MAP_FLOORS.find((floor) => floor.id === selectedVisitorMapFloor)?.id ||
+    visitorSelfLocationMarker?.location?.floor ||
     visitorDestinationInfo.floorId ||
     "ground";
   const recentAppointmentEntries = appointmentDisplayEntries.slice(0, 3);
@@ -6312,13 +6375,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const renderVisitorCampusMap = ({ fullscreen = false } = {}) => (
     <CampusMap
-      visitors={[]}
+      visitors={visitorSelfLocationMarker ? [visitorSelfLocationMarker] : []}
       floors={MONITORING_MAP_FLOORS}
       offices={visitorMapRooms}
       selectedFloor={activeVisitorMapFloor}
       selectedOffice="all"
       destinationMarkers={isCheckedOutVisitor ? [] : [visitorDestinationMarker]}
-      showVisitorMarkers={false}
+      showVisitorMarkers={Boolean(visitorSelfLocationMarker)}
       showActiveVisitorsBadge={false}
       mapBlueprints={MONITORING_MAP_BLUEPRINTS}
       mapLabels={visitorMapLabels}
