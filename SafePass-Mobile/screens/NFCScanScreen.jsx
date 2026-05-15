@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
+import { describeRfidReaderInput, normalizeRfidReaderInput } from "../utils/rfidReaderUtils";
 
 const CHECKPOINTS = [
   { key: "main-gate", label: "Main Gate", floor: "ground", office: "Main Gate", icon: "log-in-outline" },
@@ -24,10 +25,10 @@ const CHECKPOINTS = [
 ];
 
 const ACTION_OPTIONS = [
-  { key: "auto", label: "Auto", subtitle: "Use checkpoint logic" },
-  { key: "check_in", label: "Check In", subtitle: "Force arrival" },
-  { key: "check_out", label: "Check Out", subtitle: "Force departure" },
-  { key: "location", label: "Location", subtitle: "Track movement only" },
+  { key: "auto", label: "Auto", subtitle: "Gate decides", icon: "sync-outline", color: "#0A3D91" },
+  { key: "check_in", label: "Check In", subtitle: "Force arrival", icon: "log-in-outline", color: "#16A34A" },
+  { key: "check_out", label: "Check Out", subtitle: "Force departure", icon: "log-out-outline", color: "#DC2626" },
+  { key: "location", label: "Location", subtitle: "Track movement", icon: "location-outline", color: "#7C3AED" },
 ];
 
 const ALLOWED_ROLES = new Set(["admin", "security", "guard", "staff"]);
@@ -50,7 +51,23 @@ const formatRoleLabel = (role = "") =>
     .replace(/_/g, " ")
     .replace(/\b\w/g, (match) => match.toUpperCase()) || "User";
 
+const getActionMeta = (actionKey = "auto") =>
+  ACTION_OPTIONS.find((item) => item.key === actionKey) || ACTION_OPTIONS[0];
+
+const getResultTone = (result) => {
+  if (!result) return { background: "#EFF6FF", border: "#BFDBFE", icon: "#0A3D91", label: "Ready" };
+  if (!result.success) return { background: "#FEF2F2", border: "#FCA5A5", icon: "#B91C1C", label: "Blocked" };
+  if (String(result.action || "").includes("check_out")) {
+    return { background: "#FFF7ED", border: "#FDBA74", icon: "#C2410C", label: "Checked Out" };
+  }
+  if (String(result.action || "").includes("location")) {
+    return { background: "#F5F3FF", border: "#C4B5FD", icon: "#7C3AED", label: "Location Updated" };
+  }
+  return { background: "#F0FDF4", border: "#86EFAC", icon: "#166534", label: "Checked In" };
+};
+
 export default function NFCScanScreen({ navigation }) {
+  const cardInputRef = useRef(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,6 +82,8 @@ export default function NFCScanScreen({ navigation }) {
     () => CHECKPOINTS.find((checkpoint) => checkpoint.key === selectedCheckpointKey) || CHECKPOINTS[0],
     [selectedCheckpointKey],
   );
+  const selectedActionMeta = useMemo(() => getActionMeta(selectedAction), [selectedAction]);
+  const latestTone = useMemo(() => getResultTone(latestResult), [latestResult]);
 
   const loadUser = async () => {
     try {
@@ -88,6 +107,12 @@ export default function NFCScanScreen({ navigation }) {
     loadUser();
   }, []);
 
+  useEffect(() => {
+    if (loading) return undefined;
+    const timer = setTimeout(() => cardInputRef.current?.focus?.(), 350);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -101,8 +126,10 @@ export default function NFCScanScreen({ navigation }) {
     setStationEvents((currentEvents) => [event, ...currentEvents].slice(0, 8));
   };
 
-  const handleSubmitTap = async () => {
-    const normalizedCardId = String(cardId || "").trim().toUpperCase();
+  const focusReader = () => cardInputRef.current?.focus?.();
+
+  const handleSubmitTap = async (scannedValue = cardId) => {
+    const normalizedCardId = normalizeRfidReaderInput(scannedValue);
     if (!normalizedCardId) {
       Alert.alert("Card Required", "Enter or scan the NFC card UID first.");
       return;
@@ -143,6 +170,7 @@ export default function NFCScanScreen({ navigation }) {
       setLatestResult(event);
       recordLocalEvent(event);
       setCardId("");
+      focusReader();
     } catch (error) {
       const failedEvent = {
         success: false,
@@ -221,133 +249,241 @@ export default function NFCScanScreen({ navigation }) {
           </View>
         ) : null}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Checkpoint</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionRow}>
-            {CHECKPOINTS.map((checkpoint) => {
-              const selected = checkpoint.key === selectedCheckpointKey;
-              return (
-                <TouchableOpacity
-                  key={checkpoint.key}
-                  style={[styles.optionCard, selected && styles.optionCardActive]}
-                  onPress={() => setSelectedCheckpointKey(checkpoint.key)}
-                >
+        <View style={styles.stationLayout}>
+          <View style={styles.stationPrimary}>
+            <View
+              style={[
+                styles.tapPad,
+                { backgroundColor: latestTone.background, borderColor: latestTone.border },
+                busy && styles.tapPadBusy,
+              ]}
+            >
+              <View style={[styles.tapPadIcon, { backgroundColor: `${latestTone.icon}18` }]}>
+                {busy ? (
+                  <ActivityIndicator size="large" color={latestTone.icon} />
+                ) : (
                   <Ionicons
-                    name={checkpoint.icon}
-                    size={18}
-                    color={selected ? "#FFFFFF" : "#0A3D91"}
+                    name={latestResult?.success === false ? "alert-circle-outline" : "radio-outline"}
+                    size={44}
+                    color={latestTone.icon}
                   />
-                  <Text style={[styles.optionLabel, selected && styles.optionLabelActive]}>
-                    {checkpoint.label}
-                  </Text>
-                  <Text style={[styles.optionMeta, selected && styles.optionMetaActive]}>
-                    {checkpoint.floor}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+                )}
+              </View>
+              <Text style={[styles.tapPadTitle, { color: latestTone.icon }]}>
+                {busy ? "Processing Tap" : latestResult ? latestTone.label : "Ready To Tap"}
+              </Text>
+              <Text style={styles.tapPadSubtitle}>
+                {latestResult?.message ||
+                  "Place the card on the USB reader. The station will record the selected action immediately."}
+              </Text>
+              <View style={styles.tapPadMetaRow}>
+                <View style={styles.tapPadMetaCard}>
+                  <Text style={styles.tapPadMetaLabel}>Mode</Text>
+                  <Text style={styles.tapPadMetaValue}>{selectedActionMeta.label}</Text>
+                </View>
+                <View style={styles.tapPadMetaCard}>
+                  <Text style={styles.tapPadMetaLabel}>Checkpoint</Text>
+                  <Text style={styles.tapPadMetaValue}>{selectedCheckpoint.label}</Text>
+                </View>
+              </View>
+            </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tap Mode</Text>
-          <View style={styles.actionGrid}>
-            {ACTION_OPTIONS.map((option) => {
-              const selected = option.key === selectedAction;
-              return (
+            <View style={styles.readerPanel}>
+              <View style={styles.readerPanelHeader}>
+                <View>
+                  <Text style={styles.readerPanelLabel}>USB Reader</Text>
+                  <Text style={styles.readerPanelTitle}>{describeRfidReaderInput(cardId)}</Text>
+                </View>
+                <TouchableOpacity style={styles.focusButton} onPress={focusReader}>
+                  <Ionicons name="locate-outline" size={16} color="#0A3D91" />
+                  <Text style={styles.focusButtonText}>Arm</Text>
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                ref={cardInputRef}
+                style={[styles.cardInput, busy && styles.cardInputBusy]}
+                placeholder="Tap card on USB reader"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                value={cardId}
+                onChangeText={(value) => setCardId(normalizeRfidReaderInput(value))}
+                onSubmitEditing={(event) => handleSubmitTap(event?.nativeEvent?.text)}
+                returnKeyType="done"
+                blurOnSubmit={false}
+                showSoftInputOnFocus={false}
+              />
+              <View style={styles.readerHintCard}>
+                <Ionicons name="information-circle-outline" size={16} color="#0A3D91" />
+                <Text style={styles.readerHintText}>
+                  Keep this field armed, then tap a card. Most USB readers type the UID and press Enter.
+                </Text>
+              </View>
+              <View style={styles.inlineActions}>
                 <TouchableOpacity
-                  key={option.key}
-                  style={[styles.actionCard, selected && styles.actionCardActive]}
-                  onPress={() => setSelectedAction(option.key)}
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    setCardId(String(user.nfcCardId || "").toUpperCase());
+                    setTimeout(focusReader, 80);
+                  }}
                 >
-                  <Text style={[styles.actionLabel, selected && styles.actionLabelActive]}>
-                    {option.label}
-                  </Text>
-                  <Text style={[styles.actionMeta, selected && styles.actionMetaActive]}>
-                    {option.subtitle}
-                  </Text>
+                  <Ionicons name="card-outline" size={16} color="#0A3D91" />
+                  <Text style={styles.secondaryButtonText}>Use My Card</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Card Input</Text>
-          <TextInput
-            style={styles.cardInput}
-            placeholder="Enter or paste NFC card UID"
-            placeholderTextColor="#94A3B8"
-            autoCapitalize="characters"
-            autoCorrect={false}
-            value={cardId}
-            onChangeText={setCardId}
-          />
-          <View style={styles.inlineActions}>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => setCardId(String(user.nfcCardId || "").toUpperCase())}
-            >
-              <Ionicons name="card-outline" size={16} color="#0A3D91" />
-              <Text style={styles.secondaryButtonText}>Use My Card</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.primaryButton, busy && styles.buttonDisabled]}
-              onPress={handleSubmitTap}
-              disabled={busy || !isAllowed}
-            >
-              {busy ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.primaryButtonText}>Process Tap</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {latestResult ? (
-          <View
-            style={[
-              styles.resultCard,
-              latestResult.success ? styles.resultCardSuccess : styles.resultCardError,
-            ]}
-          >
-            <View style={styles.resultHeader}>
-              <View style={styles.resultIconWrap}>
-                <Ionicons
-                  name={latestResult.success ? "checkmark-circle" : "close-circle"}
-                  size={26}
-                  color={latestResult.success ? "#166534" : "#B91C1C"}
-                />
-              </View>
-              <View style={styles.resultCopy}>
-                <Text style={styles.resultTitle}>{latestResult.name}</Text>
-                <Text style={styles.resultSubtitle}>{latestResult.message}</Text>
-              </View>
-            </View>
-            <View style={styles.resultMetaGrid}>
-              <View style={styles.resultMetaCard}>
-                <Text style={styles.resultMetaLabel}>User Type</Text>
-                <Text style={styles.resultMetaValue}>{formatRoleLabel(latestResult.userType)}</Text>
-              </View>
-              <View style={styles.resultMetaCard}>
-                <Text style={styles.resultMetaLabel}>Action</Text>
-                <Text style={styles.resultMetaValue}>{formatRoleLabel(latestResult.action)}</Text>
-              </View>
-              <View style={styles.resultMetaCard}>
-                <Text style={styles.resultMetaLabel}>Checkpoint</Text>
-                <Text style={styles.resultMetaValue}>{latestResult.checkpoint}</Text>
-              </View>
-              <View style={styles.resultMetaCard}>
-                <Text style={styles.resultMetaLabel}>Status</Text>
-                <Text style={styles.resultMetaValue}>{formatRoleLabel(latestResult.status)}</Text>
+                <TouchableOpacity
+                  style={[styles.primaryButton, busy && styles.buttonDisabled]}
+                  onPress={handleSubmitTap}
+                  disabled={busy || !isAllowed}
+                >
+                  {busy ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.primaryButtonText}>Process Tap</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
           </View>
-        ) : null}
+
+          <View style={styles.stationSide}>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Check Flow</Text>
+              <View style={styles.actionGrid}>
+                {ACTION_OPTIONS.map((option) => {
+                  const selected = option.key === selectedAction;
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      style={[
+                        styles.actionCard,
+                        selected && styles.actionCardActive,
+                        selected && { borderColor: option.color },
+                      ]}
+                      onPress={() => {
+                        setSelectedAction(option.key);
+                        setTimeout(focusReader, 80);
+                      }}
+                    >
+                      <View
+                        style={[
+                          styles.actionIcon,
+                          { backgroundColor: selected ? option.color : "#E2E8F0" },
+                        ]}
+                      >
+                        <Ionicons
+                          name={option.icon}
+                          size={18}
+                          color={selected ? "#FFFFFF" : "#475569"}
+                        />
+                      </View>
+                      <View style={styles.actionCopy}>
+                        <Text style={[styles.actionLabel, selected && { color: option.color }]}>
+                          {option.label}
+                        </Text>
+                        <Text style={styles.actionMeta}>{option.subtitle}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Checkpoint</Text>
+              <View style={styles.checkpointGrid}>
+                {CHECKPOINTS.map((checkpoint) => {
+                  const selected = checkpoint.key === selectedCheckpointKey;
+                  return (
+                    <TouchableOpacity
+                      key={checkpoint.key}
+                      style={[styles.checkpointCard, selected && styles.checkpointCardActive]}
+                      onPress={() => {
+                        setSelectedCheckpointKey(checkpoint.key);
+                        setTimeout(focusReader, 80);
+                      }}
+                    >
+                      <Ionicons
+                        name={checkpoint.icon}
+                        size={18}
+                        color={selected ? "#FFFFFF" : "#0A3D91"}
+                      />
+                      <View style={styles.checkpointCopy}>
+                        <Text style={[styles.checkpointLabel, selected && styles.checkpointLabelActive]}>
+                          {checkpoint.label}
+                        </Text>
+                        <Text style={[styles.checkpointMeta, selected && styles.checkpointMetaActive]}>
+                          {checkpoint.floor}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={[styles.resultCard, { backgroundColor: latestTone.background, borderColor: latestTone.border }]}>
+              <View style={styles.resultHeader}>
+                <View style={styles.resultIconWrap}>
+                  <Ionicons
+                    name={latestResult?.success === false ? "close-circle" : "checkmark-circle"}
+                    size={26}
+                    color={latestTone.icon}
+                  />
+                </View>
+                <View style={styles.resultCopy}>
+                  <Text style={styles.resultTitle}>{latestResult?.name || "No tap recorded"}</Text>
+                  <Text style={styles.resultSubtitle}>
+                    {latestResult?.message || "The next check-in or check-out result will appear here."}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.resultMetaGrid}>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>User Type</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult ? formatRoleLabel(latestResult.userType) : "Waiting"}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Action</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult ? formatRoleLabel(latestResult.action) : selectedActionMeta.label}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Status</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult ? formatRoleLabel(latestResult.status) : "Ready"}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Time</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult ? formatDateTime(latestResult.timestamp) : "N/A"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.flowStrip}>
+          <View style={styles.flowStep}>
+            <Ionicons name="options-outline" size={18} color="#0A3D91" />
+            <Text style={styles.flowText}>Select mode</Text>
+          </View>
+          <View style={styles.flowStep}>
+            <Ionicons name="radio-outline" size={18} color="#0A3D91" />
+            <Text style={styles.flowText}>Tap card</Text>
+          </View>
+          <View style={styles.flowStep}>
+            <Ionicons name="checkmark-done-outline" size={18} color="#0A3D91" />
+            <Text style={styles.flowText}>Record event</Text>
+          </View>
+        </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -574,13 +710,12 @@ const styles = StyleSheet.create({
     color: "#D8E8FF",
   },
   actionGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: 10,
   },
   actionCard: {
-    flexGrow: 1,
-    flexBasis: 140,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#DCE5F0",
@@ -591,6 +726,16 @@ const styles = StyleSheet.create({
     borderColor: "#0A3D91",
     backgroundColor: "#EEF5FF",
   },
+  actionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionCopy: {
+    flex: 1,
+  },
   actionLabel: {
     fontSize: 14,
     fontWeight: "800",
@@ -600,7 +745,7 @@ const styles = StyleSheet.create({
     color: "#0A3D91",
   },
   actionMeta: {
-    marginTop: 6,
+    marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
     color: "#64748B",
@@ -615,7 +760,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: 1,
     color: "#0F172A",
+    backgroundColor: "#FFFFFF",
+  },
+  cardInputBusy: {
+    opacity: 0.7,
+  },
+  readerHintCard: {
+    marginTop: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 12,
+    backgroundColor: "#EEF5FF",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  readerHintText: {
+    flex: 1,
+    minWidth: 180,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    color: "#0A3D91",
+  },
+  readerHintMeta: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#475569",
   },
   inlineActions: {
     flexDirection: "row",
@@ -798,5 +975,178 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#0A3D91",
+  },
+  stationLayout: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    marginBottom: 16,
+  },
+  stationPrimary: {
+    flex: 1,
+    flexBasis: 340,
+    gap: 16,
+  },
+  stationSide: {
+    flex: 1,
+    flexBasis: 300,
+  },
+  tapPad: {
+    minHeight: 310,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tapPadBusy: {
+    opacity: 0.88,
+  },
+  tapPadIcon: {
+    width: 92,
+    height: 92,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+  tapPadTitle: {
+    fontSize: 28,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  tapPadSubtitle: {
+    marginTop: 10,
+    maxWidth: 420,
+    fontSize: 14,
+    lineHeight: 21,
+    color: "#475569",
+    textAlign: "center",
+  },
+  tapPadMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 20,
+    alignSelf: "stretch",
+  },
+  tapPadMetaCard: {
+    flex: 1,
+    minWidth: 130,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.78)",
+    padding: 12,
+  },
+  tapPadMetaLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+  },
+  tapPadMetaValue: {
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  readerPanel: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+  },
+  readerPanelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  readerPanelLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+  },
+  readerPanelTitle: {
+    marginTop: 4,
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  focusButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    backgroundColor: "#EEF5FF",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  focusButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+  checkpointGrid: {
+    gap: 10,
+  },
+  checkpointCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    backgroundColor: "#F8FAFC",
+    padding: 12,
+  },
+  checkpointCardActive: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+  checkpointCopy: {
+    flex: 1,
+  },
+  checkpointLabel: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  checkpointLabelActive: {
+    color: "#FFFFFF",
+  },
+  checkpointMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    color: "#64748B",
+  },
+  checkpointMetaActive: {
+    color: "#D8E8FF",
+  },
+  flowStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 16,
+  },
+  flowStep: {
+    flex: 1,
+    minWidth: 110,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  flowText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0F172A",
   },
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
+import { describeRfidReaderInput, normalizeRfidReaderInput } from "../utils/rfidReaderUtils";
 
 const formatDateTime = (value) =>
   value
@@ -75,6 +76,7 @@ const getActivityActor = (item) => {
 };
 
 export default function NFCManagementScreen({ navigation }) {
+  const cardInputRef = useRef(null);
   const [cards, setCards] = useState([]);
   const [users, setUsers] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -129,6 +131,11 @@ export default function NFCManagementScreen({ navigation }) {
 
     run();
   }, [loadData]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => cardInputRef.current?.focus?.(), 350);
+    return () => clearTimeout(timer);
+  }, [selectedUserId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -250,13 +257,15 @@ export default function NFCManagementScreen({ navigation }) {
     }
   };
 
-  const handleAssignCard = async () => {
+  const handleAssignCard = async (scannedValue = manualCardId) => {
     if (!selectedUser?._id) {
       Alert.alert("Select User", "Choose a user before assigning a physical card.");
       return;
     }
 
-    if (!manualCardId.trim()) {
+    const normalizedCardId = normalizeRfidReaderInput(scannedValue);
+
+    if (!normalizedCardId) {
       Alert.alert("Card UID Required", "Enter the NFC or RFID card UID first.");
       return;
     }
@@ -265,9 +274,10 @@ export default function NFCManagementScreen({ navigation }) {
       setBusyAction("assign");
       const response = await ApiService.assignNfcCard({
         userId: selectedUser._id,
-        cardId: manualCardId.trim(),
+        cardId: normalizedCardId,
       });
       setManualCardId("");
+      cardInputRef.current?.focus?.();
       await finishAction(response?.message || "NFC card assigned successfully.");
     } catch (error) {
       Alert.alert("Assign Failed", error?.message || "Unable to assign NFC card.");
@@ -425,13 +435,26 @@ export default function NFCManagementScreen({ navigation }) {
               </View>
 
               <TextInput
+                ref={cardInputRef}
                 style={styles.uidInput}
-                placeholder="Enter physical card UID"
+                placeholder="Tap card on USB reader"
                 value={manualCardId}
-                onChangeText={setManualCardId}
+                onChangeText={(value) => setManualCardId(normalizeRfidReaderInput(value))}
+                onSubmitEditing={(event) => handleAssignCard(event?.nativeEvent?.text)}
                 autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="done"
+                blurOnSubmit={false}
+                showSoftInputOnFocus={false}
                 placeholderTextColor="#94A3B8"
               />
+              <View style={styles.readerHintCard}>
+                <Ionicons name="radio-outline" size={16} color="#0A3D91" />
+                <Text style={styles.readerHintText}>
+                  Keep this field focused, then tap a card on the USB reader. Most readers type the UID and press Enter automatically.
+                </Text>
+                <Text style={styles.readerHintMeta}>{describeRfidReaderInput(manualCardId)}</Text>
+              </View>
 
               <View style={styles.actionRow}>
                 <TouchableOpacity
@@ -796,6 +819,32 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: "#0F172A",
+  },
+  readerHintCard: {
+    marginTop: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 12,
+    backgroundColor: "#EEF5FF",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  readerHintText: {
+    flex: 1,
+    minWidth: 180,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    color: "#0A3D91",
+  },
+  readerHintMeta: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#475569",
   },
   disabledButton: {
     opacity: 0.65,
