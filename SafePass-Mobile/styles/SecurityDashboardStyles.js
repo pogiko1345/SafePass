@@ -665,6 +665,26 @@ export default StyleSheet.create({
     color: colors.white,
   },
 
+  visitorNfcUnassignButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 12,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 144,
+  },
+
+  visitorNfcUnassignButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "900",
+    color: "#B91C1C",
+  },
+
   visitorNfcStatus: {
     marginTop: spacing.sm,
     borderRadius: 12,

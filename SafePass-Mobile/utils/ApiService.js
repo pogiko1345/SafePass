@@ -1648,10 +1648,21 @@ async rejectVisitor(visitorId, reason) {
     }
   }
 
-  async revokeNfcCard(userId) {
+  async revokeNfcCard(userIdOrTarget) {
     try {
-      const response = await this.fetch(`/admin/nfc-cards/${userId}/revoke`, {
+      const target =
+        typeof userIdOrTarget === "object" && userIdOrTarget !== null
+          ? userIdOrTarget
+          : { userId: userIdOrTarget };
+      const identifier = target.userId || target.email;
+      if (!identifier) {
+        throw new Error("User ID or email is required to revoke an NFC card.");
+      }
+      const response = await this.fetch(`/admin/nfc-cards/${encodeURIComponent(identifier)}/revoke`, {
         method: "PUT",
+        body: {
+          email: target.email,
+        },
       });
       return response;
     } catch (error) {

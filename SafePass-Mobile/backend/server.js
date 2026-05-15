@@ -694,7 +694,12 @@ const sendPhoneOtp = async ({ phoneNumber, otpCode, provider }) => {
 
 const ATTENDANCE_USER_TYPES = ["student", "teacher", "staff", "security", "guard", "visitor"];
 
-const normalizeUserRoleValue = (value = "") => String(value || "").trim().toLowerCase();
+const normalizeUserRoleValue = (value = "") => {
+  const normalized = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["security_officer", "security_guard", "guard_officer"].includes(normalized)) return "security";
+  if (normalized === "academic_teacher" || normalized === "faculty") return "teacher";
+  return normalized;
+};
 
 const toObjectIdOrNull = (value) => {
   if (!value) return null;
@@ -4244,6 +4249,8 @@ const attachSafePassIdsToVisitors = async (visitors = []) => {
   return visitors.map((visitor) => {
     const payload = typeof visitor.toObject === "function" ? visitor.toObject() : { ...visitor };
     const email = String(payload.email || "").trim().toLowerCase();
+    const matchedUser = users.find((user) => String(user.email || "").trim().toLowerCase() === email);
+    payload.userId = matchedUser?._id || payload.userId || null;
     payload.nfcCardId = safePassByEmail.get(email) || payload.nfcCardId || "";
     payload.safePassId = payload.nfcCardId;
     return payload;
@@ -12284,11 +12291,19 @@ app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
 // Revoke NFC card
 app.put("/api/admin/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
+    const requesterRole = normalizeUserRoleValue(req.user?.role);
+    const canRevokeAnyUser = requesterRole === "admin";
+    const canRevokeVisitorOnly = ["security", "guard"].includes(requesterRole);
+
+    if (!canRevokeAnyUser && !canRevokeVisitorOnly) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const user = await User.findById(req.params.id);
+    const normalizedEmail = String(req.body?.email || req.query?.email || "").trim().toLowerCase();
+    const paramId = String(req.params.id || "").trim();
+    const user = mongoose.Types.ObjectId.isValid(paramId)
+      ? await User.findById(paramId)
+      : await User.findOne({ email: normalizedEmail || paramId.toLowerCase() });
 
     if (!user) {
       return res
@@ -12296,11 +12311,20 @@ app.put("/api/admin/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
+    const targetRole = normalizeUserRoleValue(user.role);
+    if (canRevokeVisitorOnly && targetRole !== "visitor") {
+      return res.status(403).json({
+        success: false,
+        message: "Security can only unassign NFC cards from visitor accounts.",
+      });
+    }
+
     const oldCardId = user.nfcCardId;
     user.nfcCardId = null;
     user.accessPermissions = {
       canAccess: user.accessPermissions?.canAccess || [],
       restrictedAreas: user.accessPermissions?.restrictedAreas || [],
+      timeRestrictions: user.accessPermissions?.timeRestrictions || [],
       cardActive: false,
     };
     await user.save();

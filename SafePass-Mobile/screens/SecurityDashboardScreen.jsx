@@ -1465,6 +1465,43 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
   };
 
+  const handleUnassignVisitorNfc = async () => {
+    if (!selectedVisitorForNfc?.email) {
+      setVisitorNfcStatus({ type: "error", message: "Choose a visitor before unassigning a card UID." });
+      Alert.alert("Select Visitor", "Choose a visitor before unassigning a card UID.");
+      return;
+    }
+
+    const currentCard = selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId;
+    if (!currentCard) {
+      setVisitorNfcStatus({ type: "error", message: "This visitor has no assigned UID to remove." });
+      Alert.alert("No UID Assigned", "This visitor has no assigned UID to remove.");
+      return;
+    }
+
+    try {
+      setVisitorNfcBusy(true);
+      setVisitorNfcStatus({ type: "info", message: `Unassigning ${currentCard} from ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...` });
+      const response = await ApiService.revokeNfcCard({
+        userId:
+          selectedVisitorForNfc.userId ||
+          selectedVisitorForNfc.relatedUser?._id ||
+          selectedVisitorForNfc.accountId ||
+          undefined,
+        email: selectedVisitorForNfc.email,
+      });
+      await refreshData();
+      setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
+      setVisitorNfcStatus({ type: "success", message: response?.message || "Visitor UID unassigned successfully." });
+      Alert.alert("Visitor Card Unassigned", response?.message || "Visitor UID unassigned successfully.");
+    } catch (error) {
+      setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to unassign this card UID." });
+      Alert.alert("Unassign Failed", error?.message || "Unable to unassign this card UID.");
+    } finally {
+      setVisitorNfcBusy(false);
+    }
+  };
+
   const refreshSecurityLiveData = async () => {
     if (securityLiveRefreshRef.current) return;
     securityLiveRefreshRef.current = true;
@@ -2629,6 +2666,16 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Ionicons name="radio-outline" size={16} color="#0A3D91" />
                 <Text style={styles.visitorNfcHintText}>{describeRfidReaderInput(visitorNfcUid)}</Text>
               </View>
+              {(selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId) ? (
+                <TouchableOpacity
+                  style={[styles.visitorNfcUnassignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
+                  onPress={() => handleUnassignVisitorNfc()}
+                  disabled={visitorNfcBusy}
+                >
+                  <Ionicons name="unlink-outline" size={16} color="#B91C1C" />
+                  <Text style={styles.visitorNfcUnassignButtonText}>Unassign UID</Text>
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity
                 style={[styles.visitorNfcAssignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
                 onPress={() => handleAssignVisitorNfc()}
