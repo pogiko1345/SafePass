@@ -665,6 +665,44 @@ export default StyleSheet.create({
     color: colors.white,
   },
 
+  visitorNfcStatus: {
+    marginTop: spacing.sm,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+
+  visitorNfcStatusSuccess: {
+    borderColor: "#A7F3D0",
+    backgroundColor: "#ECFDF5",
+  },
+
+  visitorNfcStatusError: {
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+  },
+
+  visitorNfcStatusText: {
+    flex: 1,
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+
+  visitorNfcStatusTextSuccess: {
+    color: "#047857",
+  },
+
+  visitorNfcStatusTextError: {
+    color: "#B91C1C",
+  },
+
   visitorNfcEmpty: {
     marginTop: spacing.md,
     borderRadius: 14,

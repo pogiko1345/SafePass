@@ -298,6 +298,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [selectedVisitorNfcId, setSelectedVisitorNfcId] = useState('');
   const [visitorNfcUid, setVisitorNfcUid] = useState('');
   const [visitorNfcBusy, setVisitorNfcBusy] = useState(false);
+  const [visitorNfcStatus, setVisitorNfcStatus] = useState(null);
   const [mobileDateFilter, setMobileDateFilter] = useState('all');
   const [mobileLocationFilter, setMobileLocationFilter] = useState('all');
   const [mobileLogFilter, setMobileLogFilter] = useState('all');
@@ -1427,27 +1428,37 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const handleAssignVisitorNfc = async (scannedValue = visitorNfcUid) => {
     if (!selectedVisitorForNfc?.email) {
+      setVisitorNfcStatus({ type: "error", message: "Choose a visitor before assigning a card UID." });
       Alert.alert("Select Visitor", "Choose a visitor before assigning a card UID.");
       return;
     }
 
     const normalizedCardId = normalizeRfidReaderInput(scannedValue);
     if (!normalizedCardId) {
+      setVisitorNfcStatus({ type: "error", message: "Tap a card on the USB reader or enter the UID first." });
       Alert.alert("Card UID Required", "Tap a card on the USB reader or enter the UID first.");
       return;
     }
 
     try {
       setVisitorNfcBusy(true);
+      setVisitorNfcStatus({ type: "info", message: `Assigning ${normalizedCardId} to ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...` });
       const response = await ApiService.assignNfcCard({
+        userId:
+          selectedVisitorForNfc.userId ||
+          selectedVisitorForNfc.relatedUser?._id ||
+          selectedVisitorForNfc.accountId ||
+          undefined,
         email: selectedVisitorForNfc.email,
         cardId: normalizedCardId,
       });
       setVisitorNfcUid("");
       await refreshData();
       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
+      setVisitorNfcStatus({ type: "success", message: response?.message || "NFC card assigned to visitor." });
       Alert.alert("Visitor Card Assigned", response?.message || "NFC card assigned to visitor.");
     } catch (error) {
+      setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to assign this card UID." });
       Alert.alert("Assign Failed", error?.message || "Unable to assign this card UID.");
     } finally {
       setVisitorNfcBusy(false);
@@ -2086,14 +2097,25 @@ export default function SecurityDashboardScreen({ navigation }) {
     const deduped = new Map();
 
     [
-      ...(visitors.approved || []),
       ...(visitors.active || []),
-      ...(visitors.pending || []),
+      ...(visitors.approved || []),
       ...(visitors.notReady || []),
-      ...(visitors.all || []),
     ].forEach((visitor) => {
-      const identity = String(visitor?._id || visitor?.email || "").trim();
-      if (!identity || deduped.has(identity)) return;
+      const email = String(visitor?.email || "").trim().toLowerCase();
+      const userIdentity = String(
+        visitor?.userId ||
+        visitor?.relatedUser?._id ||
+        visitor?.accountId ||
+        "",
+      ).trim();
+      const identity = email || userIdentity || String(visitor?._id || "").trim();
+      if (!identity) return;
+      const existing = deduped.get(identity);
+      if (existing) {
+        const existingHasCard = Boolean(existing?.nfcCardId || existing?.safePassId);
+        const nextHasCard = Boolean(visitor?.nfcCardId || visitor?.safePassId);
+        if (existingHasCard || !nextHasCard) return;
+      }
       deduped.set(identity, visitor);
     });
 
@@ -2117,10 +2139,8 @@ export default function SecurityDashboardScreen({ navigation }) {
   }, [
     visitorNfcSearch,
     visitors.active,
-    visitors.all,
     visitors.approved,
     visitors.notReady,
-    visitors.pending,
   ]);
 
   const selectedVisitorForNfc = useMemo(
@@ -2560,6 +2580,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 style={[styles.visitorNfcChip, selected && styles.visitorNfcChipActive]}
                 onPress={() => {
                   setSelectedVisitorNfcId(visitor?._id || "");
+                  setVisitorNfcStatus(null);
                   setTimeout(() => visitorNfcInputRef.current?.focus?.(), 80);
                 }}
               >
@@ -2591,6 +2612,9 @@ export default function SecurityDashboardScreen({ navigation }) {
               value={visitorNfcUid}
               onChangeText={(value) => setVisitorNfcUid(normalizeRfidReaderInput(value))}
               onSubmitEditing={(event) => handleAssignVisitorNfc(event?.nativeEvent?.text)}
+              onFocus={() => {
+                if (visitorNfcStatus?.type === "error") setVisitorNfcStatus(null);
+              }}
               placeholder="Tap visitor card on USB reader"
               placeholderTextColor="#94A3B8"
               autoCapitalize="characters"
@@ -2620,6 +2644,42 @@ export default function SecurityDashboardScreen({ navigation }) {
                 )}
               </TouchableOpacity>
             </View>
+            {visitorNfcStatus?.message ? (
+              <View
+                style={[
+                  styles.visitorNfcStatus,
+                  visitorNfcStatus.type === "success" && styles.visitorNfcStatusSuccess,
+                  visitorNfcStatus.type === "error" && styles.visitorNfcStatusError,
+                ]}
+              >
+                <Ionicons
+                  name={
+                    visitorNfcStatus.type === "success"
+                      ? "checkmark-circle-outline"
+                      : visitorNfcStatus.type === "error"
+                        ? "alert-circle-outline"
+                        : "time-outline"
+                  }
+                  size={16}
+                  color={
+                    visitorNfcStatus.type === "success"
+                      ? "#047857"
+                      : visitorNfcStatus.type === "error"
+                        ? "#B91C1C"
+                        : "#0A3D91"
+                  }
+                />
+                <Text
+                  style={[
+                    styles.visitorNfcStatusText,
+                    visitorNfcStatus.type === "success" && styles.visitorNfcStatusTextSuccess,
+                    visitorNfcStatus.type === "error" && styles.visitorNfcStatusTextError,
+                  ]}
+                >
+                  {visitorNfcStatus.message}
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : (
           <View style={styles.visitorNfcEmpty}>

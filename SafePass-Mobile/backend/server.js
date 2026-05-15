@@ -12199,17 +12199,6 @@ app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
       });
     }
 
-    const existingCardOwner = await User.findOne({
-      nfcCardId: normalizedCardId,
-    }).select("_id email role nfcCardId");
-
-    if (existingCardOwner && String(existingCardOwner._id) !== String(userId || "")) {
-      return res.status(409).json({
-        success: false,
-        message: `Card ${normalizedCardId} is already assigned to ${existingCardOwner.email}.`,
-      });
-    }
-
     const user = userId
       ? await User.findById(userId)
       : await User.findOne({ email: normalizedEmail });
@@ -12218,6 +12207,17 @@ app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "User account not found.",
+      });
+    }
+
+    const existingCardOwner = await User.findOne({
+      nfcCardId: normalizedCardId,
+    }).select("_id email role nfcCardId");
+
+    if (existingCardOwner && String(existingCardOwner._id) !== String(user._id)) {
+      return res.status(409).json({
+        success: false,
+        message: `Card ${normalizedCardId} is already assigned to ${existingCardOwner.email}.`,
       });
     }
 
