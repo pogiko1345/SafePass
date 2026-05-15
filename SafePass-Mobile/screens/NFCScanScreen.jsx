@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -32,6 +33,18 @@ const ACTION_OPTIONS = [
 ];
 
 const ALLOWED_ROLES = new Set(["admin", "security", "guard", "staff"]);
+
+const CARD_SHADOW = Platform.select({
+  web: { boxShadow: "0px 14px 34px rgba(15, 23, 42, 0.08)" },
+  ios: {
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  android: { elevation: 3 },
+  default: {},
+});
 
 const formatDateTime = (value) => {
   if (!value) return "N/A";
@@ -211,26 +224,60 @@ export default function NFCScanScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerCard}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={22} color="#0A3D91" />
-          </TouchableOpacity>
-          <View style={styles.headerCopy}>
-            <Text style={styles.headerEyebrow}>Checkpoint Station</Text>
-            <Text style={styles.headerTitle}>NFC Tap Console</Text>
-            <Text style={styles.headerSubtitle}>
-              Process check-in, check-out, and checkpoint movement using the same campus attendance
-              and visitor logic as the NFC hardware flow.
-            </Text>
+          <View style={styles.headerMainRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={22} color="#0A3D91" />
+            </TouchableOpacity>
+            <View style={styles.headerCopy}>
+              <Text style={styles.headerEyebrow}>Checkpoint Station</Text>
+              <Text style={styles.headerTitle}>NFC Tap Console</Text>
+              <Text style={styles.headerSubtitle}>
+                Process campus attendance, visitor arrival, departure, and location taps from one
+                dedicated reader station.
+              </Text>
+            </View>
+            <View style={[styles.headerBadge, !isAllowed && styles.headerBadgeWarning]}>
+              <Ionicons
+                name={isAllowed ? "shield-checkmark-outline" : "alert-circle-outline"}
+                size={17}
+                color={isAllowed ? "#BBF7D0" : "#FDE68A"}
+              />
+              <Text style={[styles.headerBadgeText, !isAllowed && styles.headerBadgeTextWarning]}>
+                {isAllowed ? "Authorized" : "Read Only"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.headerMetricRow}>
+            <View style={styles.headerMetric}>
+              <Text style={styles.headerMetricLabel}>Mode</Text>
+              <Text style={styles.headerMetricValue}>{selectedActionMeta.label}</Text>
+            </View>
+            <View style={styles.headerMetric}>
+              <Text style={styles.headerMetricLabel}>Checkpoint</Text>
+              <Text style={styles.headerMetricValue}>{selectedCheckpoint.label}</Text>
+            </View>
+            <View style={styles.headerMetric}>
+              <Text style={styles.headerMetricLabel}>Session Events</Text>
+              <Text style={styles.headerMetricValue}>{stationEvents.length}</Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.operatorCard}>
-          <View>
+          <View style={styles.operatorIdentity}>
+            <View style={styles.operatorAvatar}>
+              <Text style={styles.operatorAvatarText}>
+                {`${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.trim() || "SO"}
+              </Text>
+            </View>
+            <View>
             <Text style={styles.operatorLabel}>Operator</Text>
             <Text style={styles.operatorName}>
               {user.firstName} {user.lastName}
             </Text>
             <Text style={styles.operatorMeta}>{formatRoleLabel(user.role)}</Text>
+            </View>
           </View>
           <View style={[styles.operatorStatusBadge, !isAllowed && styles.operatorStatusBadgeWarning]}>
             <Text style={[styles.operatorStatusText, !isAllowed && styles.operatorStatusTextWarning]}>
@@ -258,6 +305,17 @@ export default function NFCScanScreen({ navigation }) {
                 busy && styles.tapPadBusy,
               ]}
             >
+              <View style={styles.tapPadStatusRow}>
+                <View style={[styles.tapPadStatusPill, { borderColor: latestTone.border }]}>
+                  <View style={[styles.tapPadStatusDot, { backgroundColor: latestTone.icon }]} />
+                  <Text style={[styles.tapPadStatusText, { color: latestTone.icon }]}>
+                    {busy ? "Reader Processing" : "Reader Armed"}
+                  </Text>
+                </View>
+                <Text style={styles.tapPadTimestamp}>
+                  {latestResult ? formatDateTime(latestResult.timestamp) : "No taps yet"}
+                </Text>
+              </View>
               <View style={[styles.tapPadIcon, { backgroundColor: `${latestTone.icon}18` }]}>
                 {busy ? (
                   <ActivityIndicator size="large" color={latestTone.icon} />
@@ -332,7 +390,7 @@ export default function NFCScanScreen({ navigation }) {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.primaryButton, busy && styles.buttonDisabled]}
-                  onPress={handleSubmitTap}
+                  onPress={() => handleSubmitTap()}
                   disabled={busy || !isAllowed}
                 >
                   {busy ? (
@@ -540,7 +598,7 @@ export default function NFCScanScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F7FB",
+    backgroundColor: "#F3F6FA",
   },
   loadingContainer: {
     flex: 1,
@@ -555,45 +613,108 @@ const styles = StyleSheet.create({
     color: "#334155",
   },
   content: {
-    padding: 18,
-    paddingBottom: 28,
+    width: "100%",
+    maxWidth: 1480,
+    alignSelf: "center",
+    padding: 22,
+    paddingBottom: 34,
   },
   headerCard: {
+    backgroundColor: "#071D3A",
+    borderRadius: 24,
+    padding: 22,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#123C74",
+    ...CARD_SHADOW,
+  },
+  headerMainRow: {
     flexDirection: "row",
-    gap: 14,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 16,
+    gap: 16,
+    alignItems: "flex-start",
+    flexWrap: "wrap",
   },
   backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: "#EEF5FF",
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
   headerCopy: {
     flex: 1,
+    minWidth: 260,
   },
   headerEyebrow: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#0A3D91",
+    fontWeight: "900",
+    color: "#93C5FD",
     textTransform: "uppercase",
   },
   headerTitle: {
     marginTop: 4,
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#0F172A",
+    fontSize: 30,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   headerSubtitle: {
     marginTop: 8,
     fontSize: 14,
     lineHeight: 20,
-    color: "#475569",
+    color: "#D8E8FF",
+    maxWidth: 760,
+  },
+  headerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(22, 163, 74, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(187, 247, 208, 0.34)",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  headerBadgeWarning: {
+    backgroundColor: "rgba(245, 158, 11, 0.16)",
+    borderColor: "rgba(253, 230, 138, 0.36)",
+  },
+  headerBadgeText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#DCFCE7",
+  },
+  headerBadgeTextWarning: {
+    color: "#FEF3C7",
+  },
+  headerMetricRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 18,
+  },
+  headerMetric: {
+    flex: 1,
+    minWidth: 160,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(216, 232, 255, 0.18)",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  headerMetricLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#93C5FD",
+    textTransform: "uppercase",
+  },
+  headerMetricValue: {
+    marginTop: 5,
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   operatorCard: {
     flexDirection: "row",
@@ -602,7 +723,29 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...CARD_SHADOW,
+  },
+  operatorIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  operatorAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "#0A3D91",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  operatorAvatarText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   operatorLabel: {
     fontSize: 12,
@@ -659,6 +802,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...CARD_SHADOW,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -667,8 +813,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "800",
+    fontSize: 19,
+    fontWeight: "900",
     color: "#0F172A",
     marginBottom: 12,
   },
@@ -718,9 +864,9 @@ const styles = StyleSheet.create({
     gap: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#DCE5F0",
+    borderColor: "#D9E2EE",
     padding: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#FBFCFE",
   },
   actionCardActive: {
     borderColor: "#0A3D91",
@@ -755,7 +901,7 @@ const styles = StyleSheet.create({
   },
   cardInput: {
     borderWidth: 1,
-    borderColor: "#DCE5F0",
+    borderColor: "#CBD5E1",
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -777,7 +923,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#BFDBFE",
     borderRadius: 12,
-    backgroundColor: "#EEF5FF",
+    backgroundColor: "#F0F7FF",
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -807,8 +953,8 @@ const styles = StyleSheet.create({
     gap: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
-    backgroundColor: "#EEF5FF",
+    borderColor: "#C7DAF8",
+    backgroundColor: "#F0F7FF",
     paddingVertical: 12,
   },
   secondaryButtonText: {
@@ -825,6 +971,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#0A3D91",
     paddingVertical: 12,
+    ...Platform.select({
+      web: { boxShadow: "0px 10px 20px rgba(10, 61, 145, 0.22)" },
+      android: { elevation: 2 },
+      default: {},
+    }),
   },
   primaryButtonText: {
     fontSize: 13,
@@ -839,6 +990,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
+    ...CARD_SHADOW,
   },
   resultCardSuccess: {
     backgroundColor: "#F0FDF4",
@@ -979,39 +1131,42 @@ const styles = StyleSheet.create({
   stationLayout: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
+    gap: 20,
     marginBottom: 16,
   },
   stationPrimary: {
-    flex: 1,
-    flexBasis: 340,
+    flex: 1.15,
+    flexBasis: 520,
     gap: 16,
   },
   stationSide: {
-    flex: 1,
-    flexBasis: 300,
+    flex: 0.85,
+    flexBasis: 360,
   },
   tapPad: {
-    minHeight: 310,
-    borderRadius: 22,
+    minHeight: 360,
+    borderRadius: 24,
     borderWidth: 1,
-    padding: 22,
+    padding: 26,
     alignItems: "center",
     justifyContent: "center",
+    ...CARD_SHADOW,
   },
   tapPadBusy: {
     opacity: 0.88,
   },
   tapPadIcon: {
-    width: 92,
-    height: 92,
-    borderRadius: 28,
+    width: 104,
+    height: 104,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.72)",
   },
   tapPadTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "900",
     textAlign: "center",
   },
@@ -1022,6 +1177,40 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: "#475569",
     textAlign: "center",
+  },
+  tapPadStatusRow: {
+    position: "absolute",
+    top: 18,
+    left: 18,
+    right: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  tapPadStatusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.74)",
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  tapPadStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
+  tapPadStatusText: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  tapPadTimestamp: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
   },
   tapPadMetaRow: {
     flexDirection: "row",
@@ -1053,6 +1242,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
     padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...CARD_SHADOW,
   },
   readerPanelHeader: {
     flexDirection: "row",
@@ -1096,8 +1288,8 @@ const styles = StyleSheet.create({
     gap: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#DCE5F0",
-    backgroundColor: "#F8FAFC",
+    borderColor: "#D9E2EE",
+    backgroundColor: "#FBFCFE",
     padding: 12,
   },
   checkpointCardActive: {
@@ -1131,6 +1323,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 12,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...CARD_SHADOW,
   },
   flowStep: {
     flex: 1,

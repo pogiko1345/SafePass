@@ -459,7 +459,7 @@ export default function NFCManagementScreen({ navigation }) {
               <View style={styles.actionRow}>
                 <TouchableOpacity
                   style={[styles.secondaryButton, busyAction === "assign" && styles.disabledButton]}
-                  onPress={handleAssignCard}
+                  onPress={() => handleAssignCard()}
                   disabled={busyAction === "assign"}
                 >
                   <Text style={styles.secondaryButtonText}>

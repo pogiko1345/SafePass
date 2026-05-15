@@ -139,9 +139,9 @@ const reviewAppointmentIdImage = ({ idType, idImage, idVerification }) => {
 
   if (!normalizedIdImage) {
     return {
-      isAccepted: false,
-      status: "missing_image",
-      message: "Please upload a clear image of your valid ID.",
+      isAccepted: true,
+      status: "physical_id_required",
+      message: `${normalizedIdType} will be presented at campus entry for manual verification.`,
     };
   }
 
@@ -9507,13 +9507,6 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
       });
     }
 
-    if (!normalizedIdImage) {
-      return res.status(400).json({
-        success: false,
-        message: "A clear valid ID picture is required for appointment verification.",
-      });
-    }
-
     if (dataPrivacyAccepted !== true) {
       return res.status(400).json({
         success: false,
@@ -9531,7 +9524,15 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
     let idReview = reviewAppointmentIdImage({
       idType: normalizedIdType,
       idImage: normalizedIdImage,
-      idVerification,
+      idVerification:
+        idVerification ||
+        (!normalizedIdImage
+          ? {
+              status: "physical_id_required",
+              isValid: true,
+              message: `${normalizedIdType} will be presented at campus entry for manual verification.`,
+            }
+          : null),
     });
 
     if (!idReview.isAccepted) {

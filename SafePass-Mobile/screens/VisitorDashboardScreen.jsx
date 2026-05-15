@@ -3053,7 +3053,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const selectedDepartments = getSelectedAppointmentDepartments();
     const department = selectedDepartments[0] || "";
     const idType = String(appointmentForm.idType || "").trim();
-    const idImage = appointmentForm.idImage;
 
     if (!currentUser?._id) {
       showVisitorAlert("Login Required", "Please sign in again before requesting a new appointment.");
@@ -3118,29 +3117,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
-    if (!idImage) {
-      showVisitorAlert("Missing Valid ID Picture", "Please upload a clear picture of your valid ID before submitting.");
-      return;
-    }
-
-    if (isVerifyingAppointmentId) {
-      showVisitorAlert("ID Verification Running", "Please wait until OCR verification finishes.");
-      return;
-    }
-
-    if (!appointmentForm.idVerification?.isValid) {
-      showVisitorAlert(
-        "Verify Valid ID First",
-        appointmentForm.idVerification?.message ||
-          "Please upload a clear valid ID photo and let OCR verification pass before submitting.",
-      );
-      return;
-    }
-
     if (!appointmentForm.privacyAccepted) {
       showVisitorAlert(
         "Data Privacy Confirmation",
-        "Please confirm that you allow Sapphire SafePass to collect your appointment and ID information for visit verification.",
+        "Please confirm that your appointment information is accurate and that you will present the selected ID at campus entry.",
       );
       return;
     }
@@ -3173,8 +3153,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         purposeOfVisit,
         idType,
         idNumber: idType,
-        idImage,
-        idVerification: appointmentForm.idVerification,
+        idImage: "",
+        idVerification: {
+          status: "physical_id_required",
+          isValid: true,
+          message: `${idType} will be presented at campus entry for manual verification.`,
+        },
         dataPrivacyAccepted: true,
         dataPrivacyAcceptedAt: new Date().toISOString(),
       });
@@ -3198,8 +3182,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           host: department,
           idType,
           idNumber: idType,
-          idImage,
-          idVerification: appointmentForm.idVerification,
+          idImage: "",
+          idVerification: {
+            status: "physical_id_required",
+            isValid: true,
+            message: `${idType} will be presented at campus entry for manual verification.`,
+          },
         }));
         setAppointmentFeedback({
           title: afterHoursNotice?.title || "Appointment Submitted Successfully",
@@ -5443,7 +5431,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             {[
               ["Schedule", "Date and time"],
               ["Office", "Destination"],
-              ["ID", "Valid ID photo"],
+              ["ID", "Present at gate"],
             ].map(([title, text], index) => (
               <View key={title} style={[visitorDashboardStyles.appointmentStepPill, isVisitorDarkMode && visitorDashboardStyles.darkReadablePill]}>
                 <View style={visitorDashboardStyles.appointmentStepNumber}>
@@ -5845,8 +5833,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         setAppointmentForm((prev) => ({
                           ...prev,
                           idType: option,
-                          idImage: prev.idType && prev.idType !== option ? null : prev.idImage,
-                          idVerification: prev.idType && prev.idType !== option ? null : prev.idVerification,
+                          idImage: null,
+                          idVerification: {
+                            status: "physical_id_required",
+                            isValid: true,
+                            message: `${option} will be presented at campus entry for manual verification.`,
+                          },
                         }));
                         setShowIdTypeDropdown(false);
                       }}
@@ -5870,116 +5862,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
             ) : null}
             <Text style={[visitorDashboardStyles.appointmentAutoHint, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
-              Select the ID you will bring on campus. The uploaded image must match this selected ID type.
+              Select the physical ID you will bring. Security will compare it with your approved appointment before allowing entry.
             </Text>
           </View>
 
           <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
-            <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Valid ID Picture</Text>
-            <TouchableOpacity
-              style={[visitorDashboardStyles.appointmentIdUploadCard, isVisitorDarkMode && visitorDashboardStyles.darkUploadCard]}
-              onPress={handlePickAppointmentIdImage}
-              activeOpacity={0.85}
-            >
-              {appointmentForm.idImage ? (
-                <Image
-                  source={{ uri: appointmentForm.idImage }}
-                  style={visitorDashboardStyles.appointmentIdPreview}
-                />
-              ) : (
-                <View style={visitorDashboardStyles.appointmentIdPlaceholder}>
-                  <Ionicons name="image-outline" size={28} color="#64748B" />
-                  <Text style={[visitorDashboardStyles.appointmentIdPlaceholderTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
-                    Upload valid ID picture
-                  </Text>
-                  <Text style={[visitorDashboardStyles.appointmentIdPlaceholderText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
-                    Use a clear school, government, or company ID image.
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            {appointmentForm.idImage ? (
-              <TouchableOpacity
-                style={visitorDashboardStyles.appointmentChangeIdButton}
-                onPress={handlePickAppointmentIdImage}
-                disabled={isVerifyingAppointmentId}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="refresh-outline" size={16} color="#0A3D91" />
-                <Text style={visitorDashboardStyles.appointmentChangeIdText}>
-                  Change ID picture
+            <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Campus Entry ID Check</Text>
+            <View style={[visitorDashboardStyles.appointmentIdUploadCard, isVisitorDarkMode && visitorDashboardStyles.darkUploadCard]}>
+              <View style={visitorDashboardStyles.appointmentIdPlaceholder}>
+                <Ionicons name="shield-checkmark-outline" size={28} color="#0A3D91" />
+                <Text style={[visitorDashboardStyles.appointmentIdPlaceholderTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+                  Present your selected ID at the gate
                 </Text>
-              </TouchableOpacity>
-            ) : null}
-            {appointmentForm.idImage ? (
-              <View
-                style={[
-                  visitorDashboardStyles.idVerificationCard,
-                  appointmentForm.idVerification?.isValid
-                    ? visitorDashboardStyles.idVerificationCardPassed
-                    : appointmentForm.idVerification
-                      ? visitorDashboardStyles.idVerificationCardFailed
-                      : null,
-                ]}
-              >
-                <View style={visitorDashboardStyles.idVerificationHeader}>
-                  <View
-                    style={[
-                      visitorDashboardStyles.idVerificationIcon,
-                      appointmentForm.idVerification?.isValid &&
-                        visitorDashboardStyles.idVerificationIconPassed,
-                    ]}
-                  >
-                    {isVerifyingAppointmentId ||
-                    appointmentForm.idVerification?.status === "scanning" ? (
-                      <ActivityIndicator size="small" color="#0A3D91" />
-                    ) : (
-                      <Ionicons
-                        name={
-                          appointmentForm.idVerification?.isValid
-                            ? "shield-checkmark-outline"
-                            : "alert-circle-outline"
-                        }
-                        size={18}
-                        color={appointmentForm.idVerification?.isValid ? "#047857" : "#DC2626"}
-                      />
-                    )}
-                  </View>
-                  <View style={visitorDashboardStyles.idVerificationCopy}>
-                    <Text style={visitorDashboardStyles.idVerificationTitle}>
-                      {isVerifyingAppointmentId ||
-                      appointmentForm.idVerification?.status === "scanning"
-                        ? "OCR verification running"
-                        : appointmentForm.idVerification?.isValid
-                          ? "OCR verification passed"
-                          : "OCR verification needed"}
-                    </Text>
-                    <Text style={visitorDashboardStyles.idVerificationMessage}>
-                      {appointmentForm.idVerification?.message ||
-                        "Scan the uploaded ID image before submitting your appointment request."}
-                    </Text>
-                  </View>
-                  {typeof appointmentForm.idVerification?.confidence === "number" ? (
-                    <Text style={visitorDashboardStyles.idVerificationScore}>
-                      {appointmentForm.idVerification.confidence}%
-                    </Text>
-                  ) : null}
-                </View>
-                <TouchableOpacity
-                  style={visitorDashboardStyles.idVerificationAction}
-                  onPress={handleVerifyAppointmentIdAgain}
-                  disabled={isVerifyingAppointmentId}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="scan-outline" size={16} color="#0A3D91" />
-                  <Text style={visitorDashboardStyles.idVerificationActionText}>
-                    {isVerifyingAppointmentId ? "Scanning..." : "Run OCR verification"}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={[visitorDashboardStyles.appointmentIdPlaceholderText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
+                  No upload is needed. Bring the same ID type you selected so security can verify it before entry.
+                </Text>
               </View>
-            ) : null}
-            <Text style={visitorDashboardStyles.appointmentAutoHint}>
-              Upload the same ID type you selected above. OCR verification helps catch unclear or mismatched ID photos before staff or security completes the final review.
+            </View>
+            <Text style={[visitorDashboardStyles.appointmentAutoHint, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
+              Your appointment request will store the ID type only. The actual ID is checked manually when you arrive.
             </Text>
           </View>
           </View>
@@ -6011,8 +5912,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               ) : null}
             </View>
             <Text style={visitorDashboardStyles.appointmentPrivacyText}>
-              I confirm that the information and valid ID picture I provide are accurate,
-              and I allow Sapphire SafePass to use them for appointment and visit verification.
+              I confirm that my appointment information is accurate and I will present the selected valid ID for campus entry verification.
             </Text>
           </TouchableOpacity>
 

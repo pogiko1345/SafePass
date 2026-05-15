@@ -236,13 +236,9 @@ export default function VerificationScreen({ navigation, route }) {
         setShowPhoneInput(false);
         setOtpTimer(60);
         setCanResend(false);
-        const isBackendLogOtp = response.deliveryMode === "backend_log";
-        
         Alert.alert(
-          isBackendLogOtp ? "Verification Code Generated" : "Verification Code Sent",
-          isBackendLogOtp
-            ? `A 6-digit code was generated for ${cleanPhone}.\n\nCheck the backend terminal for the OTP code.`
-            : `A 6-digit code has been sent to ${cleanPhone}.`,
+          "Verification Code Sent",
+          `A 6-digit OTP has been sent to ${cleanPhone}.\n\nThis code will expire in 5 minutes. If it expires, request a new code.`,
           [{ text: "OK" }]
         );
       } else {

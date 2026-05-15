@@ -2607,7 +2607,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               </View>
               <TouchableOpacity
                 style={[styles.visitorNfcAssignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
-                onPress={handleAssignVisitorNfc}
+                onPress={() => handleAssignVisitorNfc()}
                 disabled={visitorNfcBusy}
               >
                 {visitorNfcBusy ? (
