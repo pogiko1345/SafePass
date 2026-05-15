@@ -1441,6 +1441,32 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
   };
 
+  const applyVisitorNfcCardUpdate = (visitorEmail, cardId = "") => {
+    const normalizedEmail = String(visitorEmail || "").trim().toLowerCase();
+    if (!normalizedEmail) return;
+
+    const updateCollection = (collection = []) =>
+      collection.map((visitor) =>
+        String(visitor?.email || "").trim().toLowerCase() === normalizedEmail
+          ? {
+              ...visitor,
+              nfcCardId: cardId,
+              safePassId: cardId,
+            }
+          : visitor,
+      );
+
+    setVisitors((current) => ({
+      ...current,
+      active: updateCollection(current.active),
+      pending: updateCollection(current.pending),
+      approved: updateCollection(current.approved),
+      notReady: updateCollection(current.notReady),
+      completed: updateCollection(current.completed),
+      all: updateCollection(current.all),
+    }));
+  };
+
   const handleAssignVisitorNfc = async (scannedValue = visitorNfcUid) => {
     if (!selectedVisitorForNfc?.email) {
       setVisitorNfcStatus({ type: "error", message: "Choose a visitor before assigning a card UID." });
@@ -1467,8 +1493,10 @@ export default function SecurityDashboardScreen({ navigation }) {
         email: selectedVisitorForNfc.email,
         cardId: normalizedCardId,
       });
+      const assignedCardId = response?.card?.cardNumber || normalizedCardId;
       setVisitorNfcUid("");
       await refreshData();
+      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, assignedCardId);
       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
       setVisitorNfcStatus({ type: "success", message: response?.message || "NFC card assigned to visitor." });
       Alert.alert("Visitor Card Assigned", response?.message || "NFC card assigned to visitor.");
@@ -1506,6 +1534,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         email: selectedVisitorForNfc.email,
       });
       await refreshData();
+      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, "");
       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
       setVisitorNfcStatus({ type: "success", message: response?.message || "Visitor UID unassigned successfully." });
       Alert.alert("Visitor Card Unassigned", response?.message || "Visitor UID unassigned successfully.");

@@ -8091,9 +8091,11 @@ app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "securit
 
     const total = await Visitor.countDocuments(query);
 
+    const visitorPayloads = await attachSafePassIdsToVisitors(visitors);
+
     res.json({
       success: true,
-      visitors,
+      visitors: visitorPayloads,
       totalPages: Math.ceil(total / limit),
       currentPage: page,
     });
