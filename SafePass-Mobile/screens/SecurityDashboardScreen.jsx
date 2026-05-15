@@ -2380,6 +2380,25 @@ export default function SecurityDashboardScreen({ navigation }) {
             Track approved visitors, monitor live movement, and respond to alerts from one command workspace.
           </Text>
 
+          <View style={styles.securityHeroActions}>
+            <TouchableOpacity
+              style={styles.securityHeroPrimaryAction}
+              onPress={() => navigation.navigate("NFCScan")}
+              accessibilityRole="button"
+              accessibilityLabel="Open NFC checkpoint scanner"
+            >
+              <Ionicons name="scan-outline" size={18} color="#0A3D91" />
+              <Text style={styles.securityHeroPrimaryActionText}>Scan Card</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.securityHeroSecondaryAction}
+              onPress={() => setSelectedSubmodule("visitor-live")}
+            >
+              <Ionicons name="map-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.securityHeroSecondaryActionText}>Live Map</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.securityHeroStats}>
             <View style={styles.securityHeroStatCard}>
               <Text style={styles.securityHeroStatValue}>{visitorStats.activeNow}</Text>

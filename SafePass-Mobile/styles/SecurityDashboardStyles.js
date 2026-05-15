@@ -440,6 +440,51 @@ export default StyleSheet.create({
     marginTop: spacing.sm,
   },
 
+  securityHeroActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+
+  securityHeroPrimaryAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 132,
+  },
+
+  securityHeroPrimaryActionText: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+
+  securityHeroSecondaryAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.42)",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 120,
+  },
+
+  securityHeroSecondaryActionText: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.white,
+  },
+
   securityHeroStats: {
     flexDirection: "row",
     flexWrap: "wrap",
