@@ -42,6 +42,7 @@ import {
   isValidPhilippineMobileNumber,
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
+import { describeRfidReaderInput, normalizeRfidReaderInput } from "../utils/rfidReaderUtils";
 import styles from "../styles/SecurityDashboardStyles";
 import Logo from "../assets/LogoSapphire.jpg";
 
@@ -236,6 +237,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const lastOperationalRefreshAtRef = useRef(0);
   const operationalDataSignatureRef = useRef("");
   const notificationDataSignatureRef = useRef("");
+  const visitorNfcInputRef = useRef(null);
   
   // Dashboard Data
   const [dashboardStats, setDashboardStats] = useState({
@@ -292,6 +294,10 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [selectedSubmodule, setSelectedSubmodule] = useState('home-main');
   const [visitorFilter, setVisitorFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [visitorNfcSearch, setVisitorNfcSearch] = useState('');
+  const [selectedVisitorNfcId, setSelectedVisitorNfcId] = useState('');
+  const [visitorNfcUid, setVisitorNfcUid] = useState('');
+  const [visitorNfcBusy, setVisitorNfcBusy] = useState(false);
   const [mobileDateFilter, setMobileDateFilter] = useState('all');
   const [mobileLocationFilter, setMobileLocationFilter] = useState('all');
   const [mobileLogFilter, setMobileLogFilter] = useState('all');
@@ -1419,6 +1425,35 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
   };
 
+  const handleAssignVisitorNfc = async (scannedValue = visitorNfcUid) => {
+    if (!selectedVisitorForNfc?.email) {
+      Alert.alert("Select Visitor", "Choose a visitor before assigning a card UID.");
+      return;
+    }
+
+    const normalizedCardId = normalizeRfidReaderInput(scannedValue);
+    if (!normalizedCardId) {
+      Alert.alert("Card UID Required", "Tap a card on the USB reader or enter the UID first.");
+      return;
+    }
+
+    try {
+      setVisitorNfcBusy(true);
+      const response = await ApiService.assignNfcCard({
+        email: selectedVisitorForNfc.email,
+        cardId: normalizedCardId,
+      });
+      setVisitorNfcUid("");
+      await refreshData();
+      setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
+      Alert.alert("Visitor Card Assigned", response?.message || "NFC card assigned to visitor.");
+    } catch (error) {
+      Alert.alert("Assign Failed", error?.message || "Unable to assign this card UID.");
+    } finally {
+      setVisitorNfcBusy(false);
+    }
+  };
+
   const refreshSecurityLiveData = async () => {
     if (securityLiveRefreshRef.current) return;
     securityLiveRefreshRef.current = true;
@@ -2046,6 +2081,62 @@ export default function SecurityDashboardScreen({ navigation }) {
     [visitors.active, visitors.approved],
   );
 
+  const assignableNfcVisitors = useMemo(() => {
+    const normalizedSearch = String(visitorNfcSearch || "").trim().toLowerCase();
+    const deduped = new Map();
+
+    [
+      ...(visitors.approved || []),
+      ...(visitors.active || []),
+      ...(visitors.pending || []),
+      ...(visitors.notReady || []),
+      ...(visitors.all || []),
+    ].forEach((visitor) => {
+      const identity = String(visitor?._id || visitor?.email || "").trim();
+      if (!identity || deduped.has(identity)) return;
+      deduped.set(identity, visitor);
+    });
+
+    return Array.from(deduped.values())
+      .filter((visitor) => {
+        if (!normalizedSearch) return true;
+        return [
+          visitor.fullName,
+          visitor.email,
+          visitor.phoneNumber,
+          visitor.nfcCardId,
+          visitor.safePassId,
+          visitor.assignedOffice,
+          visitor.host,
+          visitor.status,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(normalizedSearch));
+      })
+      .slice(0, 18);
+  }, [
+    visitorNfcSearch,
+    visitors.active,
+    visitors.all,
+    visitors.approved,
+    visitors.notReady,
+    visitors.pending,
+  ]);
+
+  const selectedVisitorForNfc = useMemo(
+    () =>
+      assignableNfcVisitors.find((visitor) => String(visitor?._id) === String(selectedVisitorNfcId)) ||
+      assignableNfcVisitors[0] ||
+      null,
+    [assignableNfcVisitors, selectedVisitorNfcId],
+  );
+
+  useEffect(() => {
+    if (!selectedVisitorNfcId && assignableNfcVisitors[0]?._id) {
+      setSelectedVisitorNfcId(assignableNfcVisitors[0]._id);
+    }
+  }, [assignableNfcVisitors, selectedVisitorNfcId]);
+
   const mobileLogItems = useMemo(() => {
     const normalizedSearch = String(searchQuery || "").trim().toLowerCase();
     return (accessLogs || []).filter((log) => {
@@ -2434,6 +2525,108 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Text style={styles.securityHeroSideMeta}>{alerts.length} security alert{alerts.length === 1 ? '' : 's'} tracked</Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.visitorNfcPanel}>
+        <View style={styles.visitorNfcHeader}>
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="card-outline" size={20} color="#0A3D91" />
+            <View>
+              <Text style={styles.sectionTitle}>Assign Visitor Card</Text>
+              <Text style={styles.securitySectionSubtitle}>
+                Link a physical UID from the USB reader to a visitor account before their gate tap.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.visitorNfcCountBadge}>
+            <Text style={styles.visitorNfcCountText}>{assignableNfcVisitors.length} visitors</Text>
+          </View>
+        </View>
+
+        <TextInput
+          style={styles.visitorNfcSearchInput}
+          value={visitorNfcSearch}
+          onChangeText={setVisitorNfcSearch}
+          placeholder="Search visitor by name, email, phone, card, or office"
+          placeholderTextColor="#94A3B8"
+        />
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.visitorNfcChipRow}>
+          {assignableNfcVisitors.map((visitor) => {
+            const selected = String(visitor?._id) === String(selectedVisitorForNfc?._id);
+            return (
+              <TouchableOpacity
+                key={visitor?._id || visitor?.email}
+                style={[styles.visitorNfcChip, selected && styles.visitorNfcChipActive]}
+                onPress={() => {
+                  setSelectedVisitorNfcId(visitor?._id || "");
+                  setTimeout(() => visitorNfcInputRef.current?.focus?.(), 80);
+                }}
+              >
+                <Text style={[styles.visitorNfcChipName, selected && styles.visitorNfcChipNameActive]} numberOfLines={1}>
+                  {visitor?.fullName || visitor?.email || "Visitor"}
+                </Text>
+                <Text style={[styles.visitorNfcChipMeta, selected && styles.visitorNfcChipMetaActive]} numberOfLines={1}>
+                  {visitor?.nfcCardId || visitor?.safePassId || "No UID assigned"}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {selectedVisitorForNfc ? (
+          <View style={styles.visitorNfcAssignBox}>
+            <View style={styles.visitorNfcSelected}>
+              <Text style={styles.visitorNfcSelectedLabel}>Selected Visitor</Text>
+              <Text style={styles.visitorNfcSelectedName}>{selectedVisitorForNfc.fullName || "Visitor"}</Text>
+              <Text style={styles.visitorNfcSelectedMeta}>
+                {selectedVisitorForNfc.email || "No email"} | Current UID:{" "}
+                {selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId || "None"}
+              </Text>
+            </View>
+
+            <TextInput
+              ref={visitorNfcInputRef}
+              style={styles.visitorNfcUidInput}
+              value={visitorNfcUid}
+              onChangeText={(value) => setVisitorNfcUid(normalizeRfidReaderInput(value))}
+              onSubmitEditing={(event) => handleAssignVisitorNfc(event?.nativeEvent?.text)}
+              placeholder="Tap visitor card on USB reader"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              returnKeyType="done"
+              blurOnSubmit={false}
+              showSoftInputOnFocus={false}
+            />
+
+            <View style={styles.visitorNfcFooter}>
+              <View style={styles.visitorNfcHint}>
+                <Ionicons name="radio-outline" size={16} color="#0A3D91" />
+                <Text style={styles.visitorNfcHintText}>{describeRfidReaderInput(visitorNfcUid)}</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.visitorNfcAssignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
+                onPress={handleAssignVisitorNfc}
+                disabled={visitorNfcBusy}
+              >
+                {visitorNfcBusy ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="link-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.visitorNfcAssignButtonText}>Assign UID</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.visitorNfcEmpty}>
+            <Ionicons name="person-outline" size={24} color="#94A3B8" />
+            <Text style={styles.visitorNfcEmptyText}>No visitors available for card assignment.</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.securityWorkspaceGrid}>

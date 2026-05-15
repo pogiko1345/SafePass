@@ -485,6 +485,202 @@ export default StyleSheet.create({
     color: colors.white,
   },
 
+  visitorNfcPanel: {
+    backgroundColor: colors.white,
+    borderRadius: isSmallPhone ? 16 : 22,
+    padding: isSmallPhone ? spacing.md : spacing.lg,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    ...(isWeb && {
+      maxWidth: isDesktop ? 1200 : isTablet ? 900 : "100%",
+      alignSelf: "center",
+      width: "100%",
+      boxShadow: "0px 10px 28px rgba(15,23,42,0.08)",
+    }),
+  },
+
+  visitorNfcHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    flexWrap: "wrap",
+  },
+
+  visitorNfcCountBadge: {
+    borderRadius: 999,
+    backgroundColor: "#EEF5FF",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+
+  visitorNfcCountText: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+
+  visitorNfcSearchInput: {
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fontSize.sm,
+    color: colors.text,
+  },
+
+  visitorNfcChipRow: {
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+
+  visitorNfcChip: {
+    minWidth: 178,
+    maxWidth: 220,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+
+  visitorNfcChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+
+  visitorNfcChipName: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.text,
+  },
+
+  visitorNfcChipNameActive: {
+    color: colors.white,
+  },
+
+  visitorNfcChipMeta: {
+    marginTop: 4,
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+  },
+
+  visitorNfcChipMetaActive: {
+    color: "#D8E8FF",
+  },
+
+  visitorNfcAssignBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EEF5FF",
+    padding: spacing.md,
+  },
+
+  visitorNfcSelected: {
+    marginBottom: spacing.sm,
+  },
+
+  visitorNfcSelectedLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.primary,
+    textTransform: "uppercase",
+  },
+
+  visitorNfcSelectedName: {
+    marginTop: 4,
+    fontSize: fontSize.lg,
+    fontWeight: "900",
+    color: colors.text,
+  },
+
+  visitorNfcSelectedMeta: {
+    marginTop: 4,
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+  },
+
+  visitorNfcUidInput: {
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fontSize.md,
+    fontWeight: "900",
+    letterSpacing: 1,
+    color: colors.text,
+  },
+
+  visitorNfcFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    flexWrap: "wrap",
+  },
+
+  visitorNfcHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flex: 1,
+    minWidth: 180,
+  },
+
+  visitorNfcHintText: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+
+  visitorNfcAssignButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 132,
+  },
+
+  visitorNfcAssignButtonDisabled: {
+    opacity: 0.65,
+  },
+
+  visitorNfcAssignButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "900",
+    color: colors.white,
+  },
+
+  visitorNfcEmpty: {
+    marginTop: spacing.md,
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    padding: spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  visitorNfcEmptyText: {
+    marginTop: spacing.xs,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.textMuted,
+  },
+
   securityHeroStats: {
     flexDirection: "row",
     flexWrap: "wrap",

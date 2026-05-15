@@ -12179,7 +12179,11 @@ app.post("/api/admin/nfc-cards/issue", authMiddleware, async (req, res) => {
 // Assign a physical NFC/RFID card UID to a visitor account
 app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
+    const requesterRole = normalizeUserRoleValue(req.user?.role);
+    const canAssignAnyUser = requesterRole === "admin";
+    const canAssignVisitorOnly = ["security", "guard"].includes(requesterRole);
+
+    if (!canAssignAnyUser && !canAssignVisitorOnly) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
@@ -12213,6 +12217,14 @@ app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "User account not found.",
+      });
+    }
+
+    const targetRole = normalizeUserRoleValue(user.role);
+    if (canAssignVisitorOnly && targetRole !== "visitor") {
+      return res.status(403).json({
+        success: false,
+        message: "Security can only assign NFC cards to visitor accounts.",
       });
     }
 
