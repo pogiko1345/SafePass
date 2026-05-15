@@ -1299,6 +1299,15 @@ export default function SecurityDashboardScreen({ navigation }) {
       ],
     },
     {
+      key: 'nfc-scan',
+      label: 'NFC Scan',
+      icon: 'scan-outline',
+      color: '#0A3D91',
+      submodules: [
+        { key: 'nfc-assign', label: 'Assign / Unassign', badge: 0 },
+      ],
+    },
+    {
       key: 'reports',
       label: 'Reports',
       icon: 'document-text-outline',
@@ -1324,6 +1333,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (submoduleKey.startsWith('map-')) return 'map';
     if (submoduleKey === 'appointment-records') return 'visitors';
     if (submoduleKey === 'checked-in-visitors') return 'presence';
+    if (submoduleKey === 'nfc-assign') return 'nfc';
     if (submoduleKey === 'report-file') return 'reports';
     return 'dashboard';
   };
@@ -1347,6 +1357,11 @@ export default function SecurityDashboardScreen({ navigation }) {
         };
       case 'report-file':
         return { title: 'File a Report', subtitle: 'Submit a security report and review recently filed incidents.' };
+      case 'nfc-assign':
+        return {
+          title: 'NFC Scan',
+          subtitle: 'Assign and unassign visitor RFID cards from the security USB reader.',
+        };
       case 'home-main':
       default:
         return { title: 'Security Home', subtitle: 'Live guard operations, visitor status, and priority actions.' };
@@ -2489,6 +2504,181 @@ export default function SecurityDashboardScreen({ navigation }) {
   const getPresenceLocation = (item) =>
     item?.location || item?.checkpointName || item?.checkpointId || "Campus checkpoint";
 
+  const renderVisitorNfcAssignmentPanel = () => (
+    <View style={styles.visitorNfcPanel}>
+      <View style={styles.visitorNfcHeader}>
+        <View style={styles.sectionTitleContainer}>
+          <Ionicons name="card-outline" size={20} color="#0A3D91" />
+          <View>
+            <Text style={styles.sectionTitle}>Assign Visitor Card</Text>
+            <Text style={styles.securitySectionSubtitle}>
+              Link or remove a physical UID from the USB reader before the visitor gate tap.
+            </Text>
+          </View>
+        </View>
+        <View style={styles.visitorNfcCountBadge}>
+          <Text style={styles.visitorNfcCountText}>{assignableNfcVisitors.length} visitors</Text>
+        </View>
+      </View>
+
+      <TextInput
+        style={styles.visitorNfcSearchInput}
+        value={visitorNfcSearch}
+        onChangeText={setVisitorNfcSearch}
+        placeholder="Search visitor by name, email, phone, card, or office"
+        placeholderTextColor="#94A3B8"
+      />
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.visitorNfcChipRow}>
+        {assignableNfcVisitors.map((visitor) => {
+          const selected = String(visitor?._id) === String(selectedVisitorForNfc?._id);
+          return (
+            <TouchableOpacity
+              key={visitor?._id || visitor?.email}
+              style={[styles.visitorNfcChip, selected && styles.visitorNfcChipActive]}
+              onPress={() => {
+                setSelectedVisitorNfcId(visitor?._id || "");
+                setVisitorNfcStatus(null);
+                setTimeout(() => visitorNfcInputRef.current?.focus?.(), 80);
+              }}
+            >
+              <Text style={[styles.visitorNfcChipName, selected && styles.visitorNfcChipNameActive]} numberOfLines={1}>
+                {visitor?.fullName || visitor?.email || "Visitor"}
+              </Text>
+              <Text style={[styles.visitorNfcChipMeta, selected && styles.visitorNfcChipMetaActive]} numberOfLines={1}>
+                {visitor?.nfcCardId || visitor?.safePassId || "No UID assigned"}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {selectedVisitorForNfc ? (
+        <View style={styles.visitorNfcAssignBox}>
+          <View style={styles.visitorNfcSelected}>
+            <Text style={styles.visitorNfcSelectedLabel}>Selected Visitor</Text>
+            <Text style={styles.visitorNfcSelectedName}>{selectedVisitorForNfc.fullName || "Visitor"}</Text>
+            <Text style={styles.visitorNfcSelectedMeta}>
+              {selectedVisitorForNfc.email || "No email"} | Current UID:{" "}
+              {selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId || "None"}
+            </Text>
+          </View>
+
+          <TextInput
+            ref={visitorNfcInputRef}
+            style={styles.visitorNfcUidInput}
+            value={visitorNfcUid}
+            onChangeText={(value) => setVisitorNfcUid(normalizeRfidReaderInput(value))}
+            onSubmitEditing={(event) => handleAssignVisitorNfc(event?.nativeEvent?.text)}
+            onFocus={() => {
+              if (visitorNfcStatus?.type === "error") setVisitorNfcStatus(null);
+            }}
+            placeholder="Tap visitor card on USB reader"
+            placeholderTextColor="#94A3B8"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            returnKeyType="done"
+            blurOnSubmit={false}
+            showSoftInputOnFocus={false}
+          />
+
+          <View style={styles.visitorNfcFooter}>
+            <View style={styles.visitorNfcHint}>
+              <Ionicons name="radio-outline" size={16} color="#0A3D91" />
+              <Text style={styles.visitorNfcHintText}>{describeRfidReaderInput(visitorNfcUid)}</Text>
+            </View>
+            {(selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId) ? (
+              <TouchableOpacity
+                style={[styles.visitorNfcUnassignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
+                onPress={() => handleUnassignVisitorNfc()}
+                disabled={visitorNfcBusy}
+              >
+                <Ionicons name="unlink-outline" size={16} color="#B91C1C" />
+                <Text style={styles.visitorNfcUnassignButtonText}>Unassign UID</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.visitorNfcAssignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
+              onPress={() => handleAssignVisitorNfc()}
+              disabled={visitorNfcBusy}
+            >
+              {visitorNfcBusy ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="link-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.visitorNfcAssignButtonText}>Assign UID</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+          {visitorNfcStatus?.message ? (
+            <View
+              style={[
+                styles.visitorNfcStatus,
+                visitorNfcStatus.type === "success" && styles.visitorNfcStatusSuccess,
+                visitorNfcStatus.type === "error" && styles.visitorNfcStatusError,
+              ]}
+            >
+              <Ionicons
+                name={
+                  visitorNfcStatus.type === "success"
+                    ? "checkmark-circle-outline"
+                    : visitorNfcStatus.type === "error"
+                      ? "alert-circle-outline"
+                      : "time-outline"
+                }
+                size={16}
+                color={
+                  visitorNfcStatus.type === "success"
+                    ? "#047857"
+                    : visitorNfcStatus.type === "error"
+                      ? "#B91C1C"
+                      : "#0A3D91"
+                }
+              />
+              <Text
+                style={[
+                  styles.visitorNfcStatusText,
+                  visitorNfcStatus.type === "success" && styles.visitorNfcStatusTextSuccess,
+                  visitorNfcStatus.type === "error" && styles.visitorNfcStatusTextError,
+                ]}
+              >
+                {visitorNfcStatus.message}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <View style={styles.visitorNfcEmpty}>
+          <Ionicons name="person-outline" size={24} color="#94A3B8" />
+          <Text style={styles.visitorNfcEmptyText}>No visitors available for card assignment.</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderNfcAssignmentTab = () => (
+    <ScrollView
+      style={styles.scrollView}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refreshData}
+          tintColor="#0A3D91"
+          colors={["#0A3D91"]}
+          title="Refreshing NFC assignments..."
+          titleColor="#0A3D91"
+        />
+      }
+    >
+      <View style={styles.dashboardShell}>
+        {renderVisitorNfcAssignmentPanel()}
+      </View>
+    </ScrollView>
+  );
+
   // Render Dashboard Tab
   const renderDashboardTab = () => (
     <ScrollView 
@@ -2531,16 +2721,16 @@ export default function SecurityDashboardScreen({ navigation }) {
           <View style={styles.securityHeroActions}>
             <TouchableOpacity
               style={styles.securityHeroPrimaryAction}
-              onPress={() => navigation.navigate("NFCScan")}
+              onPress={() => selectGuardSubmodule('nfc-assign')}
               accessibilityRole="button"
-              accessibilityLabel="Open NFC checkpoint scanner"
+              accessibilityLabel="Open NFC assignment module"
             >
               <Ionicons name="scan-outline" size={18} color="#0A3D91" />
-              <Text style={styles.securityHeroPrimaryActionText}>Scan Card</Text>
+              <Text style={styles.securityHeroPrimaryActionText}>NFC Scan</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.securityHeroSecondaryAction}
-              onPress={() => setSelectedSubmodule("visitor-live")}
+              onPress={() => selectGuardSubmodule('map-ground')}
             >
               <Ionicons name="map-outline" size={18} color="#FFFFFF" />
               <Text style={styles.securityHeroSecondaryActionText}>Live Map</Text>
@@ -2582,158 +2772,6 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Text style={styles.securityHeroSideMeta}>{alerts.length} security alert{alerts.length === 1 ? '' : 's'} tracked</Text>
           </View>
         </View>
-      </View>
-
-      <View style={styles.visitorNfcPanel}>
-        <View style={styles.visitorNfcHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="card-outline" size={20} color="#0A3D91" />
-            <View>
-              <Text style={styles.sectionTitle}>Assign Visitor Card</Text>
-              <Text style={styles.securitySectionSubtitle}>
-                Link a physical UID from the USB reader to a visitor account before their gate tap.
-              </Text>
-            </View>
-          </View>
-          <View style={styles.visitorNfcCountBadge}>
-            <Text style={styles.visitorNfcCountText}>{assignableNfcVisitors.length} visitors</Text>
-          </View>
-        </View>
-
-        <TextInput
-          style={styles.visitorNfcSearchInput}
-          value={visitorNfcSearch}
-          onChangeText={setVisitorNfcSearch}
-          placeholder="Search visitor by name, email, phone, card, or office"
-          placeholderTextColor="#94A3B8"
-        />
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.visitorNfcChipRow}>
-          {assignableNfcVisitors.map((visitor) => {
-            const selected = String(visitor?._id) === String(selectedVisitorForNfc?._id);
-            return (
-              <TouchableOpacity
-                key={visitor?._id || visitor?.email}
-                style={[styles.visitorNfcChip, selected && styles.visitorNfcChipActive]}
-                onPress={() => {
-                  setSelectedVisitorNfcId(visitor?._id || "");
-                  setVisitorNfcStatus(null);
-                  setTimeout(() => visitorNfcInputRef.current?.focus?.(), 80);
-                }}
-              >
-                <Text style={[styles.visitorNfcChipName, selected && styles.visitorNfcChipNameActive]} numberOfLines={1}>
-                  {visitor?.fullName || visitor?.email || "Visitor"}
-                </Text>
-                <Text style={[styles.visitorNfcChipMeta, selected && styles.visitorNfcChipMetaActive]} numberOfLines={1}>
-                  {visitor?.nfcCardId || visitor?.safePassId || "No UID assigned"}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {selectedVisitorForNfc ? (
-          <View style={styles.visitorNfcAssignBox}>
-            <View style={styles.visitorNfcSelected}>
-              <Text style={styles.visitorNfcSelectedLabel}>Selected Visitor</Text>
-              <Text style={styles.visitorNfcSelectedName}>{selectedVisitorForNfc.fullName || "Visitor"}</Text>
-              <Text style={styles.visitorNfcSelectedMeta}>
-                {selectedVisitorForNfc.email || "No email"} | Current UID:{" "}
-                {selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId || "None"}
-              </Text>
-            </View>
-
-            <TextInput
-              ref={visitorNfcInputRef}
-              style={styles.visitorNfcUidInput}
-              value={visitorNfcUid}
-              onChangeText={(value) => setVisitorNfcUid(normalizeRfidReaderInput(value))}
-              onSubmitEditing={(event) => handleAssignVisitorNfc(event?.nativeEvent?.text)}
-              onFocus={() => {
-                if (visitorNfcStatus?.type === "error") setVisitorNfcStatus(null);
-              }}
-              placeholder="Tap visitor card on USB reader"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              returnKeyType="done"
-              blurOnSubmit={false}
-              showSoftInputOnFocus={false}
-            />
-
-            <View style={styles.visitorNfcFooter}>
-              <View style={styles.visitorNfcHint}>
-                <Ionicons name="radio-outline" size={16} color="#0A3D91" />
-                <Text style={styles.visitorNfcHintText}>{describeRfidReaderInput(visitorNfcUid)}</Text>
-              </View>
-              {(selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId) ? (
-                <TouchableOpacity
-                  style={[styles.visitorNfcUnassignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
-                  onPress={() => handleUnassignVisitorNfc()}
-                  disabled={visitorNfcBusy}
-                >
-                  <Ionicons name="unlink-outline" size={16} color="#B91C1C" />
-                  <Text style={styles.visitorNfcUnassignButtonText}>Unassign UID</Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity
-                style={[styles.visitorNfcAssignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
-                onPress={() => handleAssignVisitorNfc()}
-                disabled={visitorNfcBusy}
-              >
-                {visitorNfcBusy ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="link-outline" size={16} color="#FFFFFF" />
-                    <Text style={styles.visitorNfcAssignButtonText}>Assign UID</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-            {visitorNfcStatus?.message ? (
-              <View
-                style={[
-                  styles.visitorNfcStatus,
-                  visitorNfcStatus.type === "success" && styles.visitorNfcStatusSuccess,
-                  visitorNfcStatus.type === "error" && styles.visitorNfcStatusError,
-                ]}
-              >
-                <Ionicons
-                  name={
-                    visitorNfcStatus.type === "success"
-                      ? "checkmark-circle-outline"
-                      : visitorNfcStatus.type === "error"
-                        ? "alert-circle-outline"
-                        : "time-outline"
-                  }
-                  size={16}
-                  color={
-                    visitorNfcStatus.type === "success"
-                      ? "#047857"
-                      : visitorNfcStatus.type === "error"
-                        ? "#B91C1C"
-                        : "#0A3D91"
-                  }
-                />
-                <Text
-                  style={[
-                    styles.visitorNfcStatusText,
-                    visitorNfcStatus.type === "success" && styles.visitorNfcStatusTextSuccess,
-                    visitorNfcStatus.type === "error" && styles.visitorNfcStatusTextError,
-                  ]}
-                >
-                  {visitorNfcStatus.message}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        ) : (
-          <View style={styles.visitorNfcEmpty}>
-            <Ionicons name="person-outline" size={24} color="#94A3B8" />
-            <Text style={styles.visitorNfcEmptyText}>No visitors available for card assignment.</Text>
-          </View>
-        )}
       </View>
 
       <View style={styles.securityWorkspaceGrid}>
@@ -5622,6 +5660,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           {selectedSubmodule.startsWith('map-') && renderMapTab()}
           {selectedSubmodule === 'appointment-records' && renderVisitorsTab()}
           {selectedSubmodule === 'checked-in-visitors' && renderCampusActivityTab()}
+          {selectedSubmodule === 'nfc-assign' && renderNfcAssignmentTab()}
           {selectedSubmodule === 'report-file' && renderReportsTab()}
           
         </Animated.View>

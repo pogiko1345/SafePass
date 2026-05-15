@@ -1637,7 +1637,7 @@ async rejectVisitor(visitorId, reason) {
 
   async assignNfcCard({ userId, email, cardId, nfcCardId, uid } = {}) {
     try {
-      const response = await this.fetch("/admin/nfc-cards/assign", {
+      const response = await this.fetch("/nfc-cards/assign", {
         method: "POST",
         body: { userId, email, cardId, nfcCardId, uid },
       });
@@ -1658,7 +1658,7 @@ async rejectVisitor(visitorId, reason) {
       if (!identifier) {
         throw new Error("User ID or email is required to revoke an NFC card.");
       }
-      const response = await this.fetch(`/admin/nfc-cards/${encodeURIComponent(identifier)}/revoke`, {
+      const response = await this.fetch(`/nfc-cards/${encodeURIComponent(identifier)}/revoke`, {
         method: "PUT",
         body: {
           email: target.email,

@@ -12185,7 +12185,7 @@ app.post("/api/admin/nfc-cards/issue", authMiddleware, async (req, res) => {
 });
 
 // Assign a physical NFC/RFID card UID to a visitor account
-app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
+app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
   try {
     const requesterRole = normalizeUserRoleValue(req.user?.role);
     const canAssignAnyUser = requesterRole === "admin";
@@ -12289,7 +12289,7 @@ app.post("/api/admin/nfc-cards/assign", authMiddleware, async (req, res) => {
 });
 
 // Revoke NFC card
-app.put("/api/admin/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
+app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
   try {
     const requesterRole = normalizeUserRoleValue(req.user?.role);
     const canRevokeAnyUser = requesterRole === "admin";
