@@ -2980,7 +2980,7 @@ app.post(
       const cardUser = await User.findOne({
         nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
       }).select(
-        "_id email firstName lastName nfcCardId role status accessPermissions department position scheduleProfile",
+        "_id email firstName lastName nfcCardId role status accessPermissions department position scheduleProfile course yearLevel section studentId teacherId employeeId",
       );
 
       if (!cardUser) {
@@ -3130,6 +3130,14 @@ app.post(
             email: cardUser.email,
             role: normalizedUserRole,
             nfcCardId: normalizedCardId,
+            department: cardUser.department || "",
+            position: cardUser.position || "",
+            course: cardUser.course || "",
+            yearLevel: cardUser.yearLevel || "",
+            section: cardUser.section || "",
+            studentId: cardUser.studentId || "",
+            teacherId: cardUser.teacherId || "",
+            employeeId: cardUser.employeeId || "",
           },
         });
       }
@@ -3316,6 +3324,48 @@ app.post(
         notes: `${operatorName} recorded ${visitor.fullName} ${action.replace("_", " ")} at ${tapLocation.office}.`,
       });
 
+      if (action === "check_in" || action === "check_out") {
+        const isCheckIn = action === "check_in";
+        await Promise.all([
+          createRoleNotification({
+            title: isCheckIn ? "Visitor Checked In" : "Visitor Checked Out",
+            message: `${visitor.fullName} ${isCheckIn ? "checked in" : "checked out"} at ${tapLocation.office}.`,
+            targetRole: "security",
+            relatedVisitor: visitor._id,
+            relatedUser: cardUser._id,
+            type: "info",
+            severity: isCheckIn ? "medium" : "low",
+            metadata: {
+              activityType,
+              source: "checkpoint_station",
+              deviceId,
+              action,
+              tapLocation,
+              currentLocation: visitor.currentLocation,
+              attendanceRecordId: visitorAttendanceRecord._id,
+            },
+          }),
+          createRoleNotification({
+            title: isCheckIn ? "Visitor Checked In" : "Visitor Checked Out",
+            message: `${visitor.fullName} ${isCheckIn ? "checked in" : "checked out"} at ${tapLocation.office}.`,
+            targetRole: "admin",
+            relatedVisitor: visitor._id,
+            relatedUser: cardUser._id,
+            type: "info",
+            severity: "low",
+            metadata: {
+              activityType,
+              source: "checkpoint_station",
+              deviceId,
+              action,
+              tapLocation,
+              currentLocation: visitor.currentLocation,
+              attendanceRecordId: visitorAttendanceRecord._id,
+            },
+          }),
+        ]);
+      }
+
       return res.json({
         success: true,
         message: responseMessage,
@@ -3329,6 +3379,11 @@ app.post(
           email: visitor.email,
           status: visitor.status,
           currentLocation: visitor.currentLocation,
+          assignedOffice: visitor.assignedOffice || "",
+          appointmentDepartment: visitor.appointmentDepartment || "",
+          purpose: visitor.purpose || "",
+          host: visitor.host || "",
+          nfcCardId: normalizedCardId,
         },
       });
     } catch (error) {

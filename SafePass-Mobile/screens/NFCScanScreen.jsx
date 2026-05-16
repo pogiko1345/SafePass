@@ -79,6 +79,44 @@ const getResultTone = (result) => {
   return { background: "#F0FDF4", border: "#86EFAC", icon: "#166534", label: "Checked In" };
 };
 
+const getPersonDetails = (response = {}) => {
+  const person = response.user || response.visitor || {};
+  const role = response.userType || person.role || person.userType || "visitor";
+  const normalizedRole = String(role || "").toLowerCase();
+  const name =
+    person.name ||
+    person.fullName ||
+    response.attendance?.name ||
+    "Campus user";
+  const program =
+    person.course ||
+    person.program ||
+    person.department ||
+    person.assignedOffice ||
+    person.appointmentDepartment ||
+    person.host ||
+    "";
+  const yearSection =
+    [person.yearLevel, person.section].filter(Boolean).join(" - ") ||
+    person.position ||
+    person.purpose ||
+    "";
+  const campusId =
+    person.studentId ||
+    person.teacherId ||
+    person.employeeId ||
+    "";
+
+  return {
+    name,
+    role: normalizedRole,
+    program,
+    yearSection,
+    campusId,
+    nfcCardId: person.nfcCardId || response.attendance?.nfcCardId || "",
+  };
+};
+
 export default function NFCScanScreen({ navigation }) {
   const cardInputRef = useRef(null);
   const [user, setUser] = useState(null);
@@ -159,6 +197,7 @@ export default function NFCScanScreen({ navigation }) {
         checkpointName: selectedCheckpoint.label,
         deviceId: "mobile-checkpoint-station",
       });
+      const personDetails = getPersonDetails(response);
 
       const event = {
         success: true,
@@ -166,12 +205,12 @@ export default function NFCScanScreen({ navigation }) {
         timestamp: new Date().toISOString(),
         checkpoint: selectedCheckpoint.label,
         action: response?.action || selectedAction,
-        userType: response?.userType || response?.user?.role || "visitor",
-        name:
-          response?.user?.name ||
-          response?.visitor?.fullName ||
-          response?.attendance?.name ||
-          "Campus user",
+        userType: personDetails.role,
+        name: personDetails.name,
+        program: personDetails.program,
+        yearSection: personDetails.yearSection,
+        campusId: personDetails.campusId,
+        nfcCardId: personDetails.nfcCardId || normalizedCardId,
         status:
           response?.attendance?.status ||
           response?.visitor?.status ||
@@ -493,6 +532,13 @@ export default function NFCScanScreen({ navigation }) {
                 </View>
                 <View style={styles.resultCopy}>
                   <Text style={styles.resultTitle}>{latestResult?.name || "No tap recorded"}</Text>
+                  {latestResult?.program || latestResult?.yearSection || latestResult?.campusId ? (
+                    <Text style={styles.resultPersonMeta}>
+                      {[latestResult.program, latestResult.yearSection, latestResult.campusId]
+                        .filter(Boolean)
+                        .join(" | ")}
+                    </Text>
+                  ) : null}
                   <Text style={styles.resultSubtitle}>
                     {latestResult?.message || "The next check-in or check-out result will appear here."}
                   </Text>
@@ -521,6 +567,24 @@ export default function NFCScanScreen({ navigation }) {
                   <Text style={styles.resultMetaLabel}>Time</Text>
                   <Text style={styles.resultMetaValue}>
                     {latestResult ? formatDateTime(latestResult.timestamp) : "N/A"}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Program / Area</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult?.program || "N/A"}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Year / Section</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult?.yearSection || "N/A"}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>NFC UID</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult?.nfcCardId || "N/A"}
                   </Text>
                 </View>
               </View>
@@ -577,7 +641,9 @@ export default function NFCScanScreen({ navigation }) {
                 <View style={styles.feedCopy}>
                   <Text style={styles.feedTitle}>{event.name}</Text>
                   <Text style={styles.feedSubtitle}>
-                    {formatRoleLabel(event.userType)} | {formatRoleLabel(event.action)} | {event.checkpoint}
+                    {[formatRoleLabel(event.userType), event.program, event.yearSection, formatRoleLabel(event.action), event.checkpoint]
+                      .filter(Boolean)
+                      .join(" | ")}
                   </Text>
                   <Text style={styles.feedTimestamp}>{formatDateTime(event.timestamp)}</Text>
                 </View>
@@ -1020,6 +1086,13 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
     color: "#0F172A",
+  },
+  resultPersonMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "800",
+    color: "#0A3D91",
   },
   resultSubtitle: {
     marginTop: 4,
