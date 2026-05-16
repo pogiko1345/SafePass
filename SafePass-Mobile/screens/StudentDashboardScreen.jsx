@@ -45,13 +45,15 @@ const formatDate = (value) =>
       })
     : "N/A";
 
-const formatTime = (value) =>
-  value
-    ? new Date(value).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "N/A";
+const formatTime = (value, fallback = "N/A") => {
+  if (!value) return fallback;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return fallback;
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 const isSameCalendarDay = (value, referenceDate = new Date()) => {
   if (!value) return false;
@@ -65,9 +67,11 @@ const isSameCalendarDay = (value, referenceDate = new Date()) => {
   );
 };
 
-const formatDuration = (minutes) => {
+const formatDuration = (minutes, fallback = "0 min") => {
   const totalMinutes = Number(minutes || 0);
-  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return "Pending";
+  if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return fallback;
+  if (totalMinutes > 0 && totalMinutes < 1) return "< 1 min";
+  if (totalMinutes === 0) return fallback;
 
   const hours = Math.floor(totalMinutes / 60);
   const remainder = totalMinutes % 60;
@@ -114,6 +118,14 @@ const getLatestAttendanceTime = (record, action) => {
     .filter((item) => item?.action === action)
     .sort((left, right) => new Date(right.tappedAt || 0) - new Date(left.tappedAt || 0))[0];
   return latest?.tappedAt || (action === "check_in" ? record?.checkInTime : record?.checkOutTime);
+};
+
+const getDurationMinutesBetween = (startValue, endValue) => {
+  if (!startValue || !endValue) return 0;
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
 };
 
 const isNullNativeNfcError = (error) =>
@@ -189,6 +201,7 @@ export default function StudentDashboardScreen({ navigation }) {
     newPassword: "",
     confirmPassword: "",
   });
+  const [nowTick, setNowTick] = useState(Date.now());
 
   const loadData = useCallback(async () => {
     const [profileResponse, attendanceResponse] = await Promise.all([
@@ -380,6 +393,8 @@ export default function StudentDashboardScreen({ navigation }) {
   );
   const latestTodayAction = getLatestAttendanceAction(todayRecord);
   const isCheckedIn = latestTodayAction === "check_in" || Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
+  const latestEntryTime = getLatestAttendanceTime(todayRecord, "check_in");
+  const latestExitTime = getLatestAttendanceTime(todayRecord, "check_out");
   const roleLabel = String(user?.role || "").toLowerCase() === "teacher" ? "Teacher" : "Student";
   const studentName = getStudentName(user);
   const todayStatus = isCheckedIn
@@ -415,6 +430,12 @@ export default function StudentDashboardScreen({ navigation }) {
   const canUseNativeNfc = nfcAvailability.supported && nfcAvailability.enabled;
   const nfcModeLabel = canUseNativeNfc ? "NFC Ready" : "App Fallback";
 
+  useEffect(() => {
+    if (!isCheckedIn) return undefined;
+    const timer = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, [isCheckedIn]);
+
   const monthStats = useMemo(() => {
     const now = new Date();
     const monthRecords = attendance.filter((item) => {
@@ -436,9 +457,15 @@ export default function StudentDashboardScreen({ navigation }) {
   }, [attendance]);
 
   const currentSessionDuration = useMemo(() => {
-    if (!todayRecord?.checkInTime) return "Pending";
-    return formatDuration(todayRecord.sessionDurationMinutes);
-  }, [todayRecord]);
+    if (!latestEntryTime) return "0 min";
+    if (isCheckedIn) {
+      return formatDuration(getDurationMinutesBetween(latestEntryTime, nowTick));
+    }
+
+    const savedDuration = Number(todayRecord?.sessionDurationMinutes || 0);
+    if (savedDuration > 0) return formatDuration(savedDuration);
+    return formatDuration(getDurationMinutesBetween(latestEntryTime, latestExitTime));
+  }, [isCheckedIn, latestEntryTime, latestExitTime, nowTick, todayRecord?.sessionDurationMinutes]);
 
   const handleAttendanceTap = async (action, tapLocation = {}) => {
     if (tapActionLoading) return;
@@ -762,17 +789,17 @@ export default function StudentDashboardScreen({ navigation }) {
         <MobileStatusBadge status={todayStatus} label={getStatusLabel(todayRecord, true)} />
       </View>
       {[
-        ["Latest Entry", getLatestAttendanceTime(todayRecord, "check_in"), "log-in-outline", BRAND.success],
-        ["Latest Exit", getLatestAttendanceTime(todayRecord, "check_out"), "log-out-outline", BRAND.danger],
+        ["Latest Entry", latestEntryTime, "log-in-outline", BRAND.success, "Not checked in"],
+        ["Latest Exit", latestExitTime, "log-out-outline", BRAND.danger, isCheckedIn ? "Still inside" : "Not checked out"],
         ["Total Inside", currentSessionDuration, "hourglass-outline", BRAND.blue],
-      ].map(([label, value, icon, color]) => (
+      ].map(([label, value, icon, color, fallback]) => (
         <View key={label} style={styles.timelineRow}>
           <View style={[styles.timelineIcon, { backgroundColor: `${color}16` }]}>
             <Ionicons name={icon} size={17} color={color} />
           </View>
           <Text style={styles.timelineLabel}>{label}</Text>
           <Text style={styles.timelineValue}>
-            {label === "Total Inside" ? value : formatTime(value)}
+            {label === "Total Inside" ? value : formatTime(value, fallback)}
           </Text>
         </View>
       ))}
