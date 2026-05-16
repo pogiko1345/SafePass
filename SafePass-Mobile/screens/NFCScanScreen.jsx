@@ -632,6 +632,75 @@ export default function NFCScanScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
             </View>
+
+            <View style={[styles.resultCard, styles.readerResultCard, { backgroundColor: latestTone.background, borderColor: latestTone.border }]}>
+              <View style={styles.resultHeader}>
+                <View style={styles.resultIconWrap}>
+                  <Ionicons
+                    name={latestResult?.success === false ? "close-circle" : "checkmark-circle"}
+                    size={26}
+                    color={latestTone.icon}
+                  />
+                </View>
+                <View style={styles.resultCopy}>
+                  <Text style={styles.resultTitle}>{latestResult?.name || "No tap recorded"}</Text>
+                  {latestResult?.program || latestResult?.yearSection || latestResult?.campusId ? (
+                    <Text style={styles.resultPersonMeta}>
+                      {[latestResult.program, latestResult.yearSection, latestResult.campusId]
+                        .filter(Boolean)
+                        .join(" | ")}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.resultSubtitle}>
+                    {latestResult?.message || "The next check-in or check-out result will appear here."}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.resultMetaGrid}>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>User Type</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult ? formatRoleLabel(latestResult.userType) : "Waiting"}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Action</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult ? formatRoleLabel(latestResult.action) : selectedActionMeta.label}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Status</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult ? formatRoleLabel(latestResult.status) : "Ready"}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Time</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult ? formatDateTime(latestResult.timestamp) : "N/A"}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Program / Area</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult?.program || "N/A"}
+                  </Text>
+                </View>
+                <View style={styles.resultMetaCard}>
+                  <Text style={styles.resultMetaLabel}>Year / Section</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult?.yearSection || "N/A"}
+                  </Text>
+                </View>
+                <View style={[styles.resultMetaCard, styles.resultMetaCardWide]}>
+                  <Text style={styles.resultMetaLabel}>NFC UID</Text>
+                  <Text style={styles.resultMetaValue}>
+                    {latestResult?.nfcCardId || "N/A"}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
 
           <View style={styles.stationSide}>
@@ -797,89 +866,6 @@ export default function NFCScanScreen({ navigation }) {
               </ScrollView>
             </View>
 
-            <View style={[styles.resultCard, { backgroundColor: latestTone.background, borderColor: latestTone.border }]}>
-              <View style={styles.resultHeader}>
-                <View style={styles.resultIconWrap}>
-                  <Ionicons
-                    name={latestResult?.success === false ? "close-circle" : "checkmark-circle"}
-                    size={26}
-                    color={latestTone.icon}
-                  />
-                </View>
-                <View style={styles.resultCopy}>
-                  <Text style={styles.resultTitle}>{latestResult?.name || "No tap recorded"}</Text>
-                  {latestResult?.program || latestResult?.yearSection || latestResult?.campusId ? (
-                    <Text style={styles.resultPersonMeta}>
-                      {[latestResult.program, latestResult.yearSection, latestResult.campusId]
-                        .filter(Boolean)
-                        .join(" | ")}
-                    </Text>
-                  ) : null}
-                  <Text style={styles.resultSubtitle}>
-                    {latestResult?.message || "The next check-in or check-out result will appear here."}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.resultMetaGrid}>
-                <View style={styles.resultMetaCard}>
-                  <Text style={styles.resultMetaLabel}>User Type</Text>
-                  <Text style={styles.resultMetaValue}>
-                    {latestResult ? formatRoleLabel(latestResult.userType) : "Waiting"}
-                  </Text>
-                </View>
-                <View style={styles.resultMetaCard}>
-                  <Text style={styles.resultMetaLabel}>Action</Text>
-                  <Text style={styles.resultMetaValue}>
-                    {latestResult ? formatRoleLabel(latestResult.action) : selectedActionMeta.label}
-                  </Text>
-                </View>
-                <View style={styles.resultMetaCard}>
-                  <Text style={styles.resultMetaLabel}>Status</Text>
-                  <Text style={styles.resultMetaValue}>
-                    {latestResult ? formatRoleLabel(latestResult.status) : "Ready"}
-                  </Text>
-                </View>
-                <View style={styles.resultMetaCard}>
-                  <Text style={styles.resultMetaLabel}>Time</Text>
-                  <Text style={styles.resultMetaValue}>
-                    {latestResult ? formatDateTime(latestResult.timestamp) : "N/A"}
-                  </Text>
-                </View>
-                <View style={styles.resultMetaCard}>
-                  <Text style={styles.resultMetaLabel}>Program / Area</Text>
-                  <Text style={styles.resultMetaValue}>
-                    {latestResult?.program || "N/A"}
-                  </Text>
-                </View>
-                <View style={styles.resultMetaCard}>
-                  <Text style={styles.resultMetaLabel}>Year / Section</Text>
-                  <Text style={styles.resultMetaValue}>
-                    {latestResult?.yearSection || "N/A"}
-                  </Text>
-                </View>
-                <View style={styles.resultMetaCard}>
-                  <Text style={styles.resultMetaLabel}>NFC UID</Text>
-                  <Text style={styles.resultMetaValue}>
-                    {latestResult?.nfcCardId || "N/A"}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.flowStrip}>
-          <View style={styles.flowStep}>
-            <Ionicons name="options-outline" size={18} color="#0A3D91" />
-            <Text style={styles.flowText}>Select mode</Text>
-          </View>
-          <View style={styles.flowStep}>
-            <Ionicons name="radio-outline" size={18} color="#0A3D91" />
-            <Text style={styles.flowText}>Tap card</Text>
-          </View>
-          <View style={styles.flowStep}>
-            <Ionicons name="checkmark-done-outline" size={18} color="#0A3D91" />
-            <Text style={styles.flowText}>Record event</Text>
           </View>
         </View>
 
@@ -1472,6 +1458,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     ...CARD_SHADOW,
   },
+  readerResultCard: {
+    marginBottom: 0,
+  },
   resultCardSuccess: {
     backgroundColor: "#F0FDF4",
     borderColor: "#86EFAC",
@@ -1497,8 +1486,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   resultTitle: {
-    fontSize: 17,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "900",
     color: "#0F172A",
   },
   resultPersonMeta: {
@@ -1522,10 +1511,13 @@ const styles = StyleSheet.create({
   },
   resultMetaCard: {
     flexGrow: 1,
-    flexBasis: 140,
+    flexBasis: 150,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 12,
+  },
+  resultMetaCardWide: {
+    flexBasis: 230,
   },
   resultMetaLabel: {
     fontSize: 11,
@@ -1631,10 +1623,10 @@ const styles = StyleSheet.create({
     flexBasis: 360,
   },
   tapPad: {
-    minHeight: 360,
+    minHeight: 310,
     borderRadius: 24,
     borderWidth: 1,
-    padding: 26,
+    padding: 22,
     alignItems: "center",
     justifyContent: "center",
     ...CARD_SHADOW,
@@ -1643,8 +1635,8 @@ const styles = StyleSheet.create({
     opacity: 0.88,
   },
   tapPadIcon: {
-    width: 104,
-    height: 104,
+    width: 88,
+    height: 88,
     borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
@@ -1653,7 +1645,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.72)",
   },
   tapPadTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "900",
     textAlign: "center",
   },
