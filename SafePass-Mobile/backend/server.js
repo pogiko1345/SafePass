@@ -2648,17 +2648,14 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       });
     }
 
-    const checkedInVisitor = await Visitor.findOne({
+    const visitorCandidates = await Visitor.find({
       email: cardUser.email,
-      status: "checked_in",
-    }).sort({ checkedInAt: -1 });
-
-    const latestVisitor =
-      checkedInVisitor ||
-      (await Visitor.findOne({
-        email: cardUser.email,
-        status: { $ne: "checked_out" },
-      }).sort({ visitDate: -1, registeredAt: -1 }));
+      status: { $ne: "checked_out" },
+    }).sort({ checkedInAt: -1, visitDate: 1, registeredAt: -1 });
+    const checkedInVisitor = visitorCandidates.find(
+      (visitorRecord) => String(visitorRecord?.status || "").toLowerCase() === "checked_in",
+    );
+    const latestVisitor = getPrioritizedVisitorForNfcTap(visitorCandidates);
 
     if (!latestVisitor) {
       await AccessLog.create({
@@ -2798,7 +2795,18 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
 
         return res.status(checkInEligibility.statusCode || 403).json({
           success: false,
+          userType: "visitor",
+          action: "check_in",
           message: checkInEligibility.message,
+          nfcCardId: normalizedCardId,
+          visitor: getVisitorTapPayload({ visitor, visitorUser: cardUser, nfcCardId: normalizedCardId }),
+          user: {
+            _id: cardUser._id,
+            name: visitor.fullName,
+            email: cardUser.email,
+            role: "visitor",
+            nfcCardId: normalizedCardId,
+          },
         });
       }
 
@@ -3142,17 +3150,14 @@ app.post(
         });
       }
 
-      const checkedInVisitor = await Visitor.findOne({
+      const visitorCandidates = await Visitor.find({
         email: cardUser.email,
-        status: "checked_in",
-      }).sort({ checkedInAt: -1 });
-
-      const latestVisitor =
-        checkedInVisitor ||
-        (await Visitor.findOne({
-          email: cardUser.email,
-          status: { $ne: "checked_out" },
-        }).sort({ visitDate: -1, registeredAt: -1 }));
+        status: { $ne: "checked_out" },
+      }).sort({ checkedInAt: -1, visitDate: 1, registeredAt: -1 });
+      const checkedInVisitor = visitorCandidates.find(
+        (visitorRecord) => String(visitorRecord?.status || "").toLowerCase() === "checked_in",
+      );
+      const latestVisitor = getPrioritizedVisitorForNfcTap(visitorCandidates);
 
       if (!latestVisitor) {
         await AccessLog.create({
@@ -3242,7 +3247,18 @@ app.post(
 
           return res.status(checkInEligibility.statusCode || 403).json({
             success: false,
+            userType: "visitor",
+            action: "check_in",
             message: checkInEligibility.message,
+            nfcCardId: normalizedCardId,
+            visitor: getVisitorTapPayload({ visitor, visitorUser: cardUser, nfcCardId: normalizedCardId }),
+            user: {
+              _id: cardUser._id,
+              name: visitor.fullName,
+              email: cardUser.email,
+              role: "visitor",
+              nfcCardId: normalizedCardId,
+            },
           });
         }
 
@@ -3280,7 +3296,18 @@ app.post(
 
           return res.status(409).json({
             success: false,
+            userType: "visitor",
+            action: "location_update",
             message: "Visitor must be checked in before location tracking can start",
+            nfcCardId: normalizedCardId,
+            visitor: getVisitorTapPayload({ visitor, visitorUser: cardUser, nfcCardId: normalizedCardId }),
+            user: {
+              _id: cardUser._id,
+              name: visitor.fullName,
+              email: cardUser.email,
+              role: "visitor",
+              nfcCardId: normalizedCardId,
+            },
           });
         }
 
@@ -3384,18 +3411,7 @@ app.post(
         userType: "visitor",
         visitorId: visitor._id,
         currentLocation: visitor.currentLocation,
-        visitor: {
-          _id: visitor._id,
-          fullName: visitor.fullName,
-          email: visitor.email,
-          status: visitor.status,
-          currentLocation: visitor.currentLocation,
-          assignedOffice: visitor.assignedOffice || "",
-          appointmentDepartment: visitor.appointmentDepartment || "",
-          purpose: visitor.purpose || "",
-          host: visitor.host || "",
-          nfcCardId: normalizedCardId,
-        },
+        visitor: getVisitorTapPayload({ visitor, visitorUser: cardUser, nfcCardId: normalizedCardId }),
       });
     } catch (error) {
       console.error("Checkpoint station tap error:", error);
@@ -4375,6 +4391,49 @@ const getPrioritizedVisitor = (visitors = []) => {
   if (submittedAppointments[0]) return submittedAppointments[0];
 
   return [...visitors].sort((left, right) => getVisitorSubmissionTime(right) - getVisitorSubmissionTime(left))[0];
+};
+
+const getPrioritizedVisitorForNfcTap = (visitors = []) => {
+  if (!Array.isArray(visitors) || !visitors.length) return null;
+
+  const activeVisits = visitors.filter((visitor) => String(visitor?.status || "").toLowerCase() !== "checked_out");
+  const checkedIn = activeVisits
+    .filter((visitor) => String(visitor?.status || "").toLowerCase() === "checked_in")
+    .sort((left, right) => getVisitorSubmissionTime(right) - getVisitorSubmissionTime(left));
+  if (checkedIn[0]) return checkedIn[0];
+
+  const todayVisits = activeVisits
+    .filter((visitor) => getVisitDateRelation(visitor?.visitDate) === "today")
+    .sort((left, right) => getVisitorScheduleTime(left) - getVisitorScheduleTime(right));
+  if (todayVisits[0]) return todayVisits[0];
+
+  const futureVisits = activeVisits
+    .filter((visitor) => getVisitDateRelation(visitor?.visitDate) === "future")
+    .sort((left, right) => getVisitorScheduleTime(left) - getVisitorScheduleTime(right));
+  if (futureVisits[0]) return futureVisits[0];
+
+  return activeVisits.sort((left, right) => getVisitorScheduleTime(right) - getVisitorScheduleTime(left))[0] || null;
+};
+
+const getVisitorTapPayload = ({ visitor, visitorUser, nfcCardId = "" } = {}) => {
+  if (!visitor) return null;
+
+  return {
+    _id: visitor._id,
+    fullName: visitor.fullName,
+    email: visitor.email,
+    status: visitor.status,
+    appointmentStatus: visitor.appointmentStatus,
+    approvalStatus: visitor.approvalStatus,
+    visitDate: visitor.visitDate,
+    visitTime: visitor.visitTime,
+    currentLocation: visitor.currentLocation,
+    assignedOffice: visitor.assignedOffice || "",
+    appointmentDepartment: visitor.appointmentDepartment || "",
+    purpose: visitor.purposeOfVisit || visitor.purpose || "",
+    host: visitor.assignedStaffName || visitor.host || "",
+    nfcCardId: nfcCardId || visitorUser?.nfcCardId || visitor.nfcCardId || "",
+  };
 };
 
 const getCombinedAppointmentDateTime = (visitDateValue, visitTimeValue) => {

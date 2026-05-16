@@ -118,7 +118,7 @@ const getResultTone = (result) => {
 };
 
 const getPersonDetails = (response = {}) => {
-  const person = response.user || response.visitor || {};
+  const person = response.visitor || response.user || {};
   const role = response.userType || person.role || person.userType || "visitor";
   const normalizedRole = String(role || "").toLowerCase();
   const name =
@@ -151,7 +151,7 @@ const getPersonDetails = (response = {}) => {
     program,
     yearSection,
     campusId,
-    nfcCardId: person.nfcCardId || response.attendance?.nfcCardId || "",
+    nfcCardId: person.nfcCardId || response.nfcCardId || response.attendance?.nfcCardId || "",
   };
 };
 
@@ -390,15 +390,25 @@ export default function NFCScanScreen({ navigation }) {
       recordLocalEvent(event);
       focusReader();
     } catch (error) {
+      const errorData = error?.data || {};
+      const personDetails = getPersonDetails({
+        ...errorData,
+        nfcCardId: errorData.nfcCardId || normalizedCardId,
+      });
       const failedEvent = {
         success: false,
         message: error?.message || "Checkpoint tap failed.",
         timestamp: new Date().toISOString(),
         checkpoint: selectedCheckpoint.label,
-        action: selectedAction,
-        userType: "unknown",
-        name: normalizedCardId,
+        action: errorData?.action || selectedAction,
+        userType: personDetails.role || "unknown",
+        name: personDetails.name || normalizedCardId,
+        program: personDetails.program,
+        yearSection: personDetails.yearSection,
+        campusId: personDetails.campusId,
+        nfcCardId: personDetails.nfcCardId || normalizedCardId,
         status: "denied",
+        raw: errorData,
       };
       setLatestResult(failedEvent);
       recordLocalEvent(failedEvent);
