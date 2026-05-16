@@ -88,6 +88,18 @@ const normalizeNfcCardId = (value = "") =>
     .toUpperCase()
     .replace(/[^0-9A-F]/g, "");
 
+const normalizeSubmittedNfcCardId = (value = "") => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  const compactHexValue = rawValue.replace(/[\s:-]/g, "");
+  if (/^[0-9A-Fa-f]+$/.test(compactHexValue) && compactHexValue.length >= 4) {
+    return compactHexValue.toUpperCase();
+  }
+
+  return rawValue.toUpperCase();
+};
+
 const generateSafePassAccountId = async (createdAt = new Date()) => {
   const createdDate = new Date(createdAt);
   const year = Number.isNaN(createdDate.getTime())
@@ -6715,6 +6727,9 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       department,
       position,
       employeeId,
+      nfcCardId,
+      uid,
+      cardId,
     } = req.body;
 
     const normalizedFirstName = String(firstName || "").trim();
@@ -6771,11 +6786,15 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       });
     }
 
+    const requestedNfcCardId = normalizeSubmittedNfcCardId(nfcCardId || uid || cardId);
     const duplicateChecks = [
       { email: normalizedEmail },
       { username: resolvedUsername },
       { employeeId: exactTextMatch(normalizedEmployeeId) },
     ];
+    if (requestedNfcCardId) {
+      duplicateChecks.push({ nfcCardId: exactTextMatch(requestedNfcCardId) });
+    }
 
     const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
@@ -6786,6 +6805,8 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
             ? "username"
             : sameNormalizedText(existingUser.employeeId, normalizedEmployeeId)
               ? "employeeId"
+              : sameNormalizedText(existingUser.nfcCardId, requestedNfcCardId)
+                ? "nfcCardId"
             : "email";
 
       return res.status(400).json({
@@ -6795,6 +6816,8 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
             ? "Username already registered"
             : duplicateField === "employeeId"
               ? "Staff/Security number already registered"
+              : duplicateField === "nfcCardId"
+                ? "NFC card UID already assigned"
             : "Email already registered",
         field: duplicateField,
       });
@@ -6804,7 +6827,8 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
     const setupToken = createPasswordSetupToken(48);
     const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
 
-    const nfcCardId = `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const resolvedNfcCardId =
+      requestedNfcCardId || `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
     const user = new User({
       firstName: normalizedFirstName,
@@ -6820,7 +6844,7 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       employeeId: normalizedEmployeeId,
       department: normalizedDepartment,
       position: normalizedPosition,
-      nfcCardId,
+      nfcCardId: resolvedNfcCardId,
       passwordResetTokenHash: setupToken.tokenHash,
       passwordResetExpiresAt: setupToken.expiresAt,
     });
@@ -6915,7 +6939,7 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const { firstName, lastName, email, phone, shift, position, employeeId } = req.body;
+    const { firstName, lastName, email, phone, shift, position, employeeId, nfcCardId, uid, cardId } = req.body;
 
     const normalizedFirstName = String(firstName || "").trim();
     const normalizedLastName = String(lastName || "").trim();
@@ -6954,19 +6978,24 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
     }
 
     const resolvedUsername = normalizeUsernameValue(normalizedEmployeeId || normalizedEmail.split("@")[0]);
-    const existingUser = await User.findOne({
-      $or: [
+    const requestedNfcCardId = normalizeSubmittedNfcCardId(nfcCardId || uid || cardId);
+    const duplicateChecks = [
         { email: normalizedEmail },
         { username: resolvedUsername },
         { employeeId: exactTextMatch(normalizedEmployeeId) },
-      ],
-    });
+      ];
+    if (requestedNfcCardId) {
+      duplicateChecks.push({ nfcCardId: exactTextMatch(requestedNfcCardId) });
+    }
+    const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
       const field = sameNormalizedText(existingUser.email, normalizedEmail)
         ? "email"
         : sameNormalizedText(existingUser.username, resolvedUsername)
           ? "username"
-          : "employeeId";
+          : sameNormalizedText(existingUser.employeeId, normalizedEmployeeId)
+            ? "employeeId"
+            : "nfcCardId";
       return res.status(400).json({
         success: false,
         message:
@@ -6974,6 +7003,8 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
             ? "Username already registered"
             : field === "employeeId"
               ? "Staff/Security number already registered"
+              : field === "nfcCardId"
+                ? "NFC card UID already assigned"
               : "Email already registered",
         field,
       });
@@ -6981,7 +7012,7 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
 
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substr(2, 6).toUpperCase();
-    const nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
+    const resolvedNfcCardId = requestedNfcCardId || `SAFEPASS-${timestamp}-${randomString}`;
     const temporaryPassword = generateTemporaryPassword();
     const setupToken = createPasswordSetupToken(48);
     const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
@@ -6994,7 +7025,7 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       password: temporaryPassword,
       phone: normalizedPhone || "",
       role: "guard",
-      nfcCardId,
+      nfcCardId: resolvedNfcCardId,
       employeeId: normalizedEmployeeId,
       position: normalizedPosition,
       shift: String(shift || "").trim(),
@@ -7099,6 +7130,9 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
     const academicIdField = isTeacherAccount ? "teacherId" : "studentId";
     const academicLabel = isTeacherAccount ? "Academic Staff" : "Student";
     let normalizedAcademicId = String(req.body[academicIdField] || req.body.studentId || "").trim();
+    const requestedNfcCardId = normalizeSubmittedNfcCardId(
+      req.body.nfcCardId || req.body.uid || req.body.cardId,
+    );
 
     if (!normalizedEmail) {
       normalizedEmail = await generateUniqueAccountEmail({
@@ -7127,20 +7161,24 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid email format", field: "email" });
     }
 
-    const existingUser = await User.findOne({
-      $or: [
+    const duplicateChecks = [
         { email: normalizedEmail },
         { username: resolvedUsername },
         { [academicIdField]: exactTextMatch(normalizedAcademicId) },
-      ],
-    });
+      ];
+    if (requestedNfcCardId) {
+      duplicateChecks.push({ nfcCardId: exactTextMatch(requestedNfcCardId) });
+    }
+    const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
       const duplicateField =
         sameNormalizedText(existingUser.email, normalizedEmail)
           ? "email"
           : sameNormalizedText(existingUser.username, resolvedUsername)
             ? "username"
-            : academicIdField;
+            : sameNormalizedText(existingUser[academicIdField], normalizedAcademicId)
+              ? academicIdField
+              : "nfcCardId";
 
       return res.status(400).json({
         success: false,
@@ -7149,6 +7187,8 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
             ? "Username already registered"
             : duplicateField === academicIdField
               ? `${academicLabel} ID already registered`
+              : duplicateField === "nfcCardId"
+                ? "NFC card UID already assigned"
               : "Email already registered",
         field: duplicateField,
       });
@@ -7157,7 +7197,8 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
     const temporaryPassword = generateTemporaryPassword();
     const setupToken = createPasswordSetupToken(48);
     const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
-    const nfcCardId = `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const resolvedNfcCardId =
+      requestedNfcCardId || `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
     const user = new User({
       firstName: normalizedFirstName,
@@ -7174,7 +7215,7 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       course: String(req.body.course || "").trim(),
       yearLevel: String(req.body.yearLevel || "").trim(),
       section: String(req.body.section || "").trim(),
-      nfcCardId,
+      nfcCardId: resolvedNfcCardId,
       passwordResetTokenHash: setupToken.tokenHash,
       passwordResetExpiresAt: setupToken.expiresAt,
     });
@@ -11832,6 +11873,45 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
         }
 
         updates.employeeId = normalizedEmployeeId;
+      }
+    }
+
+    if (updates.nfcCardId !== undefined || updates.uid !== undefined || updates.cardId !== undefined) {
+      const submittedNfcCardId = normalizeSubmittedNfcCardId(
+        updates.nfcCardId || updates.uid || updates.cardId,
+      );
+      delete updates.uid;
+      delete updates.cardId;
+
+      if (!submittedNfcCardId) {
+        updates.nfcCardId = null;
+        updates.accessPermissions = {
+          canAccess: existingUser.accessPermissions?.canAccess || [],
+          restrictedAreas: existingUser.accessPermissions?.restrictedAreas || [],
+          timeRestrictions: existingUser.accessPermissions?.timeRestrictions || [],
+          cardActive: false,
+        };
+      } else {
+        const nfcCardConflict = await User.findOne({
+          nfcCardId: exactTextMatch(submittedNfcCardId),
+          _id: { $ne: req.params.id },
+        });
+
+        if (nfcCardConflict) {
+          return res.status(400).json({
+            success: false,
+            message: `NFC card UID already assigned to ${nfcCardConflict.email}`,
+            field: "nfcCardId",
+          });
+        }
+
+        updates.nfcCardId = submittedNfcCardId;
+        updates.accessPermissions = {
+          canAccess: existingUser.accessPermissions?.canAccess || [],
+          restrictedAreas: existingUser.accessPermissions?.restrictedAreas || [],
+          timeRestrictions: existingUser.accessPermissions?.timeRestrictions || [],
+          cardActive: true,
+        };
       }
     }
 

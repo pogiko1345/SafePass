@@ -609,6 +609,18 @@ const sanitizeAccountEmailPart = (value = "") =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
+const normalizeAdminNfcCardUid = (value = "") => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  const compactHexValue = rawValue.replace(/[\s:-]/g, "");
+  if (/^[0-9A-Fa-f]+$/.test(compactHexValue) && compactHexValue.length >= 4) {
+    return compactHexValue.toUpperCase();
+  }
+
+  return rawValue.toUpperCase();
+};
+
 const getAccountEmailRolePart = (form = {}) => {
   if (String(form.role || "").toLowerCase() === "student") return "student";
   if (String(form.role || "").toLowerCase() === "teacher") return "academic";
@@ -1255,6 +1267,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     course: "",
     yearLevel: "",
     section: "",
+    nfcCardId: "",
     status: "inactive",
   });
 
@@ -1274,6 +1287,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     course: "",
     yearLevel: "",
     section: "",
+    nfcCardId: "",
     status: "active",
     isActive: true,
   });
@@ -3795,6 +3809,7 @@ const loadDashboardData = useCallback(async () => {
     const normalizedStudentId = String(newUserData.studentId || (isStudentAccount ? generatedEmployeeId : "") || "").trim();
     const normalizedTeacherId = String(newUserData.teacherId || (isAcademicStaffAccount ? generatedEmployeeId : "") || "").trim();
     const normalizedAcademicId = isAcademicStaffAccount ? normalizedTeacherId : normalizedStudentId;
+    const normalizedNfcCardId = normalizeAdminNfcCardUid(newUserData.nfcCardId);
 
     if (!String(newUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(newUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
@@ -3856,6 +3871,14 @@ const loadDashboardData = useCallback(async () => {
           : "This student ID is already registered.";
       }
     }
+    if (normalizedNfcCardId) {
+      const existingNfcCard = allUsers.find(
+        (userItem) => normalizeAdminNfcCardUid(userItem?.nfcCardId) === normalizedNfcCardId,
+      );
+      if (existingNfcCard) {
+        nextErrors.nfcCardId = "This NFC card UID is already assigned.";
+      }
+    }
 
     setCreateUserErrors(nextErrors);
     return {
@@ -3866,6 +3889,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmployeeId,
       normalizedStudentId,
       normalizedTeacherId,
+      normalizedNfcCardId,
     };
   };
 
@@ -3888,6 +3912,7 @@ const loadDashboardData = useCallback(async () => {
       employeeId: isCreateEmployeeIdManuallyEdited ? currentValue.employeeId : "",
       studentId: isCreateEmployeeIdManuallyEdited ? currentValue.studentId : "",
       teacherId: isCreateEmployeeIdManuallyEdited ? currentValue.teacherId : "",
+      nfcCardId: currentValue.nfcCardId,
     }));
     setCreateUserErrors({});
     setStaffDropdownOpen(null);
@@ -3908,6 +3933,7 @@ const loadDashboardData = useCallback(async () => {
     const isEditingStudent = normalizedRole === "student";
     const isEditingTeacher = normalizedRole === "teacher";
     const academicId = String(isEditingTeacher ? editUserData.teacherId : editUserData.studentId || "").trim();
+    const normalizedNfcCardId = normalizeAdminNfcCardUid(editUserData.nfcCardId);
 
     if (!String(editUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(editUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
@@ -3959,6 +3985,15 @@ const loadDashboardData = useCallback(async () => {
       if (duplicateEmployeeId) nextErrors.employeeId = "This staff/security ID is already registered.";
     }
 
+    if (normalizedNfcCardId) {
+      const duplicateNfcCard = allUsers.find(
+        (userItem) =>
+          String(userItem?._id || userItem?.id) !== String(selectedId) &&
+          normalizeAdminNfcCardUid(userItem?.nfcCardId) === normalizedNfcCardId,
+      );
+      if (duplicateNfcCard) nextErrors.nfcCardId = "This NFC card UID is already assigned.";
+    }
+
     if (showErrors) setEditUserErrors(nextErrors);
     return {
       isValid: Object.keys(nextErrors).length === 0,
@@ -3966,6 +4001,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmail,
       normalizedUsername,
       normalizedEmployeeId,
+      normalizedNfcCardId,
     };
   };
 
@@ -4071,6 +4107,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmployeeId,
       normalizedStudentId,
       normalizedTeacherId,
+      normalizedNfcCardId,
     } = validateCreateUserForm();
     if (!isValid) {
       Alert.alert("Validation Error", "Please review the highlighted fields before creating the account.");
@@ -4094,6 +4131,7 @@ const loadDashboardData = useCallback(async () => {
         phone: normalizedPhone,
         role: newUserData.role,
         employeeId: normalizedEmployeeId,
+        nfcCardId: normalizedNfcCardId || undefined,
         status: "inactive",
         isActive: false,
       };
@@ -4124,6 +4162,7 @@ const loadDashboardData = useCallback(async () => {
             email: userPayload.email,
             phone: userPayload.phone,
             employeeId: userPayload.employeeId,
+            nfcCardId: userPayload.nfcCardId,
             position: userPayload.position,
             shift: userPayload.shift,
           })
@@ -4147,6 +4186,7 @@ const loadDashboardData = useCallback(async () => {
           employeeId: response.user?.employeeId || userPayload.employeeId,
           studentId: response.user?.studentId || userPayload.studentId,
           teacherId: response.user?.teacherId || userPayload.teacherId,
+          nfcCardId: response.user?.nfcCardId || userPayload.nfcCardId || "",
         };
         
         setAllUsers(prev => [...prev, newUser]);
@@ -4179,6 +4219,7 @@ const loadDashboardData = useCallback(async () => {
           userPayload.teacherId ||
           userPayload.studentId ||
           userPayload.employeeId;
+        const createdNfcCardId = response.user?.nfcCardId || userPayload.nfcCardId || "";
 
         setCreatedUserSummary({
           name: createdName,
@@ -4186,6 +4227,7 @@ const loadDashboardData = useCallback(async () => {
           username: newUser.username || "N/A",
           role: roleDisplay,
           employeeId: createdAccountId,
+          nfcCardId: createdNfcCardId,
           idLabel: isAcademicStaffAccount ? "Academic Staff ID" : isStudentAccount ? "Student ID" : "Employee ID",
           status: "Pending activation",
           deliveryNote,
@@ -4219,6 +4261,9 @@ const loadDashboardData = useCallback(async () => {
           [isAcademicStaffAccount ? "teacherId" : "studentId"]: "This academic ID is already registered.",
         }));
         Alert.alert("ID Already Used", "This academic ID is already registered. Please use another ID.");
+      } else if (message.toLowerCase().includes("nfc card") || message.toLowerCase().includes("card uid")) {
+        setCreateUserErrors((currentValue) => ({ ...currentValue, nfcCardId: "This NFC card UID is already assigned." }));
+        Alert.alert("NFC UID Already Used", "This NFC card UID is already assigned. Please use another card.");
       } else {
         Alert.alert("Error", message || "Failed to create account");
       }
@@ -4247,6 +4292,7 @@ const loadDashboardData = useCallback(async () => {
       course: userItem.course || "",
       yearLevel: userItem.yearLevel || "",
       section: userItem.section || "",
+      nfcCardId: userItem.nfcCardId || "",
       status: isUserActive(userItem) ? "active" : "inactive",
       isActive: isUserActive(userItem),
     });
@@ -4290,6 +4336,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmail,
       normalizedUsername,
       normalizedEmployeeId,
+      normalizedNfcCardId,
     } = validateEditUserForm();
     const isEditingSecurity = isSecurityRole(editUserData.role);
     const isEditingStudent = String(editUserData.role || "").toLowerCase() === "student";
@@ -4350,6 +4397,7 @@ const loadDashboardData = useCallback(async () => {
         department: editUserData.department,
         position: editUserData.position,
         employeeId: editUserData.employeeId,
+        nfcCardId: normalizedNfcCardId || "",
         status: editUserData.status,
         isActive: editUserData.status === "active",
       };
@@ -4410,6 +4458,9 @@ const loadDashboardData = useCallback(async () => {
         Alert.alert("Username Already Used", "This username is already registered. Please use another username.");
       } else if (message.toLowerCase().includes("staff id already")) {
         Alert.alert("Staff ID Already Used", "This staff ID is already registered. Please use another staff ID.");
+      } else if (message.toLowerCase().includes("nfc card") || message.toLowerCase().includes("card uid")) {
+        setEditUserErrors((currentValue) => ({ ...currentValue, nfcCardId: "This NFC card UID is already assigned." }));
+        Alert.alert("NFC UID Already Used", "This NFC card UID is already assigned. Please use another card.");
       } else {
         Alert.alert("Error", error.message || "Failed to update user");
       }
@@ -6914,6 +6965,40 @@ const loadDashboardData = useCallback(async () => {
                         {renderCreateUserFieldError("phone")}
                       </>
                     )}
+                  </View>
+                </View>
+
+                <View style={styles.userEditorGrid}>
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>NFC Card UID</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        createUserErrors.nfcCardId && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
+                      value={newUserData.nfcCardId}
+                      onChangeText={(text) => {
+                        setNewUserData((currentValue) => ({ ...currentValue, nfcCardId: text }));
+                        setCreateUserErrors((currentValue) => ({ ...currentValue, nfcCardId: null }));
+                      }}
+                      placeholder="Scan or type card UID, e.g. 04A1B2C3"
+                      autoCapitalize="characters"
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    />
+                    <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                      Optional. Use this when assigning the physical NFC card UID now.
+                    </Text>
+                    {renderCreateUserFieldError("nfcCardId")}
+                  </View>
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Card Status</Text>
+                    <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                      <Ionicons name="radio-outline" size={16} color="#64748B" />
+                      <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                        {newUserData.nfcCardId ? "Physical UID will be linked" : "SafePass ID will be generated"}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
@@ -11911,6 +11996,81 @@ const loadDashboardData = useCallback(async () => {
             >
               <View style={styles.createAccountSectionHeader}>
                 <Ionicons
+                  name="radio-outline"
+                  size={18}
+                  color={getRoleColor(newUserData.role)}
+                />
+                <View>
+                  <Text
+                    style={[
+                      styles.createAccountSectionTitle,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    NFC Card UID
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountSectionSubtitle,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Assign the physical NFC card UID now, or leave it blank to generate a SafePass ID.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.userEditorRow}>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Card UID
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      createUserErrors.nfcCardId && styles.inputError,
+                      isDarkMode && {
+                        backgroundColor: "#111827",
+                        borderColor: theme.borderColor,
+                        color: "#F8FBFE",
+                      },
+                    ]}
+                    placeholder="04A1B2C3"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    autoCapitalize="characters"
+                    value={newUserData.nfcCardId}
+                    onChangeText={(text) => {
+                      setNewUserData((prev) => ({ ...prev, nfcCardId: text }));
+                      setCreateUserErrors((prev) => ({ ...prev, nfcCardId: null }));
+                    }}
+                  />
+                  {renderCreateUserFieldError("nfcCardId")}
+                </View>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Assignment
+                  </Text>
+                  <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
+                    <Ionicons name="id-card-outline" size={16} color={isDarkMode ? "#94A3B8" : "#64748B"} />
+                    <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                      {newUserData.nfcCardId ? "Physical card UID will be saved" : "Auto SafePass ID will be used"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.createAccountSectionCard,
+                isDarkMode && {
+                  backgroundColor: "#0F172A",
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={styles.createAccountSectionHeader}>
+                <Ionicons
                   name="lock-closed-outline"
                   size={18}
                   color={getRoleColor(newUserData.role)}
@@ -12357,6 +12517,12 @@ const loadDashboardData = useCallback(async () => {
                       {selectedUser?.position || (isSecurityRole(selectedUser?.role) ? "Security Personnel" : "Not set")}
                     </Text>
                   </View>
+                  <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                    <Text style={styles.userProfileInfoLabel}>NFC Card UID</Text>
+                    <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
+                      {selectedUser?.nfcCardId || "Not assigned"}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
@@ -12626,6 +12792,39 @@ const loadDashboardData = useCallback(async () => {
                       <Ionicons name="card-outline" size={16} color="#64748B" />
                       <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
                         {editUserData.employeeId || "Not assigned"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.userEditorGrid}>
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>NFC Card UID</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        editUserErrors.nfcCardId && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
+                      value={editUserData.nfcCardId}
+                      onChangeText={(text) => {
+                        setEditUserData({ ...editUserData, nfcCardId: text });
+                        setEditUserErrors((currentValue) => ({ ...currentValue, nfcCardId: null }));
+                      }}
+                      placeholder="Scan or type card UID"
+                      autoCapitalize="characters"
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    />
+                    <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                      This is the UID matched when the physical NFC card is tapped.
+                    </Text>
+                    {renderEditUserFieldError("nfcCardId")}
+                  </View>
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Card Link</Text>
+                    <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                      <Ionicons name="radio-outline" size={16} color="#64748B" />
+                      <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                        {editUserData.nfcCardId ? "Assigned to this account" : "No physical UID assigned"}
                       </Text>
                     </View>
                   </View>
@@ -12928,6 +13127,10 @@ const loadDashboardData = useCallback(async () => {
                   {createdUserSummary?.idLabel || "Employee ID"}
                 </Text>
                 <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.employeeId || "N/A"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>NFC Card UID</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.nfcCardId || "Generated by SafePass"}</Text>
               </View>
               <View style={styles.createSuccessRow}>
                 <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Status</Text>
