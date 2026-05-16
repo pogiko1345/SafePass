@@ -159,6 +159,7 @@ export default function NFCScanScreen({ navigation }) {
   const cardInputRef = useRef(null);
   const readerBufferRef = useRef("");
   const readerBufferTimerRef = useRef(null);
+  const lastReaderInputAtRef = useRef(0);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -315,6 +316,23 @@ export default function NFCScanScreen({ navigation }) {
     setTimeout(() => cardInputRef.current?.focus?.(), 50);
   };
 
+  const handleCardInputChange = (value) => {
+    const normalizedValue = normalizeRfidReaderInput(value);
+    const now = Date.now();
+    const previousValue = cardId;
+    const shouldStartFreshScan =
+      previousValue &&
+      normalizedValue.length > previousValue.length &&
+      normalizedValue.startsWith(previousValue) &&
+      now - lastReaderInputAtRef.current > 250;
+    const nextValue = shouldStartFreshScan
+      ? normalizedValue.slice(previousValue.length)
+      : normalizedValue;
+
+    lastReaderInputAtRef.current = now;
+    setCardId(nextValue);
+  };
+
   const handleSelectFloor = (floorKey) => {
     const firstCheckpointForFloor =
       checkpointOptions.find((checkpoint) => checkpoint.floor === floorKey) ||
@@ -333,6 +351,8 @@ export default function NFCScanScreen({ navigation }) {
       return;
     }
 
+    readerBufferRef.current = "";
+    setCardId("");
     setBusy(true);
     try {
       const response = await ApiService.submitCheckpointTap({
@@ -368,7 +388,6 @@ export default function NFCScanScreen({ navigation }) {
 
       setLatestResult(event);
       recordLocalEvent(event);
-      setCardId("");
       focusReader();
     } catch (error) {
       const failedEvent = {
@@ -386,6 +405,8 @@ export default function NFCScanScreen({ navigation }) {
       Alert.alert("Tap Failed", failedEvent.message);
     } finally {
       setBusy(false);
+      setCardId("");
+      focusReader();
     }
   };
 
@@ -551,7 +572,7 @@ export default function NFCScanScreen({ navigation }) {
                 autoCapitalize="characters"
                 autoCorrect={false}
                 value={cardId}
-                onChangeText={(value) => setCardId(normalizeRfidReaderInput(value))}
+                onChangeText={handleCardInputChange}
                 onSubmitEditing={(event) => handleSubmitTap(event?.nativeEvent?.text)}
                 returnKeyType="done"
                 blurOnSubmit={false}
