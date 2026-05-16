@@ -1237,6 +1237,8 @@ export default StyleSheet.create({
   },
 
   recordToolbar: {
+    position: "relative",
+    zIndex: 1000,
     flexDirection: isDesktop ? "row" : "column",
     alignItems: "stretch",
     gap: 12,
@@ -1244,6 +1246,8 @@ export default StyleSheet.create({
   },
 
   recordToolbarCard: {
+    position: "relative",
+    zIndex: 1000,
     flex: 1,
     minWidth: 0,
     borderWidth: 1,
@@ -1251,6 +1255,7 @@ export default StyleSheet.create({
     borderRadius: 16,
     backgroundColor: colors.white,
     padding: spacing.md,
+    overflow: "visible",
   },
 
   recordToolbarHeader: {
@@ -1298,10 +1303,13 @@ export default StyleSheet.create({
   },
 
   recordToolbarFilterGrid: {
+    position: "relative",
+    zIndex: 1000,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "flex-start",
     gap: spacing.sm,
+    overflow: "visible",
   },
 
   recordToolbarField: {
@@ -1309,7 +1317,13 @@ export default StyleSheet.create({
     flexBasis: isTablet ? "100%" : 180,
     minWidth: isTablet ? "100%" : 160,
     position: "relative",
-    zIndex: 2,
+    zIndex: 10,
+    overflow: "visible",
+  },
+
+  recordToolbarFieldOpen: {
+    zIndex: 3000,
+    elevation: 24,
   },
 
   recordToolbarLabel: {
@@ -1355,13 +1369,14 @@ export default StyleSheet.create({
     top: Platform.OS === "web" ? 68 : undefined,
     left: 0,
     right: 0,
-    zIndex: 50,
+    zIndex: 4000,
     maxHeight: 210,
     borderWidth: 1,
     borderColor: "#D8E8FF",
     borderRadius: 14,
     backgroundColor: colors.white,
     padding: 6,
+    elevation: 24,
   },
 
   recordToolbarDropdownScroll: {

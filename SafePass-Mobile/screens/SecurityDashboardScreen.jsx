@@ -198,6 +198,45 @@ const securityLogFilters = [
   { key: "denied", label: "Denied" },
 ];
 
+const SECURITY_ATTENDANCE_SCOPE_OPTIONS = [
+  { value: "all", label: "All People" },
+  { value: "student", label: "Students" },
+  { value: "teacher", label: "Academic Staff" },
+  { value: "staff", label: "Staff" },
+  { value: "security", label: "Security" },
+  { value: "visitor", label: "Visitors" },
+];
+
+const SECURITY_ATTENDANCE_DATE_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "all", label: "All Dates" },
+];
+
+const SECURITY_ATTENDANCE_STATUS_OPTIONS = [
+  { value: "all", label: "All Status" },
+  { value: "inside", label: "Inside / Present" },
+  { value: "late", label: "Late" },
+  { value: "checked_out", label: "Checked Out" },
+  { value: "completed", label: "Completed" },
+];
+
+const getSecurityAttendanceDateRange = (shortcut = "today") => {
+  const now = new Date();
+  const toDate = now.toISOString().slice(0, 10);
+  const fromDate = new Date(now);
+
+  if (shortcut === "all") return {};
+  if (shortcut === "week") fromDate.setDate(now.getDate() - 6);
+  if (shortcut === "month") fromDate.setDate(now.getDate() - 29);
+
+  return {
+    dateFrom: fromDate.toISOString().slice(0, 10),
+    dateTo: toDate,
+  };
+};
+
 const buildSecurityProfileForm = (profile = {}) => ({
   firstName: profile.firstName || "",
   lastName: profile.lastName || "",
@@ -253,6 +292,12 @@ export default function SecurityDashboardScreen({ navigation }) {
     total: 0,
     byUserType: {},
   });
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceScope, setAttendanceScope] = useState("all");
+  const [attendanceDateFilter, setAttendanceDateFilter] = useState("today");
+  const [attendanceStatusFilter, setAttendanceStatusFilter] = useState("all");
+  const [attendanceSearch, setAttendanceSearch] = useState("");
   const [recentAccess, setRecentAccess] = useState([]);
   const [alerts, setAlerts] = useState([]);
   
@@ -526,6 +571,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       await Promise.all([
         loadOperationalData({ force: true }),
         loadSecurityLivePresence(),
+        loadSecurityAttendanceRecords(),
         loadNotifications(currentUser, { force: true }),
         loadMapSettings(),
       ]);
@@ -1174,6 +1220,32 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
   };
 
+  const loadSecurityAttendanceRecords = async () => {
+    setAttendanceLoading(true);
+    try {
+      const query = {
+        ...getSecurityAttendanceDateRange(attendanceDateFilter),
+        limit: 200,
+      };
+      if (attendanceScope === "security") {
+        query.module = "security_monitoring";
+      } else if (attendanceScope !== "all") {
+        query.userType = attendanceScope;
+      }
+      if (attendanceStatusFilter !== "all") query.status = attendanceStatusFilter;
+      if (attendanceSearch.trim()) query.search = attendanceSearch.trim();
+
+      const response = await ApiService.getAttendance(query);
+      setAttendanceRecords(Array.isArray(response?.attendance) ? response.attendance : []);
+      return true;
+    } catch (error) {
+      console.error("Load security attendance records error:", error);
+      return false;
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
   const loadMapSettings = async () => {
     try {
       const response = await ApiService.getMapSettings();
@@ -1252,6 +1324,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       loadOperationalData({ force: true }),
       loadLiveVisitorLocations(),
       loadSecurityLivePresence(),
+      loadSecurityAttendanceRecords(),
     ]);
   };
 
@@ -1291,11 +1364,12 @@ export default function SecurityDashboardScreen({ navigation }) {
     },
     {
       key: 'campus-activity',
-      label: 'Visitor Monitoring',
+      label: 'Campus Monitoring',
       icon: 'walk-outline',
       color: '#0A3D91',
       submodules: [
-        { key: 'checked-in-visitors', label: 'Arrival and Departure', badge: dashboardStats.activeUsers || visitors.active.length || 0 },
+        { key: 'checked-in-visitors', label: 'Visitor Arrival / Departure', badge: visitors.active.length || 0 },
+        { key: 'attendance-monitoring', label: 'Attendance Monitoring', badge: livePresenceSummary?.total || 0 },
       ],
     },
     {
@@ -1333,6 +1407,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (submoduleKey.startsWith('map-')) return 'map';
     if (submoduleKey === 'appointment-records') return 'visitors';
     if (submoduleKey === 'checked-in-visitors') return 'presence';
+    if (submoduleKey === 'attendance-monitoring') return 'attendance';
     if (submoduleKey === 'nfc-assign') return 'nfc';
     if (submoduleKey === 'report-file') return 'reports';
     return 'dashboard';
@@ -1352,8 +1427,13 @@ export default function SecurityDashboardScreen({ navigation }) {
         return { title: 'Appointment Records', subtitle: 'Review appointment records in a read-only security view.' };
       case 'checked-in-visitors':
         return {
-          title: 'Arrival and Departure',
-          subtitle: 'Monitor visitor arrivals, active campus presence, and completed departures in one security view.',
+          title: 'Visitor Arrival / Departure',
+          subtitle: 'Monitor visitor arrivals, assigned destinations, and completed departures.',
+        };
+      case 'attendance-monitoring':
+        return {
+          title: 'Attendance Monitoring',
+          subtitle: 'Monitor student, academic staff, staff, security, and visitor NFC attendance records.',
         };
       case 'report-file':
         return { title: 'File a Report', subtitle: 'Submit a security report and review recently filed incidents.' };
@@ -1382,6 +1462,10 @@ export default function SecurityDashboardScreen({ navigation }) {
 
     if (submoduleKey === 'appointment-records') {
       setVisitorFilter('all');
+    }
+
+    if (submoduleKey === 'attendance-monitoring') {
+      loadSecurityAttendanceRecords();
     }
   };
 
@@ -1555,6 +1639,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       const refreshTasks = [
         loadLiveVisitorLocations(),
         loadSecurityLivePresence(),
+        loadSecurityAttendanceRecords(),
       ];
 
       if (shouldRefreshOperationalData) {
@@ -2373,6 +2458,41 @@ export default function SecurityDashboardScreen({ navigation }) {
     return filteredReports.slice(startIndex, startIndex + reportsItemsPerPage);
   }, [filteredReports, reportsPage]);
 
+  const filteredAttendanceRecords = useMemo(() => {
+    const query = String(attendanceSearch || "").trim().toLowerCase();
+    if (!query) return attendanceRecords;
+    return attendanceRecords.filter((record) =>
+      [
+        record?.name,
+        record?.userType,
+        record?.role,
+        record?.status,
+        record?.location,
+        record?.checkpointIn,
+        record?.checkpointOut,
+        record?.nfcCardId,
+        record?.sourceDeviceId,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)),
+    );
+  }, [attendanceRecords, attendanceSearch]);
+
+  const attendanceOverview = useMemo(() => {
+    return filteredAttendanceRecords.reduce(
+      (summary, record) => {
+        const status = String(record?.status || "").toLowerCase();
+        summary.total += 1;
+        if (status === "late" || record?.isLate) summary.late += 1;
+        if (["inside", "present"].includes(status)) summary.inside += 1;
+        if (["checked_out", "completed"].includes(status) || record?.isCompleted) summary.checkedOut += 1;
+        summary.byType[record?.userType || "unknown"] = (summary.byType[record?.userType || "unknown"] || 0) + 1;
+        return summary;
+      },
+      { total: 0, inside: 0, late: 0, checkedOut: 0, byType: {} },
+    );
+  }, [filteredAttendanceRecords]);
+
   useEffect(() => {
     setAppointmentRecordsPage(1);
   }, [visitorFilter, searchQuery]);
@@ -2388,6 +2508,11 @@ export default function SecurityDashboardScreen({ navigation }) {
   useEffect(() => {
     setReportsPage(1);
   }, [reportSearchQuery, reportStatusFilter]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadSecurityAttendanceRecords();
+  }, [attendanceScope, attendanceDateFilter, attendanceStatusFilter]);
 
   const renderAppointmentPagination = () => (
     <View style={styles.appointmentRecordsPaginationRow}>
@@ -2952,14 +3077,14 @@ export default function SecurityDashboardScreen({ navigation }) {
             <View style={styles.sectionTitleContainer}>
               <Ionicons name="people-outline" size={20} color="#0A3D91" />
               <View>
-                <Text style={styles.sectionTitle}>Visitor Monitoring</Text>
+                <Text style={styles.sectionTitle}>Campus Attendance Monitoring</Text>
                 <Text style={styles.securitySectionSubtitle}>
-                  Visitor arrival, active presence, and departure activity in one place.
+                  Live NFC presence for students, academic staff, staff, security, and visitors.
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => selectGuardSubmodule('checked-in-visitors')}>
-              <Text style={styles.viewAll}>Open Arrivals</Text>
+            <TouchableOpacity onPress={() => selectGuardSubmodule('attendance-monitoring')}>
+              <Text style={styles.viewAll}>Open Attendance</Text>
             </TouchableOpacity>
           </View>
 
@@ -3158,7 +3283,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     const selectedOption = options.find((option) => option.value === value);
 
     return (
-      <View style={styles.recordToolbarField}>
+      <View style={[styles.recordToolbarField, isOpen && styles.recordToolbarFieldOpen]}>
         <Text style={styles.recordToolbarLabel}>{label}</Text>
         <TouchableOpacity
           style={styles.recordToolbarSelect}
@@ -3501,62 +3626,15 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         )}
 
-        <View style={[styles.sectionHeader, { marginTop: 16 }]}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="people-outline" size={18} color="#0A3D91" />
-            <Text style={styles.sectionTitle}>Live Visitor Monitoring</Text>
-          </View>
-          <Text style={styles.securitySectionSubtitle}>
-            {livePresenceSummary?.total || 0} active attendance record{livePresenceSummary?.total === 1 ? '' : 's'}
+        <View style={[styles.readonlyInfoBanner, { marginTop: 16 }]}>
+          <Ionicons name="people-outline" size={18} color="#0A3D91" />
+          <Text style={styles.readonlyInfoBannerText}>
+            Student, staff, and security attendance is tracked separately from visitor monitoring.
           </Text>
+          <TouchableOpacity onPress={() => selectGuardSubmodule('attendance-monitoring')}>
+            <Text style={styles.viewAll}>Open Attendance</Text>
+          </TouchableOpacity>
         </View>
-
-        <View style={styles.reportStatsGrid}>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{livePresenceByType.student || 0}</Text>
-            <Text style={styles.reportStatLabel}>Students</Text>
-          </View>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{livePresenceByType.teacher || 0}</Text>
-            <Text style={styles.reportStatLabel}>Teachers</Text>
-          </View>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{livePresenceByType.staff || 0}</Text>
-            <Text style={styles.reportStatLabel}>Staff</Text>
-          </View>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{(livePresenceByType.security || 0) + (livePresenceByType.guard || 0)}</Text>
-            <Text style={styles.reportStatLabel}>Security</Text>
-          </View>
-        </View>
-
-        {activeUsers.length > 0 ? (
-          <View style={styles.activityList}>
-            {activeUsers.map((presenceItem, index) => (
-              <View
-                key={presenceItem.attendanceId || `${presenceItem.userId || presenceItem.visitorId}-${index}`}
-                style={styles.activityItem}
-              >
-                <View style={[styles.activityIcon, { backgroundColor: '#EEF5FF' }]}>
-                  <Ionicons name={getPresenceIcon(presenceItem.userType)} size={16} color="#0A3D91" />
-                </View>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityTitle}>{presenceItem.name}</Text>
-                  <Text style={styles.activityLocation}>
-                    {titleCase(presenceItem.userType)} at {getPresenceLocation(presenceItem)}
-                  </Text>
-                </View>
-                <Text style={styles.activityTime}>{formatTime(presenceItem.lastTapTime)}</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyStateTitle}>No live campus presence</Text>
-            <Text style={styles.emptyStateSubtitle}>Students, teachers, staff, and visitors currently on site will appear here.</Text>
-          </View>
-        )}
 
         <View style={[styles.sectionHeader, { marginTop: 12 }]}>
           <View style={styles.sectionTitleContainer}>
@@ -3648,6 +3726,158 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name="checkmark-circle-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyStateTitle}>No Active Alerts</Text>
             <Text style={styles.emptyStateSubtitle}>All systems are operating normally</Text>
+          </View>
+        )}
+      </View>
+    </ScrollView>
+  );
+
+  const renderAttendanceMonitoringTab = () => (
+    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <View style={styles.visitorsContainer}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="clipboard-outline" size={20} color="#0A3D91" />
+            <View>
+              <Text style={styles.sectionTitle}>Attendance Monitoring</Text>
+              <Text style={styles.securitySectionSubtitle}>
+                View NFC attendance records for students, academic staff, staff, security, and visitors.
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={loadSecurityAttendanceRecords} disabled={attendanceLoading}>
+            <Text style={styles.viewAll}>{attendanceLoading ? "Refreshing..." : "Refresh"}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {renderRecordSearchFilterToolbar({
+          searchTitle: "Search Attendance",
+          searchSubtitle: "Find attendance by name, UID, location, type, or status.",
+          searchValue: attendanceSearch,
+          onSearchChange: setAttendanceSearch,
+          onClearSearch: () => setAttendanceSearch(""),
+          searchPlaceholder: "Search name, UID, location, or status...",
+          filterSubtitle: "Narrow attendance by person type, date, and status.",
+          hasFilters:
+            attendanceScope !== "all" ||
+            attendanceDateFilter !== "today" ||
+            attendanceStatusFilter !== "all",
+          onResetFilters: () => {
+            setAttendanceScope("all");
+            setAttendanceDateFilter("today");
+            setAttendanceStatusFilter("all");
+          },
+          filterGroups: [
+            {
+              id: "attendance-scope",
+              label: "Person Type",
+              value: attendanceScope,
+              icon: "people-outline",
+              options: SECURITY_ATTENDANCE_SCOPE_OPTIONS,
+              onSelect: setAttendanceScope,
+            },
+            {
+              id: "attendance-date",
+              label: "Date Range",
+              value: attendanceDateFilter,
+              icon: "calendar-outline",
+              options: SECURITY_ATTENDANCE_DATE_OPTIONS,
+              onSelect: setAttendanceDateFilter,
+            },
+            {
+              id: "attendance-status",
+              label: "Status",
+              value: attendanceStatusFilter,
+              icon: "pulse-outline",
+              options: SECURITY_ATTENDANCE_STATUS_OPTIONS,
+              onSelect: setAttendanceStatusFilter,
+            },
+          ],
+        })}
+
+        <View style={styles.reportStatsGrid}>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{attendanceOverview.total}</Text>
+            <Text style={styles.reportStatLabel}>Records</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{attendanceOverview.inside}</Text>
+            <Text style={styles.reportStatLabel}>Inside / Present</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{attendanceOverview.late}</Text>
+            <Text style={styles.reportStatLabel}>Late</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{attendanceOverview.checkedOut}</Text>
+            <Text style={styles.reportStatLabel}>Checked Out</Text>
+          </View>
+        </View>
+
+        {attendanceLoading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="small" color="#0A3D91" />
+            <Text style={styles.emptyStateTitle}>Loading attendance records</Text>
+          </View>
+        ) : filteredAttendanceRecords.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.appointmentRecordsTable}>
+              <View style={[styles.appointmentRecordsTableRow, styles.appointmentRecordsTableHeader]}>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsVisitorCell]}>Person</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsPurposeCell]}>Type</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsScheduleCell]}>Date</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsScheduleCell]}>Check In</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsScheduleCell]}>Check Out</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsStatusCell]}>Status</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsOfficeCell]}>Location</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsContactCell]}>NFC UID</Text>
+              </View>
+              {filteredAttendanceRecords.slice(0, 150).map((record, index) => (
+                <View
+                  key={record?._id || `${record?.name}-${record?.attendanceDate}-${index}`}
+                  style={styles.appointmentRecordsTableRow}
+                >
+                  <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsVisitorCell]}>
+                    <View style={[styles.activityIcon, { backgroundColor: '#EEF5FF' }]}>
+                      <Ionicons name={getPresenceIcon(record?.userType)} size={16} color="#0A3D91" />
+                    </View>
+                    <View style={styles.appointmentRecordsVisitorInfo}>
+                      <Text style={styles.appointmentRecordsVisitorName}>{record?.name || "Unknown"}</Text>
+                      <Text style={styles.appointmentRecordsVisitorEmail}>{record?.sourceDeviceId || "Checkpoint tap"}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsPurposeCell]}>
+                    {titleCase(record?.userType || record?.role || "User")}
+                  </Text>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsScheduleCell]}>
+                    {formatDate(record?.attendanceDate)}
+                  </Text>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsScheduleCell]}>
+                    {formatTime(record?.checkInTime)}
+                  </Text>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsScheduleCell]}>
+                    {record?.checkOutTime ? formatTime(record.checkOutTime) : "-"}
+                  </Text>
+                  <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsStatusCell]}>
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusBadgeText}>{titleCase(record?.status || "Recorded")}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsOfficeCell]} numberOfLines={1}>
+                    {record?.location || record?.checkpointIn || "Campus"}
+                  </Text>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsContactCell]} numberOfLines={1}>
+                    {record?.nfcCardId || "No UID"}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="clipboard-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateTitle}>No attendance records found</Text>
+            <Text style={styles.emptyStateSubtitle}>NFC check-ins and check-outs will appear here after cards are tapped.</Text>
           </View>
         )}
       </View>
@@ -5689,6 +5919,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           {selectedSubmodule.startsWith('map-') && renderMapTab()}
           {selectedSubmodule === 'appointment-records' && renderVisitorsTab()}
           {selectedSubmodule === 'checked-in-visitors' && renderCampusActivityTab()}
+          {selectedSubmodule === 'attendance-monitoring' && renderAttendanceMonitoringTab()}
           {selectedSubmodule === 'nfc-assign' && renderNfcAssignmentTab()}
           {selectedSubmodule === 'report-file' && renderReportsTab()}
           
