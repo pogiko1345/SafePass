@@ -119,6 +119,8 @@ const getPersonDetails = (response = {}) => {
 
 export default function NFCScanScreen({ navigation }) {
   const cardInputRef = useRef(null);
+  const readerBufferRef = useRef("");
+  const readerBufferTimerRef = useRef(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -164,6 +166,60 @@ export default function NFCScanScreen({ navigation }) {
     return () => clearTimeout(timer);
   }, [loading]);
 
+  useEffect(() => {
+    if (loading || Platform.OS !== "web") return undefined;
+
+    const armReader = () => {
+      if (document.activeElement !== cardInputRef.current) {
+        cardInputRef.current?.focus?.();
+      }
+    };
+
+    const handleDocumentPointer = () => {
+      window.setTimeout(armReader, 50);
+    };
+
+    const handleDocumentKeyDown = (event) => {
+      const activeElement = document.activeElement;
+      const isTypingTarget =
+        activeElement &&
+        ["INPUT", "TEXTAREA", "SELECT"].includes(activeElement.tagName) &&
+        activeElement !== cardInputRef.current;
+
+      if (isTypingTarget || event.ctrlKey || event.metaKey || event.altKey || busy) return;
+
+      if (event.key === "Enter") {
+        const bufferedUid = readerBufferRef.current;
+        readerBufferRef.current = "";
+        if (bufferedUid) {
+          event.preventDefault();
+          handleSubmitTap(bufferedUid);
+        }
+        return;
+      }
+
+      if (event.key?.length === 1) {
+        readerBufferRef.current += event.key;
+        window.clearTimeout(readerBufferTimerRef.current);
+        readerBufferTimerRef.current = window.setTimeout(() => {
+          readerBufferRef.current = "";
+        }, 350);
+      }
+    };
+
+    armReader();
+    window.addEventListener("focus", armReader);
+    document.addEventListener("pointerdown", handleDocumentPointer);
+    document.addEventListener("keydown", handleDocumentKeyDown);
+
+    return () => {
+      window.removeEventListener("focus", armReader);
+      document.removeEventListener("pointerdown", handleDocumentPointer);
+      document.removeEventListener("keydown", handleDocumentKeyDown);
+      window.clearTimeout(readerBufferTimerRef.current);
+    };
+  }, [loading, busy, selectedAction, selectedCheckpointKey]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -177,7 +233,10 @@ export default function NFCScanScreen({ navigation }) {
     setStationEvents((currentEvents) => [event, ...currentEvents].slice(0, 8));
   };
 
-  const focusReader = () => cardInputRef.current?.focus?.();
+  const focusReader = () => {
+    globalThis.requestAnimationFrame?.(() => cardInputRef.current?.focus?.());
+    setTimeout(() => cardInputRef.current?.focus?.(), 50);
+  };
 
   const handleSubmitTap = async (scannedValue = cardId) => {
     const normalizedCardId = normalizeRfidReaderInput(scannedValue);
@@ -413,7 +472,7 @@ export default function NFCScanScreen({ navigation }) {
               <View style={styles.readerHintCard}>
                 <Ionicons name="information-circle-outline" size={16} color="#0A3D91" />
                 <Text style={styles.readerHintText}>
-                  Keep this field armed, then tap a card. Most USB readers type the UID and press Enter.
+                  This station auto-arms the reader. Tap a card anywhere on this screen.
                 </Text>
               </View>
               <View style={styles.inlineActions}>
