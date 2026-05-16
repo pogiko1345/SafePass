@@ -3770,6 +3770,24 @@ export default StyleSheet.create({
     color: "#1C6DD0",
   },
 
+  adminNoticeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+
+  adminNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+
   managementStatsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",

@@ -1680,6 +1680,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         icon: "briefcase-outline",
         accent: ADMIN_BLUE,
         primaryActionLabel: "Create Staff",
+        primaryActionRole: "staff",
         searchPlaceholder: "Search staff by name, email, phone, or department...",
         stats: [
           { key: "total", label: "Staff Accounts", value: scopedUsers.length, icon: "people-outline" },
@@ -1703,6 +1704,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         icon: "shield-checkmark-outline",
         accent: ADMIN_BLUE,
         primaryActionLabel: "Create Security",
+        primaryActionRole: "security",
         searchPlaceholder: "Search security personnel by name, email, or phone...",
         stats: [
           { key: "total", label: "Security Accounts", value: scopedUsers.length, icon: "shield-outline" },
@@ -1725,6 +1727,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       icon: "people-circle-outline",
       accent: ADMIN_BLUE,
       primaryActionLabel: null,
+      primaryActionRole: null,
       searchPlaceholder: "Search all users by name, email, phone, or department...",
       stats: [
         { key: "total", label: "Total Users", value: allUsers.length, icon: "people-outline" },
@@ -3530,7 +3533,7 @@ const loadDashboardData = useCallback(async () => {
     }
 
     if (submoduleKey === "account-create") {
-      resetCreateUserForm("staff");
+      resetCreateUserForm(options.createRole || "staff");
     }
 
     syncLegacyMenuState(legacyMenuKey);
@@ -3756,8 +3759,7 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const openCreateUserModal = (role = accountRecordsMode === "security" ? "security" : "staff") => {
-    resetCreateUserForm(role);
-    selectAdminSubmodule("account-create");
+    selectAdminSubmodule("account-create", { createRole: role });
   };
 
   const getStaffDepartmentOption = (department) =>
@@ -4319,17 +4321,22 @@ const loadDashboardData = useCallback(async () => {
 
   const handleCloseCreateSuccessModal = async () => {
     const createdName = createdUserSummary?.name || "New user";
+    const createdRole = String(createdUserSummary?.role || newUserData.role || "staff").toLowerCase();
+    const nextAccountMode = isSecurityRole(createdRole)
+      ? "security"
+      : createdRole === "staff"
+        ? "staff"
+        : "all";
     setShowCreateSuccessModal(false);
     setCreatedUserSummary(null);
     resetCreateUserForm("staff");
     await loadDashboardData();
-    setActiveMenu("users");
+    selectAdminSubmodule("account-records", { accountMode: nextAccountMode });
     setUserFilter("all");
     setUserSearchQuery("");
     setCurrentPage(1);
     setUserManagementStatusTab("active");
     setCreateUserMessage(`${createdName} was added successfully.`);
-    setShowUserManagementModal(true);
   };
 
   // FIXED: Confirm Edit User
@@ -10400,7 +10407,7 @@ const loadDashboardData = useCallback(async () => {
             {userManagementConfig.primaryActionLabel ? (
               <TouchableOpacity
                 style={[styles.managementPrimaryButton, { backgroundColor: userManagementConfig.accent }]}
-                onPress={() => openCreateUserModal(accountRecordsMode === "security" ? "security" : "staff")}
+                onPress={() => openCreateUserModal(userManagementConfig.primaryActionRole)}
               >
                 <Ionicons name="person-add-outline" size={18} color="#FFFFFF" />
                 <Text style={styles.managementPrimaryButtonText}>
@@ -10411,6 +10418,23 @@ const loadDashboardData = useCallback(async () => {
 
           </View>
         </View>
+
+        {createUserMessage ? (
+          <View
+            style={[
+              styles.adminNoticeCard,
+              {
+                backgroundColor: isDarkMode ? "#064E3B" : "#ECFDF5",
+                borderColor: isDarkMode ? "#10B981" : "#A7F3D0",
+              },
+            ]}
+          >
+            <Ionicons name="checkmark-circle-outline" size={20} color={isDarkMode ? "#A7F3D0" : "#047857"} />
+            <Text style={[styles.adminNoticeText, { color: isDarkMode ? "#D1FAE5" : "#065F46" }]}>
+              {createUserMessage}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.managementStatsGrid}>
           {userManagementConfig.stats.map((item) => (
