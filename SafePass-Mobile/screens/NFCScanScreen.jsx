@@ -167,6 +167,7 @@ export default function NFCScanScreen({ navigation }) {
   const [mapRooms, setMapRooms] = useState(MONITORING_MAP_OFFICES);
   const [selectedFloorKey, setSelectedFloorKey] = useState(MONITORING_MAP_FLOORS[0].id);
   const [selectedCheckpointKey, setSelectedCheckpointKey] = useState(ENTRY_CHECKPOINTS[0].key);
+  const [checkpointSearch, setCheckpointSearch] = useState("");
   const [selectedAction, setSelectedAction] = useState("auto");
   const [cardId, setCardId] = useState("");
   const [stationEvents, setStationEvents] = useState([]);
@@ -181,10 +182,19 @@ export default function NFCScanScreen({ navigation }) {
       }), {}),
     [checkpointOptions],
   );
-  const visibleCheckpoints = useMemo(
-    () => checkpointOptions.filter((checkpoint) => checkpoint.floor === selectedFloorKey),
-    [checkpointOptions, selectedFloorKey],
-  );
+  const visibleCheckpoints = useMemo(() => {
+    const normalizedSearch = String(checkpointSearch || "").trim().toLowerCase();
+    return checkpointOptions.filter((checkpoint) => {
+      const matchesFloor = checkpoint.floor === selectedFloorKey;
+      if (!normalizedSearch) return matchesFloor;
+      return (
+        matchesFloor &&
+        [checkpoint.label, checkpoint.office, checkpoint.floor, getFloorName(checkpoint.floor)]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(normalizedSearch))
+      );
+    });
+  }, [checkpointOptions, selectedFloorKey, checkpointSearch]);
   const selectedCheckpoint = useMemo(
     () => checkpointOptions.find((checkpoint) => checkpoint.key === selectedCheckpointKey) || checkpointOptions[0],
     [checkpointOptions, selectedCheckpointKey],
@@ -338,6 +348,7 @@ export default function NFCScanScreen({ navigation }) {
       checkpointOptions.find((checkpoint) => checkpoint.floor === floorKey) ||
       checkpointOptions[0];
     setSelectedFloorKey(floorKey);
+    setCheckpointSearch("");
     if (firstCheckpointForFloor) {
       setSelectedCheckpointKey(firstCheckpointForFloor.key);
     }
@@ -670,17 +681,24 @@ export default function NFCScanScreen({ navigation }) {
               <View style={styles.sectionHeaderRow}>
                 <View>
                   <Text style={styles.sectionTitle}>Checkpoint</Text>
-                  <Text style={styles.sectionSubtitle}>Choose a floor, then select the office reader location.</Text>
+                  <Text style={styles.sectionSubtitle}>Pick the reader location for this station.</Text>
                 </View>
                 <View style={styles.floorCountBadge}>
                   <Text style={styles.floorCountText}>{visibleCheckpoints.length} offices</Text>
                 </View>
               </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.floorTabRow}
-              >
+
+              <View style={styles.selectedCheckpointBanner}>
+                <View style={styles.selectedCheckpointIcon}>
+                  <Ionicons name={selectedCheckpoint.icon} size={18} color="#FFFFFF" />
+                </View>
+                <View style={styles.selectedCheckpointCopy}>
+                  <Text style={styles.selectedCheckpointLabel}>{selectedCheckpoint.label}</Text>
+                  <Text style={styles.selectedCheckpointMeta}>{getFloorName(selectedCheckpoint.floor)}</Text>
+                </View>
+              </View>
+
+              <View style={styles.floorTabRow}>
                 {MONITORING_MAP_FLOORS.map((floor) => {
                   const selected = floor.id === selectedFloorKey;
                   const count = floorCheckpointCounts[floor.id] || 0;
@@ -706,36 +724,77 @@ export default function NFCScanScreen({ navigation }) {
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
-              <View style={styles.checkpointGrid}>
-                {visibleCheckpoints.map((checkpoint) => {
-                  const selected = checkpoint.key === selectedCheckpointKey;
-                  return (
-                    <TouchableOpacity
-                      key={checkpoint.key}
-                      style={[styles.checkpointCard, selected && styles.checkpointCardActive]}
-                      onPress={() => {
-                        setSelectedCheckpointKey(checkpoint.key);
-                        setTimeout(focusReader, 80);
-                      }}
-                    >
-                      <Ionicons
-                        name={checkpoint.icon}
-                        size={18}
-                        color={selected ? "#FFFFFF" : "#0A3D91"}
-                      />
-                      <View style={styles.checkpointCopy}>
-                        <Text style={[styles.checkpointLabel, selected && styles.checkpointLabelActive]}>
-                          {checkpoint.label}
-                        </Text>
-                        <Text style={[styles.checkpointMeta, selected && styles.checkpointMetaActive]}>
-                          {getFloorName(checkpoint.floor)}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
               </View>
+
+              <View style={styles.checkpointSearchWrap}>
+                <Ionicons name="search-outline" size={17} color="#64748B" />
+                <TextInput
+                  style={styles.checkpointSearchInput}
+                  value={checkpointSearch}
+                  onChangeText={setCheckpointSearch}
+                  placeholder={`Search ${getFloorName(selectedFloorKey)} offices`}
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {checkpointSearch ? (
+                  <TouchableOpacity
+                    style={styles.checkpointSearchClear}
+                    onPress={() => {
+                      setCheckpointSearch("");
+                      setTimeout(focusReader, 80);
+                    }}
+                  >
+                    <Ionicons name="close" size={16} color="#64748B" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.checkpointListScroll} showsVerticalScrollIndicator={false}>
+                <View style={styles.checkpointGrid}>
+                  {visibleCheckpoints.map((checkpoint) => {
+                    const selected = checkpoint.key === selectedCheckpointKey;
+                    return (
+                      <TouchableOpacity
+                        key={checkpoint.key}
+                        style={[styles.checkpointCard, selected && styles.checkpointCardActive]}
+                        onPress={() => {
+                          setSelectedCheckpointKey(checkpoint.key);
+                          setTimeout(focusReader, 80);
+                        }}
+                      >
+                        <View style={[styles.checkpointIcon, selected && styles.checkpointIconActive]}>
+                          <Ionicons
+                            name={checkpoint.icon}
+                            size={17}
+                            color={selected ? "#0A3D91" : "#0A3D91"}
+                          />
+                        </View>
+                        <View style={styles.checkpointCopy}>
+                          <Text
+                            style={[styles.checkpointLabel, selected && styles.checkpointLabelActive]}
+                            numberOfLines={1}
+                          >
+                            {checkpoint.label}
+                          </Text>
+                          <Text
+                            style={[styles.checkpointMeta, selected && styles.checkpointMetaActive]}
+                            numberOfLines={1}
+                          >
+                            {getFloorName(checkpoint.floor)}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {!visibleCheckpoints.length ? (
+                    <View style={styles.checkpointEmpty}>
+                      <Ionicons name="search-outline" size={20} color="#94A3B8" />
+                      <Text style={styles.checkpointEmptyText}>No office matches this search.</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </ScrollView>
             </View>
 
             <View style={[styles.resultCard, { backgroundColor: latestTone.background, borderColor: latestTone.border }]}>
@@ -1127,8 +1186,10 @@ const styles = StyleSheet.create({
     color: "#0A3D91",
   },
   floorTabRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
-    paddingBottom: 12,
+    marginBottom: 12,
   },
   floorTab: {
     minHeight: 42,
@@ -1139,8 +1200,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D9E2EE",
     backgroundColor: "#F8FAFC",
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 9,
+    flexGrow: 1,
+    flexBasis: 148,
   },
   floorTabActive: {
     backgroundColor: "#0A3D91",
@@ -1178,6 +1241,67 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#64748B",
+  },
+  selectedCheckpointBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
+    backgroundColor: "#0A3D91",
+    padding: 12,
+    marginBottom: 12,
+  },
+  selectedCheckpointIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  selectedCheckpointCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  selectedCheckpointLabel: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  selectedCheckpointMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#D8E8FF",
+  },
+  checkpointSearchWrap: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "#D9E2EE",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  checkpointSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+    paddingVertical: 10,
+    outlineStyle: "none",
+  },
+  checkpointSearchClear: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E2E8F0",
   },
   optionRow: {
     gap: 10,
@@ -1643,24 +1767,45 @@ const styles = StyleSheet.create({
     color: "#0A3D91",
   },
   checkpointGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
+  },
+  checkpointListScroll: {
+    maxHeight: 330,
   },
   checkpointCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    borderRadius: 14,
+    gap: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#D9E2EE",
     backgroundColor: "#FBFCFE",
-    padding: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    flexGrow: 1,
+    flexBasis: 150,
+    minWidth: 145,
   },
   checkpointCardActive: {
     backgroundColor: "#0A3D91",
     borderColor: "#0A3D91",
   },
+  checkpointIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+  checkpointIconActive: {
+    backgroundColor: "#FFFFFF",
+  },
   checkpointCopy: {
     flex: 1,
+    minWidth: 0,
   },
   checkpointLabel: {
     fontSize: 13,
@@ -1677,6 +1822,23 @@ const styles = StyleSheet.create({
   },
   checkpointMetaActive: {
     color: "#D8E8FF",
+  },
+  checkpointEmpty: {
+    flexGrow: 1,
+    flexBasis: "100%",
+    minHeight: 96,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  checkpointEmptyText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
   },
   flowStrip: {
     flexDirection: "row",
