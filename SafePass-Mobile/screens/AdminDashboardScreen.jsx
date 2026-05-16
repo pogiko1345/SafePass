@@ -8253,7 +8253,7 @@ const loadDashboardData = useCallback(async () => {
     const selectedOption = options.find((option) => option.value === value);
 
     return (
-      <View style={styles.appointmentToolbarField}>
+      <View style={[styles.appointmentToolbarField, isOpen && styles.appointmentToolbarFieldOpen]}>
         <Text style={[styles.appointmentToolbarLabel, isDarkMode && styles.darkTextSecondary]}>{label}</Text>
         <TouchableOpacity
           style={[
