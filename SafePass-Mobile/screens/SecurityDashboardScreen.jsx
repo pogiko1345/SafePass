@@ -1364,11 +1364,19 @@ export default function SecurityDashboardScreen({ navigation }) {
     },
     {
       key: 'campus-activity',
-      label: 'Campus Monitoring',
+      label: 'Visitor Monitoring',
       icon: 'walk-outline',
       color: '#0A3D91',
       submodules: [
         { key: 'checked-in-visitors', label: 'Visitor Arrival / Departure', badge: visitors.active.length || 0 },
+      ],
+    },
+    {
+      key: 'attendance',
+      label: 'Attendance',
+      icon: 'clipboard-outline',
+      color: '#0A3D91',
+      submodules: [
         { key: 'attendance-monitoring', label: 'Attendance Monitoring', badge: livePresenceSummary?.total || 0 },
       ],
     },
@@ -2635,8 +2643,6 @@ export default function SecurityDashboardScreen({ navigation }) {
     </View>
   );
 
-  const livePresenceByType = livePresenceSummary?.byUserType || {};
-
   const getPresenceIcon = (userType) => {
     switch (String(userType || "").toLowerCase()) {
       case "student":
@@ -3077,61 +3083,61 @@ export default function SecurityDashboardScreen({ navigation }) {
             <View style={styles.sectionTitleContainer}>
               <Ionicons name="people-outline" size={20} color="#0A3D91" />
               <View>
-                <Text style={styles.sectionTitle}>Campus Attendance Monitoring</Text>
+                <Text style={styles.sectionTitle}>Visitor Monitoring</Text>
                 <Text style={styles.securitySectionSubtitle}>
-                  Live NFC presence for students, academic staff, staff, security, and visitors.
+                  Focused view of approved visitor arrivals, active check-ins, and completed departures.
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => selectGuardSubmodule('attendance-monitoring')}>
-              <Text style={styles.viewAll}>Open Attendance</Text>
+            <TouchableOpacity onPress={() => selectGuardSubmodule('checked-in-visitors')}>
+              <Text style={styles.viewAll}>Open Visitors</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.reportStatsGrid}>
             <View style={styles.reportStatCard}>
-              <Text style={styles.reportStatValue}>{livePresenceSummary?.total || 0}</Text>
-              <Text style={styles.reportStatLabel}>On Site</Text>
+              <Text style={styles.reportStatValue}>{visitors.active.length || 0}</Text>
+              <Text style={styles.reportStatLabel}>Checked In</Text>
             </View>
             <View style={styles.reportStatCard}>
-              <Text style={styles.reportStatValue}>{livePresenceByType.student || 0}</Text>
-              <Text style={styles.reportStatLabel}>Students</Text>
+              <Text style={styles.reportStatValue}>{visitors.approved.length || 0}</Text>
+              <Text style={styles.reportStatLabel}>Approved</Text>
             </View>
             <View style={styles.reportStatCard}>
-              <Text style={styles.reportStatValue}>{livePresenceByType.teacher || 0}</Text>
-              <Text style={styles.reportStatLabel}>Teachers</Text>
+              <Text style={styles.reportStatValue}>{visitors.pending.length || 0}</Text>
+              <Text style={styles.reportStatLabel}>Pending</Text>
             </View>
             <View style={styles.reportStatCard}>
-              <Text style={styles.reportStatValue}>{livePresenceByType.visitor || 0}</Text>
-              <Text style={styles.reportStatLabel}>Visitors</Text>
+              <Text style={styles.reportStatValue}>{visitors.completed.length || 0}</Text>
+              <Text style={styles.reportStatLabel}>Completed</Text>
             </View>
           </View>
 
           <View style={styles.activityList}>
-            {activeUsers.slice(0, 6).map((presenceItem, index) => (
+            {[...(visitors.active || []), ...(visitors.approved || [])].slice(0, 6).map((visitor, index) => (
               <View
-                key={presenceItem.attendanceId || `${presenceItem.userId || presenceItem.visitorId}-${index}`}
+                key={visitor._id || visitor.id || `${visitor.email}-${index}`}
                 style={styles.activityItem}
               >
                 <View style={[styles.activityIcon, { backgroundColor: '#EEF5FF' }]}>
-                  <Ionicons name={getPresenceIcon(presenceItem.userType)} size={16} color="#0A3D91" />
+                  <Ionicons name={visitor.status === 'checked_in' ? "walk-outline" : "person-outline"} size={16} color="#0A3D91" />
                 </View>
                 <View style={styles.activityContent}>
-                  <Text style={styles.activityTitle}>{presenceItem.name}</Text>
+                  <Text style={styles.activityTitle}>{visitor.fullName || visitor.name || "Visitor"}</Text>
                   <Text style={styles.activityLocation}>
-                    {titleCase(presenceItem.userType)} at {getPresenceLocation(presenceItem)}
+                    {visitor.status === 'checked_in' ? "Inside" : titleCase(visitor.status || "Approved")} at {visitor.assignedOffice || visitor.appointmentDepartment || visitor.host || "Campus"}
                   </Text>
                 </View>
-                <Text style={styles.activityTime}>{formatTime(presenceItem.lastTapTime)}</Text>
+                <Text style={styles.activityTime}>{formatTime(visitor.checkedInAt || visitor.visitTime || visitor.visitDate)}</Text>
               </View>
             ))}
 
-            {activeUsers.length === 0 && (
+            {[...(visitors.active || []), ...(visitors.approved || [])].length === 0 && (
               <View style={styles.emptyState}>
                 <Ionicons name="people-outline" size={44} color="#D1D5DB" />
-                <Text style={styles.emptyStateTitle}>No live presence data yet</Text>
+                <Text style={styles.emptyStateTitle}>No visitor activity yet</Text>
                 <Text style={styles.emptyStateSubtitle}>
-                  Active campus attendance will appear here after NFC check-ins start coming in.
+                  Approved visitors and active check-ins will appear here.
                 </Text>
               </View>
             )}
