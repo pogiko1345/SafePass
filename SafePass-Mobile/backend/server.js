@@ -5280,6 +5280,17 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: GENERIC_AUTH_ERROR_MESSAGE });
     }
 
+    const normalizedLoginRole = normalizeUserRoleValue(user.role);
+    if (
+      ["student", "teacher"].includes(normalizedLoginRole) &&
+      (user.status === "inactive" || user.isActive === false)
+    ) {
+      user.status = "active";
+      user.isActive = true;
+      user.isVerified = true;
+      clearPasswordResetState(user);
+    }
+
     // Only disclose account state after the password is valid.
     if (user.status === "inactive" || user.status === "suspended") {
       const isActivationPending = ["staff", "security", "guard", "student", "teacher"].includes(String(user.role || "").toLowerCase()) &&
@@ -7324,6 +7335,8 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
     const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
     const resolvedNfcCardId =
       requestedNfcCardId || `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const requestedStatus = String(req.body.status || "active").trim().toLowerCase();
+    const createAsActive = requestedStatus !== "inactive";
 
     const user = new User({
       firstName: normalizedFirstName,
@@ -7333,9 +7346,9 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       password: temporaryPassword,
       phone: "",
       role: requestedRole,
-      status: "inactive",
-      isActive: false,
-      isVerified: false,
+      status: createAsActive ? "active" : "inactive",
+      isActive: createAsActive,
+      isVerified: createAsActive,
       [academicIdField]: normalizedAcademicId,
       course: String(req.body.course || "").trim(),
       yearLevel: String(req.body.yearLevel || "").trim(),
@@ -7361,10 +7374,14 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
         `Login email: ${user.email}`,
         `${academicLabel} ID: ${user[academicIdField]}`,
         "",
-        "To activate your account, open the secure setup link below and create your password:",
-        setupLink,
+        createAsActive
+          ? `Temporary password: ${temporaryPassword}`
+          : "To activate your account, open the secure setup link below and create your password:",
+        createAsActive ? "Please sign in and change your password from your profile." : setupLink,
         "",
-        "This secure link expires in 48 hours. Your account remains inactive until you complete this step.",
+        createAsActive
+          ? "Keep this password private. Your account is active and ready for first login."
+          : "This secure link expires in 48 hours. Your account remains inactive until you complete this step.",
         "",
         getSupportEmailSignature(),
       ].join("\n"),
@@ -7387,6 +7404,7 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
         delivered: credentialEmailDelivered,
         simulated: Boolean(credentialEmail?.simulated),
         error: credentialEmail?.error || "",
+        temporaryPassword: createAsActive ? temporaryPassword : undefined,
         setupLink: credentialEmail?.simulated ? setupLink : undefined,
       },
     });

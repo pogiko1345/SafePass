@@ -402,8 +402,8 @@ async register(userData) {
       const payload = {
         ...studentData,
         role,
-        status: studentData?.status || "inactive",
-        isActive: studentData?.isActive ?? false,
+        status: studentData?.status || "active",
+        isActive: studentData?.isActive ?? true,
       };
       return await this.fetch("/admin/students/create", {
         method: "POST",

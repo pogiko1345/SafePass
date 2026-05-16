@@ -538,6 +538,62 @@ export default StyleSheet.create({
     marginTop: 4,
   },
 
+  otpNoticeCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 18,
+  },
+
+  otpNoticeIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#D1FAE5",
+  },
+
+  otpNoticeCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  otpNoticeTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#064E3B",
+  },
+
+  otpNoticeMessage: {
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
+    color: "#065F46",
+  },
+
+  otpNoticeDetail: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#047857",
+  },
+
+  otpNoticeDismiss: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.7)",
+  },
+
   otpInputContainer: {
     width: "100%",
     marginBottom: 20,

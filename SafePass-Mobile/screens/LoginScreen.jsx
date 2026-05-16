@@ -1126,6 +1126,8 @@ export default function LoginScreen({ navigation, route }) {
       } else if (error?.data?.requiresOtpVerification === true) {
         setPendingVisitorOtpEmail("");
         setLoginError("This campus account is not activated correctly. Please ask an admin to verify the student or staff account role.");
+      } else if (errorMessage.toLowerCase().includes("activation required")) {
+        setLoginError("This account still needs activation. Ask the admin to create it as active or use the setup link sent to the account email.");
       } else if (errorMessage.includes("pending")) {
         setLoginError("Your account is pending approval. Please wait for admin approval.");
       } else if (

@@ -76,6 +76,7 @@ export default function VerificationScreen({ navigation, route }) {
   const [otpVerified, setOtpVerified] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [otpError, setOtpError] = useState("");
+  const [otpNotice, setOtpNotice] = useState(null);
 
   const normalizeOtpLocalPhoneInput = (value = "") => {
     const digitsOnly = String(value || "").replace(/[^0-9]/g, "");
@@ -236,11 +237,11 @@ export default function VerificationScreen({ navigation, route }) {
         setShowPhoneInput(false);
         setOtpTimer(60);
         setCanResend(false);
-        Alert.alert(
-          "Verification Code Sent",
-          `A 6-digit OTP has been sent to ${cleanPhone}.\n\nThis code will expire in 5 minutes. If it expires, request a new code.`,
-          [{ text: "OK" }]
-        );
+        setOtpNotice({
+          title: "Verification Code Sent",
+          message: `A 6-digit OTP was sent to ${cleanPhone}.`,
+          detail: "It expires in 5 minutes. If it expires, request a new code.",
+        });
       } else {
         Alert.alert("Error", response.message || "Failed to send verification code");
       }
@@ -290,6 +291,7 @@ export default function VerificationScreen({ navigation, route }) {
       setCanResend(false);
       setOtpCode("");
       setOtpError("");
+      setOtpNotice(null);
       requestOtp();
     }
   };
@@ -384,6 +386,7 @@ export default function VerificationScreen({ navigation, route }) {
     setOtpSent(false);
     setOtpCode("");
     setOtpError("");
+    setOtpNotice(null);
     setPhoneError("");
     setPhoneNumber("");
   };
@@ -691,6 +694,26 @@ export default function VerificationScreen({ navigation, route }) {
                             {formatPhoneDisplay(phoneNumber)}
                           </Text>
                         </View>
+
+                        {otpNotice ? (
+                          <View style={verificationStyles.otpNoticeCard}>
+                            <View style={verificationStyles.otpNoticeIcon}>
+                              <Ionicons name="checkmark-circle" size={22} color="#047857" />
+                            </View>
+                            <View style={verificationStyles.otpNoticeCopy}>
+                              <Text style={verificationStyles.otpNoticeTitle}>{otpNotice.title}</Text>
+                              <Text style={verificationStyles.otpNoticeMessage}>{otpNotice.message}</Text>
+                              <Text style={verificationStyles.otpNoticeDetail}>{otpNotice.detail}</Text>
+                            </View>
+                            <TouchableOpacity
+                              style={verificationStyles.otpNoticeDismiss}
+                              onPress={() => setOtpNotice(null)}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="close" size={16} color="#047857" />
+                            </TouchableOpacity>
+                          </View>
+                        ) : null}
 
                         <View style={verificationStyles.otpInputContainer}>
                           <TextInput

@@ -4132,8 +4132,8 @@ const loadDashboardData = useCallback(async () => {
         role: newUserData.role,
         employeeId: normalizedEmployeeId,
         nfcCardId: normalizedNfcCardId || undefined,
-        status: "inactive",
-        isActive: false,
+        status: isAcademicAccessAccount ? "active" : "inactive",
+        isActive: isAcademicAccessAccount,
       };
 
       if (isAcademicAccessAccount) {
@@ -4208,9 +4208,13 @@ const loadDashboardData = useCallback(async () => {
         setShowAddUserModal(false);
         const emailDelivery = response.emailDelivery || {};
         const deliveryNote = emailDelivery.delivered
-          ? `A secure activation and password setup link has been sent to ${normalizedEmail}.`
+          ? isAcademicAccessAccount
+            ? `Temporary login credentials were sent to ${normalizedEmail}.`
+            : `A secure activation and password setup link has been sent to ${normalizedEmail}.`
           : emailDelivery.simulated
-            ? `Account created. Activation email was simulated by the backend, so check the backend logs for the setup link.`
+            ? isAcademicAccessAccount
+              ? `Account created. Email was simulated, so use the temporary password shown here for first login.`
+              : `Account created. Activation email was simulated by the backend, so check the backend logs for the setup link.`
           : `Account created, but the activation email could not be sent. Check the backend mail logs before giving this account to the user.`;
         const createdAccountId =
           response.user?.teacherId ||
@@ -4229,7 +4233,8 @@ const loadDashboardData = useCallback(async () => {
           employeeId: createdAccountId,
           nfcCardId: createdNfcCardId,
           idLabel: isAcademicStaffAccount ? "Academic Staff ID" : isStudentAccount ? "Student ID" : "Employee ID",
-          status: "Pending activation",
+          temporaryPassword: emailDelivery.temporaryPassword || response.temporaryPassword || "",
+          status: response.user?.status || (isAcademicAccessAccount ? "Active" : "Pending activation"),
           deliveryNote,
         });
         setShowCreateSuccessModal(true);
@@ -13156,6 +13161,12 @@ const loadDashboardData = useCallback(async () => {
                 <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Status</Text>
                 <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.status || "N/A"}</Text>
               </View>
+              {createdUserSummary?.temporaryPassword ? (
+                <View style={styles.createSuccessRow}>
+                  <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Temporary Password</Text>
+                  <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary.temporaryPassword}</Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={[styles.createSuccessNote, isDarkMode && { backgroundColor: "#172554", borderColor: "#041E42" }]}>
