@@ -15,14 +15,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
 import { describeRfidReaderInput, normalizeRfidReaderInput } from "../utils/rfidReaderUtils";
+import {
+  MONITORING_MAP_FLOORS,
+  MONITORING_MAP_OFFICES,
+} from "../utils/monitoringMapConfig";
+import { normalizeMapSettingsPayload } from "../utils/mapSettingsUtils";
 
-const CHECKPOINTS = [
+const ENTRY_CHECKPOINTS = [
   { key: "main-gate", label: "Main Gate", floor: "ground", office: "Main Gate", icon: "log-in-outline" },
-  { key: "registrar", label: "Registrar", floor: "ground", office: "Registrar", icon: "document-text-outline" },
-  { key: "admin-office", label: "Administration", floor: "ground", office: "Administration", icon: "business-outline" },
-  { key: "library", label: "Library", floor: "third", office: "Library", icon: "library-outline" },
-  { key: "training", label: "Training", floor: "first", office: "Training", icon: "school-outline" },
-  { key: "security-office", label: "Security Office", floor: "ground", office: "Security Office", icon: "shield-outline" },
 ];
 
 const ACTION_OPTIONS = [
@@ -66,6 +66,44 @@ const formatRoleLabel = (role = "") =>
 
 const getActionMeta = (actionKey = "auto") =>
   ACTION_OPTIONS.find((item) => item.key === actionKey) || ACTION_OPTIONS[0];
+
+const getFloorName = (floorId = "") =>
+  MONITORING_MAP_FLOORS.find((floor) => floor.id === floorId)?.name || formatRoleLabel(floorId || "Floor");
+
+const formatRoomCheckpointLabel = (room, duplicateIndexByKey) => {
+  const baseName = String(room?.name || "Checkpoint").trim();
+  const duplicateKey = `${room?.floor || "floor"}::${baseName.toLowerCase()}`;
+  const duplicateIndex = duplicateIndexByKey.get(room?.id);
+  return duplicateIndex ? `${baseName} ${duplicateIndex}` : baseName;
+};
+
+const buildCheckpointOptions = (rooms = MONITORING_MAP_OFFICES) => {
+  const duplicateCounts = rooms.reduce((counts, room) => {
+    const duplicateKey = `${room?.floor || "floor"}::${String(room?.name || "").trim().toLowerCase()}`;
+    counts.set(duplicateKey, (counts.get(duplicateKey) || 0) + 1);
+    return counts;
+  }, new Map());
+
+  const duplicateRunningCount = new Map();
+  const duplicateIndexByKey = new Map();
+  rooms.forEach((room) => {
+    const duplicateKey = `${room?.floor || "floor"}::${String(room?.name || "").trim().toLowerCase()}`;
+    if ((duplicateCounts.get(duplicateKey) || 0) <= 1) return;
+    const nextIndex = (duplicateRunningCount.get(duplicateKey) || 0) + 1;
+    duplicateRunningCount.set(duplicateKey, nextIndex);
+    duplicateIndexByKey.set(room.id, nextIndex);
+  });
+
+  const roomCheckpoints = rooms.map((room) => ({
+    key: room.id,
+    label: formatRoomCheckpointLabel(room, duplicateIndexByKey),
+    floor: room.floor,
+    office: room.name,
+    icon: room.icon || "business-outline",
+  }));
+
+  return [...ENTRY_CHECKPOINTS, ...roomCheckpoints].filter((checkpoint) => checkpoint.key && checkpoint.floor && checkpoint.office);
+};
 
 const getResultTone = (result) => {
   if (!result) return { background: "#EFF6FF", border: "#BFDBFE", icon: "#0A3D91", label: "Ready" };
@@ -125,15 +163,30 @@ export default function NFCScanScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [selectedCheckpointKey, setSelectedCheckpointKey] = useState(CHECKPOINTS[0].key);
+  const [mapRooms, setMapRooms] = useState(MONITORING_MAP_OFFICES);
+  const [selectedFloorKey, setSelectedFloorKey] = useState(MONITORING_MAP_FLOORS[0].id);
+  const [selectedCheckpointKey, setSelectedCheckpointKey] = useState(ENTRY_CHECKPOINTS[0].key);
   const [selectedAction, setSelectedAction] = useState("auto");
   const [cardId, setCardId] = useState("");
   const [stationEvents, setStationEvents] = useState([]);
   const [latestResult, setLatestResult] = useState(null);
 
+  const checkpointOptions = useMemo(() => buildCheckpointOptions(mapRooms), [mapRooms]);
+  const floorCheckpointCounts = useMemo(
+    () =>
+      checkpointOptions.reduce((counts, checkpoint) => ({
+        ...counts,
+        [checkpoint.floor]: (counts[checkpoint.floor] || 0) + 1,
+      }), {}),
+    [checkpointOptions],
+  );
+  const visibleCheckpoints = useMemo(
+    () => checkpointOptions.filter((checkpoint) => checkpoint.floor === selectedFloorKey),
+    [checkpointOptions, selectedFloorKey],
+  );
   const selectedCheckpoint = useMemo(
-    () => CHECKPOINTS.find((checkpoint) => checkpoint.key === selectedCheckpointKey) || CHECKPOINTS[0],
-    [selectedCheckpointKey],
+    () => checkpointOptions.find((checkpoint) => checkpoint.key === selectedCheckpointKey) || checkpointOptions[0],
+    [checkpointOptions, selectedCheckpointKey],
   );
   const selectedActionMeta = useMemo(() => getActionMeta(selectedAction), [selectedAction]);
   const latestTone = useMemo(() => getResultTone(latestResult), [latestResult]);
@@ -148,6 +201,16 @@ export default function NFCScanScreen({ navigation }) {
         return;
       }
       setUser(currentUser);
+      try {
+        const mapResponse = await ApiService.getMapSettings();
+        if (mapResponse?.success) {
+          const normalizedMapSettings = normalizeMapSettingsPayload(mapResponse.mapSettings);
+          setMapRooms(normalizedMapSettings.rooms);
+        }
+      } catch (mapError) {
+        console.log("Checkpoint map settings fallback:", mapError?.message || mapError);
+        setMapRooms(MONITORING_MAP_OFFICES);
+      }
     } catch (error) {
       console.error("Load checkpoint user error:", error);
       Alert.alert("Error", "Failed to load checkpoint station user.");
@@ -165,6 +228,20 @@ export default function NFCScanScreen({ navigation }) {
     const timer = setTimeout(() => cardInputRef.current?.focus?.(), 350);
     return () => clearTimeout(timer);
   }, [loading]);
+
+  useEffect(() => {
+    if (!checkpointOptions.length) return;
+    const currentCheckpoint = checkpointOptions.find((checkpoint) => checkpoint.key === selectedCheckpointKey);
+    if (currentCheckpoint) {
+      setSelectedFloorKey(currentCheckpoint.floor);
+      return;
+    }
+    const fallbackCheckpoint =
+      checkpointOptions.find((checkpoint) => checkpoint.floor === selectedFloorKey) ||
+      checkpointOptions[0];
+    setSelectedCheckpointKey(fallbackCheckpoint.key);
+    setSelectedFloorKey(fallbackCheckpoint.floor);
+  }, [checkpointOptions, selectedCheckpointKey, selectedFloorKey]);
 
   useEffect(() => {
     if (loading || Platform.OS !== "web") return undefined;
@@ -236,6 +313,17 @@ export default function NFCScanScreen({ navigation }) {
   const focusReader = () => {
     globalThis.requestAnimationFrame?.(() => cardInputRef.current?.focus?.());
     setTimeout(() => cardInputRef.current?.focus?.(), 50);
+  };
+
+  const handleSelectFloor = (floorKey) => {
+    const firstCheckpointForFloor =
+      checkpointOptions.find((checkpoint) => checkpoint.floor === floorKey) ||
+      checkpointOptions[0];
+    setSelectedFloorKey(floorKey);
+    if (firstCheckpointForFloor) {
+      setSelectedCheckpointKey(firstCheckpointForFloor.key);
+    }
+    setTimeout(focusReader, 80);
   };
 
   const handleSubmitTap = async (scannedValue = cardId) => {
@@ -548,9 +636,48 @@ export default function NFCScanScreen({ navigation }) {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Checkpoint</Text>
+              <View style={styles.sectionHeaderRow}>
+                <View>
+                  <Text style={styles.sectionTitle}>Checkpoint</Text>
+                  <Text style={styles.sectionSubtitle}>Choose a floor, then select the office reader location.</Text>
+                </View>
+                <View style={styles.floorCountBadge}>
+                  <Text style={styles.floorCountText}>{visibleCheckpoints.length} offices</Text>
+                </View>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.floorTabRow}
+              >
+                {MONITORING_MAP_FLOORS.map((floor) => {
+                  const selected = floor.id === selectedFloorKey;
+                  const count = floorCheckpointCounts[floor.id] || 0;
+                  return (
+                    <TouchableOpacity
+                      key={floor.id}
+                      style={[styles.floorTab, selected && styles.floorTabActive]}
+                      onPress={() => handleSelectFloor(floor.id)}
+                    >
+                      <Ionicons
+                        name={floor.icon}
+                        size={16}
+                        color={selected ? "#FFFFFF" : "#0A3D91"}
+                      />
+                      <Text style={[styles.floorTabText, selected && styles.floorTabTextActive]}>
+                        {floor.name}
+                      </Text>
+                      <View style={[styles.floorTabBadge, selected && styles.floorTabBadgeActive]}>
+                        <Text style={[styles.floorTabBadgeText, selected && styles.floorTabBadgeTextActive]}>
+                          {count}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
               <View style={styles.checkpointGrid}>
-                {CHECKPOINTS.map((checkpoint) => {
+                {visibleCheckpoints.map((checkpoint) => {
                   const selected = checkpoint.key === selectedCheckpointKey;
                   return (
                     <TouchableOpacity
@@ -571,7 +698,7 @@ export default function NFCScanScreen({ navigation }) {
                           {checkpoint.label}
                         </Text>
                         <Text style={[styles.checkpointMeta, selected && styles.checkpointMetaActive]}>
-                          {checkpoint.floor}
+                          {getFloorName(checkpoint.floor)}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -937,11 +1064,84 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 19,
     fontWeight: "900",
     color: "#0F172A",
     marginBottom: 12,
+  },
+  sectionSubtitle: {
+    marginTop: -6,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  floorCountBadge: {
+    borderRadius: 999,
+    backgroundColor: "#EEF5FF",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  floorCountText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+  floorTabRow: {
+    gap: 8,
+    paddingBottom: 12,
+  },
+  floorTab: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D9E2EE",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  floorTabActive: {
+    backgroundColor: "#0A3D91",
+    borderColor: "#0A3D91",
+  },
+  floorTabText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  floorTabTextActive: {
+    color: "#FFFFFF",
+  },
+  floorTabBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E2E8F0",
+    paddingHorizontal: 6,
+  },
+  floorTabBadgeActive: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  floorTabBadgeText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#475569",
+  },
+  floorTabBadgeTextActive: {
+    color: "#FFFFFF",
   },
   sectionHint: {
     fontSize: 12,
