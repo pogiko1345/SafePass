@@ -3324,17 +3324,28 @@ app.post(
         notes: `${operatorName} recorded ${visitor.fullName} ${action.replace("_", " ")} at ${tapLocation.office}.`,
       });
 
-      if (action === "check_in" || action === "check_out") {
+      if (["check_in", "check_out", "location_update"].includes(action)) {
         const isCheckIn = action === "check_in";
+        const isCheckOut = action === "check_out";
+        const notificationTitle = isCheckIn
+          ? "Visitor Checked In"
+          : isCheckOut
+            ? "Visitor Checked Out"
+            : `Visitor Entered ${tapLocation.office || "Checkpoint"}`;
+        const notificationMessage = isCheckIn
+          ? `${visitor.fullName} checked in at ${tapLocation.office}.`
+          : isCheckOut
+            ? `${visitor.fullName} checked out at ${tapLocation.office}.`
+            : `${visitor.fullName} entered ${tapLocation.office || "the selected checkpoint"}.`;
         await Promise.all([
           createRoleNotification({
-            title: isCheckIn ? "Visitor Checked In" : "Visitor Checked Out",
-            message: `${visitor.fullName} ${isCheckIn ? "checked in" : "checked out"} at ${tapLocation.office}.`,
+            title: notificationTitle,
+            message: notificationMessage,
             targetRole: "security",
             relatedVisitor: visitor._id,
             relatedUser: cardUser._id,
             type: "info",
-            severity: isCheckIn ? "medium" : "low",
+            severity: isCheckIn || action === "location_update" ? "medium" : "low",
             metadata: {
               activityType,
               source: "checkpoint_station",
@@ -3346,8 +3357,8 @@ app.post(
             },
           }),
           createRoleNotification({
-            title: isCheckIn ? "Visitor Checked In" : "Visitor Checked Out",
-            message: `${visitor.fullName} ${isCheckIn ? "checked in" : "checked out"} at ${tapLocation.office}.`,
+            title: notificationTitle,
+            message: notificationMessage,
             targetRole: "admin",
             relatedVisitor: visitor._id,
             relatedUser: cardUser._id,
