@@ -10122,6 +10122,27 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
       ? await User.findById(visitor.assignedStaff)
       : null;
 
+    if (wasStaffAdjustmentPending && assignedStaffUser) {
+      await createRoleNotification({
+        title: "Staff Proposal Not Accepted",
+        message: `${visitor.fullName} requested a different schedule instead of accepting ${originalSchedule}. New request: ${newSchedule}.`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "staff",
+        targetUser: assignedStaffUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_declined_staff_adjustment",
+          originalVisitDate,
+          originalVisitTime,
+          newVisitDate: visitor.visitDate,
+          newVisitTime: visitor.visitTime,
+          reason,
+        },
+      });
+    }
+
     await createRoleNotification({
       title: "Appointment Rescheduled",
       message: `${visitor.fullName} updated their appointment from ${originalSchedule} to ${newSchedule}.`,
@@ -10248,27 +10269,6 @@ app.put("/api/visitors/:id/appointment/cancel", authMiddleware, async (req, res)
       return res.status(400).json({
         success: false,
         message: "This appointment can no longer be cancelled.",
-      });
-    }
-
-    if (wasStaffAdjustmentPending && visitor.assignedStaff) {
-      await createRoleNotification({
-        title: "Staff Proposal Not Accepted",
-        message: `${visitor.fullName} requested a different schedule instead of accepting ${originalSchedule}. New request: ${newSchedule}.`,
-        type: "warning",
-        severity: "medium",
-        targetRole: "staff",
-        targetUser: visitor.assignedStaff,
-        relatedVisitor: visitor._id,
-        relatedUser: visitorUser?._id || null,
-        metadata: {
-          activityType: "visitor_declined_staff_adjustment",
-          originalVisitDate,
-          originalVisitTime,
-          newVisitDate: visitor.visitDate,
-          newVisitTime: visitor.visitTime,
-          reason,
-        },
       });
     }
 
