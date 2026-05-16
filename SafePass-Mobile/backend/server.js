@@ -7354,8 +7354,8 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       yearLevel: String(req.body.yearLevel || "").trim(),
       section: String(req.body.section || "").trim(),
       nfcCardId: resolvedNfcCardId,
-      passwordResetTokenHash: setupToken.tokenHash,
-      passwordResetExpiresAt: setupToken.expiresAt,
+      passwordResetTokenHash: createAsActive ? "" : setupToken.tokenHash,
+      passwordResetExpiresAt: createAsActive ? null : setupToken.expiresAt,
     });
 
     await user.save();
@@ -7405,7 +7405,7 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
         simulated: Boolean(credentialEmail?.simulated),
         error: credentialEmail?.error || "",
         temporaryPassword: createAsActive ? temporaryPassword : undefined,
-        setupLink: credentialEmail?.simulated ? setupLink : undefined,
+        setupLink: !createAsActive && credentialEmail?.simulated ? setupLink : undefined,
       },
     });
   } catch (error) {
