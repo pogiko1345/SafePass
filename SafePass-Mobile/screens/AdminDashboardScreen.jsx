@@ -7710,20 +7710,32 @@ const loadDashboardData = useCallback(async () => {
                 {
                   key: "actions",
                   label: "Manage",
-                  width: 140,
+                  width: 250,
                   render: (userItem) => (
                     <View style={styles.adminTableActionRow}>
                       <TouchableOpacity
                         style={[styles.adminTableActionButton, { borderColor: "rgba(59,130,246,0.24)", backgroundColor: "rgba(59,130,246,0.12)" }]}
                         onPress={() => handleViewUser(userItem)}
                       >
+                        <Ionicons name="eye-outline" size={14} color="#0A3D91" />
                         <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>View</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.adminTableActionButton, { borderColor: "rgba(16,185,129,0.24)", backgroundColor: "rgba(16,185,129,0.12)" }]}
                         onPress={() => handleEditUser(userItem)}
                       >
+                        <Ionicons name="create-outline" size={14} color="#10B981" />
                         <Text style={[styles.adminTableActionText, { color: "#10B981" }]}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.adminTableActionButton, { borderColor: "rgba(239,68,68,0.22)", backgroundColor: "rgba(239,68,68,0.12)" }]}
+                        onPress={() => {
+                          setSelectedUser(userItem);
+                          setShowDeleteUserModal(true);
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                        <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Remove</Text>
                       </TouchableOpacity>
                     </View>
                   ),
@@ -10699,12 +10711,14 @@ const loadDashboardData = useCallback(async () => {
                             style={[styles.adminTableActionButton, { borderColor: `${roleColor}30`, backgroundColor: `${roleColor}12` }]}
                             onPress={() => handleViewUser(userItem)}
                           >
+                            <Ionicons name="eye-outline" size={14} color={roleColor} />
                             <Text style={[styles.adminTableActionText, { color: roleColor }]}>View</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.adminTableActionButton, { borderColor: `${userManagementConfig.accent}30`, backgroundColor: `${userManagementConfig.accent}12` }]}
                             onPress={() => handleEditUser(userItem)}
                           >
+                            <Ionicons name="create-outline" size={14} color={userManagementConfig.accent} />
                             <Text style={[styles.adminTableActionText, { color: userManagementConfig.accent }]}>Edit</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
@@ -10718,6 +10732,11 @@ const loadDashboardData = useCallback(async () => {
                             onPress={() => handleToggleUserStatus(userItem)}
                             disabled={processingId === `toggle-user-${userItem._id || userItem.id}`}
                           >
+                            <Ionicons
+                              name={userIsActive ? "pause-circle-outline" : "checkmark-circle-outline"}
+                              size={14}
+                              color={userIsActive ? "#F59E0B" : "#10B981"}
+                            />
                             <Text
                               style={[
                                 styles.adminTableActionText,
@@ -10734,7 +10753,8 @@ const loadDashboardData = useCallback(async () => {
                               setShowDeleteUserModal(true);
                             }}
                           >
-                            <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Delete</Text>
+                            <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                            <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Remove</Text>
                           </TouchableOpacity>
                         </View>
                       );

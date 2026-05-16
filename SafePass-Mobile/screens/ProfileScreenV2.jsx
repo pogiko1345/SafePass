@@ -60,6 +60,11 @@ const DEFAULT_PROFILE = {
   position: "",
   shift: "",
   nfcCardId: "",
+  studentId: "",
+  teacherId: "",
+  course: "",
+  yearLevel: "",
+  section: "",
   profilePhoto: null,
 };
 
@@ -144,6 +149,11 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       staff: {
         label: "Staff Member",
         icon: "briefcase-outline",
+        gradients: ["#0A3D91", "#1C6DD0"],
+      },
+      teacher: {
+        label: "Academic Staff",
+        icon: "school-outline",
         gradients: ["#0A3D91", "#1C6DD0"],
       },
       student: {
@@ -581,8 +591,15 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
     `${currentProfile?.firstName?.charAt(0) || ""}${currentProfile?.lastName?.charAt(0) || ""}`
       .trim()
       .toUpperCase() || "SP";
+  const profileRole = String(currentProfile?.role || "").toLowerCase();
+  const primaryAccountId =
+    profileRole === "student"
+      ? currentProfile?.studentId
+      : profileRole === "teacher"
+        ? currentProfile?.teacherId
+        : currentProfile?.employeeId;
   const identityLine =
-    currentProfile?.employeeId ||
+    primaryAccountId ||
     currentProfile?.nfcCardId ||
     currentProfile?._id ||
     "SafePass Account";
@@ -803,9 +820,28 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       <View style={themedCardStyle}>
         {[
           ["Role", roleConfig.label],
-          ["Employee ID", currentProfile.employeeId || "Not assigned"],
+          [
+            profileRole === "student"
+              ? "Student ID"
+              : profileRole === "teacher"
+                ? "Teacher ID"
+                : "Employee ID",
+            primaryAccountId || "Not assigned",
+          ],
+          ...(profileRole === "student" || profileRole === "teacher"
+            ? [
+                ["Program / Course", currentProfile.course || "Not assigned"],
+                [
+                  profileRole === "student" ? "Year / Section" : "Academic Group",
+                  [currentProfile.yearLevel, currentProfile.section].filter(Boolean).join(" / ") || "Not assigned",
+                ],
+              ]
+            : [
+                ["Department", currentProfile.department || "Not assigned"],
+                ["Position", currentProfile.position || "Not assigned"],
+              ]),
           ["NFC Card", currentProfile.nfcCardId || "Not issued"],
-          ["Account Status", "Active"],
+          ["Account Status", currentProfile.status || (currentProfile.isActive === false ? "Inactive" : "Active")],
         ].map(([label, value]) => (
           <View key={label} style={styles.field}>
             <Text style={[styles.kicker, isDarkProfile && styles.darkKicker]}>{label}</Text>

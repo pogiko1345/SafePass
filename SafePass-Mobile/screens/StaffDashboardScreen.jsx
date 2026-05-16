@@ -847,13 +847,15 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   };
 
   const selectSubmodule = (submoduleKey) => {
+    if (submoduleKey === "account-info") {
+      navigation.navigate("Profile");
+      return;
+    }
+
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const parentModule = getParentModule(submoduleKey);
     setExpandedModule(parentModule);
     setSelectedSubmodule(submoduleKey);
-    if (submoduleKey === "account-info") {
-      setAccountMode("view");
-    }
 
     if (submoduleKey === "appointment-request") {
       setFilter("pending");
@@ -873,8 +875,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleAssignedOfficePress = () => {
-    selectSubmodule("account-info");
+    navigation.navigate("Profile");
   };
+
+  const openSharedProfile = useCallback(() => {
+    navigation.navigate("Profile");
+  }, [navigation]);
 
   const handleNotificationCenterPress = () => {
     if (isPhoneLayout) {
@@ -2066,7 +2072,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           <Text style={styles.quickActionFooterText}>Open record history</Text>
         </HomeHoverPressable>
 
-        <HomeHoverPressable style={styles.quickActionCard} onPress={() => selectSubmodule("account-info")}>
+        <HomeHoverPressable style={styles.quickActionCard} onPress={openSharedProfile}>
           <View style={styles.quickActionMetaRow}>
             <View style={styles.quickActionBadge}>
               <Text style={styles.quickActionBadgeText}>{user?.department || "Profile"}</Text>
@@ -3406,7 +3412,18 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         >
           {content}
         </ScrollView>
-        <MobileBottomNav dark={mobileDarkModeEnabled} tabs={staffMobileNavTabs} activeTab={mobileTab} onChange={setMobileTab} />
+        <MobileBottomNav
+          dark={mobileDarkModeEnabled}
+          tabs={staffMobileNavTabs}
+          activeTab={mobileTab}
+          onChange={(tabKey) => {
+            if (tabKey === "profile") {
+              openSharedProfile();
+              return;
+            }
+            setMobileTab(tabKey);
+          }}
+        />
         {renderMobileDetailModal()}
         {renderMobileLogoutModal()}
         <ToastNotice

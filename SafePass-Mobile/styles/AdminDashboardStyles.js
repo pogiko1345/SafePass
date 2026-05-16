@@ -1899,8 +1899,10 @@ export default StyleSheet.create({
   },
 
   adminTableActionButton: {
+    flexDirection: "row",
+    gap: 6,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
     minWidth: 78,
