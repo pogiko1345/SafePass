@@ -523,7 +523,6 @@ export default StyleSheet.create({
   },
 
   visitorNfcSearchInput: {
-    marginTop: spacing.md,
     borderWidth: 1,
     borderColor: "#DCE5F0",
     borderRadius: 14,
@@ -532,6 +531,59 @@ export default StyleSheet.create({
     paddingVertical: spacing.sm,
     fontSize: fontSize.sm,
     color: colors.text,
+    alignSelf: "stretch",
+  },
+
+  visitorNfcWorkspace: {
+    flexDirection: isSmallPhone ? "column" : "row",
+    alignItems: "stretch",
+    gap: spacing.md,
+    marginTop: spacing.md,
+    flexWrap: "wrap",
+  },
+
+  visitorNfcSelectorColumn: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: isDesktop ? 320 : isTablet ? 280 : "100%",
+    minWidth: isSmallPhone ? "100%" : 260,
+  },
+
+  visitorNfcSelectList: {
+    marginTop: spacing.sm,
+    maxHeight: isDesktop ? 390 : 320,
+  },
+
+  visitorNfcSelectCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  visitorNfcSelectCardActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+
+  visitorNfcSelectIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(10,61,145,0.1)",
+  },
+
+  visitorNfcSelectContent: {
+    flex: 1,
+    minWidth: 0,
   },
 
   visitorNfcChipRow: {
@@ -576,6 +628,10 @@ export default StyleSheet.create({
   },
 
   visitorNfcAssignBox: {
+    flexGrow: 2,
+    flexShrink: 1,
+    flexBasis: isDesktop ? 640 : isTablet ? 500 : "100%",
+    minWidth: isSmallPhone ? "100%" : 320,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#BFDBFE",
@@ -605,6 +661,39 @@ export default StyleSheet.create({
     marginTop: 4,
     fontSize: fontSize.sm,
     color: colors.textMuted,
+  },
+
+  visitorNfcDetailsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+
+  visitorNfcDetailItem: {
+    flexGrow: 1,
+    flexBasis: isSmallPhone ? "100%" : 170,
+    minWidth: isSmallPhone ? "100%" : 150,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D7E6FA",
+    backgroundColor: "rgba(255,255,255,0.72)",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+
+  visitorNfcDetailLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: "900",
+    color: colors.primary,
+    textTransform: "uppercase",
+  },
+
+  visitorNfcDetailValue: {
+    marginTop: 3,
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.text,
   },
 
   visitorNfcUidInput: {

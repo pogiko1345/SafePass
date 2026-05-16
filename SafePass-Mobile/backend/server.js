@@ -12412,9 +12412,28 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
       notes: `Assigned NFC card ${normalizedCardId} to ${user.email}`,
     });
 
+    const linkedVisitor =
+      targetRole === "visitor"
+        ? await Visitor.findOne({ email: user.email })
+            .sort({ checkedInAt: -1, visitDate: -1, registeredAt: -1 })
+            .lean()
+        : null;
+
+    if (linkedVisitor) {
+      linkedVisitor.nfcCardId = user.nfcCardId;
+      linkedVisitor.safePassId = user.nfcCardId;
+      linkedVisitor.relatedUser = {
+        _id: user._id,
+        email: user.email,
+        nfcCardId: user.nfcCardId,
+        role: user.role,
+      };
+    }
+
     res.json({
       success: true,
       message: "NFC card assigned successfully",
+      visitor: linkedVisitor,
       card: {
         id: user._id,
         cardNumber: user.nfcCardId,
@@ -12489,7 +12508,25 @@ app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
     });
     await accessLog.save();
 
-    res.json({ success: true, message: "NFC card revoked successfully" });
+    const linkedVisitor =
+      targetRole === "visitor"
+        ? await Visitor.findOne({ email: user.email })
+            .sort({ checkedInAt: -1, visitDate: -1, registeredAt: -1 })
+            .lean()
+        : null;
+
+    if (linkedVisitor) {
+      linkedVisitor.nfcCardId = "";
+      linkedVisitor.safePassId = "";
+      linkedVisitor.relatedUser = {
+        _id: user._id,
+        email: user.email,
+        nfcCardId: "",
+        role: user.role,
+      };
+    }
+
+    res.json({ success: true, message: "NFC card revoked successfully", visitor: linkedVisitor });
   } catch (error) {
     console.error("Revoke NFC card error:", error);
     res
