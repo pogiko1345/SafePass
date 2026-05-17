@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   phone: { type: String, default: "" },
   emergencyContact: { type: String, default: "" },
+  parentName: { type: String, default: "", trim: true },
+  parentEmail: { type: String, default: "", trim: true, lowercase: true },
+  guardianName: { type: String, default: "", trim: true },
+  guardianEmail: { type: String, default: "", trim: true, lowercase: true },
   profilePhoto: { type: String, default: "" },
   visitorId: { type: mongoose.Schema.Types.ObjectId, ref: "Visitor" },
   studentId: {

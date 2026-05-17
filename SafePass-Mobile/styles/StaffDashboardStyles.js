@@ -912,6 +912,52 @@ export default StyleSheet.create({
     color: "#64748B",
   },
 
+  queueSummaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 14,
+  },
+
+  queueSummaryCard: {
+    flex: 1,
+    minWidth: 180,
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#DCE8F4",
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+
+  queueSummaryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EAF3FF",
+  },
+
+  queueSummaryValue: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  queueSummaryLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
   sectionActionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2353,5 +2399,93 @@ export default StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     color: "#FFFFFF",
+  },
+
+  darkSafeArea: {
+    backgroundColor: "#07111F",
+  },
+
+  darkDashboardLayout: {
+    backgroundColor: "#07111F",
+  },
+
+  darkSidebar: {
+    backgroundColor: "#0B1220",
+    borderColor: "#1E293B",
+  },
+
+  darkSidebarHeader: {
+    backgroundColor: "#0F172A",
+    borderColor: "#243247",
+  },
+
+  darkSidebarModuleButton: {
+    backgroundColor: "#0F172A",
+    borderColor: "#243247",
+  },
+
+  darkSidebarModuleButtonActive: {
+    backgroundColor: "#102342",
+    borderColor: "#1D4ED8",
+  },
+
+  darkSidebarSubmoduleList: {
+    borderLeftColor: "#243247",
+  },
+
+  darkSidebarSubmoduleButton: {
+    backgroundColor: "#111827",
+  },
+
+  darkSidebarSubmoduleButtonActive: {
+    backgroundColor: "#102342",
+  },
+
+  darkPageHeaderCard: {
+    backgroundColor: "#0F172A",
+    borderColor: "#243247",
+  },
+
+  darkSectionCard: {
+    backgroundColor: "#0F172A",
+    borderColor: "#243247",
+  },
+
+  darkNestedCard: {
+    backgroundColor: "#111827",
+    borderColor: "#243247",
+  },
+
+  darkInputSurface: {
+    backgroundColor: "#0B1220",
+    borderColor: "#334155",
+  },
+
+  darkDropdownMenu: {
+    backgroundColor: "#0F172A",
+    borderColor: "#334155",
+  },
+
+  darkTableCard: {
+    backgroundColor: "#0F172A",
+    borderColor: "#243247",
+  },
+
+  darkTableHeaderRow: {
+    backgroundColor: "#111827",
+    borderBottomColor: "#243247",
+  },
+
+  darkTableBodyRow: {
+    backgroundColor: "#0F172A",
+    borderBottomColor: "#243247",
+  },
+
+  darkText: {
+    color: "#F8FAFC",
+  },
+
+  darkMutedText: {
+    color: "#CBD5E1",
   },
 });

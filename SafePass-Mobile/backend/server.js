@@ -1115,6 +1115,135 @@ const sendCampusTapSecurityNotifications = async ({
   return results;
 };
 
+const extractEmailAddresses = (value = "") => {
+  const matches = String(value || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+  return matches ? matches.map((email) => normalizeEmailValue(email)).filter(Boolean) : [];
+};
+
+const escapeHtml = (value = "") =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const getStudentParentEmailRecipients = (student = {}) => {
+  const recipients = [
+    student.parentEmail,
+    student.guardianEmail,
+    ...extractEmailAddresses(student.emergencyContact),
+  ]
+    .map((email) => normalizeEmailValue(email))
+    .filter((email) => email && isValidEmailValue(email));
+
+  return Array.from(new Set(recipients));
+};
+
+const buildStudentParentAttendanceEmail = ({
+  student = {},
+  action = "check_in",
+  timestamp = new Date(),
+  tapLocation = {},
+}) => {
+  const studentName = getFullName(student) || student.email || "your student";
+  const parentName = String(student.parentName || student.guardianName || "").trim();
+  const isCheckOut = action === "check_out";
+  const actionText = isCheckOut ? "left the campus" : "entered the school";
+  const statusTitle = isCheckOut ? "Campus Check-Out Notice" : "Campus Check-In Notice";
+  const statusLine = isCheckOut
+    ? `${studentName} has checked out and left the campus.`
+    : `${studentName} has checked in and entered the school.`;
+  const timeLabel = new Date(timestamp).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const locationLabel = tapLocation?.office || "Main Gate";
+  const programLine = [student.course, student.yearLevel, student.section].filter(Boolean).join(" - ") || "Not specified";
+  const greeting = parentName ? `Good day, ${parentName}.` : "Good day.";
+  const subject = `SafePass ${statusTitle}: ${studentName}`;
+  const safeGreeting = escapeHtml(greeting);
+  const safeStatusTitle = escapeHtml(statusTitle);
+  const safeStatusLine = escapeHtml(statusLine);
+  const safeStudentName = escapeHtml(studentName);
+  const safeStudentId = escapeHtml(student.studentId || "N/A");
+  const safeProgramLine = escapeHtml(programLine);
+  const safeActionText = escapeHtml(actionText);
+  const safeLocationLabel = escapeHtml(locationLabel);
+  const safeTimeLabel = escapeHtml(timeLabel);
+  const text = [
+    greeting,
+    "",
+    statusLine,
+    "",
+    "Attendance details:",
+    `Student: ${studentName}`,
+    `Student ID: ${student.studentId || "N/A"}`,
+    `Program / Year / Section: ${programLine}`,
+    `Action: ${actionText}`,
+    `Checkpoint: ${locationLabel}`,
+    `Time: ${timeLabel}`,
+    "",
+    "This is an automated SafePass attendance notification from Sapphire International Aviation Academy.",
+    "",
+    getSupportEmailSignature(),
+  ].join("\n");
+  const html = `
+    <div style="font-family:Arial,sans-serif;background:#f4f7fb;padding:24px;color:#12213a;">
+      <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f5;border-radius:14px;overflow:hidden;">
+        <div style="background:#0a3d91;color:#ffffff;padding:22px 26px;">
+          <p style="margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;">Sapphire SafePass</p>
+          <h1 style="margin:0;font-size:22px;line-height:1.3;">${safeStatusTitle}</h1>
+        </div>
+        <div style="padding:26px;">
+          <p style="margin:0 0 16px;font-size:15px;">${safeGreeting}</p>
+          <p style="margin:0 0 20px;font-size:16px;line-height:1.5;"><strong>${safeStatusLine}</strong></p>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <tr><td style="padding:10px;border-top:1px solid #e6edf7;color:#5f6f88;">Student</td><td style="padding:10px;border-top:1px solid #e6edf7;font-weight:700;">${safeStudentName}</td></tr>
+            <tr><td style="padding:10px;border-top:1px solid #e6edf7;color:#5f6f88;">Student ID</td><td style="padding:10px;border-top:1px solid #e6edf7;font-weight:700;">${safeStudentId}</td></tr>
+            <tr><td style="padding:10px;border-top:1px solid #e6edf7;color:#5f6f88;">Program / Year / Section</td><td style="padding:10px;border-top:1px solid #e6edf7;font-weight:700;">${safeProgramLine}</td></tr>
+            <tr><td style="padding:10px;border-top:1px solid #e6edf7;color:#5f6f88;">Action</td><td style="padding:10px;border-top:1px solid #e6edf7;font-weight:700;">${safeActionText}</td></tr>
+            <tr><td style="padding:10px;border-top:1px solid #e6edf7;color:#5f6f88;">Checkpoint</td><td style="padding:10px;border-top:1px solid #e6edf7;font-weight:700;">${safeLocationLabel}</td></tr>
+            <tr><td style="padding:10px;border-top:1px solid #e6edf7;color:#5f6f88;">Time</td><td style="padding:10px;border-top:1px solid #e6edf7;font-weight:700;">${safeTimeLabel}</td></tr>
+          </table>
+          <p style="margin:22px 0 0;color:#5f6f88;font-size:13px;line-height:1.5;">This is an automated SafePass attendance notification from Sapphire International Aviation Academy.</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return { subject, text, html };
+};
+
+const sendStudentParentAttendanceEmail = async ({ student, action, timestamp, tapLocation }) => {
+  const normalizedRole = normalizeUserRoleValue(student?.role);
+  if (normalizedRole !== "student" || !["check_in", "check_out"].includes(action)) {
+    return [];
+  }
+
+  const recipients = getStudentParentEmailRecipients(student);
+  if (!recipients.length) {
+    console.log(`Parent attendance email skipped for ${student?.email || student?._id}: no parent email configured.`);
+    return [];
+  }
+
+  const emailContent = buildStudentParentAttendanceEmail({ student, action, timestamp, tapLocation });
+  const results = await Promise.allSettled(
+    recipients.map((recipient) => sendEmail(recipient, emailContent.subject, emailContent.text, { html: emailContent.html })),
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected" || result.value?.success === false) {
+      console.error("Parent attendance email error:", recipients[index], result.reason || result.value?.error);
+    }
+  });
+
+  return results;
+};
+
 // ========== ENHANCED CORS CONFIGURATION ==========
 app.use(
   cors({
@@ -2274,7 +2403,7 @@ const generateUniqueAcademicId = async ({ role = "student", fieldName = "student
   return candidate;
 };
 
-const sendEmail = async (to, subject, body) => {
+const sendEmail = async (to, subject, body, options = {}) => {
   if (mailTransporter) {
     try {
       const info = await mailTransporter.sendMail({
@@ -2282,6 +2411,7 @@ const sendEmail = async (to, subject, body) => {
         to,
         subject,
         text: body,
+        ...(options.html ? { html: options.html } : {}),
       });
       console.log(`Email sent to ${to}. Message ID: ${info.messageId}`);
       return { success: true, simulated: false, delivered: true, messageId: info.messageId };
@@ -2534,7 +2664,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     const cardUser = await User.findOne({
       nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
     }).select(
-      "_id email firstName lastName nfcCardId role status accessPermissions department position scheduleProfile",
+      "_id email firstName lastName nfcCardId role status accessPermissions department position scheduleProfile course yearLevel section studentId parentName parentEmail guardianName guardianEmail emergencyContact",
     );
 
     if (!cardUser) {
@@ -2661,6 +2791,13 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         tapLocation,
         attendanceRecord,
         deviceId,
+      });
+
+      await sendStudentParentAttendanceEmail({
+        student: cardUser,
+        action,
+        timestamp: now,
+        tapLocation,
       });
 
       return res.json({
@@ -3017,7 +3154,7 @@ app.post(
       const cardUser = await User.findOne({
         nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
       }).select(
-        "_id email firstName lastName nfcCardId role status accessPermissions department position scheduleProfile course yearLevel section studentId teacherId employeeId",
+        "_id email firstName lastName nfcCardId role status accessPermissions department position scheduleProfile course yearLevel section studentId teacherId employeeId parentName parentEmail guardianName guardianEmail emergencyContact",
       );
 
       if (!cardUser) {
@@ -3164,6 +3301,13 @@ app.post(
           tapLocation,
           attendanceRecord,
           deviceId,
+        });
+
+        await sendStudentParentAttendanceEmail({
+          student: cardUser,
+          action,
+          timestamp: now,
+          tapLocation,
         });
 
         return res.json({
@@ -5191,6 +5335,15 @@ app.post("/api/register", async (req, res) => {
       teacherId = await generateUniqueAcademicId({ role: "teacher", fieldName: "teacherId" });
     }
 
+    const normalizedParentEmail = normalizeEmailValue(req.body.parentEmail || req.body.guardianEmail || "");
+    if (normalizedParentEmail && !isValidEmailValue(normalizedParentEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid parent email address.",
+        field: "parentEmail",
+      });
+    }
+
 const userData = {
   firstName,
   lastName,
@@ -5198,6 +5351,10 @@ const userData = {
   email: normalizedEmail,
   password,
   phone: normalizedPhone,
+  parentName: String(req.body.parentName || req.body.guardianName || "").trim(),
+  parentEmail: normalizedParentEmail,
+  guardianName: String(req.body.guardianName || req.body.parentName || "").trim(),
+  guardianEmail: normalizedParentEmail,
   role: normalizedRole,
   nfcCardId,
   employeeId: employeeId || undefined,
@@ -5478,6 +5635,30 @@ app.put("/api/profile", authMiddleware, async (req, res) => {
     if (body.phone !== undefined) updates.phone = String(body.phone || "").trim();
     if (body.emergencyContact !== undefined) {
       updates.emergencyContact = String(body.emergencyContact || "").trim();
+    }
+    if (body.parentName !== undefined) updates.parentName = String(body.parentName || "").trim();
+    if (body.guardianName !== undefined) updates.guardianName = String(body.guardianName || "").trim();
+    if (body.parentEmail !== undefined) {
+      const normalizedParentEmail = normalizeEmailValue(body.parentEmail);
+      if (normalizedParentEmail && !isValidEmailValue(normalizedParentEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid parent email address.",
+          field: "parentEmail",
+        });
+      }
+      updates.parentEmail = normalizedParentEmail;
+    }
+    if (body.guardianEmail !== undefined) {
+      const normalizedGuardianEmail = normalizeEmailValue(body.guardianEmail);
+      if (normalizedGuardianEmail && !isValidEmailValue(normalizedGuardianEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid guardian email address.",
+          field: "guardianEmail",
+        });
+      }
+      updates.guardianEmail = normalizedGuardianEmail;
     }
     if (body.profilePhoto !== undefined) updates.profilePhoto = body.profilePhoto || null;
 
@@ -7342,6 +7523,7 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
     const requestedNfcCardId = normalizeSubmittedNfcCardId(
       req.body.nfcCardId || req.body.uid || req.body.cardId,
     );
+    const normalizedParentEmail = normalizeEmailValue(req.body.parentEmail || req.body.guardianEmail || "");
 
     if (!normalizedEmail) {
       normalizedEmail = await generateUniqueAccountEmail({
@@ -7368,6 +7550,14 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
 
     if (!isValidEmailValue(normalizedEmail)) {
       return res.status(400).json({ success: false, message: "Invalid email format", field: "email" });
+    }
+
+    if (!isTeacherAccount && normalizedParentEmail && !isValidEmailValue(normalizedParentEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid parent email address",
+        field: "parentEmail",
+      });
     }
 
     const duplicateChecks = [
@@ -7418,6 +7608,10 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       email: normalizedEmail,
       password: temporaryPassword,
       phone: "",
+      parentName: isTeacherAccount ? "" : String(req.body.parentName || req.body.guardianName || "").trim(),
+      parentEmail: isTeacherAccount ? "" : normalizedParentEmail,
+      guardianName: isTeacherAccount ? "" : String(req.body.guardianName || req.body.parentName || "").trim(),
+      guardianEmail: isTeacherAccount ? "" : normalizedParentEmail,
       role: requestedRole,
       status: createAsActive ? "active" : "inactive",
       isActive: createAsActive,
@@ -8163,36 +8357,12 @@ app.get("/api/access-logs", authMiddleware, async (req, res) => {
   }
 });
 
-// 8. NFC SCAN SIMULATION (Protected)
-app.post("/api/nfc-scan", authMiddleware, async (req, res) => {
+// 8. LEGACY NFC SCAN SIMULATION (Deprecated)
+app.post("/api/nfc-scan", authMiddleware, requireRoles("admin", "security", "guard", "staff"), async (req, res) => {
   try {
-    const { location, accessType } = req.body;
-
-    // Simulate access control logic
-    const status = Math.random() > 0.1 ? "granted" : "denied";
-
-    const accessLog = new AccessLog({
-      userId: req.user._id,
-      userEmail: req.user.email,
-      userName: `${req.user.firstName} ${req.user.lastName}`,
-      location: location || "Unknown Location",
-      accessType: accessType || "entry",
-      status,
-      nfcCardId: req.user.nfcCardId,
-      notes:
-        status === "granted"
-          ? "Access granted successfully"
-          : "Access denied - Unauthorized",
-    });
-
-    await accessLog.save();
-
-    res.json({
-      success: true,
-      message: status === "granted" ? "Access Granted" : "Access Denied",
-      status,
-      accessLog,
-      timestamp: new Date(),
+    return res.status(410).json({
+      success: false,
+      message: "This legacy NFC simulation endpoint is disabled. Use /api/nfc/station/tap for live checkpoint taps.",
     });
   } catch (error) {
     console.error("❌ NFC scan error:", error);
@@ -8252,7 +8422,7 @@ app.get("/api/health", (req, res) => {
       },
       access: {
         logs: "GET /api/access-logs",
-        nfcScan: "POST /api/nfc-scan",
+        nfcStationTap: "POST /api/nfc/station/tap",
         create: "POST /api/access-log",
       },
       device: {
@@ -8623,6 +8793,13 @@ app.post("/api/my-attendance/tap", authMiddleware, async (req, res) => {
       tapLocation,
       attendanceRecord,
       deviceId: source,
+    });
+
+    await sendStudentParentAttendanceEmail({
+      student: req.user,
+      action,
+      timestamp: now,
+      tapLocation,
     });
 
     res.json({
@@ -11738,7 +11915,7 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
     const pendingAppointmentRequestsQuery = {
       requestCategory: "appointment",
       approvalFlow: "staff",
-      appointmentStatus: "pending",
+      appointmentStatus: { $in: ["pending", "rescheduled"] },
     };
     const approvedVisitWindowsQuery = {
       approvalStatus: "approved",
@@ -11962,6 +12139,38 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
           field: "phone",
         });
       }
+    }
+
+    if (updates.parentName !== undefined) {
+      updates.parentName = String(updates.parentName || "").trim();
+    }
+
+    if (updates.guardianName !== undefined) {
+      updates.guardianName = String(updates.guardianName || "").trim();
+    }
+
+    if (updates.parentEmail !== undefined) {
+      const normalizedParentEmail = normalizeEmailValue(updates.parentEmail);
+      if (normalizedParentEmail && !isValidEmailValue(normalizedParentEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid parent email address.",
+          field: "parentEmail",
+        });
+      }
+      updates.parentEmail = normalizedParentEmail;
+    }
+
+    if (updates.guardianEmail !== undefined) {
+      const normalizedGuardianEmail = normalizeEmailValue(updates.guardianEmail);
+      if (normalizedGuardianEmail && !isValidEmailValue(normalizedGuardianEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid guardian email address.",
+          field: "guardianEmail",
+        });
+      }
+      updates.guardianEmail = normalizedGuardianEmail;
     }
 
     if (updates.studentId !== undefined) {

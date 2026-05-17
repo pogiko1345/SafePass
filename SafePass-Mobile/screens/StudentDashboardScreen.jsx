@@ -213,6 +213,8 @@ export default function StudentDashboardScreen({ navigation }) {
     username: "",
     phone: "",
     emergencyContact: "",
+    parentName: "",
+    parentEmail: "",
   });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -269,6 +271,8 @@ export default function StudentDashboardScreen({ navigation }) {
       username: user?.username || "",
       phone: user?.phone || "",
       emergencyContact: user?.emergencyContact || "",
+      parentName: user?.parentName || user?.guardianName || "",
+      parentEmail: user?.parentEmail || user?.guardianEmail || "",
     });
   }, [user]);
 
@@ -697,6 +701,8 @@ export default function StudentDashboardScreen({ navigation }) {
       username: user?.username || "",
       phone: user?.phone || "",
       emergencyContact: user?.emergencyContact || "",
+      parentName: user?.parentName || user?.guardianName || "",
+      parentEmail: user?.parentEmail || user?.guardianEmail || "",
     });
     setAccountMode("view");
   };
@@ -708,6 +714,8 @@ export default function StudentDashboardScreen({ navigation }) {
     const username = profileForm.username.trim().toLowerCase();
     const phone = String(profileForm.phone || "").replace(/[^\d+]/g, "");
     const emergencyContact = profileForm.emergencyContact.trim();
+    const parentName = profileForm.parentName.trim();
+    const parentEmail = profileForm.parentEmail.trim().toLowerCase();
 
     if (!firstName || !lastName) {
       Alert.alert("Missing Details", "First name and last name are required.");
@@ -732,6 +740,11 @@ export default function StudentDashboardScreen({ navigation }) {
       return;
     }
 
+    if (parentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)) {
+      Alert.alert("Invalid Parent Email", "Please enter a valid parent or guardian email address.");
+      return;
+    }
+
     setProfileSaving(true);
     try {
       const response = await ApiService.updateProfile({
@@ -741,6 +754,8 @@ export default function StudentDashboardScreen({ navigation }) {
         username,
         phone,
         emergencyContact,
+        parentName,
+        parentEmail,
       });
 
       if (response?.user) {
@@ -1067,6 +1082,8 @@ export default function StudentDashboardScreen({ navigation }) {
               ["Username", user?.username || "Not assigned"],
               ["Contact Number", user?.phone || "Not configured"],
               ["Emergency Contact", user?.emergencyContact || "Not configured"],
+              ["Parent / Guardian", user?.parentName || user?.guardianName || "Not configured"],
+              ["Parent Email", user?.parentEmail || user?.guardianEmail || "Not configured"],
               ["Student ID", user?.studentId || user?.teacherId || "Not assigned"],
               ["Course / Section", formatProfileDetail(user?.course, user?.yearLevel, user?.section)],
               ["NFC Card", user?.nfcCardId || "Virtual mobile check only"],
@@ -1152,6 +1169,28 @@ export default function StudentDashboardScreen({ navigation }) {
                 placeholder="Emergency contact"
                 placeholderTextColor="#94A3B8"
                 style={styles.fieldInput}
+              />
+            </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Parent / Guardian Name</Text>
+              <TextInput
+                value={profileForm.parentName}
+                onChangeText={(value) => handleProfileInputChange("parentName", value)}
+                placeholder="Parent or guardian name"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+              />
+            </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Parent Email</Text>
+              <TextInput
+                value={profileForm.parentEmail}
+                onChangeText={(value) => handleProfileInputChange("parentEmail", value)}
+                placeholder="parent@example.com"
+                placeholderTextColor="#94A3B8"
+                style={styles.fieldInput}
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
             </View>
 

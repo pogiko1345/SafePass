@@ -33,6 +33,31 @@ const ACTION_OPTIONS = [
 ];
 
 const ALLOWED_ROLES = new Set(["admin", "security", "guard", "staff"]);
+const STATION_EVENTS_STORAGE_KEY = "safepass:nfc-scan:station-events:v1";
+const STATION_FEED_PAGE_SIZE = 6;
+const MAX_STATION_EVENTS = 100;
+
+const readStoredStationEvents = () => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(STATION_EVENTS_STORAGE_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_STATION_EVENTS) : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const writeStoredStationEvents = (events = []) => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      STATION_EVENTS_STORAGE_KEY,
+      JSON.stringify(events.slice(0, MAX_STATION_EVENTS)),
+    );
+  } catch (error) {
+    // Ignore device storage failures; the live station can still process taps.
+  }
+};
 
 const CARD_SHADOW = Platform.select({
   web: { boxShadow: "0px 14px 34px rgba(15, 23, 42, 0.08)" },
@@ -175,7 +200,8 @@ export default function NFCScanScreen({ navigation }) {
   const [checkpointSearch, setCheckpointSearch] = useState("");
   const [selectedAction, setSelectedAction] = useState("auto");
   const [cardId, setCardId] = useState("");
-  const [stationEvents, setStationEvents] = useState([]);
+  const [stationEvents, setStationEvents] = useState(() => readStoredStationEvents());
+  const [stationFeedPage, setStationFeedPage] = useState(1);
   const [latestResult, setLatestResult] = useState(null);
 
   const checkpointOptions = useMemo(
@@ -209,6 +235,21 @@ export default function NFCScanScreen({ navigation }) {
   );
   const selectedActionMeta = useMemo(() => getActionMeta(selectedAction), [selectedAction]);
   const latestTone = useMemo(() => getResultTone(latestResult), [latestResult]);
+  const stationFeedTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(stationEvents.length / STATION_FEED_PAGE_SIZE)),
+    [stationEvents.length],
+  );
+  const paginatedStationEvents = useMemo(() => {
+    const safePage = Math.min(stationFeedPage, stationFeedTotalPages);
+    const startIndex = (safePage - 1) * STATION_FEED_PAGE_SIZE;
+    return stationEvents.slice(startIndex, startIndex + STATION_FEED_PAGE_SIZE);
+  }, [stationEvents, stationFeedPage, stationFeedTotalPages]);
+
+  useEffect(() => {
+    if (stationFeedPage > stationFeedTotalPages) {
+      setStationFeedPage(stationFeedTotalPages);
+    }
+  }, [stationFeedPage, stationFeedTotalPages]);
 
   const loadUser = async () => {
     try {
@@ -328,7 +369,12 @@ export default function NFCScanScreen({ navigation }) {
   };
 
   const recordLocalEvent = (event) => {
-    setStationEvents((currentEvents) => [event, ...currentEvents].slice(0, 8));
+    setStationEvents((currentEvents) => {
+      const nextEvents = [event, ...currentEvents].slice(0, MAX_STATION_EVENTS);
+      writeStoredStationEvents(nextEvents);
+      return nextEvents;
+    });
+    setStationFeedPage(1);
   };
 
   const focusReader = () => {
@@ -454,6 +500,37 @@ export default function NFCScanScreen({ navigation }) {
   if (!user) return null;
 
   const isAllowed = ALLOWED_ROLES.has(String(user.role || "").toLowerCase());
+
+  if (!isAllowed) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.accessDeniedWrap}>
+          <View style={styles.accessDeniedCard}>
+            <View style={styles.accessDeniedIcon}>
+              <Ionicons name="shield-outline" size={34} color="#DC2626" />
+            </View>
+            <Text style={styles.accessDeniedTitle}>Checkpoint Access Required</Text>
+            <Text style={styles.accessDeniedText}>
+              NFC Tap Console is only available for admin, staff, security, and guard accounts.
+              Please sign in with an authorized checkpoint operator account.
+            </Text>
+            <View style={styles.accessDeniedRolePill}>
+              <Ionicons name="person-circle-outline" size={16} color="#64748B" />
+              <Text style={styles.accessDeniedRoleText}>Current role: {formatRoleLabel(user.role)}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.accessDeniedButton}
+              onPress={() => navigation.replace("Login")}
+              activeOpacity={0.86}
+            >
+              <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.accessDeniedButtonText}>Sign In As Operator</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -883,7 +960,9 @@ export default function NFCScanScreen({ navigation }) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Station Feed</Text>
-            <Text style={styles.sectionHint}>Current session</Text>
+            <Text style={styles.sectionHint}>
+              This device | Page {Math.min(stationFeedPage, stationFeedTotalPages)} of {stationFeedTotalPages}
+            </Text>
           </View>
           {stationEvents.length === 0 ? (
             <View style={styles.emptyState}>
@@ -894,39 +973,66 @@ export default function NFCScanScreen({ navigation }) {
               </Text>
             </View>
           ) : (
-            stationEvents.map((event, index) => (
-              <View
-                key={`${event.timestamp}-${index}`}
-                style={[styles.feedRow, index > 0 && styles.feedRowBorder]}
-              >
+            <>
+              {paginatedStationEvents.map((event, index) => (
                 <View
-                  style={[
-                    styles.feedIconWrap,
-                    event.success ? styles.feedIconWrapSuccess : styles.feedIconWrapError,
-                  ]}
+                  key={`${event.timestamp}-${index}`}
+                  style={[styles.feedRow, index > 0 && styles.feedRowBorder]}
                 >
-                  <Ionicons
-                    name={event.success ? "checkmark" : "close"}
-                    size={16}
-                    color={event.success ? "#166534" : "#B91C1C"}
-                  />
+                  <View
+                    style={[
+                      styles.feedIconWrap,
+                      event.success ? styles.feedIconWrapSuccess : styles.feedIconWrapError,
+                    ]}
+                  >
+                    <Ionicons
+                      name={event.success ? "checkmark" : "close"}
+                      size={16}
+                      color={event.success ? "#166534" : "#B91C1C"}
+                    />
+                  </View>
+                  <View style={styles.feedCopy}>
+                    <Text style={styles.feedTitle}>{event.name}</Text>
+                    <Text style={styles.feedSubtitle}>
+                      {[formatRoleLabel(event.userType), event.program, event.yearSection, formatRoleLabel(event.action), event.checkpoint]
+                        .filter(Boolean)
+                        .join(" | ")}
+                    </Text>
+                    <Text style={styles.feedTimestamp}>{formatDateTime(event.timestamp)}</Text>
+                  </View>
+                  <View style={styles.feedStatusBadge}>
+                    <Text style={styles.feedStatusText}>
+                      {event.success ? "OK" : "BLOCKED"}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.feedCopy}>
-                  <Text style={styles.feedTitle}>{event.name}</Text>
-                  <Text style={styles.feedSubtitle}>
-                    {[formatRoleLabel(event.userType), event.program, event.yearSection, formatRoleLabel(event.action), event.checkpoint]
-                      .filter(Boolean)
-                      .join(" | ")}
+              ))}
+              <View style={styles.feedPager}>
+                <TouchableOpacity
+                  style={[styles.feedPagerButton, stationFeedPage <= 1 && styles.feedPagerButtonDisabled]}
+                  onPress={() => setStationFeedPage((page) => Math.max(1, page - 1))}
+                  disabled={stationFeedPage <= 1}
+                >
+                  <Ionicons name="chevron-back-outline" size={16} color={stationFeedPage <= 1 ? "#94A3B8" : "#0A3D91"} />
+                  <Text style={[styles.feedPagerButtonText, stationFeedPage <= 1 && styles.feedPagerButtonTextDisabled]}>
+                    Previous
                   </Text>
-                  <Text style={styles.feedTimestamp}>{formatDateTime(event.timestamp)}</Text>
-                </View>
-                <View style={styles.feedStatusBadge}>
-                  <Text style={styles.feedStatusText}>
-                    {event.success ? "OK" : "BLOCKED"}
+                </TouchableOpacity>
+                <Text style={styles.feedPagerText}>
+                  {stationEvents.length} saved event{stationEvents.length === 1 ? "" : "s"}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.feedPagerButton, stationFeedPage >= stationFeedTotalPages && styles.feedPagerButtonDisabled]}
+                  onPress={() => setStationFeedPage((page) => Math.min(stationFeedTotalPages, page + 1))}
+                  disabled={stationFeedPage >= stationFeedTotalPages}
+                >
+                  <Text style={[styles.feedPagerButtonText, stationFeedPage >= stationFeedTotalPages && styles.feedPagerButtonTextDisabled]}>
+                    Next
                   </Text>
-                </View>
+                  <Ionicons name="chevron-forward-outline" size={16} color={stationFeedPage >= stationFeedTotalPages ? "#94A3B8" : "#0A3D91"} />
+                </TouchableOpacity>
               </View>
-            ))
+            </>
           )}
         </View>
       </ScrollView>
@@ -950,6 +1056,79 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#334155",
+  },
+  accessDeniedWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  accessDeniedCard: {
+    width: "100%",
+    maxWidth: 440,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    padding: 24,
+    ...CARD_SHADOW,
+  },
+  accessDeniedIcon: {
+    width: 66,
+    height: 66,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEF2F2",
+    marginBottom: 16,
+  },
+  accessDeniedTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+  accessDeniedText: {
+    marginTop: 10,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "700",
+    color: "#64748B",
+    textAlign: "center",
+  },
+  accessDeniedRolePill: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderRadius: 999,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  accessDeniedRoleText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#64748B",
+  },
+  accessDeniedButton: {
+    marginTop: 18,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: "#0A3D91",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+  },
+  accessDeniedButtonText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   content: {
     width: "100%",
@@ -1617,6 +1796,49 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#0A3D91",
+  },
+  feedPager: {
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  feedPagerButton: {
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#C7DAF8",
+    backgroundColor: "#F0F7FF",
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  feedPagerButtonDisabled: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+  },
+  feedPagerButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+  feedPagerButtonTextDisabled: {
+    color: "#94A3B8",
+  },
+  feedPagerText: {
+    flex: 1,
+    minWidth: 120,
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
   },
   stationLayout: {
     flexDirection: "row",

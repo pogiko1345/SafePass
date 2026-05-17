@@ -1272,6 +1272,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     course: "",
     yearLevel: "",
     section: "",
+    parentName: "",
+    parentEmail: "",
     nfcCardId: "",
     status: "inactive",
   });
@@ -1292,6 +1294,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     course: "",
     yearLevel: "",
     section: "",
+    parentName: "",
+    parentEmail: "",
     nfcCardId: "",
     status: "active",
     isActive: true,
@@ -4247,6 +4251,10 @@ const loadDashboardData = useCallback(async () => {
         userPayload.course = newUserData.course || "";
         userPayload.yearLevel = newUserData.yearLevel || "";
         userPayload.section = newUserData.section || "";
+        if (isStudentAccount) {
+          userPayload.parentName = newUserData.parentName || "";
+          userPayload.parentEmail = newUserData.parentEmail || "";
+        }
       } else if (newUserData.role === "staff") {
         userPayload.department = newUserData.department || "General";
         userPayload.position = newUserData.position || "Staff Member";
@@ -4398,6 +4406,8 @@ const loadDashboardData = useCallback(async () => {
       course: userItem.course || "",
       yearLevel: userItem.yearLevel || "",
       section: userItem.section || "",
+      parentName: userItem.parentName || userItem.guardianName || "",
+      parentEmail: userItem.parentEmail || userItem.guardianEmail || "",
       nfcCardId: userItem.nfcCardId || "",
       status: isUserActive(userItem) ? "active" : "inactive",
       isActive: isUserActive(userItem),
@@ -4518,6 +4528,8 @@ const loadDashboardData = useCallback(async () => {
         updatePayload.course = editUserData.course;
         updatePayload.yearLevel = editUserData.yearLevel;
         updatePayload.section = editUserData.section;
+        updatePayload.parentName = editUserData.parentName;
+        updatePayload.parentEmail = editUserData.parentEmail;
       }
       if (String(editUserData.role || "").toLowerCase() === "teacher") {
         updatePayload.teacherId = editUserData.teacherId;
@@ -7193,6 +7205,38 @@ const loadDashboardData = useCallback(async () => {
                           placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                         />
                       </View>
+                      {isCreatingStudent ? (
+                        <>
+                          <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                            <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent / Guardian Name</Text>
+                            <TextInput
+                              style={[
+                                styles.input,
+                                isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                              ]}
+                              value={newUserData.parentName}
+                              onChangeText={(text) => setNewUserData((currentValue) => ({ ...currentValue, parentName: text }))}
+                              placeholder="Parent or guardian name"
+                              placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                            />
+                          </View>
+                          <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                            <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email</Text>
+                            <TextInput
+                              style={[
+                                styles.input,
+                                isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                              ]}
+                              value={newUserData.parentEmail}
+                              onChangeText={(text) => setNewUserData((currentValue) => ({ ...currentValue, parentEmail: text }))}
+                              placeholder="parent@example.com"
+                              placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                              keyboardType="email-address"
+                              autoCapitalize="none"
+                            />
+                          </View>
+                        </>
+                      ) : null}
                     </>
                   ) : isCreatingSecurity ? (
                     <>
@@ -13068,6 +13112,32 @@ const loadDashboardData = useCallback(async () => {
                       />
                     </View>
                   </View>
+                  {editUserData.role === "student" ? (
+                    <View style={styles.userEditorGrid}>
+                      <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent / Guardian Name</Text>
+                        <TextInput
+                          style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
+                          value={editUserData.parentName}
+                          onChangeText={(text) => setEditUserData({ ...editUserData, parentName: text })}
+                          placeholder="Parent or guardian name"
+                          placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        />
+                      </View>
+                      <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email</Text>
+                        <TextInput
+                          style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
+                          value={editUserData.parentEmail}
+                          onChangeText={(text) => setEditUserData({ ...editUserData, parentEmail: text })}
+                          placeholder="parent@example.com"
+                          placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                        />
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
               )}
 

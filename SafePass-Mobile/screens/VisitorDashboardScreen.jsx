@@ -835,11 +835,30 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         return "This appointment date has passed. Please request a new appointment.";
       }
       if (visitDay.getTime() > today.getTime()) {
-        return "Check-in is only available on your appointment date.";
+        const scheduledDateLabel = scheduledDate.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+        return `Your visit is approved for ${scheduledDateLabel}. Check-in is only available on that appointment date.`;
       }
     }
 
     return "";
+  };
+
+  const getVisitorAccessBlockedTitle = (message = "") => {
+    const normalizedMessage = String(message || "").toLowerCase();
+    if (normalizedMessage.includes("card")) return "Card Not Active";
+    if (normalizedMessage.includes("already been completed")) return "Visit Completed";
+    if (normalizedMessage.includes("no-show") || normalizedMessage.includes("expired")) return "Visit Expired";
+    if (normalizedMessage.includes("still waiting") || normalizedMessage.includes("approved before")) {
+      return "Approval Required";
+    }
+    if (normalizedMessage.includes("appointment date") || normalizedMessage.includes("check-in opens")) {
+      return "Check-In Not Open";
+    }
+    return "Check-In Unavailable";
   };
   const activeAppointmentPurposeOptions = useMemo(
     () => getEnabledAppointmentOptionLabels(appointmentOptions.purposes, APPOINTMENT_PURPOSE_OPTIONS),
@@ -1878,7 +1897,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
     if (blockedMessage) {
       showVisitorAlert(
-        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        getVisitorAccessBlockedTitle(blockedMessage),
         blockedMessage,
       );
       return false;
@@ -3375,7 +3394,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
     if (blockedMessage) {
       showVisitorAlert(
-        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        getVisitorAccessBlockedTitle(blockedMessage),
         blockedMessage,
       );
       return;
@@ -3486,7 +3505,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
     if (blockedMessage) {
       showVisitorAlert(
-        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        getVisitorAccessBlockedTitle(blockedMessage),
         blockedMessage,
       );
       return;
@@ -3525,7 +3544,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const blockedMessage = getVisitorAccessBlockedMessage(targetVisitor, currentUser);
     if (blockedMessage) {
       showVisitorAlert(
-        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        getVisitorAccessBlockedTitle(blockedMessage),
         blockedMessage,
       );
       return;

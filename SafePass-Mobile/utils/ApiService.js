@@ -770,10 +770,7 @@ async verifyCredentials(email, password) {
   }
 
   async simulateNfcScan(location, accessType = "entry") {
-    return await this.fetch("/nfc-scan", {
-      method: "POST",
-      body: { location, accessType },
-    });
+    throw new Error("Legacy NFC scan simulation is disabled. Use submitCheckpointTap for live checkpoint taps.");
   }
 
   async getStats() {
