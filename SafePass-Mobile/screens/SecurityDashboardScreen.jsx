@@ -345,6 +345,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [visitorNfcBusy, setVisitorNfcBusy] = useState(false);
   const [visitorNfcStatus, setVisitorNfcStatus] = useState(null);
   const [visitorNfcLocalVisitors, setVisitorNfcLocalVisitors] = useState({});
+  const [visitorNfcPinnedVisitor, setVisitorNfcPinnedVisitor] = useState(null);
   const [mobileDateFilter, setMobileDateFilter] = useState('all');
   const [mobileLocationFilter, setMobileLocationFilter] = useState('all');
   const [mobileLogFilter, setMobileLogFilter] = useState('all');
@@ -1607,6 +1608,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       ...current,
       [localIdentity]: localVisitor,
     }));
+    setVisitorNfcPinnedVisitor(localVisitor);
     setVisitors((current) => ({
       ...current,
       active: updateCollection(current.active),
@@ -1627,6 +1629,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
     const normalizedCardId = normalizeRfidReaderInput(scannedValue);
     const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
+    setVisitorNfcPinnedVisitor(selectedVisitorForNfc);
     if (!normalizedCardId) {
       if (currentCard) {
         setVisitorNfcStatus({
@@ -1697,6 +1700,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
 
     const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
+    setVisitorNfcPinnedVisitor(selectedVisitorForNfc);
     if (!currentCard) {
       setVisitorNfcStatus({ type: "error", message: "This visitor has no assigned UID to remove." });
       Alert.alert("No UID Assigned", "This visitor has no assigned UID to remove.");
@@ -2491,16 +2495,33 @@ export default function SecurityDashboardScreen({ navigation }) {
   ]);
 
   const selectedVisitorForNfc = useMemo(
-    () =>
-      assignableNfcVisitors.find(
+    () => {
+      const selectedFromList = assignableNfcVisitors.find(
         (visitor) =>
           getVisitorNfcIdentity(visitor) === String(selectedVisitorNfcId || "").trim() ||
           String(visitor?._id) === String(selectedVisitorNfcId),
-      ) ||
-      assignableNfcVisitors[0] ||
-      null,
-    [assignableNfcVisitors, selectedVisitorNfcId],
+      );
+      if (selectedFromList) return selectedFromList;
+
+      const pinnedIdentity = getVisitorNfcIdentity(visitorNfcPinnedVisitor);
+      const selectedIdentity = String(selectedVisitorNfcId || "").trim();
+      if (
+        visitorNfcPinnedVisitor &&
+        (!selectedIdentity || pinnedIdentity === selectedIdentity || String(visitorNfcPinnedVisitor?._id) === selectedIdentity) &&
+        isVisitorScheduledTodayForNfc(visitorNfcPinnedVisitor)
+      ) {
+        return visitorNfcPinnedVisitor;
+      }
+
+      return assignableNfcVisitors[0] || null;
+    },
+    [assignableNfcVisitors, selectedVisitorNfcId, visitorNfcPinnedVisitor],
   );
+
+  const visitorNfcListVisitors = useMemo(() => {
+    if (assignableNfcVisitors.length) return assignableNfcVisitors;
+    return selectedVisitorForNfc ? [selectedVisitorForNfc] : [];
+  }, [assignableNfcVisitors, selectedVisitorForNfc]);
 
   useEffect(() => {
     if (!selectedVisitorNfcId && assignableNfcVisitors[0]) {
@@ -2841,7 +2862,10 @@ export default function SecurityDashboardScreen({ navigation }) {
   const getPresenceLocation = (item) =>
     item?.location || item?.checkpointName || item?.checkpointId || "Campus checkpoint";
 
-  const renderVisitorNfcAssignmentPanel = () => (
+  const renderVisitorNfcAssignmentPanel = () => {
+    const hasPinnedOnlyVisitor = !assignableNfcVisitors.length && Boolean(selectedVisitorForNfc);
+
+    return (
     <View style={styles.visitorNfcPanel}>
       <View style={styles.visitorNfcHeader}>
         <View style={styles.sectionTitleContainer}>
@@ -2854,7 +2878,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         </View>
         <View style={styles.visitorNfcCountBadge}>
-          <Text style={styles.visitorNfcCountText}>{assignableNfcVisitors.length} today</Text>
+          <Text style={styles.visitorNfcCountText}>{visitorNfcListVisitors.length} today</Text>
         </View>
       </View>
 
@@ -2870,7 +2894,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             />
 
             <ScrollView style={styles.visitorNfcSelectList} showsVerticalScrollIndicator={false}>
-              {assignableNfcVisitors.map((visitor) => {
+              {visitorNfcListVisitors.map((visitor) => {
                 const visitorIdentity = getVisitorNfcIdentity(visitor);
                 const selected = visitorIdentity === getVisitorNfcIdentity(selectedVisitorForNfc);
                 const assignedNfcUid = getVisitorAssignedNfcUid(visitor);
@@ -2881,6 +2905,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                     style={[styles.visitorNfcSelectCard, selected && styles.visitorNfcSelectCardActive]}
                     onPress={() => {
                       setSelectedVisitorNfcId(visitorIdentity || visitor?._id || "");
+                      setVisitorNfcPinnedVisitor(visitor);
                       setVisitorNfcStatus(null);
                       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 80);
                     }}
@@ -2938,6 +2963,14 @@ export default function SecurityDashboardScreen({ navigation }) {
                 );
               })}
             </ScrollView>
+            {hasPinnedOnlyVisitor ? (
+              <View style={[styles.visitorNfcStatus, styles.visitorNfcStatusSuccess]}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#047857" />
+                <Text style={[styles.visitorNfcStatusText, styles.visitorNfcStatusTextSuccess]}>
+                  Keeping the selected visitor visible while the list refreshes.
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.visitorNfcAssignBox}>
@@ -3063,7 +3096,8 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
       )}
     </View>
-  );
+    );
+  };
 
   const renderNfcAssignmentTab = () => (
     <ScrollView

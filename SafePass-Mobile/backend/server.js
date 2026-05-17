@@ -5226,10 +5226,11 @@ const getVisitorCheckInEligibility = (visitor) => {
 
   const now = new Date();
   if (now < checkInWindow.scheduledAt) {
+    const scheduleLabel = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     return {
       allowed: false,
       statusCode: 400,
-      message: `Check-in opens at your scheduled appointment time: ${checkInWindow.scheduledAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+      message: `Check-in opens at your scheduled appointment time: ${scheduleLabel}.`,
     };
   }
 
