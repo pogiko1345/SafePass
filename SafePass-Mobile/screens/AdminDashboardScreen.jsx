@@ -329,8 +329,12 @@ const createAppointmentFilterDraft = () => ({
 });
 
 const ATTENDANCE_SCOPE_OPTIONS = [
-  { key: "students", label: "Students", roles: ["student", "teacher"] },
-  { key: "staff", label: "Staff", roles: ["staff", "security", "guard"] },
+  { key: "all", label: "All Person Types", roles: ["student", "teacher", "staff", "security", "guard", "visitor"] },
+  { key: "students", label: "Students", roles: ["student"] },
+  { key: "teachers", label: "Academic Staff / Teachers", roles: ["teacher"] },
+  { key: "staff", label: "Staff", roles: ["staff"] },
+  { key: "security", label: "Security", roles: ["security", "guard"] },
+  { key: "visitors", label: "Visitors", roles: ["visitor"] },
 ];
 
 const ATTENDANCE_DATE_SHORTCUTS = [
@@ -1185,7 +1189,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState(null);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
-  const [attendanceScope, setAttendanceScope] = useState("students");
+  const [attendanceScope, setAttendanceScope] = useState("all");
   const [attendanceDateShortcut, setAttendanceDateShortcut] = useState("today");
   const [attendanceSearchTerm, setAttendanceSearchTerm] = useState("");
 
@@ -1215,6 +1219,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   });
   const [selectedMapActivity, setSelectedMapActivity] = useState(null);
   const [hoveredMapVisitor, setHoveredMapVisitor] = useState(null);
+  const [adminLiveVisitorLocations, setAdminLiveVisitorLocations] = useState([]);
   const [showAdminMapModal, setShowAdminMapModal] = useState(false);
   const [adminMapFilter, setAdminMapFilter] = useState("all");
   const [lastAdminMapRefreshAt, setLastAdminMapRefreshAt] = useState(null);
@@ -2936,6 +2941,7 @@ const loadDashboardData = useCallback(async () => {
     await Promise.all([
       loadAdminStats(),
       loadAllVisitRequests(),
+      loadAdminLiveVisitorLocations(),
       loadAllUsers(),
       loadRecentActivities(),
       loadAppointmentManagementOptions(),
@@ -3041,12 +3047,25 @@ const loadDashboardData = useCallback(async () => {
     loadDashboardData();
   }, [loadDashboardData]);
 
+  const loadAdminLiveVisitorLocations = async () => {
+    try {
+      const response = await ApiService.getSecurityLiveVisitorLocations({ limit: 200 });
+      setAdminLiveVisitorLocations(Array.isArray(response?.visitors) ? response.visitors : []);
+      return true;
+    } catch (error) {
+      console.error("Load admin live visitor locations error:", error);
+      setAdminLiveVisitorLocations([]);
+      return false;
+    }
+  };
+
   const refreshAdminMapData = async () => {
     if (adminMapRefreshRef.current) return;
     adminMapRefreshRef.current = true;
     try {
       await Promise.all([
         loadAllVisitRequests({ silent: true }),
+        loadAdminLiveVisitorLocations(),
         loadRecentActivities(),
       ]);
       setLastAdminMapRefreshAt(new Date().toISOString());
@@ -3196,8 +3215,8 @@ const loadDashboardData = useCallback(async () => {
   );
 
   const monitoredMapVisitors = useMemo(
-    () =>
-      visitRequests
+    () => {
+      const checkedInRequestVisitors = visitRequests
         .filter((visitor) => visitor?.status === "checked_in")
         .slice(0, 18)
         .map((visitor, index) => {
@@ -3228,8 +3247,83 @@ const loadDashboardData = useCallback(async () => {
             detail: managedLocation.office || "Visitor is currently on site.",
             sourceVisitor: visitor,
           };
-        }),
-    [getManagedVisitorMapLocation, visitRequests],
+        });
+
+      if (!adminLiveVisitorLocations.length) {
+        return checkedInRequestVisitors;
+      }
+
+      const requestById = new Map(
+        visitRequests.map((visitor) => [String(visitor?._id || visitor?.id || ""), visitor]),
+      );
+
+      return adminLiveVisitorLocations.slice(0, 40).map((liveVisitor, index) => {
+        const visitorId = String(liveVisitor?.visitorId || liveVisitor?.id || liveVisitor?._id || "");
+        const matchedVisitor = requestById.get(visitorId) || null;
+        const coordinates = liveVisitor?.coordinates || {};
+        const liveLocation = {
+          floor: liveVisitor?.floor || matchedVisitor?.currentLocation?.floor || "ground",
+          office:
+            liveVisitor?.office ||
+            liveVisitor?.currentLocation ||
+            matchedVisitor?.currentLocation?.office ||
+            matchedVisitor?.assignedOffice ||
+            "Campus",
+          source: liveVisitor?.source || matchedVisitor?.currentLocation?.source || "checkpoint",
+          timestamp:
+            liveVisitor?.lastScanTime ||
+            liveVisitor?.checkedInAt ||
+            matchedVisitor?.currentLocation?.lastSeenAt ||
+            matchedVisitor?.checkedInAt ||
+            new Date().toISOString(),
+          coordinates:
+            Number.isFinite(Number(coordinates.x)) && Number.isFinite(Number(coordinates.y))
+              ? { x: Number(coordinates.x), y: Number(coordinates.y) }
+              : getVisitorMonitorCoordinates(matchedVisitor || liveVisitor, index),
+        };
+        const sourceVisitor = matchedVisitor
+          ? {
+              ...matchedVisitor,
+              currentLocation: {
+                ...(matchedVisitor.currentLocation || {}),
+                floor: liveLocation.floor,
+                office: liveLocation.office,
+                source: liveLocation.source,
+                lastSeenAt: liveLocation.timestamp,
+                coordinates: liveLocation.coordinates,
+                checkpointId: liveVisitor?.checkpointId || matchedVisitor.currentLocation?.checkpointId || "",
+                statusLabel: liveVisitor?.statusLabel || matchedVisitor.currentLocation?.statusLabel || "",
+                isActive: liveVisitor?.status !== "exited",
+              },
+            }
+          : {
+              _id: visitorId,
+              fullName: liveVisitor?.name || "Checked-In Visitor",
+              email: liveVisitor?.email || "",
+              phoneNumber: liveVisitor?.phone || "",
+              purposeOfVisit: liveVisitor?.purpose || "On-site visit",
+              assignedOffice: liveLocation.office,
+              status: "checked_in",
+              checkedInAt: liveVisitor?.checkedInAt || liveVisitor?.lastScanTime || "",
+              currentLocation: liveLocation,
+            };
+
+        return {
+          id: visitorId || `live-visitor-${index}`,
+          name: sourceVisitor.fullName || liveVisitor?.name || "Checked-In Visitor",
+          purpose: sourceVisitor.purposeOfVisit || liveVisitor?.purpose || "On-site visit",
+          status: "checked_in",
+          location: liveLocation,
+          activityType: "security_checkin",
+          eventLabel: liveVisitor?.statusLabel || "Checked In",
+          lastUpdate: liveLocation.timestamp,
+          detail: liveLocation.office || "Visitor is currently on site.",
+          sourceVisitor,
+          nfcCardId: sourceVisitor.nfcCardId || liveVisitor?.nfcCardId || "",
+        };
+      });
+    },
+    [adminLiveVisitorLocations, getManagedVisitorMapLocation, visitRequests],
   );
 
   const visibleAdminMapVisitors = useMemo(
@@ -5879,6 +5973,22 @@ const loadDashboardData = useCallback(async () => {
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 8 }}>
                 {getMapTrackingSourceLabel(activeMapActivity)} - {getMapFreshnessLabel(activeMapActivity.lastUpdate)}
               </Text>
+              <View style={{ marginTop: 10, gap: 6 }}>
+                {[
+                  ["Phone", activeMapActivity.sourceVisitor?.phoneNumber || activeMapActivity.sourceVisitor?.phone || "No phone"],
+                  ["Email", activeMapActivity.sourceVisitor?.email || "No email"],
+                  ["Office", activeMapActivity.location?.office || activeMapActivity.sourceVisitor?.assignedOffice || "Campus"],
+                  ["Schedule", activeMapActivity.sourceVisitor?.visitDate ? `${formatDate(activeMapActivity.sourceVisitor.visitDate)} ${activeMapActivity.sourceVisitor?.visitTime ? `at ${formatTime(activeMapActivity.sourceVisitor.visitTime)}` : ""}` : "No schedule"],
+                  ["Checked In", activeMapActivity.sourceVisitor?.checkedInAt ? formatDateTime(activeMapActivity.sourceVisitor.checkedInAt) : formatDateTime(activeMapActivity.lastUpdate)],
+                ].map(([label, value]) => (
+                  <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
+                    <Text style={{ color: theme.textSecondary, fontSize: 11, fontWeight: "700" }}>{label}</Text>
+                    <Text style={{ color: theme.textPrimary, fontSize: 11, fontWeight: "700", flex: 1, textAlign: "right" }} numberOfLines={1}>
+                      {value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           ) : (
             renderAdminMapEmptyState({
@@ -6009,6 +6119,22 @@ const loadDashboardData = useCallback(async () => {
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4 }}>
                 {formatDateTime(activeMapActivity.lastUpdate)}
               </Text>
+              <View style={{ marginTop: 10, gap: 6 }}>
+                {[
+                  ["Phone", activeMapActivity.sourceVisitor?.phoneNumber || activeMapActivity.sourceVisitor?.phone || "No phone"],
+                  ["Email", activeMapActivity.sourceVisitor?.email || "No email"],
+                  ["Office", activeMapActivity.location?.office || activeMapActivity.sourceVisitor?.assignedOffice || "Campus"],
+                  ["Schedule", activeMapActivity.sourceVisitor?.visitDate ? `${formatDate(activeMapActivity.sourceVisitor.visitDate)} ${activeMapActivity.sourceVisitor?.visitTime ? `at ${formatTime(activeMapActivity.sourceVisitor.visitTime)}` : ""}` : "No schedule"],
+                  ["Checked In", activeMapActivity.sourceVisitor?.checkedInAt ? formatDateTime(activeMapActivity.sourceVisitor.checkedInAt) : formatDateTime(activeMapActivity.lastUpdate)],
+                ].map(([label, value]) => (
+                  <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
+                    <Text style={{ color: theme.textSecondary, fontSize: 11, fontWeight: "700" }}>{label}</Text>
+                    <Text style={{ color: theme.textPrimary, fontSize: 11, fontWeight: "700", flex: 1, textAlign: "right" }} numberOfLines={1}>
+                      {value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           ) : (
             renderAdminMapEmptyState({
@@ -6080,9 +6206,9 @@ const loadDashboardData = useCallback(async () => {
               onClearSearch: () => setAttendanceSearchTerm(""),
               filterTitle: "Filters",
               filterSubtitle: "Narrow attendance records by person type and date range.",
-              hasFilters: attendanceScope !== "students" || attendanceDateShortcut !== "today",
+              hasFilters: attendanceScope !== "all" || attendanceDateShortcut !== "today",
               onResetFilters: () => {
-                setAttendanceScope("students");
+                setAttendanceScope("all");
                 setAttendanceDateShortcut("today");
               },
               filterGroups: [
@@ -6164,7 +6290,7 @@ const loadDashboardData = useCallback(async () => {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.adminTableScroll}>
                 <View style={[styles.adminTable, { minWidth: 920, backgroundColor: isDarkMode ? "#0F172A" : "#FFFFFF", borderColor: theme.borderColor }]}>
                   <View style={[styles.adminTableHeaderRow, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
-                    {["Name", "Type", "Date", "Check In", "Check Out", "Status", "Location"].map((heading) => (
+                    {["Name", "Person Type", "Date", "Check In", "Check Out", "Status", "Location"].map((heading) => (
                       <View key={heading} style={[styles.adminTableCell, styles.adminTableHeaderCell, heading === "Name" ? { width: 210 } : styles.adminTableFlexCell]}>
                         <Text style={[styles.adminTableHeaderText, isDarkMode && styles.darkTextSecondary]}>{heading}</Text>
                       </View>

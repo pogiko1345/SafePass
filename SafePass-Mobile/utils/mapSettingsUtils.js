@@ -12,7 +12,7 @@ export const formatRoomMapLabelText = (roomId, roomName) => {
   return labelText;
 };
 
-export const normalizeMapRooms = (rooms = []) => {
+export const normalizeMapRooms = (rooms = [], { includeDefaultMissing = false } = {}) => {
   const parsedRooms = Array.isArray(rooms) ? rooms : [];
   const validRooms = parsedRooms
     .map((room) => ({
@@ -27,12 +27,16 @@ export const normalizeMapRooms = (rooms = []) => {
     return MONITORING_MAP_OFFICES;
   }
 
+  if (!includeDefaultMissing) {
+    return validRooms;
+  }
+
   const savedRoomIds = new Set(validRooms.map((room) => room.id));
   const newDefaultRooms = MONITORING_MAP_OFFICES.filter((room) => !savedRoomIds.has(room.id));
   return [...validRooms, ...newDefaultRooms];
 };
 
-export const normalizeMapRoomPositions = (positions = {}) => {
+export const normalizeMapRoomPositions = (positions = {}, { includeDefaultMissing = false } = {}) => {
   const source = positions && typeof positions === "object" ? positions : {};
   const normalizedPositions = Object.entries(source).reduce((nextPositions, [roomId, position]) => {
     const x = Number(position?.x);
@@ -46,6 +50,10 @@ export const normalizeMapRoomPositions = (positions = {}) => {
     return nextPositions;
   }, {});
 
+  if (!includeDefaultMissing) {
+    return normalizedPositions;
+  }
+
   return {
     ...MONITORING_MAP_OFFICE_POSITIONS,
     ...normalizedPositions,
@@ -54,9 +62,15 @@ export const normalizeMapRoomPositions = (positions = {}) => {
 
 export const normalizeMapSettingsPayload = (payload = {}) => {
   const source = payload?.mapSettings || payload?.settings || payload || {};
+  const hasSavedRooms = Array.isArray(source.rooms) && source.rooms.length > 0;
+  const hasSavedPositions =
+    (source.roomPositions && typeof source.roomPositions === "object" && Object.keys(source.roomPositions).length > 0) ||
+    (source.positions && typeof source.positions === "object" && Object.keys(source.positions).length > 0);
   return {
-    rooms: normalizeMapRooms(source.rooms),
-    roomPositions: normalizeMapRoomPositions(source.roomPositions || source.positions),
+    rooms: normalizeMapRooms(source.rooms, { includeDefaultMissing: !hasSavedRooms }),
+    roomPositions: normalizeMapRoomPositions(source.roomPositions || source.positions, {
+      includeDefaultMissing: !hasSavedPositions,
+    }),
   };
 };
 

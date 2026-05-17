@@ -203,6 +203,11 @@ export default function StudentDashboardScreen({ navigation }) {
   });
   const [nowTick, setNowTick] = useState(Date.now());
 
+  const loadAttendanceRecords = useCallback(async () => {
+    const attendanceResponse = await ApiService.getMyAttendance({ limit: 30 });
+    setAttendance(Array.isArray(attendanceResponse?.attendance) ? attendanceResponse.attendance : []);
+  }, []);
+
   const loadData = useCallback(async () => {
     const [profileResponse, attendanceResponse] = await Promise.all([
       ApiService.getProfile(),
@@ -248,6 +253,24 @@ export default function StudentDashboardScreen({ navigation }) {
       emergencyContact: user?.emergencyContact || "",
     });
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const refreshAttendance = () => {
+      loadAttendanceRecords().catch((error) => {
+        console.log("Student attendance auto-refresh skipped:", error?.message || error);
+      });
+    };
+
+    const unsubscribeFocus = navigation?.addListener?.("focus", refreshAttendance);
+    const refreshTimer = setInterval(refreshAttendance, 5000);
+
+    return () => {
+      clearInterval(refreshTimer);
+      unsubscribeFocus?.();
+    };
+  }, [loadAttendanceRecords, navigation, user]);
 
   const refreshNfcAvailability = useCallback(async ({ showDisabledAlert = false } = {}) => {
     if (Platform.OS === "web" || nativeNfcUnavailableRef.current || !NfcManager) {

@@ -587,22 +587,22 @@ export default StyleSheet.create({
 
   commandDeckCard: {
     backgroundColor: "#FFFFFF",
-    marginTop: 6,
-    marginBottom: 10,
-    padding: 14,
-    borderRadius: 22,
+    marginTop: 4,
+    marginBottom: 8,
+    padding: width <= 390 ? 12 : 14,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "#D8E6F5",
     overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 14 },
-        shadowOpacity: 0.08,
-        shadowRadius: 22,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.07,
+        shadowRadius: 16,
       },
-      android: { elevation: 5 },
-      web: { boxShadow: "0px 18px 34px rgba(15,23,42,0.08)" },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 10px 22px rgba(15,23,42,0.07)" },
     }),
   },
 
@@ -611,10 +611,10 @@ export default StyleSheet.create({
   },
 
   commandDeckCardCompactHome: {
-    marginTop: 4,
-    marginBottom: 8,
+    marginTop: 2,
+    marginBottom: 6,
     padding: 12,
-    borderRadius: 20,
+    borderRadius: 18,
   },
 
   commandDeckAnimatedWrap: {
@@ -642,8 +642,8 @@ export default StyleSheet.create({
   },
 
   commandDeckHeader: {
-    gap: 6,
-    marginBottom: 10,
+    gap: 5,
+    marginBottom: 8,
   },
 
   commandDeckHeaderWide: {
@@ -687,15 +687,15 @@ export default StyleSheet.create({
   },
 
   commandDeckTitle: {
-    fontSize: width <= 390 ? 17 : 19,
+    fontSize: width <= 390 ? 16 : 18,
     fontWeight: "900",
     color: "#0F172A",
-    lineHeight: width <= 390 ? 22 : 25,
+    lineHeight: width <= 390 ? 21 : 24,
   },
 
   commandDeckSubtitle: {
-    fontSize: 11.5,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 16,
     color: "#5D6B80",
   },
 
@@ -722,27 +722,27 @@ export default StyleSheet.create({
 
   mobileQuickActionStrip: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 10,
+    gap: 7,
+    marginBottom: 8,
   },
 
   mobileQuickActionItem: {
     flex: 1,
-    minHeight: 58,
-    borderRadius: 16,
+    minHeight: 52,
+    borderRadius: 14,
     backgroundColor: "#F8FBFF",
     borderWidth: 1,
     borderColor: "#E4EDF8",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingVertical: 7,
   },
 
   mobileQuickActionIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 5,
@@ -759,29 +759,29 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 7,
+    gap: 6,
   },
 
   commandMetricCard: {
-    minHeight: 74,
+    minHeight: 66,
     backgroundColor: "#F8FBFF",
     borderWidth: 1,
     borderColor: "#E4EDF8",
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingVertical: 9,
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
 
   commandMetricIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "#E8F2FF",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 5,
   },
 
   commandMetricLabel: {
@@ -1197,7 +1197,7 @@ export default StyleSheet.create({
   nfcCard: {
     marginHorizontal: 20,
     marginTop: -25,
-    borderRadius: 24,
+    borderRadius: 18,
     overflow: "hidden",
     ...Platform.select({
       ios: {
@@ -1770,18 +1770,18 @@ export default StyleSheet.create({
   // ============ APPROVED EXPERIENCE ============
   approvedHeroCard: {
     marginHorizontal: 20,
-    marginTop: -25,
-    borderRadius: 28,
+    marginTop: 4,
+    borderRadius: 22,
     overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.16,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.1,
+        shadowRadius: 14,
       },
-      android: { elevation: 8 },
-      web: { boxShadow: "0px 10px 28px rgba(15,23,42,0.16)" },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 8px 20px rgba(15,23,42,0.10)" },
     }),
   },
 
@@ -1791,11 +1791,11 @@ export default StyleSheet.create({
   },
 
   approvedHeroGradient: {
-    padding: width <= 390 ? 16 : 22,
+    padding: width <= 390 ? 14 : 18,
   },
 
   approvedHeroGradientCompact: {
-    padding: 16,
+    padding: 14,
   },
 
   approvedHeroBadge: {
@@ -1803,11 +1803,11 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: width <= 390 ? 10 : 12,
-    paddingVertical: width <= 390 ? 6 : 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.92)",
-    marginBottom: width <= 390 ? 14 : 18,
+    marginBottom: 12,
   },
 
   approvedHeroBadgeText: {
@@ -1819,13 +1819,13 @@ export default StyleSheet.create({
   approvedHeroHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: width <= 390 ? 16 : 22,
+    marginBottom: 14,
   },
 
   approvedHeroAvatar: {
-    width: width <= 390 ? 58 : 68,
-    height: width <= 390 ? 58 : 68,
-    borderRadius: width <= 390 ? 29 : 34,
+    width: width <= 390 ? 48 : 56,
+    height: width <= 390 ? 48 : 56,
+    borderRadius: width <= 390 ? 24 : 28,
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
@@ -1833,7 +1833,7 @@ export default StyleSheet.create({
   },
 
   approvedHeroInitials: {
-    fontSize: width <= 390 ? 20 : 24,
+    fontSize: width <= 390 ? 17 : 20,
     fontWeight: "800",
     color: "#FFFFFF",
   },
@@ -1843,16 +1843,16 @@ export default StyleSheet.create({
   },
 
   approvedHeroTitle: {
-    fontSize: width <= 390 ? 24 : 28,
+    fontSize: width <= 390 ? 19 : 22,
     fontWeight: "800",
-    lineHeight: width <= 390 ? 28 : 32,
+    lineHeight: width <= 390 ? 24 : 27,
     color: "#FFFFFF",
     marginBottom: width <= 390 ? 4 : 6,
   },
 
   approvedHeroSubtitle: {
-    fontSize: width <= 390 ? 12 : 13,
-    lineHeight: width <= 390 ? 17 : 20,
+    fontSize: width <= 390 ? 11.5 : 12.5,
+    lineHeight: width <= 390 ? 16 : 18,
     color: "rgba(255,255,255,0.88)",
   },
 
@@ -1860,13 +1860,13 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "stretch",
-    gap: width <= 390 ? 10 : 12,
+    gap: 8,
   },
 
   approvedHeroFactCard: {
     backgroundColor: "rgba(255,255,255,0.14)",
-    borderRadius: width <= 390 ? 16 : 18,
-    padding: width <= 390 ? 12 : 14,
+    borderRadius: 14,
+    padding: width <= 390 ? 10 : 12,
     minWidth: 0,
   },
 
@@ -1880,17 +1880,17 @@ export default StyleSheet.create({
   },
 
   approvedHeroFactValue: {
-    fontSize: width <= 390 ? 14 : 15,
+    fontSize: width <= 390 ? 12.5 : 13.5,
     fontWeight: "700",
     color: "#FFFFFF",
   },
 
   approvedActionSection: {
-    marginTop: 20,
+    marginTop: 12,
   },
 
   approvedSectionHeader: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   approvedSectionTitle: {
@@ -1910,43 +1910,43 @@ export default StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "stretch",
-    gap: 14,
+    gap: 10,
     width: "100%",
   },
 
   approvedCompactActionsColumn: {
     flex: 1,
     minWidth: width <= 560 ? "100%" : 260,
-    gap: 12,
+    gap: 10,
     alignItems: "stretch",
   },
 
   approvedCompactActionCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 10,
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: width <= 390 ? 14 : 16,
+    borderRadius: 16,
+    padding: width <= 390 ? 12 : 14,
     borderWidth: 1,
     borderColor: "#DDEBFA",
-    minHeight: 92,
+    minHeight: 74,
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.08,
-        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
       },
-      android: { elevation: 3 },
-      web: { boxShadow: "0px 8px 18px rgba(15,23,42,0.08)" },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 6px 14px rgba(15,23,42,0.06)" },
     }),
   },
 
   approvedCompactActionIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1957,15 +1957,15 @@ export default StyleSheet.create({
   },
 
   approvedCompactActionTitle: {
-    fontSize: width <= 390 ? 15 : 16,
+    fontSize: width <= 390 ? 13.5 : 14.5,
     fontWeight: "900",
     color: "#0F172A",
     marginBottom: 4,
   },
 
   approvedCompactActionText: {
-    fontSize: 12.5,
-    lineHeight: 18,
+    fontSize: 11.5,
+    lineHeight: 16,
     color: "#64748B",
     fontWeight: "600",
   },
@@ -2019,19 +2019,19 @@ export default StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.16,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.11,
+        shadowRadius: 14,
       },
-      android: { elevation: 6 },
-      web: { boxShadow: "0px 10px 28px rgba(15,23,42,0.14)" },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 8px 20px rgba(15,23,42,0.11)" },
     }),
   },
 
   approvedVirtualNfcCardGradient: {
-    padding: width <= 390 ? 18 : 20,
-    gap: 18,
-    minHeight: width <= 390 ? 258 : 280,
+    padding: width <= 390 ? 14 : 16,
+    gap: 14,
+    minHeight: width <= 390 ? 178 : 196,
     justifyContent: "space-between",
   },
 
@@ -2068,23 +2068,23 @@ export default StyleSheet.create({
   },
 
   approvedVirtualNfcTitle: {
-    fontSize: width <= 390 ? 22 : 24,
+    fontSize: width <= 390 ? 18 : 20,
     fontWeight: "800",
     color: "#FFFFFF",
     marginBottom: 6,
   },
 
   approvedVirtualNfcSubtitle: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 17,
     color: "rgba(255,255,255,0.84)",
     maxWidth: width <= 390 ? 230 : 260,
   },
 
   approvedVirtualNfcIconWrap: {
-    width: width <= 390 ? 54 : 58,
-    height: width <= 390 ? 54 : 58,
-    borderRadius: width <= 390 ? 17 : 18,
+    width: width <= 390 ? 44 : 48,
+    height: width <= 390 ? 44 : 48,
+    borderRadius: 16,
     backgroundColor: "rgba(255,255,255,0.14)",
     justifyContent: "center",
     alignItems: "center",
@@ -2093,10 +2093,10 @@ export default StyleSheet.create({
 
   approvedVirtualNfcCardNumberRow: {
     backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 6,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
   },
 
   approvedVirtualNfcCardLabel: {
@@ -2108,7 +2108,7 @@ export default StyleSheet.create({
   },
 
   approvedVirtualNfcCardNumber: {
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: "800",
     color: "#FFFFFF",
   },
@@ -2155,20 +2155,20 @@ export default StyleSheet.create({
 
   approvedTimelineSection: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "#DDEBFA",
-    padding: width <= 390 ? 16 : 18,
-    marginTop: 18,
+    padding: width <= 390 ? 14 : 16,
+    marginTop: 12,
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.06,
-        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
       },
       android: { elevation: 3 },
-      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.06)" },
+      web: { boxShadow: "0px 7px 18px rgba(15,23,42,0.05)" },
     }),
   },
 
@@ -3761,7 +3761,7 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: width <= 390 ? 14 : 16,
-    gap: 12,
+    gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#DDE7F3",
   },
@@ -4068,20 +4068,20 @@ export default StyleSheet.create({
 
   appointmentInsightsCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "#DDE7F3",
-    padding: 18,
-    marginBottom: 12,
+    padding: width <= 390 ? 14 : 16,
+    marginBottom: 10,
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 5 },
         shadowOpacity: 0.05,
-        shadowRadius: 16,
+        shadowRadius: 12,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.05)" },
+      web: { boxShadow: "0px 7px 18px rgba(15,23,42,0.05)" },
     }),
   },
 
@@ -4089,9 +4089,9 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 8,
     flexWrap: "wrap",
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   appointmentInsightsEyebrow: {
@@ -4104,7 +4104,7 @@ export default StyleSheet.create({
   },
 
   appointmentInsightsTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "900",
     color: "#0F172A",
   },
@@ -4130,8 +4130,8 @@ export default StyleSheet.create({
   appointmentInsightsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 14,
+    gap: 8,
+    marginBottom: 10,
   },
 
   appointmentInsightsMetricCard: {
@@ -4172,9 +4172,9 @@ export default StyleSheet.create({
   },
 
   appointmentInsightsStatusIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "#E8F2FF",
     justifyContent: "center",
     alignItems: "center",
@@ -4185,15 +4185,15 @@ export default StyleSheet.create({
   },
 
   appointmentInsightsStatusTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "800",
     color: "#0F172A",
     marginBottom: 4,
   },
 
   appointmentInsightsStatusText: {
-    fontSize: 12.5,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
     color: "#64748B",
   },
 
@@ -4346,7 +4346,7 @@ export default StyleSheet.create({
   appointmentHistorySummaryCard: {
     flex: 1,
     minHeight: 58,
-    borderRadius: 16,
+    borderRadius: 14,
     backgroundColor: "#F8FBFF",
     borderWidth: 1,
     borderColor: "#E2EAF4",
@@ -4394,7 +4394,7 @@ export default StyleSheet.create({
   appointmentHistoryTableDateRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 6,
     minHeight: 38,
     paddingHorizontal: 12,
     backgroundColor: "#F8FBFE",
@@ -6613,7 +6613,7 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 8,
   },
 
   visitorMapToolbarCopy: {
@@ -6662,7 +6662,7 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#D9E4F2",
     backgroundColor: "#FFFFFF",
@@ -6681,7 +6681,7 @@ export default StyleSheet.create({
   },
 
   visitorMapFullscreenTitle: {
-    fontSize: 18,
+    fontSize: 16,
     lineHeight: 24,
     fontWeight: "900",
     color: "#0F172A",
@@ -6732,7 +6732,7 @@ export default StyleSheet.create({
   },
 
   visitorMapPrimaryActionText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "900",
     color: "#FFFFFF",
   },
@@ -6857,7 +6857,7 @@ export default StyleSheet.create({
   },
 
   accountHeroInitials: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: "800",
     color: "#FFFFFF",
   },
@@ -6886,7 +6886,7 @@ export default StyleSheet.create({
 
   accountHeroSubtext: {
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 17,
     color: "rgba(255,255,255,0.84)",
   },
 
@@ -6925,8 +6925,8 @@ export default StyleSheet.create({
     flexBasis: width <= 520 ? "100%" : "47%",
     minWidth: width <= 520 ? "100%" : 150,
     backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
   },
@@ -7033,8 +7033,8 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 14,
+    padding: 12,
   },
 
   accountActionIcon: {

@@ -77,7 +77,7 @@ const formatRoomCheckpointLabel = (room, duplicateIndexByKey) => {
   return duplicateIndex ? `${baseName} ${duplicateIndex}` : baseName;
 };
 
-const buildCheckpointOptions = (rooms = MONITORING_MAP_OFFICES) => {
+const buildCheckpointOptions = (rooms = MONITORING_MAP_OFFICES, roomPositions = {}) => {
   const duplicateCounts = rooms.reduce((counts, room) => {
     const duplicateKey = `${room?.floor || "floor"}::${String(room?.name || "").trim().toLowerCase()}`;
     counts.set(duplicateKey, (counts.get(duplicateKey) || 0) + 1);
@@ -100,6 +100,7 @@ const buildCheckpointOptions = (rooms = MONITORING_MAP_OFFICES) => {
     floor: room.floor,
     office: room.name,
     icon: room.icon || "business-outline",
+    coordinates: roomPositions?.[room.id] || null,
   }));
 
   return [...ENTRY_CHECKPOINTS, ...roomCheckpoints].filter((checkpoint) => checkpoint.key && checkpoint.floor && checkpoint.office);
@@ -108,6 +109,9 @@ const buildCheckpointOptions = (rooms = MONITORING_MAP_OFFICES) => {
 const getResultTone = (result) => {
   if (!result) return { background: "#EFF6FF", border: "#BFDBFE", icon: "#0A3D91", label: "Ready" };
   if (!result.success) return { background: "#FEF2F2", border: "#FCA5A5", icon: "#B91C1C", label: "Blocked" };
+  if (String(result.action || "").includes("office_departure")) {
+    return { background: "#FFF7ED", border: "#FDBA74", icon: "#C2410C", label: "Left Office" };
+  }
   if (String(result.action || "").includes("check_out")) {
     return { background: "#FFF7ED", border: "#FDBA74", icon: "#C2410C", label: "Checked Out" };
   }
@@ -165,6 +169,7 @@ export default function NFCScanScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mapRooms, setMapRooms] = useState(MONITORING_MAP_OFFICES);
+  const [mapRoomPositions, setMapRoomPositions] = useState({});
   const [selectedFloorKey, setSelectedFloorKey] = useState(MONITORING_MAP_FLOORS[0].id);
   const [selectedCheckpointKey, setSelectedCheckpointKey] = useState(ENTRY_CHECKPOINTS[0].key);
   const [checkpointSearch, setCheckpointSearch] = useState("");
@@ -173,7 +178,10 @@ export default function NFCScanScreen({ navigation }) {
   const [stationEvents, setStationEvents] = useState([]);
   const [latestResult, setLatestResult] = useState(null);
 
-  const checkpointOptions = useMemo(() => buildCheckpointOptions(mapRooms), [mapRooms]);
+  const checkpointOptions = useMemo(
+    () => buildCheckpointOptions(mapRooms, mapRoomPositions),
+    [mapRooms, mapRoomPositions],
+  );
   const floorCheckpointCounts = useMemo(
     () =>
       checkpointOptions.reduce((counts, checkpoint) => ({
@@ -217,10 +225,12 @@ export default function NFCScanScreen({ navigation }) {
         if (mapResponse?.success) {
           const normalizedMapSettings = normalizeMapSettingsPayload(mapResponse.mapSettings);
           setMapRooms(normalizedMapSettings.rooms);
+          setMapRoomPositions(normalizedMapSettings.roomPositions);
         }
       } catch (mapError) {
         console.log("Checkpoint map settings fallback:", mapError?.message || mapError);
         setMapRooms(MONITORING_MAP_OFFICES);
+        setMapRoomPositions({});
       }
     } catch (error) {
       console.error("Load checkpoint user error:", error);
@@ -373,6 +383,7 @@ export default function NFCScanScreen({ navigation }) {
         office: selectedCheckpoint.office,
         checkpointId: selectedCheckpoint.key,
         checkpointName: selectedCheckpoint.label,
+        coordinates: selectedCheckpoint.coordinates || undefined,
         deviceId: "mobile-checkpoint-station",
       });
       const personDetails = getPersonDetails(response);

@@ -351,7 +351,7 @@ const getVisitorSelfLocationMarker = (
   const currentLocation = visitorRecord?.currentLocation || {};
   const normalizedStatus = String(visitorRecord?.status || "").toLowerCase();
   const isOnCampus =
-    ["checked_in", "active"].includes(normalizedStatus) &&
+    normalizedStatus === "checked_in" &&
     currentLocation?.isActive !== false &&
     !visitorRecord?.checkedOutAt;
 
@@ -1057,6 +1057,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const handleVisitorSectionChange = (sectionId) => {
     if (!VISITOR_MODULES.some((module) => module.id === sectionId)) return;
+
+    if (
+      selectedVisitorSection === "appointment" &&
+      sectionId === "appointment" &&
+      selectedAppointmentScreen === "menu" &&
+      !isAppointmentScreenTransitioning
+    ) {
+      scrollDashboardToTop(true);
+      return;
+    }
 
     const currentIndex = VISITOR_MODULES.findIndex((module) => module.id === selectedVisitorSection);
     const nextIndex = VISITOR_MODULES.findIndex((module) => module.id === sectionId);
@@ -4987,9 +4997,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </Text>
             </View>
             <View style={visitorDashboardStyles.approvedHeroTextWrap}>
-              <Text style={visitorDashboardStyles.approvedHeroTitle}>Your SafePass Is Ready</Text>
+              <Text style={visitorDashboardStyles.approvedHeroTitle}>SafePass Ready</Text>
               <Text style={visitorDashboardStyles.approvedHeroSubtitle}>
-                Open your digital pass, review your schedule, and stay connected before arriving on campus.
+                Review your schedule and open your pass when you arrive.
               </Text>
             </View>
           </View>
@@ -5030,9 +5040,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               approvedSectionHeaderResponsiveStyle,
             ]}
           >
-            <Text style={visitorDashboardStyles.approvedSectionTitle}>Access Tools</Text>
+            <Text style={visitorDashboardStyles.approvedSectionTitle}>Quick Actions</Text>
             <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
-              Use your pass, manage your visit, and keep your arrival flow ready.
+              Keep the visit flow simple from arrival to checkout.
             </Text>
           </View>
 
@@ -5060,9 +5070,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       Virtual NFC Card
                     </Text>
                   </View>
-                  <Text style={visitorDashboardStyles.approvedVirtualNfcTitle}>View Access Card</Text>
+                  <Text style={visitorDashboardStyles.approvedVirtualNfcTitle}>Access Card</Text>
                   <Text style={visitorDashboardStyles.approvedVirtualNfcSubtitle}>
-                    Open your digital SafePass card and confirm check-in or check-out from this phone.
+                    Open your digital card for campus verification.
                   </Text>
                 </View>
                 <View style={visitorDashboardStyles.approvedVirtualNfcIconWrap}>
@@ -5102,7 +5112,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   {visitor?.status === "checked_in" ? "Checked In" : "Check In"}
                 </Text>
                 <Text style={visitorDashboardStyles.approvedCompactActionText}>
-                  Confirm arrival and notify security monitoring.
+                  Confirm your arrival.
                 </Text>
               </View>
             </AnimatedPressable>
@@ -5123,7 +5133,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.approvedCompactActionCopy}>
                 <Text style={visitorDashboardStyles.approvedCompactActionTitle}>Check Out</Text>
                 <Text style={visitorDashboardStyles.approvedCompactActionText}>
-                  Close your visit once your appointment is complete.
+                  Close your visit when done.
                 </Text>
               </View>
             </AnimatedPressable>
@@ -5144,9 +5154,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               approvedSectionHeaderResponsiveStyle,
             ]}
           >
-            <Text style={visitorDashboardStyles.approvedSectionTitle}>Visit Snapshot</Text>
+            <Text style={visitorDashboardStyles.approvedSectionTitle}>Visit Details</Text>
             <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
-              Review your purpose, office, and key reminders before arriving.
+              The key information for today’s visit.
             </Text>
           </View>
 
@@ -5233,15 +5243,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </TouchableOpacity>
                 </View>
                 {renderAppointmentInsightsCard()}
-                {renderVisitorModuleNavigation()}
-                {renderRecentAppointmentRail()}
               </>
             ) : isApprovedVisitor ? (
               renderApprovedVisitorDashboard()
             ) : (
               <>
                 {renderAppointmentInsightsCard()}
-                {renderVisitorModuleNavigation()}
                 {renderRecentAppointmentRail()}
                 {renderVisitorEmptyState()}
               </>
@@ -5249,7 +5256,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           ) : (
             <>
               {renderAppointmentInsightsCard()}
-              {renderVisitorModuleNavigation()}
               {renderVisitorEmptyState()}
             </>
           )}

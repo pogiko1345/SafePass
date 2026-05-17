@@ -1897,9 +1897,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         <View style={styles.heroHeader}>
           <View style={styles.heroCopy}>
             <Text style={styles.heroEyebrow}>Staff Dashboard</Text>
-            <Text style={styles.heroTitle}>Office Appointment Flow</Text>
+            <Text style={styles.heroTitle}>Staff Workspace</Text>
             <Text style={styles.heroSubtitle}>
-              Review visitor requests, manage schedules, and stay updated with your latest office activity.
+              Review visitor requests, schedules, and office updates from one focused view.
             </Text>
           </View>
         </View>
@@ -1923,9 +1923,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       <View style={staffVirtualStyles.webNotice}>
         <Ionicons name="phone-portrait-outline" size={20} color="#0A3D91" />
         <View style={staffVirtualStyles.webNoticeCopy}>
-          <Text style={staffVirtualStyles.webNoticeTitle}>Mobile NFC attendance</Text>
+          <Text style={staffVirtualStyles.webNoticeTitle}>Attendance is on mobile</Text>
           <Text style={staffVirtualStyles.webNoticeText}>
-            Staff check-in and check-out are available in the mobile app only.
+            Use the mobile app for staff check-in and check-out.
           </Text>
         </View>
       </View>
@@ -1985,7 +1985,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           <View style={styles.sectionHeaderCopy}>
             <Text style={styles.sectionTitle}>Today's Schedule</Text>
             <Text style={styles.sectionSubtitle}>
-              Today's approved and adjusted visitors for your office.
+              Approved and adjusted visitors for your office today.
             </Text>
           </View>
           <TouchableOpacity style={styles.sectionActionIconButton} onPress={() => selectSubmodule("appointment-record")}>
@@ -2050,7 +2050,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
           <Text style={styles.quickActionTitle}>Appointment Request</Text>
           <Text style={styles.quickActionSubtitle}>
-            Open the pending request queue and respond to new visitor schedules.
+            Review and respond to visitor schedule requests.
           </Text>
           <Text style={styles.quickActionFooterText}>Open request table</Text>
         </HomeHoverPressable>
@@ -2067,7 +2067,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
           <Text style={styles.quickActionTitle}>Appointment Record</Text>
           <Text style={styles.quickActionSubtitle}>
-            Review all appointment records and track status changes over time.
+            Review records and track status changes.
           </Text>
           <Text style={styles.quickActionFooterText}>Open record history</Text>
         </HomeHoverPressable>
@@ -2084,7 +2084,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
           <Text style={styles.quickActionTitle}>View Account Info</Text>
           <Text style={styles.quickActionSubtitle}>
-            Check your assigned office profile and account details with limited access.
+            Check your assigned office and account details.
           </Text>
           <Text style={styles.quickActionFooterText}>Open my profile</Text>
         </HomeHoverPressable>
@@ -3713,29 +3713,29 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
 const staffVirtualStyles = StyleSheet.create({
   webNotice: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 16,
-    marginTop: 16,
-    marginBottom: 16,
+    backgroundColor: "#F8FBFE",
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "#D8E8FF",
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
   },
   webNoticeCopy: {
     flex: 1,
   },
   webNoticeTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "900",
     color: "#0F172A",
   },
   webNoticeText: {
-    marginTop: 4,
-    fontSize: 13,
-    lineHeight: 18,
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 17,
     color: "#64748B",
   },
   card: {

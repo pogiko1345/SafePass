@@ -1053,12 +1053,16 @@ const sendCampusTapSecurityNotifications = async ({
   deviceId = "",
 }) => {
   const normalizedRole = normalizeUserRoleValue(user?.role);
-  if (!["student", "teacher", "staff"].includes(normalizedRole) || !["check_in", "check_out", "location_update"].includes(action)) {
+  if (
+    !["student", "teacher", "staff"].includes(normalizedRole) ||
+    !["check_in", "check_out", "location_update", "office_departure"].includes(action)
+  ) {
     return [];
   }
 
   const isCheckIn = action === "check_in";
   const isCheckOut = action === "check_out";
+  const isOfficeDeparture = action === "office_departure";
   const roleLabel =
     normalizedRole === "teacher"
       ? "Teacher"
@@ -1067,11 +1071,19 @@ const sendCampusTapSecurityNotifications = async ({
         : "Student";
   const personName = getFullName(user) || user?.email || roleLabel;
   const locationLabel = tapLocation?.office || "campus checkpoint";
-  const actionLabel = isCheckIn ? "Entered Campus" : isCheckOut ? "Left Campus" : `Entered ${locationLabel}`;
+  const actionLabel = isCheckIn
+    ? "Entered Campus"
+    : isCheckOut
+      ? "Left Campus"
+      : isOfficeDeparture
+        ? `Left ${locationLabel}`
+        : `Entered ${locationLabel}`;
   const notificationMessage = isCheckIn
     ? `${personName} entered campus at ${locationLabel}.`
     : isCheckOut
       ? `${personName} left campus at ${locationLabel}.`
+      : isOfficeDeparture
+        ? `${personName} left ${locationLabel}.`
       : `${personName} entered ${locationLabel}.`;
   const activityType = `${normalizedRole}_${action}`;
   const results = await Promise.allSettled([
@@ -1081,7 +1093,7 @@ const sendCampusTapSecurityNotifications = async ({
       targetRole: "security",
       relatedUser: user._id,
       type: "info",
-      severity: normalizedRole === "staff" || isCheckIn || action === "location_update" ? "medium" : "low",
+      severity: normalizedRole === "staff" || isCheckIn || action === "location_update" || isOfficeDeparture ? "medium" : "low",
       metadata: {
         activityType,
         action,
@@ -1924,6 +1936,16 @@ const GATE_CHECKPOINT_IDS = new Set([
 
 const isGateCheckpoint = (location = {}) =>
   GATE_CHECKPOINT_IDS.has(normalizeCheckpointId(location.checkpointId || location.office));
+
+const isSameCheckpointLocation = (left = {}, right = {}) => {
+  const leftCheckpoint = normalizeCheckpointId(left?.checkpointId || left?.office);
+  const rightCheckpoint = normalizeCheckpointId(right?.checkpointId || right?.office);
+  if (leftCheckpoint && rightCheckpoint && leftCheckpoint === rightCheckpoint) return true;
+
+  const leftOffice = normalizeDepartmentValue(left?.office || left?.checkpointName || "");
+  const rightOffice = normalizeDepartmentValue(right?.office || right?.checkpointName || "");
+  return Boolean(leftOffice && rightOffice && leftOffice === rightOffice);
+};
 
 const getAssignedAppointmentOffice = (visitor = {}) =>
   visitor.currentDestination?.office ||
@@ -3064,6 +3086,10 @@ app.post(
           latestAttendance?.checkInTime && !latestAttendance?.checkOutTime,
         );
         const isMainGateTap = isGateCheckpoint(tapLocation);
+        const latestCheckpointTap = Array.isArray(latestAttendance?.checkpointHistory)
+          ? latestAttendance.checkpointHistory[latestAttendance.checkpointHistory.length - 1]
+          : null;
+        const isExplicitCheckoutTap = tapAction === "checkout" || tapAction === "check_out";
         const isAutoGateTap =
           tapAction === "gate" ||
           tapAction === "entry" ||
@@ -3073,17 +3099,29 @@ app.post(
           hasOpenAttendance &&
           tapAction !== "location" &&
           tapAction !== "track" &&
-          (tapAction === "checkout" || tapAction === "check_out" || isAutoGateTap);
+          isMainGateTap &&
+          (isExplicitCheckoutTap || isAutoGateTap);
         const shouldCheckIn =
           !hasOpenAttendance &&
           tapAction !== "location" &&
           tapAction !== "track" &&
           (tapAction === "checkin" || tapAction === "check_in" || tapAction === "auto" || isAutoGateTap);
+        const shouldRecordOfficeDeparture =
+          hasOpenAttendance &&
+          !isMainGateTap &&
+          tapAction !== "location" &&
+          tapAction !== "track" &&
+          (isExplicitCheckoutTap ||
+            (tapAction === "auto" &&
+              latestCheckpointTap?.action !== "office_departure" &&
+              isSameCheckpointLocation(latestCheckpointTap, tapLocation)));
         const action = shouldCheckOut
           ? "check_out"
           : shouldCheckIn
             ? "check_in"
-            : "location_update";
+            : shouldRecordOfficeDeparture
+              ? "office_departure"
+              : "location_update";
         const accessType =
           action === "check_out" ? "exit" : action === "check_in" ? "entry" : "system";
         const attendanceRecord = await upsertAttendanceRecordForTap({
@@ -3135,7 +3173,9 @@ app.post(
               ? "Attendance check-in recorded"
               : action === "check_out"
                 ? "Attendance check-out recorded"
-                : "Location checkpoint recorded",
+                : action === "office_departure"
+                  ? "Office departure recorded"
+                  : "Location checkpoint recorded",
           userType: normalizedUserRole,
           action,
           attendance: attendanceRecord,
@@ -3191,7 +3231,11 @@ app.post(
         });
       }
 
+      const visitor = latestVisitor;
+      await applyAppointmentLifecycleIfNeeded(visitor);
+
       const isMainGateTap = isGateCheckpoint(tapLocation);
+      const isExplicitCheckoutTap = tapAction === "checkout" || tapAction === "check_out";
       const isAutoGateTap =
         tapAction === "gate" ||
         tapAction === "entry" ||
@@ -3201,15 +3245,22 @@ app.post(
         checkedInVisitor &&
         tapAction !== "location" &&
         tapAction !== "track" &&
-        (tapAction === "checkout" || tapAction === "check_out" || isAutoGateTap);
+        isMainGateTap &&
+        (isExplicitCheckoutTap || isAutoGateTap);
       const shouldCheckIn =
         !checkedInVisitor &&
         tapAction !== "location" &&
         tapAction !== "track" &&
         (tapAction === "checkin" || tapAction === "check_in" || isAutoGateTap);
-
-      const visitor = latestVisitor;
-      await applyAppointmentLifecycleIfNeeded(visitor);
+      const shouldRecordOfficeDeparture =
+        checkedInVisitor &&
+        !isMainGateTap &&
+        tapAction !== "location" &&
+        tapAction !== "track" &&
+        (isExplicitCheckoutTap ||
+          (tapAction === "auto" &&
+            visitor.currentLocation?.action !== "office_departure" &&
+            isSameCheckpointLocation(visitor.currentLocation, tapLocation)));
 
       let action = "location_update";
       let accessType = "system";
@@ -3227,6 +3278,16 @@ app.post(
         accessType = "exit";
         activityType = "station_checkout";
         responseMessage = "Visitor checked out at checkpoint station";
+      } else if (shouldRecordOfficeDeparture) {
+        visitor.updateCurrentLocation(tapLocation, {
+          deviceId,
+          action: "office_departure",
+          statusLabel: `Left ${tapLocation.office || "checkpoint"}`,
+        });
+        action = "office_departure";
+        accessType = "system";
+        activityType = "station_office_departure";
+        responseMessage = "Visitor office departure recorded";
       } else if (shouldCheckIn) {
         const checkInEligibility = getVisitorCheckInEligibility(visitor);
         if (!checkInEligibility.allowed) {
@@ -3358,18 +3419,23 @@ app.post(
         notes: `${operatorName} recorded ${visitor.fullName} ${action.replace("_", " ")} at ${tapLocation.office}.`,
       });
 
-      if (["check_in", "check_out", "location_update"].includes(action)) {
+      if (["check_in", "check_out", "location_update", "office_departure"].includes(action)) {
         const isCheckIn = action === "check_in";
         const isCheckOut = action === "check_out";
+        const isOfficeDeparture = action === "office_departure";
         const notificationTitle = isCheckIn
           ? "Visitor Checked In"
           : isCheckOut
             ? "Visitor Checked Out"
-            : `Visitor Entered ${tapLocation.office || "Checkpoint"}`;
+            : isOfficeDeparture
+              ? `Visitor Left ${tapLocation.office || "Office"}`
+              : `Visitor Entered ${tapLocation.office || "Checkpoint"}`;
         const notificationMessage = isCheckIn
           ? `${visitor.fullName} checked in at ${tapLocation.office}.`
           : isCheckOut
             ? `${visitor.fullName} checked out at ${tapLocation.office}.`
+            : isOfficeDeparture
+              ? `${visitor.fullName} left ${tapLocation.office || "the selected office"}.`
             : `${visitor.fullName} entered ${tapLocation.office || "the selected checkpoint"}.`;
         await Promise.all([
           createRoleNotification({
@@ -3379,7 +3445,7 @@ app.post(
             relatedVisitor: visitor._id,
             relatedUser: cardUser._id,
             type: "info",
-            severity: isCheckIn || action === "location_update" ? "medium" : "low",
+            severity: isCheckIn || action === "location_update" || isOfficeDeparture ? "medium" : "low",
             metadata: {
               activityType,
               source: "checkpoint_station",
@@ -8418,6 +8484,7 @@ app.get("/api/my-attendance", authMiddleware, async (req, res) => {
       AttendanceRecord.countDocuments(query),
     ]);
 
+    res.set("Cache-Control", "no-store");
     res.json({
       success: true,
       attendance: records,
@@ -12855,6 +12922,7 @@ app.put("/api/admin/settings", authMiddleware, async (req, res) => {
 app.get("/api/map-settings", async (req, res) => {
   try {
     const settingsRecord = await getSystemSettingsRecord();
+    res.set("Cache-Control", "no-store");
     res.json({
       success: true,
       mapSettings: sanitizeMapConfiguration(settingsRecord?.mapConfiguration || {}),
