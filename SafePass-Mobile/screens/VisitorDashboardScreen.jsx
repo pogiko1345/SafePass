@@ -6362,6 +6362,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       officePositions={visitorMapRoomPositions}
       onFloorChange={setSelectedVisitorMapFloor}
       showFloorNavigation={false}
+      routeStartLabel={visitorSelfLocationMarker ? "Current spot" : "Main Gate"}
       initialScale={fullscreen ? 1 : 1.25}
       fullscreen={fullscreen}
     />

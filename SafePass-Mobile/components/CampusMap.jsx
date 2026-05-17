@@ -88,6 +88,7 @@ const CampusMap = ({
   officePositions = {}, 
   onFloorChange,
   showFloorNavigation = true,
+  routeStartLabel = "Start",
 }) => {
   const { width: viewportWidth } = useWindowDimensions();
   const defaultFloorId = floors[0]?.id || "ground";
@@ -109,6 +110,11 @@ const CampusMap = ({
   const gestureStartDistanceRef = useRef(null);
   const mapSizeRef = useRef({ width: 0, height: 500 });
   const hasMountedRef = useRef(false);
+  const markerInverseScale = scaleAnim.interpolate({
+    inputRange: [0.5, 1, 3],
+    outputRange: [2, 1, 0.333],
+    extrapolate: "clamp",
+  });
 
   useEffect(() => {
     mapScaleRef.current = mapScale;
@@ -672,6 +678,10 @@ const CampusMap = ({
           ? freshness.color
           : getVisitorStatusColor(visitor.status);
       const positionStyle = getVisitorPositionStyle(visitor);
+      const markerTransform = [
+        ...(Array.isArray(positionStyle.transform) ? positionStyle.transform : []),
+        { scale: markerInverseScale },
+      ];
       const isHovered =
         hoveredVisitorGroupKey === key ||
         groupVisitors.some((groupVisitor) => hoveredVisitor?.id === groupVisitor.id);
@@ -679,7 +689,7 @@ const CampusMap = ({
       return (
         <Animated.View
           key={key}
-          style={[styles.visitorMarker, positionStyle]}
+          style={[styles.visitorMarker, positionStyle, { transform: markerTransform }]}
           onMouseEnter={() => {
             setHoveredVisitorGroupKey(key);
             onVisitorHover?.(visitor);
@@ -746,6 +756,7 @@ const CampusMap = ({
               transform: [
                 { translateX: -13 },
                 { translateY: -28 },
+                { scale: markerInverseScale },
                 {
                   scale: routePulseAnim.interpolate({
                     inputRange: [0, 1],
@@ -841,9 +852,18 @@ const CampusMap = ({
             },
           ]}
         />
-        <View style={[styles.routeStartMarker, { left: `${start.x}%`, top: `${start.y}%` }]}>
-          <Text style={styles.routeStartMarkerText}>You are here</Text>
-        </View>
+        <Animated.View
+          style={[
+            styles.routeStartMarker,
+            {
+              left: `${start.x}%`,
+              top: `${start.y}%`,
+              transform: [{ translateX: -18 }, { translateY: -18 }, { scale: markerInverseScale }],
+            },
+          ]}
+        >
+          <Text style={styles.routeStartMarkerText}>{routeStartLabel}</Text>
+        </Animated.View>
       </View>
     );
   };

@@ -1581,15 +1581,15 @@ export default function SecurityDashboardScreen({ navigation }) {
   const applyVisitorNfcCardUpdate = (visitorEmail, cardId = "", visitorDetails = null) => {
     const normalizedEmail = String(visitorEmail || "").trim().toLowerCase();
     if (!normalizedEmail) return;
+    const { safePassId: _ignoredSafePassId, ...safeVisitorDetails } = visitorDetails || {};
 
     const updateCollection = (collection = []) =>
       collection.map((visitor) =>
         String(visitor?.email || "").trim().toLowerCase() === normalizedEmail
           ? {
               ...visitor,
-              ...(visitorDetails || {}),
+              ...safeVisitorDetails,
               nfcCardId: cardId,
-              safePassId: cardId,
             }
           : visitor,
       );
@@ -1613,7 +1613,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
 
     const normalizedCardId = normalizeRfidReaderInput(scannedValue);
-    const currentCard = normalizeRfidReaderInput(selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId || "");
+    const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
     if (!normalizedCardId) {
       if (currentCard) {
         setVisitorNfcStatus({
@@ -1682,7 +1682,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       return;
     }
 
-    const currentCard = selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId;
+    const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
     if (!currentCard) {
       setVisitorNfcStatus({ type: "error", message: "This visitor has no assigned UID to remove." });
       Alert.alert("No UID Assigned", "This visitor has no assigned UID to remove.");
@@ -1877,6 +1877,23 @@ export default function SecurityDashboardScreen({ navigation }) {
   const getVisitorNfcIdentity = (visitor) =>
     String(visitor?.email || "").trim().toLowerCase() ||
     String(visitor?.userId || visitor?.relatedUser?._id || visitor?.accountId || visitor?._id || "").trim();
+
+  const isVisitorPhysicalNfcUid = (value) => {
+    const normalizedValue = normalizeRfidReaderInput(value);
+    if (!normalizedValue) return false;
+    if (/^\d{4}-\d{5,}$/i.test(normalizedValue)) return false;
+    if (/^SAFEPASS-/i.test(normalizedValue)) return false;
+    return true;
+  };
+
+  const getVisitorAssignedNfcUid = (visitor) =>
+    [
+      visitor?.nfcCardId,
+      visitor?.relatedUser?.nfcCardId,
+      visitor?.account?.nfcCardId,
+    ]
+      .map((value) => normalizeRfidReaderInput(value))
+      .find((value) => isVisitorPhysicalNfcUid(value)) || "";
 
   const getVisitorNfcDetailRows = (visitor) => [
     ["Schedule", getVisitorNfcScheduleLabel(visitor)],
@@ -2416,8 +2433,8 @@ export default function SecurityDashboardScreen({ navigation }) {
       if (!identity) return;
       const existing = deduped.get(identity);
       if (existing) {
-        const existingHasCard = Boolean(existing?.nfcCardId || existing?.safePassId);
-        const nextHasCard = Boolean(visitor?.nfcCardId || visitor?.safePassId);
+        const existingHasCard = Boolean(getVisitorAssignedNfcUid(existing));
+        const nextHasCard = Boolean(getVisitorAssignedNfcUid(visitor));
         if (existingHasCard || !nextHasCard) return;
       }
       deduped.set(identity, visitor);
@@ -2430,7 +2447,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           visitor.fullName,
           visitor.email,
           visitor.phoneNumber,
-          visitor.nfcCardId,
+          getVisitorAssignedNfcUid(visitor),
           visitor.safePassId,
           visitor.assignedOffice,
           visitor.appointmentDepartment,
@@ -2839,7 +2856,8 @@ export default function SecurityDashboardScreen({ navigation }) {
               {assignableNfcVisitors.map((visitor) => {
                 const visitorIdentity = getVisitorNfcIdentity(visitor);
                 const selected = visitorIdentity === getVisitorNfcIdentity(selectedVisitorForNfc);
-                const hasAssignedCard = Boolean(visitor?.nfcCardId || visitor?.safePassId);
+                const assignedNfcUid = getVisitorAssignedNfcUid(visitor);
+                const hasAssignedCard = Boolean(assignedNfcUid);
                 return (
                   <TouchableOpacity
                     key={visitorIdentity || visitor?._id || visitor?.email}
@@ -2874,7 +2892,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                         style={[styles.visitorNfcChipMeta, selected && styles.visitorNfcChipMetaActive]}
                         numberOfLines={1}
                       >
-                        {visitor?.nfcCardId || visitor?.safePassId || "No UID assigned"}
+                        {assignedNfcUid || "No UID assigned"}
                       </Text>
                     </View>
                     <View
@@ -2911,7 +2929,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               <Text style={styles.visitorNfcSelectedName}>{selectedVisitorForNfc.fullName || "Visitor"}</Text>
               <Text style={styles.visitorNfcSelectedMeta}>
                 {selectedVisitorForNfc.email || "No email"} | Current UID:{" "}
-                {selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId || "None"}
+                {getVisitorAssignedNfcUid(selectedVisitorForNfc) || "None"}
               </Text>
             </View>
 
@@ -2949,7 +2967,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Ionicons name="radio-outline" size={16} color="#0A3D91" />
                 <Text style={styles.visitorNfcHintText}>{describeRfidReaderInput(visitorNfcUid)}</Text>
               </View>
-              {(selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId) ? (
+              {getVisitorAssignedNfcUid(selectedVisitorForNfc) ? (
                 <TouchableOpacity
                   style={[styles.visitorNfcUnassignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
                   onPress={() => handleUnassignVisitorNfc()}
@@ -2970,7 +2988,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                   <>
                     <Ionicons name="link-outline" size={16} color="#FFFFFF" />
                     <Text style={styles.visitorNfcAssignButtonText}>
-                      {(selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId) ? "Replace UID" : "Assign UID"}
+                      {getVisitorAssignedNfcUid(selectedVisitorForNfc) ? "Replace UID" : "Assign UID"}
                     </Text>
                   </>
                 )}
