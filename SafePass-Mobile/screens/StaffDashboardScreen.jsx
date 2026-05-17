@@ -488,6 +488,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
 
       setUser(currentUser);
+      setLoading(false);
 
       const [appointmentResponse, notificationResponse, attendanceResponse] = await Promise.allSettled([
         ApiService.getStaffAppointments({ status: "all", limit: 200 }),

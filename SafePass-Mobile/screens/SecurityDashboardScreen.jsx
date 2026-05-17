@@ -609,15 +609,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         return;
       }
 
-      await Promise.all([
-        loadOperationalData({ force: true }),
-        loadSecurityLivePresence(),
-        loadSecurityAttendanceRecords(),
-        loadNotifications(currentUser, { force: true }),
-        loadMapSettings(),
-      ]);
-      lastOperationalRefreshAtRef.current = Date.now();
-
+      setIsLoading(false);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -630,6 +622,15 @@ export default function SecurityDashboardScreen({ navigation }) {
           useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
+
+      await Promise.allSettled([
+        loadOperationalData({ force: true }),
+        loadSecurityLivePresence(),
+        loadSecurityAttendanceRecords(),
+        loadNotifications(currentUser, { force: true }),
+      ]);
+      lastOperationalRefreshAtRef.current = Date.now();
+      loadMapSettings();
     } finally {
       setIsLoading(false);
     }

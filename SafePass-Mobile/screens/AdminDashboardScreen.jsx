@@ -2986,7 +2986,8 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
     setUser(currentUser);
-    await Promise.all([
+    setIsLoading(false);
+    await Promise.allSettled([
       loadAdminStats(),
       loadAllVisitRequests(),
       loadAdminLiveVisitorLocations(),
