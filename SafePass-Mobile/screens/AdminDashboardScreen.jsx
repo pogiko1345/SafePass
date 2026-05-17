@@ -2045,6 +2045,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         "status",
         (item) => getRequestStatus(item),
         (item) => getVisitorSafePassId(item),
+        (item) => getVisitorNfcUid(item),
         (item) => [
           formatDateInputValue(item.visitDate || item.scheduledVisitStart || item.createdAt),
           formatTimeInputValue(item.visitTime || item.scheduledVisitStart),
@@ -2504,8 +2505,12 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   };
 
   const getVisitorSafePassId = (visitor = {}) =>
-    visitor.nfcCardId ||
     visitor.safePassId ||
+    visitor.relatedVisitor?.safePassId ||
+    "Not assigned";
+
+  const getVisitorNfcUid = (visitor = {}) =>
+    visitor.nfcCardId ||
     visitor.relatedUser?.nfcCardId ||
     visitor.relatedVisitor?.nfcCardId ||
     "Not assigned";
@@ -5926,6 +5931,9 @@ const loadDashboardData = useCallback(async () => {
             SafePass ID: {getVisitorSafePassId(activity)}
           </Text>
           <Text style={[styles.adminMapActivityMeta, { color: theme.textSecondary }]}>
+            NFC UID: {getVisitorNfcUid(activity)}
+          </Text>
+          <Text style={[styles.adminMapActivityMeta, { color: theme.textSecondary }]}>
             {getMapFreshnessLabel(activity.timestamp || activity.createdAt)}
           </Text>
         </View>
@@ -8912,6 +8920,9 @@ const loadDashboardData = useCallback(async () => {
                     <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
                       SafePass ID: {getVisitorSafePassId(request)}
                     </Text>
+                    <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
+                      NFC UID: {getVisitorNfcUid(request)}
+                    </Text>
                   </View>
                 ),
               },
@@ -10317,6 +10328,9 @@ const loadDashboardData = useCallback(async () => {
                           <Text style={[styles.historyItemEmail, { color: theme.textSecondary }]}>{visitor.email}</Text>
                           <Text style={[styles.historyItemEmail, { color: theme.textSecondary }]}>
                             SafePass ID: {getVisitorSafePassId(visitor)}
+                          </Text>
+                          <Text style={[styles.historyItemEmail, { color: theme.textSecondary }]}>
+                            NFC UID: {getVisitorNfcUid(visitor)}
                           </Text>
                           <Text style={[styles.historyItemPurpose, { color: theme.textSecondary }]}>
                             {visitor.purposeOfVisit || "No purpose provided"}

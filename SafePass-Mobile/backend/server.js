@@ -4586,17 +4586,29 @@ const attachSafePassIdsToVisitors = async (visitors = []) => {
 
   await Promise.all(users.map((user) => ensureSafePassAccountId(user)));
 
-  const safePassByEmail = new Map(
-    users.map((user) => [String(user.email || "").trim().toLowerCase(), user.nfcCardId || ""]),
-  );
+  const accountIdByEmail = new Map();
+  const physicalCardByEmail = new Map();
+  users.forEach((user) => {
+    const email = String(user.email || "").trim().toLowerCase();
+    const userCardId = String(user.nfcCardId || "").trim();
+    if (!email) return;
+    if (isSafePassAccountId(userCardId)) {
+      accountIdByEmail.set(email, userCardId);
+      return;
+    }
+    if (userCardId) {
+      physicalCardByEmail.set(email, userCardId);
+    }
+  });
 
   return visitors.map((visitor) => {
     const payload = typeof visitor.toObject === "function" ? visitor.toObject() : { ...visitor };
     const email = String(payload.email || "").trim().toLowerCase();
     const matchedUser = users.find((user) => String(user.email || "").trim().toLowerCase() === email);
+    const visitorCardId = String(payload.nfcCardId || "").trim();
     payload.userId = matchedUser?._id || payload.userId || null;
-    payload.nfcCardId = safePassByEmail.get(email) || payload.nfcCardId || "";
-    payload.safePassId = payload.nfcCardId;
+    payload.safePassId = payload.safePassId || accountIdByEmail.get(email) || (isSafePassAccountId(visitorCardId) ? visitorCardId : "");
+    payload.nfcCardId = physicalCardByEmail.get(email) || (isSafePassAccountId(visitorCardId) ? "" : visitorCardId);
     return payload;
   });
 };
@@ -12802,6 +12814,13 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
     };
     await user.save();
 
+    if (targetRole === "visitor") {
+      await Visitor.updateMany(
+        { email: user.email },
+        { $set: { nfcCardId: user.nfcCardId } },
+      );
+    }
+
     await AccessLog.create({
       userId: req.user._id,
       userEmail: req.user.email,
@@ -12827,7 +12846,6 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
 
     if (linkedVisitor) {
       linkedVisitor.nfcCardId = user.nfcCardId;
-      linkedVisitor.safePassId = user.nfcCardId;
       linkedVisitor.relatedUser = {
         _id: user._id,
         email: user.email,
@@ -12902,6 +12920,13 @@ app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
     };
     await user.save();
 
+    if (targetRole === "visitor") {
+      await Visitor.updateMany(
+        { email: user.email },
+        { $unset: { nfcCardId: "" } },
+      );
+    }
+
     // Create access log
     const accessLog = new AccessLog({
       userId: req.user._id,
@@ -12923,7 +12948,6 @@ app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
 
     if (linkedVisitor) {
       linkedVisitor.nfcCardId = "";
-      linkedVisitor.safePassId = "";
       linkedVisitor.relatedUser = {
         _id: user._id,
         email: user.email,

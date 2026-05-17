@@ -344,6 +344,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [visitorNfcUid, setVisitorNfcUid] = useState('');
   const [visitorNfcBusy, setVisitorNfcBusy] = useState(false);
   const [visitorNfcStatus, setVisitorNfcStatus] = useState(null);
+  const [visitorNfcLocalVisitors, setVisitorNfcLocalVisitors] = useState({});
   const [mobileDateFilter, setMobileDateFilter] = useState('all');
   const [mobileLocationFilter, setMobileLocationFilter] = useState('all');
   const [mobileLogFilter, setMobileLogFilter] = useState('all');
@@ -1582,6 +1583,14 @@ export default function SecurityDashboardScreen({ navigation }) {
     const normalizedEmail = String(visitorEmail || "").trim().toLowerCase();
     if (!normalizedEmail) return;
     const { safePassId: _ignoredSafePassId, ...safeVisitorDetails } = visitorDetails || {};
+    const sourceVisitor = selectedVisitorForNfc?.email?.toLowerCase?.() === normalizedEmail ? selectedVisitorForNfc : {};
+    const localVisitor = {
+      ...sourceVisitor,
+      ...safeVisitorDetails,
+      email: safeVisitorDetails.email || sourceVisitor.email || visitorEmail,
+      nfcCardId: cardId,
+    };
+    const localIdentity = getVisitorNfcIdentity(localVisitor) || normalizedEmail;
 
     const updateCollection = (collection = []) =>
       collection.map((visitor) =>
@@ -1594,6 +1603,10 @@ export default function SecurityDashboardScreen({ navigation }) {
           : visitor,
       );
 
+    setVisitorNfcLocalVisitors((current) => ({
+      ...current,
+      [localIdentity]: localVisitor,
+    }));
     setVisitors((current) => ({
       ...current,
       active: updateCollection(current.active),
@@ -1658,6 +1671,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       const assignedCardId = response?.card?.cardNumber || normalizedCardId;
       setVisitorNfcUid("");
       setSelectedVisitorNfcId(getVisitorNfcIdentity(response?.visitor || selectedVisitorForNfc));
+      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, assignedCardId, response?.visitor);
       await refreshData();
       applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, assignedCardId, response?.visitor);
       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
@@ -1701,6 +1715,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         email: selectedVisitorForNfc.email,
       });
       setSelectedVisitorNfcId(getVisitorNfcIdentity(response?.visitor || selectedVisitorForNfc));
+      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, "", response?.visitor);
       await refreshData();
       applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, "", response?.visitor);
       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
@@ -2419,6 +2434,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       ...(visitors.active || []),
       ...(visitors.approved || []),
       ...(visitors.notReady || []),
+      ...Object.values(visitorNfcLocalVisitors || {}),
     ].forEach((visitor) => {
       if (!isVisitorScheduledTodayForNfc(visitor)) return;
 
@@ -2467,6 +2483,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       .slice(0, 18);
   }, [
     visitorNfcSearch,
+    visitorNfcLocalVisitors,
     visitors.all,
     visitors.active,
     visitors.approved,
