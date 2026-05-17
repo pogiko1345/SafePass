@@ -92,7 +92,8 @@ const CampusMap = ({
 }) => {
   const { width: viewportWidth } = useWindowDimensions();
   const defaultFloorId = floors[0]?.id || "ground";
-  const safeInitialScale = Math.max(0.5, Math.min(Number(initialScale) || 1, 3));
+  const maxMapScale = viewportWidth < 480 && !fullscreen ? 2.2 : 3;
+  const safeInitialScale = Math.max(0.5, Math.min(Number(initialScale) || 1, maxMapScale));
   const [mapScale, setMapScale] = useState(safeInitialScale);
   const [mapPan, setMapPan] = useState({ x: 0, y: 0 });
   const [activeFloor, setActiveFloor] = useState(selectedFloor || defaultFloorId);
@@ -393,8 +394,6 @@ const CampusMap = ({
     };
   };
 
-  const clampScale = (scale) => Math.max(0.5, Math.min(3, scale));
-
   const getTouchDistance = (touches = []) => {
     if (!touches || touches.length < 2) return null;
     const [firstTouch, secondTouch] = touches;
@@ -596,7 +595,7 @@ const CampusMap = ({
       const width = typeof label.width === "number" ? `${label.width}%` : label.width;
 
       return (
-        <View
+        <Animated.View
           key={label.id || `${label.text}-${left}-${top}`}
           style={[
             styles.mapTextLabel,
@@ -606,6 +605,7 @@ const CampusMap = ({
               top,
               width,
               minHeight: Math.max(10, lineCount * (fontSize + 1)),
+              transform: [{ scale: markerInverseScale }],
             },
             label.emphasis && styles.mapTextLabelEmphasis,
             label.style,
@@ -625,7 +625,7 @@ const CampusMap = ({
           >
             {labelText}
           </Text>
-        </View>
+        </Animated.View>
       );
     });
   };
@@ -809,7 +809,24 @@ const CampusMap = ({
     const position = marker.position || getOfficePosition(marker.officeId);
     if (!position) return null;
 
-    const start = normalizedActiveFloor === "ground" ? { x: 6.8, y: 40 } : { x: 84, y: 70 };
+    const activeSelfMarker = visibleVisitors.find(
+      (visitor) =>
+        visitor?.isSelfMarker &&
+        normalizeFloorId(visitor?.location?.floor || activeFloor) === normalizedActiveFloor,
+    );
+    const selfCoordinates = activeSelfMarker ? getVisitorCoordinates(activeSelfMarker) : null;
+    const fallbackStartPosition =
+      officePositions?.["ground-lobby"] ||
+      officePositions?.["main-gate"] ||
+      { x: 6.8, y: 40 };
+    const start =
+      selfCoordinates &&
+      Number.isFinite(Number(selfCoordinates.x)) &&
+      Number.isFinite(Number(selfCoordinates.y))
+        ? { x: Number(selfCoordinates.x), y: Number(selfCoordinates.y) }
+        : normalizedActiveFloor === "ground"
+          ? fallbackStartPosition
+          : { x: 84, y: 70 };
     const end = {
       x: typeof position.x === "number" ? position.x : Number.parseFloat(position.x),
       y: typeof position.y === "number" ? position.y : Number.parseFloat(position.y),
@@ -830,6 +847,7 @@ const CampusMap = ({
               left: `${horizontalLeft}%`,
               top: `${start.y}%`,
               width: `${horizontalWidth}%`,
+              transform: [{ scaleY: markerInverseScale }],
               opacity: routePulseAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [0.42, 0.82],
@@ -845,6 +863,7 @@ const CampusMap = ({
               left: `${end.x}%`,
               top: `${verticalTop}%`,
               height: `${verticalHeight}%`,
+              transform: [{ scaleX: markerInverseScale }],
               opacity: routePulseAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [0.42, 0.82],
@@ -869,8 +888,10 @@ const CampusMap = ({
   };
 
   // Handle zoom
+  const clampScale = (scale) => Math.max(0.5, Math.min(maxMapScale, scale));
+
   const handleZoomIn = () => {
-    const newScale = Math.min(mapScale + 0.2, 3);
+    const newScale = clampScale(mapScale + 0.2);
     mapScaleRef.current = newScale;
     setMapScale(newScale);
     Animated.spring(scaleAnim, {
@@ -880,7 +901,7 @@ const CampusMap = ({
   };
 
   const handleZoomOut = () => {
-    const newScale = Math.max(mapScale - 0.2, 0.5);
+    const newScale = clampScale(mapScale - 0.2);
     mapScaleRef.current = newScale;
     setMapScale(newScale);
     const nextPan = clampPan(mapPanRef.current, newScale);
