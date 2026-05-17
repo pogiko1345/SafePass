@@ -192,16 +192,16 @@ export default StyleSheet.create({
 
   visitorMarker: {
     position: "absolute",
-    width: 18,
-    height: 18,
+    width: 16,
+    height: 16,
     zIndex: 10,
   },
 
   visitorMarkerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1.5,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    borderWidth: 1,
     borderColor: "#FFFFFF",
     ...Platform.select({
       ios: {
@@ -216,28 +216,28 @@ export default StyleSheet.create({
   },
 
   visitorMarkerDotCluster: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     alignItems: "center",
     justifyContent: "center",
   },
 
   visitorMarkerDotSelf: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
+    borderWidth: 1.5,
     borderColor: "#FFFFFF",
   },
 
   visitorMarkerSelfLabel: {
     position: "absolute",
-    top: 14,
-    left: -17,
-    minWidth: 42,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    top: 11,
+    left: -10,
+    minWidth: 28,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
     borderRadius: 999,
     backgroundColor: "rgba(15, 23, 42, 0.84)",
     alignItems: "center",
@@ -245,7 +245,7 @@ export default StyleSheet.create({
   },
 
   visitorMarkerSelfLabelText: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: "900",
     color: "#FFFFFF",
   },
@@ -263,11 +263,11 @@ export default StyleSheet.create({
 
   visitorMarkerPulse: {
     position: "absolute",
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    top: -4,
-    left: -4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    top: -2.5,
+    left: -2.5,
   },
 
   visitorMarkerSourceBadge: {
@@ -292,26 +292,26 @@ export default StyleSheet.create({
     position: "absolute",
     alignItems: "center",
     zIndex: 18,
-    transform: [{ translateX: -18 }, { translateY: -36 }],
+    transform: [{ translateX: -13 }, { translateY: -28 }],
   },
 
   destinationMarkerPulse: {
     position: "absolute",
-    top: 7,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(10, 61, 145, 0.20)",
+    top: 5,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(10, 61, 145, 0.16)",
   },
 
   destinationMarkerPin: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#0A3D91",
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: "#FFFFFF",
     ...Platform.select({
       ios: {
@@ -326,10 +326,10 @@ export default StyleSheet.create({
   },
 
   destinationMarkerLabel: {
-    marginTop: 6,
-    maxWidth: 130,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    marginTop: 4,
+    maxWidth: 110,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 999,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -337,7 +337,7 @@ export default StyleSheet.create({
   },
 
   destinationMarkerLabelText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "800",
     color: "#0A3D91",
   },

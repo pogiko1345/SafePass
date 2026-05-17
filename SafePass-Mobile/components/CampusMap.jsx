@@ -744,8 +744,8 @@ const CampusMap = ({
             { left, top },
             {
               transform: [
-                { translateX: -18 },
-                { translateY: -36 },
+                { translateX: -13 },
+                { translateY: -28 },
                 {
                   scale: routePulseAnim.interpolate({
                     inputRange: [0, 1],
@@ -776,7 +776,7 @@ const CampusMap = ({
             ]}
           />
           <View style={styles.destinationMarkerPin}>
-            <Ionicons name={marker.icon || "navigate"} size={16} color="#FFFFFF" />
+            <Ionicons name={marker.icon || "navigate"} size={13} color="#FFFFFF" />
           </View>
           <View style={styles.destinationMarkerLabel}>
             <Text style={styles.destinationMarkerLabelText} numberOfLines={1}>
