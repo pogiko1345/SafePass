@@ -650,6 +650,29 @@ const buildOtpSmsMessage = ({ template, otpCode, expiresInMinutes = 5 }) => {
   return message.includes(otpCode) ? message : `${message} ${otpCode}`;
 };
 
+const formatAppointmentDatePartsLabel = (parts) => {
+  if (!parts) return "";
+  const date = new Date(Date.UTC(parts.year, parts.month, parts.day, 12, 0, 0, 0));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const formatAppointmentTimePartsLabel = (parts) => {
+  if (!parts) return "";
+  const date = new Date(Date.UTC(2000, 0, 1, parts.hour, parts.minute, 0, 0));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-US", {
+    timeZone: "UTC",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const sendIprogTechOtp = async ({ phoneNumber, otpCode }) => {
   const apiToken = getIprogTechApiToken();
   if (!apiToken) {
@@ -1492,23 +1515,12 @@ const createRoleNotification = async ({
 };
 
 const formatVisitSchedule = (visitDate, visitTime) => {
-  const resolvedDate = visitDate ? new Date(visitDate) : null;
-  const resolvedTime = visitTime ? new Date(visitTime) : null;
-  const dateLabel = resolvedDate && !Number.isNaN(resolvedDate.getTime())
-    ? resolvedDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "an upcoming date";
-  const timeLabel = resolvedTime && !Number.isNaN(resolvedTime.getTime())
-    ? resolvedTime.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : typeof visitTime === "string" && visitTime.trim()
-    ? visitTime.trim()
-    : "the scheduled time";
+  const dateParts = getAppointmentDateParts(visitDate);
+  const timeParts = parseAppointmentTimeParts(visitTime);
+  const dateLabel = formatAppointmentDatePartsLabel(dateParts) || "an upcoming date";
+  const timeLabel =
+    formatAppointmentTimePartsLabel(timeParts) ||
+    (typeof visitTime === "string" && visitTime.trim() ? visitTime.trim() : "the scheduled time");
 
   return `${dateLabel} at ${timeLabel}`;
 };

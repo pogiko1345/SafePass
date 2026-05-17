@@ -1613,15 +1613,39 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
 
     const normalizedCardId = normalizeRfidReaderInput(scannedValue);
+    const currentCard = normalizeRfidReaderInput(selectedVisitorForNfc.nfcCardId || selectedVisitorForNfc.safePassId || "");
     if (!normalizedCardId) {
+      if (currentCard) {
+        setVisitorNfcStatus({
+          type: "success",
+          message: `${selectedVisitorForNfc.fullName || "Visitor"} already has UID ${currentCard}. Tap a different card to replace it.`,
+        });
+        setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
+        return;
+      }
       setVisitorNfcStatus({ type: "error", message: "Tap a card on the USB reader or enter the UID first." });
       Alert.alert("Card UID Required", "Tap a card on the USB reader or enter the UID first.");
       return;
     }
 
+    if (currentCard && normalizedCardId === currentCard) {
+      setVisitorNfcUid("");
+      setVisitorNfcStatus({
+        type: "success",
+        message: `${selectedVisitorForNfc.fullName || "Visitor"} is already assigned to UID ${currentCard}.`,
+      });
+      setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
+      return;
+    }
+
     try {
       setVisitorNfcBusy(true);
-      setVisitorNfcStatus({ type: "info", message: `Assigning ${normalizedCardId} to ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...` });
+      setVisitorNfcStatus({
+        type: "info",
+        message: currentCard
+          ? `Replacing ${currentCard} with ${normalizedCardId} for ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...`
+          : `Assigning ${normalizedCardId} to ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...`,
+      });
       const response = await ApiService.assignNfcCard({
         userId:
           selectedVisitorForNfc.userId ||
@@ -1633,11 +1657,16 @@ export default function SecurityDashboardScreen({ navigation }) {
       });
       const assignedCardId = response?.card?.cardNumber || normalizedCardId;
       setVisitorNfcUid("");
+      setSelectedVisitorNfcId(getVisitorNfcIdentity(response?.visitor || selectedVisitorForNfc));
       await refreshData();
       applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, assignedCardId, response?.visitor);
       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
-      setVisitorNfcStatus({ type: "success", message: response?.message || "NFC card assigned to visitor." });
-      Alert.alert("Visitor Card Assigned", response?.message || "NFC card assigned to visitor.");
+      setVisitorNfcStatus({
+        type: "success",
+        message: currentCard
+          ? `UID replaced successfully. Current UID: ${assignedCardId}.`
+          : `NFC card assigned successfully. Current UID: ${assignedCardId}.`,
+      });
     } catch (error) {
       setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to assign this card UID." });
       Alert.alert("Assign Failed", error?.message || "Unable to assign this card UID.");
@@ -1671,11 +1700,11 @@ export default function SecurityDashboardScreen({ navigation }) {
           undefined,
         email: selectedVisitorForNfc.email,
       });
+      setSelectedVisitorNfcId(getVisitorNfcIdentity(response?.visitor || selectedVisitorForNfc));
       await refreshData();
       applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, "", response?.visitor);
       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
       setVisitorNfcStatus({ type: "success", message: response?.message || "Visitor UID unassigned successfully." });
-      Alert.alert("Visitor Card Unassigned", response?.message || "Visitor UID unassigned successfully.");
     } catch (error) {
       setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to unassign this card UID." });
       Alert.alert("Unassign Failed", error?.message || "Unable to unassign this card UID.");
