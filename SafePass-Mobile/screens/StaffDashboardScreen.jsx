@@ -426,7 +426,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const loadStaffThemePreference = useCallback(async () => {
     try {
-      const savedDarkMode = await AsyncStorage.getItem("darkModeEnabled");
+      const savedDarkMode =
+        Platform.OS === "web" && typeof window !== "undefined" && window.localStorage
+          ? window.localStorage.getItem("darkModeEnabled")
+          : typeof AsyncStorage?.getItem === "function"
+            ? await AsyncStorage.getItem("darkModeEnabled")
+            : null;
       setMobileDarkModeEnabled(savedDarkMode === "true");
     } catch (error) {
       console.log("Staff dark mode preference unavailable:", error?.message || error);

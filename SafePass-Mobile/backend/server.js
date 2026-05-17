@@ -1338,17 +1338,26 @@ const sendStudentParentAttendanceEmail = async ({ student, action, timestamp, ta
 };
 
 // ========== ENHANCED CORS CONFIGURATION ==========
+const corsOptions = {
+  origin: true,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Accept",
+    "Cache-Control",
+    "Pragma",
+    "x-device-key",
+  ],
+};
+
 app.use(
-  cors({
-    origin: true,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept", "x-device-key"],
-  }),
+  cors(corsOptions),
 );
 
 // Handle preflight requests. Express 5 rejects bare "*" paths.
-app.options(/.*/, cors());
+app.options(/.*/, cors(corsOptions));
 
 // Body parser middleware
 app.use(express.json({ limit: "50mb" }));

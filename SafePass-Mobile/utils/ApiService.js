@@ -1115,11 +1115,7 @@ async verifyCredentials(email, password) {
         ...filters,
         ts: Date.now(),
       }).toString();
-      return await this.fetch(`/my-attendance${queryString ? `?${queryString}` : ""}`, {
-        headers: {
-          "Cache-Control": "no-cache",
-        },
-      });
+      return await this.fetch(`/my-attendance${queryString ? `?${queryString}` : ""}`);
     } catch (error) {
       console.error("Get my attendance error:", error);
       throw error;
@@ -1870,11 +1866,7 @@ generateRandomPassword(length = 10) {
 
   async getMapSettings() {
     try {
-      const response = await this.fetch(`/map-settings?ts=${Date.now()}`, {
-        headers: {
-          "Cache-Control": "no-cache",
-        },
-      });
+      const response = await this.fetch(`/map-settings?ts=${Date.now()}`);
       return response;
     } catch (error) {
       console.error("Get map settings error:", error);
