@@ -211,6 +211,7 @@ const getAppointmentStatus = (appointment) => {
 const getStaffActionHint = (appointment) => {
   const status = getAppointmentStatus(appointment);
   if (status === "pending") return "Waiting for your decision";
+  if (status === "rescheduled") return "Visitor requested a new schedule";
   if (status === "adjustment_pending") return "Waiting for visitor confirmation";
   if (appointment?.status === "checked_in" && !appointment?.checkedOutAt) return "Visitor is currently inside";
   if (status === "approved" || status === "adjusted") return "Scheduled for your office";
@@ -219,6 +220,9 @@ const getStaffActionHint = (appointment) => {
   if (status === "no_show") return "Visitor did not arrive";
   return getStatusMeta(status).label;
 };
+
+const isActionableAppointmentRequest = (appointment) =>
+  ["pending", "rescheduled"].includes(getAppointmentStatus(appointment));
 
 const matchesAppointmentSearch = (appointment, searchTerm) => {
   const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
@@ -571,7 +575,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   );
 
   const appointmentRequests = useMemo(
-    () => appointments.filter((item) => getAppointmentStatus(item) === "pending"),
+    () => appointments.filter((item) => isActionableAppointmentRequest(item)),
     [appointments],
   );
 
@@ -1584,7 +1588,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             ...group.entries.map((appointment) => {
             const appointmentStatus = getAppointmentStatus(appointment);
             const statusMeta = getStatusMeta(appointmentStatus);
-            const isPending = appointmentStatus === "pending";
+            const canActOnRequest = isActionableAppointmentRequest(appointment);
             const canComplete =
               appointment.status === "checked_in" &&
               !appointment.checkedOutAt &&
@@ -1629,7 +1633,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                     <Text style={styles.tableActionButtonText}>View</Text>
                   </TouchableOpacity>
 
-                  {mode === "requests" && isPending ? (
+                  {mode === "requests" && canActOnRequest ? (
                     <>
                       <TouchableOpacity
                         style={[styles.tableActionButton, styles.tableActionButtonPrimary, isProcessing && styles.disabledAction]}
@@ -2908,7 +2912,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const renderMobileAppointmentCard = (appointment, mode = "request") => {
     const appointmentStatus = getAppointmentStatus(appointment);
-    const isPending = appointmentStatus === "pending";
+    const canActOnRequest = isActionableAppointmentRequest(appointment);
     const isProcessing = processingId === appointment._id;
     const canComplete =
       appointment.status === "checked_in" &&
@@ -2936,9 +2940,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             </Text>
             <View style={staffMobileStyles.appointmentHintRow}>
               <Ionicons
-                name={appointmentStatus === "pending" ? "alert-circle-outline" : "information-circle-outline"}
+                name={canActOnRequest ? "alert-circle-outline" : "information-circle-outline"}
                 size={13}
-                color={appointmentStatus === "pending" ? BRAND.warning : BRAND.blue}
+                color={canActOnRequest ? BRAND.warning : BRAND.blue}
               />
               <Text style={[staffMobileStyles.appointmentHintText, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]} numberOfLines={1}>
                 {actionHint}
@@ -2965,7 +2969,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
         </View>
 
-        {mode === "request" && isPending ? (
+        {mode === "request" && canActOnRequest ? (
           <View style={staffMobileStyles.cardActions}>
             <TouchableOpacity
               style={[staffMobileStyles.actionButton, staffMobileStyles.approveButton, isProcessing && staffMobileStyles.disabledButton]}
