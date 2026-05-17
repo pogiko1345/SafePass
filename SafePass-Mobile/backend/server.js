@@ -631,21 +631,36 @@ const getIprogTechBaseUrl = () =>
     .trim()
     .replace(/\/+$/, "");
 
+const buildOtpSmsMessage = ({ template, otpCode, expiresInMinutes = 5 }) => {
+  const fallbackTemplate =
+    "SafePass verification code: {otp}. Valid for {minutes} minutes. Do not share this code. Sapphire SafePass will never ask for it.";
+  const resolvedTemplate = String(template || fallbackTemplate).trim() || fallbackTemplate;
+  const replacements = {
+    "{otp}": otpCode,
+    "{code}": otpCode,
+    "{minutes}": String(expiresInMinutes),
+    "{app}": "SafePass",
+  };
+
+  const message = Object.entries(replacements).reduce(
+    (current, [token, value]) => current.replaceAll(token, value),
+    resolvedTemplate,
+  );
+
+  return message.includes(otpCode) ? message : `${message} ${otpCode}`;
+};
+
 const sendIprogTechOtp = async ({ phoneNumber, otpCode }) => {
   const apiToken = getIprogTechApiToken();
   if (!apiToken) {
     return { success: false, skipped: true, provider: "backend_log" };
   }
 
-  const messageTemplate = String(
+  const messageTemplate =
     process.env.IPROGTECH_OTP_MESSAGE ||
-      process.env.IPROG_SMS_OTP_MESSAGE ||
-      process.env.SMS_OTP_MESSAGE ||
-      "Your SafePass login OTP is {otp}. It expires in 5 minutes.",
-  );
-  const message = messageTemplate.includes("{otp}")
-    ? messageTemplate.replaceAll("{otp}", otpCode)
-    : `${messageTemplate} ${otpCode}`;
+    process.env.IPROG_SMS_OTP_MESSAGE ||
+    process.env.SMS_OTP_MESSAGE;
+  const message = buildOtpSmsMessage({ template: messageTemplate, otpCode, expiresInMinutes: 5 });
   const payload = new URLSearchParams({
     api_token: apiToken,
     phone_number: formatPhoneForIprogTech(phoneNumber),
@@ -1479,18 +1494,20 @@ const createRoleNotification = async ({
 const formatVisitSchedule = (visitDate, visitTime) => {
   const resolvedDate = visitDate ? new Date(visitDate) : null;
   const resolvedTime = visitTime ? new Date(visitTime) : null;
-  const dateLabel = resolvedDate
+  const dateLabel = resolvedDate && !Number.isNaN(resolvedDate.getTime())
     ? resolvedDate.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
       })
     : "an upcoming date";
-  const timeLabel = resolvedTime
+  const timeLabel = resolvedTime && !Number.isNaN(resolvedTime.getTime())
     ? resolvedTime.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
       })
+    : typeof visitTime === "string" && visitTime.trim()
+    ? visitTime.trim()
     : "the scheduled time";
 
   return `${dateLabel} at ${timeLabel}`;
@@ -2814,6 +2831,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         userType: normalizedUserRole,
         action,
         attendance: attendanceRecord,
+        user: getCampusUserTapPayload({ user: cardUser, nfcCardId: normalizedCardId }),
       });
     }
 
@@ -3014,6 +3032,10 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         return res.status(409).json({
           success: false,
           message: "Visitor must be checked in before location tracking can start",
+          userType: "visitor",
+          action: "location_update",
+          nfcCardId: normalizedCardId,
+          visitor: getVisitorTapPayload({ visitor, visitorUser: cardUser, nfcCardId: normalizedCardId }),
         });
       }
 
@@ -3097,15 +3119,11 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       success: true,
       message: responseMessage,
       action,
+      userType: "visitor",
+      nfcCardId: normalizedCardId,
       visitorId: visitor._id,
       currentLocation: visitor.currentLocation,
-      visitor: {
-        _id: visitor._id,
-        fullName: visitor.fullName,
-        email: visitor.email,
-        status: visitor.status,
-        currentLocation: visitor.currentLocation,
-      },
+      visitor: getVisitorTapPayload({ visitor, visitorUser: cardUser, nfcCardId: normalizedCardId }),
     });
   } catch (error) {
     console.error("Arduino location tap error:", error);
@@ -4616,23 +4634,32 @@ const getPrioritizedVisitor = (visitors = []) => {
 const getPrioritizedVisitorForNfcTap = (visitors = []) => {
   if (!Array.isArray(visitors) || !visitors.length) return null;
 
-  const activeVisits = visitors.filter((visitor) => String(visitor?.status || "").toLowerCase() !== "checked_out");
+  const inactiveStatuses = new Set(["checked_out", "expired", "no_show", "rejected", "cancelled"]);
+  const activeVisits = visitors.filter(
+    (visitor) => !inactiveStatuses.has(String(visitor?.status || "").toLowerCase()),
+  );
   const checkedIn = activeVisits
     .filter((visitor) => String(visitor?.status || "").toLowerCase() === "checked_in")
     .sort((left, right) => getVisitorSubmissionTime(right) - getVisitorSubmissionTime(left));
   if (checkedIn[0]) return checkedIn[0];
 
+  const sortByLatestAppointmentActivity = (left, right) => {
+    const submissionDelta = getVisitorSubmissionTime(right) - getVisitorSubmissionTime(left);
+    if (submissionDelta !== 0) return submissionDelta;
+    return getVisitorScheduleTime(left) - getVisitorScheduleTime(right);
+  };
+
   const todayVisits = activeVisits
     .filter((visitor) => getVisitDateRelation(visitor?.visitDate) === "today")
-    .sort((left, right) => getVisitorScheduleTime(left) - getVisitorScheduleTime(right));
+    .sort(sortByLatestAppointmentActivity);
   if (todayVisits[0]) return todayVisits[0];
 
   const futureVisits = activeVisits
     .filter((visitor) => getVisitDateRelation(visitor?.visitDate) === "future")
-    .sort((left, right) => getVisitorScheduleTime(left) - getVisitorScheduleTime(right));
+    .sort(sortByLatestAppointmentActivity);
   if (futureVisits[0]) return futureVisits[0];
 
-  return activeVisits.sort((left, right) => getVisitorScheduleTime(right) - getVisitorScheduleTime(left))[0] || null;
+  return activeVisits.sort(sortByLatestAppointmentActivity)[0] || null;
 };
 
 const getVisitorTapPayload = ({ visitor, visitorUser, nfcCardId = "" } = {}) => {
@@ -4647,14 +4674,35 @@ const getVisitorTapPayload = ({ visitor, visitorUser, nfcCardId = "" } = {}) => 
     approvalStatus: visitor.approvalStatus,
     visitDate: visitor.visitDate,
     visitTime: visitor.visitTime,
+    purposeOfVisit: visitor.purposeOfVisit || visitor.purpose || "",
+    purpose: visitor.purposeOfVisit || visitor.purpose || "",
+    visitSchedule: formatVisitSchedule(visitor.visitDate, visitor.visitTime),
     currentLocation: visitor.currentLocation,
     assignedOffice: visitor.assignedOffice || "",
     appointmentDepartment: visitor.appointmentDepartment || "",
-    purpose: visitor.purposeOfVisit || visitor.purpose || "",
     host: visitor.assignedStaffName || visitor.host || "",
     nfcCardId: nfcCardId || visitorUser?.nfcCardId || visitor.nfcCardId || "",
   };
 };
+
+const getCampusUserTapPayload = ({ user = {}, nfcCardId = "" } = {}) => ({
+  _id: user?._id,
+  name: getFullName(user) || user?.email || "Campus user",
+  email: user?.email || "",
+  role: normalizeUserRoleValue(user?.role),
+  nfcCardId: nfcCardId || user?.nfcCardId || "",
+  department: user?.department || "",
+  position: user?.position || "",
+  course: user?.course || "",
+  yearLevel: user?.yearLevel || "",
+  section: user?.section || "",
+  studentId: user?.studentId || "",
+  teacherId: user?.teacherId || "",
+  employeeId: user?.employeeId || "",
+  attendanceScope: normalizeUserRoleValue(user?.role) === "student"
+    ? "Student attendance with parent notification"
+    : "Campus attendance",
+});
 
 const getCombinedAppointmentDateTime = (visitDateValue, visitTimeValue) => {
   const visitDate = getAppointmentDateParts(visitDateValue);

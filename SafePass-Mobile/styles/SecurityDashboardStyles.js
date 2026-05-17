@@ -586,6 +586,42 @@ export default StyleSheet.create({
     minWidth: 0,
   },
 
+  visitorNfcAssignmentBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+
+  visitorNfcAssignmentBadgeAssigned: {
+    borderColor: "#A7F3D0",
+    backgroundColor: "#ECFDF5",
+  },
+
+  visitorNfcAssignmentBadgeActive: {
+    borderColor: "rgba(255,255,255,0.38)",
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+
+  visitorNfcAssignmentBadgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: "900",
+    color: "#64748B",
+  },
+
+  visitorNfcAssignmentBadgeTextAssigned: {
+    color: "#047857",
+  },
+
+  visitorNfcAssignmentBadgeTextActive: {
+    color: colors.white,
+  },
+
   visitorNfcChipRow: {
     gap: spacing.sm,
     paddingVertical: spacing.md,

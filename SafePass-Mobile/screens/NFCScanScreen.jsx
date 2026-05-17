@@ -84,6 +84,29 @@ const formatDateTime = (value) => {
   });
 };
 
+const formatDateOnly = (value) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const formatTimeOnly = (value) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return typeof value === "string" ? value.trim() : "";
+  }
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const formatRoleLabel = (role = "") =>
   String(role || "")
     .replace(/_/g, " ")
@@ -150,29 +173,27 @@ const getPersonDetails = (response = {}) => {
   const person = response.visitor || response.user || {};
   const role = response.userType || person.role || person.userType || "visitor";
   const normalizedRole = String(role || "").toLowerCase();
+  const isVisitor = normalizedRole === "visitor";
   const name =
     person.name ||
     person.fullName ||
     response.attendance?.name ||
     "Campus user";
   const program =
-    person.course ||
-    person.program ||
-    person.department ||
-    person.assignedOffice ||
-    person.appointmentDepartment ||
-    person.host ||
-    "";
+    isVisitor
+      ? person.appointmentDepartment || person.assignedOffice || person.host || person.currentLocation?.office || ""
+      : person.course || person.program || person.department || response.attendance?.destination || "";
   const yearSection =
-    [person.yearLevel, person.section].filter(Boolean).join(" - ") ||
-    person.position ||
-    person.purpose ||
-    "";
+    isVisitor
+      ? person.purposeOfVisit || person.purpose || ""
+      : [person.yearLevel, person.section].filter(Boolean).join(" - ") || person.position || "";
   const campusId =
     person.studentId ||
     person.teacherId ||
     person.employeeId ||
     "";
+  const visitDate = person.visitDate || response.visitDate || "";
+  const visitTime = person.visitTime || response.visitTime || "";
 
   return {
     name,
@@ -180,6 +201,11 @@ const getPersonDetails = (response = {}) => {
     program,
     yearSection,
     campusId,
+    visitDate,
+    visitTime,
+    visitSchedule: person.visitSchedule || [formatDateOnly(visitDate), formatTimeOnly(visitTime)].filter(Boolean).join(" "),
+    purpose: person.purposeOfVisit || person.purpose || "",
+    attendanceScope: person.attendanceScope || "",
     nfcCardId: person.nfcCardId || response.nfcCardId || response.attendance?.nfcCardId || "",
   };
 };
@@ -445,6 +471,11 @@ export default function NFCScanScreen({ navigation }) {
         program: personDetails.program,
         yearSection: personDetails.yearSection,
         campusId: personDetails.campusId,
+        visitDate: personDetails.visitDate,
+        visitTime: personDetails.visitTime,
+        visitSchedule: personDetails.visitSchedule,
+        purpose: personDetails.purpose,
+        attendanceScope: personDetails.attendanceScope,
         nfcCardId: personDetails.nfcCardId || normalizedCardId,
         status:
           response?.attendance?.status ||
@@ -474,6 +505,11 @@ export default function NFCScanScreen({ navigation }) {
         program: personDetails.program,
         yearSection: personDetails.yearSection,
         campusId: personDetails.campusId,
+        visitDate: personDetails.visitDate,
+        visitTime: personDetails.visitTime,
+        visitSchedule: personDetails.visitSchedule,
+        purpose: personDetails.purpose,
+        attendanceScope: personDetails.attendanceScope,
         nfcCardId: personDetails.nfcCardId || normalizedCardId,
         status: "denied",
         raw: errorData,
@@ -770,17 +806,37 @@ export default function NFCScanScreen({ navigation }) {
                   </Text>
                 </View>
                 <View style={styles.resultMetaCard}>
-                  <Text style={styles.resultMetaLabel}>Program / Area</Text>
+                  <Text style={styles.resultMetaLabel}>
+                    {latestResult?.userType === "visitor" ? "Office / Area" : "Program / Area"}
+                  </Text>
                   <Text style={styles.resultMetaValue}>
                     {latestResult?.program || "N/A"}
                   </Text>
                 </View>
                 <View style={styles.resultMetaCard}>
-                  <Text style={styles.resultMetaLabel}>Year / Section</Text>
+                  <Text style={styles.resultMetaLabel}>
+                    {latestResult?.userType === "visitor" ? "Purpose" : "Year / Section"}
+                  </Text>
                   <Text style={styles.resultMetaValue}>
                     {latestResult?.yearSection || "N/A"}
                   </Text>
                 </View>
+                {latestResult?.userType === "visitor" ? (
+                  <View style={styles.resultMetaCard}>
+                    <Text style={styles.resultMetaLabel}>Visit Schedule</Text>
+                    <Text style={styles.resultMetaValue}>
+                      {latestResult.visitSchedule || "N/A"}
+                    </Text>
+                  </View>
+                ) : null}
+                {latestResult && latestResult.userType !== "visitor" ? (
+                  <View style={styles.resultMetaCard}>
+                    <Text style={styles.resultMetaLabel}>Record Type</Text>
+                    <Text style={styles.resultMetaValue}>
+                      {latestResult.attendanceScope || "Attendance"}
+                    </Text>
+                  </View>
+                ) : null}
                 <View style={[styles.resultMetaCard, styles.resultMetaCardWide]}>
                   <Text style={styles.resultMetaLabel}>NFC UID</Text>
                   <Text style={styles.resultMetaValue}>
