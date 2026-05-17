@@ -1086,9 +1086,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     if (
       selectedVisitorSection === "appointment" &&
       sectionId === "appointment" &&
-      selectedAppointmentScreen === "menu" &&
-      !isAppointmentScreenTransitioning
+      selectedAppointmentScreen === "menu"
     ) {
+      if (appointmentTransitionTimeoutRef.current) {
+        clearTimeout(appointmentTransitionTimeoutRef.current);
+        appointmentTransitionTimeoutRef.current = null;
+      }
+      setIsAppointmentScreenTransitioning(false);
+      closeAppointmentPopovers();
       scrollDashboardToTop(true);
       return;
     }

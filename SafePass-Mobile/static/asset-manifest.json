@@ -1,9 +1,9 @@
 {
   "files": {
-    "main.js": "/static/js/main.c9ea6fb2.js",
-    "static/js/747.9a7f7a05.chunk.js": "/static/js/747.9a7f7a05.chunk.js",
+    "main.js": "/static/js/main.08f36d68.js",
+    "static/js/747.869e2c74.chunk.js": "/static/js/747.869e2c74.chunk.js",
     "static/js/827.20b0be6e.chunk.js": "/static/js/827.20b0be6e.chunk.js",
-    "static/js/460.814326cb.chunk.js": "/static/js/460.814326cb.chunk.js",
+    "static/js/460.1792b545.chunk.js": "/static/js/460.1792b545.chunk.js",
     "static/js/767.3ddb1aa9.chunk.js": "/static/js/767.3ddb1aa9.chunk.js",
     "static/js/943.502924b4.chunk.js": "/static/js/943.502924b4.chunk.js",
     "static/js/929.f51e4fdb.chunk.js": "/static/js/929.f51e4fdb.chunk.js",
@@ -39,10 +39,10 @@
     "favicon-16.png": "/favicon-16.png",
     "manifest.json": "/manifest.json",
     "serve.json": "/serve.json",
-    "main.c9ea6fb2.js.map": "/static/js/main.c9ea6fb2.js.map",
-    "747.9a7f7a05.chunk.js.map": "/static/js/747.9a7f7a05.chunk.js.map",
+    "main.08f36d68.js.map": "/static/js/main.08f36d68.js.map",
+    "747.869e2c74.chunk.js.map": "/static/js/747.869e2c74.chunk.js.map",
     "827.20b0be6e.chunk.js.map": "/static/js/827.20b0be6e.chunk.js.map",
-    "460.814326cb.chunk.js.map": "/static/js/460.814326cb.chunk.js.map",
+    "460.1792b545.chunk.js.map": "/static/js/460.1792b545.chunk.js.map",
     "767.3ddb1aa9.chunk.js.map": "/static/js/767.3ddb1aa9.chunk.js.map",
     "943.502924b4.chunk.js.map": "/static/js/943.502924b4.chunk.js.map",
     "929.f51e4fdb.chunk.js.map": "/static/js/929.f51e4fdb.chunk.js.map",
@@ -67,6 +67,6 @@
   },
   "entrypoints": [
     "static/js/440.92bb763b.js",
-    "static/js/main.c9ea6fb2.js"
+    "static/js/main.08f36d68.js"
   ]
 }

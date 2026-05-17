@@ -145,6 +145,23 @@ const isChunkLoadFailure = (error) => {
   );
 };
 
+const reloadForChunkUpdate = () => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return false;
+
+  const lastReloadAt = Number(
+    window.sessionStorage?.getItem(CHUNK_RELOAD_STORAGE_KEY) || 0,
+  );
+  const canReload =
+    !Number.isFinite(lastReloadAt) ||
+    Date.now() - lastReloadAt > CHUNK_RELOAD_COOLDOWN_MS;
+
+  if (!canReload) return false;
+
+  window.sessionStorage?.setItem(CHUNK_RELOAD_STORAGE_KEY, String(Date.now()));
+  window.location.reload();
+  return true;
+};
+
 class ChunkLoadRecoveryBoundary extends React.Component {
   state = { hasChunkError: false };
 
@@ -161,17 +178,7 @@ class ChunkLoadRecoveryBoundary extends React.Component {
       throw error;
     }
 
-    const lastReloadAt = Number(
-      window.sessionStorage?.getItem(CHUNK_RELOAD_STORAGE_KEY) || 0,
-    );
-    const canReload =
-      !Number.isFinite(lastReloadAt) ||
-      Date.now() - lastReloadAt > CHUNK_RELOAD_COOLDOWN_MS;
-
-    if (canReload) {
-      window.sessionStorage?.setItem(CHUNK_RELOAD_STORAGE_KEY, String(Date.now()));
-      window.location.reload();
-    }
+    reloadForChunkUpdate();
   }
 
   render() {
@@ -279,6 +286,25 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isNewRegistration, setIsNewRegistration] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
+
+    const handleChunkFailure = (event) => {
+      const error = event?.reason || event?.error || event;
+      if (isChunkLoadFailure(error) && reloadForChunkUpdate()) {
+        event?.preventDefault?.();
+      }
+    };
+
+    window.addEventListener("error", handleChunkFailure);
+    window.addEventListener("unhandledrejection", handleChunkFailure);
+
+    return () => {
+      window.removeEventListener("error", handleChunkFailure);
+      window.removeEventListener("unhandledrejection", handleChunkFailure);
+    };
+  }, []);
 
   const resetToAuthRoute = useCallback(() => {
     const routeName = IS_VISITOR_ONLY_APP ? "Login" : "RoleSelect";

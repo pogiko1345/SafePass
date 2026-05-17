@@ -2302,6 +2302,7 @@ const officeTapAccessMiddleware = (req, res, next) => {
 // ========== EMAIL DELIVERY ==========
 let mailTransporter = null;
 let nodemailerLoadError = null;
+let mailTransporterVerified = false;
 
 try {
   const nodemailer = require("nodemailer");
@@ -2333,9 +2334,11 @@ const verifyMailTransporter = async () => {
 
   try {
     await mailTransporter.verify();
+    mailTransporterVerified = true;
     console.log(`SMTP ready for ${String(process.env.MAIL_USER || "").trim()}`);
     return true;
   } catch (error) {
+    mailTransporterVerified = false;
     console.error("SMTP verification failed:", error.message);
     return false;
   }
@@ -8389,6 +8392,11 @@ app.get("/api/health", (req, res) => {
     success: true,
     database:
       mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
+    emailDelivery: {
+      configured: Boolean(mailTransporter),
+      verified: mailTransporterVerified,
+      mode: mailTransporter ? "smtp" : "simulation",
+    },
     timestamp: new Date(),
     endpoints: {
       auth: {
@@ -11107,10 +11115,10 @@ app.put("/api/staff/appointments/:id/reject", authMiddleware, async (req, res) =
       });
     }
 
-    if ((visitor.appointmentStatus || "pending") !== "pending") {
+    if (!["pending", "rescheduled"].includes(visitor.appointmentStatus || "pending")) {
       return res.status(400).json({
         success: false,
-        message: "Only pending appointments can be rejected.",
+        message: "Only pending or rescheduled appointments can be rejected.",
       });
     }
 
@@ -13033,6 +13041,11 @@ app.get("/api/admin/health", authMiddleware, async (req, res) => {
         database: dbStatus,
         api: "Running",
         nfcService: "Active",
+        emailDelivery: mailTransporter
+          ? mailTransporterVerified
+            ? "SMTP Ready"
+            : "SMTP Configured - Verify Failed"
+          : "Simulation Mode",
       },
     });
   } catch (error) {

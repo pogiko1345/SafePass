@@ -7478,7 +7478,21 @@ const loadDashboardData = useCallback(async () => {
       { label: "Position", value: selectedUser?.position || (isSecurityRole(selectedUser?.role) ? "Security Personnel" : "Not set"), icon: "briefcase-outline" },
       { label: "Status", value: isUserActive(selectedUser) ? "Active" : "Inactive", icon: "checkmark-circle-outline" },
     ];
-    const isStudentUser = ["student", "teacher"].includes(String(panelUser?.role || "").toLowerCase());
+    const isStudentUser = String(panelUser?.role || "").toLowerCase() === "student";
+    if (isStudentUser) {
+      infoItems.splice(3, 0,
+        {
+          label: "Parent / Guardian",
+          value: selectedUser?.parentName || selectedUser?.guardianName || "Not configured",
+          icon: "people-outline",
+        },
+        {
+          label: "Parent Email",
+          value: selectedUser?.parentEmail || selectedUser?.guardianEmail || "Not configured",
+          icon: "mail-outline",
+        },
+      );
+    }
 
     return (
       <View style={[styles.userDataBottomPanel, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
@@ -12747,6 +12761,22 @@ const loadDashboardData = useCallback(async () => {
                       {selectedUser?.nfcCardId || "Not assigned"}
                     </Text>
                   </View>
+                  {String(selectedUser?.role || "").toLowerCase() === "student" ? (
+                    <>
+                      <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                        <Text style={styles.userProfileInfoLabel}>Parent / Guardian</Text>
+                        <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
+                          {selectedUser?.parentName || selectedUser?.guardianName || "Not configured"}
+                        </Text>
+                      </View>
+                      <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                        <Text style={styles.userProfileInfoLabel}>Parent Email</Text>
+                        <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
+                          {selectedUser?.parentEmail || selectedUser?.guardianEmail || "Not configured"}
+                        </Text>
+                      </View>
+                    </>
+                  ) : null}
                 </View>
               </View>
 
