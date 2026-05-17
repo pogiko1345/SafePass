@@ -5095,6 +5095,27 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
           <View style={visitorDashboardStyles.approvedCompactActionsColumn}>
             <AnimatedPressable
+              style={[
+                visitorDashboardStyles.approvedCompactActionCard,
+                { width: compactApprovedActionCardWidth },
+                !isAppointmentManageable(visitor) && visitorDashboardStyles.appointmentManageButtonDisabled,
+              ]}
+              onPress={() => openEditAppointmentModal(visitor)}
+              activeOpacity={0.9}
+              disabled={!isAppointmentManageable(visitor) || isUpdatingAppointment}
+            >
+              <View style={[visitorDashboardStyles.approvedCompactActionIcon, { backgroundColor: "#EAF3FF" }]}>
+                <Ionicons name="calendar-outline" size={18} color="#0A3D91" />
+              </View>
+              <View style={visitorDashboardStyles.approvedCompactActionCopy}>
+                <Text style={visitorDashboardStyles.approvedCompactActionTitle}>Request Change</Text>
+                <Text style={visitorDashboardStyles.approvedCompactActionText}>
+                  Move the date or time.
+                </Text>
+              </View>
+            </AnimatedPressable>
+
+            <AnimatedPressable
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
               onPress={handleCheckInAction}
               activeOpacity={0.9}
@@ -6067,6 +6088,22 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     );
   };
 
+  const getEditAppointmentModalTitle = () => {
+    const appointmentStatus = String(appointmentEditForm.appointment?.appointmentStatus || "").toLowerCase();
+    if (["approved", "adjusted"].includes(appointmentStatus)) {
+      return "Request Appointment Change";
+    }
+    return "Edit Appointment";
+  };
+
+  const getEditAppointmentModalSubtitle = () => {
+    const appointmentStatus = String(appointmentEditForm.appointment?.appointmentStatus || "").toLowerCase();
+    if (["approved", "adjusted"].includes(appointmentStatus)) {
+      return "Choose a new date or time. Staff will review the updated schedule before entry.";
+    }
+    return "Update the date or time for staff review.";
+  };
+
   const renderCurrentAppointmentCard = () => {
     if (!currentAppointmentEntry) {
       return (
@@ -6894,9 +6931,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 <Ionicons name="create-outline" size={22} color="#0A3D91" />
               </View>
               <View style={visitorDashboardStyles.appointmentManageModalCopy}>
-                <Text style={visitorDashboardStyles.appointmentManageModalTitle}>Edit Appointment</Text>
+                <Text style={visitorDashboardStyles.appointmentManageModalTitle}>
+                  {getEditAppointmentModalTitle()}
+                </Text>
                 <Text style={visitorDashboardStyles.appointmentManageModalSubtitle}>
-                  Change your appointment date or time. Staff will be notified.
+                  {getEditAppointmentModalSubtitle()}
                 </Text>
               </View>
               <TouchableOpacity
