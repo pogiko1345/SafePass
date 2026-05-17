@@ -80,6 +80,32 @@ const visitorSchema = new mongoose.Schema({
     trim: true,
     index: true
   },
+  safePassId: {
+    type: String,
+    default: "",
+    trim: true,
+    index: true,
+  },
+  nfcCardId: {
+    type: String,
+    default: "",
+    trim: true,
+    index: true,
+  },
+  physicalNfcUid: {
+    type: String,
+    default: "",
+    trim: true,
+    uppercase: true,
+    index: true,
+  },
+  phoneNfcUid: {
+    type: String,
+    default: "",
+    trim: true,
+    uppercase: true,
+    index: true,
+  },
   idNumber: { 
     type: String, 
     default: "",
@@ -1201,6 +1227,13 @@ visitorSchema.statics = {
 // ============ Middleware ============
 // Update timestamp on save
 visitorSchema.pre('save', function() {
+  if (this.email) this.email = String(this.email).trim().toLowerCase();
+  if (this.nfcCardId === null) this.nfcCardId = "";
+  if (this.physicalNfcUid === null) this.physicalNfcUid = "";
+  if (this.phoneNfcUid === null) this.phoneNfcUid = "";
+  if (this.safePassId === null) this.safePassId = "";
+  if (this.physicalNfcUid) this.physicalNfcUid = String(this.physicalNfcUid).trim().toUpperCase();
+  if (this.phoneNfcUid) this.phoneNfcUid = String(this.phoneNfcUid).trim().toUpperCase();
   this.updatedAt = new Date();
 });
 

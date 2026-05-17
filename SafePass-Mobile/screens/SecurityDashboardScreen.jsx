@@ -1590,6 +1590,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       ...safeVisitorDetails,
       email: safeVisitorDetails.email || sourceVisitor.email || visitorEmail,
       nfcCardId: cardId,
+      physicalNfcUid: cardId,
     };
     const localIdentity = getVisitorNfcIdentity(localVisitor) || normalizedEmail;
 
@@ -1600,6 +1601,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               ...visitor,
               ...safeVisitorDetails,
               nfcCardId: cardId,
+              physicalNfcUid: cardId,
             }
           : visitor,
       );
@@ -1907,6 +1909,9 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const getVisitorAssignedNfcUid = (visitor) =>
     [
+      visitor?.physicalNfcUid,
+      visitor?.relatedUser?.physicalNfcUid,
+      visitor?.account?.physicalNfcUid,
       visitor?.nfcCardId,
       visitor?.relatedUser?.nfcCardId,
       visitor?.account?.nfcCardId,

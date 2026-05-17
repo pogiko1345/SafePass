@@ -600,9 +600,21 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         : currentProfile?.employeeId;
   const identityLine =
     primaryAccountId ||
+    currentProfile?.safePassId ||
+    currentProfile?.physicalNfcUid ||
     currentProfile?.nfcCardId ||
     currentProfile?._id ||
     "SafePass Account";
+  const profileSafePassId =
+    currentProfile?.safePassId ||
+    (/^(SAFEPASS-|PENDING-|20\d{2}-)/i.test(String(currentProfile?.nfcCardId || ""))
+      ? currentProfile?.nfcCardId
+      : "");
+  const profilePhysicalNfcUid =
+    currentProfile?.physicalNfcUid ||
+    (!/^(SAFEPASS-|PENDING-|20\d{2}-)/i.test(String(currentProfile?.nfcCardId || ""))
+      ? currentProfile?.nfcCardId
+      : "");
 
   if (isLoading && !profile) {
     return (
@@ -811,10 +823,10 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       <LinearGradient colors={["#0F172A", "#1E293B"]} style={styles.accessCard}>
         <Text style={styles.accessLabel}>Access Credential</Text>
         <Text style={styles.accessValue}>
-          {currentProfile.nfcCardId || "No NFC card assigned"}
+          {profileSafePassId || primaryAccountId || "SafePass account"}
         </Text>
         <Text style={styles.accessHint}>
-          Use this profile as your account reference for campus access services.
+          This is your account reference. Physical NFC cards are listed separately when assigned.
         </Text>
       </LinearGradient>
       <View style={themedCardStyle}>
@@ -840,7 +852,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                 ["Department", currentProfile.department || "Not assigned"],
                 ["Position", currentProfile.position || "Not assigned"],
               ]),
-          ["NFC Card", currentProfile.nfcCardId || "Not issued"],
+          ["SafePass ID", profileSafePassId || "Not issued"],
+          ["Physical NFC UID", profilePhysicalNfcUid || "Not assigned"],
           ["Account Status", currentProfile.status || (currentProfile.isActive === false ? "Inactive" : "Active")],
         ].map(([label, value]) => (
           <View key={label} style={styles.field}>

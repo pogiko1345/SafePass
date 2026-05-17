@@ -561,7 +561,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       const response = await ApiService.submitMyAttendanceTap({
         action,
         source: "virtual_nfc_card",
-        nfcCardId: user?.nfcCardId,
+        nfcCardId: user?.phoneNfcUid || user?.safePassId || user?.physicalNfcUid || user?.nfcCardId,
         office: "Staff Virtual NFC Card",
         floor: "Mobile",
         checkpointId: "staff-virtual-nfc",
@@ -3087,7 +3087,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Text style={staffVirtualStyles.title}>
               {isStaffCheckedIn ? "Currently Checked In" : "Ready for Check In"}
             </Text>
-            <Text style={staffVirtualStyles.meta}>Card ID: {user?.nfcCardId || "Not assigned"}</Text>
+            <Text style={staffVirtualStyles.meta}>
+              SafePass ID: {user?.safePassId || user?.phoneNfcUid || user?.nfcCardId || "Not assigned"}
+            </Text>
           </View>
         </View>
         <View style={staffVirtualStyles.actionRow}>

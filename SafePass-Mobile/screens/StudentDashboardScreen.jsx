@@ -1082,7 +1082,7 @@ export default function StudentDashboardScreen({ navigation }) {
               ["Parent Email", maskEmail(user?.parentEmail || user?.guardianEmail) || "Not configured"],
               ["Student ID", user?.studentId || user?.teacherId || "Not assigned"],
               ["Course / Section", formatProfileDetail(user?.course, user?.yearLevel, user?.section)],
-              ["NFC Card", user?.nfcCardId || "Virtual mobile check only"],
+              ["Physical NFC UID", user?.physicalNfcUid || user?.nfcCardId || "Virtual mobile check only"],
             ].map(([label, value]) => (
               <View key={label} style={styles.profileRow}>
                 <Text style={styles.profileLabel}>{label}</Text>

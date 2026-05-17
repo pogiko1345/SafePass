@@ -82,6 +82,11 @@ const formatSafePassAccountId = (year, sequence) =>
 
 const isSafePassAccountId = (value = "") => /^\d{4}-\d{6}$/.test(String(value || "").trim());
 
+const isLegacySafePassToken = (value = "") => {
+  const token = String(value || "").trim();
+  return isSafePassAccountId(token) || /^SAFEPASS-/i.test(token) || /^PENDING-/i.test(token);
+};
+
 const normalizeNfcCardId = (value = "") =>
   String(value || "")
     .trim()
@@ -100,6 +105,42 @@ const normalizeSubmittedNfcCardId = (value = "") => {
   return rawValue.toUpperCase();
 };
 
+const getUserSafePassId = (user = {}) => {
+  const explicitSafePassId = String(user?.safePassId || "").trim();
+  if (explicitSafePassId) return explicitSafePassId;
+
+  const legacyCardId = String(user?.nfcCardId || "").trim();
+  return isLegacySafePassToken(legacyCardId) ? legacyCardId : "";
+};
+
+const getUserPhysicalNfcUid = (user = {}) => {
+  const explicitPhysicalUid = normalizeSubmittedNfcCardId(user?.physicalNfcUid || "");
+  if (explicitPhysicalUid) return explicitPhysicalUid;
+
+  const legacyCardId = normalizeSubmittedNfcCardId(user?.nfcCardId || "");
+  return legacyCardId && !isLegacySafePassToken(legacyCardId) ? legacyCardId : "";
+};
+
+const getUserPhoneNfcUid = (user = {}) => normalizeSubmittedNfcCardId(user?.phoneNfcUid || "");
+
+const buildNfcCredentialQuery = (rawCardId = "", normalizedCardId = "") => {
+  const candidates = Array.from(
+    new Set(
+      [rawCardId, normalizedCardId, normalizeSubmittedNfcCardId(rawCardId), normalizeSubmittedNfcCardId(normalizedCardId)]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  return {
+    $or: [
+      { physicalNfcUid: { $in: candidates } },
+      { phoneNfcUid: { $in: candidates } },
+      { nfcCardId: { $in: candidates } },
+    ],
+  };
+};
+
 const generateSafePassAccountId = async (createdAt = new Date()) => {
   const createdDate = new Date(createdAt);
   const year = Number.isNaN(createdDate.getTime())
@@ -116,7 +157,9 @@ const generateSafePassAccountId = async (createdAt = new Date()) => {
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
     const candidate = formatSafePassAccountId(year, counter.sequence);
-    const existing = await User.exists({ nfcCardId: candidate });
+    const existing = await User.exists({
+      $or: [{ safePassId: candidate }, { nfcCardId: candidate }],
+    });
     if (!existing) return candidate;
   }
 
@@ -124,15 +167,27 @@ const generateSafePassAccountId = async (createdAt = new Date()) => {
 };
 
 const ensureSafePassAccountId = async (user) => {
-  if (!user || String(user.role || "").toLowerCase() !== "visitor") {
-    return user?.nfcCardId || "";
+  if (!user) return "";
+
+  const existingSafePassId = getUserSafePassId(user);
+  if (existingSafePassId) {
+    if (!String(user.safePassId || "").trim()) {
+      user.safePassId = existingSafePassId;
+      await user.save();
+    }
+    return existingSafePassId;
   }
 
-  if (String(user.nfcCardId || "").trim()) return user.nfcCardId;
+  if (String(user.role || "").toLowerCase() !== "visitor") {
+    return String(user.nfcCardId || "").trim();
+  }
 
-  user.nfcCardId = await generateSafePassAccountId(user.createdAt || new Date());
+  user.safePassId = await generateSafePassAccountId(user.createdAt || new Date());
+  if (!String(user.nfcCardId || "").trim()) {
+    user.nfcCardId = user.safePassId;
+  }
   await user.save();
-  return user.nfcCardId;
+  return user.safePassId;
 };
 
 const reviewAppointmentIdImage = ({ idType, idImage, idVerification }) => {
@@ -2693,10 +2748,8 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       });
     }
 
-    const cardUser = await User.findOne({
-      nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
-    }).select(
-      "_id email firstName lastName nfcCardId role status accessPermissions department position scheduleProfile course yearLevel section studentId parentName parentEmail guardianName guardianEmail emergencyContact",
+    const cardUser = await User.findOne(buildNfcCredentialQuery(cardId, normalizedCardId)).select(
+      "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions department position scheduleProfile course yearLevel section studentId parentName parentEmail guardianName guardianEmail emergencyContact",
     );
 
     if (!cardUser) {
@@ -3184,10 +3237,8 @@ app.post(
         });
       }
 
-      const cardUser = await User.findOne({
-        nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
-      }).select(
-        "_id email firstName lastName nfcCardId role status accessPermissions department position scheduleProfile course yearLevel section studentId teacherId employeeId parentName parentEmail guardianName guardianEmail emergencyContact",
+      const cardUser = await User.findOne(buildNfcCredentialQuery(cardId, normalizedCardId)).select(
+        "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions department position scheduleProfile course yearLevel section studentId teacherId employeeId parentName parentEmail guardianName guardianEmail emergencyContact",
       );
 
       if (!cardUser) {
@@ -3726,9 +3777,9 @@ app.post("/api/nfc/office-tap", officeTapAccessMiddleware, async (req, res) => {
 
     const visitorUser = normalizedCardId
       ? await User.findOne({
-          nfcCardId: { $in: Array.from(new Set([cardId, normalizedCardId])) },
+          ...buildNfcCredentialQuery(cardId, normalizedCardId),
           role: "visitor",
-        }).select("_id email firstName lastName nfcCardId role status")
+        }).select("_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status")
       : null;
 
     const visitorQuery = req.body?.visitorId
@@ -4380,7 +4431,7 @@ const isVisitorOwner = (user = {}, visitor = {}) => {
 };
 
 const isUserSafePassCardActive = (user = {}) =>
-  Boolean(user?.nfcCardId) &&
+  Boolean(getUserPhysicalNfcUid(user) || getUserPhoneNfcUid(user) || getUserSafePassId(user)) &&
   String(user?.status || "").toLowerCase() === "active" &&
   user?.accessPermissions?.cardActive !== false;
 
@@ -4390,7 +4441,10 @@ const getVisitorAccountPayload = (user = {}) => ({
   email: user.email,
   phoneNumber: user.phone,
   status: user.status,
-  nfcCardId: user.nfcCardId || "",
+  safePassId: getUserSafePassId(user),
+  nfcCardId: getUserPhysicalNfcUid(user),
+  physicalNfcUid: getUserPhysicalNfcUid(user),
+  phoneNfcUid: getUserPhoneNfcUid(user),
   cardActive: isUserSafePassCardActive(user),
   accessPermissions: {
     canAccess: user.accessPermissions?.canAccess || [],
@@ -4436,11 +4490,8 @@ const getVisitorCardTimeRestrictions = (visitor = {}) => {
 const activateVisitorSafePassCardForUser = async (user, visitor = {}) => {
   if (!user) return "";
 
-  if (!String(user.nfcCardId || "").trim()) {
-    user.nfcCardId = await generateSafePassAccountId(user.createdAt || new Date());
-  }
-
   user.role = "visitor";
+  const safePassId = await ensureSafePassAccountId(user);
   user.status = "active";
   user.isActive = true;
   if (visitor?._id) {
@@ -4454,7 +4505,7 @@ const activateVisitorSafePassCardForUser = async (user, visitor = {}) => {
   };
 
   await user.save();
-  return user.nfcCardId || "";
+  return safePassId;
 };
 
 const findVisitorForUser = async (user) => {
@@ -4588,17 +4639,16 @@ const attachSafePassIdsToVisitors = async (visitors = []) => {
 
   const accountIdByEmail = new Map();
   const physicalCardByEmail = new Map();
+  const phoneCardByEmail = new Map();
   users.forEach((user) => {
     const email = String(user.email || "").trim().toLowerCase();
-    const userCardId = String(user.nfcCardId || "").trim();
     if (!email) return;
-    if (isSafePassAccountId(userCardId)) {
-      accountIdByEmail.set(email, userCardId);
-      return;
-    }
-    if (userCardId) {
-      physicalCardByEmail.set(email, userCardId);
-    }
+    const safePassId = getUserSafePassId(user);
+    const physicalUid = getUserPhysicalNfcUid(user);
+    const phoneUid = getUserPhoneNfcUid(user);
+    if (safePassId) accountIdByEmail.set(email, safePassId);
+    if (physicalUid) physicalCardByEmail.set(email, physicalUid);
+    if (phoneUid) phoneCardByEmail.set(email, phoneUid);
   });
 
   return visitors.map((visitor) => {
@@ -4607,8 +4657,16 @@ const attachSafePassIdsToVisitors = async (visitors = []) => {
     const matchedUser = users.find((user) => String(user.email || "").trim().toLowerCase() === email);
     const visitorCardId = String(payload.nfcCardId || "").trim();
     payload.userId = matchedUser?._id || payload.userId || null;
-    payload.safePassId = payload.safePassId || accountIdByEmail.get(email) || (isSafePassAccountId(visitorCardId) ? visitorCardId : "");
-    payload.nfcCardId = physicalCardByEmail.get(email) || (isSafePassAccountId(visitorCardId) ? "" : visitorCardId);
+    payload.safePassId =
+      payload.safePassId ||
+      accountIdByEmail.get(email) ||
+      (isLegacySafePassToken(visitorCardId) ? visitorCardId : "");
+    payload.physicalNfcUid =
+      physicalCardByEmail.get(email) ||
+      payload.physicalNfcUid ||
+      (visitorCardId && !isLegacySafePassToken(visitorCardId) ? visitorCardId : "");
+    payload.phoneNfcUid = phoneCardByEmail.get(email) || payload.phoneNfcUid || "";
+    payload.nfcCardId = payload.physicalNfcUid;
     return payload;
   });
 };
@@ -4705,7 +4763,10 @@ const getVisitorTapPayload = ({ visitor, visitorUser, nfcCardId = "" } = {}) => 
     assignedOffice: visitor.assignedOffice || "",
     appointmentDepartment: visitor.appointmentDepartment || "",
     host: visitor.assignedStaffName || visitor.host || "",
-    nfcCardId: nfcCardId || visitorUser?.nfcCardId || visitor.nfcCardId || "",
+    safePassId: visitor.safePassId || getUserSafePassId(visitorUser) || "",
+    nfcCardId: nfcCardId || getUserPhysicalNfcUid(visitorUser) || visitor.physicalNfcUid || visitor.nfcCardId || "",
+    physicalNfcUid: getUserPhysicalNfcUid(visitorUser) || visitor.physicalNfcUid || "",
+    phoneNfcUid: getUserPhoneNfcUid(visitorUser) || visitor.phoneNfcUid || "",
   };
 };
 
@@ -4714,7 +4775,10 @@ const getCampusUserTapPayload = ({ user = {}, nfcCardId = "" } = {}) => ({
   name: getFullName(user) || user?.email || "Campus user",
   email: user?.email || "",
   role: normalizeUserRoleValue(user?.role),
-  nfcCardId: nfcCardId || user?.nfcCardId || "",
+  safePassId: getUserSafePassId(user),
+  nfcCardId: nfcCardId || getUserPhysicalNfcUid(user) || user?.nfcCardId || "",
+  physicalNfcUid: getUserPhysicalNfcUid(user),
+  phoneNfcUid: getUserPhoneNfcUid(user),
   department: user?.department || "",
   position: user?.position || "",
   course: user?.course || "",
@@ -4758,7 +4822,10 @@ const buildVisitorProfilePayload = async (visitorUser) => {
     }
 
     const visitorPayload = visitor.toObject();
-    visitorPayload.nfcCardId = visitorUser.nfcCardId || "";
+    visitorPayload.safePassId = getUserSafePassId(visitorUser) || visitorPayload.safePassId || "";
+    visitorPayload.physicalNfcUid = getUserPhysicalNfcUid(visitorUser) || visitorPayload.physicalNfcUid || "";
+    visitorPayload.phoneNfcUid = getUserPhoneNfcUid(visitorUser) || visitorPayload.phoneNfcUid || "";
+    visitorPayload.nfcCardId = visitorPayload.physicalNfcUid;
 
     return {
       success: true,
@@ -6972,6 +7039,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
         isActive: true,
         visitorId: visitor._id,
         nfcCardId: realNfcCardId,
+        safePassId: realNfcCardId,
         accessPermissions: {
           canAccess: [],
           restrictedAreas: [],
@@ -7000,7 +7068,10 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       user.password = tempPassword;
       user.status = "active";
       user.isActive = true;
-      user.nfcCardId = realNfcCardId;
+      user.safePassId = realNfcCardId;
+      if (!getUserPhysicalNfcUid(user)) {
+        user.nfcCardId = realNfcCardId;
+      }
       user.accessPermissions = {
         canAccess: user.accessPermissions?.canAccess || [],
         restrictedAreas: user.accessPermissions?.restrictedAreas || [],
@@ -7067,8 +7138,10 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
         status: visitor.status,
         approvalStatus: visitor.approvalStatus,
         temporaryPassword: tempPassword,
-        nfcCardId: user.nfcCardId,
-        safePassId: user.nfcCardId,
+        nfcCardId: getUserPhysicalNfcUid(user),
+        physicalNfcUid: getUserPhysicalNfcUid(user),
+        phoneNfcUid: getUserPhoneNfcUid(user),
+        safePassId: getUserSafePassId(user),
         cardActive: user.accessPermissions?.cardActive !== false,
       },
     });
@@ -7236,6 +7309,8 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
     ];
     if (requestedNfcCardId) {
       duplicateChecks.push({ nfcCardId: exactTextMatch(requestedNfcCardId) });
+      duplicateChecks.push({ physicalNfcUid: exactTextMatch(requestedNfcCardId) });
+      duplicateChecks.push({ phoneNfcUid: exactTextMatch(requestedNfcCardId) });
     }
 
     const existingUser = await User.findOne({ $or: duplicateChecks });
@@ -7247,7 +7322,12 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
             ? "username"
             : sameNormalizedText(existingUser.employeeId, normalizedEmployeeId)
               ? "employeeId"
-              : sameNormalizedText(existingUser.nfcCardId, requestedNfcCardId)
+              : requestedNfcCardId &&
+                (
+                  sameNormalizedText(existingUser.nfcCardId, requestedNfcCardId) ||
+                  sameNormalizedText(existingUser.physicalNfcUid, requestedNfcCardId) ||
+                  sameNormalizedText(existingUser.phoneNfcUid, requestedNfcCardId)
+                )
                 ? "nfcCardId"
             : "email";
 
@@ -7269,8 +7349,7 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
     const setupToken = createPasswordSetupToken(48);
     const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
 
-    const resolvedNfcCardId =
-      requestedNfcCardId || `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const resolvedNfcCardId = requestedNfcCardId || "";
 
     const user = new User({
       firstName: normalizedFirstName,
@@ -7287,6 +7366,7 @@ app.post("/api/admin/staff/create", authMiddleware, async (req, res) => {
       department: normalizedDepartment,
       position: normalizedPosition,
       nfcCardId: resolvedNfcCardId,
+      physicalNfcUid: resolvedNfcCardId,
       passwordResetTokenHash: setupToken.tokenHash,
       passwordResetExpiresAt: setupToken.expiresAt,
     });
@@ -7428,6 +7508,8 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       ];
     if (requestedNfcCardId) {
       duplicateChecks.push({ nfcCardId: exactTextMatch(requestedNfcCardId) });
+      duplicateChecks.push({ physicalNfcUid: exactTextMatch(requestedNfcCardId) });
+      duplicateChecks.push({ phoneNfcUid: exactTextMatch(requestedNfcCardId) });
     }
     const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
@@ -7437,7 +7519,14 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
           ? "username"
           : sameNormalizedText(existingUser.employeeId, normalizedEmployeeId)
             ? "employeeId"
-            : "nfcCardId";
+            : requestedNfcCardId &&
+              (
+                sameNormalizedText(existingUser.nfcCardId, requestedNfcCardId) ||
+                sameNormalizedText(existingUser.physicalNfcUid, requestedNfcCardId) ||
+                sameNormalizedText(existingUser.phoneNfcUid, requestedNfcCardId)
+              )
+              ? "nfcCardId"
+              : "email";
       return res.status(400).json({
         success: false,
         message:
@@ -7452,9 +7541,7 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       });
     }
 
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substr(2, 6).toUpperCase();
-    const resolvedNfcCardId = requestedNfcCardId || `SAFEPASS-${timestamp}-${randomString}`;
+    const resolvedNfcCardId = requestedNfcCardId || "";
     const temporaryPassword = generateTemporaryPassword();
     const setupToken = createPasswordSetupToken(48);
     const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
@@ -7468,6 +7555,7 @@ app.post("/api/admin/security/create", authMiddleware, async (req, res) => {
       phone: normalizedPhone || "",
       role: "guard",
       nfcCardId: resolvedNfcCardId,
+      physicalNfcUid: resolvedNfcCardId,
       employeeId: normalizedEmployeeId,
       position: normalizedPosition,
       shift: String(shift || "").trim(),
@@ -7619,6 +7707,8 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       ];
     if (requestedNfcCardId) {
       duplicateChecks.push({ nfcCardId: exactTextMatch(requestedNfcCardId) });
+      duplicateChecks.push({ physicalNfcUid: exactTextMatch(requestedNfcCardId) });
+      duplicateChecks.push({ phoneNfcUid: exactTextMatch(requestedNfcCardId) });
     }
     const existingUser = await User.findOne({ $or: duplicateChecks });
     if (existingUser) {
@@ -7629,7 +7719,14 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
             ? "username"
             : sameNormalizedText(existingUser[academicIdField], normalizedAcademicId)
               ? academicIdField
-              : "nfcCardId";
+              : requestedNfcCardId &&
+                (
+                  sameNormalizedText(existingUser.nfcCardId, requestedNfcCardId) ||
+                  sameNormalizedText(existingUser.physicalNfcUid, requestedNfcCardId) ||
+                  sameNormalizedText(existingUser.phoneNfcUid, requestedNfcCardId)
+                )
+                ? "nfcCardId"
+                : "email";
 
       return res.status(400).json({
         success: false,
@@ -7648,8 +7745,7 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
     const temporaryPassword = generateTemporaryPassword();
     const setupToken = createPasswordSetupToken(48);
     const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
-    const resolvedNfcCardId =
-      requestedNfcCardId || `SAFEPASS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const resolvedNfcCardId = requestedNfcCardId || "";
     const requestedStatus = String(req.body.status || "active").trim().toLowerCase();
     const createAsActive = requestedStatus !== "inactive";
 
@@ -7673,6 +7769,7 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       yearLevel: String(req.body.yearLevel || "").trim(),
       section: String(req.body.section || "").trim(),
       nfcCardId: resolvedNfcCardId,
+      physicalNfcUid: resolvedNfcCardId,
       passwordResetTokenHash: createAsActive ? "" : setupToken.tokenHash,
       passwordResetExpiresAt: createAsActive ? null : setupToken.expiresAt,
     });
@@ -11905,7 +12002,7 @@ app.get("/api/admin/activities", authMiddleware, async (req, res) => {
       .sort({ timestamp: -1 })
       .limit(limit)
       .populate("relatedVisitor", "fullName email visitDate visitTime purposeOfVisit assignedOffice host status appointmentStatus approvalStatus")
-      .populate("relatedUser", "firstName lastName email role department nfcCardId");
+      .populate("relatedUser", "firstName lastName email role department nfcCardId safePassId physicalNfcUid phoneNfcUid");
 
     const visitorActivityUsers = activities
       .map((activity) => activity.relatedUser)
@@ -11914,12 +12011,30 @@ app.get("/api/admin/activities", authMiddleware, async (req, res) => {
 
     const activityPayloads = activities.map((activity) => {
       const payload = activity.toObject();
-      if (payload.relatedUser?.nfcCardId) {
-        payload.nfcCardId = payload.relatedUser.nfcCardId;
+      const relatedPhysicalUid = getUserPhysicalNfcUid(payload.relatedUser);
+      const relatedSafePassId = getUserSafePassId(payload.relatedUser);
+      const relatedPhoneUid = getUserPhoneNfcUid(payload.relatedUser);
+      if (relatedPhysicalUid) {
+        payload.nfcCardId = relatedPhysicalUid;
+        payload.physicalNfcUid = relatedPhysicalUid;
       }
-      if (payload.relatedVisitor && payload.relatedUser?.nfcCardId) {
-        payload.relatedVisitor.nfcCardId = payload.relatedUser.nfcCardId;
-        payload.relatedVisitor.safePassId = payload.relatedUser.nfcCardId;
+      if (relatedSafePassId) {
+        payload.safePassId = relatedSafePassId;
+      }
+      if (relatedPhoneUid) {
+        payload.phoneNfcUid = relatedPhoneUid;
+      }
+      if (payload.relatedVisitor) {
+        if (relatedPhysicalUid) {
+          payload.relatedVisitor.nfcCardId = relatedPhysicalUid;
+          payload.relatedVisitor.physicalNfcUid = relatedPhysicalUid;
+        }
+        if (relatedSafePassId) {
+          payload.relatedVisitor.safePassId = relatedSafePassId;
+        }
+        if (relatedPhoneUid) {
+          payload.relatedVisitor.phoneNfcUid = relatedPhoneUid;
+        }
       }
       return payload;
     });
@@ -12370,6 +12485,7 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
 
       if (!submittedNfcCardId) {
         updates.nfcCardId = null;
+        updates.physicalNfcUid = null;
         updates.accessPermissions = {
           canAccess: existingUser.accessPermissions?.canAccess || [],
           restrictedAreas: existingUser.accessPermissions?.restrictedAreas || [],
@@ -12378,7 +12494,11 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
         };
       } else {
         const nfcCardConflict = await User.findOne({
-          nfcCardId: exactTextMatch(submittedNfcCardId),
+          $or: [
+            { nfcCardId: exactTextMatch(submittedNfcCardId) },
+            { physicalNfcUid: exactTextMatch(submittedNfcCardId) },
+            { phoneNfcUid: exactTextMatch(submittedNfcCardId) },
+          ],
           _id: { $ne: req.params.id },
         });
 
@@ -12391,6 +12511,7 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
         }
 
         updates.nfcCardId = submittedNfcCardId;
+        updates.physicalNfcUid = submittedNfcCardId;
         updates.accessPermissions = {
           canAccess: existingUser.accessPermissions?.canAccess || [],
           restrictedAreas: existingUser.accessPermissions?.restrictedAreas || [],
@@ -12654,14 +12775,24 @@ app.get("/api/admin/nfc-cards", authMiddleware, async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const users = await User.find({ nfcCardId: { $exists: true, $ne: null } })
-      .select("firstName lastName email nfcCardId role status createdAt accessPermissions")
+    const users = await User.find({
+      $or: [
+        { nfcCardId: { $exists: true, $ne: null } },
+        { safePassId: { $exists: true, $ne: null } },
+        { physicalNfcUid: { $exists: true, $ne: null } },
+        { phoneNfcUid: { $exists: true, $ne: null } },
+      ],
+    })
+      .select("firstName lastName email nfcCardId safePassId physicalNfcUid phoneNfcUid role status createdAt accessPermissions")
       .skip(skip)
       .limit(parseInt(limit));
 
     const cards = users.map((user) => ({
       id: user._id,
-      cardNumber: user.nfcCardId,
+      cardNumber: getUserPhysicalNfcUid(user) || getUserSafePassId(user) || user.nfcCardId,
+      safePassId: getUserSafePassId(user),
+      physicalNfcUid: getUserPhysicalNfcUid(user),
+      phoneNfcUid: getUserPhoneNfcUid(user),
       userName: `${user.firstName} ${user.lastName}`,
       email: user.email,
       role: user.role,
@@ -12672,7 +12803,12 @@ app.get("/api/admin/nfc-cards", authMiddleware, async (req, res) => {
     }));
 
     const total = await User.countDocuments({
-      nfcCardId: { $exists: true, $ne: null },
+      $or: [
+        { nfcCardId: { $exists: true, $ne: null } },
+        { safePassId: { $exists: true, $ne: null } },
+        { physicalNfcUid: { $exists: true, $ne: null } },
+        { phoneNfcUid: { $exists: true, $ne: null } },
+      ],
     });
 
     res.json({
@@ -12706,12 +12842,7 @@ app.post("/api/admin/nfc-cards/issue", authMiddleware, async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
-    // Generate unique NFC card ID
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substr(2, 6).toUpperCase();
-    const nfcCardId = `SAFEPASS-${timestamp}-${randomString}`;
-
-    user.nfcCardId = nfcCardId;
+    const safePassId = await ensureSafePassAccountId(user);
     user.accessPermissions = {
       canAccess: user.accessPermissions?.canAccess || [],
       restrictedAreas: user.accessPermissions?.restrictedAreas || [],
@@ -12727,16 +12858,18 @@ app.post("/api/admin/nfc-cards/issue", authMiddleware, async (req, res) => {
       location: "Admin Panel",
       accessType: "system",
       status: "granted",
-      notes: `Issued NFC card to ${user.email}: ${nfcCardId}`,
+      notes: `Issued SafePass virtual ID to ${user.email}: ${safePassId}`,
     });
     await accessLog.save();
 
     res.json({
       success: true,
-      message: "NFC card issued successfully",
+      message: "SafePass virtual ID issued successfully",
       card: {
         id: user._id,
-        cardNumber: nfcCardId,
+        cardNumber: getUserPhysicalNfcUid(user) || safePassId,
+        safePassId,
+        physicalNfcUid: getUserPhysicalNfcUid(user),
         userName: `${user.firstName} ${user.lastName}`,
         status: "active",
         issuedDate: new Date(),
@@ -12785,8 +12918,12 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
     }
 
     const existingCardOwner = await User.findOne({
-      nfcCardId: normalizedCardId,
-    }).select("_id email role nfcCardId");
+      $or: [
+        { physicalNfcUid: normalizedCardId },
+        { phoneNfcUid: normalizedCardId },
+        { nfcCardId: normalizedCardId },
+      ],
+    }).select("_id email role nfcCardId safePassId physicalNfcUid phoneNfcUid");
 
     if (existingCardOwner && String(existingCardOwner._id) !== String(user._id)) {
       return res.status(409).json({
@@ -12803,8 +12940,12 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
       });
     }
 
-    const previousCardId = user.nfcCardId || "";
-    user.nfcCardId = normalizedCardId;
+    const previousCardId = getUserPhysicalNfcUid(user);
+    await ensureSafePassAccountId(user);
+    user.physicalNfcUid = normalizedCardId;
+    if (!isLegacySafePassToken(user.nfcCardId)) {
+      user.nfcCardId = normalizedCardId;
+    }
     user.status = "active";
     user.isActive = true;
     user.accessPermissions = {
@@ -12818,7 +12959,13 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
     if (targetRole === "visitor") {
       await Visitor.updateMany(
         { email: user.email },
-        { $set: { nfcCardId: user.nfcCardId } },
+        {
+          $set: {
+            safePassId: getUserSafePassId(user),
+            physicalNfcUid: user.physicalNfcUid,
+            nfcCardId: user.physicalNfcUid,
+          },
+        },
       );
     }
 
@@ -12846,11 +12993,15 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
         : null;
 
     if (linkedVisitor) {
-      linkedVisitor.nfcCardId = user.nfcCardId;
+      linkedVisitor.safePassId = getUserSafePassId(user);
+      linkedVisitor.physicalNfcUid = user.physicalNfcUid;
+      linkedVisitor.nfcCardId = user.physicalNfcUid;
       linkedVisitor.relatedUser = {
         _id: user._id,
         email: user.email,
-        nfcCardId: user.nfcCardId,
+        nfcCardId: user.physicalNfcUid,
+        safePassId: getUserSafePassId(user),
+        physicalNfcUid: user.physicalNfcUid,
         role: user.role,
       };
     }
@@ -12861,8 +13012,10 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
       visitor: linkedVisitor,
       card: {
         id: user._id,
-        cardNumber: user.nfcCardId,
+        cardNumber: user.physicalNfcUid,
         previousCardNumber: previousCardId,
+        safePassId: getUserSafePassId(user),
+        physicalNfcUid: user.physicalNfcUid,
         userName: `${user.firstName} ${user.lastName}`.trim(),
         email: user.email,
         role: user.role,
@@ -12911,8 +13064,12 @@ app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
       });
     }
 
-    const oldCardId = user.nfcCardId;
-    user.nfcCardId = null;
+    const oldCardId = getUserPhysicalNfcUid(user);
+    await ensureSafePassAccountId(user);
+    user.physicalNfcUid = undefined;
+    if (!isLegacySafePassToken(user.nfcCardId)) {
+      user.nfcCardId = user.safePassId || undefined;
+    }
     user.accessPermissions = {
       canAccess: user.accessPermissions?.canAccess || [],
       restrictedAreas: user.accessPermissions?.restrictedAreas || [],
@@ -12924,7 +13081,13 @@ app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
     if (targetRole === "visitor") {
       await Visitor.updateMany(
         { email: user.email },
-        { $unset: { nfcCardId: "" } },
+        {
+          $set: {
+            safePassId: getUserSafePassId(user),
+            nfcCardId: "",
+            physicalNfcUid: "",
+          },
+        },
       );
     }
 
@@ -12948,11 +13111,15 @@ app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
         : null;
 
     if (linkedVisitor) {
+      linkedVisitor.safePassId = getUserSafePassId(user);
+      linkedVisitor.physicalNfcUid = "";
       linkedVisitor.nfcCardId = "";
       linkedVisitor.relatedUser = {
         _id: user._id,
         email: user.email,
         nfcCardId: "",
+        safePassId: getUserSafePassId(user),
+        physicalNfcUid: "",
         role: user.role,
       };
     }

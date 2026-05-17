@@ -206,7 +206,8 @@ const getPersonDetails = (response = {}) => {
     visitSchedule: person.visitSchedule || [formatDateOnly(visitDate), formatTimeOnly(visitTime)].filter(Boolean).join(" "),
     purpose: person.purposeOfVisit || person.purpose || "",
     attendanceScope: person.attendanceScope || "",
-    nfcCardId: person.nfcCardId || response.nfcCardId || response.attendance?.nfcCardId || "",
+    safePassId: person.safePassId || response.safePassId || "",
+    nfcCardId: person.physicalNfcUid || person.nfcCardId || response.nfcCardId || response.attendance?.nfcCardId || "",
   };
 };
 
@@ -733,7 +734,7 @@ export default function NFCScanScreen({ navigation }) {
                 <TouchableOpacity
                   style={styles.secondaryButton}
                   onPress={() => {
-                    setCardId(String(user.nfcCardId || "").toUpperCase());
+                    setCardId(String(user.physicalNfcUid || user.phoneNfcUid || user.nfcCardId || user.safePassId || "").toUpperCase());
                     setTimeout(focusReader, 80);
                   }}
                 >
