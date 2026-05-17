@@ -1738,6 +1738,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       filters: [
         { key: "all", label: "All", count: allUsers.length },
         { key: "staff", label: "Staff", count: staffUsers.length },
+        { key: "teacher", label: "Staff Teacher", count: academicStaffUsers.length },
+        { key: "student", label: "Students", count: studentUsers.length },
         { key: "security", label: "Security", count: guardUsers.length },
         { key: "visitor", label: "Visitors", count: visitorUsers.length },
         { key: "admin", label: "Admins", count: adminUsers.length },
@@ -1749,9 +1751,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     accountRecordsMode,
     activeUsersList.length,
     adminUsers.length,
+    academicStaffUsers.length,
     allUsers.length,
     guardUsers.length,
     inactiveUsersList.length,
+    studentUsers.length,
     scopedActiveUsers.length,
     scopedInactiveUsers.length,
     scopedUsers.length,
@@ -3945,9 +3949,10 @@ const loadDashboardData = useCallback(async () => {
     if (!["staff", "security", "guard", "student", "teacher", "admin", "visitor"].includes(normalizedRole)) {
       nextErrors.role = "Select a valid role.";
     }
-    if (!String(editUserData.phone || "").trim()) {
+    const isEditingSecurity = isSecurityRole(normalizedRole);
+    if (isEditingSecurity && !String(editUserData.phone || "").trim()) {
       nextErrors.phone = "Contact number is required.";
-    } else if (!isValidPhilippineMobileNumber(editUserData.phone)) {
+    } else if (String(editUserData.phone || "").trim() && !isValidPhilippineMobileNumber(editUserData.phone)) {
       nextErrors.phone = PHILIPPINE_MOBILE_NUMBER_MESSAGE;
     }
     if (normalizedRole === "staff" && !String(editUserData.department || "").trim()) {

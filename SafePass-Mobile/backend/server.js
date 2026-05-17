@@ -1053,11 +1053,12 @@ const sendCampusTapSecurityNotifications = async ({
   deviceId = "",
 }) => {
   const normalizedRole = normalizeUserRoleValue(user?.role);
-  if (!["student", "teacher", "staff"].includes(normalizedRole) || !["check_in", "check_out"].includes(action)) {
+  if (!["student", "teacher", "staff"].includes(normalizedRole) || !["check_in", "check_out", "location_update"].includes(action)) {
     return [];
   }
 
   const isCheckIn = action === "check_in";
+  const isCheckOut = action === "check_out";
   const roleLabel =
     normalizedRole === "teacher"
       ? "Teacher"
@@ -1066,15 +1067,21 @@ const sendCampusTapSecurityNotifications = async ({
         : "Student";
   const personName = getFullName(user) || user?.email || roleLabel;
   const locationLabel = tapLocation?.office || "campus checkpoint";
-  const activityType = `${normalizedRole}_${isCheckIn ? "check_in" : "check_out"}`;
+  const actionLabel = isCheckIn ? "Entered Campus" : isCheckOut ? "Left Campus" : `Entered ${locationLabel}`;
+  const notificationMessage = isCheckIn
+    ? `${personName} entered campus at ${locationLabel}.`
+    : isCheckOut
+      ? `${personName} left campus at ${locationLabel}.`
+      : `${personName} entered ${locationLabel}.`;
+  const activityType = `${normalizedRole}_${action}`;
   const results = await Promise.allSettled([
     createRoleNotification({
-      title: `${roleLabel} ${isCheckIn ? "Entered Campus" : "Left Campus"}`,
-      message: `${personName} ${isCheckIn ? "entered" : "left"} campus at ${locationLabel}.`,
+      title: `${roleLabel} ${actionLabel}`,
+      message: notificationMessage,
       targetRole: "security",
       relatedUser: user._id,
       type: "info",
-      severity: normalizedRole === "staff" || isCheckIn ? "medium" : "low",
+      severity: normalizedRole === "staff" || isCheckIn || action === "location_update" ? "medium" : "low",
       metadata: {
         activityType,
         action,
@@ -2586,7 +2593,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         !hasOpenAttendance &&
         tapAction !== "location" &&
         tapAction !== "track" &&
-        (tapAction === "checkin" || tapAction === "check_in" || isAutoGateTap);
+        (tapAction === "checkin" || tapAction === "check_in" || tapAction === "auto" || isAutoGateTap);
       const action = shouldCheckOut
         ? "check_out"
         : shouldCheckIn
@@ -3071,7 +3078,7 @@ app.post(
           !hasOpenAttendance &&
           tapAction !== "location" &&
           tapAction !== "track" &&
-          (tapAction === "checkin" || tapAction === "check_in" || isAutoGateTap);
+          (tapAction === "checkin" || tapAction === "check_in" || tapAction === "auto" || isAutoGateTap);
         const action = shouldCheckOut
           ? "check_out"
           : shouldCheckIn
