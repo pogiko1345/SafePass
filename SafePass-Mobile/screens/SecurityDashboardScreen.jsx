@@ -2507,8 +2507,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       const selectedIdentity = String(selectedVisitorNfcId || "").trim();
       if (
         visitorNfcPinnedVisitor &&
-        (!selectedIdentity || pinnedIdentity === selectedIdentity || String(visitorNfcPinnedVisitor?._id) === selectedIdentity) &&
-        isVisitorScheduledTodayForNfc(visitorNfcPinnedVisitor)
+        (!selectedIdentity || pinnedIdentity === selectedIdentity || String(visitorNfcPinnedVisitor?._id) === selectedIdentity)
       ) {
         return visitorNfcPinnedVisitor;
       }
@@ -2614,6 +2613,71 @@ export default function SecurityDashboardScreen({ navigation }) {
       ),
     [visitors.active],
   );
+  const liveVisitorMonitoringRows = useMemo(() => {
+    const visitorMap = new Map();
+    const addVisitor = (visitor) => {
+      if (!visitor) return;
+      const sourceVisitor = visitor.sourceVisitor || visitor;
+      const key = getVisitorTrackingIdentity(sourceVisitor) || getVisitorTrackingIdentity(visitor);
+      if (!key) return;
+
+      const mergedVisitor = {
+        ...sourceVisitor,
+        ...visitor,
+        status: sourceVisitor.status || visitor.status || "checked_in",
+        fullName: sourceVisitor.fullName || visitor.fullName || visitor.name || "Visitor",
+        assignedOffice:
+          visitor.location?.office ||
+          visitor.currentLocation?.office ||
+          sourceVisitor.assignedOffice ||
+          visitor.assignedOffice ||
+          sourceVisitor.appointmentDepartment ||
+          "",
+        checkedInAt: sourceVisitor.checkedInAt || visitor.checkedInAt || visitor.checkInTime,
+        currentLocation: {
+          ...(sourceVisitor.currentLocation || {}),
+          ...(visitor.currentLocation || {}),
+          office:
+            visitor.location?.office ||
+            visitor.currentLocation?.office ||
+            sourceVisitor.currentLocation?.office ||
+            sourceVisitor.assignedOffice ||
+            "",
+          floor:
+            visitor.location?.floor ||
+            visitor.currentLocation?.floor ||
+            sourceVisitor.currentLocation?.floor ||
+            "ground",
+          lastSeenAt:
+            visitor.location?.timestamp ||
+            visitor.currentLocation?.lastSeenAt ||
+            sourceVisitor.currentLocation?.lastSeenAt ||
+            sourceVisitor.checkedInAt,
+          statusLabel:
+            visitor.location?.statusLabel ||
+            visitor.currentLocation?.statusLabel ||
+            sourceVisitor.currentLocation?.statusLabel ||
+            "Inside campus",
+          isActive: true,
+        },
+      };
+
+      const existingVisitor = visitorMap.get(key);
+      if (
+        !existingVisitor ||
+        getVisitorTrackingTimestamp(mergedVisitor) > getVisitorTrackingTimestamp(existingVisitor)
+      ) {
+        visitorMap.set(key, mergedVisitor);
+      }
+    };
+
+    visitors.active.forEach(addVisitor);
+    visitorLocations.forEach(addVisitor);
+
+    return Array.from(visitorMap.values()).sort(
+      (left, right) => getVisitorTrackingTimestamp(right) - getVisitorTrackingTimestamp(left),
+    );
+  }, [visitors.active, visitorLocations]);
   const recentlyCheckedOutVisitors = useMemo(
     () =>
       [...(visitors.completed || [])]
@@ -3377,7 +3441,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
           <View style={styles.reportStatsGrid}>
             <View style={styles.reportStatCard}>
-              <Text style={styles.reportStatValue}>{visitors.active.length || 0}</Text>
+              <Text style={styles.reportStatValue}>{liveVisitorMonitoringRows.length || 0}</Text>
               <Text style={styles.reportStatLabel}>Checked In</Text>
             </View>
             <View style={styles.reportStatCard}>
@@ -3395,7 +3459,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
 
           <View style={styles.activityList}>
-            {[...(visitors.active || []), ...(visitors.approved || [])].slice(0, 6).map((visitor, index) => (
+            {[...(liveVisitorMonitoringRows || []), ...(visitors.approved || [])].slice(0, 6).map((visitor, index) => (
               <View
                 key={visitor._id || visitor.id || `${visitor.email}-${index}`}
                 style={styles.activityItem}
@@ -3406,14 +3470,14 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <View style={styles.activityContent}>
                   <Text style={styles.activityTitle}>{visitor.fullName || visitor.name || "Visitor"}</Text>
                   <Text style={styles.activityLocation}>
-                    {visitor.status === 'checked_in' ? "Inside" : titleCase(visitor.status || "Approved")} at {visitor.assignedOffice || visitor.appointmentDepartment || visitor.host || "Campus"}
+                    {visitor.status === 'checked_in' ? "Inside" : titleCase(visitor.status || "Approved")} at {visitor.currentLocation?.office || visitor.location?.office || visitor.assignedOffice || visitor.appointmentDepartment || visitor.host || "Campus"}
                   </Text>
                 </View>
-                <Text style={styles.activityTime}>{formatTime(visitor.checkedInAt || visitor.visitTime || visitor.visitDate)}</Text>
+                <Text style={styles.activityTime}>{formatTime(visitor.currentLocation?.lastSeenAt || visitor.checkedInAt || visitor.visitTime || visitor.visitDate)}</Text>
               </View>
             ))}
 
-            {[...(visitors.active || []), ...(visitors.approved || [])].length === 0 && (
+            {[...(liveVisitorMonitoringRows || []), ...(visitors.approved || [])].length === 0 && (
               <View style={styles.emptyState}>
                 <Ionicons name="people-outline" size={44} color="#D1D5DB" />
                 <Text style={styles.emptyStateTitle}>No visitor activity yet</Text>
