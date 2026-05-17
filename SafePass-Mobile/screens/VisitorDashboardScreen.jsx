@@ -231,9 +231,15 @@ const ScrollReveal = ({
 }) => {
   const [layoutY, setLayoutY] = useState(null);
   const [hasRevealed, setHasRevealed] = useState(false);
-  const revealAnim = useRef(new Animated.Value(0)).current;
+  const revealAnim = useRef(new Animated.Value(Platform.OS === "web" ? 0 : 1)).current;
 
   useEffect(() => {
+    if (Platform.OS !== "web") {
+      setHasRevealed(true);
+      revealAnim.setValue(1);
+      return;
+    }
+
     if (hasRevealed || layoutY === null) return;
 
     const revealPoint = Number(scrollY || 0) + Number(viewportHeight || 0) - threshold;
@@ -6682,7 +6688,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         showsVerticalScrollIndicator
         contentContainerStyle={[
           visitorDashboardStyles.scrollContent,
-          { paddingBottom: isCompactVisitorDashboard ? 190 : 172 },
+          { paddingBottom: isCompactVisitorDashboard ? 230 : 190 },
         ]}
         onScroll={(event) => setDashboardScrollY(event.nativeEvent.contentOffset.y)}
         scrollEventThrottle={16}
@@ -7204,14 +7210,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 }
               />
             </View>
-            <Text style={visitorDashboardStyles.visitorAlertTitle}>
-              {visitorAlert?.title || "Notice"}
-            </Text>
-            {visitorAlert?.message ? (
-              <Text style={visitorDashboardStyles.visitorAlertMessage}>
-                {visitorAlert.message}
+            <View style={visitorDashboardStyles.visitorAlertTextBlock}>
+              <Text style={visitorDashboardStyles.visitorAlertTitle}>
+                {visitorAlert?.title || "Notice"}
               </Text>
-            ) : null}
+              {visitorAlert?.message ? (
+                <Text style={visitorDashboardStyles.visitorAlertMessage}>
+                  {visitorAlert.message}
+                </Text>
+              ) : null}
+            </View>
             <View style={visitorDashboardStyles.visitorAlertActionRow}>
               {(visitorAlert?.buttons || [{ text: "OK" }]).map((button, index) => {
                 const isCancel = button.style === "cancel";

@@ -128,6 +128,24 @@ const getDurationMinutesBetween = (startValue, endValue) => {
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
 };
 
+const getAttendanceEventMeta = (action = "") => {
+  if (action === "check_out") {
+    return {
+      label: "Checked Out",
+      icon: "log-out-outline",
+      color: BRAND.danger,
+      status: "checked_out",
+    };
+  }
+
+  return {
+    label: "Checked In",
+    icon: "log-in-outline",
+    color: BRAND.success,
+    status: "inside",
+  };
+};
+
 const isNullNativeNfcError = (error) =>
   String(error?.message || error || "").toLowerCase().includes("cannot convert null value to object");
 
@@ -478,6 +496,67 @@ export default function StudentDashboardScreen({ navigation }) {
     const completed = monthRecords.filter((item) => item.checkInTime && item.checkOutTime).length;
     return { present, late, completed, total: monthRecords.length };
   }, [attendance]);
+
+  const attendanceEvents = useMemo(() => {
+    const events = attendance.flatMap((record) => {
+      const history = Array.isArray(record?.checkpointHistory) ? record.checkpointHistory : [];
+      const tapEvents = history
+        .filter((item) => item?.action === "check_in" || item?.action === "check_out")
+        .map((item, index) => ({
+          id: `${record?._id || "attendance"}-${item.action}-${item.tappedAt || index}-${index}`,
+          recordId: record?._id,
+          action: item.action,
+          tappedAt: item.tappedAt || (item.action === "check_in" ? record?.checkInTime : record?.checkOutTime),
+          attendanceDate: record?.attendanceDate,
+          location: item.office || item.checkpointName || record?.location || record?.checkpointIn || record?.checkpointOut || "Campus checkpoint",
+          checkpointId: item.checkpointId || "",
+          floor: item.floor || "",
+          lateMinutes: record?.lateMinutes || 0,
+          sessionDurationMinutes: record?.sessionDurationMinutes || 0,
+        }));
+
+      if (tapEvents.length) return tapEvents;
+
+      return [
+        record?.checkInTime
+          ? {
+              id: `${record?._id || "attendance"}-check-in`,
+              recordId: record?._id,
+              action: "check_in",
+              tappedAt: record.checkInTime,
+              attendanceDate: record.attendanceDate,
+              location: record.location || record.checkpointIn || "Campus checkpoint",
+              lateMinutes: record.lateMinutes || 0,
+              sessionDurationMinutes: record.sessionDurationMinutes || 0,
+            }
+          : null,
+        record?.checkOutTime
+          ? {
+              id: `${record?._id || "attendance"}-check-out`,
+              recordId: record?._id,
+              action: "check_out",
+              tappedAt: record.checkOutTime,
+              attendanceDate: record.attendanceDate,
+              location: record.location || record.checkpointOut || "Campus checkpoint",
+              lateMinutes: record.lateMinutes || 0,
+              sessionDurationMinutes: record.sessionDurationMinutes || 0,
+            }
+          : null,
+      ].filter(Boolean);
+    });
+
+    return events.sort((left, right) => new Date(right.tappedAt || 0) - new Date(left.tappedAt || 0));
+  }, [attendance]);
+
+  const historyStats = useMemo(() => {
+    const checkIns = attendanceEvents.filter((event) => event.action === "check_in").length;
+    const checkOuts = attendanceEvents.filter((event) => event.action === "check_out").length;
+    return {
+      checkIns,
+      checkOuts,
+      total: attendanceEvents.length,
+    };
+  }, [attendanceEvents]);
 
   const currentSessionDuration = useMemo(() => {
     if (!latestEntryTime) return "0 min";
@@ -856,8 +935,8 @@ export default function StudentDashboardScreen({ navigation }) {
           <Text style={styles.sectionAction}>View all</Text>
         </TouchableOpacity>
       </View>
-      {attendance.length ? (
-        attendance.slice(0, 3).map((record) => renderAttendanceRecord(record))
+      {attendanceEvents.length ? (
+        attendanceEvents.slice(0, 3).map((event) => renderAttendanceEvent(event))
       ) : (
         <MobileEmptyState
           icon="calendar-outline"
@@ -868,58 +947,77 @@ export default function StudentDashboardScreen({ navigation }) {
     </>
   );
 
-  const renderAttendanceRecord = (record) => (
-    <View key={record._id} style={styles.recordCard}>
+  const renderAttendanceEvent = (event) => {
+    const meta = getAttendanceEventMeta(event.action);
+    const isCheckOut = event.action === "check_out";
+    const dateValue = event.tappedAt || event.attendanceDate;
+    const durationMinutes =
+      Number(event.sessionDurationMinutes || 0) ||
+      (isCheckOut
+        ? getDurationMinutesBetween(
+            getLatestAttendanceTime(
+              attendance.find((record) => record?._id === event.recordId),
+              "check_in",
+            ),
+            event.tappedAt,
+          )
+        : 0);
+
+    return (
+      <View key={event.id} style={styles.recordCard}>
       <View style={styles.recordTop}>
         <View>
-          <Text style={styles.recordDate}>{formatDate(record.attendanceDate)}</Text>
-          <Text style={styles.recordLocation}>{record.location || record.checkpointIn || "Campus checkpoint"}</Text>
+            <Text style={styles.recordDate}>{meta.label}</Text>
+            <Text style={styles.recordLocation}>
+              {formatDate(dateValue)} • {event.location || "Campus checkpoint"}
+            </Text>
         </View>
-        <MobileStatusBadge status={record.status || "present"} label={getStatusLabel(record)} />
+          <MobileStatusBadge status={meta.status} label={isCheckOut ? "Outside" : "Inside"} />
       </View>
       <View style={styles.recordTimes}>
         <View style={styles.recordTimeItem}>
-          <Ionicons name="log-in-outline" size={16} color={BRAND.success} />
-          <Text style={styles.recordTimeText}>{formatTime(record.checkInTime)}</Text>
+            <Ionicons name={meta.icon} size={16} color={meta.color} />
+            <Text style={styles.recordTimeText}>{formatTime(event.tappedAt)}</Text>
         </View>
-        <View style={styles.recordTimeItem}>
-          <Ionicons name="log-out-outline" size={16} color={BRAND.danger} />
-          <Text style={styles.recordTimeText}>{formatTime(record.checkOutTime)}</Text>
-        </View>
-        <View style={styles.recordTimeItem}>
-          <Ionicons name="alarm-outline" size={16} color={BRAND.warning} />
-          <Text style={styles.recordTimeText}>{record.lateMinutes || 0} late min</Text>
-        </View>
-        <View style={styles.recordTimeItem}>
-          <Ionicons name="hourglass-outline" size={16} color={BRAND.blue} />
-          <Text style={styles.recordTimeText}>{formatDuration(record.sessionDurationMinutes)}</Text>
-        </View>
+          {!isCheckOut && Number(event.lateMinutes || 0) > 0 ? (
+            <View style={styles.recordTimeItem}>
+              <Ionicons name="alarm-outline" size={16} color={BRAND.warning} />
+              <Text style={styles.recordTimeText}>{event.lateMinutes} late min</Text>
+            </View>
+          ) : null}
+          {isCheckOut ? (
+            <View style={styles.recordTimeItem}>
+              <Ionicons name="hourglass-outline" size={16} color={BRAND.blue} />
+              <Text style={styles.recordTimeText}>{formatDuration(durationMinutes)}</Text>
+            </View>
+          ) : null}
       </View>
     </View>
-  );
+    );
+  };
 
   const renderHistory = () => (
     <>
       <View style={styles.compactHeader}>
         <Text style={styles.compactTitle}>Attendance History</Text>
-        <Text style={styles.compactSubtitle}>{monthStats.total} latest records from SafePass NFC attendance.</Text>
+        <Text style={styles.compactSubtitle}>{historyStats.total} latest tap events from SafePass NFC attendance.</Text>
       </View>
       <View style={styles.statStrip}>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>{monthStats.present}</Text>
-          <Text style={styles.statLabel}>Present</Text>
+          <Text style={styles.statValue}>{historyStats.checkIns}</Text>
+          <Text style={styles.statLabel}>Check Ins</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>{monthStats.late}</Text>
-          <Text style={styles.statLabel}>Late</Text>
+          <Text style={styles.statValue}>{historyStats.checkOuts}</Text>
+          <Text style={styles.statLabel}>Check Outs</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>{monthStats.total}</Text>
-          <Text style={styles.statLabel}>Records</Text>
+          <Text style={styles.statValue}>{historyStats.total}</Text>
+          <Text style={styles.statLabel}>Events</Text>
         </View>
       </View>
-      {attendance.length ? (
-        attendance.map((record) => renderAttendanceRecord(record))
+      {attendanceEvents.length ? (
+        attendanceEvents.map((event) => renderAttendanceEvent(event))
       ) : (
         <MobileEmptyState icon="time-outline" title="No attendance history" message="Attendance records will show here." />
       )}

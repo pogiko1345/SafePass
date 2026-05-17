@@ -10333,25 +10333,27 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
       });
     }
 
-    if (wasApproved) {
-      await createRoleNotification({
-        title: "Approved Appointment Rescheduled",
-        message: `${visitor.fullName}'s approved appointment changed from ${originalSchedule} to ${newSchedule}. Staff review is required before entry.`,
-        type: "warning",
-        severity: "medium",
-        targetRole: "security",
-        relatedVisitor: visitor._id,
-        relatedUser: visitorUser?._id || null,
-        metadata: {
-          activityType: "visitor_rescheduled_approved_appointment",
-          originalVisitDate,
-          originalVisitTime,
-          newVisitDate: visitor.visitDate,
-          newVisitTime: visitor.visitTime,
-          reason,
-        },
-      });
-    }
+    await createRoleNotification({
+      title: wasApproved ? "Approved Appointment Rescheduled" : "Visitor Appointment Rescheduled",
+      message: wasApproved
+        ? `${visitor.fullName}'s approved appointment changed from ${originalSchedule} to ${newSchedule}. Staff review is required before entry.`
+        : `${visitor.fullName} updated their appointment from ${originalSchedule} to ${newSchedule}. Security should use the new schedule when preparing visitor entry.`,
+      type: "warning",
+      severity: "medium",
+      targetRole: "security",
+      relatedVisitor: visitor._id,
+      relatedUser: visitorUser?._id || null,
+      metadata: {
+        activityType: wasApproved
+          ? "visitor_rescheduled_approved_appointment"
+          : "visitor_rescheduled_appointment",
+        originalVisitDate,
+        originalVisitTime,
+        newVisitDate: visitor.visitDate,
+        newVisitTime: visitor.visitTime,
+        reason,
+      },
+    });
 
     await createSystemActivity({
       actorUser: req.user,

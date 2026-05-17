@@ -125,6 +125,7 @@ export default StyleSheet.create({
   visitorAlertModalContent: {
     width: "100%",
     maxWidth: 420,
+    maxHeight: "86%",
     backgroundColor: "#FFFFFF",
     borderRadius: 22,
     padding: width <= 390 ? 18 : 22,
@@ -153,6 +154,12 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D8E8FF",
     marginBottom: 14,
+  },
+
+  visitorAlertTextBlock: {
+    width: "100%",
+    alignItems: "center",
+    paddingHorizontal: width <= 390 ? 2 : 6,
   },
 
   visitorAlertIconSuccess: {
@@ -194,7 +201,9 @@ export default StyleSheet.create({
   },
 
   visitorAlertButton: {
-    flex: 1,
+    flexGrow: width <= 420 ? 0 : 1,
+    flexShrink: 0,
+    width: width <= 420 ? "100%" : undefined,
     minHeight: 48,
     borderRadius: 14,
     borderWidth: 1,
