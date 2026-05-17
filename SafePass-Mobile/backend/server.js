@@ -5639,30 +5639,6 @@ app.put("/api/profile", authMiddleware, async (req, res) => {
     if (body.emergencyContact !== undefined) {
       updates.emergencyContact = String(body.emergencyContact || "").trim();
     }
-    if (body.parentName !== undefined) updates.parentName = String(body.parentName || "").trim();
-    if (body.guardianName !== undefined) updates.guardianName = String(body.guardianName || "").trim();
-    if (body.parentEmail !== undefined) {
-      const normalizedParentEmail = normalizeEmailValue(body.parentEmail);
-      if (normalizedParentEmail && !isValidEmailValue(normalizedParentEmail)) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid parent email address.",
-          field: "parentEmail",
-        });
-      }
-      updates.parentEmail = normalizedParentEmail;
-    }
-    if (body.guardianEmail !== undefined) {
-      const normalizedGuardianEmail = normalizeEmailValue(body.guardianEmail);
-      if (normalizedGuardianEmail && !isValidEmailValue(normalizedGuardianEmail)) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid guardian email address.",
-          field: "guardianEmail",
-        });
-      }
-      updates.guardianEmail = normalizedGuardianEmail;
-    }
     if (body.profilePhoto !== undefined) updates.profilePhoto = body.profilePhoto || null;
 
     if (body.email !== undefined) {

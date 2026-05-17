@@ -83,6 +83,17 @@ const formatDuration = (minutes, fallback = "0 min") => {
 
 const formatProfileDetail = (...values) => values.filter(Boolean).join(" | ") || "Not configured";
 
+const maskEmail = (value) => {
+  const email = String(value || "").trim();
+  const [localPart, domain] = email.split("@");
+  if (!localPart || !domain) return "";
+
+  const visiblePrefix = localPart.slice(0, 1);
+  const visibleSuffix = localPart.length > 2 ? localPart.slice(-1) : "";
+  const maskLength = Math.max(4, localPart.length - visiblePrefix.length - visibleSuffix.length);
+  return `${visiblePrefix}${"*".repeat(maskLength)}${visibleSuffix}@${domain}`;
+};
+
 const studentTabs = [
   { key: "home", label: "Pass", icon: "id-card-outline", activeIcon: "id-card" },
   { key: "history", label: "History", icon: "time-outline", activeIcon: "time" },
@@ -213,8 +224,6 @@ export default function StudentDashboardScreen({ navigation }) {
     username: "",
     phone: "",
     emergencyContact: "",
-    parentName: "",
-    parentEmail: "",
   });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -271,8 +280,6 @@ export default function StudentDashboardScreen({ navigation }) {
       username: user?.username || "",
       phone: user?.phone || "",
       emergencyContact: user?.emergencyContact || "",
-      parentName: user?.parentName || user?.guardianName || "",
-      parentEmail: user?.parentEmail || user?.guardianEmail || "",
     });
   }, [user]);
 
@@ -701,8 +708,6 @@ export default function StudentDashboardScreen({ navigation }) {
       username: user?.username || "",
       phone: user?.phone || "",
       emergencyContact: user?.emergencyContact || "",
-      parentName: user?.parentName || user?.guardianName || "",
-      parentEmail: user?.parentEmail || user?.guardianEmail || "",
     });
     setAccountMode("view");
   };
@@ -714,8 +719,6 @@ export default function StudentDashboardScreen({ navigation }) {
     const username = profileForm.username.trim().toLowerCase();
     const phone = String(profileForm.phone || "").replace(/[^\d+]/g, "");
     const emergencyContact = profileForm.emergencyContact.trim();
-    const parentName = profileForm.parentName.trim();
-    const parentEmail = profileForm.parentEmail.trim().toLowerCase();
 
     if (!firstName || !lastName) {
       Alert.alert("Missing Details", "First name and last name are required.");
@@ -740,11 +743,6 @@ export default function StudentDashboardScreen({ navigation }) {
       return;
     }
 
-    if (parentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)) {
-      Alert.alert("Invalid Parent Email", "Please enter a valid parent or guardian email address.");
-      return;
-    }
-
     setProfileSaving(true);
     try {
       const response = await ApiService.updateProfile({
@@ -754,8 +752,6 @@ export default function StudentDashboardScreen({ navigation }) {
         username,
         phone,
         emergencyContact,
-        parentName,
-        parentEmail,
       });
 
       if (response?.user) {
@@ -1083,7 +1079,7 @@ export default function StudentDashboardScreen({ navigation }) {
               ["Contact Number", user?.phone || "Not configured"],
               ["Emergency Contact", user?.emergencyContact || "Not configured"],
               ["Parent / Guardian", user?.parentName || user?.guardianName || "Not configured"],
-              ["Parent Email", user?.parentEmail || user?.guardianEmail || "Not configured"],
+              ["Parent Email", maskEmail(user?.parentEmail || user?.guardianEmail) || "Not configured"],
               ["Student ID", user?.studentId || user?.teacherId || "Not assigned"],
               ["Course / Section", formatProfileDetail(user?.course, user?.yearLevel, user?.section)],
               ["NFC Card", user?.nfcCardId || "Virtual mobile check only"],
@@ -1096,7 +1092,7 @@ export default function StudentDashboardScreen({ navigation }) {
             <View style={styles.accountNotice}>
               <Ionicons name="information-circle-outline" size={18} color={BRAND.blue} />
               <Text style={styles.accountNoticeText}>
-                Student ID, course, and NFC card are managed by the school office.
+                Student ID, course, NFC card, and parent contact are managed from official school enrollment records.
               </Text>
             </View>
           </>
@@ -1171,29 +1167,6 @@ export default function StudentDashboardScreen({ navigation }) {
                 style={styles.fieldInput}
               />
             </View>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Parent / Guardian Name</Text>
-              <TextInput
-                value={profileForm.parentName}
-                onChangeText={(value) => handleProfileInputChange("parentName", value)}
-                placeholder="Parent or guardian name"
-                placeholderTextColor="#94A3B8"
-                style={styles.fieldInput}
-              />
-            </View>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Parent Email</Text>
-              <TextInput
-                value={profileForm.parentEmail}
-                onChangeText={(value) => handleProfileInputChange("parentEmail", value)}
-                placeholder="parent@example.com"
-                placeholderTextColor="#94A3B8"
-                style={styles.fieldInput}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
             <View style={styles.formActions}>
               <TouchableOpacity style={styles.secondaryButton} onPress={handleCancelProfileEdit}>
                 <Text style={styles.secondaryButtonText}>Cancel</Text>

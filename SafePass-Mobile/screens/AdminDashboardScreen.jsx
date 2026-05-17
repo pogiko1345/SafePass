@@ -1362,6 +1362,13 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     if (needsAdminPhone && newUserData.phone && !isValidPhilippineMobileNumber(newUserData.phone)) {
       issues.push("Valid Philippine contact number");
     }
+    if (
+      isStudentAccount &&
+      String(newUserData.parentEmail || "").trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(newUserData.parentEmail || "").trim())
+    ) {
+      issues.push("Valid parent email");
+    }
     if (!isAcademicAccessAccount && !isSecurityRole(newUserData.role) && !String(newUserData.department || "").trim()) {
       issues.push("Department");
     }
@@ -1466,6 +1473,35 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           }
         } catch (error) {
           console.log("Shared map settings load skipped:", error?.message || error);
+        }
+
+        const defaultRoomById = MONITORING_MAP_OFFICES.reduce((lookup, room) => {
+          lookup[room.id] = room;
+          return lookup;
+        }, {});
+        const roomIds = new Set(nextRooms.map((room) => room.id));
+        const restoredRequiredRoomIds = ["mezzanine-fire-exit"].filter(
+          (roomId) => defaultRoomById[roomId] && !roomIds.has(roomId),
+        );
+
+        if (restoredRequiredRoomIds.length) {
+          nextRooms = [
+            ...nextRooms,
+            ...restoredRequiredRoomIds.map((roomId) => defaultRoomById[roomId]),
+          ];
+          nextRoomPositions = {
+            ...nextRoomPositions,
+            ...restoredRequiredRoomIds.reduce((positions, roomId) => {
+              positions[roomId] = MONITORING_MAP_OFFICE_POSITIONS[roomId];
+              return positions;
+            }, {}),
+          };
+          ApiService.updateAdminMapSettings({
+            rooms: nextRooms,
+            roomPositions: nextRoomPositions,
+          }).catch((syncError) => {
+            console.log("Required map room migration skipped:", syncError?.message || syncError);
+          });
         }
 
         setManagedRooms(nextRooms);
@@ -3914,6 +3950,7 @@ const loadDashboardData = useCallback(async () => {
     const normalizedTeacherId = String(newUserData.teacherId || (isAcademicStaffAccount ? generatedEmployeeId : "") || "").trim();
     const normalizedAcademicId = isAcademicStaffAccount ? normalizedTeacherId : normalizedStudentId;
     const normalizedNfcCardId = normalizeAdminNfcCardUid(newUserData.nfcCardId);
+    const normalizedParentEmail = String(newUserData.parentEmail || "").trim().toLowerCase();
 
     if (!String(newUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(newUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
@@ -3936,6 +3973,9 @@ const loadDashboardData = useCallback(async () => {
         : "";
     if (!isAcademicAccessAccount && String(newUserData.phone || "").trim() && !isValidPhilippineMobileNumber(newUserData.phone)) {
       nextErrors.phone = PHILIPPINE_MOBILE_NUMBER_MESSAGE;
+    }
+    if (isStudentAccount && normalizedParentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedParentEmail)) {
+      nextErrors.parentEmail = "Enter a valid parent or guardian email address.";
     }
 
     if (!isSecurityRole(newUserData.role) && !isAcademicAccessAccount) {
@@ -3994,6 +4034,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedStudentId,
       normalizedTeacherId,
       normalizedNfcCardId,
+      normalizedParentEmail,
     };
   };
 
@@ -4038,6 +4079,7 @@ const loadDashboardData = useCallback(async () => {
     const isEditingTeacher = normalizedRole === "teacher";
     const academicId = String(isEditingTeacher ? editUserData.teacherId : editUserData.studentId || "").trim();
     const normalizedNfcCardId = normalizeAdminNfcCardUid(editUserData.nfcCardId);
+    const normalizedParentEmail = String(editUserData.parentEmail || "").trim().toLowerCase();
 
     if (!String(editUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(editUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
@@ -4060,6 +4102,9 @@ const loadDashboardData = useCallback(async () => {
       nextErrors[isEditingTeacher ? "teacherId" : "studentId"] = isEditingTeacher
         ? "Academic staff ID is required."
         : "Student ID is required.";
+    }
+    if (isEditingStudent && normalizedParentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedParentEmail)) {
+      nextErrors.parentEmail = "Enter a valid parent or guardian email address.";
     }
     if (!["active", "inactive", "pending", "suspended"].includes(String(editUserData.status || "").toLowerCase())) {
       nextErrors.status = "Select a valid account status.";
@@ -4107,6 +4152,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedUsername,
       normalizedEmployeeId,
       normalizedNfcCardId,
+      normalizedParentEmail,
     };
   };
 
@@ -4449,7 +4495,7 @@ const loadDashboardData = useCallback(async () => {
   };
 
   // FIXED: Confirm Edit User
-  const confirmEditUser = async () => {
+  const confirmEditUser = async ({ confirmEnrollmentContactChange = false } = {}) => {
     if (!ensureAdminAccess()) return;
     const selectedId = editUserData.id;
     const {
@@ -4504,6 +4550,30 @@ const loadDashboardData = useCallback(async () => {
     if (!["active", "inactive", "pending", "suspended"].includes(String(editUserData.status || "").toLowerCase())) {
       Alert.alert("Invalid Status", "Please select a valid account status.");
       return;
+    }
+
+    if (isEditingStudent && !confirmEnrollmentContactChange) {
+      const previousParentName = String(selectedUser?.parentName || selectedUser?.guardianName || "").trim();
+      const previousParentEmail = String(selectedUser?.parentEmail || selectedUser?.guardianEmail || "").trim().toLowerCase();
+      const nextParentName = String(editUserData.parentName || "").trim();
+      const nextParentEmail = String(editUserData.parentEmail || "").trim().toLowerCase();
+      const enrollmentContactChanged =
+        previousParentName !== nextParentName || previousParentEmail !== nextParentEmail;
+
+      if (enrollmentContactChanged) {
+        Alert.alert(
+          "Update Enrollment Contact",
+          "Parent or guardian details are based on the official enrollment record. Continue only if you are correcting the school record.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Continue",
+              onPress: () => confirmEditUser({ confirmEnrollmentContactChange: true }),
+            },
+          ],
+        );
+        return;
+      }
     }
 
     setProcessingId("edit-user");
@@ -7208,7 +7278,7 @@ const loadDashboardData = useCallback(async () => {
                       {isCreatingStudent ? (
                         <>
                           <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                            <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent / Guardian Name</Text>
+                            <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent / Guardian Name (Enrollment Record)</Text>
                             <TextInput
                               style={[
                                 styles.input,
@@ -7221,19 +7291,34 @@ const loadDashboardData = useCallback(async () => {
                             />
                           </View>
                           <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                            <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email</Text>
+                            <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email (Enrollment Record)</Text>
                             <TextInput
                               style={[
                                 styles.input,
+                                createUserErrors.parentEmail && styles.inputErrorState,
                                 isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
                               ]}
                               value={newUserData.parentEmail}
-                              onChangeText={(text) => setNewUserData((currentValue) => ({ ...currentValue, parentEmail: text }))}
+                              onChangeText={(text) => {
+                                setNewUserData((currentValue) => ({ ...currentValue, parentEmail: text }));
+                                setCreateUserErrors((currentValue) => ({ ...currentValue, parentEmail: null }));
+                              }}
                               placeholder="parent@example.com"
                               placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                               keyboardType="email-address"
                               autoCapitalize="none"
                             />
+                            {renderCreateUserFieldError("parentEmail")}
+                            <Text
+                              style={{
+                                color: isDarkMode ? "#94A3B8" : "#64748B",
+                                fontSize: 12,
+                                lineHeight: 17,
+                                marginTop: 6,
+                              }}
+                            >
+                              Official school-managed contact. Students can view this masked, but only admins can update it.
+                            </Text>
                           </View>
                         </>
                       ) : null}
@@ -7482,12 +7567,12 @@ const loadDashboardData = useCallback(async () => {
     if (isStudentUser) {
       infoItems.splice(3, 0,
         {
-          label: "Parent / Guardian",
+          label: "Parent / Guardian (Enrollment)",
           value: selectedUser?.parentName || selectedUser?.guardianName || "Not configured",
           icon: "people-outline",
         },
         {
-          label: "Parent Email",
+          label: "Parent Email (Enrollment)",
           value: selectedUser?.parentEmail || selectedUser?.guardianEmail || "Not configured",
           icon: "mail-outline",
         },
@@ -12764,13 +12849,13 @@ const loadDashboardData = useCallback(async () => {
                   {String(selectedUser?.role || "").toLowerCase() === "student" ? (
                     <>
                       <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                        <Text style={styles.userProfileInfoLabel}>Parent / Guardian</Text>
+                        <Text style={styles.userProfileInfoLabel}>Parent / Guardian (Enrollment)</Text>
                         <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
                           {selectedUser?.parentName || selectedUser?.guardianName || "Not configured"}
                         </Text>
                       </View>
                       <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                        <Text style={styles.userProfileInfoLabel}>Parent Email</Text>
+                        <Text style={styles.userProfileInfoLabel}>Parent Email (Enrollment)</Text>
                         <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
                           {selectedUser?.parentEmail || selectedUser?.guardianEmail || "Not configured"}
                         </Text>
@@ -13145,7 +13230,7 @@ const loadDashboardData = useCallback(async () => {
                   {editUserData.role === "student" ? (
                     <View style={styles.userEditorGrid}>
                       <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent / Guardian Name</Text>
+                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent / Guardian Name (Enrollment Record)</Text>
                         <TextInput
                           style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
                           value={editUserData.parentName}
@@ -13155,16 +13240,34 @@ const loadDashboardData = useCallback(async () => {
                         />
                       </View>
                       <View style={[styles.userEditorHalfField, styles.inputGroup]}>
-                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email</Text>
+                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email (Enrollment Record)</Text>
                         <TextInput
-                          style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
+                          style={[
+                            styles.input,
+                            editUserErrors.parentEmail && styles.inputErrorState,
+                            isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                          ]}
                           value={editUserData.parentEmail}
-                          onChangeText={(text) => setEditUserData({ ...editUserData, parentEmail: text })}
+                          onChangeText={(text) => {
+                            setEditUserData({ ...editUserData, parentEmail: text });
+                            setEditUserErrors((currentValue) => ({ ...currentValue, parentEmail: null }));
+                          }}
                           placeholder="parent@example.com"
                           placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                           keyboardType="email-address"
                           autoCapitalize="none"
                         />
+                        {renderEditUserFieldError("parentEmail")}
+                        <Text
+                          style={{
+                            color: isDarkMode ? "#94A3B8" : "#64748B",
+                            fontSize: 12,
+                            lineHeight: 17,
+                            marginTop: 6,
+                          }}
+                        >
+                          Based on the official enrollment record. Saving changes will ask for admin confirmation.
+                        </Text>
                       </View>
                     </View>
                   ) : null}

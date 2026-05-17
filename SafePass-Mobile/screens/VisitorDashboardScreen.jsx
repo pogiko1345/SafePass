@@ -380,9 +380,10 @@ const getVisitorSelfLocationMarker = (
   const numericY = Number(coordinates.y);
   const matchedPosition = matchedRoom ? mapRoomPositions[matchedRoom.id] : null;
   const position =
-    Number.isFinite(numericX) && Number.isFinite(numericY)
+    matchedPosition ||
+    (Number.isFinite(numericX) && Number.isFinite(numericY)
       ? { x: numericX, y: numericY }
-      : matchedPosition;
+      : null);
 
   if (!position) return null;
 

@@ -478,6 +478,40 @@ export default function SecurityDashboardScreen({ navigation }) {
     };
   };
 
+  const getSharedMapLocationForVisitor = (visitor = {}) => {
+    const location = visitor?.currentLocation || visitor?.location || {};
+    const officeLabel =
+      location.office ||
+      visitor?.lastTappedOffice ||
+      visitor?.office ||
+      visitor?.assignedOffice ||
+      visitor?.appointmentDepartment ||
+      visitor?.expectedDestination ||
+      visitor?.host ||
+      "";
+    const matchedOffice = getOfficeConfigForLabel(officeLabel);
+    const mappedPosition = matchedOffice ? officePositions?.[matchedOffice.id] : null;
+
+    if (
+      matchedOffice &&
+      mappedPosition &&
+      Number.isFinite(Number(mappedPosition.x)) &&
+      Number.isFinite(Number(mappedPosition.y))
+    ) {
+      return {
+        floor: matchedOffice.floor || location.floor || "ground",
+        office: matchedOffice.name,
+        coordinates: {
+          x: Number(mappedPosition.x),
+          y: Number(mappedPosition.y),
+        },
+        officeId: matchedOffice.id,
+      };
+    }
+
+    return null;
+  };
+
   // ============ LOGOUT FUNCTIONS ============
   const handleLogoutPress = () => {
     setShowLogoutModal(true);
@@ -869,6 +903,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         const liveLocation = visitor.currentLocation?.isActive
           ? visitor.currentLocation
           : null;
+        const sharedMapLocation = getSharedMapLocationForVisitor(visitor);
         const liveCoordinates = liveLocation?.coordinates || {};
         const hasLiveCoordinates =
           Number.isFinite(Number(liveCoordinates.x)) &&
@@ -892,9 +927,11 @@ export default function SecurityDashboardScreen({ navigation }) {
           idPhoto: visitor.idImage,
           sourceVisitor: visitor,
           location: {
-            floor: liveLocation?.floor || assignedDestination.floorId || 'ground',
-            office: liveLocation?.office || assignedDestination.officeName || getRandomOffice(),
-            coordinates: hasLiveCoordinates
+            floor: sharedMapLocation?.floor || liveLocation?.floor || assignedDestination.floorId || 'ground',
+            office: sharedMapLocation?.office || liveLocation?.office || assignedDestination.officeName || getRandomOffice(),
+            coordinates: sharedMapLocation?.coordinates
+              ? sharedMapLocation.coordinates
+              : hasLiveCoordinates
               ? {
                   x: Number(liveCoordinates.x),
                   y: Number(liveCoordinates.y),
@@ -911,9 +948,10 @@ export default function SecurityDashboardScreen({ navigation }) {
             timestamp: liveLocation?.lastSeenAt || visitor.checkedInAt || new Date(),
             source:
               liveLocation?.source ||
+              (sharedMapLocation ? 'shared_map_position' : null) ||
               (hasAssignedCoordinates ? 'assigned_office' : 'system_estimate'),
             statusLabel: liveLocation?.statusLabel || "Inside campus",
-            checkpointId: liveLocation?.checkpointId || "",
+            checkpointId: liveLocation?.checkpointId || sharedMapLocation?.officeId || "",
           },
           movement: visitor.locationHistory || [],
         };
@@ -929,6 +967,26 @@ export default function SecurityDashboardScreen({ navigation }) {
       const hasCoordinates =
         Number.isFinite(Number(coordinates.x)) &&
         Number.isFinite(Number(coordinates.y));
+      const sharedMapLocation = getSharedMapLocationForVisitor({
+        ...matchedVisitor,
+        ...visitor,
+        currentLocation: {
+          ...(matchedVisitor?.currentLocation || {}),
+          office: visitor.office || matchedVisitor?.currentLocation?.office || matchedVisitor?.assignedOffice || "",
+          floor: visitor.floor || matchedVisitor?.currentLocation?.floor || "ground",
+          checkpointId: visitor.checkpointId || matchedVisitor?.currentLocation?.checkpointId || "",
+        },
+      });
+      const resolvedCoordinates = sharedMapLocation?.coordinates ||
+        (hasCoordinates
+          ? {
+              x: Number(coordinates.x),
+              y: Number(coordinates.y),
+            }
+          : {
+              x: 15 + ((index * 17) % 70),
+              y: 15 + ((index * 23) % 70),
+            });
 
       return {
         id: visitor.visitorId,
@@ -953,38 +1011,25 @@ export default function SecurityDashboardScreen({ navigation }) {
         idImage: matchedVisitor?.idImage || null,
         sourceVisitor: matchedVisitor,
         location: {
-          floor: visitor.floor || "ground",
-          office: visitor.office || getRandomOffice(),
-          coordinates: hasCoordinates
-            ? {
-                x: Number(coordinates.x),
-                y: Number(coordinates.y),
-              }
-            : {
-                x: 15 + ((index * 17) % 70),
-                y: 15 + ((index * 23) % 70),
-              },
+          floor: sharedMapLocation?.floor || visitor.floor || "ground",
+          office: sharedMapLocation?.office || visitor.office || getRandomOffice(),
+          coordinates: resolvedCoordinates,
           timestamp: visitor.lastScanTime || new Date(),
-          source: visitor.source || "checkpoint",
+          source: sharedMapLocation ? "shared_map_position" : visitor.source || "checkpoint",
           statusLabel: visitor.statusLabel || "Inside campus",
-          checkpointId: visitor.checkpointId || "",
+          checkpointId: visitor.checkpointId || sharedMapLocation?.officeId || "",
         },
-        currentLocation:
-          matchedVisitor?.currentLocation || {
-            floor: visitor.floor || "ground",
-            office: visitor.office || "Campus",
-            coordinates: hasCoordinates
-              ? {
-                  x: Number(coordinates.x),
-                  y: Number(coordinates.y),
-                }
-              : null,
-            lastSeenAt: visitor.lastScanTime || null,
-            source: visitor.source || "checkpoint",
-            statusLabel: visitor.statusLabel || "Inside campus",
-            checkpointId: visitor.checkpointId || "",
-            isActive: visitor.status !== "exited",
-          },
+        currentLocation: {
+          ...(matchedVisitor?.currentLocation || {}),
+          floor: sharedMapLocation?.floor || matchedVisitor?.currentLocation?.floor || visitor.floor || "ground",
+          office: sharedMapLocation?.office || matchedVisitor?.currentLocation?.office || visitor.office || "Campus",
+          coordinates: resolvedCoordinates,
+          lastSeenAt: visitor.lastScanTime || matchedVisitor?.currentLocation?.lastSeenAt || null,
+          source: sharedMapLocation ? "shared_map_position" : visitor.source || matchedVisitor?.currentLocation?.source || "checkpoint",
+          statusLabel: visitor.statusLabel || matchedVisitor?.currentLocation?.statusLabel || "Inside campus",
+          checkpointId: visitor.checkpointId || matchedVisitor?.currentLocation?.checkpointId || sharedMapLocation?.officeId || "",
+          isActive: matchedVisitor?.currentLocation?.isActive ?? visitor.status !== "exited",
+        },
         movement: visitor.movementHistory || matchedVisitor?.locationHistory || [],
         wrongLocationAlerts: visitor.wrongLocationAlerts || [],
       };
