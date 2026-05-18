@@ -277,6 +277,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const operationalDataSignatureRef = useRef("");
   const notificationDataSignatureRef = useRef("");
   const visitorNfcInputRef = useRef(null);
+  const authRedirectHandledRef = useRef(false);
   
   // Dashboard Data
   const [dashboardStats, setDashboardStats] = useState({
@@ -1149,6 +1150,23 @@ export default function SecurityDashboardScreen({ navigation }) {
       .join("|");
 
   // ============ DATA LOADING FUNCTIONS ============
+  const isAuthError = (error) => {
+    const message = String(error?.message || "").toLowerCase();
+    return (
+      error?.status === 401 ||
+      message.includes("401") ||
+      message.includes("authenticate") ||
+      message.includes("unauthorized")
+    );
+  };
+
+  const handleAuthExpired = async () => {
+    if (authRedirectHandledRef.current) return;
+    authRedirectHandledRef.current = true;
+    await ApiService.clearAuth();
+    navigation.replace("Login");
+  };
+
   const loadUserData = async () => {
     try {
       const [cachedUser, token] = await Promise.all([
@@ -1180,6 +1198,10 @@ export default function SecurityDashboardScreen({ navigation }) {
           setSecurityProfileForm(buildSecurityProfileForm(refreshedUser));
         })
         .catch((profileError) => {
+          if (isAuthError(profileError)) {
+            handleAuthExpired();
+            return;
+          }
           console.log("Security profile refresh skipped:", profileError?.message || profileError);
         });
 
@@ -1247,6 +1269,9 @@ export default function SecurityDashboardScreen({ navigation }) {
       return true;
     } catch (error) {
       console.error("Load operational data error:", error);
+      if (isAuthError(error)) {
+        await handleAuthExpired();
+      }
       return false;
     }
   };
@@ -1260,6 +1285,9 @@ export default function SecurityDashboardScreen({ navigation }) {
       return true;
     } catch (error) {
       console.error("Load live visitor locations error:", error);
+      if (isAuthError(error)) {
+        await handleAuthExpired();
+      }
       return false;
     }
   };
@@ -1279,6 +1307,9 @@ export default function SecurityDashboardScreen({ navigation }) {
       return true;
     } catch (error) {
       console.error("Load security live presence error:", error);
+      if (isAuthError(error)) {
+        await handleAuthExpired();
+      }
       return false;
     }
   };
@@ -1303,6 +1334,9 @@ export default function SecurityDashboardScreen({ navigation }) {
       return true;
     } catch (error) {
       console.error("Load security attendance records error:", error);
+      if (isAuthError(error)) {
+        await handleAuthExpired();
+      }
       return false;
     } finally {
       setAttendanceLoading(false);
@@ -1374,6 +1408,9 @@ export default function SecurityDashboardScreen({ navigation }) {
       return true;
     } catch (error) {
       console.error("Load notifications error:", error);
+      if (isAuthError(error)) {
+        await handleAuthExpired();
+      }
       return false;
     }
   };
