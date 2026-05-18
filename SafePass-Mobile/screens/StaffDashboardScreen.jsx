@@ -479,29 +479,35 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const loadData = useCallback(async () => {
     try {
       setLoadError("");
-      const profile = await ApiService.getProfile();
-      const currentUser = profile?.user || (await ApiService.getCurrentUser());
-      if (!currentUser || String(currentUser.role).toLowerCase() !== "staff") {
+      const cachedUser = await ApiService.getCurrentUser();
+      const cachedRole = String(cachedUser?.role || "").toLowerCase();
+      if (cachedUser && cachedRole === "staff") {
+        setUser(cachedUser);
+        setLoading(false);
+      }
+
+      const profilePromise = ApiService.getProfile();
+      const appointmentPromise = ApiService.getStaffAppointments({ status: "all", limit: 200 });
+
+      const appointmentResponse = await appointmentPromise;
+      setAppointments(appointmentResponse?.appointments || []);
+      setLoading(false);
+
+      const profile = await profilePromise;
+      const currentUser = profile?.user || cachedUser;
+      const currentRole = String(currentUser?.role || "").toLowerCase();
+      if (!currentUser || currentRole !== "staff") {
         Alert.alert("Access Denied", "This screen is for staff accounts only.");
         navigation.replace("Login");
         return;
       }
 
       setUser(currentUser);
-      setLoading(false);
 
-      const [appointmentResponse, notificationResponse, attendanceResponse] = await Promise.allSettled([
-        ApiService.getStaffAppointments({ status: "all", limit: 200 }),
+      const [notificationResponse, attendanceResponse] = await Promise.allSettled([
         ApiService.getNotifications({ limit: 20 }),
         ApiService.getMyAttendance({ limit: 10 }),
       ]);
-
-      if (appointmentResponse.status === "fulfilled") {
-        setAppointments(appointmentResponse.value?.appointments || []);
-      } else {
-        console.error("Staff appointments error:", appointmentResponse.reason);
-        setAppointments([]);
-      }
 
       if (notificationResponse.status === "fulfilled") {
         setNotifications(notificationResponse.value?.notifications || []);
