@@ -1395,9 +1395,10 @@ const connectToDatabase = () => {
   if (!mongoConnectionPromise) {
     mongoConnectionPromise = mongoose
       .connect(MONGODB_URI, {
-        serverSelectionTimeoutMS: 15000,
-        connectTimeoutMS: 15000,
-        socketTimeoutMS: 45000,
+        serverSelectionTimeoutMS: 30000,
+        connectTimeoutMS: 30000,
+        maxPoolSize: 10,
+        minPoolSize: isHostedRuntime ? 1 : 0,
       })
 
       .then(() => {
@@ -8701,29 +8702,32 @@ app.post("/api/create-demo-user", async (req, res) => {
 app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "security", "guard"), async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 200);
+    const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
 
     let query = {};
     if (status) query.status = status;
     applyDateRangeFilter(query, "visitDate", req.query);
 
-    const visitors = await Visitor.find(query)
-      .sort({ registeredAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .populate("checkedInBy", "firstName lastName")
-      .populate("checkedOutBy", "firstName lastName");
-
-    await Promise.all(visitors.map((visitorRecord) => applyAppointmentLifecycleIfNeeded(visitorRecord)));
-
-    const total = await Visitor.countDocuments(query);
+    const [visitors, total] = await Promise.all([
+      Visitor.find(query)
+        .sort({ registeredAt: -1 })
+        .limit(parsedLimit)
+        .skip((parsedPage - 1) * parsedLimit)
+        .populate("checkedInBy", "firstName lastName")
+        .populate("checkedOutBy", "firstName lastName")
+        .lean(),
+      Visitor.countDocuments(query),
+    ]);
 
     const visitorPayloads = await attachSafePassIdsToVisitors(visitors);
 
     res.json({
       success: true,
       visitors: visitorPayloads,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      totalPages: Math.ceil(total / parsedLimit),
+      currentPage: parsedPage,
+      total,
     });
   } catch (error) {
     console.error("Get visitors error:", error);
