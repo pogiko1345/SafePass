@@ -38,6 +38,12 @@ const Storage =
 
 const Stack = createNativeStackNavigator();
 const SCHOOL_LOGO = require("./assets/LogoSapphire.jpg");
+const APP_DEBUG_ENABLED = process.env.EXPO_PUBLIC_APP_DEBUG === "true";
+const logAppDebug = (...args) => {
+  if (APP_DEBUG_ENABLED) {
+    console.log(...args);
+  }
+};
 const AdminDashboardScreen = lazy(() => import("./screens/AdminDashboardScreen"));
 const SecurityDashboardScreen = lazy(() => import("./screens/SecurityDashboardScreen"));
 const VisitorDashboardScreen = lazy(() => import("./screens/VisitorDashboardScreen"));
@@ -133,6 +139,113 @@ const WEB_LINKING = {
   },
 };
 
+const CHUNK_RELOAD_STORAGE_KEY = "safepass:lastChunkReloadAt";
+const CHUNK_RELOAD_COOLDOWN_MS = 2 * 60 * 1000;
+
+const isChunkLoadFailure = (error) => {
+  const message = `${error?.name || ""} ${error?.message || ""}`;
+  return (
+    /ChunkLoadError/i.test(message) ||
+    /Loading chunk \d+ failed/i.test(message) ||
+    /Failed to fetch dynamically imported module/i.test(message)
+  );
+};
+
+const reloadForChunkUpdate = () => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return false;
+
+  const lastReloadAt = Number(
+    window.sessionStorage?.getItem(CHUNK_RELOAD_STORAGE_KEY) || 0,
+  );
+  const canReload =
+    !Number.isFinite(lastReloadAt) ||
+    Date.now() - lastReloadAt > CHUNK_RELOAD_COOLDOWN_MS;
+
+  if (!canReload) return false;
+
+  window.sessionStorage?.setItem(CHUNK_RELOAD_STORAGE_KEY, String(Date.now()));
+  window.location.reload();
+  return true;
+};
+
+class ChunkLoadRecoveryBoundary extends React.Component {
+  state = { hasChunkError: false };
+
+  static getDerivedStateFromError(error) {
+    return isChunkLoadFailure(error) ? { hasChunkError: true } : null;
+  }
+
+  componentDidCatch(error) {
+    if (
+      Platform.OS !== "web" ||
+      typeof window === "undefined" ||
+      !isChunkLoadFailure(error)
+    ) {
+      throw error;
+    }
+
+    reloadForChunkUpdate();
+  }
+
+  render() {
+    if (!this.state.hasChunkError) {
+      return this.props.children;
+    }
+
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: brandColors.background,
+          paddingHorizontal: 24,
+        }}
+      >
+        <Image
+          source={SCHOOL_LOGO}
+          resizeMode="contain"
+          style={{ width: 116, height: 54, marginBottom: 18 }}
+        />
+        <Text
+          style={{
+            color: brandColors.text,
+            fontSize: 16,
+            fontWeight: "700",
+            textAlign: "center",
+            marginBottom: 8,
+          }}
+        >
+          SafePass was updated
+        </Text>
+        <Text
+          style={{
+            color: brandColors.textMuted,
+            fontSize: 14,
+            textAlign: "center",
+            marginBottom: 18,
+          }}
+        >
+          Refresh this page to load the latest staff dashboard.
+        </Text>
+        <Text
+          accessibilityRole="button"
+          onPress={() => window.location.reload()}
+          style={{
+            color: brandColors.blue,
+            fontSize: 14,
+            fontWeight: "700",
+            paddingHorizontal: 18,
+            paddingVertical: 10,
+          }}
+        >
+          Refresh now
+        </Text>
+      </View>
+    );
+  }
+}
+
 const ScreenFallback = () => (
   <View
     style={{
@@ -180,6 +293,25 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isNewRegistration, setIsNewRegistration] = useState(false);
 
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
+
+    const handleChunkFailure = (event) => {
+      const error = event?.reason || event?.error || event;
+      if (isChunkLoadFailure(error) && reloadForChunkUpdate()) {
+        event?.preventDefault?.();
+      }
+    };
+
+    window.addEventListener("error", handleChunkFailure);
+    window.addEventListener("unhandledrejection", handleChunkFailure);
+
+    return () => {
+      window.removeEventListener("error", handleChunkFailure);
+      window.removeEventListener("unhandledrejection", handleChunkFailure);
+    };
+  }, []);
+
   const resetToAuthRoute = useCallback(() => {
     const routeName = IS_VISITOR_ONLY_APP ? "Login" : "RoleSelect";
     if (navigationRef.isReady()) {
@@ -219,7 +351,7 @@ export default function App() {
     try {
       await ApiService.logout();
     } catch (error) {
-      console.log("App logout API error ignored:", error);
+      logAppDebug("App logout API error ignored:", error);
       await ApiService.clearAuth();
     } finally {
       await Storage.removeItem(LAST_ACTIVITY_AT_KEY);
@@ -243,7 +375,7 @@ export default function App() {
     if (!currentUser) return;
 
     Storage.setItem(LAST_ACTIVITY_AT_KEY, String(Date.now())).catch((error) => {
-      console.log("Persist last activity error:", error);
+      logAppDebug("Persist last activity error:", error);
     });
 
     idleTimerRef.current = setTimeout(() => {
@@ -283,7 +415,7 @@ export default function App() {
     checkAuthStatus();
 
     logoutCallback = () => {
-      console.log("Global logout triggered from App.js");
+      logAppDebug("Global logout triggered from App.js");
       performAppLogout({ resetNavigation: true });
     };
 
@@ -349,7 +481,7 @@ export default function App() {
       const registrationFlag = await Storage.getItem("isNewRegistration");
 
       if (registrationFlag === "true") {
-        console.log("New registration flow detected - staying on auth screens");
+        logAppDebug("New registration flow detected - staying on auth screens");
         setIsNewRegistration(true);
         setCurrentUser(null);
         await Storage.removeItem("isNewRegistration");
@@ -359,12 +491,12 @@ export default function App() {
 
       const token = await ApiService.getToken();
       const user = token ? await ApiService.restoreCurrentUserFromToken() : null;
-      console.log("App.js checkAuthStatus - User found:", user ? "Yes" : "No");
+      logAppDebug("App.js checkAuthStatus - User found:", user ? "Yes" : "No");
 
       if (user) {
         const rememberedSessionActive = await ApiService.isRememberedSessionActive();
         if (!rememberedSessionActive) {
-          console.log("Remembered login expired. Asking user to sign in again.");
+          logAppDebug("Remembered login expired. Asking user to sign in again.");
           await ApiService.clearAuth();
           await Storage.setItem(AUTH_NOTICE_KEY, SESSION_EXPIRED_MESSAGE);
           setCurrentUser(null);
@@ -373,7 +505,7 @@ export default function App() {
 
         const idleState = await getStoredIdleState();
         if (idleState.expired) {
-          console.log("Idle session expired. Asking user to sign in again.");
+          logAppDebug("Idle session expired. Asking user to sign in again.");
           await ApiService.clearAuth();
           await Storage.setItem(AUTH_NOTICE_KEY, SESSION_EXPIRED_MESSAGE);
           setCurrentUser(null);
@@ -389,7 +521,7 @@ export default function App() {
           await Storage.setItem(LAST_ACTIVITY_AT_KEY, String(Date.now()));
           setCurrentUser(normalizedUser);
         } else {
-          console.log(
+          logAppDebug(
             "User role is not available in this app build:",
             user.role,
           );
@@ -397,7 +529,7 @@ export default function App() {
             normalizedRole &&
             !isRoleAllowedInCurrentVariant(normalizedRole)
           ) {
-            console.log(getVariantBlockedRoleMessage(normalizedRole));
+            logAppDebug(getVariantBlockedRoleMessage(normalizedRole));
           }
           await ApiService.clearAuth();
           setCurrentUser(null);
@@ -405,7 +537,7 @@ export default function App() {
       } else {
         const cachedUser = await ApiService.getCurrentUser();
         if (cachedUser && !token) {
-          console.log(
+          logAppDebug(
             "User cache exists but auth token is missing. Clearing stale auth state.",
           );
           await ApiService.clearAuth();
@@ -563,8 +695,8 @@ export default function App() {
     initialRoute = "Login";
   }
 
-  console.log("App.js initialRoute:", initialRoute);
-  console.log("Current user:", currentUser ? `${currentUser.role}` : "None");
+  logAppDebug("App.js initialRoute:", initialRoute);
+  logAppDebug("Current user:", currentUser ? `${currentUser.role}` : "None");
 
   return (
     <View style={{ flex: 1, backgroundColor: brandColors.background }} onTouchStart={resetIdleTimer}>
@@ -578,6 +710,7 @@ export default function App() {
             WEB_ROUTE_TITLES[route?.name] || `${APP_NAME} | ${APP_ORGANIZATION}`,
         }}
       >
+      <ChunkLoadRecoveryBoundary>
       <Suspense fallback={<ScreenFallback />}>
         <Stack.Navigator
           initialRouteName={initialRoute}
@@ -727,6 +860,7 @@ export default function App() {
         )}
         </Stack.Navigator>
       </Suspense>
+      </ChunkLoadRecoveryBoundary>
       </NavigationContainer>
     </View>
   );

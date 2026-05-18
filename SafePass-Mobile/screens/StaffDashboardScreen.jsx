@@ -36,6 +36,7 @@ import {
   MobileSearchField,
   MobileStatusBadge,
 } from "../components/mobile/MobileRoleComponents";
+import ToastNotice from "../components/shared/ToastNotice";
 import styles from "../styles/StaffDashboardStyles";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -206,6 +207,22 @@ const getAppointmentStatus = (appointment) => {
   if (appointment.status === "no_show") return "no_show";
   return String(appointment.appointmentStatus || "pending").toLowerCase();
 };
+
+const getStaffActionHint = (appointment) => {
+  const status = getAppointmentStatus(appointment);
+  if (status === "pending") return "Waiting for your decision";
+  if (status === "rescheduled") return "Visitor requested a new schedule";
+  if (status === "adjustment_pending") return "Waiting for visitor confirmation";
+  if (appointment?.status === "checked_in" && !appointment?.checkedOutAt) return "Visitor is currently inside";
+  if (status === "approved" || status === "adjusted") return "Scheduled for your office";
+  if (status === "completed") return "Visit completed";
+  if (status === "rejected") return "Request declined";
+  if (status === "no_show") return "Visitor did not arrive";
+  return getStatusMeta(status).label;
+};
+
+const isActionableAppointmentRequest = (appointment) =>
+  ["pending", "rescheduled"].includes(getAppointmentStatus(appointment));
 
 const matchesAppointmentSearch = (appointment, searchTerm) => {
   const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
@@ -400,19 +417,50 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [detailAppointment, setDetailAppointment] = useState(null);
+  const [toast, setToast] = useState({
+    visible: false,
+    type: "info",
+    title: "",
+    message: "",
+  });
+
+  const loadStaffThemePreference = useCallback(async () => {
+    try {
+      const savedDarkMode =
+        Platform.OS === "web" && typeof window !== "undefined" && window.localStorage
+          ? window.localStorage.getItem("darkModeEnabled")
+          : typeof AsyncStorage?.getItem === "function"
+            ? await AsyncStorage.getItem("darkModeEnabled")
+            : null;
+      setMobileDarkModeEnabled(savedDarkMode === "true");
+    } catch (error) {
+      console.log("Staff dark mode preference unavailable:", error?.message || error);
+    }
+  }, []);
 
   useEffect(() => {
-    const loadMobileTheme = async () => {
-      try {
-        const savedDarkMode = await AsyncStorage.getItem("darkModeEnabled");
-        setMobileDarkModeEnabled(savedDarkMode === "true");
-      } catch (error) {
-        console.log("Staff dark mode preference unavailable:", error?.message || error);
-      }
-    };
+    loadStaffThemePreference();
 
-    loadMobileTheme();
-  }, []);
+    const unsubscribeNavigationFocus = navigation?.addListener?.("focus", loadStaffThemePreference);
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const handleWindowFocus = () => loadStaffThemePreference();
+      const handleStorageChange = (event) => {
+        if (!event?.key || event.key === "darkModeEnabled") {
+          loadStaffThemePreference();
+        }
+      };
+      window.addEventListener("focus", handleWindowFocus);
+      window.addEventListener("storage", handleStorageChange);
+      return () => {
+        unsubscribeNavigationFocus?.();
+        window.removeEventListener("focus", handleWindowFocus);
+        window.removeEventListener("storage", handleStorageChange);
+      };
+    }
+
+    return () => unsubscribeNavigationFocus?.();
+  }, [loadStaffThemePreference, navigation]);
   const itemsPerPage = 5;
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -440,6 +488,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
 
       setUser(currentUser);
+      setLoading(false);
 
       const [appointmentResponse, notificationResponse, attendanceResponse] = await Promise.allSettled([
         ApiService.getStaffAppointments({ status: "all", limit: 200 }),
@@ -497,6 +546,19 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     loadData();
   }, [loadData]);
 
+  const showStaffToast = useCallback((nextToast) => {
+    setToast({
+      visible: true,
+      type: nextToast.type || "info",
+      title: nextToast.title || "SafePass",
+      message: nextToast.message || "",
+    });
+  }, []);
+
+  const closeStaffToast = useCallback(() => {
+    setToast((currentToast) => ({ ...currentToast, visible: false }));
+  }, []);
+
   const handleStaffAttendanceTap = async (action) => {
     if (attendanceTapLoading) return;
 
@@ -505,7 +567,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       const response = await ApiService.submitMyAttendanceTap({
         action,
         source: "virtual_nfc_card",
-        nfcCardId: user?.nfcCardId,
+        nfcCardId: user?.phoneNfcUid || user?.safePassId || user?.physicalNfcUid || user?.nfcCardId,
         office: "Staff Virtual NFC Card",
         floor: "Mobile",
         checkpointId: "staff-virtual-nfc",
@@ -519,10 +581,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
 
       await loadData();
-      Alert.alert(
-        action === "check_in" ? "Checked In" : "Checked Out",
-        response?.message || "Your staff attendance was recorded.",
-      );
+      showStaffToast({
+        type: "success",
+        title: action === "check_in" ? "Checked In" : "Checked Out",
+        message: response?.message || "Your staff attendance was recorded.",
+      });
     } catch (error) {
       Alert.alert("NFC Card Error", error?.message || "Unable to record your staff attendance.");
     } finally {
@@ -538,7 +601,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   );
 
   const appointmentRequests = useMemo(
-    () => appointments.filter((item) => getAppointmentStatus(item) === "pending"),
+    () => appointments.filter((item) => isActionableAppointmentRequest(item)),
     [appointments],
   );
 
@@ -623,6 +686,15 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const unreadNotificationsCount = useMemo(
     () => (notifications || []).filter((item) => !isNotificationRead(item)).length,
     [notifications, isNotificationRead],
+  );
+
+  const staffMobileNavTabs = useMemo(
+    () =>
+      staffMobileTabs.map((tab) => {
+        if (tab.key === "requests") return { ...tab, badge: stats.pending };
+        return tab;
+      }),
+    [stats.pending],
   );
 
   const latestAttendanceRecord = attendance[0] || null;
@@ -805,13 +877,15 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   };
 
   const selectSubmodule = (submoduleKey) => {
+    if (submoduleKey === "account-info") {
+      navigation.navigate("Profile");
+      return;
+    }
+
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const parentModule = getParentModule(submoduleKey);
     setExpandedModule(parentModule);
     setSelectedSubmodule(submoduleKey);
-    if (submoduleKey === "account-info") {
-      setAccountMode("view");
-    }
 
     if (submoduleKey === "appointment-request") {
       setFilter("pending");
@@ -831,8 +905,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleAssignedOfficePress = () => {
-    selectSubmodule("account-info");
+    navigation.navigate("Profile");
   };
+
+  const openSharedProfile = useCallback(() => {
+    navigation.navigate("Profile");
+  }, [navigation]);
 
   const handleNotificationCenterPress = () => {
     if (isPhoneLayout) {
@@ -1065,6 +1143,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               },
         ),
       );
+      showStaffToast({
+        type: "success",
+        title: "Notifications Cleared",
+        message: "All staff notifications are marked as read.",
+      });
     } catch (error) {
       Alert.alert("Notification Update Failed", error?.message || "Could not mark notifications as read.");
     }
@@ -1093,6 +1176,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         mergeAppointment(response.visitor);
       }
       await loadData();
+      showStaffToast({
+        type: "success",
+        title: "Request Approved",
+        message: `${appointment.fullName || "Visitor"} is now scheduled for your office.`,
+      });
     } catch (error) {
       Alert.alert("Approval Failed", error?.message || "Could not approve appointment.");
     } finally {
@@ -1233,6 +1321,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
       closeAdjustModal();
       await loadData();
+      showStaffToast({
+        type: "success",
+        title: "Schedule Adjusted",
+        message: `${selectedAppointment.fullName || "Visitor"} will receive the updated time.`,
+      });
     } catch (error) {
       Alert.alert("Update Failed", error?.message || "Could not adjust appointment.");
     } finally {
@@ -1263,6 +1356,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
       closeRejectModal();
       await loadData();
+      showStaffToast({
+        type: "info",
+        title: "Request Rejected",
+        message: `${selectedAppointment.fullName || "Visitor"} will see your reason for declining.`,
+      });
     } catch (error) {
       Alert.alert("Rejection Failed", error?.message || "Could not reject appointment.");
     } finally {
@@ -1281,10 +1379,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           mergeAppointment(response.visitor);
         }
         await loadData();
-        Alert.alert(
-          "Appointment Completed",
-          "Security, admin, and the visitor have been notified for checkout follow-up.",
-        );
+        showStaffToast({
+          type: "success",
+          title: "Appointment Completed",
+          message: "Security, admin, and the visitor have been notified for checkout follow-up.",
+        });
       } catch (error) {
         Alert.alert("Complete Failed", error?.message || "Could not complete appointment.");
       } finally {
@@ -1328,10 +1427,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       }
 
       await loadData();
-      Alert.alert(
-        "Destination Updated",
-        response?.message || `Visitor was redirected to ${office}.`,
-      );
+      showStaffToast({
+        type: "success",
+        title: "Destination Updated",
+        message: response?.message || `Visitor was redirected to ${office}.`,
+      });
     } catch (error) {
       Alert.alert("Redirect Failed", error?.message || "Could not update the visitor destination.");
     } finally {
@@ -1481,40 +1581,40 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       contentContainerStyle={styles.tableScrollContent}
       style={styles.tableScroll}
     >
-      <View style={styles.tableCard}>
-        <View style={styles.tableHeaderRow}>
+      <View style={[styles.tableCard, mobileDarkModeEnabled && styles.darkTableCard]}>
+        <View style={[styles.tableHeaderRow, mobileDarkModeEnabled && styles.darkTableHeaderRow]}>
           <View style={[styles.tableHeaderColumnWide, styles.tableColumnVisitor]}>
-            <Text style={styles.tableHeaderCellWide}>Visitor</Text>
+            <Text style={[styles.tableHeaderCellWide, mobileDarkModeEnabled && styles.darkMutedText]}>Visitor</Text>
           </View>
           <View style={[styles.tableHeaderColumn, styles.tableColumnSchedule]}>
-            <Text style={styles.tableHeaderCell}>Schedule</Text>
+            <Text style={[styles.tableHeaderCell, mobileDarkModeEnabled && styles.darkMutedText]}>Schedule</Text>
           </View>
           <View style={[styles.tableHeaderColumn, styles.tableColumnOffice]}>
-            <Text style={styles.tableHeaderCell}>Office</Text>
+            <Text style={[styles.tableHeaderCell, mobileDarkModeEnabled && styles.darkMutedText]}>Office</Text>
           </View>
           <View style={[styles.tableHeaderColumn, styles.tableColumnStatus]}>
-            <Text style={styles.tableHeaderCell}>Status</Text>
+            <Text style={[styles.tableHeaderCell, mobileDarkModeEnabled && styles.darkMutedText]}>Status</Text>
           </View>
           <View style={styles.tableHeaderColumnActions}>
-            <Text style={styles.tableHeaderCellActions}>Actions</Text>
+            <Text style={[styles.tableHeaderCellActions, mobileDarkModeEnabled && styles.darkMutedText]}>Actions</Text>
           </View>
         </View>
 
         {appointmentsToRender.length === 0 ? (
           <View style={styles.tableEmptyState}>
             <Ionicons name="documents-outline" size={42} color="#94A3B8" />
-            <Text style={styles.emptyTitle}>{emptyTitle}</Text>
-            <Text style={styles.emptySubtitle}>{emptySubtitle}</Text>
+            <Text style={[styles.emptyTitle, mobileDarkModeEnabled && styles.darkText]}>{emptyTitle}</Text>
+            <Text style={[styles.emptySubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>{emptySubtitle}</Text>
           </View>
         ) : (
           groupAppointmentsByDate(appointmentsToRender).flatMap((group) => [
-            <View key={`${mode}-${group.dateKey}`} style={styles.tableDateGroupRow}>
-              <Text style={styles.tableDateGroupText}>{group.label}</Text>
+            <View key={`${mode}-${group.dateKey}`} style={[styles.tableDateGroupRow, mobileDarkModeEnabled && styles.darkTableHeaderRow]}>
+              <Text style={[styles.tableDateGroupText, mobileDarkModeEnabled && styles.darkText]}>{group.label}</Text>
             </View>,
             ...group.entries.map((appointment) => {
             const appointmentStatus = getAppointmentStatus(appointment);
             const statusMeta = getStatusMeta(appointmentStatus);
-            const isPending = appointmentStatus === "pending";
+            const canActOnRequest = isActionableAppointmentRequest(appointment);
             const canComplete =
               appointment.status === "checked_in" &&
               !appointment.checkedOutAt &&
@@ -1522,25 +1622,25 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             const isProcessing = processingId === appointment._id;
 
             return (
-              <View key={appointment._id} style={styles.tableBodyRow}>
+              <View key={appointment._id} style={[styles.tableBodyRow, mobileDarkModeEnabled && styles.darkTableBodyRow]}>
                 <View style={[styles.tableCellWide, styles.tableColumnVisitor]}>
-                  <Text style={styles.tablePrimaryText}>{appointment.fullName}</Text>
-                  <Text style={styles.tableSecondaryText}>{appointment.email || "No email address"}</Text>
-                  <Text style={styles.tableHelperText}>
+                  <Text style={[styles.tablePrimaryText, mobileDarkModeEnabled && styles.darkText]}>{appointment.fullName}</Text>
+                  <Text style={[styles.tableSecondaryText, mobileDarkModeEnabled && styles.darkMutedText]}>{appointment.email || "No email address"}</Text>
+                  <Text style={[styles.tableHelperText, mobileDarkModeEnabled && styles.darkMutedText]}>
                     {appointment.purposeOfVisit || "No visit purpose provided"}
                   </Text>
                 </View>
 
                 <View style={[styles.tableCell, styles.tableColumnSchedule]}>
-                  <Text style={styles.tablePrimaryText}>{formatDate(appointment.visitDate)}</Text>
-                  <Text style={styles.tableSecondaryText}>{formatTime(appointment.visitTime)}</Text>
+                  <Text style={[styles.tablePrimaryText, mobileDarkModeEnabled && styles.darkText]}>{formatDate(appointment.visitDate)}</Text>
+                  <Text style={[styles.tableSecondaryText, mobileDarkModeEnabled && styles.darkMutedText]}>{formatTime(appointment.visitTime)}</Text>
                 </View>
 
                 <View style={[styles.tableCell, styles.tableColumnOffice]}>
-                  <Text style={styles.tablePrimaryText}>
+                  <Text style={[styles.tablePrimaryText, mobileDarkModeEnabled && styles.darkText]}>
                     {appointment.appointmentDepartment || appointment.assignedOffice || "Assigned department"}
                   </Text>
-                  <Text style={styles.tableSecondaryText}>
+                  <Text style={[styles.tableSecondaryText, mobileDarkModeEnabled && styles.darkMutedText]}>
                     {appointment.assignedStaffName || profileName}
                   </Text>
                 </View>
@@ -1559,7 +1659,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                     <Text style={styles.tableActionButtonText}>View</Text>
                   </TouchableOpacity>
 
-                  {mode === "requests" && isPending ? (
+                  {mode === "requests" && canActOnRequest ? (
                     <>
                       <TouchableOpacity
                         style={[styles.tableActionButton, styles.tableActionButtonPrimary, isProcessing && styles.disabledAction]}
@@ -1827,9 +1927,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         <View style={styles.heroHeader}>
           <View style={styles.heroCopy}>
             <Text style={styles.heroEyebrow}>Staff Dashboard</Text>
-            <Text style={styles.heroTitle}>Office Appointment Flow</Text>
+            <Text style={styles.heroTitle}>Staff Workspace</Text>
             <Text style={styles.heroSubtitle}>
-              Review visitor requests, manage schedules, and stay updated with your latest office activity.
+              Review visitor requests, schedules, and office updates from one focused view.
             </Text>
           </View>
         </View>
@@ -1853,9 +1953,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       <View style={staffVirtualStyles.webNotice}>
         <Ionicons name="phone-portrait-outline" size={20} color="#0A3D91" />
         <View style={staffVirtualStyles.webNoticeCopy}>
-          <Text style={staffVirtualStyles.webNoticeTitle}>Mobile NFC attendance</Text>
+          <Text style={staffVirtualStyles.webNoticeTitle}>Attendance is on mobile</Text>
           <Text style={staffVirtualStyles.webNoticeText}>
-            Staff check-in and check-out are available in the mobile app only.
+            Use the mobile app for staff check-in and check-out.
           </Text>
         </View>
       </View>
@@ -1915,7 +2015,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           <View style={styles.sectionHeaderCopy}>
             <Text style={styles.sectionTitle}>Today's Schedule</Text>
             <Text style={styles.sectionSubtitle}>
-              Today's approved and adjusted visitors for your office.
+              Approved and adjusted visitors for your office today.
             </Text>
           </View>
           <TouchableOpacity style={styles.sectionActionIconButton} onPress={() => selectSubmodule("appointment-record")}>
@@ -1980,7 +2080,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
           <Text style={styles.quickActionTitle}>Appointment Request</Text>
           <Text style={styles.quickActionSubtitle}>
-            Open the pending request queue and respond to new visitor schedules.
+            Review and respond to visitor schedule requests.
           </Text>
           <Text style={styles.quickActionFooterText}>Open request table</Text>
         </HomeHoverPressable>
@@ -1997,12 +2097,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
           <Text style={styles.quickActionTitle}>Appointment Record</Text>
           <Text style={styles.quickActionSubtitle}>
-            Review all appointment records and track status changes over time.
+            Review records and track status changes.
           </Text>
           <Text style={styles.quickActionFooterText}>Open record history</Text>
         </HomeHoverPressable>
 
-        <HomeHoverPressable style={styles.quickActionCard} onPress={() => selectSubmodule("account-info")}>
+        <HomeHoverPressable style={styles.quickActionCard} onPress={openSharedProfile}>
           <View style={styles.quickActionMetaRow}>
             <View style={styles.quickActionBadge}>
               <Text style={styles.quickActionBadgeText}>{user?.department || "Profile"}</Text>
@@ -2014,7 +2114,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
           <Text style={styles.quickActionTitle}>View Account Info</Text>
           <Text style={styles.quickActionSubtitle}>
-            Check your assigned office profile and account details with limited access.
+            Check your assigned office and account details.
           </Text>
           <Text style={styles.quickActionFooterText}>Open my profile</Text>
         </HomeHoverPressable>
@@ -2112,9 +2212,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
     return (
       <View style={styles.recordToolbarField}>
-        <Text style={styles.recordToolbarLabel}>{label}</Text>
+        <Text style={[styles.recordToolbarLabel, mobileDarkModeEnabled && styles.darkMutedText]}>{label}</Text>
         <TouchableOpacity
-          style={styles.recordToolbarSelect}
+          style={[styles.recordToolbarSelect, mobileDarkModeEnabled && styles.darkInputSurface]}
           onPress={() => setRecordFilterDropdownOpen(isOpen ? null : id)}
           activeOpacity={0.85}
           accessibilityRole="button"
@@ -2122,14 +2222,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         >
           <View style={styles.recordToolbarSelectValue}>
             <Ionicons name={icon} size={15} color="#64748B" />
-            <Text style={styles.recordToolbarSelectText} numberOfLines={1}>
+            <Text style={[styles.recordToolbarSelectText, mobileDarkModeEnabled && styles.darkText]} numberOfLines={1}>
               {selectedOption?.label || "All"}
             </Text>
           </View>
           <Ionicons name={isOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color="#64748B" />
         </TouchableOpacity>
         {isOpen ? (
-          <View style={styles.recordToolbarDropdownMenu}>
+          <View style={[styles.recordToolbarDropdownMenu, mobileDarkModeEnabled && styles.darkDropdownMenu]}>
             <ScrollView style={styles.recordToolbarDropdownScroll} nestedScrollEnabled>
               {options.map((option) => {
                 const selected = option.value === value;
@@ -2142,7 +2242,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                       setRecordFilterDropdownOpen(null);
                     }}
                   >
-                    <Text style={[styles.recordToolbarDropdownText, selected && styles.recordToolbarDropdownTextActive]} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.recordToolbarDropdownText,
+                        mobileDarkModeEnabled && styles.darkMutedText,
+                        selected && styles.recordToolbarDropdownTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
                       {option.label}
                     </Text>
                     {selected ? <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" /> : null}
@@ -2169,11 +2276,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     filterGroups,
   }) => (
     <View style={styles.recordToolbar}>
-      <View style={styles.recordToolbarCard}>
+      <View style={[styles.recordToolbarCard, mobileDarkModeEnabled && styles.darkNestedCard]}>
         <View style={styles.recordToolbarHeader}>
           <View style={styles.recordToolbarHeaderCopy}>
-            <Text style={styles.recordToolbarTitle}>{searchTitle}</Text>
-            <Text style={styles.recordToolbarSubtitle}>{searchSubtitle}</Text>
+            <Text style={[styles.recordToolbarTitle, mobileDarkModeEnabled && styles.darkText]}>{searchTitle}</Text>
+            <Text style={[styles.recordToolbarSubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>{searchSubtitle}</Text>
           </View>
           {searchValue ? (
             <TouchableOpacity onPress={onClearSearch} style={styles.recordToolbarClear}>
@@ -2181,24 +2288,24 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             </TouchableOpacity>
           ) : null}
         </View>
-        <View style={styles.searchBar}>
+        <View style={[styles.searchBar, mobileDarkModeEnabled && styles.darkInputSurface]}>
           <Ionicons name="search-outline" size={18} color="#64748B" />
           <TextInput
             value={searchValue}
             onChangeText={onSearchChange}
             placeholder={searchPlaceholder}
             placeholderTextColor="#94A3B8"
-            style={styles.searchBarInput}
+            style={[styles.searchBarInput, mobileDarkModeEnabled && styles.darkText]}
             returnKeyType="search"
           />
         </View>
       </View>
 
-      <View style={styles.recordToolbarCard}>
+      <View style={[styles.recordToolbarCard, mobileDarkModeEnabled && styles.darkNestedCard]}>
         <View style={styles.recordToolbarHeader}>
           <View style={styles.recordToolbarHeaderCopy}>
-            <Text style={styles.recordToolbarTitle}>Filters</Text>
-            <Text style={styles.recordToolbarSubtitle}>{filterSubtitle}</Text>
+            <Text style={[styles.recordToolbarTitle, mobileDarkModeEnabled && styles.darkText]}>Filters</Text>
+            <Text style={[styles.recordToolbarSubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>{filterSubtitle}</Text>
           </View>
           {hasFilters ? (
             <TouchableOpacity onPress={onResetFilters} style={styles.recordToolbarClear}>
@@ -2223,9 +2330,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   );
 
   const renderAppointmentRequestContent = () => (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, mobileDarkModeEnabled && styles.darkSectionCard]}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Pending Appointment Requests</Text>
+        <View>
+          <Text style={[styles.sectionTitle, mobileDarkModeEnabled && styles.darkText]}>Pending Appointment Requests</Text>
+          <Text style={[styles.sectionSubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>
+            Review new and rescheduled requests assigned to your office.
+          </Text>
+        </View>
         <View style={styles.sectionActionRow}>
           {renderTablePrintButton({
             label: "Print Requests",
@@ -2238,6 +2350,24 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
           </TouchableOpacity>
         </View>
+      </View>
+
+      <View style={styles.queueSummaryGrid}>
+        {[
+          ["Actionable", appointmentRequests.length, "mail-unread-outline"],
+          ["Today", appointmentRequests.filter((item) => isSameCalendarDay(item.visitDate)).length, "today-outline"],
+          ["This Week", appointmentRequests.filter((item) => isWithinCurrentWeek(item.visitDate)).length, "calendar-outline"],
+        ].map(([label, value, icon]) => (
+          <View key={label} style={[styles.queueSummaryCard, mobileDarkModeEnabled && styles.darkNestedCard]}>
+            <View style={styles.queueSummaryIcon}>
+              <Ionicons name={icon} size={17} color="#0A3D91" />
+            </View>
+            <View>
+              <Text style={[styles.queueSummaryValue, mobileDarkModeEnabled && styles.darkText]}>{value}</Text>
+              <Text style={[styles.queueSummaryLabel, mobileDarkModeEnabled && styles.darkMutedText]}>{label}</Text>
+            </View>
+          </View>
+        ))}
       </View>
 
       {renderRecordSearchFilterToolbar({
@@ -2289,9 +2419,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const renderAppointmentRecordContent = () => (
     <>
-      <View style={styles.sectionCard}>
+      <View style={[styles.sectionCard, mobileDarkModeEnabled && styles.darkSectionCard]}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Appointment Records</Text>
+          <Text style={[styles.sectionTitle, mobileDarkModeEnabled && styles.darkText]}>Appointment Records</Text>
           <View style={styles.sectionActionRow}>
             {renderTablePrintButton({
               label: "Print Records",
@@ -2358,15 +2488,15 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const renderAccountInfoContent = () => (
     <>
-      <View style={styles.sectionCard}>
+      <View style={[styles.sectionCard, mobileDarkModeEnabled && styles.darkSectionCard]}>
         <View style={styles.accountProfileTopRow}>
           <View style={styles.accountProfileHeader}>
             <View style={styles.accountProfileAvatar}>
               <Text style={styles.accountProfileAvatarText}>{profileInitials}</Text>
             </View>
             <View style={styles.accountProfileCopy}>
-              <Text style={styles.accountProfileName}>{profileName}</Text>
-              <Text style={styles.accountProfileRole}>
+              <Text style={[styles.accountProfileName, mobileDarkModeEnabled && styles.darkText]}>{profileName}</Text>
+              <Text style={[styles.accountProfileRole, mobileDarkModeEnabled && styles.darkMutedText]}>
                 {String(user?.role || "staff").toUpperCase()} ACCESS
               </Text>
             </View>
@@ -2399,20 +2529,20 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
         </View>
 
-        <View style={styles.accountHeroStrip}>
-          <View style={styles.accountHeroMetric}>
-            <Text style={styles.accountHeroMetricLabel}>Assigned Office</Text>
-            <Text style={styles.accountHeroMetricValue}>{user?.department || "Not assigned"}</Text>
+        <View style={[styles.accountHeroStrip, mobileDarkModeEnabled && styles.darkNestedCard]}>
+          <View style={[styles.accountHeroMetric, mobileDarkModeEnabled && styles.darkInputSurface]}>
+            <Text style={[styles.accountHeroMetricLabel, mobileDarkModeEnabled && styles.darkMutedText]}>Assigned Office</Text>
+            <Text style={[styles.accountHeroMetricValue, mobileDarkModeEnabled && styles.darkText]}>{user?.department || "Not assigned"}</Text>
           </View>
-          <View style={styles.accountHeroMetric}>
-            <Text style={styles.accountHeroMetricLabel}>Staff ID</Text>
-            <Text style={styles.accountHeroMetricValue}>
+          <View style={[styles.accountHeroMetric, mobileDarkModeEnabled && styles.darkInputSurface]}>
+            <Text style={[styles.accountHeroMetricLabel, mobileDarkModeEnabled && styles.darkMutedText]}>Staff ID</Text>
+            <Text style={[styles.accountHeroMetricValue, mobileDarkModeEnabled && styles.darkText]}>
               {user?.staffId || user?.employeeId || "Pending"}
             </Text>
           </View>
-          <View style={styles.accountHeroMetric}>
-            <Text style={styles.accountHeroMetricLabel}>Account Status</Text>
-            <Text style={styles.accountHeroMetricValue}>
+          <View style={[styles.accountHeroMetric, mobileDarkModeEnabled && styles.darkInputSurface]}>
+            <Text style={[styles.accountHeroMetricLabel, mobileDarkModeEnabled && styles.darkMutedText]}>Account Status</Text>
+            <Text style={[styles.accountHeroMetricValue, mobileDarkModeEnabled && styles.darkText]}>
               {String(user?.status || "active").toUpperCase()}
             </Text>
           </View>
@@ -2421,46 +2551,46 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         {accountMode === "view" ? (
           <>
             <View style={styles.accountSectionHeader}>
-              <Text style={styles.accountSectionTitle}>Profile Overview</Text>
-              <Text style={styles.accountSectionSubtitle}>
+              <Text style={[styles.accountSectionTitle, mobileDarkModeEnabled && styles.darkText]}>Profile Overview</Text>
+              <Text style={[styles.accountSectionSubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>
                 Your core staff account details and current office assignment.
               </Text>
             </View>
 
             <View style={styles.accountInfoGrid}>
-              <View style={styles.accountInfoItem}>
-                <Text style={styles.accountInfoLabel}>Email</Text>
-                <Text style={styles.accountInfoValue}>{user?.email || "N/A"}</Text>
+              <View style={[styles.accountInfoItem, mobileDarkModeEnabled && styles.darkNestedCard]}>
+                <Text style={[styles.accountInfoLabel, mobileDarkModeEnabled && styles.darkMutedText]}>Email</Text>
+                <Text style={[styles.accountInfoValue, mobileDarkModeEnabled && styles.darkText]}>{user?.email || "N/A"}</Text>
               </View>
-              <View style={styles.accountInfoItem}>
-                <Text style={styles.accountInfoLabel}>Username</Text>
-                <Text style={styles.accountInfoValue}>{user?.username || "N/A"}</Text>
+              <View style={[styles.accountInfoItem, mobileDarkModeEnabled && styles.darkNestedCard]}>
+                <Text style={[styles.accountInfoLabel, mobileDarkModeEnabled && styles.darkMutedText]}>Username</Text>
+                <Text style={[styles.accountInfoValue, mobileDarkModeEnabled && styles.darkText]}>{user?.username || "N/A"}</Text>
               </View>
-              <View style={styles.accountInfoItem}>
-                <Text style={styles.accountInfoLabel}>Staff ID</Text>
-                <Text style={styles.accountInfoValue}>
+              <View style={[styles.accountInfoItem, mobileDarkModeEnabled && styles.darkNestedCard]}>
+                <Text style={[styles.accountInfoLabel, mobileDarkModeEnabled && styles.darkMutedText]}>Staff ID</Text>
+                <Text style={[styles.accountInfoValue, mobileDarkModeEnabled && styles.darkText]}>
                   {user?.staffId || user?.employeeId || "Not assigned"}
                 </Text>
               </View>
-              <View style={styles.accountInfoItem}>
-                <Text style={styles.accountInfoLabel}>Department</Text>
-                <Text style={styles.accountInfoValue}>{user?.department || "Not assigned"}</Text>
+              <View style={[styles.accountInfoItem, mobileDarkModeEnabled && styles.darkNestedCard]}>
+                <Text style={[styles.accountInfoLabel, mobileDarkModeEnabled && styles.darkMutedText]}>Department</Text>
+                <Text style={[styles.accountInfoValue, mobileDarkModeEnabled && styles.darkText]}>{user?.department || "Not assigned"}</Text>
               </View>
-              <View style={styles.accountInfoItem}>
-                <Text style={styles.accountInfoLabel}>Contact Number</Text>
-                <Text style={styles.accountInfoValue}>
+              <View style={[styles.accountInfoItem, mobileDarkModeEnabled && styles.darkNestedCard]}>
+                <Text style={[styles.accountInfoLabel, mobileDarkModeEnabled && styles.darkMutedText]}>Contact Number</Text>
+                <Text style={[styles.accountInfoValue, mobileDarkModeEnabled && styles.darkText]}>
                   {user?.phone || user?.phoneNumber || user?.contactNumber || "N/A"}
                 </Text>
               </View>
-              <View style={styles.accountInfoItem}>
-                <Text style={styles.accountInfoLabel}>Status</Text>
-                <Text style={styles.accountInfoValue}>{user?.status || "active"}</Text>
+              <View style={[styles.accountInfoItem, mobileDarkModeEnabled && styles.darkNestedCard]}>
+                <Text style={[styles.accountInfoLabel, mobileDarkModeEnabled && styles.darkMutedText]}>Status</Text>
+                <Text style={[styles.accountInfoValue, mobileDarkModeEnabled && styles.darkText]}>{user?.status || "active"}</Text>
               </View>
             </View>
 
-            <View style={styles.accountNoticeCard}>
+            <View style={[styles.accountNoticeCard, mobileDarkModeEnabled && styles.darkNestedCard]}>
               <Ionicons name="information-circle-outline" size={18} color="#1C6DD0" />
-              <Text style={styles.accountNoticeText}>
+              <Text style={[styles.accountNoticeText, mobileDarkModeEnabled && styles.darkMutedText]}>
                 Your department and staff ID are managed by admin. Personal details and password can be updated here anytime.
               </Text>
             </View>
@@ -2470,8 +2600,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         {accountMode === "edit" ? (
           <View style={styles.accountEditForm}>
             <View style={styles.accountSectionHeader}>
-              <Text style={styles.accountSectionTitle}>Edit Personal Details</Text>
-              <Text style={styles.accountSectionSubtitle}>
+              <Text style={[styles.accountSectionTitle, mobileDarkModeEnabled && styles.darkText]}>Edit Personal Details</Text>
+              <Text style={[styles.accountSectionSubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>
                 Keep your contact information and login details accurate.
               </Text>
             </View>
@@ -2565,8 +2695,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         {accountMode === "password" ? (
           <View style={styles.accountEditForm}>
             <View style={styles.accountSectionHeader}>
-              <Text style={styles.accountSectionTitle}>Password & Security</Text>
-              <Text style={styles.accountSectionSubtitle}>
+              <Text style={[styles.accountSectionTitle, mobileDarkModeEnabled && styles.darkText]}>Password & Security</Text>
+              <Text style={[styles.accountSectionSubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>
                 Update your password regularly to keep your staff account secure.
               </Text>
             </View>
@@ -2634,9 +2764,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   );
 
   const renderSidebar = () => (
-    <View style={styles.sidebar}>
+    <View style={[styles.sidebar, mobileDarkModeEnabled && styles.darkSidebar]}>
         <SidebarHoverPressable
-          style={styles.sidebarHeader}
+          style={[styles.sidebarHeader, mobileDarkModeEnabled && styles.darkSidebarHeader]}
           onPress={() => selectSubmodule("account-info")}
           hoverScale={1.012}
         >
@@ -2644,8 +2774,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Text style={styles.sidebarAvatarText}>{profileInitials}</Text>
           </View>
           <View style={styles.sidebarUserCopy}>
-            <Text style={styles.sidebarUserName}>{profileName}</Text>
-            <Text style={styles.sidebarUserRole}>Staff Panel</Text>
+            <Text style={[styles.sidebarUserName, mobileDarkModeEnabled && styles.darkText]}>{profileName}</Text>
+            <Text style={[styles.sidebarUserRole, mobileDarkModeEnabled && styles.darkMutedText]}>Staff Panel</Text>
           </View>
           <Ionicons name="chevron-forward-outline" size={18} color="#64748B" />
         </SidebarHoverPressable>
@@ -2663,7 +2793,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               <SidebarHoverPressable
                 style={[
                   styles.sidebarModuleButton,
+                  mobileDarkModeEnabled && styles.darkSidebarModuleButton,
                   hasSelectedChild && styles.sidebarModuleButtonActive,
+                  mobileDarkModeEnabled && hasSelectedChild && styles.darkSidebarModuleButtonActive,
                 ]}
                 onPress={() => toggleModule(module.key)}
                 hoverScale={1.012}
@@ -2674,7 +2806,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                 <Text
                   style={[
                     styles.sidebarModuleLabel,
+                    mobileDarkModeEnabled && styles.darkMutedText,
                     hasSelectedChild && styles.sidebarModuleLabelActive,
+                    mobileDarkModeEnabled && hasSelectedChild && styles.darkText,
                   ]}
                 >
                   {module.label}
@@ -2693,7 +2827,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               </SidebarHoverPressable>
 
               {!isHomeModule && isExpanded ? (
-                <View style={styles.sidebarSubmoduleList}>
+                <View style={[styles.sidebarSubmoduleList, mobileDarkModeEnabled && styles.darkSidebarSubmoduleList]}>
                   {module.submodules.map((submodule) => {
                     const isActive = selectedSubmodule === submodule.key;
                     return (
@@ -2701,7 +2835,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                         key={submodule.key}
                         style={[
                           styles.sidebarSubmoduleButton,
+                          mobileDarkModeEnabled && styles.darkSidebarSubmoduleButton,
                           isActive && styles.sidebarSubmoduleButtonActive,
+                          mobileDarkModeEnabled && isActive && styles.darkSidebarSubmoduleButtonActive,
                         ]}
                         onPress={() => selectSubmodule(submodule.key)}
                         hoverScale={1.012}
@@ -2709,7 +2845,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                         <Text
                           style={[
                             styles.sidebarSubmoduleLabel,
+                            mobileDarkModeEnabled && styles.darkMutedText,
                             isActive && styles.sidebarSubmoduleLabelActive,
+                            mobileDarkModeEnabled && isActive && styles.darkText,
                           ]}
                         >
                           {submodule.label}
@@ -2838,13 +2976,13 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const renderMobileAppointmentCard = (appointment, mode = "request") => {
     const appointmentStatus = getAppointmentStatus(appointment);
-    const isPending = appointmentStatus === "pending";
+    const canActOnRequest = isActionableAppointmentRequest(appointment);
     const isProcessing = processingId === appointment._id;
     const canComplete =
-      mode === "history" &&
       appointment.status === "checked_in" &&
       !appointment.checkedOutAt &&
       !appointment.appointmentCompletedAt;
+    const actionHint = getStaffActionHint(appointment);
 
     return (
       <TouchableOpacity
@@ -2864,6 +3002,16 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Text style={[staffMobileStyles.appointmentPurpose, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]} numberOfLines={2}>
               {appointment.purposeOfVisit || "No visit purpose provided"}
             </Text>
+            <View style={staffMobileStyles.appointmentHintRow}>
+              <Ionicons
+                name={canActOnRequest ? "alert-circle-outline" : "information-circle-outline"}
+                size={13}
+                color={canActOnRequest ? BRAND.warning : BRAND.blue}
+              />
+              <Text style={[staffMobileStyles.appointmentHintText, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]} numberOfLines={1}>
+                {actionHint}
+              </Text>
+            </View>
           </View>
           <MobileStatusBadge status={appointmentStatus} label={getStatusMeta(appointmentStatus).label} />
         </View>
@@ -2885,16 +3033,24 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
         </View>
 
-        {mode === "request" && isPending ? (
+        {mode === "request" && canActOnRequest ? (
           <View style={staffMobileStyles.cardActions}>
             <TouchableOpacity
               style={[staffMobileStyles.actionButton, staffMobileStyles.approveButton, isProcessing && staffMobileStyles.disabledButton]}
               onPress={() => handleApprove(appointment)}
               disabled={isProcessing}
             >
-              {isProcessing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={staffMobileStyles.approveButtonText}>Approve</Text>}
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
+                  <Text style={staffMobileStyles.approveButtonText}>Approve</Text>
+                </>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={staffMobileStyles.actionButton} onPress={() => openAdjustModal(appointment)} disabled={isProcessing}>
+              <Ionicons name="calendar-outline" size={15} color="#334155" />
               <Text style={staffMobileStyles.actionButtonText}>Adjust</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -2902,6 +3058,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               onPress={() => openRejectModal(appointment)}
               disabled={isProcessing}
             >
+              <Ionicons name="close-circle-outline" size={15} color={BRAND.danger} />
               <Text style={staffMobileStyles.rejectButtonText}>Reject</Text>
             </TouchableOpacity>
           </View>
@@ -2936,7 +3093,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Text style={staffVirtualStyles.title}>
               {isStaffCheckedIn ? "Currently Checked In" : "Ready for Check In"}
             </Text>
-            <Text style={staffVirtualStyles.meta}>Card ID: {user?.nfcCardId || "Not assigned"}</Text>
+            <Text style={staffVirtualStyles.meta}>
+              SafePass ID: {user?.safePassId || user?.phoneNfcUid || user?.nfcCardId || "Not assigned"}
+            </Text>
           </View>
         </View>
         <View style={staffVirtualStyles.actionRow}>
@@ -2966,7 +3125,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       {todaysSchedule.length ? (
         todaysSchedule.slice(0, 3).map((appointment) => renderMobileAppointmentCard(appointment, "visitor"))
       ) : (
-        <MobileEmptyState dark={mobileDarkModeEnabled} icon="calendar-outline" title="No visitors today" message="Approved visitors for today will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="calendar-outline" title="No visitors today" message="Approved or adjusted visitors for your office will appear here." />
       )}
     </>
   );
@@ -2988,7 +3147,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       {filteredRequestAppointments.length ? (
         filteredRequestAppointments.slice(0, 30).map((appointment) => renderMobileAppointmentCard(appointment, "request"))
       ) : (
-        <MobileEmptyState dark={mobileDarkModeEnabled} icon="mail-open-outline" title="No matching requests" message="New appointment requests assigned to your office will show here." />
+        <MobileEmptyState
+          dark={mobileDarkModeEnabled}
+          icon="mail-open-outline"
+          title={requestSearchTerm || requestFilter !== "all" ? "No matching requests" : "No pending requests"}
+          message={requestSearchTerm || requestFilter !== "all" ? "Try clearing the search or choosing All." : "New appointment requests assigned to your office will show here."}
+          actionLabel={requestSearchTerm || requestFilter !== "all" ? "Clear filters" : undefined}
+          onAction={requestSearchTerm || requestFilter !== "all" ? () => {
+            setRequestSearchTerm("");
+            setRequestFilter("all");
+          } : undefined}
+        />
       )}
     </>
   );
@@ -3002,7 +3171,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       {todaysSchedule.length ? (
         todaysSchedule.map((appointment) => renderMobileAppointmentCard(appointment, "visitor"))
       ) : (
-        <MobileEmptyState dark={mobileDarkModeEnabled} icon="people-outline" title="No scheduled visitors" message="Approved visitors scheduled for today will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="people-outline" title="No scheduled visitors" message="Approved and adjusted visitors scheduled for today will appear here." />
       )}
     </>
   );
@@ -3034,7 +3203,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             .map((appointment) => renderMobileAppointmentCard(appointment, "history"))}
         </>
       ) : (
-        <MobileEmptyState dark={mobileDarkModeEnabled} icon="archive-outline" title="No history found" message="Try a different search or status filter." />
+        <MobileEmptyState
+          dark={mobileDarkModeEnabled}
+          icon="archive-outline"
+          title="No history found"
+          message="Try a different search or status filter."
+          actionLabel="Clear filters"
+          onAction={() => {
+            setRecordSearchTerm("");
+            setFilter("all");
+          }}
+        />
       )}
     </>
   );
@@ -3303,9 +3482,28 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         >
           {content}
         </ScrollView>
-        <MobileBottomNav dark={mobileDarkModeEnabled} tabs={staffMobileTabs} activeTab={mobileTab} onChange={setMobileTab} />
+        <MobileBottomNav
+          dark={mobileDarkModeEnabled}
+          tabs={staffMobileNavTabs}
+          activeTab={mobileTab}
+          onChange={(tabKey) => {
+            if (tabKey === "profile") {
+              openSharedProfile();
+              return;
+            }
+            setMobileTab(tabKey);
+          }}
+        />
         {renderMobileDetailModal()}
         {renderMobileLogoutModal()}
+        <ToastNotice
+          visible={toast.visible}
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={closeStaffToast}
+          style={staffMobileStyles.toast}
+        />
       </SafeAreaView>
     );
   };
@@ -3367,8 +3565,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.dashboardLayout}>
+    <SafeAreaView style={[styles.safeArea, mobileDarkModeEnabled && styles.darkSafeArea]}>
+      <View style={[styles.dashboardLayout, mobileDarkModeEnabled && styles.darkDashboardLayout]}>
         {renderSidebar()}
 
         <View style={styles.contentArea}>
@@ -3387,16 +3585,24 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             }
             contentContainerStyle={styles.scrollContent}
           >
-            <View style={styles.pageHeaderCard}>
-              <Text style={styles.pageEyebrow}>Staff Module</Text>
-              <Text style={styles.pageTitle}>{selectedSubmoduleMeta.title}</Text>
-              <Text style={styles.pageSubtitle}>{selectedSubmoduleMeta.subtitle}</Text>
+            <View style={[styles.pageHeaderCard, mobileDarkModeEnabled && styles.darkPageHeaderCard]}>
+              <Text style={[styles.pageEyebrow, mobileDarkModeEnabled && styles.darkMutedText]}>Staff Module</Text>
+              <Text style={[styles.pageTitle, mobileDarkModeEnabled && styles.darkText]}>{selectedSubmoduleMeta.title}</Text>
+              <Text style={[styles.pageSubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>{selectedSubmoduleMeta.subtitle}</Text>
             </View>
 
             {renderActiveContent()}
           </ScrollView>
         </View>
       </View>
+
+      <ToastNotice
+        visible={toast.visible}
+        type={toast.type}
+        title={toast.title}
+        message={toast.message}
+        onClose={closeStaffToast}
+      />
 
       <Modal visible={showAdjustModal} transparent animationType="fade" onRequestClose={closeAdjustModal}>
         <View style={styles.modalOverlay}>
@@ -3577,29 +3783,29 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
 const staffVirtualStyles = StyleSheet.create({
   webNotice: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 16,
-    marginTop: 16,
-    marginBottom: 16,
+    backgroundColor: "#F8FBFE",
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "#D8E8FF",
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
   },
   webNoticeCopy: {
     flex: 1,
   },
   webNoticeTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "900",
     color: "#0F172A",
   },
   webNoticeText: {
-    marginTop: 4,
-    fontSize: 13,
-    lineHeight: 18,
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 17,
     color: "#64748B",
   },
   card: {
@@ -3950,6 +4156,20 @@ const staffMobileStyles = StyleSheet.create({
     lineHeight: 17,
     color: BRAND.muted,
   },
+  appointmentHintRow: {
+    marginTop: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  appointmentHintText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "900",
+    color: "#475569",
+  },
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -3981,6 +4201,8 @@ const staffMobileStyles = StyleSheet.create({
     flex: 1,
     minHeight: 42,
     borderRadius: 12,
+    flexDirection: "row",
+    gap: 5,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#EEF2F7",
@@ -4369,5 +4591,12 @@ const staffMobileStyles = StyleSheet.create({
   darkDangerButton: {
     backgroundColor: "#1E1118",
     borderColor: "#7F1D1D",
+  },
+  toast: {
+    top: 12,
+    left: 12,
+    right: 12,
+    width: undefined,
+    maxWidth: undefined,
   },
 });

@@ -440,6 +440,430 @@ export default StyleSheet.create({
     marginTop: spacing.sm,
   },
 
+  securityHeroActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+
+  securityHeroPrimaryAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 132,
+  },
+
+  securityHeroPrimaryActionText: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+
+  securityHeroSecondaryAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.42)",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 120,
+  },
+
+  securityHeroSecondaryActionText: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.white,
+  },
+
+  visitorNfcPanel: {
+    backgroundColor: colors.white,
+    borderRadius: isSmallPhone ? 16 : 22,
+    padding: isSmallPhone ? spacing.md : spacing.lg,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    ...(isWeb && {
+      maxWidth: isDesktop ? 1200 : isTablet ? 900 : "100%",
+      alignSelf: "center",
+      width: "100%",
+      boxShadow: "0px 10px 28px rgba(15,23,42,0.08)",
+    }),
+  },
+
+  visitorNfcHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    flexWrap: "wrap",
+  },
+
+  visitorNfcCountBadge: {
+    borderRadius: 999,
+    backgroundColor: "#EEF5FF",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+
+  visitorNfcCountText: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+
+  visitorNfcSearchInput: {
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    alignSelf: "stretch",
+  },
+
+  visitorNfcWorkspace: {
+    flexDirection: isSmallPhone ? "column" : "row",
+    alignItems: "stretch",
+    gap: spacing.md,
+    marginTop: spacing.md,
+    flexWrap: "wrap",
+  },
+
+  visitorNfcSelectorColumn: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: isDesktop ? 320 : isTablet ? 280 : "100%",
+    minWidth: isSmallPhone ? "100%" : 260,
+  },
+
+  visitorNfcSelectList: {
+    marginTop: spacing.sm,
+    maxHeight: isDesktop ? 390 : 320,
+  },
+
+  visitorNfcSelectCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  visitorNfcSelectCardActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+
+  visitorNfcSelectIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(10,61,145,0.1)",
+  },
+
+  visitorNfcSelectContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  visitorNfcAssignmentBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+
+  visitorNfcAssignmentBadgeAssigned: {
+    borderColor: "#A7F3D0",
+    backgroundColor: "#ECFDF5",
+  },
+
+  visitorNfcAssignmentBadgeActive: {
+    borderColor: "rgba(255,255,255,0.38)",
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+
+  visitorNfcAssignmentBadgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: "900",
+    color: "#64748B",
+  },
+
+  visitorNfcAssignmentBadgeTextAssigned: {
+    color: "#047857",
+  },
+
+  visitorNfcAssignmentBadgeTextActive: {
+    color: colors.white,
+  },
+
+  visitorNfcChipRow: {
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+
+  visitorNfcChip: {
+    minWidth: 178,
+    maxWidth: 220,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE5F0",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+
+  visitorNfcChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+
+  visitorNfcChipName: {
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.text,
+  },
+
+  visitorNfcChipNameActive: {
+    color: colors.white,
+  },
+
+  visitorNfcChipMeta: {
+    marginTop: 4,
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+  },
+
+  visitorNfcChipMetaActive: {
+    color: "#D8E8FF",
+  },
+
+  visitorNfcAssignBox: {
+    flexGrow: 2,
+    flexShrink: 1,
+    flexBasis: isDesktop ? 640 : isTablet ? 500 : "100%",
+    minWidth: isSmallPhone ? "100%" : 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EEF5FF",
+    padding: spacing.md,
+  },
+
+  visitorNfcSelected: {
+    marginBottom: spacing.sm,
+  },
+
+  visitorNfcSelectedLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.primary,
+    textTransform: "uppercase",
+  },
+
+  visitorNfcSelectedName: {
+    marginTop: 4,
+    fontSize: fontSize.lg,
+    fontWeight: "900",
+    color: colors.text,
+  },
+
+  visitorNfcSelectedMeta: {
+    marginTop: 4,
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+  },
+
+  visitorNfcDetailsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+
+  visitorNfcDetailItem: {
+    flexGrow: 1,
+    flexBasis: isSmallPhone ? "100%" : 170,
+    minWidth: isSmallPhone ? "100%" : 150,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D7E6FA",
+    backgroundColor: "rgba(255,255,255,0.72)",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+
+  visitorNfcDetailLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: "900",
+    color: colors.primary,
+    textTransform: "uppercase",
+  },
+
+  visitorNfcDetailValue: {
+    marginTop: 3,
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.text,
+  },
+
+  visitorNfcUidInput: {
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fontSize.md,
+    fontWeight: "900",
+    letterSpacing: 1,
+    color: colors.text,
+  },
+
+  visitorNfcFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    flexWrap: "wrap",
+  },
+
+  visitorNfcHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flex: 1,
+    minWidth: 180,
+  },
+
+  visitorNfcHintText: {
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+
+  visitorNfcAssignButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 132,
+  },
+
+  visitorNfcAssignButtonDisabled: {
+    opacity: 0.65,
+  },
+
+  visitorNfcAssignButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "900",
+    color: colors.white,
+  },
+
+  visitorNfcUnassignButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: 12,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 144,
+  },
+
+  visitorNfcUnassignButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: "900",
+    color: "#B91C1C",
+  },
+
+  visitorNfcStatus: {
+    marginTop: spacing.sm,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+
+  visitorNfcStatusSuccess: {
+    borderColor: "#A7F3D0",
+    backgroundColor: "#ECFDF5",
+  },
+
+  visitorNfcStatusError: {
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+  },
+
+  visitorNfcStatusText: {
+    flex: 1,
+    fontSize: fontSize.xs,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+
+  visitorNfcStatusTextSuccess: {
+    color: "#047857",
+  },
+
+  visitorNfcStatusTextError: {
+    color: "#B91C1C",
+  },
+
+  visitorNfcEmpty: {
+    marginTop: spacing.md,
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    padding: spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  visitorNfcEmptyText: {
+    marginTop: spacing.xs,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.textMuted,
+  },
+
   securityHeroStats: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -938,6 +1362,8 @@ export default StyleSheet.create({
   },
 
   recordToolbar: {
+    position: "relative",
+    zIndex: 1000,
     flexDirection: isDesktop ? "row" : "column",
     alignItems: "stretch",
     gap: 12,
@@ -945,6 +1371,8 @@ export default StyleSheet.create({
   },
 
   recordToolbarCard: {
+    position: "relative",
+    zIndex: 1000,
     flex: 1,
     minWidth: 0,
     borderWidth: 1,
@@ -952,6 +1380,7 @@ export default StyleSheet.create({
     borderRadius: 16,
     backgroundColor: colors.white,
     padding: spacing.md,
+    overflow: "visible",
   },
 
   recordToolbarHeader: {
@@ -999,10 +1428,13 @@ export default StyleSheet.create({
   },
 
   recordToolbarFilterGrid: {
+    position: "relative",
+    zIndex: 1000,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "flex-start",
     gap: spacing.sm,
+    overflow: "visible",
   },
 
   recordToolbarField: {
@@ -1010,7 +1442,13 @@ export default StyleSheet.create({
     flexBasis: isTablet ? "100%" : 180,
     minWidth: isTablet ? "100%" : 160,
     position: "relative",
-    zIndex: 2,
+    zIndex: 10,
+    overflow: "visible",
+  },
+
+  recordToolbarFieldOpen: {
+    zIndex: 3000,
+    elevation: 24,
   },
 
   recordToolbarLabel: {
@@ -1056,13 +1494,14 @@ export default StyleSheet.create({
     top: Platform.OS === "web" ? 68 : undefined,
     left: 0,
     right: 0,
-    zIndex: 50,
+    zIndex: 4000,
     maxHeight: 210,
     borderWidth: 1,
     borderColor: "#D8E8FF",
     borderRadius: 14,
     backgroundColor: colors.white,
     padding: 6,
+    elevation: 24,
   },
 
   recordToolbarDropdownScroll: {

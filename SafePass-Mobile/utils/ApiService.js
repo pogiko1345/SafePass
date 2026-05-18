@@ -46,6 +46,11 @@ const API_BASE_URL_CANDIDATES = [
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
 const API_DEBUG_ENABLED = process.env.EXPO_PUBLIC_API_DEBUG === "true";
+const logApiDebug = (...args) => {
+  if (API_DEBUG_ENABLED) {
+    console.log(...args);
+  }
+};
 const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const WEB_REMEMBERED_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const REMEMBERED_SESSION_DURATION_MS =
@@ -299,7 +304,7 @@ class ApiService {
   // ================= GENERIC FETCH =================
 async fetch(url, options = {}) {
   const token = await this.getToken();
-  console.log(`🌐 FETCH: ${url}, Method: ${options.method || 'GET'}, Has Token: ${!!token}`);
+  logApiDebug(`[ApiService] FETCH ${url}, Method: ${options.method || 'GET'}, Has Token: ${!!token}`);
 
   const headers = {
     "Content-Type": "application/json",
@@ -318,24 +323,24 @@ async fetch(url, options = {}) {
   }
 
   try {
-    console.log(`📤 Sending request to: ${API_BASE_URL}${url}`);
+    logApiDebug(`[ApiService] Sending request to: ${API_BASE_URL}${url}`);
     const response = await fetch(`${API_BASE_URL}${url}`, config);
-    console.log(`📥 Response status: ${response.status}`);
+    logApiDebug(`[ApiService] Response status: ${response.status}`);
 
     const contentType = response.headers.get("content-type");
     let data;
 
     if (contentType && contentType.includes("application/json")) {
       data = await response.json();
-      console.log(`📦 Response data:`, data);
+      logApiDebug("[ApiService] Response data:", data);
     } else {
       const text = await response.text();
       data = text ? { message: text } : {};
-      console.log(`📦 Response text:`, text);
+      logApiDebug("[ApiService] Response text:", text);
     }
 
     if (!response.ok) {
-      console.log(`❌ HTTP ${response.status}:`, data);
+      logApiDebug(`[ApiService] HTTP ${response.status}:`, data);
       const apiError = new Error(data.error || data.message || `HTTP ${response.status}`);
       apiError.status = response.status;
       apiError.data = data;
@@ -358,12 +363,12 @@ async fetch(url, options = {}) {
 
 async register(userData) {
   try {
-    console.log('📝 Registering user:', userData);
+    logApiDebug("[ApiService] Registering user:", userData);
     const response = await this.fetch("/register", {
       method: "POST",
       body: userData,
     });
-    console.log('📥 Register response:', response);
+    logApiDebug("[ApiService] Register response:", response);
     return response;
   } catch (error) {
     console.error('❌ Register error:', error);
@@ -402,8 +407,8 @@ async register(userData) {
       const payload = {
         ...studentData,
         role,
-        status: studentData?.status || "inactive",
-        isActive: studentData?.isActive ?? false,
+        status: studentData?.status || "active",
+        isActive: studentData?.isActive ?? true,
       };
       return await this.fetch("/admin/students/create", {
         method: "POST",
@@ -488,12 +493,12 @@ async register(userData) {
       }
       return response;
     } catch (error) {
-      console.log("Profile fetch failed:", error.message);
+      logApiDebug("Profile fetch failed:", error.message);
       
       if (error.message.includes("401") || error.message.includes("authenticate")) {
         const cachedUser = await this.getCurrentUser();
         if (cachedUser) {
-          console.log("Using cached user data as fallback");
+          logApiDebug("Using cached user data as fallback");
           return { 
             user: cachedUser,
             fromCache: true,
@@ -524,7 +529,7 @@ async register(userData) {
     try {
       return JSON.parse(json);
     } catch (error) {
-      console.log("Invalid cached user data. Removing currentUser cache.", error);
+      logApiDebug("Invalid cached user data. Removing currentUser cache.", error);
       await AsyncStorage.removeItem("currentUser");
       return null;
     }
@@ -624,7 +629,7 @@ async verifyCredentials(email, password) {
       });
       return response;
     } catch (error) {
-      console.log("⚠️ OTP request API not ready - using simulation");
+      logApiDebug("OTP request API not ready - using simulation");
       
       if (!this.isDevFallbackEnabled()) {
         throw error;
@@ -640,7 +645,7 @@ async verifyCredentials(email, password) {
         expiresAt: Date.now() + 60000
       };
       
-      console.log(`📱 [SIMULATION] OTP for ${phoneNumber}: ${mockOtp}`);
+      logApiDebug(`[SIMULATION] OTP for ${phoneNumber}: ${mockOtp}`);
       
       if (__DEV__) {
         setTimeout(() => {
@@ -665,7 +670,7 @@ async verifyCredentials(email, password) {
       });
       return response;
     } catch (error) {
-      console.log("⚠️ OTP verify API not ready - using simulation");
+      logApiDebug("OTP verify API not ready - using simulation");
       
       if (!this.isDevFallbackEnabled()) {
         throw error;
@@ -705,7 +710,7 @@ async verifyCredentials(email, password) {
       });
       return response;
     } catch (error) {
-      console.log("⚠️ Enable 2FA API not ready - using simulation");
+      logApiDebug("Enable 2FA API not ready - using simulation");
       if (!this.isDevFallbackEnabled()) {
         throw error;
       }
@@ -724,7 +729,7 @@ async verifyCredentials(email, password) {
       });
       return response;
     } catch (error) {
-      console.log("⚠️ Disable 2FA API not ready - using simulation");
+      logApiDebug("Disable 2FA API not ready - using simulation");
       if (!this.isDevFallbackEnabled()) {
         throw error;
       }
@@ -770,10 +775,7 @@ async verifyCredentials(email, password) {
   }
 
   async simulateNfcScan(location, accessType = "entry") {
-    return await this.fetch("/nfc-scan", {
-      method: "POST",
-      body: { location, accessType },
-    });
+    throw new Error("Legacy NFC scan simulation is disabled. Use submitCheckpointTap for live checkpoint taps.");
   }
 
   async getStats() {
@@ -790,7 +792,7 @@ async verifyCredentials(email, password) {
       });
       return response;
     } catch (error) {
-      console.log("⚠️ Password reset API not ready - using simulation");
+      logApiDebug("Password reset API not ready - using simulation");
       
       if (!this.isDevFallbackEnabled()) {
         throw error;
@@ -802,7 +804,7 @@ async verifyCredentials(email, password) {
         expiresAt: Date.now() + 600000
       };
       
-      console.log(`📧 [SIMULATION] Password reset OTP for ${email}: 123456`);
+      logApiDebug(`[SIMULATION] Password reset OTP for ${email}: 123456`);
       
       if (__DEV__) {
         setTimeout(() => {
@@ -825,7 +827,7 @@ async verifyCredentials(email, password) {
       });
       return response;
     } catch (error) {
-      console.log("⚠️ Password reset verify API not ready - using simulation");
+      logApiDebug("Password reset verify API not ready - using simulation");
       
       if (!this.isDevFallbackEnabled()) {
         throw error;
@@ -861,7 +863,7 @@ async verifyCredentials(email, password) {
       });
       return response;
     } catch (error) {
-      console.log("⚠️ Password reset API not ready - using simulation");
+      logApiDebug("Password reset API not ready - using simulation");
       if (!this.isDevFallbackEnabled()) {
         throw error;
       }
@@ -897,7 +899,7 @@ async verifyCredentials(email, password) {
         String(error?.data?.code || "").toUpperCase() === "ACCOUNT_EXISTS" ||
         String(error?.message || "").toLowerCase().includes("already exists");
       if (isExistingAccount) {
-        console.log("Visitor registration needs existing-account login:", error?.message);
+        logApiDebug("Visitor registration needs existing-account login:", error?.message);
       } else {
         console.error("Visitor registration error:", error);
       }
@@ -1109,7 +1111,10 @@ async verifyCredentials(email, password) {
 
   async getMyAttendance(filters = {}) {
     try {
-      const queryString = new URLSearchParams(filters).toString();
+      const queryString = new URLSearchParams({
+        ...filters,
+        ts: Date.now(),
+      }).toString();
       return await this.fetch(`/my-attendance${queryString ? `?${queryString}` : ""}`);
     } catch (error) {
       console.error("Get my attendance error:", error);
@@ -1382,12 +1387,12 @@ async verifyCredentials(email, password) {
 
 async approveVisitor(visitorId, adminNotes = '') {
   try {
-    console.log(`🚀 Approving visitor with ID: ${visitorId}`);
+    logApiDebug(`Approving visitor with ID: ${visitorId}`);
     const response = await this.fetch(`/admin/visitors/${visitorId}/approve`, {
       method: "PUT",
       body: { adminNotes }
     });
-    console.log('✅ Approve response:', response);
+    logApiDebug("Approve response:", response);
     return response;
   } catch (error) {
     console.error('❌ Approve error:', error);
@@ -1397,12 +1402,12 @@ async approveVisitor(visitorId, adminNotes = '') {
 
 async rejectVisitor(visitorId, reason) {
   try {
-    console.log(`🚀 Rejecting visitor with ID: ${visitorId}, Reason: ${reason}`);
+    logApiDebug(`Rejecting visitor with ID: ${visitorId}`);
     const response = await this.fetch(`/admin/visitors/${visitorId}/reject`, {
       method: "PUT",
       body: { reason }
     });
-    console.log('✅ Reject response:', response);
+    logApiDebug("Reject response:", response);
     return response;
   } catch (error) {
     console.error('❌ Reject error:', error);
@@ -1637,7 +1642,7 @@ async rejectVisitor(visitorId, reason) {
 
   async assignNfcCard({ userId, email, cardId, nfcCardId, uid } = {}) {
     try {
-      const response = await this.fetch("/admin/nfc-cards/assign", {
+      const response = await this.fetch("/nfc-cards/assign", {
         method: "POST",
         body: { userId, email, cardId, nfcCardId, uid },
       });
@@ -1648,10 +1653,21 @@ async rejectVisitor(visitorId, reason) {
     }
   }
 
-  async revokeNfcCard(userId) {
+  async revokeNfcCard(userIdOrTarget) {
     try {
-      const response = await this.fetch(`/admin/nfc-cards/${userId}/revoke`, {
+      const target =
+        typeof userIdOrTarget === "object" && userIdOrTarget !== null
+          ? userIdOrTarget
+          : { userId: userIdOrTarget };
+      const identifier = target.userId || target.email;
+      if (!identifier) {
+        throw new Error("User ID or email is required to revoke an NFC card.");
+      }
+      const response = await this.fetch(`/nfc-cards/${encodeURIComponent(identifier)}/revoke`, {
         method: "PUT",
+        body: {
+          email: target.email,
+        },
       });
       return response;
     } catch (error) {
@@ -1676,7 +1692,7 @@ async rejectVisitor(visitorId, reason) {
 // Create a new security guard
 async createSecurityGuard(guardData) {
   try {
-    console.log('👮 Creating security guard:', guardData);
+    logApiDebug("Creating security guard:", guardData);
     
     const response = await this.fetch("/admin/security/create", {
       method: "POST",
@@ -1687,7 +1703,7 @@ async createSecurityGuard(guardData) {
       }
     });
     
-    console.log('📥 Create guard response:', response);
+    logApiDebug("Create guard response:", response);
     return response;
   } catch (error) {
     console.error("❌ Create security guard error:", error);
@@ -1850,7 +1866,7 @@ generateRandomPassword(length = 10) {
 
   async getMapSettings() {
     try {
-      const response = await this.fetch("/map-settings");
+      const response = await this.fetch(`/map-settings?ts=${Date.now()}`);
       return response;
     } catch (error) {
       console.error("Get map settings error:", error);
@@ -2144,4 +2160,5 @@ ApiService.prototype.testConnection = async function testConnectionWithAndroidFa
 };
 
 export default new ApiService();
+
 

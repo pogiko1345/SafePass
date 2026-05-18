@@ -1000,6 +1000,8 @@ export default StyleSheet.create({
   },
 
   appointmentRecordsToolbar: {
+    position: "relative",
+    zIndex: 1000,
     flexDirection: width < 1180 ? "column" : "row",
     alignItems: "flex-start",
     gap: 14,
@@ -1008,6 +1010,8 @@ export default StyleSheet.create({
   },
 
   appointmentToolbarCard: {
+    position: "relative",
+    zIndex: 1000,
     flex: 1,
     width: width < 1180 ? "100%" : undefined,
     minWidth: 0,
@@ -1016,6 +1020,7 @@ export default StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#FFFFFF",
     padding: 14,
+    overflow: "visible",
   },
 
   appointmentToolbarHeader: {
@@ -1094,10 +1099,13 @@ export default StyleSheet.create({
   },
 
   appointmentToolbarFilterGrid: {
+    position: "relative",
+    zIndex: 1000,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "flex-start",
     gap: 10,
+    overflow: "visible",
   },
 
   appointmentToolbarFooter: {
@@ -1109,7 +1117,13 @@ export default StyleSheet.create({
     flexBasis: width < 760 ? "100%" : 150,
     minWidth: width < 760 ? "100%" : 140,
     position: "relative",
-    zIndex: 2,
+    zIndex: 10,
+    overflow: "visible",
+  },
+
+  appointmentToolbarFieldOpen: {
+    zIndex: 3000,
+    elevation: 24,
   },
 
   appointmentToolbarLabel: {
@@ -1175,7 +1189,7 @@ export default StyleSheet.create({
     top: Platform.OS === "web" ? 68 : undefined,
     left: 0,
     right: 0,
-    zIndex: 50,
+    zIndex: 4000,
     maxHeight: 210,
     borderWidth: 1,
     borderColor: "#D8E8FF",
@@ -1186,7 +1200,7 @@ export default StyleSheet.create({
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 12 },
     shadowRadius: 20,
-    elevation: 6,
+    elevation: 24,
   },
 
   appointmentToolbarDropdownScroll: {
@@ -1885,8 +1899,10 @@ export default StyleSheet.create({
   },
 
   adminTableActionButton: {
+    flexDirection: "row",
+    gap: 6,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
     minWidth: 78,
@@ -2439,6 +2455,8 @@ export default StyleSheet.create({
   },
 
   attendanceSummaryGrid: {
+    position: "relative",
+    zIndex: 1,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
@@ -3750,6 +3768,24 @@ export default StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: "#1C6DD0",
+  },
+
+  adminNoticeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+
+  adminNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
   },
 
   managementStatsGrid: {

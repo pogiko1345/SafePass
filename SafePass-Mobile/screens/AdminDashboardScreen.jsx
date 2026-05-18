@@ -329,8 +329,12 @@ const createAppointmentFilterDraft = () => ({
 });
 
 const ATTENDANCE_SCOPE_OPTIONS = [
-  { key: "students", label: "Students", roles: ["student", "teacher"] },
-  { key: "staff", label: "Staff", roles: ["staff", "security", "guard"] },
+  { key: "all", label: "All Person Types", roles: ["student", "teacher", "staff", "security", "guard", "visitor"] },
+  { key: "students", label: "Students", roles: ["student"] },
+  { key: "teachers", label: "Academic Staff / Teachers", roles: ["teacher"] },
+  { key: "staff", label: "Staff", roles: ["staff"] },
+  { key: "security", label: "Security", roles: ["security", "guard"] },
+  { key: "visitors", label: "Visitors", roles: ["visitor"] },
 ];
 
 const ATTENDANCE_DATE_SHORTCUTS = [
@@ -608,6 +612,18 @@ const sanitizeAccountEmailPart = (value = "") =>
   String(value || "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
+
+const normalizeAdminNfcCardUid = (value = "") => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  const compactHexValue = rawValue.replace(/[\s:-]/g, "");
+  if (/^[0-9A-Fa-f]+$/.test(compactHexValue) && compactHexValue.length >= 4) {
+    return compactHexValue.toUpperCase();
+  }
+
+  return rawValue.toUpperCase();
+};
 
 const getAccountEmailRolePart = (form = {}) => {
   if (String(form.role || "").toLowerCase() === "student") return "student";
@@ -1173,7 +1189,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState(null);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
-  const [attendanceScope, setAttendanceScope] = useState("students");
+  const [attendanceScope, setAttendanceScope] = useState("all");
   const [attendanceDateShortcut, setAttendanceDateShortcut] = useState("today");
   const [attendanceSearchTerm, setAttendanceSearchTerm] = useState("");
 
@@ -1203,6 +1219,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   });
   const [selectedMapActivity, setSelectedMapActivity] = useState(null);
   const [hoveredMapVisitor, setHoveredMapVisitor] = useState(null);
+  const [adminLiveVisitorLocations, setAdminLiveVisitorLocations] = useState([]);
   const [showAdminMapModal, setShowAdminMapModal] = useState(false);
   const [adminMapFilter, setAdminMapFilter] = useState("all");
   const [lastAdminMapRefreshAt, setLastAdminMapRefreshAt] = useState(null);
@@ -1255,6 +1272,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     course: "",
     yearLevel: "",
     section: "",
+    parentName: "",
+    parentEmail: "",
+    nfcCardId: "",
     status: "inactive",
   });
 
@@ -1274,6 +1294,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     course: "",
     yearLevel: "",
     section: "",
+    parentName: "",
+    parentEmail: "",
+    nfcCardId: "",
     status: "active",
     isActive: true,
   });
@@ -1338,6 +1361,13 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     if (!resolvedId) issues.push(isAcademicStaffAccount ? "Academic staff ID" : isStudentAccount ? "Student ID" : "Staff/Security number");
     if (needsAdminPhone && newUserData.phone && !isValidPhilippineMobileNumber(newUserData.phone)) {
       issues.push("Valid Philippine contact number");
+    }
+    if (
+      isStudentAccount &&
+      String(newUserData.parentEmail || "").trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(newUserData.parentEmail || "").trim())
+    ) {
+      issues.push("Valid parent email");
     }
     if (!isAcademicAccessAccount && !isSecurityRole(newUserData.role) && !String(newUserData.department || "").trim()) {
       issues.push("Department");
@@ -1443,6 +1473,35 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           }
         } catch (error) {
           console.log("Shared map settings load skipped:", error?.message || error);
+        }
+
+        const defaultRoomById = MONITORING_MAP_OFFICES.reduce((lookup, room) => {
+          lookup[room.id] = room;
+          return lookup;
+        }, {});
+        const roomIds = new Set(nextRooms.map((room) => room.id));
+        const restoredRequiredRoomIds = ["mezzanine-fire-exit"].filter(
+          (roomId) => defaultRoomById[roomId] && !roomIds.has(roomId),
+        );
+
+        if (restoredRequiredRoomIds.length) {
+          nextRooms = [
+            ...nextRooms,
+            ...restoredRequiredRoomIds.map((roomId) => defaultRoomById[roomId]),
+          ];
+          nextRoomPositions = {
+            ...nextRoomPositions,
+            ...restoredRequiredRoomIds.reduce((positions, roomId) => {
+              positions[roomId] = MONITORING_MAP_OFFICE_POSITIONS[roomId];
+              return positions;
+            }, {}),
+          };
+          ApiService.updateAdminMapSettings({
+            rooms: nextRooms,
+            roomPositions: nextRoomPositions,
+          }).catch((syncError) => {
+            console.log("Required map room migration skipped:", syncError?.message || syncError);
+          });
         }
 
         setManagedRooms(nextRooms);
@@ -1666,6 +1725,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         icon: "briefcase-outline",
         accent: ADMIN_BLUE,
         primaryActionLabel: "Create Staff",
+        primaryActionRole: "staff",
         searchPlaceholder: "Search staff by name, email, phone, or department...",
         stats: [
           { key: "total", label: "Staff Accounts", value: scopedUsers.length, icon: "people-outline" },
@@ -1689,6 +1749,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         icon: "shield-checkmark-outline",
         accent: ADMIN_BLUE,
         primaryActionLabel: "Create Security",
+        primaryActionRole: "security",
         searchPlaceholder: "Search security personnel by name, email, or phone...",
         stats: [
           { key: "total", label: "Security Accounts", value: scopedUsers.length, icon: "shield-outline" },
@@ -1711,6 +1772,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       icon: "people-circle-outline",
       accent: ADMIN_BLUE,
       primaryActionLabel: null,
+      primaryActionRole: null,
       searchPlaceholder: "Search all users by name, email, phone, or department...",
       stats: [
         { key: "total", label: "Total Users", value: allUsers.length, icon: "people-outline" },
@@ -1721,6 +1783,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       filters: [
         { key: "all", label: "All", count: allUsers.length },
         { key: "staff", label: "Staff", count: staffUsers.length },
+        { key: "teacher", label: "Staff Teacher", count: academicStaffUsers.length },
+        { key: "student", label: "Students", count: studentUsers.length },
         { key: "security", label: "Security", count: guardUsers.length },
         { key: "visitor", label: "Visitors", count: visitorUsers.length },
         { key: "admin", label: "Admins", count: adminUsers.length },
@@ -1732,9 +1796,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     accountRecordsMode,
     activeUsersList.length,
     adminUsers.length,
+    academicStaffUsers.length,
     allUsers.length,
     guardUsers.length,
     inactiveUsersList.length,
+    studentUsers.length,
     scopedActiveUsers.length,
     scopedInactiveUsers.length,
     scopedUsers.length,
@@ -1979,6 +2045,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         "status",
         (item) => getRequestStatus(item),
         (item) => getVisitorSafePassId(item),
+        (item) => getVisitorNfcUid(item),
         (item) => [
           formatDateInputValue(item.visitDate || item.scheduledVisitStart || item.createdAt),
           formatTimeInputValue(item.visitTime || item.scheduledVisitStart),
@@ -2438,9 +2505,16 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   };
 
   const getVisitorSafePassId = (visitor = {}) =>
-    visitor.nfcCardId ||
     visitor.safePassId ||
+    visitor.relatedVisitor?.safePassId ||
+    "Not assigned";
+
+  const getVisitorNfcUid = (visitor = {}) =>
+    visitor.physicalNfcUid ||
+    visitor.nfcCardId ||
+    visitor.relatedUser?.physicalNfcUid ||
     visitor.relatedUser?.nfcCardId ||
+    visitor.relatedVisitor?.physicalNfcUid ||
     visitor.relatedVisitor?.nfcCardId ||
     "Not assigned";
 
@@ -2912,9 +2986,11 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
     setUser(currentUser);
-    await Promise.all([
+    setIsLoading(false);
+    await Promise.allSettled([
       loadAdminStats(),
       loadAllVisitRequests(),
+      loadAdminLiveVisitorLocations(),
       loadAllUsers(),
       loadRecentActivities(),
       loadAppointmentManagementOptions(),
@@ -3020,12 +3096,25 @@ const loadDashboardData = useCallback(async () => {
     loadDashboardData();
   }, [loadDashboardData]);
 
+  const loadAdminLiveVisitorLocations = async () => {
+    try {
+      const response = await ApiService.getSecurityLiveVisitorLocations({ limit: 200 });
+      setAdminLiveVisitorLocations(Array.isArray(response?.visitors) ? response.visitors : []);
+      return true;
+    } catch (error) {
+      console.error("Load admin live visitor locations error:", error);
+      setAdminLiveVisitorLocations([]);
+      return false;
+    }
+  };
+
   const refreshAdminMapData = async () => {
     if (adminMapRefreshRef.current) return;
     adminMapRefreshRef.current = true;
     try {
       await Promise.all([
         loadAllVisitRequests({ silent: true }),
+        loadAdminLiveVisitorLocations(),
         loadRecentActivities(),
       ]);
       setLastAdminMapRefreshAt(new Date().toISOString());
@@ -3175,8 +3264,8 @@ const loadDashboardData = useCallback(async () => {
   );
 
   const monitoredMapVisitors = useMemo(
-    () =>
-      visitRequests
+    () => {
+      const checkedInRequestVisitors = visitRequests
         .filter((visitor) => visitor?.status === "checked_in")
         .slice(0, 18)
         .map((visitor, index) => {
@@ -3207,8 +3296,83 @@ const loadDashboardData = useCallback(async () => {
             detail: managedLocation.office || "Visitor is currently on site.",
             sourceVisitor: visitor,
           };
-        }),
-    [getManagedVisitorMapLocation, visitRequests],
+        });
+
+      if (!adminLiveVisitorLocations.length) {
+        return checkedInRequestVisitors;
+      }
+
+      const requestById = new Map(
+        visitRequests.map((visitor) => [String(visitor?._id || visitor?.id || ""), visitor]),
+      );
+
+      return adminLiveVisitorLocations.slice(0, 40).map((liveVisitor, index) => {
+        const visitorId = String(liveVisitor?.visitorId || liveVisitor?.id || liveVisitor?._id || "");
+        const matchedVisitor = requestById.get(visitorId) || null;
+        const coordinates = liveVisitor?.coordinates || {};
+        const liveLocation = {
+          floor: liveVisitor?.floor || matchedVisitor?.currentLocation?.floor || "ground",
+          office:
+            liveVisitor?.office ||
+            liveVisitor?.currentLocation ||
+            matchedVisitor?.currentLocation?.office ||
+            matchedVisitor?.assignedOffice ||
+            "Campus",
+          source: liveVisitor?.source || matchedVisitor?.currentLocation?.source || "checkpoint",
+          timestamp:
+            liveVisitor?.lastScanTime ||
+            liveVisitor?.checkedInAt ||
+            matchedVisitor?.currentLocation?.lastSeenAt ||
+            matchedVisitor?.checkedInAt ||
+            new Date().toISOString(),
+          coordinates:
+            Number.isFinite(Number(coordinates.x)) && Number.isFinite(Number(coordinates.y))
+              ? { x: Number(coordinates.x), y: Number(coordinates.y) }
+              : getVisitorMonitorCoordinates(matchedVisitor || liveVisitor, index),
+        };
+        const sourceVisitor = matchedVisitor
+          ? {
+              ...matchedVisitor,
+              currentLocation: {
+                ...(matchedVisitor.currentLocation || {}),
+                floor: liveLocation.floor,
+                office: liveLocation.office,
+                source: liveLocation.source,
+                lastSeenAt: liveLocation.timestamp,
+                coordinates: liveLocation.coordinates,
+                checkpointId: liveVisitor?.checkpointId || matchedVisitor.currentLocation?.checkpointId || "",
+                statusLabel: liveVisitor?.statusLabel || matchedVisitor.currentLocation?.statusLabel || "",
+                isActive: liveVisitor?.status !== "exited",
+              },
+            }
+          : {
+              _id: visitorId,
+              fullName: liveVisitor?.name || "Checked-In Visitor",
+              email: liveVisitor?.email || "",
+              phoneNumber: liveVisitor?.phone || "",
+              purposeOfVisit: liveVisitor?.purpose || "On-site visit",
+              assignedOffice: liveLocation.office,
+              status: "checked_in",
+              checkedInAt: liveVisitor?.checkedInAt || liveVisitor?.lastScanTime || "",
+              currentLocation: liveLocation,
+            };
+
+        return {
+          id: visitorId || `live-visitor-${index}`,
+          name: sourceVisitor.fullName || liveVisitor?.name || "Checked-In Visitor",
+          purpose: sourceVisitor.purposeOfVisit || liveVisitor?.purpose || "On-site visit",
+          status: "checked_in",
+          location: liveLocation,
+          activityType: "security_checkin",
+          eventLabel: liveVisitor?.statusLabel || "Checked In",
+          lastUpdate: liveLocation.timestamp,
+          detail: liveLocation.office || "Visitor is currently on site.",
+          sourceVisitor,
+          nfcCardId: sourceVisitor.nfcCardId || liveVisitor?.nfcCardId || "",
+        };
+      });
+    },
+    [adminLiveVisitorLocations, getManagedVisitorMapLocation, visitRequests],
   );
 
   const visibleAdminMapVisitors = useMemo(
@@ -3516,7 +3680,7 @@ const loadDashboardData = useCallback(async () => {
     }
 
     if (submoduleKey === "account-create") {
-      resetCreateUserForm("staff");
+      resetCreateUserForm(options.createRole || "staff");
     }
 
     syncLegacyMenuState(legacyMenuKey);
@@ -3742,8 +3906,7 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const openCreateUserModal = (role = accountRecordsMode === "security" ? "security" : "staff") => {
-    resetCreateUserForm(role);
-    selectAdminSubmodule("account-create");
+    selectAdminSubmodule("account-create", { createRole: role });
   };
 
   const getStaffDepartmentOption = (department) =>
@@ -3795,6 +3958,8 @@ const loadDashboardData = useCallback(async () => {
     const normalizedStudentId = String(newUserData.studentId || (isStudentAccount ? generatedEmployeeId : "") || "").trim();
     const normalizedTeacherId = String(newUserData.teacherId || (isAcademicStaffAccount ? generatedEmployeeId : "") || "").trim();
     const normalizedAcademicId = isAcademicStaffAccount ? normalizedTeacherId : normalizedStudentId;
+    const normalizedNfcCardId = normalizeAdminNfcCardUid(newUserData.nfcCardId);
+    const normalizedParentEmail = String(newUserData.parentEmail || "").trim().toLowerCase();
 
     if (!String(newUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(newUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
@@ -3817,6 +3982,9 @@ const loadDashboardData = useCallback(async () => {
         : "";
     if (!isAcademicAccessAccount && String(newUserData.phone || "").trim() && !isValidPhilippineMobileNumber(newUserData.phone)) {
       nextErrors.phone = PHILIPPINE_MOBILE_NUMBER_MESSAGE;
+    }
+    if (isStudentAccount && normalizedParentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedParentEmail)) {
+      nextErrors.parentEmail = "Enter a valid parent or guardian email address.";
     }
 
     if (!isSecurityRole(newUserData.role) && !isAcademicAccessAccount) {
@@ -3856,6 +4024,14 @@ const loadDashboardData = useCallback(async () => {
           : "This student ID is already registered.";
       }
     }
+    if (normalizedNfcCardId) {
+      const existingNfcCard = allUsers.find(
+        (userItem) => normalizeAdminNfcCardUid(userItem?.physicalNfcUid || userItem?.nfcCardId) === normalizedNfcCardId,
+      );
+      if (existingNfcCard) {
+        nextErrors.nfcCardId = "This NFC card UID is already assigned.";
+      }
+    }
 
     setCreateUserErrors(nextErrors);
     return {
@@ -3866,6 +4042,8 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmployeeId,
       normalizedStudentId,
       normalizedTeacherId,
+      normalizedNfcCardId,
+      normalizedParentEmail,
     };
   };
 
@@ -3888,6 +4066,7 @@ const loadDashboardData = useCallback(async () => {
       employeeId: isCreateEmployeeIdManuallyEdited ? currentValue.employeeId : "",
       studentId: isCreateEmployeeIdManuallyEdited ? currentValue.studentId : "",
       teacherId: isCreateEmployeeIdManuallyEdited ? currentValue.teacherId : "",
+      nfcCardId: currentValue.nfcCardId,
     }));
     setCreateUserErrors({});
     setStaffDropdownOpen(null);
@@ -3908,6 +4087,8 @@ const loadDashboardData = useCallback(async () => {
     const isEditingStudent = normalizedRole === "student";
     const isEditingTeacher = normalizedRole === "teacher";
     const academicId = String(isEditingTeacher ? editUserData.teacherId : editUserData.studentId || "").trim();
+    const normalizedNfcCardId = normalizeAdminNfcCardUid(editUserData.nfcCardId);
+    const normalizedParentEmail = String(editUserData.parentEmail || "").trim().toLowerCase();
 
     if (!String(editUserData.firstName || "").trim()) nextErrors.firstName = "First name is required.";
     if (!String(editUserData.lastName || "").trim()) nextErrors.lastName = "Last name is required.";
@@ -3917,9 +4098,10 @@ const loadDashboardData = useCallback(async () => {
     if (!["staff", "security", "guard", "student", "teacher", "admin", "visitor"].includes(normalizedRole)) {
       nextErrors.role = "Select a valid role.";
     }
-    if (!String(editUserData.phone || "").trim()) {
+    const isEditingSecurity = isSecurityRole(normalizedRole);
+    if (isEditingSecurity && !String(editUserData.phone || "").trim()) {
       nextErrors.phone = "Contact number is required.";
-    } else if (!isValidPhilippineMobileNumber(editUserData.phone)) {
+    } else if (String(editUserData.phone || "").trim() && !isValidPhilippineMobileNumber(editUserData.phone)) {
       nextErrors.phone = PHILIPPINE_MOBILE_NUMBER_MESSAGE;
     }
     if (normalizedRole === "staff" && !String(editUserData.department || "").trim()) {
@@ -3929,6 +4111,9 @@ const loadDashboardData = useCallback(async () => {
       nextErrors[isEditingTeacher ? "teacherId" : "studentId"] = isEditingTeacher
         ? "Academic staff ID is required."
         : "Student ID is required.";
+    }
+    if (isEditingStudent && normalizedParentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedParentEmail)) {
+      nextErrors.parentEmail = "Enter a valid parent or guardian email address.";
     }
     if (!["active", "inactive", "pending", "suspended"].includes(String(editUserData.status || "").toLowerCase())) {
       nextErrors.status = "Select a valid account status.";
@@ -3959,6 +4144,15 @@ const loadDashboardData = useCallback(async () => {
       if (duplicateEmployeeId) nextErrors.employeeId = "This staff/security ID is already registered.";
     }
 
+    if (normalizedNfcCardId) {
+      const duplicateNfcCard = allUsers.find(
+        (userItem) =>
+          String(userItem?._id || userItem?.id) !== String(selectedId) &&
+          normalizeAdminNfcCardUid(userItem?.physicalNfcUid || userItem?.nfcCardId) === normalizedNfcCardId,
+      );
+      if (duplicateNfcCard) nextErrors.nfcCardId = "This NFC card UID is already assigned.";
+    }
+
     if (showErrors) setEditUserErrors(nextErrors);
     return {
       isValid: Object.keys(nextErrors).length === 0,
@@ -3966,6 +4160,8 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmail,
       normalizedUsername,
       normalizedEmployeeId,
+      normalizedNfcCardId,
+      normalizedParentEmail,
     };
   };
 
@@ -4071,6 +4267,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmployeeId,
       normalizedStudentId,
       normalizedTeacherId,
+      normalizedNfcCardId,
     } = validateCreateUserForm();
     if (!isValid) {
       Alert.alert("Validation Error", "Please review the highlighted fields before creating the account.");
@@ -4094,8 +4291,9 @@ const loadDashboardData = useCallback(async () => {
         phone: normalizedPhone,
         role: newUserData.role,
         employeeId: normalizedEmployeeId,
-        status: "inactive",
-        isActive: false,
+        nfcCardId: normalizedNfcCardId || undefined,
+        status: isAcademicAccessAccount ? "active" : "inactive",
+        isActive: isAcademicAccessAccount,
       };
 
       if (isAcademicAccessAccount) {
@@ -4108,6 +4306,10 @@ const loadDashboardData = useCallback(async () => {
         userPayload.course = newUserData.course || "";
         userPayload.yearLevel = newUserData.yearLevel || "";
         userPayload.section = newUserData.section || "";
+        if (isStudentAccount) {
+          userPayload.parentName = newUserData.parentName || "";
+          userPayload.parentEmail = newUserData.parentEmail || "";
+        }
       } else if (newUserData.role === "staff") {
         userPayload.department = newUserData.department || "General";
         userPayload.position = newUserData.position || "Staff Member";
@@ -4124,6 +4326,7 @@ const loadDashboardData = useCallback(async () => {
             email: userPayload.email,
             phone: userPayload.phone,
             employeeId: userPayload.employeeId,
+            nfcCardId: userPayload.nfcCardId,
             position: userPayload.position,
             shift: userPayload.shift,
           })
@@ -4147,6 +4350,8 @@ const loadDashboardData = useCallback(async () => {
           employeeId: response.user?.employeeId || userPayload.employeeId,
           studentId: response.user?.studentId || userPayload.studentId,
           teacherId: response.user?.teacherId || userPayload.teacherId,
+          nfcCardId: response.user?.physicalNfcUid || response.user?.nfcCardId || userPayload.nfcCardId || "",
+          physicalNfcUid: response.user?.physicalNfcUid || response.user?.nfcCardId || userPayload.nfcCardId || "",
         };
         
         setAllUsers(prev => [...prev, newUser]);
@@ -4168,9 +4373,13 @@ const loadDashboardData = useCallback(async () => {
         setShowAddUserModal(false);
         const emailDelivery = response.emailDelivery || {};
         const deliveryNote = emailDelivery.delivered
-          ? `A secure activation and password setup link has been sent to ${normalizedEmail}.`
+          ? isAcademicAccessAccount
+            ? `Temporary login credentials were sent to ${normalizedEmail}.`
+            : `A secure activation and password setup link has been sent to ${normalizedEmail}.`
           : emailDelivery.simulated
-            ? `Account created. Activation email was simulated by the backend, so check the backend logs for the setup link.`
+            ? isAcademicAccessAccount
+              ? `Account created. Email was simulated, so use the temporary password shown here for first login.`
+              : `Account created. Activation email was simulated by the backend, so check the backend logs for the setup link.`
           : `Account created, but the activation email could not be sent. Check the backend mail logs before giving this account to the user.`;
         const createdAccountId =
           response.user?.teacherId ||
@@ -4179,6 +4388,7 @@ const loadDashboardData = useCallback(async () => {
           userPayload.teacherId ||
           userPayload.studentId ||
           userPayload.employeeId;
+        const createdNfcCardId = response.user?.physicalNfcUid || response.user?.nfcCardId || userPayload.nfcCardId || "";
 
         setCreatedUserSummary({
           name: createdName,
@@ -4186,8 +4396,10 @@ const loadDashboardData = useCallback(async () => {
           username: newUser.username || "N/A",
           role: roleDisplay,
           employeeId: createdAccountId,
+          nfcCardId: createdNfcCardId,
           idLabel: isAcademicStaffAccount ? "Academic Staff ID" : isStudentAccount ? "Student ID" : "Employee ID",
-          status: "Pending activation",
+          temporaryPassword: emailDelivery.temporaryPassword || response.temporaryPassword || "",
+          status: response.user?.status || (isAcademicAccessAccount ? "Active" : "Pending activation"),
           deliveryNote,
         });
         setShowCreateSuccessModal(true);
@@ -4219,6 +4431,9 @@ const loadDashboardData = useCallback(async () => {
           [isAcademicStaffAccount ? "teacherId" : "studentId"]: "This academic ID is already registered.",
         }));
         Alert.alert("ID Already Used", "This academic ID is already registered. Please use another ID.");
+      } else if (message.toLowerCase().includes("nfc card") || message.toLowerCase().includes("card uid")) {
+        setCreateUserErrors((currentValue) => ({ ...currentValue, nfcCardId: "This NFC card UID is already assigned." }));
+        Alert.alert("NFC UID Already Used", "This NFC card UID is already assigned. Please use another card.");
       } else {
         Alert.alert("Error", message || "Failed to create account");
       }
@@ -4247,6 +4462,9 @@ const loadDashboardData = useCallback(async () => {
       course: userItem.course || "",
       yearLevel: userItem.yearLevel || "",
       section: userItem.section || "",
+      parentName: userItem.parentName || userItem.guardianName || "",
+      parentEmail: userItem.parentEmail || userItem.guardianEmail || "",
+      nfcCardId: userItem.physicalNfcUid || userItem.nfcCardId || "",
       status: isUserActive(userItem) ? "active" : "inactive",
       isActive: isUserActive(userItem),
     });
@@ -4268,21 +4486,26 @@ const loadDashboardData = useCallback(async () => {
 
   const handleCloseCreateSuccessModal = async () => {
     const createdName = createdUserSummary?.name || "New user";
+    const createdRole = String(createdUserSummary?.role || newUserData.role || "staff").toLowerCase();
+    const nextAccountMode = isSecurityRole(createdRole)
+      ? "security"
+      : createdRole === "staff"
+        ? "staff"
+        : "all";
     setShowCreateSuccessModal(false);
     setCreatedUserSummary(null);
     resetCreateUserForm("staff");
     await loadDashboardData();
-    setActiveMenu("users");
+    selectAdminSubmodule("account-records", { accountMode: nextAccountMode });
     setUserFilter("all");
     setUserSearchQuery("");
     setCurrentPage(1);
     setUserManagementStatusTab("active");
     setCreateUserMessage(`${createdName} was added successfully.`);
-    setShowUserManagementModal(true);
   };
 
   // FIXED: Confirm Edit User
-  const confirmEditUser = async () => {
+  const confirmEditUser = async ({ confirmEnrollmentContactChange = false } = {}) => {
     if (!ensureAdminAccess()) return;
     const selectedId = editUserData.id;
     const {
@@ -4290,6 +4513,7 @@ const loadDashboardData = useCallback(async () => {
       normalizedEmail,
       normalizedUsername,
       normalizedEmployeeId,
+      normalizedNfcCardId,
     } = validateEditUserForm();
     const isEditingSecurity = isSecurityRole(editUserData.role);
     const isEditingStudent = String(editUserData.role || "").toLowerCase() === "student";
@@ -4338,6 +4562,30 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
 
+    if (isEditingStudent && !confirmEnrollmentContactChange) {
+      const previousParentName = String(selectedUser?.parentName || selectedUser?.guardianName || "").trim();
+      const previousParentEmail = String(selectedUser?.parentEmail || selectedUser?.guardianEmail || "").trim().toLowerCase();
+      const nextParentName = String(editUserData.parentName || "").trim();
+      const nextParentEmail = String(editUserData.parentEmail || "").trim().toLowerCase();
+      const enrollmentContactChanged =
+        previousParentName !== nextParentName || previousParentEmail !== nextParentEmail;
+
+      if (enrollmentContactChanged) {
+        Alert.alert(
+          "Update Enrollment Contact",
+          "Parent or guardian details are based on the official enrollment record. Continue only if you are correcting the school record.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Continue",
+              onPress: () => confirmEditUser({ confirmEnrollmentContactChange: true }),
+            },
+          ],
+        );
+        return;
+      }
+    }
+
     setProcessingId("edit-user");
     try {
       const updatePayload = {
@@ -4350,6 +4598,7 @@ const loadDashboardData = useCallback(async () => {
         department: editUserData.department,
         position: editUserData.position,
         employeeId: editUserData.employeeId,
+        nfcCardId: normalizedNfcCardId || "",
         status: editUserData.status,
         isActive: editUserData.status === "active",
       };
@@ -4359,6 +4608,8 @@ const loadDashboardData = useCallback(async () => {
         updatePayload.course = editUserData.course;
         updatePayload.yearLevel = editUserData.yearLevel;
         updatePayload.section = editUserData.section;
+        updatePayload.parentName = editUserData.parentName;
+        updatePayload.parentEmail = editUserData.parentEmail;
       }
       if (String(editUserData.role || "").toLowerCase() === "teacher") {
         updatePayload.teacherId = editUserData.teacherId;
@@ -4410,6 +4661,9 @@ const loadDashboardData = useCallback(async () => {
         Alert.alert("Username Already Used", "This username is already registered. Please use another username.");
       } else if (message.toLowerCase().includes("staff id already")) {
         Alert.alert("Staff ID Already Used", "This staff ID is already registered. Please use another staff ID.");
+      } else if (message.toLowerCase().includes("nfc card") || message.toLowerCase().includes("card uid")) {
+        setEditUserErrors((currentValue) => ({ ...currentValue, nfcCardId: "This NFC card UID is already assigned." }));
+        Alert.alert("NFC UID Already Used", "This NFC card UID is already assigned. Please use another card.");
       } else {
         Alert.alert("Error", error.message || "Failed to update user");
       }
@@ -5682,6 +5936,9 @@ const loadDashboardData = useCallback(async () => {
             SafePass ID: {getVisitorSafePassId(activity)}
           </Text>
           <Text style={[styles.adminMapActivityMeta, { color: theme.textSecondary }]}>
+            NFC UID: {getVisitorNfcUid(activity)}
+          </Text>
+          <Text style={[styles.adminMapActivityMeta, { color: theme.textSecondary }]}>
             {getMapFreshnessLabel(activity.timestamp || activity.createdAt)}
           </Text>
         </View>
@@ -5811,6 +6068,22 @@ const loadDashboardData = useCallback(async () => {
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 8 }}>
                 {getMapTrackingSourceLabel(activeMapActivity)} - {getMapFreshnessLabel(activeMapActivity.lastUpdate)}
               </Text>
+              <View style={{ marginTop: 10, gap: 6 }}>
+                {[
+                  ["Phone", activeMapActivity.sourceVisitor?.phoneNumber || activeMapActivity.sourceVisitor?.phone || "No phone"],
+                  ["Email", activeMapActivity.sourceVisitor?.email || "No email"],
+                  ["Office", activeMapActivity.location?.office || activeMapActivity.sourceVisitor?.assignedOffice || "Campus"],
+                  ["Schedule", activeMapActivity.sourceVisitor?.visitDate ? `${formatDate(activeMapActivity.sourceVisitor.visitDate)} ${activeMapActivity.sourceVisitor?.visitTime ? `at ${formatTime(activeMapActivity.sourceVisitor.visitTime)}` : ""}` : "No schedule"],
+                  ["Checked In", activeMapActivity.sourceVisitor?.checkedInAt ? formatDateTime(activeMapActivity.sourceVisitor.checkedInAt) : formatDateTime(activeMapActivity.lastUpdate)],
+                ].map(([label, value]) => (
+                  <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
+                    <Text style={{ color: theme.textSecondary, fontSize: 11, fontWeight: "700" }}>{label}</Text>
+                    <Text style={{ color: theme.textPrimary, fontSize: 11, fontWeight: "700", flex: 1, textAlign: "right" }} numberOfLines={1}>
+                      {value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           ) : (
             renderAdminMapEmptyState({
@@ -5941,6 +6214,22 @@ const loadDashboardData = useCallback(async () => {
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4 }}>
                 {formatDateTime(activeMapActivity.lastUpdate)}
               </Text>
+              <View style={{ marginTop: 10, gap: 6 }}>
+                {[
+                  ["Phone", activeMapActivity.sourceVisitor?.phoneNumber || activeMapActivity.sourceVisitor?.phone || "No phone"],
+                  ["Email", activeMapActivity.sourceVisitor?.email || "No email"],
+                  ["Office", activeMapActivity.location?.office || activeMapActivity.sourceVisitor?.assignedOffice || "Campus"],
+                  ["Schedule", activeMapActivity.sourceVisitor?.visitDate ? `${formatDate(activeMapActivity.sourceVisitor.visitDate)} ${activeMapActivity.sourceVisitor?.visitTime ? `at ${formatTime(activeMapActivity.sourceVisitor.visitTime)}` : ""}` : "No schedule"],
+                  ["Checked In", activeMapActivity.sourceVisitor?.checkedInAt ? formatDateTime(activeMapActivity.sourceVisitor.checkedInAt) : formatDateTime(activeMapActivity.lastUpdate)],
+                ].map(([label, value]) => (
+                  <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
+                    <Text style={{ color: theme.textSecondary, fontSize: 11, fontWeight: "700" }}>{label}</Text>
+                    <Text style={{ color: theme.textPrimary, fontSize: 11, fontWeight: "700", flex: 1, textAlign: "right" }} numberOfLines={1}>
+                      {value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           ) : (
             renderAdminMapEmptyState({
@@ -6012,9 +6301,9 @@ const loadDashboardData = useCallback(async () => {
               onClearSearch: () => setAttendanceSearchTerm(""),
               filterTitle: "Filters",
               filterSubtitle: "Narrow attendance records by person type and date range.",
-              hasFilters: attendanceScope !== "students" || attendanceDateShortcut !== "today",
+              hasFilters: attendanceScope !== "all" || attendanceDateShortcut !== "today",
               onResetFilters: () => {
-                setAttendanceScope("students");
+                setAttendanceScope("all");
                 setAttendanceDateShortcut("today");
               },
               filterGroups: [
@@ -6096,7 +6385,7 @@ const loadDashboardData = useCallback(async () => {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.adminTableScroll}>
                 <View style={[styles.adminTable, { minWidth: 920, backgroundColor: isDarkMode ? "#0F172A" : "#FFFFFF", borderColor: theme.borderColor }]}>
                   <View style={[styles.adminTableHeaderRow, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
-                    {["Name", "Type", "Date", "Check In", "Check Out", "Status", "Location"].map((heading) => (
+                    {["Name", "Person Type", "Date", "Check In", "Check Out", "Status", "Location"].map((heading) => (
                       <View key={heading} style={[styles.adminTableCell, styles.adminTableHeaderCell, heading === "Name" ? { width: 210 } : styles.adminTableFlexCell]}>
                         <Text style={[styles.adminTableHeaderText, isDarkMode && styles.darkTextSecondary]}>{heading}</Text>
                       </View>
@@ -6918,6 +7207,40 @@ const loadDashboardData = useCallback(async () => {
                 </View>
 
                 <View style={styles.userEditorGrid}>
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>NFC Card UID</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        createUserErrors.nfcCardId && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
+                      value={newUserData.nfcCardId}
+                      onChangeText={(text) => {
+                        setNewUserData((currentValue) => ({ ...currentValue, nfcCardId: text }));
+                        setCreateUserErrors((currentValue) => ({ ...currentValue, nfcCardId: null }));
+                      }}
+                      placeholder="Scan or type card UID, e.g. 04A1B2C3"
+                      autoCapitalize="characters"
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    />
+                    <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                      Optional. Use this when assigning the physical NFC card UID now.
+                    </Text>
+                    {renderCreateUserFieldError("nfcCardId")}
+                  </View>
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Card Status</Text>
+                    <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                      <Ionicons name="radio-outline" size={16} color="#64748B" />
+                      <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                        {newUserData.nfcCardId ? "Physical UID will be linked" : "SafePass ID will be generated"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.userEditorGrid}>
                   {isCreatingAcademicAccess ? (
                     <>
                       <View style={[styles.userEditorHalfField, styles.inputGroup]}>
@@ -6965,6 +7288,53 @@ const loadDashboardData = useCallback(async () => {
                           placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
                         />
                       </View>
+                      {isCreatingStudent ? (
+                        <>
+                          <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                            <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent / Guardian Name (Enrollment Record)</Text>
+                            <TextInput
+                              style={[
+                                styles.input,
+                                isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                              ]}
+                              value={newUserData.parentName}
+                              onChangeText={(text) => setNewUserData((currentValue) => ({ ...currentValue, parentName: text }))}
+                              placeholder="Parent or guardian name"
+                              placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                            />
+                          </View>
+                          <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                            <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email (Enrollment Record)</Text>
+                            <TextInput
+                              style={[
+                                styles.input,
+                                createUserErrors.parentEmail && styles.inputErrorState,
+                                isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                              ]}
+                              value={newUserData.parentEmail}
+                              onChangeText={(text) => {
+                                setNewUserData((currentValue) => ({ ...currentValue, parentEmail: text }));
+                                setCreateUserErrors((currentValue) => ({ ...currentValue, parentEmail: null }));
+                              }}
+                              placeholder="parent@example.com"
+                              placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                              keyboardType="email-address"
+                              autoCapitalize="none"
+                            />
+                            {renderCreateUserFieldError("parentEmail")}
+                            <Text
+                              style={{
+                                color: isDarkMode ? "#94A3B8" : "#64748B",
+                                fontSize: 12,
+                                lineHeight: 17,
+                                marginTop: 6,
+                              }}
+                            >
+                              Official school-managed contact. Students can view this masked, but only admins can update it.
+                            </Text>
+                          </View>
+                        </>
+                      ) : null}
                     </>
                   ) : isCreatingSecurity ? (
                     <>
@@ -7206,7 +7576,21 @@ const loadDashboardData = useCallback(async () => {
       { label: "Position", value: selectedUser?.position || (isSecurityRole(selectedUser?.role) ? "Security Personnel" : "Not set"), icon: "briefcase-outline" },
       { label: "Status", value: isUserActive(selectedUser) ? "Active" : "Inactive", icon: "checkmark-circle-outline" },
     ];
-    const isStudentUser = ["student", "teacher"].includes(String(panelUser?.role || "").toLowerCase());
+    const isStudentUser = String(panelUser?.role || "").toLowerCase() === "student";
+    if (isStudentUser) {
+      infoItems.splice(3, 0,
+        {
+          label: "Parent / Guardian (Enrollment)",
+          value: selectedUser?.parentName || selectedUser?.guardianName || "Not configured",
+          icon: "people-outline",
+        },
+        {
+          label: "Parent Email (Enrollment)",
+          value: selectedUser?.parentEmail || selectedUser?.guardianEmail || "Not configured",
+          icon: "mail-outline",
+        },
+      );
+    }
 
     return (
       <View style={[styles.userDataBottomPanel, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
@@ -7625,20 +8009,32 @@ const loadDashboardData = useCallback(async () => {
                 {
                   key: "actions",
                   label: "Manage",
-                  width: 140,
+                  width: 250,
                   render: (userItem) => (
                     <View style={styles.adminTableActionRow}>
                       <TouchableOpacity
                         style={[styles.adminTableActionButton, { borderColor: "rgba(59,130,246,0.24)", backgroundColor: "rgba(59,130,246,0.12)" }]}
                         onPress={() => handleViewUser(userItem)}
                       >
+                        <Ionicons name="eye-outline" size={14} color="#0A3D91" />
                         <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>View</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.adminTableActionButton, { borderColor: "rgba(16,185,129,0.24)", backgroundColor: "rgba(16,185,129,0.12)" }]}
                         onPress={() => handleEditUser(userItem)}
                       >
+                        <Ionicons name="create-outline" size={14} color="#10B981" />
                         <Text style={[styles.adminTableActionText, { color: "#10B981" }]}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.adminTableActionButton, { borderColor: "rgba(239,68,68,0.22)", backgroundColor: "rgba(239,68,68,0.12)" }]}
+                        onPress={() => {
+                          setSelectedUser(userItem);
+                          setShowDeleteUserModal(true);
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                        <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Remove</Text>
                       </TouchableOpacity>
                     </View>
                   ),
@@ -8168,7 +8564,7 @@ const loadDashboardData = useCallback(async () => {
     const selectedOption = options.find((option) => option.value === value);
 
     return (
-      <View style={styles.appointmentToolbarField}>
+      <View style={[styles.appointmentToolbarField, isOpen && styles.appointmentToolbarFieldOpen]}>
         <Text style={[styles.appointmentToolbarLabel, isDarkMode && styles.darkTextSecondary]}>{label}</Text>
         <TouchableOpacity
           style={[
@@ -8528,6 +8924,9 @@ const loadDashboardData = useCallback(async () => {
                     </Text>
                     <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
                       SafePass ID: {getVisitorSafePassId(request)}
+                    </Text>
+                    <Text style={[styles.adminTableSecondaryText, isDarkMode && styles.darkTextSecondary]}>
+                      NFC UID: {getVisitorNfcUid(request)}
                     </Text>
                   </View>
                 ),
@@ -9935,6 +10334,9 @@ const loadDashboardData = useCallback(async () => {
                           <Text style={[styles.historyItemEmail, { color: theme.textSecondary }]}>
                             SafePass ID: {getVisitorSafePassId(visitor)}
                           </Text>
+                          <Text style={[styles.historyItemEmail, { color: theme.textSecondary }]}>
+                            NFC UID: {getVisitorNfcUid(visitor)}
+                          </Text>
                           <Text style={[styles.historyItemPurpose, { color: theme.textSecondary }]}>
                             {visitor.purposeOfVisit || "No purpose provided"}
                           </Text>
@@ -10298,7 +10700,7 @@ const loadDashboardData = useCallback(async () => {
             {userManagementConfig.primaryActionLabel ? (
               <TouchableOpacity
                 style={[styles.managementPrimaryButton, { backgroundColor: userManagementConfig.accent }]}
-                onPress={() => openCreateUserModal(accountRecordsMode === "security" ? "security" : "staff")}
+                onPress={() => openCreateUserModal(userManagementConfig.primaryActionRole)}
               >
                 <Ionicons name="person-add-outline" size={18} color="#FFFFFF" />
                 <Text style={styles.managementPrimaryButtonText}>
@@ -10309,6 +10711,23 @@ const loadDashboardData = useCallback(async () => {
 
           </View>
         </View>
+
+        {createUserMessage ? (
+          <View
+            style={[
+              styles.adminNoticeCard,
+              {
+                backgroundColor: isDarkMode ? "#064E3B" : "#ECFDF5",
+                borderColor: isDarkMode ? "#10B981" : "#A7F3D0",
+              },
+            ]}
+          >
+            <Ionicons name="checkmark-circle-outline" size={20} color={isDarkMode ? "#A7F3D0" : "#047857"} />
+            <Text style={[styles.adminNoticeText, { color: isDarkMode ? "#D1FAE5" : "#065F46" }]}>
+              {createUserMessage}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.managementStatsGrid}>
           {userManagementConfig.stats.map((item) => (
@@ -10614,12 +11033,14 @@ const loadDashboardData = useCallback(async () => {
                             style={[styles.adminTableActionButton, { borderColor: `${roleColor}30`, backgroundColor: `${roleColor}12` }]}
                             onPress={() => handleViewUser(userItem)}
                           >
+                            <Ionicons name="eye-outline" size={14} color={roleColor} />
                             <Text style={[styles.adminTableActionText, { color: roleColor }]}>View</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.adminTableActionButton, { borderColor: `${userManagementConfig.accent}30`, backgroundColor: `${userManagementConfig.accent}12` }]}
                             onPress={() => handleEditUser(userItem)}
                           >
+                            <Ionicons name="create-outline" size={14} color={userManagementConfig.accent} />
                             <Text style={[styles.adminTableActionText, { color: userManagementConfig.accent }]}>Edit</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
@@ -10633,6 +11054,11 @@ const loadDashboardData = useCallback(async () => {
                             onPress={() => handleToggleUserStatus(userItem)}
                             disabled={processingId === `toggle-user-${userItem._id || userItem.id}`}
                           >
+                            <Ionicons
+                              name={userIsActive ? "pause-circle-outline" : "checkmark-circle-outline"}
+                              size={14}
+                              color={userIsActive ? "#F59E0B" : "#10B981"}
+                            />
                             <Text
                               style={[
                                 styles.adminTableActionText,
@@ -10649,7 +11075,8 @@ const loadDashboardData = useCallback(async () => {
                               setShowDeleteUserModal(true);
                             }}
                           >
-                            <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Delete</Text>
+                            <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                            <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Remove</Text>
                           </TouchableOpacity>
                         </View>
                       );
@@ -11911,6 +12338,81 @@ const loadDashboardData = useCallback(async () => {
             >
               <View style={styles.createAccountSectionHeader}>
                 <Ionicons
+                  name="radio-outline"
+                  size={18}
+                  color={getRoleColor(newUserData.role)}
+                />
+                <View>
+                  <Text
+                    style={[
+                      styles.createAccountSectionTitle,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    NFC Card UID
+                  </Text>
+                  <Text
+                    style={[
+                      styles.createAccountSectionSubtitle,
+                      isDarkMode && styles.darkTextSecondary,
+                    ]}
+                  >
+                    Assign the physical NFC card UID now, or leave it blank to generate a SafePass ID.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.userEditorRow}>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Card UID
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      createUserErrors.nfcCardId && styles.inputError,
+                      isDarkMode && {
+                        backgroundColor: "#111827",
+                        borderColor: theme.borderColor,
+                        color: "#F8FBFE",
+                      },
+                    ]}
+                    placeholder="04A1B2C3"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    autoCapitalize="characters"
+                    value={newUserData.nfcCardId}
+                    onChangeText={(text) => {
+                      setNewUserData((prev) => ({ ...prev, nfcCardId: text }));
+                      setCreateUserErrors((prev) => ({ ...prev, nfcCardId: null }));
+                    }}
+                  />
+                  {renderCreateUserFieldError("nfcCardId")}
+                </View>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>
+                    Assignment
+                  </Text>
+                  <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}>
+                    <Ionicons name="id-card-outline" size={16} color={isDarkMode ? "#94A3B8" : "#64748B"} />
+                    <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                      {newUserData.nfcCardId ? "Physical card UID will be saved" : "Auto SafePass ID will be used"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.createAccountSectionCard,
+                isDarkMode && {
+                  backgroundColor: "#0F172A",
+                  borderColor: theme.borderColor,
+                },
+              ]}
+            >
+              <View style={styles.createAccountSectionHeader}>
+                <Ionicons
                   name="lock-closed-outline"
                   size={18}
                   color={getRoleColor(newUserData.role)}
@@ -12357,6 +12859,28 @@ const loadDashboardData = useCallback(async () => {
                       {selectedUser?.position || (isSecurityRole(selectedUser?.role) ? "Security Personnel" : "Not set")}
                     </Text>
                   </View>
+                  <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                    <Text style={styles.userProfileInfoLabel}>NFC Card UID</Text>
+                    <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
+                      {selectedUser?.physicalNfcUid || selectedUser?.nfcCardId || "Not assigned"}
+                    </Text>
+                  </View>
+                  {String(selectedUser?.role || "").toLowerCase() === "student" ? (
+                    <>
+                      <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                        <Text style={styles.userProfileInfoLabel}>Parent / Guardian (Enrollment)</Text>
+                        <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
+                          {selectedUser?.parentName || selectedUser?.guardianName || "Not configured"}
+                        </Text>
+                      </View>
+                      <View style={[styles.userProfileInfoCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                        <Text style={styles.userProfileInfoLabel}>Parent Email (Enrollment)</Text>
+                        <Text style={[styles.userProfileInfoValue, isDarkMode && styles.darkText]}>
+                          {selectedUser?.parentEmail || selectedUser?.guardianEmail || "Not configured"}
+                        </Text>
+                      </View>
+                    </>
+                  ) : null}
                 </View>
               </View>
 
@@ -12630,6 +13154,39 @@ const loadDashboardData = useCallback(async () => {
                     </View>
                   </View>
                 </View>
+                <View style={styles.userEditorGrid}>
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>NFC Card UID</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        editUserErrors.nfcCardId && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
+                      value={editUserData.nfcCardId}
+                      onChangeText={(text) => {
+                        setEditUserData({ ...editUserData, nfcCardId: text });
+                        setEditUserErrors((currentValue) => ({ ...currentValue, nfcCardId: null }));
+                      }}
+                      placeholder="Scan or type card UID"
+                      autoCapitalize="characters"
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    />
+                    <Text style={[styles.inputHint, isDarkMode && styles.darkTextSecondary]}>
+                      This is the UID matched when the physical NFC card is tapped.
+                    </Text>
+                    {renderEditUserFieldError("nfcCardId")}
+                  </View>
+                  <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                    <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Card Link</Text>
+                    <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+                      <Ionicons name="radio-outline" size={16} color="#64748B" />
+                      <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
+                        {editUserData.nfcCardId ? "Assigned to this account" : "No physical UID assigned"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
               </View>
 
               {(editUserData.role === "student" || editUserData.role === "teacher") && (
@@ -12689,6 +13246,50 @@ const loadDashboardData = useCallback(async () => {
                       />
                     </View>
                   </View>
+                  {editUserData.role === "student" ? (
+                    <View style={styles.userEditorGrid}>
+                      <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent / Guardian Name (Enrollment Record)</Text>
+                        <TextInput
+                          style={[styles.input, isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" }]}
+                          value={editUserData.parentName}
+                          onChangeText={(text) => setEditUserData({ ...editUserData, parentName: text })}
+                          placeholder="Parent or guardian name"
+                          placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                        />
+                      </View>
+                      <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                        <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email (Enrollment Record)</Text>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            editUserErrors.parentEmail && styles.inputErrorState,
+                            isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                          ]}
+                          value={editUserData.parentEmail}
+                          onChangeText={(text) => {
+                            setEditUserData({ ...editUserData, parentEmail: text });
+                            setEditUserErrors((currentValue) => ({ ...currentValue, parentEmail: null }));
+                          }}
+                          placeholder="parent@example.com"
+                          placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                        />
+                        {renderEditUserFieldError("parentEmail")}
+                        <Text
+                          style={{
+                            color: isDarkMode ? "#94A3B8" : "#64748B",
+                            fontSize: 12,
+                            lineHeight: 17,
+                            marginTop: 6,
+                          }}
+                        >
+                          Based on the official enrollment record. Saving changes will ask for admin confirmation.
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
               )}
 
@@ -12930,9 +13531,19 @@ const loadDashboardData = useCallback(async () => {
                 <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.employeeId || "N/A"}</Text>
               </View>
               <View style={styles.createSuccessRow}>
+                <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>NFC Card UID</Text>
+                <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.nfcCardId || "No physical UID assigned"}</Text>
+              </View>
+              <View style={styles.createSuccessRow}>
                 <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Status</Text>
                 <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.status || "N/A"}</Text>
               </View>
+              {createdUserSummary?.temporaryPassword ? (
+                <View style={styles.createSuccessRow}>
+                  <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Temporary Password</Text>
+                  <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary.temporaryPassword}</Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={[styles.createSuccessNote, isDarkMode && { backgroundColor: "#172554", borderColor: "#041E42" }]}>

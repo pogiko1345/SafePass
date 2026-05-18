@@ -45,13 +45,15 @@ const formatDate = (value) =>
       })
     : "N/A";
 
-const formatTime = (value) =>
-  value
-    ? new Date(value).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "N/A";
+const formatTime = (value, fallback = "N/A") => {
+  if (!value) return fallback;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return fallback;
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 const isSameCalendarDay = (value, referenceDate = new Date()) => {
   if (!value) return false;
@@ -65,9 +67,11 @@ const isSameCalendarDay = (value, referenceDate = new Date()) => {
   );
 };
 
-const formatDuration = (minutes) => {
+const formatDuration = (minutes, fallback = "0 min") => {
   const totalMinutes = Number(minutes || 0);
-  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return "Pending";
+  if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return fallback;
+  if (totalMinutes > 0 && totalMinutes < 1) return "< 1 min";
+  if (totalMinutes === 0) return fallback;
 
   const hours = Math.floor(totalMinutes / 60);
   const remainder = totalMinutes % 60;
@@ -78,6 +82,17 @@ const formatDuration = (minutes) => {
 };
 
 const formatProfileDetail = (...values) => values.filter(Boolean).join(" | ") || "Not configured";
+
+const maskEmail = (value) => {
+  const email = String(value || "").trim();
+  const [localPart, domain] = email.split("@");
+  if (!localPart || !domain) return "";
+
+  const visiblePrefix = localPart.slice(0, 1);
+  const visibleSuffix = localPart.length > 2 ? localPart.slice(-1) : "";
+  const maskLength = Math.max(4, localPart.length - visiblePrefix.length - visibleSuffix.length);
+  return `${visiblePrefix}${"*".repeat(maskLength)}${visibleSuffix}@${domain}`;
+};
 
 const studentTabs = [
   { key: "home", label: "Pass", icon: "id-card-outline", activeIcon: "id-card" },
@@ -114,6 +129,32 @@ const getLatestAttendanceTime = (record, action) => {
     .filter((item) => item?.action === action)
     .sort((left, right) => new Date(right.tappedAt || 0) - new Date(left.tappedAt || 0))[0];
   return latest?.tappedAt || (action === "check_in" ? record?.checkInTime : record?.checkOutTime);
+};
+
+const getDurationMinutesBetween = (startValue, endValue) => {
+  if (!startValue || !endValue) return 0;
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
+};
+
+const getAttendanceEventMeta = (action = "") => {
+  if (action === "check_out") {
+    return {
+      label: "Checked Out",
+      icon: "log-out-outline",
+      color: BRAND.danger,
+      status: "checked_out",
+    };
+  }
+
+  return {
+    label: "Checked In",
+    icon: "log-in-outline",
+    color: BRAND.success,
+    status: "inside",
+  };
 };
 
 const isNullNativeNfcError = (error) =>
@@ -189,6 +230,12 @@ export default function StudentDashboardScreen({ navigation }) {
     newPassword: "",
     confirmPassword: "",
   });
+  const [nowTick, setNowTick] = useState(Date.now());
+
+  const loadAttendanceRecords = useCallback(async () => {
+    const attendanceResponse = await ApiService.getMyAttendance({ limit: 30 });
+    setAttendance(Array.isArray(attendanceResponse?.attendance) ? attendanceResponse.attendance : []);
+  }, []);
 
   const loadData = useCallback(async () => {
     const [profileResponse, attendanceResponse] = await Promise.all([
@@ -235,6 +282,24 @@ export default function StudentDashboardScreen({ navigation }) {
       emergencyContact: user?.emergencyContact || "",
     });
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const refreshAttendance = () => {
+      loadAttendanceRecords().catch((error) => {
+        console.log("Student attendance auto-refresh skipped:", error?.message || error);
+      });
+    };
+
+    const unsubscribeFocus = navigation?.addListener?.("focus", refreshAttendance);
+    const refreshTimer = setInterval(refreshAttendance, 5000);
+
+    return () => {
+      clearInterval(refreshTimer);
+      unsubscribeFocus?.();
+    };
+  }, [loadAttendanceRecords, navigation, user]);
 
   const refreshNfcAvailability = useCallback(async ({ showDisabledAlert = false } = {}) => {
     if (Platform.OS === "web" || nativeNfcUnavailableRef.current || !NfcManager) {
@@ -380,6 +445,8 @@ export default function StudentDashboardScreen({ navigation }) {
   );
   const latestTodayAction = getLatestAttendanceAction(todayRecord);
   const isCheckedIn = latestTodayAction === "check_in" || Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
+  const latestEntryTime = getLatestAttendanceTime(todayRecord, "check_in");
+  const latestExitTime = getLatestAttendanceTime(todayRecord, "check_out");
   const roleLabel = String(user?.role || "").toLowerCase() === "teacher" ? "Teacher" : "Student";
   const studentName = getStudentName(user);
   const todayStatus = isCheckedIn
@@ -415,6 +482,12 @@ export default function StudentDashboardScreen({ navigation }) {
   const canUseNativeNfc = nfcAvailability.supported && nfcAvailability.enabled;
   const nfcModeLabel = canUseNativeNfc ? "NFC Ready" : "App Fallback";
 
+  useEffect(() => {
+    if (!isCheckedIn) return undefined;
+    const timer = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, [isCheckedIn]);
+
   const monthStats = useMemo(() => {
     const now = new Date();
     const monthRecords = attendance.filter((item) => {
@@ -435,10 +508,77 @@ export default function StudentDashboardScreen({ navigation }) {
     return { present, late, completed, total: monthRecords.length };
   }, [attendance]);
 
+  const attendanceEvents = useMemo(() => {
+    const events = attendance.flatMap((record) => {
+      const history = Array.isArray(record?.checkpointHistory) ? record.checkpointHistory : [];
+      const tapEvents = history
+        .filter((item) => item?.action === "check_in" || item?.action === "check_out")
+        .map((item, index) => ({
+          id: `${record?._id || "attendance"}-${item.action}-${item.tappedAt || index}-${index}`,
+          recordId: record?._id,
+          action: item.action,
+          tappedAt: item.tappedAt || (item.action === "check_in" ? record?.checkInTime : record?.checkOutTime),
+          attendanceDate: record?.attendanceDate,
+          location: item.office || item.checkpointName || record?.location || record?.checkpointIn || record?.checkpointOut || "Campus checkpoint",
+          checkpointId: item.checkpointId || "",
+          floor: item.floor || "",
+          lateMinutes: record?.lateMinutes || 0,
+          sessionDurationMinutes: record?.sessionDurationMinutes || 0,
+        }));
+
+      if (tapEvents.length) return tapEvents;
+
+      return [
+        record?.checkInTime
+          ? {
+              id: `${record?._id || "attendance"}-check-in`,
+              recordId: record?._id,
+              action: "check_in",
+              tappedAt: record.checkInTime,
+              attendanceDate: record.attendanceDate,
+              location: record.location || record.checkpointIn || "Campus checkpoint",
+              lateMinutes: record.lateMinutes || 0,
+              sessionDurationMinutes: record.sessionDurationMinutes || 0,
+            }
+          : null,
+        record?.checkOutTime
+          ? {
+              id: `${record?._id || "attendance"}-check-out`,
+              recordId: record?._id,
+              action: "check_out",
+              tappedAt: record.checkOutTime,
+              attendanceDate: record.attendanceDate,
+              location: record.location || record.checkpointOut || "Campus checkpoint",
+              lateMinutes: record.lateMinutes || 0,
+              sessionDurationMinutes: record.sessionDurationMinutes || 0,
+            }
+          : null,
+      ].filter(Boolean);
+    });
+
+    return events.sort((left, right) => new Date(right.tappedAt || 0) - new Date(left.tappedAt || 0));
+  }, [attendance]);
+
+  const historyStats = useMemo(() => {
+    const checkIns = attendanceEvents.filter((event) => event.action === "check_in").length;
+    const checkOuts = attendanceEvents.filter((event) => event.action === "check_out").length;
+    return {
+      checkIns,
+      checkOuts,
+      total: attendanceEvents.length,
+    };
+  }, [attendanceEvents]);
+
   const currentSessionDuration = useMemo(() => {
-    if (!todayRecord?.checkInTime) return "Pending";
-    return formatDuration(todayRecord.sessionDurationMinutes);
-  }, [todayRecord]);
+    if (!latestEntryTime) return "0 min";
+    if (isCheckedIn) {
+      return formatDuration(getDurationMinutesBetween(latestEntryTime, nowTick));
+    }
+
+    const savedDuration = Number(todayRecord?.sessionDurationMinutes || 0);
+    if (savedDuration > 0) return formatDuration(savedDuration);
+    return formatDuration(getDurationMinutesBetween(latestEntryTime, latestExitTime));
+  }, [isCheckedIn, latestEntryTime, latestExitTime, nowTick, todayRecord?.sessionDurationMinutes]);
 
   const handleAttendanceTap = async (action, tapLocation = {}) => {
     if (tapActionLoading) return;
@@ -762,17 +902,17 @@ export default function StudentDashboardScreen({ navigation }) {
         <MobileStatusBadge status={todayStatus} label={getStatusLabel(todayRecord, true)} />
       </View>
       {[
-        ["Latest Entry", getLatestAttendanceTime(todayRecord, "check_in"), "log-in-outline", BRAND.success],
-        ["Latest Exit", getLatestAttendanceTime(todayRecord, "check_out"), "log-out-outline", BRAND.danger],
+        ["Latest Entry", latestEntryTime, "log-in-outline", BRAND.success, "Not checked in"],
+        ["Latest Exit", latestExitTime, "log-out-outline", BRAND.danger, isCheckedIn ? "Still inside" : "Not checked out"],
         ["Total Inside", currentSessionDuration, "hourglass-outline", BRAND.blue],
-      ].map(([label, value, icon, color]) => (
+      ].map(([label, value, icon, color, fallback]) => (
         <View key={label} style={styles.timelineRow}>
           <View style={[styles.timelineIcon, { backgroundColor: `${color}16` }]}>
             <Ionicons name={icon} size={17} color={color} />
           </View>
           <Text style={styles.timelineLabel}>{label}</Text>
           <Text style={styles.timelineValue}>
-            {label === "Total Inside" ? value : formatTime(value)}
+            {label === "Total Inside" ? value : formatTime(value, fallback)}
           </Text>
         </View>
       ))}
@@ -806,8 +946,8 @@ export default function StudentDashboardScreen({ navigation }) {
           <Text style={styles.sectionAction}>View all</Text>
         </TouchableOpacity>
       </View>
-      {attendance.length ? (
-        attendance.slice(0, 3).map((record) => renderAttendanceRecord(record))
+      {attendanceEvents.length ? (
+        attendanceEvents.slice(0, 3).map((event) => renderAttendanceEvent(event))
       ) : (
         <MobileEmptyState
           icon="calendar-outline"
@@ -818,58 +958,77 @@ export default function StudentDashboardScreen({ navigation }) {
     </>
   );
 
-  const renderAttendanceRecord = (record) => (
-    <View key={record._id} style={styles.recordCard}>
+  const renderAttendanceEvent = (event) => {
+    const meta = getAttendanceEventMeta(event.action);
+    const isCheckOut = event.action === "check_out";
+    const dateValue = event.tappedAt || event.attendanceDate;
+    const durationMinutes =
+      Number(event.sessionDurationMinutes || 0) ||
+      (isCheckOut
+        ? getDurationMinutesBetween(
+            getLatestAttendanceTime(
+              attendance.find((record) => record?._id === event.recordId),
+              "check_in",
+            ),
+            event.tappedAt,
+          )
+        : 0);
+
+    return (
+      <View key={event.id} style={styles.recordCard}>
       <View style={styles.recordTop}>
         <View>
-          <Text style={styles.recordDate}>{formatDate(record.attendanceDate)}</Text>
-          <Text style={styles.recordLocation}>{record.location || record.checkpointIn || "Campus checkpoint"}</Text>
+            <Text style={styles.recordDate}>{meta.label}</Text>
+            <Text style={styles.recordLocation}>
+              {formatDate(dateValue)} • {event.location || "Campus checkpoint"}
+            </Text>
         </View>
-        <MobileStatusBadge status={record.status || "present"} label={getStatusLabel(record)} />
+          <MobileStatusBadge status={meta.status} label={isCheckOut ? "Outside" : "Inside"} />
       </View>
       <View style={styles.recordTimes}>
         <View style={styles.recordTimeItem}>
-          <Ionicons name="log-in-outline" size={16} color={BRAND.success} />
-          <Text style={styles.recordTimeText}>{formatTime(record.checkInTime)}</Text>
+            <Ionicons name={meta.icon} size={16} color={meta.color} />
+            <Text style={styles.recordTimeText}>{formatTime(event.tappedAt)}</Text>
         </View>
-        <View style={styles.recordTimeItem}>
-          <Ionicons name="log-out-outline" size={16} color={BRAND.danger} />
-          <Text style={styles.recordTimeText}>{formatTime(record.checkOutTime)}</Text>
-        </View>
-        <View style={styles.recordTimeItem}>
-          <Ionicons name="alarm-outline" size={16} color={BRAND.warning} />
-          <Text style={styles.recordTimeText}>{record.lateMinutes || 0} late min</Text>
-        </View>
-        <View style={styles.recordTimeItem}>
-          <Ionicons name="hourglass-outline" size={16} color={BRAND.blue} />
-          <Text style={styles.recordTimeText}>{formatDuration(record.sessionDurationMinutes)}</Text>
-        </View>
+          {!isCheckOut && Number(event.lateMinutes || 0) > 0 ? (
+            <View style={styles.recordTimeItem}>
+              <Ionicons name="alarm-outline" size={16} color={BRAND.warning} />
+              <Text style={styles.recordTimeText}>{event.lateMinutes} late min</Text>
+            </View>
+          ) : null}
+          {isCheckOut ? (
+            <View style={styles.recordTimeItem}>
+              <Ionicons name="hourglass-outline" size={16} color={BRAND.blue} />
+              <Text style={styles.recordTimeText}>{formatDuration(durationMinutes)}</Text>
+            </View>
+          ) : null}
       </View>
     </View>
-  );
+    );
+  };
 
   const renderHistory = () => (
     <>
       <View style={styles.compactHeader}>
         <Text style={styles.compactTitle}>Attendance History</Text>
-        <Text style={styles.compactSubtitle}>{monthStats.total} latest records from SafePass NFC attendance.</Text>
+        <Text style={styles.compactSubtitle}>{historyStats.total} latest tap events from SafePass NFC attendance.</Text>
       </View>
       <View style={styles.statStrip}>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>{monthStats.present}</Text>
-          <Text style={styles.statLabel}>Present</Text>
+          <Text style={styles.statValue}>{historyStats.checkIns}</Text>
+          <Text style={styles.statLabel}>Check Ins</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>{monthStats.late}</Text>
-          <Text style={styles.statLabel}>Late</Text>
+          <Text style={styles.statValue}>{historyStats.checkOuts}</Text>
+          <Text style={styles.statLabel}>Check Outs</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>{monthStats.total}</Text>
-          <Text style={styles.statLabel}>Records</Text>
+          <Text style={styles.statValue}>{historyStats.total}</Text>
+          <Text style={styles.statLabel}>Events</Text>
         </View>
       </View>
-      {attendance.length ? (
-        attendance.map((record) => renderAttendanceRecord(record))
+      {attendanceEvents.length ? (
+        attendanceEvents.map((event) => renderAttendanceEvent(event))
       ) : (
         <MobileEmptyState icon="time-outline" title="No attendance history" message="Attendance records will show here." />
       )}
@@ -919,9 +1078,11 @@ export default function StudentDashboardScreen({ navigation }) {
               ["Username", user?.username || "Not assigned"],
               ["Contact Number", user?.phone || "Not configured"],
               ["Emergency Contact", user?.emergencyContact || "Not configured"],
+              ["Parent / Guardian", user?.parentName || user?.guardianName || "Not configured"],
+              ["Parent Email", maskEmail(user?.parentEmail || user?.guardianEmail) || "Not configured"],
               ["Student ID", user?.studentId || user?.teacherId || "Not assigned"],
               ["Course / Section", formatProfileDetail(user?.course, user?.yearLevel, user?.section)],
-              ["NFC Card", user?.nfcCardId || "Virtual mobile check only"],
+              ["Physical NFC UID", user?.physicalNfcUid || user?.nfcCardId || "Virtual mobile check only"],
             ].map(([label, value]) => (
               <View key={label} style={styles.profileRow}>
                 <Text style={styles.profileLabel}>{label}</Text>
@@ -931,7 +1092,7 @@ export default function StudentDashboardScreen({ navigation }) {
             <View style={styles.accountNotice}>
               <Ionicons name="information-circle-outline" size={18} color={BRAND.blue} />
               <Text style={styles.accountNoticeText}>
-                Student ID, course, and NFC card are managed by the school office.
+                Student ID, course, NFC card, and parent contact are managed from official school enrollment records.
               </Text>
             </View>
           </>
@@ -1006,7 +1167,6 @@ export default function StudentDashboardScreen({ navigation }) {
                 style={styles.fieldInput}
               />
             </View>
-
             <View style={styles.formActions}>
               <TouchableOpacity style={styles.secondaryButton} onPress={handleCancelProfileEdit}>
                 <Text style={styles.secondaryButtonText}>Cancel</Text>

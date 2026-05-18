@@ -231,9 +231,15 @@ const ScrollReveal = ({
 }) => {
   const [layoutY, setLayoutY] = useState(null);
   const [hasRevealed, setHasRevealed] = useState(false);
-  const revealAnim = useRef(new Animated.Value(0)).current;
+  const revealAnim = useRef(new Animated.Value(Platform.OS === "web" ? 0 : 1)).current;
 
   useEffect(() => {
+    if (Platform.OS !== "web") {
+      setHasRevealed(true);
+      revealAnim.setValue(1);
+      return;
+    }
+
     if (hasRevealed || layoutY === null) return;
 
     const revealPoint = Number(scrollY || 0) + Number(viewportHeight || 0) - threshold;
@@ -340,6 +346,62 @@ const getVisitorDestinationInfo = (
     floorName: floor?.name || "Ground Floor",
     icon: office?.icon || "navigate-outline",
     position: mapRoomPositions[officeId] || MONITORING_MAP_OFFICE_POSITIONS[officeId],
+  };
+};
+
+const getVisitorSelfLocationMarker = (
+  visitorRecord = {},
+  mapRooms = MONITORING_MAP_OFFICES,
+  mapRoomPositions = MONITORING_MAP_OFFICE_POSITIONS,
+) => {
+  const currentLocation = visitorRecord?.currentLocation || {};
+  const normalizedStatus = String(visitorRecord?.status || "").toLowerCase();
+  const isOnCampus =
+    normalizedStatus === "checked_in" &&
+    currentLocation?.isActive !== false &&
+    !visitorRecord?.checkedOutAt;
+
+  if (!isOnCampus) return null;
+
+  const officeName = String(
+    currentLocation.office ||
+      visitorRecord?.currentDestination?.office ||
+      visitorRecord?.appointmentDepartment ||
+      visitorRecord?.assignedOffice ||
+      visitorRecord?.host ||
+      "",
+  ).trim();
+  const matchedRoom =
+    mapRooms.find((room) => room.name.toLowerCase() === officeName.toLowerCase()) ||
+    mapRooms.find((room) => officeName.toLowerCase().includes(room.name.toLowerCase())) ||
+    mapRooms.find((room) => room.name.toLowerCase().includes(officeName.toLowerCase()));
+  const coordinates = currentLocation.coordinates || currentLocation || {};
+  const numericX = Number(coordinates.x);
+  const numericY = Number(coordinates.y);
+  const matchedPosition = matchedRoom ? mapRoomPositions[matchedRoom.id] : null;
+  const position =
+    matchedPosition ||
+    (Number.isFinite(numericX) && Number.isFinite(numericY)
+      ? { x: numericX, y: numericY }
+      : null);
+
+  if (!position) return null;
+
+  return {
+    id: `visitor-self-${visitorRecord._id || visitorRecord.id || "current"}`,
+    name: "You are here",
+    status: "checked_in",
+    isSelfMarker: true,
+    purpose: officeName || "Your current campus location",
+    trackingSource: currentLocation.source || "visitor_self",
+    lastUpdate: currentLocation.lastSeenAt || visitorRecord.updatedAt || visitorRecord.checkedInAt,
+    location: {
+      floor: currentLocation.floor || matchedRoom?.floor || "ground",
+      office: officeName || matchedRoom?.name || "Campus",
+      coordinates: position,
+      timestamp: currentLocation.lastSeenAt || visitorRecord.updatedAt || visitorRecord.checkedInAt,
+      source: currentLocation.source || "visitor_self",
+    },
   };
 };
 
@@ -688,9 +750,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
     loadVisitorMapSettings();
     const unsubscribe = navigation?.addListener?.("focus", loadVisitorMapSettings);
+    const refreshTimer = setInterval(loadVisitorMapSettings, VISITOR_LIVE_REFRESH_INTERVAL_MS);
 
     return () => {
       isMounted = false;
+      clearInterval(refreshTimer);
       unsubscribe?.();
     };
   }, [navigation]);
@@ -772,11 +836,30 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         return "This appointment date has passed. Please request a new appointment.";
       }
       if (visitDay.getTime() > today.getTime()) {
-        return "Check-in is only available on your appointment date.";
+        const scheduledDateLabel = scheduledDate.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+        return `Your visit is approved for ${scheduledDateLabel}. Check-in is only available on that appointment date.`;
       }
     }
 
     return "";
+  };
+
+  const getVisitorAccessBlockedTitle = (message = "") => {
+    const normalizedMessage = String(message || "").toLowerCase();
+    if (normalizedMessage.includes("card")) return "Card Not Active";
+    if (normalizedMessage.includes("already been completed")) return "Visit Completed";
+    if (normalizedMessage.includes("no-show") || normalizedMessage.includes("expired")) return "Visit Expired";
+    if (normalizedMessage.includes("still waiting") || normalizedMessage.includes("approved before")) {
+      return "Approval Required";
+    }
+    if (normalizedMessage.includes("appointment date") || normalizedMessage.includes("check-in opens")) {
+      return "Check-In Not Open";
+    }
+    return "Check-In Unavailable";
   };
   const activeAppointmentPurposeOptions = useMemo(
     () => getEnabledAppointmentOptionLabels(appointmentOptions.purposes, APPOINTMENT_PURPOSE_OPTIONS),
@@ -1000,6 +1083,21 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const handleVisitorSectionChange = (sectionId) => {
     if (!VISITOR_MODULES.some((module) => module.id === sectionId)) return;
+
+    if (
+      selectedVisitorSection === "appointment" &&
+      sectionId === "appointment" &&
+      selectedAppointmentScreen === "menu"
+    ) {
+      if (appointmentTransitionTimeoutRef.current) {
+        clearTimeout(appointmentTransitionTimeoutRef.current);
+        appointmentTransitionTimeoutRef.current = null;
+      }
+      setIsAppointmentScreenTransitioning(false);
+      closeAppointmentPopovers();
+      scrollDashboardToTop(true);
+      return;
+    }
 
     const currentIndex = VISITOR_MODULES.findIndex((module) => module.id === selectedVisitorSection);
     const nextIndex = VISITOR_MODULES.findIndex((module) => module.id === sectionId);
@@ -1805,7 +1903,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
     if (blockedMessage) {
       showVisitorAlert(
-        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        getVisitorAccessBlockedTitle(blockedMessage),
         blockedMessage,
       );
       return false;
@@ -2996,7 +3094,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const selectedDepartments = getSelectedAppointmentDepartments();
     const department = selectedDepartments[0] || "";
     const idType = String(appointmentForm.idType || "").trim();
-    const idImage = appointmentForm.idImage;
 
     if (!currentUser?._id) {
       showVisitorAlert("Login Required", "Please sign in again before requesting a new appointment.");
@@ -3061,29 +3158,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
-    if (!idImage) {
-      showVisitorAlert("Missing Valid ID Picture", "Please upload a clear picture of your valid ID before submitting.");
-      return;
-    }
-
-    if (isVerifyingAppointmentId) {
-      showVisitorAlert("ID Verification Running", "Please wait until OCR verification finishes.");
-      return;
-    }
-
-    if (!appointmentForm.idVerification?.isValid) {
-      showVisitorAlert(
-        "Verify Valid ID First",
-        appointmentForm.idVerification?.message ||
-          "Please upload a clear valid ID photo and let OCR verification pass before submitting.",
-      );
-      return;
-    }
-
     if (!appointmentForm.privacyAccepted) {
       showVisitorAlert(
         "Data Privacy Confirmation",
-        "Please confirm that you allow Sapphire SafePass to collect your appointment and ID information for visit verification.",
+        "Please confirm that your appointment information is accurate and that you will present the selected ID at campus entry.",
       );
       return;
     }
@@ -3116,8 +3194,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         purposeOfVisit,
         idType,
         idNumber: idType,
-        idImage,
-        idVerification: appointmentForm.idVerification,
+        idImage: "",
+        idVerification: {
+          status: "physical_id_required",
+          isValid: true,
+          message: `${idType} will be presented at campus entry for manual verification.`,
+        },
         dataPrivacyAccepted: true,
         dataPrivacyAcceptedAt: new Date().toISOString(),
       });
@@ -3141,8 +3223,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           host: department,
           idType,
           idNumber: idType,
-          idImage,
-          idVerification: appointmentForm.idVerification,
+          idImage: "",
+          idVerification: {
+            status: "physical_id_required",
+            isValid: true,
+            message: `${idType} will be presented at campus entry for manual verification.`,
+          },
         }));
         setAppointmentFeedback({
           title: afterHoursNotice?.title || "Appointment Submitted Successfully",
@@ -3314,7 +3400,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
     if (blockedMessage) {
       showVisitorAlert(
-        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        getVisitorAccessBlockedTitle(blockedMessage),
         blockedMessage,
       );
       return;
@@ -3425,7 +3511,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const blockedMessage = getVisitorAccessBlockedMessage(visitor, currentUser);
     if (blockedMessage) {
       showVisitorAlert(
-        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        getVisitorAccessBlockedTitle(blockedMessage),
         blockedMessage,
       );
       return;
@@ -3464,7 +3550,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     const blockedMessage = getVisitorAccessBlockedMessage(targetVisitor, currentUser);
     if (blockedMessage) {
       showVisitorAlert(
-        blockedMessage.includes("card") ? "Card Not Active" : "Approval Required",
+        getVisitorAccessBlockedTitle(blockedMessage),
         blockedMessage,
       );
       return;
@@ -3974,8 +4060,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     icon: "navigate",
     position: visitorDestinationInfo.position,
   };
+  const visitorSelfLocationMarker = getVisitorSelfLocationMarker(
+    visitor,
+    visitorMapRooms,
+    visitorMapRoomPositions,
+  );
   const activeVisitorMapFloor =
     MONITORING_MAP_FLOORS.find((floor) => floor.id === selectedVisitorMapFloor)?.id ||
+    visitorSelfLocationMarker?.location?.floor ||
     visitorDestinationInfo.floorId ||
     "ground";
   const recentAppointmentEntries = appointmentDisplayEntries.slice(0, 3);
@@ -4936,9 +5028,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </Text>
             </View>
             <View style={visitorDashboardStyles.approvedHeroTextWrap}>
-              <Text style={visitorDashboardStyles.approvedHeroTitle}>Your SafePass Is Ready</Text>
+              <Text style={visitorDashboardStyles.approvedHeroTitle}>SafePass Ready</Text>
               <Text style={visitorDashboardStyles.approvedHeroSubtitle}>
-                Open your digital pass, review your schedule, and stay connected before arriving on campus.
+                Review your schedule and open your pass when you arrive.
               </Text>
             </View>
           </View>
@@ -4979,9 +5071,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               approvedSectionHeaderResponsiveStyle,
             ]}
           >
-            <Text style={visitorDashboardStyles.approvedSectionTitle}>Access Tools</Text>
+            <Text style={visitorDashboardStyles.approvedSectionTitle}>Quick Actions</Text>
             <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
-              Use your pass, manage your visit, and keep your arrival flow ready.
+              Keep the visit flow simple from arrival to checkout.
             </Text>
           </View>
 
@@ -5009,9 +5101,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       Virtual NFC Card
                     </Text>
                   </View>
-                  <Text style={visitorDashboardStyles.approvedVirtualNfcTitle}>View Access Card</Text>
+                  <Text style={visitorDashboardStyles.approvedVirtualNfcTitle}>Access Card</Text>
                   <Text style={visitorDashboardStyles.approvedVirtualNfcSubtitle}>
-                    Open your digital SafePass card and confirm check-in or check-out from this phone.
+                    Open your digital card for campus verification.
                   </Text>
                 </View>
                 <View style={visitorDashboardStyles.approvedVirtualNfcIconWrap}>
@@ -5034,6 +5126,27 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
           <View style={visitorDashboardStyles.approvedCompactActionsColumn}>
             <AnimatedPressable
+              style={[
+                visitorDashboardStyles.approvedCompactActionCard,
+                { width: compactApprovedActionCardWidth },
+                !isAppointmentManageable(visitor) && visitorDashboardStyles.appointmentManageButtonDisabled,
+              ]}
+              onPress={() => openEditAppointmentModal(visitor)}
+              activeOpacity={0.9}
+              disabled={!isAppointmentManageable(visitor) || isUpdatingAppointment}
+            >
+              <View style={[visitorDashboardStyles.approvedCompactActionIcon, { backgroundColor: "#EAF3FF" }]}>
+                <Ionicons name="calendar-outline" size={18} color="#0A3D91" />
+              </View>
+              <View style={visitorDashboardStyles.approvedCompactActionCopy}>
+                <Text style={visitorDashboardStyles.approvedCompactActionTitle}>Request Change</Text>
+                <Text style={visitorDashboardStyles.approvedCompactActionText}>
+                  Move the date or time.
+                </Text>
+              </View>
+            </AnimatedPressable>
+
+            <AnimatedPressable
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
               onPress={handleCheckInAction}
               activeOpacity={0.9}
@@ -5051,7 +5164,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   {visitor?.status === "checked_in" ? "Checked In" : "Check In"}
                 </Text>
                 <Text style={visitorDashboardStyles.approvedCompactActionText}>
-                  Confirm arrival and notify security monitoring.
+                  Confirm your arrival.
                 </Text>
               </View>
             </AnimatedPressable>
@@ -5072,7 +5185,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.approvedCompactActionCopy}>
                 <Text style={visitorDashboardStyles.approvedCompactActionTitle}>Check Out</Text>
                 <Text style={visitorDashboardStyles.approvedCompactActionText}>
-                  Close your visit once your appointment is complete.
+                  Close your visit when done.
                 </Text>
               </View>
             </AnimatedPressable>
@@ -5093,9 +5206,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               approvedSectionHeaderResponsiveStyle,
             ]}
           >
-            <Text style={visitorDashboardStyles.approvedSectionTitle}>Visit Snapshot</Text>
+            <Text style={visitorDashboardStyles.approvedSectionTitle}>Visit Details</Text>
             <Text style={visitorDashboardStyles.approvedSectionSubtitle}>
-              Review your purpose, office, and key reminders before arriving.
+              The key information for today’s visit.
             </Text>
           </View>
 
@@ -5182,15 +5295,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </TouchableOpacity>
                 </View>
                 {renderAppointmentInsightsCard()}
-                {renderVisitorModuleNavigation()}
-                {renderRecentAppointmentRail()}
               </>
             ) : isApprovedVisitor ? (
               renderApprovedVisitorDashboard()
             ) : (
               <>
                 {renderAppointmentInsightsCard()}
-                {renderVisitorModuleNavigation()}
                 {renderRecentAppointmentRail()}
                 {renderVisitorEmptyState()}
               </>
@@ -5198,7 +5308,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           ) : (
             <>
               {renderAppointmentInsightsCard()}
-              {renderVisitorModuleNavigation()}
               {renderVisitorEmptyState()}
             </>
           )}
@@ -5380,7 +5489,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             {[
               ["Schedule", "Date and time"],
               ["Office", "Destination"],
-              ["ID", "Valid ID photo"],
+              ["ID", "Present at gate"],
             ].map(([title, text], index) => (
               <View key={title} style={[visitorDashboardStyles.appointmentStepPill, isVisitorDarkMode && visitorDashboardStyles.darkReadablePill]}>
                 <View style={visitorDashboardStyles.appointmentStepNumber}>
@@ -5782,8 +5891,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         setAppointmentForm((prev) => ({
                           ...prev,
                           idType: option,
-                          idImage: prev.idType && prev.idType !== option ? null : prev.idImage,
-                          idVerification: prev.idType && prev.idType !== option ? null : prev.idVerification,
+                          idImage: null,
+                          idVerification: {
+                            status: "physical_id_required",
+                            isValid: true,
+                            message: `${option} will be presented at campus entry for manual verification.`,
+                          },
                         }));
                         setShowIdTypeDropdown(false);
                       }}
@@ -5807,116 +5920,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
             ) : null}
             <Text style={[visitorDashboardStyles.appointmentAutoHint, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
-              Select the ID you will bring on campus. The uploaded image must match this selected ID type.
+              Select the physical ID you will bring. Security will compare it with your approved appointment before allowing entry.
             </Text>
           </View>
 
           <View style={[visitorDashboardStyles.appointmentField, appointmentFormColumnResponsiveStyle]}>
-            <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Valid ID Picture</Text>
-            <TouchableOpacity
-              style={[visitorDashboardStyles.appointmentIdUploadCard, isVisitorDarkMode && visitorDashboardStyles.darkUploadCard]}
-              onPress={handlePickAppointmentIdImage}
-              activeOpacity={0.85}
-            >
-              {appointmentForm.idImage ? (
-                <Image
-                  source={{ uri: appointmentForm.idImage }}
-                  style={visitorDashboardStyles.appointmentIdPreview}
-                />
-              ) : (
-                <View style={visitorDashboardStyles.appointmentIdPlaceholder}>
-                  <Ionicons name="image-outline" size={28} color="#64748B" />
-                  <Text style={[visitorDashboardStyles.appointmentIdPlaceholderTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
-                    Upload valid ID picture
-                  </Text>
-                  <Text style={[visitorDashboardStyles.appointmentIdPlaceholderText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
-                    Use a clear school, government, or company ID image.
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            {appointmentForm.idImage ? (
-              <TouchableOpacity
-                style={visitorDashboardStyles.appointmentChangeIdButton}
-                onPress={handlePickAppointmentIdImage}
-                disabled={isVerifyingAppointmentId}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="refresh-outline" size={16} color="#0A3D91" />
-                <Text style={visitorDashboardStyles.appointmentChangeIdText}>
-                  Change ID picture
+            <Text style={[visitorDashboardStyles.appointmentFieldLabel, isVisitorDarkMode && visitorDashboardStyles.darkKickerText]}>Campus Entry ID Check</Text>
+            <View style={[visitorDashboardStyles.appointmentIdUploadCard, isVisitorDarkMode && visitorDashboardStyles.darkUploadCard]}>
+              <View style={visitorDashboardStyles.appointmentIdPlaceholder}>
+                <Ionicons name="shield-checkmark-outline" size={28} color="#0A3D91" />
+                <Text style={[visitorDashboardStyles.appointmentIdPlaceholderTitle, isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText]}>
+                  Present your selected ID at the gate
                 </Text>
-              </TouchableOpacity>
-            ) : null}
-            {appointmentForm.idImage ? (
-              <View
-                style={[
-                  visitorDashboardStyles.idVerificationCard,
-                  appointmentForm.idVerification?.isValid
-                    ? visitorDashboardStyles.idVerificationCardPassed
-                    : appointmentForm.idVerification
-                      ? visitorDashboardStyles.idVerificationCardFailed
-                      : null,
-                ]}
-              >
-                <View style={visitorDashboardStyles.idVerificationHeader}>
-                  <View
-                    style={[
-                      visitorDashboardStyles.idVerificationIcon,
-                      appointmentForm.idVerification?.isValid &&
-                        visitorDashboardStyles.idVerificationIconPassed,
-                    ]}
-                  >
-                    {isVerifyingAppointmentId ||
-                    appointmentForm.idVerification?.status === "scanning" ? (
-                      <ActivityIndicator size="small" color="#0A3D91" />
-                    ) : (
-                      <Ionicons
-                        name={
-                          appointmentForm.idVerification?.isValid
-                            ? "shield-checkmark-outline"
-                            : "alert-circle-outline"
-                        }
-                        size={18}
-                        color={appointmentForm.idVerification?.isValid ? "#047857" : "#DC2626"}
-                      />
-                    )}
-                  </View>
-                  <View style={visitorDashboardStyles.idVerificationCopy}>
-                    <Text style={visitorDashboardStyles.idVerificationTitle}>
-                      {isVerifyingAppointmentId ||
-                      appointmentForm.idVerification?.status === "scanning"
-                        ? "OCR verification running"
-                        : appointmentForm.idVerification?.isValid
-                          ? "OCR verification passed"
-                          : "OCR verification needed"}
-                    </Text>
-                    <Text style={visitorDashboardStyles.idVerificationMessage}>
-                      {appointmentForm.idVerification?.message ||
-                        "Scan the uploaded ID image before submitting your appointment request."}
-                    </Text>
-                  </View>
-                  {typeof appointmentForm.idVerification?.confidence === "number" ? (
-                    <Text style={visitorDashboardStyles.idVerificationScore}>
-                      {appointmentForm.idVerification.confidence}%
-                    </Text>
-                  ) : null}
-                </View>
-                <TouchableOpacity
-                  style={visitorDashboardStyles.idVerificationAction}
-                  onPress={handleVerifyAppointmentIdAgain}
-                  disabled={isVerifyingAppointmentId}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="scan-outline" size={16} color="#0A3D91" />
-                  <Text style={visitorDashboardStyles.idVerificationActionText}>
-                    {isVerifyingAppointmentId ? "Scanning..." : "Run OCR verification"}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={[visitorDashboardStyles.appointmentIdPlaceholderText, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
+                  No upload is needed. Bring the same ID type you selected so security can verify it before entry.
+                </Text>
               </View>
-            ) : null}
-            <Text style={visitorDashboardStyles.appointmentAutoHint}>
-              Upload the same ID type you selected above. OCR verification helps catch unclear or mismatched ID photos before staff or security completes the final review.
+            </View>
+            <Text style={[visitorDashboardStyles.appointmentAutoHint, isVisitorDarkMode && visitorDashboardStyles.darkMutedText]}>
+              Your appointment request will store the ID type only. The actual ID is checked manually when you arrive.
             </Text>
           </View>
           </View>
@@ -5948,8 +5970,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               ) : null}
             </View>
             <Text style={visitorDashboardStyles.appointmentPrivacyText}>
-              I confirm that the information and valid ID picture I provide are accurate,
-              and I allow Sapphire SafePass to use them for appointment and visit verification.
+              I confirm that my appointment information is accurate and I will present the selected valid ID for campus entry verification.
             </Text>
           </TouchableOpacity>
 
@@ -6096,6 +6117,22 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         </TouchableOpacity>
       </View>
     );
+  };
+
+  const getEditAppointmentModalTitle = () => {
+    const appointmentStatus = String(appointmentEditForm.appointment?.appointmentStatus || "").toLowerCase();
+    if (["approved", "adjusted"].includes(appointmentStatus)) {
+      return "Request Appointment Change";
+    }
+    return "Edit Appointment";
+  };
+
+  const getEditAppointmentModalSubtitle = () => {
+    const appointmentStatus = String(appointmentEditForm.appointment?.appointmentStatus || "").toLowerCase();
+    if (["approved", "adjusted"].includes(appointmentStatus)) {
+      return "Choose a new date or time. Staff will review the updated schedule before entry.";
+    }
+    return "Update the date or time for staff review.";
   };
 
   const renderCurrentAppointmentCard = () => {
@@ -6312,19 +6349,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const renderVisitorCampusMap = ({ fullscreen = false } = {}) => (
     <CampusMap
-      visitors={[]}
+      visitors={visitorSelfLocationMarker ? [visitorSelfLocationMarker] : []}
       floors={MONITORING_MAP_FLOORS}
       offices={visitorMapRooms}
       selectedFloor={activeVisitorMapFloor}
       selectedOffice="all"
       destinationMarkers={isCheckedOutVisitor ? [] : [visitorDestinationMarker]}
-      showVisitorMarkers={false}
+      showVisitorMarkers={Boolean(visitorSelfLocationMarker)}
       showActiveVisitorsBadge={false}
       mapBlueprints={MONITORING_MAP_BLUEPRINTS}
       mapLabels={visitorMapLabels}
       officePositions={visitorMapRoomPositions}
       onFloorChange={setSelectedVisitorMapFloor}
       showFloorNavigation={false}
+      routeStartLabel={visitorSelfLocationMarker ? "Current spot" : "Main Gate"}
       initialScale={fullscreen ? 1 : 1.25}
       fullscreen={fullscreen}
     />
@@ -6676,7 +6714,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         showsVerticalScrollIndicator
         contentContainerStyle={[
           visitorDashboardStyles.scrollContent,
-          { paddingBottom: isCompactVisitorDashboard ? 190 : 172 },
+          { paddingBottom: isCompactVisitorDashboard ? 230 : 190 },
         ]}
         onScroll={(event) => setDashboardScrollY(event.nativeEvent.contentOffset.y)}
         scrollEventThrottle={16}
@@ -6925,9 +6963,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 <Ionicons name="create-outline" size={22} color="#0A3D91" />
               </View>
               <View style={visitorDashboardStyles.appointmentManageModalCopy}>
-                <Text style={visitorDashboardStyles.appointmentManageModalTitle}>Edit Appointment</Text>
+                <Text style={visitorDashboardStyles.appointmentManageModalTitle}>
+                  {getEditAppointmentModalTitle()}
+                </Text>
                 <Text style={visitorDashboardStyles.appointmentManageModalSubtitle}>
-                  Change your appointment date or time. Staff will be notified.
+                  {getEditAppointmentModalSubtitle()}
                 </Text>
               </View>
               <TouchableOpacity
@@ -7196,14 +7236,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 }
               />
             </View>
-            <Text style={visitorDashboardStyles.visitorAlertTitle}>
-              {visitorAlert?.title || "Notice"}
-            </Text>
-            {visitorAlert?.message ? (
-              <Text style={visitorDashboardStyles.visitorAlertMessage}>
-                {visitorAlert.message}
+            <View style={visitorDashboardStyles.visitorAlertTextBlock}>
+              <Text style={visitorDashboardStyles.visitorAlertTitle}>
+                {visitorAlert?.title || "Notice"}
               </Text>
-            ) : null}
+              {visitorAlert?.message ? (
+                <Text style={visitorDashboardStyles.visitorAlertMessage}>
+                  {visitorAlert.message}
+                </Text>
+              ) : null}
+            </View>
             <View style={visitorDashboardStyles.visitorAlertActionRow}>
               {(visitorAlert?.buttons || [{ text: "OK" }]).map((button, index) => {
                 const isCancel = button.style === "cancel";

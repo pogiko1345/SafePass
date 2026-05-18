@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   phone: { type: String, default: "" },
   emergencyContact: { type: String, default: "" },
+  parentName: { type: String, default: "", trim: true },
+  parentEmail: { type: String, default: "", trim: true, lowercase: true },
+  guardianName: { type: String, default: "", trim: true },
+  guardianEmail: { type: String, default: "", trim: true, lowercase: true },
   profilePhoto: { type: String, default: "" },
   visitorId: { type: mongoose.Schema.Types.ObjectId, ref: "Visitor" },
   studentId: {
@@ -62,7 +66,11 @@ role: {
     enum: ["pending", "active", "suspended", "inactive"],
     default: "pending",
   },
+  // Legacy field kept for backward compatibility with existing SafePass records.
   nfcCardId: { type: String, unique: true, sparse: true },
+  safePassId: { type: String, unique: true, sparse: true, trim: true },
+  physicalNfcUid: { type: String, unique: true, sparse: true, trim: true, uppercase: true },
+  phoneNfcUid: { type: String, unique: true, sparse: true, trim: true, uppercase: true },
   cardExpiry: {
     type: Date,
     default: () => {
@@ -121,6 +129,30 @@ userSchema.pre("save", async function () {
 
   if (this.nfcCardId === null || this.nfcCardId === "") {
     this.nfcCardId = undefined;
+  }
+
+  if (this.safePassId === null || this.safePassId === "") {
+    this.safePassId = undefined;
+  }
+
+  if (this.physicalNfcUid === null || this.physicalNfcUid === "") {
+    this.physicalNfcUid = undefined;
+  }
+
+  if (this.phoneNfcUid === null || this.phoneNfcUid === "") {
+    this.phoneNfcUid = undefined;
+  }
+
+  if (this.safePassId) {
+    this.safePassId = String(this.safePassId).trim();
+  }
+
+  if (this.physicalNfcUid) {
+    this.physicalNfcUid = String(this.physicalNfcUid).trim().toUpperCase();
+  }
+
+  if (this.phoneNfcUid) {
+    this.phoneNfcUid = String(this.phoneNfcUid).trim().toUpperCase();
   }
 
   if (this.email) {

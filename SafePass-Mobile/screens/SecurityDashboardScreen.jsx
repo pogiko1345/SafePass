@@ -42,6 +42,7 @@ import {
   isValidPhilippineMobileNumber,
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
+import { describeRfidReaderInput, normalizeRfidReaderInput } from "../utils/rfidReaderUtils";
 import styles from "../styles/SecurityDashboardStyles";
 import Logo from "../assets/LogoSapphire.jpg";
 
@@ -197,6 +198,45 @@ const securityLogFilters = [
   { key: "denied", label: "Denied" },
 ];
 
+const SECURITY_ATTENDANCE_SCOPE_OPTIONS = [
+  { value: "all", label: "All People" },
+  { value: "student", label: "Students" },
+  { value: "teacher", label: "Academic Staff" },
+  { value: "staff", label: "Staff" },
+  { value: "security", label: "Security" },
+  { value: "visitor", label: "Visitors" },
+];
+
+const SECURITY_ATTENDANCE_DATE_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "all", label: "All Dates" },
+];
+
+const SECURITY_ATTENDANCE_STATUS_OPTIONS = [
+  { value: "all", label: "All Status" },
+  { value: "inside", label: "Inside / Present" },
+  { value: "late", label: "Late" },
+  { value: "checked_out", label: "Checked Out" },
+  { value: "completed", label: "Completed" },
+];
+
+const getSecurityAttendanceDateRange = (shortcut = "today") => {
+  const now = new Date();
+  const toDate = now.toISOString().slice(0, 10);
+  const fromDate = new Date(now);
+
+  if (shortcut === "all") return {};
+  if (shortcut === "week") fromDate.setDate(now.getDate() - 6);
+  if (shortcut === "month") fromDate.setDate(now.getDate() - 29);
+
+  return {
+    dateFrom: fromDate.toISOString().slice(0, 10),
+    dateTo: toDate,
+  };
+};
+
 const buildSecurityProfileForm = (profile = {}) => ({
   firstName: profile.firstName || "",
   lastName: profile.lastName || "",
@@ -236,6 +276,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const lastOperationalRefreshAtRef = useRef(0);
   const operationalDataSignatureRef = useRef("");
   const notificationDataSignatureRef = useRef("");
+  const visitorNfcInputRef = useRef(null);
   
   // Dashboard Data
   const [dashboardStats, setDashboardStats] = useState({
@@ -251,6 +292,12 @@ export default function SecurityDashboardScreen({ navigation }) {
     total: 0,
     byUserType: {},
   });
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceScope, setAttendanceScope] = useState("all");
+  const [attendanceDateFilter, setAttendanceDateFilter] = useState("today");
+  const [attendanceStatusFilter, setAttendanceStatusFilter] = useState("all");
+  const [attendanceSearch, setAttendanceSearch] = useState("");
   const [recentAccess, setRecentAccess] = useState([]);
   const [alerts, setAlerts] = useState([]);
   
@@ -292,6 +339,13 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [selectedSubmodule, setSelectedSubmodule] = useState('home-main');
   const [visitorFilter, setVisitorFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [visitorNfcSearch, setVisitorNfcSearch] = useState('');
+  const [selectedVisitorNfcId, setSelectedVisitorNfcId] = useState('');
+  const [visitorNfcUid, setVisitorNfcUid] = useState('');
+  const [visitorNfcBusy, setVisitorNfcBusy] = useState(false);
+  const [visitorNfcStatus, setVisitorNfcStatus] = useState(null);
+  const [visitorNfcLocalVisitors, setVisitorNfcLocalVisitors] = useState({});
+  const [visitorNfcPinnedVisitor, setVisitorNfcPinnedVisitor] = useState(null);
   const [mobileDateFilter, setMobileDateFilter] = useState('all');
   const [mobileLocationFilter, setMobileLocationFilter] = useState('all');
   const [mobileLogFilter, setMobileLogFilter] = useState('all');
@@ -304,7 +358,12 @@ export default function SecurityDashboardScreen({ navigation }) {
   useEffect(() => {
     const loadMobileTheme = async () => {
       try {
-        const savedDarkMode = await AsyncStorage.getItem("darkModeEnabled");
+        const savedDarkMode =
+          Platform.OS === "web" && typeof window !== "undefined" && window.localStorage
+            ? window.localStorage.getItem("darkModeEnabled")
+            : typeof AsyncStorage?.getItem === "function"
+              ? await AsyncStorage.getItem("darkModeEnabled")
+              : null;
         setMobileDarkModeEnabled(savedDarkMode === "true");
       } catch (error) {
         console.log("Security dark mode preference unavailable:", error?.message || error);
@@ -426,6 +485,40 @@ export default function SecurityDashboardScreen({ navigation }) {
     };
   };
 
+  const getSharedMapLocationForVisitor = (visitor = {}) => {
+    const location = visitor?.currentLocation || visitor?.location || {};
+    const officeLabel =
+      location.office ||
+      visitor?.lastTappedOffice ||
+      visitor?.office ||
+      visitor?.assignedOffice ||
+      visitor?.appointmentDepartment ||
+      visitor?.expectedDestination ||
+      visitor?.host ||
+      "";
+    const matchedOffice = getOfficeConfigForLabel(officeLabel);
+    const mappedPosition = matchedOffice ? officePositions?.[matchedOffice.id] : null;
+
+    if (
+      matchedOffice &&
+      mappedPosition &&
+      Number.isFinite(Number(mappedPosition.x)) &&
+      Number.isFinite(Number(mappedPosition.y))
+    ) {
+      return {
+        floor: matchedOffice.floor || location.floor || "ground",
+        office: matchedOffice.name,
+        coordinates: {
+          x: Number(mappedPosition.x),
+          y: Number(mappedPosition.y),
+        },
+        officeId: matchedOffice.id,
+      };
+    }
+
+    return null;
+  };
+
   // ============ LOGOUT FUNCTIONS ============
   const handleLogoutPress = () => {
     setShowLogoutModal(true);
@@ -516,14 +609,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         return;
       }
 
-      await Promise.all([
-        loadOperationalData({ force: true }),
-        loadSecurityLivePresence(),
-        loadNotifications(currentUser, { force: true }),
-        loadMapSettings(),
-      ]);
-      lastOperationalRefreshAtRef.current = Date.now();
-
+      setIsLoading(false);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -536,6 +622,15 @@ export default function SecurityDashboardScreen({ navigation }) {
           useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
+
+      await Promise.allSettled([
+        loadOperationalData({ force: true }),
+        loadSecurityLivePresence(),
+        loadSecurityAttendanceRecords(),
+        loadNotifications(currentUser, { force: true }),
+      ]);
+      lastOperationalRefreshAtRef.current = Date.now();
+      loadMapSettings();
     } finally {
       setIsLoading(false);
     }
@@ -816,6 +911,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         const liveLocation = visitor.currentLocation?.isActive
           ? visitor.currentLocation
           : null;
+        const sharedMapLocation = getSharedMapLocationForVisitor(visitor);
         const liveCoordinates = liveLocation?.coordinates || {};
         const hasLiveCoordinates =
           Number.isFinite(Number(liveCoordinates.x)) &&
@@ -839,9 +935,11 @@ export default function SecurityDashboardScreen({ navigation }) {
           idPhoto: visitor.idImage,
           sourceVisitor: visitor,
           location: {
-            floor: liveLocation?.floor || assignedDestination.floorId || 'ground',
-            office: liveLocation?.office || assignedDestination.officeName || getRandomOffice(),
-            coordinates: hasLiveCoordinates
+            floor: sharedMapLocation?.floor || liveLocation?.floor || assignedDestination.floorId || 'ground',
+            office: sharedMapLocation?.office || liveLocation?.office || assignedDestination.officeName || getRandomOffice(),
+            coordinates: sharedMapLocation?.coordinates
+              ? sharedMapLocation.coordinates
+              : hasLiveCoordinates
               ? {
                   x: Number(liveCoordinates.x),
                   y: Number(liveCoordinates.y),
@@ -858,9 +956,10 @@ export default function SecurityDashboardScreen({ navigation }) {
             timestamp: liveLocation?.lastSeenAt || visitor.checkedInAt || new Date(),
             source:
               liveLocation?.source ||
+              (sharedMapLocation ? 'shared_map_position' : null) ||
               (hasAssignedCoordinates ? 'assigned_office' : 'system_estimate'),
             statusLabel: liveLocation?.statusLabel || "Inside campus",
-            checkpointId: liveLocation?.checkpointId || "",
+            checkpointId: liveLocation?.checkpointId || sharedMapLocation?.officeId || "",
           },
           movement: visitor.locationHistory || [],
         };
@@ -876,6 +975,26 @@ export default function SecurityDashboardScreen({ navigation }) {
       const hasCoordinates =
         Number.isFinite(Number(coordinates.x)) &&
         Number.isFinite(Number(coordinates.y));
+      const sharedMapLocation = getSharedMapLocationForVisitor({
+        ...matchedVisitor,
+        ...visitor,
+        currentLocation: {
+          ...(matchedVisitor?.currentLocation || {}),
+          office: visitor.office || matchedVisitor?.currentLocation?.office || matchedVisitor?.assignedOffice || "",
+          floor: visitor.floor || matchedVisitor?.currentLocation?.floor || "ground",
+          checkpointId: visitor.checkpointId || matchedVisitor?.currentLocation?.checkpointId || "",
+        },
+      });
+      const resolvedCoordinates = sharedMapLocation?.coordinates ||
+        (hasCoordinates
+          ? {
+              x: Number(coordinates.x),
+              y: Number(coordinates.y),
+            }
+          : {
+              x: 15 + ((index * 17) % 70),
+              y: 15 + ((index * 23) % 70),
+            });
 
       return {
         id: visitor.visitorId,
@@ -900,38 +1019,25 @@ export default function SecurityDashboardScreen({ navigation }) {
         idImage: matchedVisitor?.idImage || null,
         sourceVisitor: matchedVisitor,
         location: {
-          floor: visitor.floor || "ground",
-          office: visitor.office || getRandomOffice(),
-          coordinates: hasCoordinates
-            ? {
-                x: Number(coordinates.x),
-                y: Number(coordinates.y),
-              }
-            : {
-                x: 15 + ((index * 17) % 70),
-                y: 15 + ((index * 23) % 70),
-              },
+          floor: sharedMapLocation?.floor || visitor.floor || "ground",
+          office: sharedMapLocation?.office || visitor.office || getRandomOffice(),
+          coordinates: resolvedCoordinates,
           timestamp: visitor.lastScanTime || new Date(),
-          source: visitor.source || "checkpoint",
+          source: sharedMapLocation ? "shared_map_position" : visitor.source || "checkpoint",
           statusLabel: visitor.statusLabel || "Inside campus",
-          checkpointId: visitor.checkpointId || "",
+          checkpointId: visitor.checkpointId || sharedMapLocation?.officeId || "",
         },
-        currentLocation:
-          matchedVisitor?.currentLocation || {
-            floor: visitor.floor || "ground",
-            office: visitor.office || "Campus",
-            coordinates: hasCoordinates
-              ? {
-                  x: Number(coordinates.x),
-                  y: Number(coordinates.y),
-                }
-              : null,
-            lastSeenAt: visitor.lastScanTime || null,
-            source: visitor.source || "checkpoint",
-            statusLabel: visitor.statusLabel || "Inside campus",
-            checkpointId: visitor.checkpointId || "",
-            isActive: visitor.status !== "exited",
-          },
+        currentLocation: {
+          ...(matchedVisitor?.currentLocation || {}),
+          floor: sharedMapLocation?.floor || matchedVisitor?.currentLocation?.floor || visitor.floor || "ground",
+          office: sharedMapLocation?.office || matchedVisitor?.currentLocation?.office || visitor.office || "Campus",
+          coordinates: resolvedCoordinates,
+          lastSeenAt: visitor.lastScanTime || matchedVisitor?.currentLocation?.lastSeenAt || null,
+          source: sharedMapLocation ? "shared_map_position" : visitor.source || matchedVisitor?.currentLocation?.source || "checkpoint",
+          statusLabel: visitor.statusLabel || matchedVisitor?.currentLocation?.statusLabel || "Inside campus",
+          checkpointId: visitor.checkpointId || matchedVisitor?.currentLocation?.checkpointId || sharedMapLocation?.officeId || "",
+          isActive: matchedVisitor?.currentLocation?.isActive ?? visitor.status !== "exited",
+        },
         movement: visitor.movementHistory || matchedVisitor?.locationHistory || [],
         wrongLocationAlerts: visitor.wrongLocationAlerts || [],
       };
@@ -1167,6 +1273,32 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
   };
 
+  const loadSecurityAttendanceRecords = async () => {
+    setAttendanceLoading(true);
+    try {
+      const query = {
+        ...getSecurityAttendanceDateRange(attendanceDateFilter),
+        limit: 200,
+      };
+      if (attendanceScope === "security") {
+        query.module = "security_monitoring";
+      } else if (attendanceScope !== "all") {
+        query.userType = attendanceScope;
+      }
+      if (attendanceStatusFilter !== "all") query.status = attendanceStatusFilter;
+      if (attendanceSearch.trim()) query.search = attendanceSearch.trim();
+
+      const response = await ApiService.getAttendance(query);
+      setAttendanceRecords(Array.isArray(response?.attendance) ? response.attendance : []);
+      return true;
+    } catch (error) {
+      console.error("Load security attendance records error:", error);
+      return false;
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
   const loadMapSettings = async () => {
     try {
       const response = await ApiService.getMapSettings();
@@ -1245,6 +1377,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       loadOperationalData({ force: true }),
       loadLiveVisitorLocations(),
       loadSecurityLivePresence(),
+      loadSecurityAttendanceRecords(),
     ]);
   };
 
@@ -1288,7 +1421,25 @@ export default function SecurityDashboardScreen({ navigation }) {
       icon: 'walk-outline',
       color: '#0A3D91',
       submodules: [
-        { key: 'checked-in-visitors', label: 'Arrival and Departure', badge: dashboardStats.activeUsers || visitors.active.length || 0 },
+        { key: 'checked-in-visitors', label: 'Visitor Arrival / Departure', badge: visitors.active.length || 0 },
+      ],
+    },
+    {
+      key: 'attendance',
+      label: 'Attendance',
+      icon: 'clipboard-outline',
+      color: '#0A3D91',
+      submodules: [
+        { key: 'attendance-monitoring', label: 'Attendance Monitoring', badge: livePresenceSummary?.total || 0 },
+      ],
+    },
+    {
+      key: 'nfc-scan',
+      label: 'NFC Scan',
+      icon: 'scan-outline',
+      color: '#0A3D91',
+      submodules: [
+        { key: 'nfc-assign', label: 'Assign / Unassign', badge: 0 },
       ],
     },
     {
@@ -1317,6 +1468,8 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (submoduleKey.startsWith('map-')) return 'map';
     if (submoduleKey === 'appointment-records') return 'visitors';
     if (submoduleKey === 'checked-in-visitors') return 'presence';
+    if (submoduleKey === 'attendance-monitoring') return 'attendance';
+    if (submoduleKey === 'nfc-assign') return 'nfc';
     if (submoduleKey === 'report-file') return 'reports';
     return 'dashboard';
   };
@@ -1335,11 +1488,21 @@ export default function SecurityDashboardScreen({ navigation }) {
         return { title: 'Appointment Records', subtitle: 'Review appointment records in a read-only security view.' };
       case 'checked-in-visitors':
         return {
-          title: 'Arrival and Departure',
-          subtitle: 'Monitor visitor arrivals, active campus presence, and completed departures in one security view.',
+          title: 'Visitor Arrival / Departure',
+          subtitle: 'Monitor visitor arrivals, assigned destinations, and completed departures.',
+        };
+      case 'attendance-monitoring':
+        return {
+          title: 'Attendance Monitoring',
+          subtitle: 'Monitor student, academic staff, staff, security, and visitor NFC attendance records.',
         };
       case 'report-file':
         return { title: 'File a Report', subtitle: 'Submit a security report and review recently filed incidents.' };
+      case 'nfc-assign':
+        return {
+          title: 'NFC Scan',
+          subtitle: 'Assign and unassign visitor RFID cards from the security USB reader.',
+        };
       case 'home-main':
       default:
         return { title: 'Security Home', subtitle: 'Live guard operations, visitor status, and priority actions.' };
@@ -1360,6 +1523,10 @@ export default function SecurityDashboardScreen({ navigation }) {
 
     if (submoduleKey === 'appointment-records') {
       setVisitorFilter('all');
+    }
+
+    if (submoduleKey === 'attendance-monitoring') {
+      loadSecurityAttendanceRecords();
     }
   };
 
@@ -1419,6 +1586,160 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
   };
 
+  const applyVisitorNfcCardUpdate = (visitorEmail, cardId = "", visitorDetails = null) => {
+    const normalizedEmail = String(visitorEmail || "").trim().toLowerCase();
+    if (!normalizedEmail) return;
+    const { safePassId: _ignoredSafePassId, ...safeVisitorDetails } = visitorDetails || {};
+    const sourceVisitor = selectedVisitorForNfc?.email?.toLowerCase?.() === normalizedEmail ? selectedVisitorForNfc : {};
+    const localVisitor = {
+      ...sourceVisitor,
+      ...safeVisitorDetails,
+      email: safeVisitorDetails.email || sourceVisitor.email || visitorEmail,
+      nfcCardId: cardId,
+      physicalNfcUid: cardId,
+    };
+    const localIdentity = getVisitorNfcIdentity(localVisitor) || normalizedEmail;
+
+    const updateCollection = (collection = []) =>
+      collection.map((visitor) =>
+        String(visitor?.email || "").trim().toLowerCase() === normalizedEmail
+          ? {
+              ...visitor,
+              ...safeVisitorDetails,
+              nfcCardId: cardId,
+              physicalNfcUid: cardId,
+            }
+          : visitor,
+      );
+
+    setVisitorNfcLocalVisitors((current) => ({
+      ...current,
+      [localIdentity]: localVisitor,
+    }));
+    setVisitorNfcPinnedVisitor(localVisitor);
+    setVisitors((current) => ({
+      ...current,
+      active: updateCollection(current.active),
+      pending: updateCollection(current.pending),
+      approved: updateCollection(current.approved),
+      notReady: updateCollection(current.notReady),
+      completed: updateCollection(current.completed),
+      all: updateCollection(current.all),
+    }));
+  };
+
+  const handleAssignVisitorNfc = async (scannedValue = visitorNfcUid) => {
+    if (!selectedVisitorForNfc?.email) {
+      setVisitorNfcStatus({ type: "error", message: "Choose a visitor before assigning a card UID." });
+      Alert.alert("Select Visitor", "Choose a visitor before assigning a card UID.");
+      return;
+    }
+
+    const normalizedCardId = normalizeRfidReaderInput(scannedValue);
+    const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
+    setVisitorNfcPinnedVisitor(selectedVisitorForNfc);
+    if (!normalizedCardId) {
+      if (currentCard) {
+        setVisitorNfcStatus({
+          type: "success",
+          message: `${selectedVisitorForNfc.fullName || "Visitor"} already has UID ${currentCard}. Tap a different card to replace it.`,
+        });
+        setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
+        return;
+      }
+      setVisitorNfcStatus({ type: "error", message: "Tap a card on the USB reader or enter the UID first." });
+      Alert.alert("Card UID Required", "Tap a card on the USB reader or enter the UID first.");
+      return;
+    }
+
+    if (currentCard && normalizedCardId === currentCard) {
+      setVisitorNfcUid("");
+      setVisitorNfcStatus({
+        type: "success",
+        message: `${selectedVisitorForNfc.fullName || "Visitor"} is already assigned to UID ${currentCard}.`,
+      });
+      setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
+      return;
+    }
+
+    try {
+      setVisitorNfcBusy(true);
+      setVisitorNfcStatus({
+        type: "info",
+        message: currentCard
+          ? `Replacing ${currentCard} with ${normalizedCardId} for ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...`
+          : `Assigning ${normalizedCardId} to ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...`,
+      });
+      const response = await ApiService.assignNfcCard({
+        userId:
+          selectedVisitorForNfc.userId ||
+          selectedVisitorForNfc.relatedUser?._id ||
+          selectedVisitorForNfc.accountId ||
+          undefined,
+        email: selectedVisitorForNfc.email,
+        cardId: normalizedCardId,
+      });
+      const assignedCardId = response?.card?.cardNumber || normalizedCardId;
+      setVisitorNfcUid("");
+      setSelectedVisitorNfcId(getVisitorNfcIdentity(response?.visitor || selectedVisitorForNfc));
+      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, assignedCardId, response?.visitor);
+      await refreshData();
+      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, assignedCardId, response?.visitor);
+      setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
+      setVisitorNfcStatus({
+        type: "success",
+        message: currentCard
+          ? `UID replaced successfully. Current UID: ${assignedCardId}.`
+          : `NFC card assigned successfully. Current UID: ${assignedCardId}.`,
+      });
+    } catch (error) {
+      setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to assign this card UID." });
+      Alert.alert("Assign Failed", error?.message || "Unable to assign this card UID.");
+    } finally {
+      setVisitorNfcBusy(false);
+    }
+  };
+
+  const handleUnassignVisitorNfc = async () => {
+    if (!selectedVisitorForNfc?.email) {
+      setVisitorNfcStatus({ type: "error", message: "Choose a visitor before unassigning a card UID." });
+      Alert.alert("Select Visitor", "Choose a visitor before unassigning a card UID.");
+      return;
+    }
+
+    const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
+    setVisitorNfcPinnedVisitor(selectedVisitorForNfc);
+    if (!currentCard) {
+      setVisitorNfcStatus({ type: "error", message: "This visitor has no assigned UID to remove." });
+      Alert.alert("No UID Assigned", "This visitor has no assigned UID to remove.");
+      return;
+    }
+
+    try {
+      setVisitorNfcBusy(true);
+      setVisitorNfcStatus({ type: "info", message: `Unassigning ${currentCard} from ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...` });
+      const response = await ApiService.revokeNfcCard({
+        userId:
+          selectedVisitorForNfc.userId ||
+          selectedVisitorForNfc.relatedUser?._id ||
+          selectedVisitorForNfc.accountId ||
+          undefined,
+        email: selectedVisitorForNfc.email,
+      });
+      setSelectedVisitorNfcId(getVisitorNfcIdentity(response?.visitor || selectedVisitorForNfc));
+      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, "", response?.visitor);
+      await refreshData();
+      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, "", response?.visitor);
+      setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
+      setVisitorNfcStatus({ type: "success", message: response?.message || "Visitor UID unassigned successfully." });
+    } catch (error) {
+      setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to unassign this card UID." });
+      Alert.alert("Unassign Failed", error?.message || "Unable to unassign this card UID.");
+    } finally {
+      setVisitorNfcBusy(false);
+    }
+  };
+
   const refreshSecurityLiveData = async () => {
     if (securityLiveRefreshRef.current) return;
     securityLiveRefreshRef.current = true;
@@ -1428,11 +1749,13 @@ export default function SecurityDashboardScreen({ navigation }) {
       const refreshTasks = [
         loadLiveVisitorLocations(),
         loadSecurityLivePresence(),
+        loadSecurityAttendanceRecords(),
       ];
 
       if (shouldRefreshOperationalData) {
         lastOperationalRefreshAtRef.current = Date.now();
         refreshTasks.push(loadOperationalData());
+        refreshTasks.push(loadMapSettings());
       }
 
       await Promise.all(refreshTasks);
@@ -1445,7 +1768,10 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (liveMapRefreshRef.current) return;
     liveMapRefreshRef.current = true;
     try {
-      const loaded = await loadLiveVisitorLocations();
+      const [loaded] = await Promise.all([
+        loadLiveVisitorLocations(),
+        loadMapSettings(),
+      ]);
       if (!loaded) {
         await loadOperationalData();
       }
@@ -1535,6 +1861,78 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (now >= visitDayEnd) return "past";
     return "today";
   };
+
+  const isVisitorScheduledTodayForNfc = (visitor) => {
+    if (!visitor) return false;
+    const relation = getVisitDayRelation(visitor);
+    if (relation !== "today") return false;
+
+    const visitStatus = String(visitor?.status || "").toLowerCase();
+    const appointmentStatus = String(visitor?.appointmentStatus || "").toLowerCase();
+    const approvalStatus = String(visitor?.approvalStatus || "").toLowerCase();
+    const blockedStatuses = ["cancelled", "rejected", "expired", "no_show", "checked_out", "completed"];
+
+    if (blockedStatuses.includes(visitStatus) || blockedStatuses.includes(appointmentStatus)) return false;
+    if (approvalStatus === "rejected") return false;
+
+    return true;
+  };
+
+  const getVisitorNfcDestination = (visitor) =>
+    visitor?.assignedOffice ||
+    visitor?.appointmentDepartment ||
+    visitor?.currentDestination?.office ||
+    visitor?.host ||
+    "No assigned office";
+
+  const getVisitorNfcScheduleLabel = (visitor) => {
+    const scheduleDate = formatDate(visitor?.visitDate || visitor?.visitTime);
+    const scheduleTime = formatTime(visitor?.visitTime || visitor?.visitDate);
+    if (scheduleDate === "N/A" && scheduleTime === "N/A") return "Schedule pending";
+    return `${scheduleDate} at ${scheduleTime}`;
+  };
+
+  const getVisitorNfcStatusLabel = (visitor) =>
+    titleCase(visitor?.appointmentStatus || visitor?.status || visitor?.approvalStatus || "Scheduled");
+
+  const getVisitorNfcLocationLabel = (visitor) =>
+    visitor?.currentLocation?.office ||
+    visitor?.currentLocation?.checkpointId ||
+    visitor?.currentLocation?.statusLabel ||
+    (visitor?.status === "checked_in" ? "Inside campus" : "Not checked in");
+
+  const getVisitorNfcIdentity = (visitor) =>
+    String(visitor?.email || "").trim().toLowerCase() ||
+    String(visitor?.userId || visitor?.relatedUser?._id || visitor?.accountId || visitor?._id || "").trim();
+
+  const isVisitorPhysicalNfcUid = (value) => {
+    const normalizedValue = normalizeRfidReaderInput(value);
+    if (!normalizedValue) return false;
+    if (/^\d{4}-\d{5,}$/i.test(normalizedValue)) return false;
+    if (/^SAFEPASS-/i.test(normalizedValue)) return false;
+    return true;
+  };
+
+  const getVisitorAssignedNfcUid = (visitor) =>
+    [
+      visitor?.physicalNfcUid,
+      visitor?.relatedUser?.physicalNfcUid,
+      visitor?.account?.physicalNfcUid,
+      visitor?.nfcCardId,
+      visitor?.relatedUser?.nfcCardId,
+      visitor?.account?.nfcCardId,
+    ]
+      .map((value) => normalizeRfidReaderInput(value))
+      .find((value) => isVisitorPhysicalNfcUid(value)) || "";
+
+  const getVisitorNfcDetailRows = (visitor) => [
+    ["Schedule", getVisitorNfcScheduleLabel(visitor)],
+    ["Office", getVisitorNfcDestination(visitor)],
+    ["Host/Staff", visitor?.assignedStaffName || visitor?.host || "Not assigned"],
+    ["Phone", visitor?.phoneNumber || "No phone"],
+    ["Status", getVisitorNfcStatusLabel(visitor)],
+    ["Location", getVisitorNfcLocationLabel(visitor)],
+  ];
 
   const isCheckInAllowedNow = (visitor) => {
     if (!hasApprovedVisitWindow(visitor)) return false;
@@ -2042,6 +2440,105 @@ export default function SecurityDashboardScreen({ navigation }) {
     [visitors.active, visitors.approved],
   );
 
+  const assignableNfcVisitors = useMemo(() => {
+    const normalizedSearch = String(visitorNfcSearch || "").trim().toLowerCase();
+    const deduped = new Map();
+
+    [
+      ...(visitors.all || []),
+      ...(visitors.active || []),
+      ...(visitors.approved || []),
+      ...(visitors.notReady || []),
+      ...Object.values(visitorNfcLocalVisitors || {}),
+    ].forEach((visitor) => {
+      if (!isVisitorScheduledTodayForNfc(visitor)) return;
+
+      const email = String(visitor?.email || "").trim().toLowerCase();
+      const userIdentity = String(
+        visitor?.userId ||
+        visitor?.relatedUser?._id ||
+        visitor?.accountId ||
+        "",
+      ).trim();
+      const identity = email || userIdentity || String(visitor?._id || "").trim();
+      if (!identity) return;
+      const existing = deduped.get(identity);
+      if (existing) {
+        const existingHasCard = Boolean(getVisitorAssignedNfcUid(existing));
+        const nextHasCard = Boolean(getVisitorAssignedNfcUid(visitor));
+        if (existingHasCard || !nextHasCard) return;
+      }
+      deduped.set(identity, visitor);
+    });
+
+    return Array.from(deduped.values())
+      .filter((visitor) => {
+        if (!normalizedSearch) return true;
+        return [
+          visitor.fullName,
+          visitor.email,
+          visitor.phoneNumber,
+          getVisitorAssignedNfcUid(visitor),
+          visitor.safePassId,
+          visitor.assignedOffice,
+          visitor.appointmentDepartment,
+          visitor.host,
+          visitor.assignedStaffName,
+          visitor.status,
+          visitor.appointmentStatus,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(normalizedSearch));
+      })
+      .sort(
+        (left, right) =>
+          getAppointmentTimeSortValue(left) - getAppointmentTimeSortValue(right) ||
+          String(left?.fullName || left?.email || "").localeCompare(String(right?.fullName || right?.email || "")),
+      )
+      .slice(0, 18);
+  }, [
+    visitorNfcSearch,
+    visitorNfcLocalVisitors,
+    visitors.all,
+    visitors.active,
+    visitors.approved,
+    visitors.notReady,
+  ]);
+
+  const selectedVisitorForNfc = useMemo(
+    () => {
+      const selectedFromList = assignableNfcVisitors.find(
+        (visitor) =>
+          getVisitorNfcIdentity(visitor) === String(selectedVisitorNfcId || "").trim() ||
+          String(visitor?._id) === String(selectedVisitorNfcId),
+      );
+      if (selectedFromList) return selectedFromList;
+
+      const pinnedIdentity = getVisitorNfcIdentity(visitorNfcPinnedVisitor);
+      const selectedIdentity = String(selectedVisitorNfcId || "").trim();
+      if (
+        visitorNfcPinnedVisitor &&
+        (!selectedIdentity || pinnedIdentity === selectedIdentity || String(visitorNfcPinnedVisitor?._id) === selectedIdentity)
+      ) {
+        return visitorNfcPinnedVisitor;
+      }
+
+      return assignableNfcVisitors[0] || null;
+    },
+    [assignableNfcVisitors, selectedVisitorNfcId, visitorNfcPinnedVisitor],
+  );
+
+  const visitorNfcListVisitors = useMemo(() => {
+    if (assignableNfcVisitors.length) return assignableNfcVisitors;
+    return selectedVisitorForNfc ? [selectedVisitorForNfc] : [];
+  }, [assignableNfcVisitors, selectedVisitorForNfc]);
+
+  useEffect(() => {
+    if (!selectedVisitorNfcId && assignableNfcVisitors[0]) {
+      setSelectedVisitorNfcId(getVisitorNfcIdentity(assignableNfcVisitors[0]));
+    }
+  }, [assignableNfcVisitors, selectedVisitorNfcId]);
+
   const mobileLogItems = useMemo(() => {
     const normalizedSearch = String(searchQuery || "").trim().toLowerCase();
     return (accessLogs || []).filter((log) => {
@@ -2127,6 +2624,71 @@ export default function SecurityDashboardScreen({ navigation }) {
       ),
     [visitors.active],
   );
+  const liveVisitorMonitoringRows = useMemo(() => {
+    const visitorMap = new Map();
+    const addVisitor = (visitor) => {
+      if (!visitor) return;
+      const sourceVisitor = visitor.sourceVisitor || visitor;
+      const key = getVisitorTrackingIdentity(sourceVisitor) || getVisitorTrackingIdentity(visitor);
+      if (!key) return;
+
+      const mergedVisitor = {
+        ...sourceVisitor,
+        ...visitor,
+        status: sourceVisitor.status || visitor.status || "checked_in",
+        fullName: sourceVisitor.fullName || visitor.fullName || visitor.name || "Visitor",
+        assignedOffice:
+          visitor.location?.office ||
+          visitor.currentLocation?.office ||
+          sourceVisitor.assignedOffice ||
+          visitor.assignedOffice ||
+          sourceVisitor.appointmentDepartment ||
+          "",
+        checkedInAt: sourceVisitor.checkedInAt || visitor.checkedInAt || visitor.checkInTime,
+        currentLocation: {
+          ...(sourceVisitor.currentLocation || {}),
+          ...(visitor.currentLocation || {}),
+          office:
+            visitor.location?.office ||
+            visitor.currentLocation?.office ||
+            sourceVisitor.currentLocation?.office ||
+            sourceVisitor.assignedOffice ||
+            "",
+          floor:
+            visitor.location?.floor ||
+            visitor.currentLocation?.floor ||
+            sourceVisitor.currentLocation?.floor ||
+            "ground",
+          lastSeenAt:
+            visitor.location?.timestamp ||
+            visitor.currentLocation?.lastSeenAt ||
+            sourceVisitor.currentLocation?.lastSeenAt ||
+            sourceVisitor.checkedInAt,
+          statusLabel:
+            visitor.location?.statusLabel ||
+            visitor.currentLocation?.statusLabel ||
+            sourceVisitor.currentLocation?.statusLabel ||
+            "Inside campus",
+          isActive: true,
+        },
+      };
+
+      const existingVisitor = visitorMap.get(key);
+      if (
+        !existingVisitor ||
+        getVisitorTrackingTimestamp(mergedVisitor) > getVisitorTrackingTimestamp(existingVisitor)
+      ) {
+        visitorMap.set(key, mergedVisitor);
+      }
+    };
+
+    visitors.active.forEach(addVisitor);
+    visitorLocations.forEach(addVisitor);
+
+    return Array.from(visitorMap.values()).sort(
+      (left, right) => getVisitorTrackingTimestamp(right) - getVisitorTrackingTimestamp(left),
+    );
+  }, [visitors.active, visitorLocations]);
   const recentlyCheckedOutVisitors = useMemo(
     () =>
       [...(visitors.completed || [])]
@@ -2177,6 +2739,41 @@ export default function SecurityDashboardScreen({ navigation }) {
     return filteredReports.slice(startIndex, startIndex + reportsItemsPerPage);
   }, [filteredReports, reportsPage]);
 
+  const filteredAttendanceRecords = useMemo(() => {
+    const query = String(attendanceSearch || "").trim().toLowerCase();
+    if (!query) return attendanceRecords;
+    return attendanceRecords.filter((record) =>
+      [
+        record?.name,
+        record?.userType,
+        record?.role,
+        record?.status,
+        record?.location,
+        record?.checkpointIn,
+        record?.checkpointOut,
+        record?.nfcCardId,
+        record?.sourceDeviceId,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)),
+    );
+  }, [attendanceRecords, attendanceSearch]);
+
+  const attendanceOverview = useMemo(() => {
+    return filteredAttendanceRecords.reduce(
+      (summary, record) => {
+        const status = String(record?.status || "").toLowerCase();
+        summary.total += 1;
+        if (status === "late" || record?.isLate) summary.late += 1;
+        if (["inside", "present"].includes(status)) summary.inside += 1;
+        if (["checked_out", "completed"].includes(status) || record?.isCompleted) summary.checkedOut += 1;
+        summary.byType[record?.userType || "unknown"] = (summary.byType[record?.userType || "unknown"] || 0) + 1;
+        return summary;
+      },
+      { total: 0, inside: 0, late: 0, checkedOut: 0, byType: {} },
+    );
+  }, [filteredAttendanceRecords]);
+
   useEffect(() => {
     setAppointmentRecordsPage(1);
   }, [visitorFilter, searchQuery]);
@@ -2192,6 +2789,11 @@ export default function SecurityDashboardScreen({ navigation }) {
   useEffect(() => {
     setReportsPage(1);
   }, [reportSearchQuery, reportStatusFilter]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadSecurityAttendanceRecords();
+  }, [attendanceScope, attendanceDateFilter, attendanceStatusFilter]);
 
   const renderAppointmentPagination = () => (
     <View style={styles.appointmentRecordsPaginationRow}>
@@ -2314,8 +2916,6 @@ export default function SecurityDashboardScreen({ navigation }) {
     </View>
   );
 
-  const livePresenceByType = livePresenceSummary?.byUserType || {};
-
   const getPresenceIcon = (userType) => {
     switch (String(userType || "").toLowerCase()) {
       case "student":
@@ -2336,6 +2936,264 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const getPresenceLocation = (item) =>
     item?.location || item?.checkpointName || item?.checkpointId || "Campus checkpoint";
+
+  const renderVisitorNfcAssignmentPanel = () => {
+    const hasPinnedOnlyVisitor = !assignableNfcVisitors.length && Boolean(selectedVisitorForNfc);
+
+    return (
+    <View style={styles.visitorNfcPanel}>
+      <View style={styles.visitorNfcHeader}>
+        <View style={styles.sectionTitleContainer}>
+          <Ionicons name="card-outline" size={20} color="#0A3D91" />
+          <View>
+            <Text style={styles.sectionTitle}>Assign Visitor Card</Text>
+            <Text style={styles.securitySectionSubtitle}>
+              Select today's scheduled visitor, then link the physical UID before the visitor gate tap.
+            </Text>
+          </View>
+        </View>
+        <View style={styles.visitorNfcCountBadge}>
+          <Text style={styles.visitorNfcCountText}>{visitorNfcListVisitors.length} today</Text>
+        </View>
+      </View>
+
+      {selectedVisitorForNfc ? (
+        <View style={styles.visitorNfcWorkspace}>
+          <View style={styles.visitorNfcSelectorColumn}>
+            <TextInput
+              style={styles.visitorNfcSearchInput}
+              value={visitorNfcSearch}
+              onChangeText={setVisitorNfcSearch}
+              placeholder="Search today's visitors"
+              placeholderTextColor="#94A3B8"
+            />
+
+            <ScrollView style={styles.visitorNfcSelectList} showsVerticalScrollIndicator={false}>
+              {visitorNfcListVisitors.map((visitor) => {
+                const visitorIdentity = getVisitorNfcIdentity(visitor);
+                const selected = visitorIdentity === getVisitorNfcIdentity(selectedVisitorForNfc);
+                const assignedNfcUid = getVisitorAssignedNfcUid(visitor);
+                const hasAssignedCard = Boolean(assignedNfcUid);
+                return (
+                  <TouchableOpacity
+                    key={visitorIdentity || visitor?._id || visitor?.email}
+                    style={[styles.visitorNfcSelectCard, selected && styles.visitorNfcSelectCardActive]}
+                    onPress={() => {
+                      setSelectedVisitorNfcId(visitorIdentity || visitor?._id || "");
+                      setVisitorNfcPinnedVisitor(visitor);
+                      setVisitorNfcStatus(null);
+                      setTimeout(() => visitorNfcInputRef.current?.focus?.(), 80);
+                    }}
+                  >
+                    <View style={styles.visitorNfcSelectIcon}>
+                      <Ionicons
+                        name={selected ? "person" : "person-outline"}
+                        size={17}
+                        color={selected ? "#FFFFFF" : "#0A3D91"}
+                      />
+                    </View>
+                    <View style={styles.visitorNfcSelectContent}>
+                      <Text
+                        style={[styles.visitorNfcChipName, selected && styles.visitorNfcChipNameActive]}
+                        numberOfLines={1}
+                      >
+                        {visitor?.fullName || visitor?.email || "Visitor"}
+                      </Text>
+                      <Text
+                        style={[styles.visitorNfcChipMeta, selected && styles.visitorNfcChipMetaActive]}
+                        numberOfLines={1}
+                      >
+                        {getVisitorNfcDestination(visitor)}
+                      </Text>
+                      <Text
+                        style={[styles.visitorNfcChipMeta, selected && styles.visitorNfcChipMetaActive]}
+                        numberOfLines={1}
+                      >
+                        {assignedNfcUid || "No UID assigned"}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.visitorNfcAssignmentBadge,
+                        hasAssignedCard && styles.visitorNfcAssignmentBadgeAssigned,
+                        selected && styles.visitorNfcAssignmentBadgeActive,
+                      ]}
+                    >
+                      <Ionicons
+                        name={hasAssignedCard ? "checkmark-circle" : "ellipse-outline"}
+                        size={14}
+                        color={selected ? "#FFFFFF" : hasAssignedCard ? "#047857" : "#64748B"}
+                      />
+                      <Text
+                        style={[
+                          styles.visitorNfcAssignmentBadgeText,
+                          hasAssignedCard && styles.visitorNfcAssignmentBadgeTextAssigned,
+                          selected && styles.visitorNfcAssignmentBadgeTextActive,
+                        ]}
+                      >
+                        {hasAssignedCard ? "Assigned" : "Open"}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            {hasPinnedOnlyVisitor ? (
+              <View style={[styles.visitorNfcStatus, styles.visitorNfcStatusSuccess]}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#047857" />
+                <Text style={[styles.visitorNfcStatusText, styles.visitorNfcStatusTextSuccess]}>
+                  Keeping the selected visitor visible while the list refreshes.
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.visitorNfcAssignBox}>
+            <View style={styles.visitorNfcSelected}>
+              <Text style={styles.visitorNfcSelectedLabel}>Selected Visitor</Text>
+              <Text style={styles.visitorNfcSelectedName}>{selectedVisitorForNfc.fullName || "Visitor"}</Text>
+              <Text style={styles.visitorNfcSelectedMeta}>
+                {selectedVisitorForNfc.email || "No email"} | Current UID:{" "}
+                {getVisitorAssignedNfcUid(selectedVisitorForNfc) || "None"}
+              </Text>
+            </View>
+
+            <View style={styles.visitorNfcDetailsGrid}>
+              {getVisitorNfcDetailRows(selectedVisitorForNfc).map(([label, value]) => (
+                <View key={label} style={styles.visitorNfcDetailItem}>
+                  <Text style={styles.visitorNfcDetailLabel}>{label}</Text>
+                  <Text style={styles.visitorNfcDetailValue} numberOfLines={2}>
+                    {value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <TextInput
+              ref={visitorNfcInputRef}
+              style={styles.visitorNfcUidInput}
+              value={visitorNfcUid}
+              onChangeText={(value) => setVisitorNfcUid(normalizeRfidReaderInput(value))}
+              onSubmitEditing={(event) => handleAssignVisitorNfc(event?.nativeEvent?.text)}
+              onFocus={() => {
+                if (visitorNfcStatus?.type === "error") setVisitorNfcStatus(null);
+              }}
+              placeholder="Tap visitor card on USB reader"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              returnKeyType="done"
+              blurOnSubmit={false}
+              showSoftInputOnFocus={false}
+            />
+
+            <View style={styles.visitorNfcFooter}>
+              <View style={styles.visitorNfcHint}>
+                <Ionicons name="radio-outline" size={16} color="#0A3D91" />
+                <Text style={styles.visitorNfcHintText}>{describeRfidReaderInput(visitorNfcUid)}</Text>
+              </View>
+              {getVisitorAssignedNfcUid(selectedVisitorForNfc) ? (
+                <TouchableOpacity
+                  style={[styles.visitorNfcUnassignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
+                  onPress={() => handleUnassignVisitorNfc()}
+                  disabled={visitorNfcBusy}
+                >
+                  <Ionicons name="unlink-outline" size={16} color="#B91C1C" />
+                  <Text style={styles.visitorNfcUnassignButtonText}>Unassign UID</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                style={[styles.visitorNfcAssignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
+                onPress={() => handleAssignVisitorNfc()}
+                disabled={visitorNfcBusy}
+              >
+                {visitorNfcBusy ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="link-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.visitorNfcAssignButtonText}>
+                      {getVisitorAssignedNfcUid(selectedVisitorForNfc) ? "Replace UID" : "Assign UID"}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+            {visitorNfcStatus?.message ? (
+              <View
+                style={[
+                  styles.visitorNfcStatus,
+                  visitorNfcStatus.type === "success" && styles.visitorNfcStatusSuccess,
+                  visitorNfcStatus.type === "error" && styles.visitorNfcStatusError,
+                ]}
+              >
+                <Ionicons
+                  name={
+                    visitorNfcStatus.type === "success"
+                      ? "checkmark-circle-outline"
+                      : visitorNfcStatus.type === "error"
+                        ? "alert-circle-outline"
+                        : "time-outline"
+                  }
+                  size={16}
+                  color={
+                    visitorNfcStatus.type === "success"
+                      ? "#047857"
+                      : visitorNfcStatus.type === "error"
+                        ? "#B91C1C"
+                        : "#0A3D91"
+                  }
+                />
+                <Text
+                  style={[
+                    styles.visitorNfcStatusText,
+                    visitorNfcStatus.type === "success" && styles.visitorNfcStatusTextSuccess,
+                    visitorNfcStatus.type === "error" && styles.visitorNfcStatusTextError,
+                  ]}
+                >
+                  {visitorNfcStatus.message}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.visitorNfcEmpty}>
+          <TextInput
+            style={styles.visitorNfcSearchInput}
+            value={visitorNfcSearch}
+            onChangeText={setVisitorNfcSearch}
+            placeholder="Search today's visitors"
+            placeholderTextColor="#94A3B8"
+          />
+          <Ionicons name="person-outline" size={24} color="#94A3B8" />
+          <Text style={styles.visitorNfcEmptyText}>No scheduled visitors today match this search.</Text>
+        </View>
+      )}
+    </View>
+    );
+  };
+
+  const renderNfcAssignmentTab = () => (
+    <ScrollView
+      style={styles.scrollView}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refreshData}
+          tintColor="#0A3D91"
+          colors={["#0A3D91"]}
+          title="Refreshing NFC assignments..."
+          titleColor="#0A3D91"
+        />
+      }
+    >
+      <View style={styles.dashboardShell}>
+        {renderVisitorNfcAssignmentPanel()}
+      </View>
+    </ScrollView>
+  );
 
   // Render Dashboard Tab
   const renderDashboardTab = () => (
@@ -2375,6 +3233,25 @@ export default function SecurityDashboardScreen({ navigation }) {
           <Text style={styles.securityHeroSubtitle}>
             Track approved visitors, monitor live movement, and respond to alerts from one command workspace.
           </Text>
+
+          <View style={styles.securityHeroActions}>
+            <TouchableOpacity
+              style={styles.securityHeroPrimaryAction}
+              onPress={() => selectGuardSubmodule('nfc-assign')}
+              accessibilityRole="button"
+              accessibilityLabel="Open NFC assignment module"
+            >
+              <Ionicons name="scan-outline" size={18} color="#0A3D91" />
+              <Text style={styles.securityHeroPrimaryActionText}>NFC Scan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.securityHeroSecondaryAction}
+              onPress={() => selectGuardSubmodule('map-ground')}
+            >
+              <Ionicons name="map-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.securityHeroSecondaryActionText}>Live Map</Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.securityHeroStats}>
             <View style={styles.securityHeroStatCard}>
@@ -2564,59 +3441,59 @@ export default function SecurityDashboardScreen({ navigation }) {
               <View>
                 <Text style={styles.sectionTitle}>Visitor Monitoring</Text>
                 <Text style={styles.securitySectionSubtitle}>
-                  Visitor arrival, active presence, and departure activity in one place.
+                  Focused view of approved visitor arrivals, active check-ins, and completed departures.
                 </Text>
               </View>
             </View>
             <TouchableOpacity onPress={() => selectGuardSubmodule('checked-in-visitors')}>
-              <Text style={styles.viewAll}>Open Arrivals</Text>
+              <Text style={styles.viewAll}>Open Visitors</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.reportStatsGrid}>
             <View style={styles.reportStatCard}>
-              <Text style={styles.reportStatValue}>{livePresenceSummary?.total || 0}</Text>
-              <Text style={styles.reportStatLabel}>On Site</Text>
+              <Text style={styles.reportStatValue}>{liveVisitorMonitoringRows.length || 0}</Text>
+              <Text style={styles.reportStatLabel}>Checked In</Text>
             </View>
             <View style={styles.reportStatCard}>
-              <Text style={styles.reportStatValue}>{livePresenceByType.student || 0}</Text>
-              <Text style={styles.reportStatLabel}>Students</Text>
+              <Text style={styles.reportStatValue}>{visitors.approved.length || 0}</Text>
+              <Text style={styles.reportStatLabel}>Approved</Text>
             </View>
             <View style={styles.reportStatCard}>
-              <Text style={styles.reportStatValue}>{livePresenceByType.teacher || 0}</Text>
-              <Text style={styles.reportStatLabel}>Teachers</Text>
+              <Text style={styles.reportStatValue}>{visitors.pending.length || 0}</Text>
+              <Text style={styles.reportStatLabel}>Pending</Text>
             </View>
             <View style={styles.reportStatCard}>
-              <Text style={styles.reportStatValue}>{livePresenceByType.visitor || 0}</Text>
-              <Text style={styles.reportStatLabel}>Visitors</Text>
+              <Text style={styles.reportStatValue}>{visitors.completed.length || 0}</Text>
+              <Text style={styles.reportStatLabel}>Completed</Text>
             </View>
           </View>
 
           <View style={styles.activityList}>
-            {activeUsers.slice(0, 6).map((presenceItem, index) => (
+            {[...(liveVisitorMonitoringRows || []), ...(visitors.approved || [])].slice(0, 6).map((visitor, index) => (
               <View
-                key={presenceItem.attendanceId || `${presenceItem.userId || presenceItem.visitorId}-${index}`}
+                key={visitor._id || visitor.id || `${visitor.email}-${index}`}
                 style={styles.activityItem}
               >
                 <View style={[styles.activityIcon, { backgroundColor: '#EEF5FF' }]}>
-                  <Ionicons name={getPresenceIcon(presenceItem.userType)} size={16} color="#0A3D91" />
+                  <Ionicons name={visitor.status === 'checked_in' ? "walk-outline" : "person-outline"} size={16} color="#0A3D91" />
                 </View>
                 <View style={styles.activityContent}>
-                  <Text style={styles.activityTitle}>{presenceItem.name}</Text>
+                  <Text style={styles.activityTitle}>{visitor.fullName || visitor.name || "Visitor"}</Text>
                   <Text style={styles.activityLocation}>
-                    {titleCase(presenceItem.userType)} at {getPresenceLocation(presenceItem)}
+                    {visitor.status === 'checked_in' ? "Inside" : titleCase(visitor.status || "Approved")} at {visitor.currentLocation?.office || visitor.location?.office || visitor.assignedOffice || visitor.appointmentDepartment || visitor.host || "Campus"}
                   </Text>
                 </View>
-                <Text style={styles.activityTime}>{formatTime(presenceItem.lastTapTime)}</Text>
+                <Text style={styles.activityTime}>{formatTime(visitor.currentLocation?.lastSeenAt || visitor.checkedInAt || visitor.visitTime || visitor.visitDate)}</Text>
               </View>
             ))}
 
-            {activeUsers.length === 0 && (
+            {[...(liveVisitorMonitoringRows || []), ...(visitors.approved || [])].length === 0 && (
               <View style={styles.emptyState}>
                 <Ionicons name="people-outline" size={44} color="#D1D5DB" />
-                <Text style={styles.emptyStateTitle}>No live presence data yet</Text>
+                <Text style={styles.emptyStateTitle}>No visitor activity yet</Text>
                 <Text style={styles.emptyStateSubtitle}>
-                  Active campus attendance will appear here after NFC check-ins start coming in.
+                  Approved visitors and active check-ins will appear here.
                 </Text>
               </View>
             )}
@@ -2768,7 +3645,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     const selectedOption = options.find((option) => option.value === value);
 
     return (
-      <View style={styles.recordToolbarField}>
+      <View style={[styles.recordToolbarField, isOpen && styles.recordToolbarFieldOpen]}>
         <Text style={styles.recordToolbarLabel}>{label}</Text>
         <TouchableOpacity
           style={styles.recordToolbarSelect}
@@ -3111,62 +3988,15 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         )}
 
-        <View style={[styles.sectionHeader, { marginTop: 16 }]}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="people-outline" size={18} color="#0A3D91" />
-            <Text style={styles.sectionTitle}>Live Visitor Monitoring</Text>
-          </View>
-          <Text style={styles.securitySectionSubtitle}>
-            {livePresenceSummary?.total || 0} active attendance record{livePresenceSummary?.total === 1 ? '' : 's'}
+        <View style={[styles.readonlyInfoBanner, { marginTop: 16 }]}>
+          <Ionicons name="people-outline" size={18} color="#0A3D91" />
+          <Text style={styles.readonlyInfoBannerText}>
+            Student, staff, and security attendance is tracked separately from visitor monitoring.
           </Text>
+          <TouchableOpacity onPress={() => selectGuardSubmodule('attendance-monitoring')}>
+            <Text style={styles.viewAll}>Open Attendance</Text>
+          </TouchableOpacity>
         </View>
-
-        <View style={styles.reportStatsGrid}>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{livePresenceByType.student || 0}</Text>
-            <Text style={styles.reportStatLabel}>Students</Text>
-          </View>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{livePresenceByType.teacher || 0}</Text>
-            <Text style={styles.reportStatLabel}>Teachers</Text>
-          </View>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{livePresenceByType.staff || 0}</Text>
-            <Text style={styles.reportStatLabel}>Staff</Text>
-          </View>
-          <View style={styles.reportStatCard}>
-            <Text style={styles.reportStatValue}>{(livePresenceByType.security || 0) + (livePresenceByType.guard || 0)}</Text>
-            <Text style={styles.reportStatLabel}>Security</Text>
-          </View>
-        </View>
-
-        {activeUsers.length > 0 ? (
-          <View style={styles.activityList}>
-            {activeUsers.map((presenceItem, index) => (
-              <View
-                key={presenceItem.attendanceId || `${presenceItem.userId || presenceItem.visitorId}-${index}`}
-                style={styles.activityItem}
-              >
-                <View style={[styles.activityIcon, { backgroundColor: '#EEF5FF' }]}>
-                  <Ionicons name={getPresenceIcon(presenceItem.userType)} size={16} color="#0A3D91" />
-                </View>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityTitle}>{presenceItem.name}</Text>
-                  <Text style={styles.activityLocation}>
-                    {titleCase(presenceItem.userType)} at {getPresenceLocation(presenceItem)}
-                  </Text>
-                </View>
-                <Text style={styles.activityTime}>{formatTime(presenceItem.lastTapTime)}</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyStateTitle}>No live campus presence</Text>
-            <Text style={styles.emptyStateSubtitle}>Students, teachers, staff, and visitors currently on site will appear here.</Text>
-          </View>
-        )}
 
         <View style={[styles.sectionHeader, { marginTop: 12 }]}>
           <View style={styles.sectionTitleContainer}>
@@ -3258,6 +4088,158 @@ export default function SecurityDashboardScreen({ navigation }) {
             <Ionicons name="checkmark-circle-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyStateTitle}>No Active Alerts</Text>
             <Text style={styles.emptyStateSubtitle}>All systems are operating normally</Text>
+          </View>
+        )}
+      </View>
+    </ScrollView>
+  );
+
+  const renderAttendanceMonitoringTab = () => (
+    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <View style={styles.visitorsContainer}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="clipboard-outline" size={20} color="#0A3D91" />
+            <View>
+              <Text style={styles.sectionTitle}>Attendance Monitoring</Text>
+              <Text style={styles.securitySectionSubtitle}>
+                View NFC attendance records for students, academic staff, staff, security, and visitors.
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={loadSecurityAttendanceRecords} disabled={attendanceLoading}>
+            <Text style={styles.viewAll}>{attendanceLoading ? "Refreshing..." : "Refresh"}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {renderRecordSearchFilterToolbar({
+          searchTitle: "Search Attendance",
+          searchSubtitle: "Find attendance by name, UID, location, type, or status.",
+          searchValue: attendanceSearch,
+          onSearchChange: setAttendanceSearch,
+          onClearSearch: () => setAttendanceSearch(""),
+          searchPlaceholder: "Search name, UID, location, or status...",
+          filterSubtitle: "Narrow attendance by person type, date, and status.",
+          hasFilters:
+            attendanceScope !== "all" ||
+            attendanceDateFilter !== "today" ||
+            attendanceStatusFilter !== "all",
+          onResetFilters: () => {
+            setAttendanceScope("all");
+            setAttendanceDateFilter("today");
+            setAttendanceStatusFilter("all");
+          },
+          filterGroups: [
+            {
+              id: "attendance-scope",
+              label: "Person Type",
+              value: attendanceScope,
+              icon: "people-outline",
+              options: SECURITY_ATTENDANCE_SCOPE_OPTIONS,
+              onSelect: setAttendanceScope,
+            },
+            {
+              id: "attendance-date",
+              label: "Date Range",
+              value: attendanceDateFilter,
+              icon: "calendar-outline",
+              options: SECURITY_ATTENDANCE_DATE_OPTIONS,
+              onSelect: setAttendanceDateFilter,
+            },
+            {
+              id: "attendance-status",
+              label: "Status",
+              value: attendanceStatusFilter,
+              icon: "pulse-outline",
+              options: SECURITY_ATTENDANCE_STATUS_OPTIONS,
+              onSelect: setAttendanceStatusFilter,
+            },
+          ],
+        })}
+
+        <View style={styles.reportStatsGrid}>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{attendanceOverview.total}</Text>
+            <Text style={styles.reportStatLabel}>Records</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{attendanceOverview.inside}</Text>
+            <Text style={styles.reportStatLabel}>Inside / Present</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{attendanceOverview.late}</Text>
+            <Text style={styles.reportStatLabel}>Late</Text>
+          </View>
+          <View style={styles.reportStatCard}>
+            <Text style={styles.reportStatValue}>{attendanceOverview.checkedOut}</Text>
+            <Text style={styles.reportStatLabel}>Checked Out</Text>
+          </View>
+        </View>
+
+        {attendanceLoading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="small" color="#0A3D91" />
+            <Text style={styles.emptyStateTitle}>Loading attendance records</Text>
+          </View>
+        ) : filteredAttendanceRecords.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.appointmentRecordsTable}>
+              <View style={[styles.appointmentRecordsTableRow, styles.appointmentRecordsTableHeader]}>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsVisitorCell]}>Person</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsPurposeCell]}>Type</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsScheduleCell]}>Date</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsScheduleCell]}>Check In</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsScheduleCell]}>Check Out</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsStatusCell]}>Status</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsOfficeCell]}>Location</Text>
+                <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsContactCell]}>NFC UID</Text>
+              </View>
+              {filteredAttendanceRecords.slice(0, 150).map((record, index) => (
+                <View
+                  key={record?._id || `${record?.name}-${record?.attendanceDate}-${index}`}
+                  style={styles.appointmentRecordsTableRow}
+                >
+                  <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsVisitorCell]}>
+                    <View style={[styles.activityIcon, { backgroundColor: '#EEF5FF' }]}>
+                      <Ionicons name={getPresenceIcon(record?.userType)} size={16} color="#0A3D91" />
+                    </View>
+                    <View style={styles.appointmentRecordsVisitorInfo}>
+                      <Text style={styles.appointmentRecordsVisitorName}>{record?.name || "Unknown"}</Text>
+                      <Text style={styles.appointmentRecordsVisitorEmail}>{record?.sourceDeviceId || "Checkpoint tap"}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsPurposeCell]}>
+                    {titleCase(record?.userType || record?.role || "User")}
+                  </Text>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsScheduleCell]}>
+                    {formatDate(record?.attendanceDate)}
+                  </Text>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsScheduleCell]}>
+                    {formatTime(record?.checkInTime)}
+                  </Text>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsScheduleCell]}>
+                    {record?.checkOutTime ? formatTime(record.checkOutTime) : "-"}
+                  </Text>
+                  <View style={[styles.appointmentRecordsCell, styles.appointmentRecordsStatusCell]}>
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusBadgeText}>{titleCase(record?.status || "Recorded")}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsOfficeCell]} numberOfLines={1}>
+                    {record?.location || record?.checkpointIn || "Campus"}
+                  </Text>
+                  <Text style={[styles.appointmentRecordsCell, styles.appointmentRecordsContactCell]} numberOfLines={1}>
+                    {record?.nfcCardId || "No UID"}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="clipboard-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyStateTitle}>No attendance records found</Text>
+            <Text style={styles.emptyStateSubtitle}>NFC check-ins and check-outs will appear here after cards are tapped.</Text>
           </View>
         )}
       </View>
@@ -5299,6 +6281,8 @@ export default function SecurityDashboardScreen({ navigation }) {
           {selectedSubmodule.startsWith('map-') && renderMapTab()}
           {selectedSubmodule === 'appointment-records' && renderVisitorsTab()}
           {selectedSubmodule === 'checked-in-visitors' && renderCampusActivityTab()}
+          {selectedSubmodule === 'attendance-monitoring' && renderAttendanceMonitoringTab()}
+          {selectedSubmodule === 'nfc-assign' && renderNfcAssignmentTab()}
           {selectedSubmodule === 'report-file' && renderReportsTab()}
           
         </Animated.View>
