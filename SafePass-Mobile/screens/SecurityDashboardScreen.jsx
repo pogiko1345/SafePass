@@ -623,14 +623,18 @@ export default function SecurityDashboardScreen({ navigation }) {
         }),
       ]).start();
 
-      await Promise.allSettled([
-        loadOperationalData({ force: true }),
-        loadSecurityLivePresence(),
-        loadSecurityAttendanceRecords(),
-        loadNotifications(currentUser, { force: true }),
-      ]);
+      await loadOperationalData({ force: true });
       lastOperationalRefreshAtRef.current = Date.now();
-      loadMapSettings();
+      setTimeout(() => {
+        Promise.allSettled([
+          loadSecurityLivePresence(),
+          loadNotifications(currentUser, { force: true }),
+          loadMapSettings(),
+        ]);
+      }, 100);
+      setTimeout(() => {
+        loadSecurityAttendanceRecords();
+      }, 500);
     } finally {
       setIsLoading(false);
     }
@@ -1163,16 +1167,22 @@ export default function SecurityDashboardScreen({ navigation }) {
         navigation.replace("Login");
         return null;
       }
-      let profileUser = null;
-      try {
-        const profileResponse = await ApiService.getProfile();
-        profileUser = profileResponse?.user || null;
-      } catch (profileError) {
-        console.log("Security profile refresh skipped:", profileError?.message || profileError);
-      }
-      const normalizedUser = { ...cachedUser, ...(profileUser || {}), role: normalizedRole };
+      const normalizedUser = { ...cachedUser, role: normalizedRole };
       setUser(normalizedUser);
       setSecurityProfileForm(buildSecurityProfileForm(normalizedUser));
+
+      ApiService.getProfile()
+        .then((profileResponse) => {
+          const profileUser = profileResponse?.user || null;
+          if (!profileUser) return;
+          const refreshedUser = { ...normalizedUser, ...profileUser, role: normalizedRole };
+          setUser(refreshedUser);
+          setSecurityProfileForm(buildSecurityProfileForm(refreshedUser));
+        })
+        .catch((profileError) => {
+          console.log("Security profile refresh skipped:", profileError?.message || profileError);
+        });
+
       return normalizedUser;
     } catch (error) {
       console.error("Load user error:", error);
@@ -1184,7 +1194,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const loadOperationalData = async ({ force = false } = {}) => {
     try {
       const [allVisitorsRes, accessLogsRes] = await Promise.allSettled([
-        ApiService.getVisitors({ limit: 500 }),
+        ApiService.getVisitors({ limit: 100 }),
         ApiService.getAccessLogs(1, 100, { all: true }),
       ]);
       if (allVisitorsRes.status === "rejected") {
