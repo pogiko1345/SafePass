@@ -1364,21 +1364,45 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ========== DATABASE CONNECTION ==========
-const MONGODB_URI =
-  process.env.MONGODB_URI || "mongodb://localhost:27017/sapphire_aviation";
+const isHostedRuntime =
+  Boolean(process.env.RENDER || process.env.VERCEL) ||
+  process.env.NODE_ENV === "production";
+const MONGODB_URI = String(
+  process.env.MONGODB_URI ||
+    (isHostedRuntime ? "" : "mongodb://localhost:27017/sapphire_aviation"),
+).trim();
 const FRONTEND_URL =
   process.env.FRONTEND_URL || "https://sapphiresafepass2.vercel.app";
 const maskMongoUri = (uri = "") =>
   String(uri).replace(/\/\/([^:]+):([^@]+)@/, "//$1:***@");
+const getDatabaseStateName = () => {
+  const states = ["Disconnected", "Connected", "Connecting", "Disconnecting"];
+  return states[mongoose.connection.readyState] || "Unknown";
+};
 
 let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
+let mongoConnectionError = global.__safepassMongoConnectionError || null;
 
 const connectToDatabase = () => {
+  if (!MONGODB_URI) {
+    mongoConnectionError =
+      "MONGODB_URI is not configured. Add it in your Render service Environment variables.";
+    global.__safepassMongoConnectionError = mongoConnectionError;
+    console.error(`MongoDB configuration error: ${mongoConnectionError}`);
+    return Promise.reject(new Error(mongoConnectionError));
+  }
+
   if (!mongoConnectionPromise) {
     mongoConnectionPromise = mongoose
-      .connect(MONGODB_URI)
+      .connect(MONGODB_URI, {
+        serverSelectionTimeoutMS: 15000,
+        connectTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
+      })
 
       .then(() => {
+        mongoConnectionError = null;
+        global.__safepassMongoConnectionError = null;
         if (process.env.NODE_ENV !== "test") {
           console.log(
             `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
@@ -1387,6 +1411,8 @@ const connectToDatabase = () => {
         return mongoose.connection;
       })
       .catch((err) => {
+        mongoConnectionError = err?.message || "Unknown MongoDB connection error";
+        global.__safepassMongoConnectionError = mongoConnectionError;
         console.error("❌ MongoDB Connection Error:", err);
         console.log("Trying to connect to:", maskMongoUri(MONGODB_URI));
         mongoConnectionPromise = null;
@@ -1400,7 +1426,9 @@ const connectToDatabase = () => {
   return mongoConnectionPromise;
 };
 
-connectToDatabase();
+connectToDatabase().catch(() => {
+  // /api/health reports the database state so Render can show the issue clearly.
+});
 
 const authAttemptLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -6787,7 +6815,9 @@ app.get("/api/admin/visitors/pending", authMiddleware, async (req, res) => {
       requestCategory: "registration",
       approvalFlow: "admin",
       approvalStatus: "pending",
-    }).sort({ registeredAt: -1 });
+    })
+      .sort({ registeredAt: -1 })
+      .lean();
 
     const visitorsWithSafePassIds = await attachSafePassIdsToVisitors(visitors);
 
@@ -6841,22 +6871,26 @@ app.get("/api/admin/visitors", authMiddleware, async (req, res) => {
       ];
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+    const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+    const skip = (parsedPage - 1) * parsedLimit;
 
-    const visitors = await Visitor.find(query)
-      .sort({ registeredAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .populate("reports.reportedBy", "firstName lastName email role department");
-
-    const total = await Visitor.countDocuments(query);
+    const [visitors, total] = await Promise.all([
+      Visitor.find(query)
+        .sort({ registeredAt: -1 })
+        .skip(skip)
+        .limit(parsedLimit)
+        .populate("reports.reportedBy", "firstName lastName email role department")
+        .lean(),
+      Visitor.countDocuments(query),
+    ]);
     const visitorsWithSafePassIds = await attachSafePassIdsToVisitors(visitors);
 
     res.json({
       success: true,
       visitors: visitorsWithSafePassIds,
-      totalPages: Math.ceil(total / parseInt(limit)),
-      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / parsedLimit),
+      currentPage: parsedPage,
       total,
     });
   } catch (error) {
@@ -8545,8 +8579,10 @@ app.get("/api/health", (req, res) => {
   res.json({
     status: "OK",
     success: true,
-    database:
-      mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
+    database: getDatabaseStateName(),
+    databaseConfigured: Boolean(MONGODB_URI),
+    databaseTarget: MONGODB_URI ? maskMongoUri(MONGODB_URI) : "not configured",
+    databaseError: mongoConnectionError,
     emailDelivery: {
       configured: Boolean(mailTransporter),
       verified: mailTransporterVerified,
@@ -8706,7 +8742,8 @@ app.get(
     try {
       const page = parseInt(req.query.page, 10) || 1;
       const limit = parseInt(req.query.limit, 10) || 50;
-      const skip = (page - 1) * limit;
+      const safeLimit = Math.min(Math.max(limit, 1), 500);
+      const skip = (page - 1) * safeLimit;
       const query = {};
 
       applyDateRangeFilter(query, "attendanceDate", req.query);
@@ -8725,7 +8762,8 @@ app.get(
         AttendanceRecord.find(query)
           .sort({ attendanceDate: -1, checkInTime: -1, createdAt: -1 })
           .skip(skip)
-          .limit(limit),
+          .limit(safeLimit)
+          .lean(),
         AttendanceRecord.countDocuments(query),
       ]);
 
@@ -8734,9 +8772,9 @@ app.get(
         attendance: records,
         pagination: {
           page,
-          limit,
+          limit: safeLimit,
           total,
-          pages: Math.ceil(total / limit),
+          pages: Math.ceil(total / safeLimit),
         },
       });
     } catch (error) {
@@ -8759,33 +8797,53 @@ app.get(
       applyDateRangeFilter(query, "attendanceDate", req.query);
       if (req.query.userType) query.userType = String(req.query.userType).trim().toLowerCase();
 
-      const records = await AttendanceRecord.find(query).select(
-        "userType status isLate isNoShow isExpired isCompleted",
-      );
-
-      const summary = records.reduce(
-        (accumulator, record) => {
-          accumulator.total += 1;
-          accumulator.byUserType[record.userType] =
-            (accumulator.byUserType[record.userType] || 0) + 1;
-          accumulator.byStatus[record.status] =
-            (accumulator.byStatus[record.status] || 0) + 1;
-          if (record.isLate) accumulator.late += 1;
-          if (record.isNoShow) accumulator.noShow += 1;
-          if (record.isExpired) accumulator.expired += 1;
-          if (record.isCompleted) accumulator.completed += 1;
-          return accumulator;
+      const [summaryCounts = {}] = await AttendanceRecord.aggregate([
+        { $match: query },
+        {
+          $facet: {
+            totals: [
+              {
+                $group: {
+                  _id: null,
+                  total: { $sum: 1 },
+                  late: { $sum: { $cond: ["$isLate", 1, 0] } },
+                  noShow: { $sum: { $cond: ["$isNoShow", 1, 0] } },
+                  expired: { $sum: { $cond: ["$isExpired", 1, 0] } },
+                  completed: { $sum: { $cond: ["$isCompleted", 1, 0] } },
+                },
+              },
+            ],
+            byUserType: [{ $group: { _id: "$userType", count: { $sum: 1 } } }],
+            byStatus: [{ $group: { _id: "$status", count: { $sum: 1 } } }],
+          },
         },
         {
-          total: 0,
-          late: 0,
-          noShow: 0,
-          expired: 0,
-          completed: 0,
-          byUserType: {},
-          byStatus: {},
+          $project: {
+            totals: { $ifNull: [{ $arrayElemAt: ["$totals", 0] }, {}] },
+            byUserType: 1,
+            byStatus: 1,
+          },
         },
-      );
+      ]);
+
+      const totals = summaryCounts.totals || {};
+      const summary = {
+        total: totals.total || 0,
+        late: totals.late || 0,
+        noShow: totals.noShow || 0,
+        expired: totals.expired || 0,
+        completed: totals.completed || 0,
+        byUserType: Object.fromEntries(
+          (summaryCounts.byUserType || [])
+            .filter((item) => item._id)
+            .map((item) => [item._id, item.count]),
+        ),
+        byStatus: Object.fromEntries(
+          (summaryCounts.byStatus || [])
+            .filter((item) => item._id)
+            .map((item) => [item._id, item.count]),
+        ),
+      };
 
       res.json({ success: true, summary });
     } catch (error) {
@@ -10880,6 +10938,7 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
     }
 
     const { status = "all", limit = 100 } = req.query;
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 200);
     const query = {
       requestCategory: "appointment",
       approvalFlow: "staff",
@@ -10906,7 +10965,7 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
 
     const appointments = await Visitor.find(query)
       .sort({ visitDate: -1, visitTime: -1, appointmentRequestedAt: -1, updatedAt: -1 })
-      .limit(parseInt(limit, 10))
+      .limit(parsedLimit)
       .populate("assignedStaff", "firstName lastName email department")
       .populate("staffActionBy", "firstName lastName email department");
 
@@ -12109,46 +12168,54 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
       ],
     };
 
-    const totalUsers = await User.countDocuments();
-    const activeUsers = await User.countDocuments({ status: "active" });
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const todayAccess = await AccessLog.countDocuments({
-      timestamp: { $gte: today },
-    });
+    const [
+      totalUsers,
+      activeUsers,
+      todayAccess,
+      totalAdmins,
+      totalStaff,
+      totalSecurity,
+      totalVisitors,
+      pendingRegistrationRequests,
+      pendingAppointmentRequests,
+      approvedVisits,
+      checkedInVisitors,
+      completedVisits,
+      totalAccess,
+      grantedAccess,
+      deniedAccessToday,
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ status: "active" }),
+      AccessLog.countDocuments({ timestamp: { $gte: today } }),
+      User.countDocuments({ role: "admin" }),
+      User.countDocuments({ role: "staff" }),
+      User.countDocuments({ role: { $in: ["guard", "security"] } }),
+      Visitor.countDocuments(),
+      Visitor.countDocuments(pendingRegistrationRequestsQuery),
+      Visitor.countDocuments(pendingAppointmentRequestsQuery),
+      Visitor.countDocuments(approvedVisitWindowsQuery),
+      Visitor.countDocuments({ status: "checked_in" }),
+      Visitor.countDocuments({ status: "checked_out" }),
+      AccessLog.countDocuments(),
+      AccessLog.countDocuments({ status: "granted" }),
+      AccessLog.countDocuments({
+        status: "denied",
+        timestamp: { $gte: today },
+      }),
+    ]);
 
-    const totalAdmins = await User.countDocuments({ role: "admin" });
-    const totalStaff = await User.countDocuments({ role: "staff" });
-    const totalSecurity = await User.countDocuments({ 
-      role: { $in: ["guard", "security"] } 
-    });
-    const totalVisitors = await Visitor.countDocuments();
-    const pendingRegistrationRequests = await Visitor.countDocuments(
-      pendingRegistrationRequestsQuery,
-    );
-    const pendingAppointmentRequests = await Visitor.countDocuments(
-      pendingAppointmentRequestsQuery,
-    );
     const pendingApprovals =
       pendingRegistrationRequests + pendingAppointmentRequests;
-    const approvedVisits = await Visitor.countDocuments(approvedVisitWindowsQuery);
-    const checkedInVisitors = await Visitor.countDocuments({ status: "checked_in" });
-    const completedVisits = await Visitor.countDocuments({ status: "checked_out" });
-
-    const totalAccess = await AccessLog.countDocuments();
-    const grantedAccess = await AccessLog.countDocuments({ status: "granted" });
     const successRate =
       totalAccess > 0
         ? ((grantedAccess / totalAccess) * 100).toFixed(1) + "%"
         : "0%";
 
-    const pendingIssues =
-      pendingApprovals +
-      (await AccessLog.countDocuments({
-        status: "denied",
-        timestamp: { $gte: today },
-      }));
+    const pendingIssues = pendingApprovals + deniedAccessToday;
 
     res.json({
       success: true,
@@ -12199,21 +12266,25 @@ app.get("/api/admin/users", authMiddleware, async (req, res) => {
       else if (status === "pending") query.status = "pending";
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500);
+    const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+    const skip = (parsedPage - 1) * parsedLimit;
 
-    const users = await User.find(query)
-      .select("-password")
-      .skip(skip)
-      .limit(parseInt(limit))
-      .sort({ createdAt: -1 });
-
-    const total = await User.countDocuments(query);
+    const [users, total] = await Promise.all([
+      User.find(query)
+        .select("-password")
+        .skip(skip)
+        .limit(parsedLimit)
+        .sort({ createdAt: -1 })
+        .lean(),
+      User.countDocuments(query),
+    ]);
 
     res.json({
       success: true,
       users,
-      totalPages: Math.ceil(total / parseInt(limit)),
-      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / parsedLimit),
+      currentPage: parsedPage,
       total,
     });
   } catch (error) {

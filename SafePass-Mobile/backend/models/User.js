@@ -174,4 +174,11 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
+userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ role: 1, status: 1, createdAt: -1 });
+userSchema.index({ status: 1, createdAt: -1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ lastLogin: -1, createdAt: 1 });
+userSchema.index({ role: 1, email: 1 });
+
 module.exports = mongoose.model("User", userSchema);

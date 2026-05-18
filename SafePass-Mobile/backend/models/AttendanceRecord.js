@@ -68,5 +68,10 @@ const attendanceRecordSchema = new mongoose.Schema(
 
 attendanceRecordSchema.index({ userId: 1, attendanceDate: 1, module: 1 });
 attendanceRecordSchema.index({ visitorId: 1, attendanceDate: 1, module: 1 });
+attendanceRecordSchema.index({ attendanceDate: -1, checkInTime: -1, createdAt: -1 });
+attendanceRecordSchema.index({ attendanceDate: 1, userType: 1 });
+attendanceRecordSchema.index({ attendanceDate: 1, status: 1 });
+attendanceRecordSchema.index({ attendanceDate: 1, module: 1 });
+attendanceRecordSchema.index({ attendanceDate: 1, lastTapTime: -1, checkInTime: -1, createdAt: -1 });
 
 module.exports = mongoose.model("AttendanceRecord", attendanceRecordSchema);

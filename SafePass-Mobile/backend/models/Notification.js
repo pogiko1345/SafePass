@@ -41,4 +41,9 @@ const notificationSchema = new mongoose.Schema({
   expiresAt: Date // Auto-delete after this date
 });
 
+notificationSchema.index({ targetRole: 1, createdAt: -1 });
+notificationSchema.index({ targetUser: 1, createdAt: -1 });
+notificationSchema.index({ createdAt: -1 });
+notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0, sparse: true });
+
 module.exports = mongoose.model('Notification', notificationSchema);

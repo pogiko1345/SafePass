@@ -554,6 +554,15 @@ visitorSchema.index({ approvalStatus: 1, status: 1 });
 visitorSchema.index({ visitDate: 1, status: 1 });
 visitorSchema.index({ registeredAt: -1 });
 visitorSchema.index({ requestCategory: 1, appointmentStatus: 1, visitDate: 1 });
+visitorSchema.index({ status: 1, registeredAt: -1 });
+visitorSchema.index({ status: 1, checkedInAt: -1, visitDate: -1, registeredAt: -1 });
+visitorSchema.index({ requestCategory: 1, approvalFlow: 1, approvalStatus: 1, registeredAt: -1 });
+visitorSchema.index({ requestCategory: 1, approvalFlow: 1, appointmentStatus: 1, registeredAt: -1 });
+visitorSchema.index({ appointmentStatus: 1, visitDate: -1, visitTime: -1, updatedAt: -1 });
+visitorSchema.index({ requestCategory: 1, approvalFlow: 1, assignedStaff: 1, visitDate: -1, visitTime: -1 });
+visitorSchema.index({ requestCategory: 1, approvalFlow: 1, appointmentDepartment: 1, visitDate: -1, visitTime: -1 });
+visitorSchema.index({ requestCategory: 1, approvalFlow: 1, assignedOffice: 1, visitDate: -1, visitTime: -1 });
+visitorSchema.index({ "currentLocation.lastSeenAt": -1, checkedInAt: -1, updatedAt: -1, registeredAt: -1 });
 
 // ============ Virtual Fields ============
 visitorSchema.virtual('isApproved').get(function() {
