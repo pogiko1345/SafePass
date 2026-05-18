@@ -1383,6 +1383,30 @@ const getDatabaseStateName = () => {
 let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
 let mongoConnectionError = global.__safepassMongoConnectionError || null;
 
+const isTransientMongoNetworkError = (error) => {
+  const name = String(error?.name || "");
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    name === "MongoNetworkTimeoutError" ||
+    name === "MongoNetworkError" ||
+    message.includes("connection") && message.includes("timed out")
+  );
+};
+
+const runMongoReadWithRetry = async (operation, label) => {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!isTransientMongoNetworkError(error)) {
+      throw error;
+    }
+
+    console.warn(`${label} Mongo read timed out; retrying once.`);
+    await connectToDatabase();
+    return operation();
+  }
+};
+
 const connectToDatabase = () => {
   if (!MONGODB_URI) {
     mongoConnectionError =
@@ -4658,7 +4682,7 @@ const syncVisitorRecordsForUserUpdate = async (existingUser, updatedUser) => {
   );
 };
 
-const attachSafePassIdsToVisitors = async (visitors = []) => {
+const attachSafePassIdsToVisitors = async (visitors = [], { ensureMissingIds = true } = {}) => {
   if (!Array.isArray(visitors) || !visitors.length) return [];
 
   const emails = [
@@ -4669,11 +4693,18 @@ const attachSafePassIdsToVisitors = async (visitors = []) => {
     ),
   ];
 
-  const users = emails.length
-    ? await User.find({ role: "visitor", email: { $in: emails } })
+  const userQuery = emails.length
+    ? User.find({ role: "visitor", email: { $in: emails } })
+    : null;
+  const users = userQuery
+    ? ensureMissingIds
+      ? await userQuery
+      : await userQuery.lean()
     : [];
 
-  await Promise.all(users.map((user) => ensureSafePassAccountId(user)));
+  if (ensureMissingIds) {
+    await Promise.all(users.map((user) => ensureSafePassAccountId(user)));
+  }
 
   const accountIdByEmail = new Map();
   const physicalCardByEmail = new Map();
@@ -8709,18 +8740,27 @@ app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "securit
     if (status) query.status = status;
     applyDateRangeFilter(query, "visitDate", req.query);
 
-    const [visitors, total] = await Promise.all([
-      Visitor.find(query)
-        .sort({ registeredAt: -1 })
-        .limit(parsedLimit)
-        .skip((parsedPage - 1) * parsedLimit)
-        .populate("checkedInBy", "firstName lastName")
-        .populate("checkedOutBy", "firstName lastName")
-        .lean(),
-      Visitor.countDocuments(query),
-    ]);
+    const { visitorPayloads, total } = await runMongoReadWithRetry(
+      async () => {
+        const [visitorRecords, visitorTotal] = await Promise.all([
+          Visitor.find(query)
+            .sort({ registeredAt: -1 })
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .populate("checkedInBy", "firstName lastName")
+            .populate("checkedOutBy", "firstName lastName")
+            .lean(),
+          Visitor.countDocuments(query),
+        ]);
 
-    const visitorPayloads = await attachSafePassIdsToVisitors(visitors);
+        const payloads = await attachSafePassIdsToVisitors(visitorRecords, {
+          ensureMissingIds: false,
+        });
+
+        return { visitorPayloads: payloads, total: visitorTotal };
+      },
+      "Get visitors",
+    );
 
     res.json({
       success: true,
