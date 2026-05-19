@@ -798,10 +798,8 @@ export default StyleSheet.create({
   },
 
   recordToolbarDropdownMenu: {
-    position: Platform.OS === "web" ? "absolute" : "relative",
-    bottom: Platform.OS === "web" ? 48 : undefined,
-    left: 0,
-    right: 0,
+    position: "relative",
+    marginBottom: 8,
     zIndex: 100,
     elevation: 24,
     maxHeight: 210,

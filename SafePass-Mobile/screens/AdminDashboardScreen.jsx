@@ -7778,6 +7778,8 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const renderUserDataPanel = () => {
+    return null;
+
     if (!userDataPanelMode || !selectedUser) return null;
 
     const isEditing = userDataPanelMode === "edit";

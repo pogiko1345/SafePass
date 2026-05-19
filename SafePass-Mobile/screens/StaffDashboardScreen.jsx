@@ -2425,21 +2425,6 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     return (
       <View style={styles.recordToolbarField}>
         <Text style={[styles.recordToolbarLabel, mobileDarkModeEnabled && styles.darkMutedText]}>{label}</Text>
-        <TouchableOpacity
-          style={[styles.recordToolbarSelect, mobileDarkModeEnabled && styles.darkInputSurface]}
-          onPress={() => setRecordFilterDropdownOpen(isOpen ? null : id)}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel={`${label} filter`}
-        >
-          <View style={styles.recordToolbarSelectValue}>
-            <Ionicons name={icon} size={15} color="#64748B" />
-            <Text style={[styles.recordToolbarSelectText, mobileDarkModeEnabled && styles.darkText]} numberOfLines={1}>
-              {selectedOption?.label || "All"}
-            </Text>
-          </View>
-          <Ionicons name={isOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color="#64748B" />
-        </TouchableOpacity>
         {isOpen ? (
           <View style={[styles.recordToolbarDropdownMenu, mobileDarkModeEnabled && styles.darkDropdownMenu]}>
             <ScrollView style={styles.recordToolbarDropdownScroll} nestedScrollEnabled>
@@ -2471,6 +2456,21 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             </ScrollView>
           </View>
         ) : null}
+        <TouchableOpacity
+          style={[styles.recordToolbarSelect, mobileDarkModeEnabled && styles.darkInputSurface]}
+          onPress={() => setRecordFilterDropdownOpen(isOpen ? null : id)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`${label} filter`}
+        >
+          <View style={styles.recordToolbarSelectValue}>
+            <Ionicons name={icon} size={15} color="#64748B" />
+            <Text style={[styles.recordToolbarSelectText, mobileDarkModeEnabled && styles.darkText]} numberOfLines={1}>
+              {selectedOption?.label || "All"}
+            </Text>
+          </View>
+          <Ionicons name={isOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color="#64748B" />
+        </TouchableOpacity>
       </View>
     );
   };
