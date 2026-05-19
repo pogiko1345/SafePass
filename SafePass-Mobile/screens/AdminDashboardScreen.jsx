@@ -250,22 +250,44 @@ const normalizeMapText = (value = "") =>
 
 const DEFAULT_APPOINTMENT_MANAGEMENT_OPTIONS = {
   offices: [
+    "Academy Director",
+    "Accounting Office",
     "Registrar",
+    "Registrar's Office",
     "Accounting",
-    "Information Desk",
-    "Guidance",
     "Administration",
+    "Admissions",
     "Cashier",
-    "Flight Operations",
-    "Training",
-    "I.T Room",
+    "Chairman",
+    "Clinic",
+    "Conference Room",
     "Faculty Room",
+    "File Room",
+    "Flight Operations",
+    "Guidance",
+    "Head Of Training Room",
+    "Information Desk",
+    "I.T Room",
     "Laboratory",
-    "TESDA",
-    "Workshop",
     "Library",
-    "Student Services",
+    "Lobby",
+    "Mock Up",
     "STO",
+    "Storage",
+    "Student Services",
+    "Students Lounge",
+    "TESDA",
+    "Tools Room",
+    "Training",
+    "Workshop",
+    "Classroom 1",
+    "Classroom 2",
+    "Classroom 3",
+    "Classroom 4",
+    "Classroom 5",
+    "Classroom 6",
+    "Classroom 7",
+    "Classroom 8",
   ].map((label) => ({ id: `office-${normalizeTextToId(label)}`, label, enabled: true })),
   purposes: ["Enrollment", "Payment", "Inquiry", "Document Request", "Other"].map((label) => ({
     id: `purpose-${normalizeTextToId(label)}`,
@@ -285,7 +307,7 @@ for (let hour = 7; hour <= 18; hour += 1) {
       value: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
       hour,
       minute,
-      capacity: 2,
+      capacity: 3,
       enabled: true,
     });
   }
@@ -1075,6 +1097,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [historySortOrder, setHistorySortOrder] = useState("newest");
   const [historySearchQuery, setHistorySearchQuery] = useState("");
   const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyItemsPerPage] = useState(6);
   const [reportSearchTerm, setReportSearchTerm] = useState("");
   const [reportStatusFilter, setReportStatusFilter] = useState("all");
   const [securityReportSearchTerm, setSecurityReportSearchTerm] = useState("");
@@ -1119,11 +1143,14 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     startOfWeek.setDate(startOfToday.getDate() - dayOfWeek);
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 7);
+    const startOfLastWeek = new Date(startOfWeek);
+    startOfLastWeek.setDate(startOfWeek.getDate() - 7);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     if (shortcut === "today") return date >= startOfToday && date < endOfToday;
     if (shortcut === "week") return date >= startOfWeek && date < endOfWeek;
+    if (shortcut === "last_week") return date >= startOfLastWeek && date < startOfWeek;
     if (shortcut === "month") return date >= startOfMonth && date < endOfMonth;
     return true;
   };
@@ -1927,6 +1954,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     { key: "all", label: "Any Date", icon: "calendar-outline" },
     { key: "today", label: "Today", icon: "today-outline" },
     { key: "week", label: "This Week", icon: "calendar-number-outline" },
+    { key: "last_week", label: "Last Week", icon: "calendar-outline" },
     { key: "month", label: "This Month", icon: "calendar-clear-outline" },
   ];
 
@@ -2659,7 +2687,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     enabled: existing.enabled !== false,
   });
 
-  const buildAppointmentTimeSlotOption = (value, existing = {}, capacityValue = existing.capacity ?? existing.limit ?? 2) => {
+  const buildAppointmentTimeSlotOption = (value, existing = {}, capacityValue = existing.capacity ?? existing.limit ?? 3) => {
     const normalized = String(value || "").trim();
     const match = normalized.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
     if (!match) return null;
@@ -2734,7 +2762,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         ? buildAppointmentTimeSlotOption(
             draft,
             option,
-            appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 2,
+            appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 3,
           )
         : buildAppointmentTextOption(groupKey, draft, option);
 
@@ -3068,6 +3096,18 @@ const loadDashboardData = useCallback(async () => {
       setDataManagementFieldPage(fieldSetupTotalPages);
     }
   }, [dataManagementFieldPage, fieldSetupTotalPages]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [
+    historyDateFilter,
+    historyDateRange.startDate,
+    historyDateRange.endDate,
+    historyFilter,
+    historyOfficeFilter,
+    historySearchQuery,
+    historySortOrder,
+  ]);
 
   useEffect(() => {
     if (!createUserMessage) return;
@@ -4443,6 +4483,16 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const handleEditUser = (userItem) => {
+    if (selectedSubmodule !== "data-management") {
+      handleViewUser(userItem);
+      publishAdminNotice(
+        "info",
+        "Account records are view-only",
+        "Open User Data Management to edit account details.",
+      );
+      return;
+    }
+
     setSelectedUser(userItem);
     setEditUserErrors({});
     setEditUserData({
@@ -4468,11 +4518,7 @@ const loadDashboardData = useCallback(async () => {
       status: isUserActive(userItem) ? "active" : "inactive",
       isActive: isUserActive(userItem),
     });
-    if (selectedSubmodule === "data-management") {
-      setUserDataPanelMode("edit");
-      return;
-    }
-    setShowEditUserModal(true);
+    setUserDataPanelMode("edit");
   };
 
   const handleViewUser = (userItem) => {
@@ -4675,6 +4721,11 @@ const loadDashboardData = useCallback(async () => {
   // FIXED: Handle Delete User
   const handleDeleteUser = async () => {
     if (!ensureAdminAccess()) return;
+    if (selectedSubmodule !== "data-management") {
+      Alert.alert("View Only", "Account Records are read-only. Open User Data Management to remove accounts.");
+      return;
+    }
+
     const selectedId = selectedUser?._id || selectedUser?.id;
     if (!selectedId) {
       Alert.alert("Error", "Cannot find user ID. Please refresh and try again.");
@@ -5201,10 +5252,28 @@ const loadDashboardData = useCallback(async () => {
     const columnScale = totalColumnWidth > availableTableWidth
       ? availableTableWidth / totalColumnWidth
       : 1;
+    const extraTableWidth = Math.max(0, availableTableWidth - totalColumnWidth);
+    const totalGrowWeight = columns.reduce((total, column) => {
+      if (column.grow === 0) return total;
+      if (typeof column.grow === "number") return total + column.grow;
+      return total + (column.key === "actions" ? 0.25 : 1);
+    }, 0);
     const getColumnStyle = (column) => {
       const baseWidth = column.width || fallbackColumnWidth;
       const minimumWidth = column.minWidth || (column.key === "actions" ? 132 : 86);
-      const scaledWidth = Math.max(minimumWidth, Math.floor(baseWidth * columnScale));
+      const growWeight =
+        column.grow === 0
+          ? 0
+          : typeof column.grow === "number"
+            ? column.grow
+            : column.key === "actions"
+              ? 0.25
+              : 1;
+      const extraWidth =
+        extraTableWidth > 0 && totalGrowWeight > 0
+          ? Math.floor((extraTableWidth * growWeight) / totalGrowWeight)
+          : 0;
+      const scaledWidth = Math.max(minimumWidth, Math.floor(baseWidth * columnScale) + extraWidth);
 
       return {
         width: scaledWidth,
@@ -7660,6 +7729,7 @@ const loadDashboardData = useCallback(async () => {
                 placeholder="First name"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("firstName")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Last Name</Text>
@@ -7670,6 +7740,7 @@ const loadDashboardData = useCallback(async () => {
                 placeholder="Last name"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("lastName")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Username</Text>
@@ -7681,6 +7752,7 @@ const loadDashboardData = useCallback(async () => {
                 autoCapitalize="none"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("username")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Email</Text>
@@ -7693,6 +7765,7 @@ const loadDashboardData = useCallback(async () => {
                 autoCapitalize="none"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("email")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Phone</Text>
@@ -7705,6 +7778,7 @@ const loadDashboardData = useCallback(async () => {
                 maxLength={16}
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("phone")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Employee ID</Text>
@@ -7715,6 +7789,7 @@ const loadDashboardData = useCallback(async () => {
                 placeholder="Staff / Security ID"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("employeeId")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Department</Text>
@@ -7725,6 +7800,7 @@ const loadDashboardData = useCallback(async () => {
                 placeholder="Department"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("department")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Position</Text>
@@ -7739,7 +7815,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Role</Text>
               <View style={styles.userDataCompactOptions}>
-                {["staff", "security", "admin", "visitor"].map((role) => (
+                {["student", "teacher", "staff", "security", "admin", "visitor"].map((role) => (
                   <TouchableOpacity
                     key={role}
                     style={[
@@ -7754,7 +7830,49 @@ const loadDashboardData = useCallback(async () => {
                   </TouchableOpacity>
                 ))}
               </View>
+              {renderEditUserFieldError("role")}
             </View>
+            {String(editUserData.role || "").toLowerCase() === "student" ? (
+              <>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Student ID</Text>
+                  <TextInput
+                    style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
+                    value={editUserData.studentId}
+                    onChangeText={(text) => setEditUserData({ ...editUserData, studentId: text })}
+                    placeholder="Student ID"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                  />
+                  {renderEditUserFieldError("studentId")}
+                </View>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email</Text>
+                  <TextInput
+                    style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
+                    value={editUserData.parentEmail}
+                    onChangeText={(text) => setEditUserData({ ...editUserData, parentEmail: text })}
+                    placeholder="parent@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                  />
+                  {renderEditUserFieldError("parentEmail")}
+                </View>
+              </>
+            ) : null}
+            {String(editUserData.role || "").toLowerCase() === "teacher" ? (
+              <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Academic Staff ID</Text>
+                <TextInput
+                  style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
+                  value={editUserData.teacherId}
+                  onChangeText={(text) => setEditUserData({ ...editUserData, teacherId: text })}
+                  placeholder="Academic staff ID"
+                  placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                />
+                {renderEditUserFieldError("teacherId")}
+              </View>
+            ) : null}
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Status</Text>
               <View style={styles.userDataCompactOptions}>
@@ -7773,6 +7891,7 @@ const loadDashboardData = useCallback(async () => {
                   </TouchableOpacity>
                 ))}
               </View>
+              {renderEditUserFieldError("status")}
             </View>
             <View style={styles.userDataPanelFooter}>
               <TouchableOpacity
@@ -7785,10 +7904,10 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity
                 style={[
                   styles.dataManagementPrimaryButton,
-                  (!editUserReadiness.isValid || processingId === "edit-user") && styles.submitButtonDisabled,
+                  processingId === "edit-user" && styles.submitButtonDisabled,
                 ]}
                 onPress={confirmEditUser}
-                disabled={!editUserReadiness.isValid || processingId === "edit-user"}
+                disabled={processingId === "edit-user"}
               >
                 <Ionicons name="save-outline" size={15} color="#FFFFFF" />
                 <Text style={styles.dataManagementPrimaryButtonText}>
@@ -7917,6 +8036,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "name",
                   label: "User",
                   width: 220,
+                  grow: 1.4,
                   render: (userItem) => {
                     const roleColor = getRoleColor(userItem.role);
                     return (
@@ -7942,6 +8062,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "role",
                   label: "Role",
                   width: 105,
+                  grow: 0.75,
                   render: (userItem) => {
                     const roleColor = getRoleColor(userItem.role);
                     return (
@@ -7957,6 +8078,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "department",
                   label: "Department",
                   width: 140,
+                  grow: 1,
                   render: (userItem) => (
                     <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
                       {userItem.department || "General"}
@@ -7967,6 +8089,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "contact",
                   label: "Contact",
                   width: 160,
+                  grow: 1,
                   render: (userItem) => (
                     <View>
                       <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
@@ -7982,6 +8105,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "status",
                   label: "Status",
                   width: 100,
+                  grow: 0.55,
                   render: (userItem) => {
                     const userIsActive = isUserActive(userItem);
                     return (
@@ -8009,7 +8133,8 @@ const loadDashboardData = useCallback(async () => {
                 {
                   key: "actions",
                   label: "Manage",
-                  width: 250,
+                  width: 210,
+                  grow: 0.15,
                   render: (userItem) => (
                     <View style={styles.adminTableActionRow}>
                       <TouchableOpacity
@@ -9083,7 +9208,7 @@ const loadDashboardData = useCallback(async () => {
                           style={[styles.appointmentOptionCapacityInput, isDarkMode && styles.darkInput]}
                           placeholder="Slots"
                           placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
-                          value={String(appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 2)}
+                          value={String(appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 3)}
                           keyboardType="number-pad"
                           onChangeText={(value) =>
                             setAppointmentSlotCapacityDrafts((prev) => ({ ...prev, [option.id]: value }))
@@ -9109,7 +9234,7 @@ const loadDashboardData = useCallback(async () => {
                           <>
                             <Ionicons name="people-outline" size={13} color="#64748B" />
                             <Text style={[styles.appointmentOptionStatusText, isDarkMode && styles.darkTextSecondary]}>
-                              {option.capacity || option.limit || 2} slots
+                              {option.capacity || option.limit || 3} slots
                             </Text>
                           </>
                         ) : null}
@@ -9137,7 +9262,7 @@ const loadDashboardData = useCallback(async () => {
                         if (groupKey === "timeSlots") {
                           setAppointmentSlotCapacityDrafts((prev) => ({
                             ...prev,
-                            [option.id]: String(option.capacity || option.limit || 2),
+                            [option.id]: String(option.capacity || option.limit || 3),
                           }));
                         }
                       }}
@@ -9797,6 +9922,12 @@ const loadDashboardData = useCallback(async () => {
     const chart = getCurrentChartData();
     const historyStats = getHistoryStats();
     const filteredHistory = getFilteredHistory();
+    const historyTotalPages = Math.max(1, Math.ceil(filteredHistory.length / historyItemsPerPage));
+    const safeHistoryPage = Math.min(historyPage, historyTotalPages);
+    const historyStartIndex = (safeHistoryPage - 1) * historyItemsPerPage;
+    const paginatedHistory = filteredHistory.slice(historyStartIndex, historyStartIndex + historyItemsPerPage);
+    const historyVisibleStart = filteredHistory.length ? historyStartIndex + 1 : 0;
+    const historyVisibleEnd = Math.min(historyStartIndex + historyItemsPerPage, filteredHistory.length);
     const activeDatasetLabel = activeChartDataset.charAt(0).toUpperCase() + activeChartDataset.slice(1);
     const selectedDateLabel = selectedDate.toLocaleDateString("en-US", {
       month: "long",
@@ -10222,6 +10353,7 @@ const loadDashboardData = useCallback(async () => {
                 onSearchChange: (value) => {
                   setHistorySearchTerm(value);
                   setHistorySearchQuery(value.trim());
+                  setHistoryPage(1);
                 },
                 searchPlaceholder: "Search visitor, email, office, purpose, status, or date...",
                 searchSubtitle: "Find visitor records by name, email, office, purpose, status, or exact date.",
@@ -10229,6 +10361,7 @@ const loadDashboardData = useCallback(async () => {
                 onClearSearch: () => {
                   setHistorySearchTerm("");
                   setHistorySearchQuery("");
+                  setHistoryPage(1);
                 },
                 filterTitle: "Filters",
                 filterSubtitle: "Narrow visitor history by status, date, office, and time order.",
@@ -10244,6 +10377,7 @@ const loadDashboardData = useCallback(async () => {
                   setHistoryOfficeFilter("all");
                   setHistoryDateRange({ startDate: null, endDate: null });
                   setHistorySortOrder("newest");
+                  setHistoryPage(1);
                 },
                 filterGroups: [
                   {
@@ -10306,7 +10440,8 @@ const loadDashboardData = useCallback(async () => {
                   </Text>
                 </View>
               ) : (
-                filteredHistory.slice(0, 8).map((visitor) => {
+                <>
+                {paginatedHistory.map((visitor) => {
                   const statusInfo = getStatusColor(visitor.status);
                   const isToday =
                     visitor.visitDate &&
@@ -10375,7 +10510,38 @@ const loadDashboardData = useCallback(async () => {
                       </View>
                     </View>
                   );
-                })
+                })}
+                <View style={styles.userPaginationRow}>
+                  <Text style={[styles.userPaginationSummary, { color: theme.textSecondary }]}>
+                    Showing {historyVisibleStart}-{historyVisibleEnd} of {filteredHistory.length} records
+                  </Text>
+                  <View style={styles.userPaginationControls}>
+                    <TouchableOpacity
+                      style={[styles.userPaginationButton, safeHistoryPage === 1 && styles.userPaginationButtonDisabled]}
+                      onPress={() => setHistoryPage((page) => Math.max(1, page - 1))}
+                      disabled={safeHistoryPage === 1}
+                    >
+                      <Ionicons name="chevron-back-outline" size={16} color={safeHistoryPage === 1 ? "#94A3B8" : "#334155"} />
+                      <Text style={[styles.userPaginationButtonText, safeHistoryPage === 1 && styles.userPaginationButtonTextDisabled]}>
+                        Previous
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.userPaginationSummary, { color: theme.textSecondary }]}>
+                      Page {safeHistoryPage} of {historyTotalPages}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.userPaginationButton, safeHistoryPage >= historyTotalPages && styles.userPaginationButtonDisabled]}
+                      onPress={() => setHistoryPage((page) => Math.min(historyTotalPages, page + 1))}
+                      disabled={safeHistoryPage >= historyTotalPages}
+                    >
+                      <Text style={[styles.userPaginationButtonText, safeHistoryPage >= historyTotalPages && styles.userPaginationButtonTextDisabled]}>
+                        Next
+                      </Text>
+                      <Ionicons name="chevron-forward-outline" size={16} color={safeHistoryPage >= historyTotalPages ? "#94A3B8" : "#334155"} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                </>
               )}
             </View>
           </View>
@@ -11023,10 +11189,9 @@ const loadDashboardData = useCallback(async () => {
                   {
                     key: "actions",
                     label: "Actions",
-                    width: 320,
+                    width: 130,
                     render: (userItem) => {
                       const roleColor = getRoleColor(userItem.role);
-                      const userIsActive = isUserActive(userItem);
                       return (
                         <View style={styles.adminTableActionRow}>
                           <TouchableOpacity
@@ -11035,48 +11200,6 @@ const loadDashboardData = useCallback(async () => {
                           >
                             <Ionicons name="eye-outline" size={14} color={roleColor} />
                             <Text style={[styles.adminTableActionText, { color: roleColor }]}>View</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.adminTableActionButton, { borderColor: `${userManagementConfig.accent}30`, backgroundColor: `${userManagementConfig.accent}12` }]}
-                            onPress={() => handleEditUser(userItem)}
-                          >
-                            <Ionicons name="create-outline" size={14} color={userManagementConfig.accent} />
-                            <Text style={[styles.adminTableActionText, { color: userManagementConfig.accent }]}>Edit</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[
-                              styles.adminTableActionButton,
-                              {
-                                borderColor: userIsActive ? "rgba(245,158,11,0.24)" : "rgba(16,185,129,0.24)",
-                                backgroundColor: userIsActive ? "rgba(245,158,11,0.12)" : "rgba(16,185,129,0.12)",
-                              },
-                            ]}
-                            onPress={() => handleToggleUserStatus(userItem)}
-                            disabled={processingId === `toggle-user-${userItem._id || userItem.id}`}
-                          >
-                            <Ionicons
-                              name={userIsActive ? "pause-circle-outline" : "checkmark-circle-outline"}
-                              size={14}
-                              color={userIsActive ? "#F59E0B" : "#10B981"}
-                            />
-                            <Text
-                              style={[
-                                styles.adminTableActionText,
-                                { color: userIsActive ? "#F59E0B" : "#10B981" },
-                              ]}
-                            >
-                              {userIsActive ? "Deactivate" : "Activate"}
-                            </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.adminTableActionButton, { borderColor: "rgba(239,68,68,0.22)", backgroundColor: "rgba(239,68,68,0.12)" }]}
-                            onPress={() => {
-                              setSelectedUser(userItem);
-                              setShowDeleteUserModal(true);
-                            }}
-                          >
-                            <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                            <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Remove</Text>
                           </TouchableOpacity>
                         </View>
                       );
@@ -12904,17 +13027,19 @@ const loadDashboardData = useCallback(async () => {
               >
                 <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Close</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={() => {
-                  if (selectedUser) {
-                    handleEditUser(selectedUser);
-                    setShowViewUserModal(false);
-                  }
-                }}
-              >
-                <Text style={styles.submitButtonText}>Edit User</Text>
-              </TouchableOpacity>
+              {selectedSubmodule === "data-management" ? (
+                <TouchableOpacity
+                  style={styles.submitButton}
+                  onPress={() => {
+                    if (selectedUser) {
+                      handleEditUser(selectedUser);
+                      setShowViewUserModal(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.submitButtonText}>Edit User</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         </View>
@@ -13354,10 +13479,10 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity
                 style={[
                   styles.submitButton,
-                  (!editUserReadiness.isValid || processingId === "edit-user") && styles.submitButtonDisabled,
+                  processingId === "edit-user" && styles.submitButtonDisabled,
                 ]}
                 onPress={confirmEditUser}
-                disabled={!editUserReadiness.isValid || processingId === "edit-user"}
+                disabled={processingId === "edit-user"}
               >
                 {processingId === "edit-user" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Save Changes</Text>}
               </TouchableOpacity>

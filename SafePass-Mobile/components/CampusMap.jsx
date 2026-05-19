@@ -417,6 +417,32 @@ const CampusMap = ({
     }
   };
 
+  const getVisitorMovementAction = (visitor = {}) =>
+    String(
+      visitor?.location?.action ||
+        visitor?.currentLocation?.action ||
+        visitor?.sourceVisitor?.currentLocation?.action ||
+        "",
+    ).toLowerCase();
+
+  const getVisitorMarkerColor = (visitor, freshness) => {
+    if (visitor?.wrongLocationAlerts?.length) return "#DC2626";
+    const action = getVisitorMovementAction(visitor);
+    if (action === "office_departure") return "#F59E0B";
+    if (["check_in", "location_update"].includes(action)) return "#0A3D91";
+    if (visitor.status === "checked_in" || visitor.status === "active") {
+      return freshness?.color || "#10B981";
+    }
+    return getVisitorStatusColor(visitor.status);
+  };
+
+  const getVisitorInitials = (visitor = {}) => {
+    const name = String(visitor?.name || visitor?.fullName || visitor?.email || "V").trim();
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
+
   const getVisitorLastSeenAt = (visitor) =>
     visitor?.lastUpdate ||
     visitor?.location?.timestamp ||
@@ -496,7 +522,19 @@ const CampusMap = ({
 
   const renderMapEmptyState = (visibleVisitors) => {
     if (visibleVisitors.length > 0) return null;
-    return null;
+    return (
+      <View style={styles.mapEmptyState} pointerEvents="none">
+        <View style={styles.mapEmptyStateCard}>
+          <View style={styles.mapEmptyStateIcon}>
+            <Ionicons name="location-outline" size={22} color="#0A3D91" />
+          </View>
+          <Text style={styles.mapEmptyStateTitle}>No live visitors on this floor</Text>
+          <Text style={styles.mapEmptyStateText}>
+            Visitor markers appear after NFC gate or office taps.
+          </Text>
+        </View>
+      </View>
+    );
   };
 
   // Render floor navigation
@@ -673,10 +711,7 @@ const CampusMap = ({
     return groupVisibleVisitors(visibleVisitors).map(({ key, visitors: groupVisitors, primaryVisitor }) => {
       const visitor = primaryVisitor;
       const freshness = getVisitorFreshness(visitor);
-      const statusColor =
-        visitor.status === "checked_in" || visitor.status === "active"
-          ? freshness.color
-          : getVisitorStatusColor(visitor.status);
+      const statusColor = getVisitorMarkerColor(visitor, freshness);
       const positionStyle = getVisitorPositionStyle(visitor);
       const markerTransform = [
         ...(Array.isArray(positionStyle.transform) ? positionStyle.transform : []),
@@ -715,9 +750,9 @@ const CampusMap = ({
             }
           >
             <View style={[styles.visitorMarkerPulse, { backgroundColor: statusColor + "40" }]} />
-            {groupVisitors.length > 1 ? (
-              <Text style={styles.visitorMarkerCountText}>{groupVisitors.length}</Text>
-            ) : null}
+            <Text style={styles.visitorMarkerCountText}>
+              {groupVisitors.length > 1 ? groupVisitors.length : getVisitorInitials(visitor)}
+            </Text>
           </TouchableOpacity>
           {visitor.isSelfMarker ? (
             <View style={styles.visitorMarkerSelfLabel}>
@@ -1087,18 +1122,18 @@ const CampusMap = ({
         </View>
       </View>
       
-      {/* Floor Legend */}
+      {/* Floor Guide */}
       <View style={styles.floorLegend}>
-        <Text style={styles.floorLegendTitle}>Floor Legend</Text>
+        <Text style={styles.floorLegendTitle}>Floor Guide</Text>
         <View style={styles.floorLegendItems}>
           {floors.map((floor) => (
             <View key={floor.id} style={styles.floorLegendItem}>
               <View style={[
                 styles.floorLegendColor, 
                 { backgroundColor: 
-                  floor.id === "ground" ? "#EFF6FF" :
-                  floor.id === "first" || floor.id === "mezzanine" ? "#EEF5FF" :
-                  floor.id === "second" ? "#FEF3C7" : "#EDE9FE"
+                  floor.id === "ground" ? "#2563EB" :
+                  floor.id === "first" || floor.id === "mezzanine" ? "#10B981" :
+                  floor.id === "second" ? "#F59E0B" : "#7C3AED"
                 }
               ]} />
               <Text style={styles.floorLegendText}>{floor.name}</Text>

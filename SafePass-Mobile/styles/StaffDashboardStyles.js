@@ -461,6 +461,7 @@ export default StyleSheet.create({
   homeWorkspaceSide: {
     flex: 1,
     minWidth: width > 1180 ? 360 : 0,
+    gap: width > 900 ? 14 : 12,
   },
 
   todayScheduleList: {
@@ -510,6 +511,116 @@ export default StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     color: "#64748B",
+  },
+
+  activeVisitsCard: {
+    borderColor: "#BBF7D0",
+  },
+
+  activeVisitCountBadge: {
+    minWidth: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "#DCFCE7",
+    borderWidth: 1,
+    borderColor: "#86EFAC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  activeVisitCountText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#047857",
+  },
+
+  compactEmptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 18,
+    paddingHorizontal: 8,
+  },
+
+  activeVisitList: {
+    gap: 10,
+  },
+
+  activeVisitItem: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D1FAE5",
+    backgroundColor: "#F0FDF4",
+    padding: 12,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#FFFFFF",
+        borderColor: "#86EFAC",
+        boxShadow: "0px 8px 18px rgba(15, 23, 42, 0.07)",
+      },
+    }),
+  },
+
+  activeVisitTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  activeVisitAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: "#DCFCE7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  activeVisitCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  activeVisitName: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  activeVisitMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#047857",
+  },
+
+  activeVisitFooter: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  activeVisitTime: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  activeVisitManageButton: {
+    borderRadius: 999,
+    backgroundColor: "#047857",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+
+  activeVisitManageText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
 
   homeInsightAction: {
@@ -2022,6 +2133,22 @@ export default StyleSheet.create({
     color: "#334155",
   },
 
+  visitManagementActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 4,
+  },
+
+  visitManagementDoneButton: {
+    backgroundColor: "#047857",
+    borderColor: "#047857",
+  },
+
+  visitManagementDoneButtonText: {
+    color: "#FFFFFF",
+  },
+
   detailSectionTitle: {
     fontSize: 13,
     fontWeight: "800",
@@ -2269,6 +2396,61 @@ export default StyleSheet.create({
     textAlignVertical: "top",
   },
 
+  redirectOfficeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 16,
+  },
+
+  redirectOfficeChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+
+  redirectOfficeChipSelected: {
+    borderColor: "#0A3D91",
+    backgroundColor: "#EEF5FF",
+  },
+
+  redirectOfficeChipDisabled: {
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F1F5F9",
+    opacity: 0.68,
+  },
+
+  redirectOfficeChipText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#334155",
+  },
+
+  redirectOfficeChipTextSelected: {
+    color: "#0A3D91",
+  },
+
+  redirectOfficeChipTextDisabled: {
+    color: "#94A3B8",
+  },
+
+  visitManagementSummary: {
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#DBE3F0",
+    backgroundColor: "#F8FBFE",
+    padding: 14,
+    gap: 12,
+  },
+
+  visitManagementSummaryRow: {
+    gap: 4,
+  },
+
   modalActionRow: {
     flexDirection: "row",
     gap: 12,
@@ -2301,6 +2483,22 @@ export default StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     color: "#FFFFFF",
+  },
+
+  modalSecondaryAction: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    alignItems: "center",
+  },
+
+  modalSecondaryActionText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0A3D91",
   },
 
   modalReject: {

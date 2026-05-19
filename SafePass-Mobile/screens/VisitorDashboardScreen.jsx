@@ -62,22 +62,44 @@ const APPOINTMENT_PURPOSE_OPTIONS = [
 ];
 
 const APPOINTMENT_DEPARTMENT_OPTIONS = [
+  "Academy Director",
+  "Accounting Office",
   "Registrar",
+  "Registrar's Office",
   "Accounting",
-  "Information Desk",
-  "Guidance",
   "Administration",
+  "Admissions",
   "Cashier",
-  "Flight Operations",
-  "Training",
-  "I.T Room",
+  "Chairman",
+  "Clinic",
+  "Conference Room",
   "Faculty Room",
+  "File Room",
+  "Flight Operations",
+  "Guidance",
+  "Head Of Training Room",
+  "Information Desk",
+  "I.T Room",
   "Laboratory",
-  "TESDA",
-  "Workshop",
   "Library",
-  "Student Services",
+  "Lobby",
+  "Mock Up",
   "STO",
+  "Storage",
+  "Student Services",
+  "Students Lounge",
+  "TESDA",
+  "Tools Room",
+  "Training",
+  "Workshop",
+  "Classroom 1",
+  "Classroom 2",
+  "Classroom 3",
+  "Classroom 4",
+  "Classroom 5",
+  "Classroom 6",
+  "Classroom 7",
+  "Classroom 8",
 ];
 
 const DEFAULT_APPOINTMENT_TIME_SLOTS = [];
@@ -301,21 +323,43 @@ const getDateFromTimeSlot = (slot = {}) => {
 
 const VISITOR_OFFICE_MAP_ALIASES = {
   Registrar: "ground-registrar",
+  "Registrar's Office": "ground-registrar",
   Accounting: "ground-accounting",
+  "Accounting Office": "ground-accounting",
   Cashier: "ground-cashier",
   "Information Desk": "ground-lobby",
+  Lobby: "ground-lobby",
   Guidance: "ground-offices",
   Administration: "ground-offices",
+  Admissions: "ground-offices",
+  "File Room": "ground-file-room",
+  Storage: "ground-storage",
+  Clinic: "ground-clinic",
+  "Conference Room": "ground-conference-room",
+  Chairman: "ground-chairman",
   "Flight Operations": "flight-operations",
   Training: "head-of-training-room",
+  "Head Of Training Room": "head-of-training-room",
   "I.T Room": "it-room",
   "Faculty Room": "faculty-room",
+  "Academy Director": "academy-director",
+  "Mock Up": "second-mock-up",
   Laboratory: "second-laboratory",
   TESDA: "second-tesda",
   Workshop: "third-workshop",
+  "Tools Room": "third-tools-room",
   Library: "third-library",
   "Student Services": "ground-staff",
+  "Students Lounge": "third-students-lounge",
   STO: "sto",
+  "Classroom 1": "second-classroom-1",
+  "Classroom 2": "second-classroom-2",
+  "Classroom 3": "second-classroom-3",
+  "Classroom 4": "second-classroom-4",
+  "Classroom 5": "second-classroom-5",
+  "Classroom 6": "second-classroom-6",
+  "Classroom 7": "second-classroom-7",
+  "Classroom 8": "second-classroom-8",
 };
 
 const getVisitorDestinationInfo = (
@@ -573,6 +617,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
   const [isUpdatingAppointment, setIsUpdatingAppointment] = useState(false);
   const [isVerifyingAppointmentId, setIsVerifyingAppointmentId] = useState(false);
+  const [isSendingLateNotice, setIsSendingLateNotice] = useState(false);
   const [isVirtualTapLoading, setIsVirtualTapLoading] = useState(false);
   const [isCheckInLoading, setIsCheckInLoading] = useState(false);
   const [isCheckOutLoading, setIsCheckOutLoading] = useState(false);
@@ -2276,10 +2321,29 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     );
   };
 
+  const getAppointmentSlotDateTime = (timeOption, dateValue = appointmentForm.preferredDate) => {
+    const date = getValidDate(dateValue);
+    const time = getValidDate(timeOption);
+    if (!date || !time) return null;
+    const combinedDateTime = new Date(date);
+    combinedDateTime.setHours(time.getHours(), time.getMinutes(), 0, 0);
+    return Number.isNaN(combinedDateTime.getTime()) ? null : combinedDateTime;
+  };
+
+  const isAppointmentTimeSlotPassed = (timeOption, dateValue = appointmentForm.preferredDate) => {
+    const slotDateTime = getAppointmentSlotDateTime(timeOption, dateValue);
+    if (!slotDateTime) return false;
+    return slotDateTime < new Date(Date.now() - 60 * 1000);
+  };
+
   const isAppointmentTimeSlotFull = (timeOption) =>
     Boolean(getAppointmentSlotInfo(timeOption)?.isFull);
 
   const getAppointmentSlotStatusText = (timeOption) => {
+    if (isAppointmentTimeSlotPassed(timeOption)) {
+      return "Time has passed";
+    }
+
     const slot = getAppointmentSlotInfo(timeOption);
     if (!slot) {
       return isLoadingAppointmentSlots ? "Checking slots..." : "Select office to view slots";
@@ -2503,8 +2567,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return left.getHours() === right.getHours() && left.getMinutes() === right.getMinutes();
   };
 
+  const isConfiguredAppointmentTime = (timeValue) => {
+    const time = getValidDate(timeValue);
+    if (!time) return false;
+    return appointmentTimeOptions.some((option) => isSameAppointmentTime(option, time));
+  };
+
   const handleAppointmentSlotTimeSelect = (timeOption) => {
-    if (isLoadingAppointmentSlots || isAppointmentTimeSlotFull(timeOption)) return;
+    if (
+      isLoadingAppointmentSlots ||
+      isAppointmentTimeSlotFull(timeOption) ||
+      isAppointmentTimeSlotPassed(timeOption)
+    ) {
+      return;
+    }
     setHasAppointmentDraft(true);
     setAppointmentForm((prev) => ({ ...prev, preferredTime: timeOption }));
   };
@@ -2595,13 +2671,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 {group.options.map((option) => {
                   const isSelected = isSameAppointmentTime(option, selectedTime);
                   const isFull = isAppointmentTimeSlotFull(option);
-                  const isDisabled = isLoadingAppointmentSlots || isFull;
+                  const isPassed = isAppointmentTimeSlotPassed(option);
+                  const isUnavailable = isFull || isPassed;
+                  const isDisabled = isLoadingAppointmentSlots || isUnavailable;
                   return (
                     <TouchableOpacity
                       key={`${group.label}-${option.getHours()}-${option.getMinutes()}`}
                       style={[
                         visitorDashboardStyles.mobileTimeSlotButton,
-                        isFull && visitorDashboardStyles.mobileTimeSlotButtonUnavailable,
+                        isUnavailable && visitorDashboardStyles.mobileTimeSlotButtonUnavailable,
                         isSelected && visitorDashboardStyles.mobileTimeSlotButtonSelected,
                       ]}
                       disabled={isDisabled}
@@ -2611,11 +2689,21 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       <Text
                         style={[
                           visitorDashboardStyles.mobileTimeSlotText,
-                          isFull && visitorDashboardStyles.mobileTimeSlotTextUnavailable,
+                          isUnavailable && visitorDashboardStyles.mobileTimeSlotTextUnavailable,
                           isSelected && visitorDashboardStyles.mobileTimeSlotTextSelected,
                         ]}
                       >
                         {formatTime(option)}
+                      </Text>
+                      <Text
+                        style={[
+                          visitorDashboardStyles.mobileTimeSlotMeta,
+                          isUnavailable && visitorDashboardStyles.mobileTimeSlotMetaUnavailable,
+                          isSelected && visitorDashboardStyles.mobileTimeSlotMetaSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {getAppointmentSlotStatusText(option)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -2739,13 +2827,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   {group.options.map((option) => {
                     const isSelected = isSameAppointmentTime(option, selectedTime);
                     const isFull = isAppointmentTimeSlotFull(option);
-                    const isDisabled = isLoadingAppointmentSlots || isFull;
+                    const isPassed = isAppointmentTimeSlotPassed(option);
+                    const isUnavailable = isFull || isPassed;
+                    const isDisabled = isLoadingAppointmentSlots || isUnavailable;
                     return (
                       <TouchableOpacity
                         key={`${group.label}-${option.getHours()}-${option.getMinutes()}`}
                         style={[
                           visitorDashboardStyles.webTimeSlotButton,
-                          isFull && visitorDashboardStyles.webTimeSlotButtonUnavailable,
+                          isUnavailable && visitorDashboardStyles.webTimeSlotButtonUnavailable,
                           isSelected && visitorDashboardStyles.webTimeSlotButtonSelected,
                         ]}
                         disabled={isDisabled}
@@ -2754,11 +2844,21 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         <Text
                           style={[
                             visitorDashboardStyles.webTimeSlotText,
-                            isFull && visitorDashboardStyles.webTimeSlotTextUnavailable,
+                            isUnavailable && visitorDashboardStyles.webTimeSlotTextUnavailable,
                             isSelected && visitorDashboardStyles.webTimeSlotTextSelected,
                           ]}
                         >
                           {formatTime(option)}
+                        </Text>
+                        <Text
+                          style={[
+                            visitorDashboardStyles.webTimeSlotMeta,
+                            isUnavailable && visitorDashboardStyles.webTimeSlotMetaUnavailable,
+                            isSelected && visitorDashboardStyles.webTimeSlotMetaSelected,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {getAppointmentSlotStatusText(option)}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -3148,6 +3248,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
+    if (isAppointmentTimeSlotPassed(preferredTime, preferredDate)) {
+      showVisitorAlert(
+        "Time Slot Passed",
+        "That appointment time has already passed. Please choose another available time slot.",
+      );
+      return;
+    }
+
     if (!selectedDepartments.length) {
       showVisitorAlert("Missing Details", "Please choose at least one office to visit.");
       return;
@@ -3275,6 +3383,22 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
+    if (!isConfiguredAppointmentTime(preferredTime)) {
+      showVisitorAlert(
+        "Choose An Available Time",
+        "Please choose one of the available appointment time slots. Custom times like 2:45 PM are not available.",
+      );
+      return;
+    }
+
+    if (isAppointmentTimeSlotPassed(preferredTime, preferredDate)) {
+      showVisitorAlert(
+        "Time Slot Passed",
+        "That appointment time has already passed. Please choose another available time slot.",
+      );
+      return;
+    }
+
     const combinedDateTime = new Date(preferredDate);
     combinedDateTime.setHours(preferredTime.getHours(), preferredTime.getMinutes(), 0, 0);
     if (Number.isNaN(combinedDateTime.getTime())) {
@@ -3331,6 +3455,46 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         { text: "Update", onPress: submitAppointmentReschedule },
       ],
     );
+  };
+
+  const canSendRunningLateNotice = (record = visitor) => {
+    if (!record?._id || record.runningLateNotifiedAt) return false;
+    const appointmentStatus = String(record.appointmentStatus || "").toLowerCase();
+    const visitStatus = String(record.status || "").toLowerCase();
+    const isStaffAppointment =
+      record.approvalFlow === "staff" || Boolean(record.assignedStaff || record.appointmentDepartment);
+    return (
+      isStaffAppointment &&
+      ["approved", "adjusted"].includes(appointmentStatus) &&
+      !["checked_in", "checked_out", "cancelled", "rejected", "expired", "no_show"].includes(visitStatus)
+    );
+  };
+
+  const notifyRunningLate = async (target = visitor) => {
+    if (!target?._id || isSendingLateNotice) return;
+
+    setIsSendingLateNotice(true);
+    try {
+      const response = await ApiService.notifyVisitorRunningLate(target._id, {
+        reason: "Visitor reported they may arrive late.",
+      });
+      const message =
+        response?.message ||
+        "The office has been notified. Please arrive within the 15-minute grace period if possible.";
+
+      showVisitorPushNotice({
+        title: "Office Notified",
+        message,
+        type: "warning",
+      });
+      showVisitorAlert("Office Notified", message);
+      await loadVisitorData();
+    } catch (error) {
+      console.error("Notify running late error:", error);
+      showVisitorAlert("Notice Failed", error?.message || "Unable to notify the office right now.");
+    } finally {
+      setIsSendingLateNotice(false);
+    }
   };
 
   const submitAppointmentCancellation = async () => {
@@ -5613,6 +5777,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       {appointmentTimeOptions.map((option) => {
                         const isSelected = isSameAppointmentTime(appointmentForm.preferredTime, option);
                         const isFull = isAppointmentTimeSlotFull(option);
+                        const isPassed = isAppointmentTimeSlotPassed(option);
+                        const isUnavailable = isFull || isPassed;
                         return (
                           <TouchableOpacity
                             key={`${option.getHours()}-${option.getMinutes()}`}
@@ -5620,9 +5786,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                               visitorDashboardStyles.pickerOptionItem,
                               isVisitorDarkMode && visitorDashboardStyles.darkOptionItem,
                               isSelected && visitorDashboardStyles.pickerOptionItemActive,
-                              isFull && visitorDashboardStyles.pickerOptionItemDisabled,
+                              isUnavailable && visitorDashboardStyles.pickerOptionItemDisabled,
                             ]}
-                            disabled={isFull}
+                            disabled={isUnavailable}
                             onPress={() => {
                               setHasAppointmentDraft(true);
                               setAppointmentForm((prev) => ({ ...prev, preferredTime: option }));
@@ -5635,7 +5801,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                                   visitorDashboardStyles.pickerOptionText,
                                   isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText,
                                   isSelected && visitorDashboardStyles.pickerOptionTextActive,
-                                  isFull && visitorDashboardStyles.pickerOptionTextDisabled,
+                                  isUnavailable && visitorDashboardStyles.pickerOptionTextDisabled,
                                 ]}
                               >
                                 {formatTime(option)}
@@ -5644,7 +5810,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                                 style={[
                                  visitorDashboardStyles.pickerOptionMeta,
                                   isVisitorDarkMode && visitorDashboardStyles.darkMutedText,
-                                  isFull && visitorDashboardStyles.pickerOptionMetaFull,
+                                  isUnavailable && visitorDashboardStyles.pickerOptionMetaFull,
                                 ]}
                               >
                                 {getAppointmentSlotStatusText(option)}
@@ -5652,7 +5818,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             </View>
                             {isSelected ? (
                               <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
-                            ) : isFull ? (
+                            ) : isUnavailable ? (
                               <Ionicons name="lock-closed-outline" size={18} color="#DC2626" />
                             ) : null}
                           </TouchableOpacity>
@@ -7060,13 +7226,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             appointmentEditForm.preferredTime &&
                             new Date(appointmentEditForm.preferredTime).getHours() === option.getHours() &&
                             new Date(appointmentEditForm.preferredTime).getMinutes() === option.getMinutes();
+                          const isPassed = isAppointmentTimeSlotPassed(option, appointmentEditForm.preferredDate);
                           return (
                             <TouchableOpacity
                               key={`edit-${option.getHours()}-${option.getMinutes()}`}
                               style={[
                                 visitorDashboardStyles.pickerOptionItem,
                                 isSelected && visitorDashboardStyles.pickerOptionItemActive,
+                                isPassed && visitorDashboardStyles.pickerOptionItemDisabled,
                               ]}
+                              disabled={isPassed}
                               onPress={() => {
                                 setAppointmentEditForm((prev) => ({ ...prev, preferredTime: option }));
                                 setShowEditAppointmentTimePicker(false);
@@ -7076,11 +7245,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                                 style={[
                                   visitorDashboardStyles.pickerOptionText,
                                   isSelected && visitorDashboardStyles.pickerOptionTextActive,
+                                  isPassed && visitorDashboardStyles.pickerOptionTextDisabled,
                                 ]}
                               >
                                 {formatTime(option)}
                               </Text>
-                              {isSelected ? <Ionicons name="checkmark-circle" size={18} color="#0A3D91" /> : null}
+                              {isPassed ? (
+                                <Text style={[visitorDashboardStyles.pickerOptionMeta, visitorDashboardStyles.pickerOptionMetaFull]}>
+                                  Time has passed
+                                </Text>
+                              ) : isSelected ? (
+                                <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
+                              ) : null}
                             </TouchableOpacity>
                           );
                         })}
@@ -7643,9 +7819,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.checkInArrivalGuideCard}>
                 <Text style={visitorDashboardStyles.checkInArrivalGuideTitle}>What happens after check-in?</Text>
                 {[
-                  "Your visitor status will switch to checked in.",
-                  "Security and admin monitoring will receive your arrival event.",
-                  "Your access activity will be recorded in the dashboard history.",
+                  "You may check in up to 20 minutes early and wait in the lobby.",
+                  "Please enter the office only when your appointment time starts.",
+                  "You have a 15-minute grace period if you are running late.",
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.checkInArrivalGuideRow}>
                     <View style={visitorDashboardStyles.checkInArrivalGuideIcon}>
@@ -7655,6 +7831,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </View>
                 ))}
               </View>
+
+              {canSendRunningLateNotice(visitor) ? (
+                <TouchableOpacity
+                  style={visitorDashboardStyles.accessFlowLateNoticeButton}
+                  onPress={() => notifyRunningLate(visitor)}
+                  disabled={isSendingLateNotice}
+                >
+                  {isSendingLateNotice ? (
+                    <ActivityIndicator size="small" color="#0A3D91" />
+                  ) : (
+                    <>
+                      <Ionicons name="time-outline" size={18} color="#0A3D91" />
+                      <Text style={visitorDashboardStyles.accessFlowLateNoticeButtonText}>
+                        Tell Office I May Be Late
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              ) : null}
 
               <View style={visitorDashboardStyles.accessFlowFooter}>
                 <TouchableOpacity

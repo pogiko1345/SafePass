@@ -74,8 +74,14 @@ export default function SharedMonitoringMap({
         <View style={styles.summaryRow}>
           {summaryItems.map((item) => (
             <View key={item.label} style={[styles.summaryPill, { borderColor, backgroundColor: mapBackgroundColor }]}>
-              <Text style={[styles.summaryValue, { color: item.color || iconColor }]}>{item.value}</Text>
-              <Text style={[styles.summaryLabel, { color: textSecondary }]}>{item.label}</Text>
+              <View style={styles.summaryLabelRow}>
+                <View style={[styles.summaryDot, { backgroundColor: item.color || iconColor }]} />
+                <Text style={[styles.summaryLabel, { color: textSecondary }]}>{item.label}</Text>
+              </View>
+              <Text style={[styles.summaryValue, { color: textPrimary }]}>{item.value}</Text>
+              {item.helper ? (
+                <Text style={[styles.summaryHelper, { color: textSecondary }]}>{item.helper}</Text>
+              ) : null}
             </View>
           ))}
         </View>
@@ -181,19 +187,37 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   summaryPill: {
-    minWidth: 88,
+    minWidth: 118,
+    flexGrow: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
   },
+  summaryLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 5,
+  },
+  summaryDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
   summaryValue: {
-    fontSize: 16,
-    fontWeight: "800",
-    marginBottom: 2,
+    fontSize: 20,
+    fontWeight: "900",
   },
   summaryLabel: {
     fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  summaryHelper: {
+    marginTop: 3,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: "600",
   },
   mapWrapper: {

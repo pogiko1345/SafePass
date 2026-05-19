@@ -222,7 +222,14 @@ const getStaffActionHint = (appointment) => {
 };
 
 const isActionableAppointmentRequest = (appointment) =>
-  ["pending", "rescheduled"].includes(getAppointmentStatus(appointment));
+  ["pending", "rescheduled"].includes(getAppointmentStatus(appointment)) &&
+  !appointment?.checkedInAt &&
+  !appointment?.checkedOutAt;
+
+const isActiveStaffVisit = (appointment) =>
+  appointment?.status === "checked_in" &&
+  !appointment?.checkedOutAt &&
+  !appointment?.appointmentCompletedAt;
 
 const matchesAppointmentSearch = (appointment, searchTerm) => {
   const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
@@ -466,10 +473,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showRedirectAppointmentModal, setShowRedirectAppointmentModal] = useState(false);
+  const [showVisitManagementModal, setShowVisitManagementModal] = useState(false);
   const [adjustedDate, setAdjustedDate] = useState(new Date());
   const [adjustedTime, setAdjustedTime] = useState(new Date());
   const [adjustmentNote, setAdjustmentNote] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
+  const [redirectAppointmentOffice, setRedirectAppointmentOffice] = useState("");
+  const [redirectAppointmentNote, setRedirectAppointmentNote] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const contentScrollRef = useRef(null);
@@ -711,6 +722,18 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const checkedInNowCount = useMemo(
     () =>
       appointments.filter((item) => item?.checkedInAt && !item?.checkedOutAt).length,
+    [appointments],
+  );
+
+  const activeStaffVisits = useMemo(
+    () =>
+      appointments
+        .filter((item) => isActiveStaffVisit(item))
+        .sort(
+          (firstItem, secondItem) =>
+            new Date(secondItem.checkedInAt || secondItem.updatedAt || 0) -
+            new Date(firstItem.checkedInAt || firstItem.updatedAt || 0),
+        ),
     [appointments],
   );
 
@@ -1173,6 +1196,24 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     setRejectionReason("");
   };
 
+  const closeRedirectAppointmentModal = () => {
+    setShowRedirectAppointmentModal(false);
+    setSelectedAppointment(null);
+    setRedirectAppointmentOffice("");
+    setRedirectAppointmentNote("");
+  };
+
+  const closeVisitManagementModal = () => {
+    setShowVisitManagementModal(false);
+    setSelectedAppointment(null);
+  };
+
+  const openVisitManagementModal = (appointment) => {
+    setSelectedAppointment(appointment);
+    setDetailAppointment(appointment);
+    setShowVisitManagementModal(true);
+  };
+
   const handleApprove = async (appointment) => {
     if (!appointment?._id) return;
     setProcessingId(appointment._id);
@@ -1345,6 +1386,22 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     setShowRejectModal(true);
   };
 
+  const openRedirectAppointmentModal = (appointment) => {
+    const currentOffice = appointment?.appointmentDepartment || appointment?.assignedOffice || user?.department || "";
+    const nextOffice =
+      staffRedirectDestinations.find(
+        (office) => office.toLowerCase() !== String(currentOffice).trim().toLowerCase(),
+      ) || "";
+    setSelectedAppointment(appointment);
+    setRedirectAppointmentOffice(nextOffice);
+    setRedirectAppointmentNote(
+      currentOffice
+        ? `Please review this request. Visitor should be assisted by ${nextOffice || "the selected office"} instead of ${currentOffice}.`
+        : "",
+    );
+    setShowRedirectAppointmentModal(true);
+  };
+
   const submitRejection = async () => {
     if (!selectedAppointment) return;
     if (!rejectionReason.trim()) {
@@ -1374,7 +1431,37 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     }
   };
 
-  const handleComplete = async (appointment) => {
+  const submitAppointmentRedirect = async () => {
+    if (!selectedAppointment) return;
+    if (!redirectAppointmentOffice.trim()) {
+      Alert.alert("Office Required", "Please choose the office that should review this appointment.");
+      return;
+    }
+
+    setProcessingId(selectedAppointment._id);
+    try {
+      const response = await ApiService.redirectStaffAppointment(selectedAppointment._id, {
+        office: redirectAppointmentOffice,
+        note: redirectAppointmentNote,
+      });
+      if (response?.visitor) {
+        mergeAppointment(response.visitor);
+      }
+      closeRedirectAppointmentModal();
+      await loadData();
+      showStaffToast({
+        type: "success",
+        title: "Appointment Redirected",
+        message: response?.message || `${selectedAppointment.fullName || "Visitor"} was sent to ${redirectAppointmentOffice}.`,
+      });
+    } catch (error) {
+      Alert.alert("Redirect Failed", error?.message || "Could not redirect appointment.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleComplete = async (appointment, { skipConfirmation = false } = {}) => {
     if (!appointment?._id || processingId) return;
 
     const performComplete = async () => {
@@ -1384,6 +1471,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         if (response?.visitor) {
           mergeAppointment(response.visitor);
         }
+        closeVisitManagementModal();
         await loadData();
         showStaffToast({
           type: "success",
@@ -1396,6 +1484,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         setProcessingId(null);
       }
     };
+
+    if (skipConfirmation) {
+      await performComplete();
+      return;
+    }
 
     if (Platform.OS === "web") {
       const confirmed = globalThis?.window?.confirm?.(
@@ -1432,6 +1525,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         setDetailAppointment(response.visitor);
       }
 
+      setShowVisitManagementModal(false);
+      setSelectedAppointment(null);
       await loadData();
       showStaffToast({
         type: "success",
@@ -1621,10 +1716,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             const appointmentStatus = getAppointmentStatus(appointment);
             const statusMeta = getStatusMeta(appointmentStatus);
             const canActOnRequest = isActionableAppointmentRequest(appointment);
-            const canComplete =
-              appointment.status === "checked_in" &&
-              !appointment.checkedOutAt &&
-              !appointment.appointmentCompletedAt;
+            const canManageVisit = isActiveStaffVisit(appointment);
             const isProcessing = processingId === appointment._id;
 
             return (
@@ -1686,6 +1778,13 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                         <Text style={styles.tableActionButtonText}>Adjust</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
+                        style={styles.tableActionButton}
+                        onPress={() => openRedirectAppointmentModal(appointment)}
+                        disabled={isProcessing}
+                      >
+                        <Text style={styles.tableActionButtonText}>Redirect</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
                         style={[styles.tableActionButton, styles.tableActionButtonDanger]}
                         onPress={() => openRejectModal(appointment)}
                         disabled={isProcessing}
@@ -1695,16 +1794,16 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                     </>
                   ) : null}
 
-                  {mode === "records" && canComplete ? (
+                  {mode === "records" && canManageVisit ? (
                     <TouchableOpacity
                       style={[styles.tableActionButton, styles.tableActionButtonPrimary, isProcessing && styles.disabledAction]}
-                      onPress={() => handleComplete(appointment)}
+                      onPress={() => openVisitManagementModal(appointment)}
                       disabled={isProcessing}
                     >
                       {isProcessing ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
-                        <Text style={styles.tableActionButtonPrimaryText}>Complete</Text>
+                        <Text style={styles.tableActionButtonPrimaryText}>Manage</Text>
                       )}
                     </TouchableOpacity>
                   ) : null}
@@ -1891,10 +1990,22 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             </View>
           </View>
 
-          {detailAppointment.staffAdjustmentNote ? (
+          {detailAppointment.staffAdjustmentNote && !detailAppointment.appointmentRedirectedAt ? (
             <View style={styles.detailNoteCard}>
               <Text style={styles.detailLabel}>Adjustment Note</Text>
               <Text style={styles.detailNoteText}>{detailAppointment.staffAdjustmentNote}</Text>
+            </View>
+          ) : null}
+
+          {detailAppointment.appointmentRedirectedAt ? (
+            <View style={styles.detailNoteCard}>
+              <Text style={styles.detailLabel}>Office Redirect</Text>
+              <Text style={styles.detailNoteText}>
+                {detailAppointment.appointmentRedirectFrom || "Previous office"} to {detailAppointment.appointmentRedirectTo || "new office"}
+              </Text>
+              {detailAppointment.appointmentRedirectNote ? (
+                <Text style={styles.detailNoteText}>{detailAppointment.appointmentRedirectNote}</Text>
+              ) : null}
             </View>
           ) : null}
 
@@ -1912,15 +2023,29 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             </View>
           ) : null}
 
-          {detailAppointment.status === "checked_in" && !detailAppointment.checkedOutAt ? (
-            <TouchableOpacity
-              style={[styles.sectionActionButton, processingId === detailAppointment._id && styles.disabledAction]}
-              onPress={() => handleRedirectVisitor(detailAppointment)}
-              disabled={processingId === detailAppointment._id}
-            >
-              <Ionicons name="navigate-outline" size={16} color="#0A3D91" />
-              <Text style={styles.sectionActionButtonText}>Update Next Destination</Text>
-            </TouchableOpacity>
+          {isActiveStaffVisit(detailAppointment) ? (
+            <View style={styles.visitManagementActions}>
+              <TouchableOpacity
+                style={[styles.sectionActionButton, styles.visitManagementDoneButton, processingId === detailAppointment._id && styles.disabledAction]}
+                onPress={() => handleComplete(detailAppointment, { skipConfirmation: true })}
+                disabled={processingId === detailAppointment._id}
+              >
+                {processingId === detailAppointment._id ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" />
+                )}
+                <Text style={[styles.sectionActionButtonText, styles.visitManagementDoneButtonText]}>Done</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sectionActionButton, processingId === detailAppointment._id && styles.disabledAction]}
+                onPress={() => handleRedirectVisitor(detailAppointment)}
+                disabled={processingId === detailAppointment._id}
+              >
+                <Ionicons name="navigate-outline" size={16} color="#0A3D91" />
+                <Text style={styles.sectionActionButtonText}>Redirect</Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
         </View>
       </View>
@@ -2052,6 +2177,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                   onPress={() => {
                     selectSubmodule("appointment-record");
                     setDetailAppointment(appointment);
+                    if (isActiveStaffVisit(appointment)) {
+                      openVisitManagementModal(appointment);
+                    }
                   }}
                 >
                   <View style={styles.todayScheduleTopRow}>
@@ -2129,6 +2257,68 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </View>
 
         <View style={styles.homeWorkspaceSide}>
+      <View style={[styles.sectionCard, styles.activeVisitsCard]}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderCopy}>
+            <Text style={styles.sectionTitle}>Active Visits</Text>
+            <Text style={styles.sectionSubtitle}>
+              Checked-in visitors currently assigned to your office.
+            </Text>
+          </View>
+          <View style={styles.activeVisitCountBadge}>
+            <Text style={styles.activeVisitCountText}>{activeStaffVisits.length}</Text>
+          </View>
+        </View>
+
+        {activeStaffVisits.length === 0 ? (
+          <View style={styles.compactEmptyState}>
+            <Ionicons name="walk-outline" size={34} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No active visits</Text>
+            <Text style={styles.emptySubtitle}>
+              When security checks in a visitor for your office, they will appear here.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.activeVisitList}>
+            {activeStaffVisits.slice(0, 6).map((appointment) => (
+              <HomeHoverPressable
+                key={appointment._id}
+                style={styles.activeVisitItem}
+                onPress={() => openVisitManagementModal(appointment)}
+              >
+                <View style={styles.activeVisitTopRow}>
+                  <View style={styles.activeVisitAvatar}>
+                    <Ionicons name="person-outline" size={18} color="#047857" />
+                  </View>
+                  <View style={styles.activeVisitCopy}>
+                    <Text style={styles.activeVisitName} numberOfLines={1}>
+                      {appointment.fullName || "Visitor"}
+                    </Text>
+                    <Text style={styles.activeVisitMeta} numberOfLines={1}>
+                      {appointment.currentLocation?.office ||
+                        appointment.currentDestination?.office ||
+                        appointment.appointmentDepartment ||
+                        "Inside campus"}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.activeVisitFooter}>
+                  <Text style={styles.activeVisitTime}>
+                    Checked in {formatRelativeTime(appointment.checkedInAt)}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.activeVisitManageButton}
+                    onPress={() => openVisitManagementModal(appointment)}
+                  >
+                    <Text style={styles.activeVisitManageText}>Manage</Text>
+                  </TouchableOpacity>
+                </View>
+              </HomeHoverPressable>
+            ))}
+          </View>
+        )}
+      </View>
+
       <View style={[styles.sectionCard, styles.notificationsCard]}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderCopy}>
@@ -2984,10 +3174,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     const appointmentStatus = getAppointmentStatus(appointment);
     const canActOnRequest = isActionableAppointmentRequest(appointment);
     const isProcessing = processingId === appointment._id;
-    const canComplete =
-      appointment.status === "checked_in" &&
-      !appointment.checkedOutAt &&
-      !appointment.appointmentCompletedAt;
+    const canManageVisit = isActiveStaffVisit(appointment);
     const actionHint = getStaffActionHint(appointment);
 
     return (
@@ -3059,6 +3246,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               <Ionicons name="calendar-outline" size={15} color="#334155" />
               <Text style={staffMobileStyles.actionButtonText}>Adjust</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={staffMobileStyles.actionButton} onPress={() => openRedirectAppointmentModal(appointment)} disabled={isProcessing}>
+              <Ionicons name="swap-horizontal-outline" size={15} color="#334155" />
+              <Text style={staffMobileStyles.actionButtonText}>Redirect</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[staffMobileStyles.actionButton, staffMobileStyles.rejectButton]}
               onPress={() => openRejectModal(appointment)}
@@ -3070,14 +3261,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </View>
         ) : null}
 
-        {canComplete ? (
+        {canManageVisit ? (
           <TouchableOpacity
             style={[staffMobileStyles.fullActionButton, isProcessing && staffMobileStyles.disabledButton]}
-            onPress={() => handleComplete(appointment)}
+            onPress={() => openVisitManagementModal(appointment)}
             disabled={isProcessing}
           >
-            <Ionicons name="flag-outline" size={17} color="#FFFFFF" />
-            <Text style={staffMobileStyles.fullActionButtonText}>Mark Complete</Text>
+            <Ionicons name="clipboard-outline" size={17} color="#FFFFFF" />
+            <Text style={staffMobileStyles.fullActionButtonText}>Manage Visit</Text>
           </TouchableOpacity>
         ) : null}
       </TouchableOpacity>
@@ -3407,15 +3598,29 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                   <Text style={staffMobileStyles.detailValue}>{value}</Text>
                 </View>
               ))}
-              {detailAppointment.status === "checked_in" && !detailAppointment.checkedOutAt ? (
-                <TouchableOpacity
-                  style={staffMobileStyles.fullActionButton}
-                  onPress={() => handleRedirectVisitor(detailAppointment)}
-                  disabled={processingId === detailAppointment._id}
-                >
-                  <Ionicons name="navigate-outline" size={17} color="#FFFFFF" />
-                  <Text style={staffMobileStyles.fullActionButtonText}>Update Next Destination</Text>
-                </TouchableOpacity>
+              {isActiveStaffVisit(detailAppointment) ? (
+                <View style={staffMobileStyles.visitManageActions}>
+                  <TouchableOpacity
+                    style={[staffMobileStyles.fullActionButton, processingId === detailAppointment._id && staffMobileStyles.disabledButton]}
+                    onPress={() => handleComplete(detailAppointment, { skipConfirmation: true })}
+                    disabled={processingId === detailAppointment._id}
+                  >
+                    {processingId === detailAppointment._id ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="checkmark-done-outline" size={17} color="#FFFFFF" />
+                    )}
+                    <Text style={staffMobileStyles.fullActionButtonText}>Done</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[staffMobileStyles.fullActionButton, staffMobileStyles.redirectVisitButton]}
+                    onPress={() => handleRedirectVisitor(detailAppointment)}
+                    disabled={processingId === detailAppointment._id}
+                  >
+                    <Ionicons name="navigate-outline" size={17} color="#FFFFFF" />
+                    <Text style={staffMobileStyles.fullActionButtonText}>Redirect</Text>
+                  </TouchableOpacity>
+                </View>
               ) : null}
             </ScrollView>
           ) : null}
@@ -3713,6 +3918,137 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSubmit} onPress={submitAdjustment}>
                 <Text style={styles.modalSubmitText}>Save Time</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showRedirectAppointmentModal} transparent animationType="fade" onRequestClose={closeRedirectAppointmentModal}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Redirect Appointment</Text>
+            <Text style={styles.modalSubtitle}>
+              Send this request to the correct office. The visitor and receiving staff will be notified.
+            </Text>
+
+            <View style={styles.redirectOfficeGrid}>
+              {staffRedirectDestinations.map((office) => {
+                const isCurrentOffice =
+                  String(office).trim().toLowerCase() ===
+                  String(selectedAppointment?.appointmentDepartment || selectedAppointment?.assignedOffice || "").trim().toLowerCase();
+                const isSelected = redirectAppointmentOffice === office;
+                return (
+                  <TouchableOpacity
+                    key={office}
+                    style={[
+                      styles.redirectOfficeChip,
+                      isSelected && styles.redirectOfficeChipSelected,
+                      isCurrentOffice && styles.redirectOfficeChipDisabled,
+                    ]}
+                    onPress={() => !isCurrentOffice && setRedirectAppointmentOffice(office)}
+                    disabled={isCurrentOffice}
+                  >
+                    <Text
+                      style={[
+                        styles.redirectOfficeChipText,
+                        isSelected && styles.redirectOfficeChipTextSelected,
+                        isCurrentOffice && styles.redirectOfficeChipTextDisabled,
+                      ]}
+                    >
+                      {office}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TextInput
+              value={redirectAppointmentNote}
+              onChangeText={setRedirectAppointmentNote}
+              placeholder="Add a short note for the receiving office and visitor"
+              placeholderTextColor="#94A3B8"
+              style={[styles.modalInput, styles.modalTextarea]}
+              multiline
+            />
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity style={styles.modalCancel} onPress={closeRedirectAppointmentModal}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, processingId === selectedAppointment?._id && styles.disabledAction]}
+                onPress={submitAppointmentRedirect}
+                disabled={processingId === selectedAppointment?._id}
+              >
+                {processingId === selectedAppointment?._id ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Send Request</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showVisitManagementModal} transparent animationType="fade" onRequestClose={closeVisitManagementModal}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Manage Visitor Visit</Text>
+            <Text style={styles.modalSubtitle}>
+              Use this after security has checked the visitor in. Mark the visit done or redirect the visitor to another office.
+            </Text>
+
+            <View style={styles.visitManagementSummary}>
+              <View style={styles.visitManagementSummaryRow}>
+                <Text style={styles.detailLabel}>Visitor</Text>
+                <Text style={styles.detailValue}>{selectedAppointment?.fullName || "Visitor"}</Text>
+              </View>
+              <View style={styles.visitManagementSummaryRow}>
+                <Text style={styles.detailLabel}>Office</Text>
+                <Text style={styles.detailValue}>
+                  {selectedAppointment?.currentDestination?.office ||
+                    selectedAppointment?.appointmentDepartment ||
+                    selectedAppointment?.assignedOffice ||
+                    "Assigned department"}
+                </Text>
+              </View>
+              <View style={styles.visitManagementSummaryRow}>
+                <Text style={styles.detailLabel}>Schedule</Text>
+                <Text style={styles.detailValue}>
+                  {formatDate(selectedAppointment?.visitDate)} at {formatTime(selectedAppointment?.visitTime)}
+                </Text>
+              </View>
+              <View style={styles.visitManagementSummaryRow}>
+                <Text style={styles.detailLabel}>Current Location</Text>
+                <Text style={styles.detailValue}>
+                  {selectedAppointment?.currentLocation?.office || "Not tapped inside an office yet"}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity style={styles.modalCancel} onPress={closeVisitManagementModal}>
+                <Text style={styles.modalCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSecondaryAction, processingId === selectedAppointment?._id && styles.disabledAction]}
+                onPress={() => selectedAppointment && handleRedirectVisitor(selectedAppointment)}
+                disabled={!selectedAppointment || processingId === selectedAppointment?._id}
+              >
+                <Text style={styles.modalSecondaryActionText}>Redirect</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, processingId === selectedAppointment?._id && styles.disabledAction]}
+                onPress={() => selectedAppointment && handleComplete(selectedAppointment, { skipConfirmation: true })}
+                disabled={!selectedAppointment || processingId === selectedAppointment?._id}
+              >
+                {processingId === selectedAppointment?._id ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Done</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -4251,6 +4587,13 @@ const staffMobileStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900",
     color: "#FFFFFF",
+  },
+  visitManageActions: {
+    gap: 10,
+    marginTop: 4,
+  },
+  redirectVisitButton: {
+    backgroundColor: "#0F766E",
   },
   notificationCard: {
     flexDirection: "row",

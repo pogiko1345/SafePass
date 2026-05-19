@@ -19,26 +19,48 @@ const DEFAULT_APPOINTMENT_PURPOSE_OPTIONS = [
 ];
 
 const DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS = [
+  "Academy Director",
+  "Accounting Office",
   "Registrar",
+  "Registrar's Office",
   "Accounting",
-  "Information Desk",
-  "Guidance",
   "Administration",
+  "Admissions",
   "Cashier",
-  "Flight Operations",
-  "Training",
-  "I.T Room",
+  "Chairman",
+  "Clinic",
+  "Conference Room",
   "Faculty Room",
+  "File Room",
+  "Flight Operations",
+  "Guidance",
+  "Head Of Training Room",
+  "Information Desk",
+  "I.T Room",
   "Laboratory",
-  "TESDA",
-  "Workshop",
   "Library",
-  "Student Services",
+  "Lobby",
+  "Mock Up",
   "STO",
+  "Storage",
+  "Student Services",
+  "Students Lounge",
+  "TESDA",
+  "Tools Room",
+  "Training",
+  "Workshop",
+  "Classroom 1",
+  "Classroom 2",
+  "Classroom 3",
+  "Classroom 4",
+  "Classroom 5",
+  "Classroom 6",
+  "Classroom 7",
+  "Classroom 8",
 ];
 
 const DEFAULT_APPOINTMENT_TIME_SLOTS = [];
-const DEFAULT_APPOINTMENT_SLOT_LIMIT = 2;
+const DEFAULT_APPOINTMENT_SLOT_LIMIT = 3;
 for (let hour = 7; hour <= 18; hour += 1) {
   for (const minute of [0, 30]) {
     const hour12 = hour % 12 || 12;
@@ -112,17 +134,13 @@ const toAppointmentTimeSlot = (slot) => {
   const parsed = parseTimeSlotValue(slot);
   if (!parsed) return null;
   const value = `${String(parsed.hour).padStart(2, "0")}:${String(parsed.minute).padStart(2, "0")}`;
-  const parsedCapacity = Number(slot?.capacity ?? slot?.limit ?? slot?.slots ?? DEFAULT_APPOINTMENT_SLOT_LIMIT);
-  const capacity = Number.isInteger(parsedCapacity) && parsedCapacity > 0
-    ? Math.min(parsedCapacity, 50)
-    : DEFAULT_APPOINTMENT_SLOT_LIMIT;
   return {
     id: String(slot?.id || "").trim() || `slot-${value.replace(":", "-")}`,
     label: String(slot?.label || "").trim() || formatTimeSlotLabel(parsed),
     value,
     hour: parsed.hour,
     minute: parsed.minute,
-    capacity,
+    capacity: DEFAULT_APPOINTMENT_SLOT_LIMIT,
     enabled: slot?.enabled !== false,
   };
 };
@@ -149,6 +167,22 @@ const dedupeTimeSlots = (slots) => {
     .sort((left, right) => left.hour * 60 + left.minute - (right.hour * 60 + right.minute));
 };
 
+const mergeOptionsWithDefaults = (sourceOptions = [], defaultOptions = []) => {
+  const sourceMap = new Map();
+  sourceOptions.forEach((option) => {
+    const key = String(option?.label || option?.value || "").trim().toLowerCase();
+    if (key) sourceMap.set(key, option);
+  });
+
+  return dedupeByLabel([
+    ...sourceOptions,
+    ...defaultOptions.filter((option) => {
+      const key = String(option?.label || option?.value || "").trim().toLowerCase();
+      return key && !sourceMap.has(key);
+    }),
+  ]);
+};
+
 const DEFAULT_APPOINTMENT_OPTIONS = {
   offices: DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS.map((label) => toAppointmentOption(label, "office")),
   purposes: DEFAULT_APPOINTMENT_PURPOSE_OPTIONS.map((label) => toAppointmentOption(label, "purpose")),
@@ -157,16 +191,14 @@ const DEFAULT_APPOINTMENT_OPTIONS = {
 
 const sanitizeAppointmentOptions = (input = {}) => {
   const source = input?.appointmentOptions || input || {};
-  const offices = dedupeByLabel(
-    (Array.isArray(source.offices) ? source.offices : DEFAULT_APPOINTMENT_OPTIONS.offices)
-      .map((item) => toAppointmentOption(item, "office"))
-      .filter(Boolean),
-  );
-  const purposes = dedupeByLabel(
-    (Array.isArray(source.purposes) ? source.purposes : DEFAULT_APPOINTMENT_OPTIONS.purposes)
-      .map((item) => toAppointmentOption(item, "purpose"))
-      .filter(Boolean),
-  );
+  const sourceOffices = (Array.isArray(source.offices) ? source.offices : [])
+    .map((item) => toAppointmentOption(item, "office"))
+    .filter(Boolean);
+  const sourcePurposes = (Array.isArray(source.purposes) ? source.purposes : [])
+    .map((item) => toAppointmentOption(item, "purpose"))
+    .filter(Boolean);
+  const offices = mergeOptionsWithDefaults(sourceOffices, DEFAULT_APPOINTMENT_OPTIONS.offices);
+  const purposes = mergeOptionsWithDefaults(sourcePurposes, DEFAULT_APPOINTMENT_OPTIONS.purposes);
   const timeSlots = dedupeTimeSlots(
     (Array.isArray(source.timeSlots) ? source.timeSlots : DEFAULT_APPOINTMENT_OPTIONS.timeSlots)
       .map(toAppointmentTimeSlot)

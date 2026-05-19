@@ -3347,6 +3347,28 @@ export default StyleSheet.create({
     color: "#475569",
   },
 
+  accessFlowLateNoticeButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    paddingVertical: width <= 390 ? 12 : 14,
+    paddingHorizontal: 16,
+    minHeight: 48,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  accessFlowLateNoticeButtonText: {
+    flexShrink: 1,
+    fontSize: width <= 390 ? 13.5 : 15,
+    fontWeight: "800",
+    color: "#0A3D91",
+    textAlign: "center",
+  },
+
   accessFlowPrimaryButton: {
     flex: 1,
     borderRadius: 16,
@@ -5055,7 +5077,7 @@ export default StyleSheet.create({
 
   mobileTimeSlotButton: {
     width: "31%",
-    minHeight: 40,
+    minHeight: 54,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#D8E2EE",
@@ -5088,6 +5110,22 @@ export default StyleSheet.create({
 
   mobileTimeSlotTextSelected: {
     color: "#FFFFFF",
+  },
+
+  mobileTimeSlotMeta: {
+    marginTop: 3,
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#64748B",
+    textAlign: "center",
+  },
+
+  mobileTimeSlotMetaUnavailable: {
+    color: "#9CA3AF",
+  },
+
+  mobileTimeSlotMetaSelected: {
+    color: "#DBEAFE",
   },
 
   mobileSlotLegendRow: {
@@ -5303,8 +5341,8 @@ export default StyleSheet.create({
   },
 
   webTimeSlotButton: {
-    minWidth: 86,
-    minHeight: 38,
+    minWidth: 112,
+    minHeight: 50,
     borderRadius: 8,
     backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
@@ -5333,6 +5371,21 @@ export default StyleSheet.create({
 
   webTimeSlotTextSelected: {
     color: "#FFFFFF",
+  },
+
+  webTimeSlotMeta: {
+    marginTop: 3,
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#A7F3D0",
+  },
+
+  webTimeSlotMetaUnavailable: {
+    color: "#CBD5E1",
+  },
+
+  webTimeSlotMetaSelected: {
+    color: "#DBEAFE",
   },
 
   webSelectedSlotBar: {
