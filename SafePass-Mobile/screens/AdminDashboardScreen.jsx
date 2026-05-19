@@ -1097,6 +1097,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [historySortOrder, setHistorySortOrder] = useState("newest");
   const [historySearchQuery, setHistorySearchQuery] = useState("");
   const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyItemsPerPage] = useState(6);
   const [reportSearchTerm, setReportSearchTerm] = useState("");
   const [reportStatusFilter, setReportStatusFilter] = useState("all");
   const [securityReportSearchTerm, setSecurityReportSearchTerm] = useState("");
@@ -1141,11 +1143,14 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     startOfWeek.setDate(startOfToday.getDate() - dayOfWeek);
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 7);
+    const startOfLastWeek = new Date(startOfWeek);
+    startOfLastWeek.setDate(startOfWeek.getDate() - 7);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     if (shortcut === "today") return date >= startOfToday && date < endOfToday;
     if (shortcut === "week") return date >= startOfWeek && date < endOfWeek;
+    if (shortcut === "last_week") return date >= startOfLastWeek && date < startOfWeek;
     if (shortcut === "month") return date >= startOfMonth && date < endOfMonth;
     return true;
   };
@@ -1949,6 +1954,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     { key: "all", label: "Any Date", icon: "calendar-outline" },
     { key: "today", label: "Today", icon: "today-outline" },
     { key: "week", label: "This Week", icon: "calendar-number-outline" },
+    { key: "last_week", label: "Last Week", icon: "calendar-outline" },
     { key: "month", label: "This Month", icon: "calendar-clear-outline" },
   ];
 
@@ -3090,6 +3096,18 @@ const loadDashboardData = useCallback(async () => {
       setDataManagementFieldPage(fieldSetupTotalPages);
     }
   }, [dataManagementFieldPage, fieldSetupTotalPages]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [
+    historyDateFilter,
+    historyDateRange.startDate,
+    historyDateRange.endDate,
+    historyFilter,
+    historyOfficeFilter,
+    historySearchQuery,
+    historySortOrder,
+  ]);
 
   useEffect(() => {
     if (!createUserMessage) return;
@@ -5234,10 +5252,28 @@ const loadDashboardData = useCallback(async () => {
     const columnScale = totalColumnWidth > availableTableWidth
       ? availableTableWidth / totalColumnWidth
       : 1;
+    const extraTableWidth = Math.max(0, availableTableWidth - totalColumnWidth);
+    const totalGrowWeight = columns.reduce((total, column) => {
+      if (column.grow === 0) return total;
+      if (typeof column.grow === "number") return total + column.grow;
+      return total + (column.key === "actions" ? 0.25 : 1);
+    }, 0);
     const getColumnStyle = (column) => {
       const baseWidth = column.width || fallbackColumnWidth;
       const minimumWidth = column.minWidth || (column.key === "actions" ? 132 : 86);
-      const scaledWidth = Math.max(minimumWidth, Math.floor(baseWidth * columnScale));
+      const growWeight =
+        column.grow === 0
+          ? 0
+          : typeof column.grow === "number"
+            ? column.grow
+            : column.key === "actions"
+              ? 0.25
+              : 1;
+      const extraWidth =
+        extraTableWidth > 0 && totalGrowWeight > 0
+          ? Math.floor((extraTableWidth * growWeight) / totalGrowWeight)
+          : 0;
+      const scaledWidth = Math.max(minimumWidth, Math.floor(baseWidth * columnScale) + extraWidth);
 
       return {
         width: scaledWidth,
@@ -8000,6 +8036,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "name",
                   label: "User",
                   width: 220,
+                  grow: 1.4,
                   render: (userItem) => {
                     const roleColor = getRoleColor(userItem.role);
                     return (
@@ -8025,6 +8062,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "role",
                   label: "Role",
                   width: 105,
+                  grow: 0.75,
                   render: (userItem) => {
                     const roleColor = getRoleColor(userItem.role);
                     return (
@@ -8040,6 +8078,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "department",
                   label: "Department",
                   width: 140,
+                  grow: 1,
                   render: (userItem) => (
                     <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
                       {userItem.department || "General"}
@@ -8050,6 +8089,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "contact",
                   label: "Contact",
                   width: 160,
+                  grow: 1,
                   render: (userItem) => (
                     <View>
                       <Text style={[styles.adminTableCellText, isDarkMode && styles.darkText]}>
@@ -8065,6 +8105,7 @@ const loadDashboardData = useCallback(async () => {
                   key: "status",
                   label: "Status",
                   width: 100,
+                  grow: 0.55,
                   render: (userItem) => {
                     const userIsActive = isUserActive(userItem);
                     return (
@@ -8092,7 +8133,8 @@ const loadDashboardData = useCallback(async () => {
                 {
                   key: "actions",
                   label: "Manage",
-                  width: 250,
+                  width: 210,
+                  grow: 0.15,
                   render: (userItem) => (
                     <View style={styles.adminTableActionRow}>
                       <TouchableOpacity
@@ -9880,6 +9922,12 @@ const loadDashboardData = useCallback(async () => {
     const chart = getCurrentChartData();
     const historyStats = getHistoryStats();
     const filteredHistory = getFilteredHistory();
+    const historyTotalPages = Math.max(1, Math.ceil(filteredHistory.length / historyItemsPerPage));
+    const safeHistoryPage = Math.min(historyPage, historyTotalPages);
+    const historyStartIndex = (safeHistoryPage - 1) * historyItemsPerPage;
+    const paginatedHistory = filteredHistory.slice(historyStartIndex, historyStartIndex + historyItemsPerPage);
+    const historyVisibleStart = filteredHistory.length ? historyStartIndex + 1 : 0;
+    const historyVisibleEnd = Math.min(historyStartIndex + historyItemsPerPage, filteredHistory.length);
     const activeDatasetLabel = activeChartDataset.charAt(0).toUpperCase() + activeChartDataset.slice(1);
     const selectedDateLabel = selectedDate.toLocaleDateString("en-US", {
       month: "long",
@@ -10305,6 +10353,7 @@ const loadDashboardData = useCallback(async () => {
                 onSearchChange: (value) => {
                   setHistorySearchTerm(value);
                   setHistorySearchQuery(value.trim());
+                  setHistoryPage(1);
                 },
                 searchPlaceholder: "Search visitor, email, office, purpose, status, or date...",
                 searchSubtitle: "Find visitor records by name, email, office, purpose, status, or exact date.",
@@ -10312,6 +10361,7 @@ const loadDashboardData = useCallback(async () => {
                 onClearSearch: () => {
                   setHistorySearchTerm("");
                   setHistorySearchQuery("");
+                  setHistoryPage(1);
                 },
                 filterTitle: "Filters",
                 filterSubtitle: "Narrow visitor history by status, date, office, and time order.",
@@ -10327,6 +10377,7 @@ const loadDashboardData = useCallback(async () => {
                   setHistoryOfficeFilter("all");
                   setHistoryDateRange({ startDate: null, endDate: null });
                   setHistorySortOrder("newest");
+                  setHistoryPage(1);
                 },
                 filterGroups: [
                   {
@@ -10389,7 +10440,8 @@ const loadDashboardData = useCallback(async () => {
                   </Text>
                 </View>
               ) : (
-                filteredHistory.slice(0, 8).map((visitor) => {
+                <>
+                {paginatedHistory.map((visitor) => {
                   const statusInfo = getStatusColor(visitor.status);
                   const isToday =
                     visitor.visitDate &&
@@ -10458,7 +10510,38 @@ const loadDashboardData = useCallback(async () => {
                       </View>
                     </View>
                   );
-                })
+                })}
+                <View style={styles.userPaginationRow}>
+                  <Text style={[styles.userPaginationSummary, { color: theme.textSecondary }]}>
+                    Showing {historyVisibleStart}-{historyVisibleEnd} of {filteredHistory.length} records
+                  </Text>
+                  <View style={styles.userPaginationControls}>
+                    <TouchableOpacity
+                      style={[styles.userPaginationButton, safeHistoryPage === 1 && styles.userPaginationButtonDisabled]}
+                      onPress={() => setHistoryPage((page) => Math.max(1, page - 1))}
+                      disabled={safeHistoryPage === 1}
+                    >
+                      <Ionicons name="chevron-back-outline" size={16} color={safeHistoryPage === 1 ? "#94A3B8" : "#334155"} />
+                      <Text style={[styles.userPaginationButtonText, safeHistoryPage === 1 && styles.userPaginationButtonTextDisabled]}>
+                        Previous
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.userPaginationSummary, { color: theme.textSecondary }]}>
+                      Page {safeHistoryPage} of {historyTotalPages}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.userPaginationButton, safeHistoryPage >= historyTotalPages && styles.userPaginationButtonDisabled]}
+                      onPress={() => setHistoryPage((page) => Math.min(historyTotalPages, page + 1))}
+                      disabled={safeHistoryPage >= historyTotalPages}
+                    >
+                      <Text style={[styles.userPaginationButtonText, safeHistoryPage >= historyTotalPages && styles.userPaginationButtonTextDisabled]}>
+                        Next
+                      </Text>
+                      <Ionicons name="chevron-forward-outline" size={16} color={safeHistoryPage >= historyTotalPages ? "#94A3B8" : "#334155"} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                </>
               )}
             </View>
           </View>
