@@ -5312,44 +5312,30 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
             <AnimatedPressable
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
-              onPress={handleCheckInAction}
-              activeOpacity={0.9}
-              disabled={isCheckInLoading || visitor?.status === "checked_in"}
+              activeOpacity={1}
             >
               <View style={[visitorDashboardStyles.approvedCompactActionIcon, { backgroundColor: "#DCFCE7" }]}>
-                {isCheckInLoading ? (
-                  <ActivityIndicator size="small" color="#166534" />
-                ) : (
-                  <Ionicons name="log-in-outline" size={18} color="#166534" />
-                )}
+                <Ionicons name="radio-outline" size={18} color="#166534" />
               </View>
               <View style={visitorDashboardStyles.approvedCompactActionCopy}>
-                <Text style={visitorDashboardStyles.approvedCompactActionTitle}>
-                  {visitor?.status === "checked_in" ? "Checked In" : "Check In"}
-                </Text>
+                <Text style={visitorDashboardStyles.approvedCompactActionTitle}>Tap At Lobby</Text>
                 <Text style={visitorDashboardStyles.approvedCompactActionText}>
-                  Confirm your arrival.
+                  Use your NFC card at the reader.
                 </Text>
               </View>
             </AnimatedPressable>
 
             <AnimatedPressable
               style={[visitorDashboardStyles.approvedCompactActionCard, { width: compactApprovedActionCardWidth }]}
-              onPress={() => handleCheckOutAction()}
-              activeOpacity={0.9}
-              disabled={isCheckOutLoading || visitor?.status !== "checked_in"}
+              activeOpacity={1}
             >
               <View style={[visitorDashboardStyles.approvedCompactActionIcon, { backgroundColor: "#FEE2E2" }]}>
-                {isCheckOutLoading ? (
-                  <ActivityIndicator size="small" color="#B91C1C" />
-                ) : (
-                  <Ionicons name="log-out-outline" size={18} color="#B91C1C" />
-                )}
+                <Ionicons name="log-out-outline" size={18} color="#B91C1C" />
               </View>
               <View style={visitorDashboardStyles.approvedCompactActionCopy}>
-                <Text style={visitorDashboardStyles.approvedCompactActionTitle}>Check Out</Text>
+                <Text style={visitorDashboardStyles.approvedCompactActionTitle}>Exit By Reader</Text>
                 <Text style={visitorDashboardStyles.approvedCompactActionText}>
-                  Close your visit when done.
+                  Tap again when leaving campus.
                 </Text>
               </View>
             </AnimatedPressable>
@@ -7563,7 +7549,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View>
                 <Text style={visitorDashboardStyles.virtualNfcModalTitle}>Virtual NFC Card</Text>
                 <Text style={visitorDashboardStyles.virtualNfcModalSubtitle}>
-                  Use this phone as your virtual SafePass card for check-in and check-out.
+                  Show this card and tap your assigned NFC card at the campus reader.
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setShowVirtualNfcModal(false)}>
@@ -7585,10 +7571,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   isCompactVirtualCardView && visitorDashboardStyles.virtualNfcDisplayRowCompact,
                 ]}
               >
-                <TouchableOpacity
-                  activeOpacity={0.92}
-                  onPress={handleVirtualNfcCardTap}
-                  disabled={isVirtualTapLoading}
+                <View
                   style={[
                     visitorDashboardStyles.virtualNfcPreviewCard,
                     isCompactVirtualCardView && visitorDashboardStyles.virtualNfcPreviewCardCompact,
@@ -7610,11 +7593,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         </Text>
                       </View>
                       <View style={visitorDashboardStyles.virtualNfcPreviewChip}>
-                        {isVirtualTapLoading ? (
-                          <ActivityIndicator size="small" color="#EEF5FF" />
-                        ) : (
-                          <Ionicons name="radio" size={16} color="#EEF5FF" />
-                        )}
+                        <Ionicons name="radio" size={16} color="#EEF5FF" />
                       </View>
                     </View>
 
@@ -7671,15 +7650,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       </View>
                       <View style={visitorDashboardStyles.virtualNfcTapHintCopy}>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintTitle}>
-                          Use This Virtual Card
+                          Ready To Tap
                         </Text>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintText}>
-                          The system will check you in or out from this phone based on your current visit status.
+                          Tap your assigned NFC card at the PN532 lobby reader for check-in or check-out.
                         </Text>
                       </View>
                     </View>
                   </LinearGradient>
-                </TouchableOpacity>
+                </View>
               </View>
 
               <View
@@ -7689,9 +7668,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 ]}
               >
                 {[
-                  "Use the card view above to confirm your approved visitor details before continuing.",
-                  "Confirm from this phone to process campus entry or exit.",
-                  "Security and admin monitoring will record the virtual card event automatically.",
+                  "Use the card view above to confirm your approved visitor details.",
+                  "Tap your assigned physical NFC card at the lobby reader to enter or leave campus.",
+                  "Security and admin monitoring will record the reader tap automatically.",
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.virtualNfcInfoRow}>
                     <Ionicons name="checkmark-circle-outline" size={18} color="#0A3D91" />
@@ -7708,28 +7687,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               ]}
             >
               <TouchableOpacity
-                style={visitorDashboardStyles.virtualNfcSecondaryButton}
-                onPress={() => setShowVirtualNfcModal(false)}
-                disabled={isVirtualTapLoading}
-              >
-                <Text style={visitorDashboardStyles.virtualNfcSecondaryButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
                 style={visitorDashboardStyles.virtualNfcPrimaryButton}
-                onPress={handleVirtualNfcCardTap}
-                disabled={isVirtualTapLoading}
+                onPress={() => setShowVirtualNfcModal(false)}
               >
-                {isVirtualTapLoading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name={isNfcReading ? "pause-circle-outline" : "log-in-outline"} size={18} color="#FFFFFF" />
-                    <Text style={visitorDashboardStyles.virtualNfcPrimaryButtonText}>
-                      {isNfcReading ? "Stop NFC" : "Use Virtual Card"}
-                    </Text>
-                  </>
-                )}
+                <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
+                <Text style={visitorDashboardStyles.virtualNfcPrimaryButtonText}>
+                  Got It
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
