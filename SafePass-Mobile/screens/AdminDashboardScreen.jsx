@@ -4633,7 +4633,7 @@ const loadDashboardData = useCallback(async () => {
   };
 
   // FIXED: Confirm Edit User
-  const confirmEditUser = async ({ confirmEnrollmentContactChange = false } = {}) => {
+  const confirmEditUser = async () => {
     if (!ensureAdminAccess()) return;
     const selectedId = editUserData.id;
     const {
@@ -4690,30 +4690,6 @@ const loadDashboardData = useCallback(async () => {
       return;
     }
 
-    if (isEditingStudent && !confirmEnrollmentContactChange) {
-      const previousParentName = String(selectedUser?.parentName || selectedUser?.guardianName || "").trim();
-      const previousParentEmail = String(selectedUser?.parentEmail || selectedUser?.guardianEmail || "").trim().toLowerCase();
-      const nextParentName = String(editUserData.parentName || "").trim();
-      const nextParentEmail = String(editUserData.parentEmail || "").trim().toLowerCase();
-      const enrollmentContactChanged =
-        previousParentName !== nextParentName || previousParentEmail !== nextParentEmail;
-
-      if (enrollmentContactChanged) {
-        Alert.alert(
-          "Update Enrollment Contact",
-          "Parent or guardian details are based on the official enrollment record. Continue only if you are correcting the school record.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Continue",
-              onPress: () => confirmEditUser({ confirmEnrollmentContactChange: true }),
-            },
-          ],
-        );
-        return;
-      }
-    }
-
     setProcessingId("edit-user");
     try {
       const updatePayload = {
@@ -4736,8 +4712,10 @@ const loadDashboardData = useCallback(async () => {
         updatePayload.course = editUserData.course;
         updatePayload.yearLevel = editUserData.yearLevel;
         updatePayload.section = editUserData.section;
-        updatePayload.parentName = editUserData.parentName;
-        updatePayload.parentEmail = editUserData.parentEmail;
+        updatePayload.parentName = String(editUserData.parentName || "").trim();
+        updatePayload.parentEmail = String(editUserData.parentEmail || "").trim().toLowerCase();
+        updatePayload.guardianName = updatePayload.parentName;
+        updatePayload.guardianEmail = updatePayload.parentEmail;
       }
       if (String(editUserData.role || "").toLowerCase() === "teacher") {
         updatePayload.teacherId = editUserData.teacherId;
@@ -4749,9 +4727,18 @@ const loadDashboardData = useCallback(async () => {
       const response = await ApiService.updateUser(editUserData.id, updatePayload);
       if (response && (response.success || response.user)) {
         const savedUser = response.user || updatePayload;
+        const normalizedSavedUser = isEditingStudent
+          ? {
+              ...savedUser,
+              parentName: savedUser.parentName ?? savedUser.guardianName ?? updatePayload.parentName,
+              parentEmail: savedUser.parentEmail ?? savedUser.guardianEmail ?? updatePayload.parentEmail,
+              guardianName: savedUser.guardianName ?? savedUser.parentName ?? updatePayload.guardianName,
+              guardianEmail: savedUser.guardianEmail ?? savedUser.parentEmail ?? updatePayload.guardianEmail,
+            }
+          : savedUser;
         const updatedUsers = allUsers.map(user => {
           if ((user._id === editUserData.id || user.id === editUserData.id)) {
-            return { ...user, ...savedUser };
+            return { ...user, ...normalizedSavedUser };
           }
           return user;
         });
@@ -4759,7 +4746,7 @@ const loadDashboardData = useCallback(async () => {
         const updatedSelectedUser = selectedUser && (
           selectedUser._id === editUserData.id || selectedUser.id === editUserData.id
         )
-          ? { ...selectedUser, ...savedUser }
+          ? { ...selectedUser, ...normalizedSavedUser }
           : selectedUser;
         
         setAllUsers(updatedUsers);
@@ -4790,6 +4777,9 @@ const loadDashboardData = useCallback(async () => {
       } else if (message.toLowerCase().includes("email already") || message.toLowerCase().includes("email is already")) {
         setEditUserErrors((currentValue) => ({ ...currentValue, email: "This email address is already registered." }));
         Alert.alert("Email Already Used", "This email is already registered. Please use another email address.");
+      } else if (message.toLowerCase().includes("parent email") || message.toLowerCase().includes("guardian email")) {
+        setEditUserErrors((currentValue) => ({ ...currentValue, parentEmail: "Enter a valid parent or guardian email address." }));
+        Alert.alert("Parent Email Error", message || "Please enter a valid parent or guardian email address.");
       } else if (message.toLowerCase().includes("staff id already")) {
         Alert.alert("Staff ID Already Used", "This staff ID is already registered. Please use another staff ID.");
       } else if (message.toLowerCase().includes("nfc card") || message.toLowerCase().includes("card uid")) {
@@ -13652,7 +13642,7 @@ const loadDashboardData = useCallback(async () => {
                             marginTop: 6,
                           }}
                         >
-                          Based on the official enrollment record. Saving changes will ask for admin confirmation.
+                          Based on the official enrollment record. Admin changes save directly to the student profile.
                         </Text>
                       </View>
                     </View>
