@@ -2298,6 +2298,10 @@ const GATE_CHECKPOINT_IDS = new Set([
   "campus_exit",
   "arduino_reader",
   "arduino_reader_1",
+  "pn532",
+  "pn532_reader",
+  "pn532_reader_1",
+  "pn532_gate",
   "lobby",
 ]);
 
@@ -2940,9 +2944,38 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       });
     }
 
-    const cardUser = await User.findOne(buildNfcCredentialQuery(cardId, normalizedCardId)).select(
+    let cardUser = await User.findOne(buildNfcCredentialQuery(cardId, normalizedCardId)).select(
       "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions department position scheduleProfile course yearLevel section studentId parentName parentEmail guardianName guardianEmail emergencyContact",
     );
+
+    let firstTapAssignment = null;
+    if (!cardUser) {
+      firstTapAssignment = await findApprovedVisitorForFirstNfcTap(normalizedCardId);
+      if (firstTapAssignment.visitor && firstTapAssignment.user) {
+        await assignFirstTapNfcUidToVisitor({
+          visitor: firstTapAssignment.visitor,
+          user: firstTapAssignment.user,
+          normalizedCardId,
+        });
+        cardUser = firstTapAssignment.user;
+
+        await AccessLog.create({
+          userId: cardUser._id,
+          userEmail: cardUser.email,
+          userName: getFullName(cardUser) || firstTapAssignment.visitor.fullName,
+          actorRole: "device",
+          location: tapLocation.office,
+          accessType: "system",
+          activityType: "first_nfc_tap_assigned",
+          status: "granted",
+          nfcCardId: normalizedCardId,
+          relatedVisitor: firstTapAssignment.visitor._id,
+          relatedUser: cardUser._id,
+          metadata: { deviceId, tapLocation, source: "first_tap_auto_assign" },
+          notes: `Assigned NFC UID ${normalizedCardId} to ${firstTapAssignment.visitor.fullName} from first PN532 tap.`,
+        });
+      }
+    }
 
     if (!cardUser) {
       await AccessLog.create({
@@ -2963,7 +2996,10 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
 
       return res.status(404).json({
         success: false,
-        message: "NFC card is not assigned to any user",
+        message:
+          firstTapAssignment?.reason === "ambiguous"
+            ? "More than one approved visitor is waiting for NFC assignment. Assign the card from Security first."
+            : "NFC card is not assigned to any user",
       });
     }
 
@@ -3468,9 +3504,38 @@ app.post(
         });
       }
 
-      const cardUser = await User.findOne(buildNfcCredentialQuery(cardId, normalizedCardId)).select(
+      let cardUser = await User.findOne(buildNfcCredentialQuery(cardId, normalizedCardId)).select(
         "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions department position scheduleProfile course yearLevel section studentId teacherId employeeId parentName parentEmail guardianName guardianEmail emergencyContact",
       );
+
+      let firstTapAssignment = null;
+      if (!cardUser) {
+        firstTapAssignment = await findApprovedVisitorForFirstNfcTap(normalizedCardId);
+        if (firstTapAssignment.visitor && firstTapAssignment.user) {
+          await assignFirstTapNfcUidToVisitor({
+            visitor: firstTapAssignment.visitor,
+            user: firstTapAssignment.user,
+            normalizedCardId,
+          });
+          cardUser = firstTapAssignment.user;
+
+          await AccessLog.create({
+            userId: req.user._id,
+            userEmail: req.user.email,
+            userName: operatorName,
+            actorRole: operatorRole || "security",
+            location: tapLocation.office,
+            accessType: "system",
+            activityType: "first_nfc_tap_assigned",
+            status: "granted",
+            nfcCardId: normalizedCardId,
+            relatedVisitor: firstTapAssignment.visitor._id,
+            relatedUser: cardUser._id,
+            metadata: { deviceId, tapLocation, source: "station_first_tap_auto_assign" },
+            notes: `Assigned NFC UID ${normalizedCardId} to ${firstTapAssignment.visitor.fullName} from checkpoint station tap.`,
+          });
+        }
+      }
 
       if (!cardUser) {
         await AccessLog.create({
@@ -3493,7 +3558,10 @@ app.post(
 
         return res.status(404).json({
           success: false,
-          message: "NFC card is not assigned to any user",
+          message:
+            firstTapAssignment?.reason === "ambiguous"
+              ? "More than one approved visitor is waiting for NFC assignment. Assign the card from Security first."
+              : "NFC card is not assigned to any user",
         });
       }
 
@@ -4797,6 +4865,96 @@ const activateVisitorSafePassCardForUser = async (user, visitor = {}) => {
 
   await user.save();
   return safePassId;
+};
+
+const isEmptyPhysicalNfcUid = (value = "") => !normalizeSubmittedNfcCardId(value);
+
+const findApprovedVisitorForFirstNfcTap = async (normalizedCardId = "") => {
+  if (!normalizedCardId) {
+    return { visitor: null, user: null, reason: "missing_uid" };
+  }
+
+  const duplicateUser = await User.findOne(buildNfcCredentialQuery(normalizedCardId, normalizedCardId)).select(
+    "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions",
+  );
+  if (duplicateUser) {
+    return { visitor: null, user: duplicateUser, reason: "already_assigned" };
+  }
+
+  const inactiveStatuses = ["checked_out", "expired", "no_show", "rejected", "cancelled"];
+  const dayStart = getStartOfDay(new Date());
+  const dayEnd = getEndOfDay(new Date());
+  const approvedVisitors = await Visitor.find({
+    requestCategory: "appointment",
+    appointmentStatus: { $in: ["approved", "adjusted"] },
+    approvalStatus: "approved",
+    status: { $nin: inactiveStatuses },
+    checkedOutAt: null,
+    $or: [
+      { physicalNfcUid: { $exists: false } },
+      { physicalNfcUid: null },
+      { physicalNfcUid: "" },
+    ],
+  }).sort({ visitDate: 1, visitTime: 1, registeredAt: -1 });
+
+  const candidatesWithUsers = [];
+  for (const visitor of approvedVisitors) {
+    const visitorUser = await User.findOne({
+      role: "visitor",
+      $or: [
+        ...(visitor.email ? [{ email: String(visitor.email).trim().toLowerCase() }] : []),
+        { visitorId: visitor._id },
+      ],
+    }).select("_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions");
+
+    if (!visitorUser || !isEmptyPhysicalNfcUid(visitorUser.physicalNfcUid)) {
+      continue;
+    }
+
+    candidatesWithUsers.push({ visitor, user: visitorUser });
+  }
+
+  const todayCandidates = candidatesWithUsers.filter(({ visitor }) => {
+    const visitDate = new Date(visitor.visitDate);
+    return !Number.isNaN(visitDate.getTime()) && visitDate >= dayStart && visitDate <= dayEnd;
+  });
+
+  const finalCandidates = todayCandidates.length ? todayCandidates : candidatesWithUsers;
+  if (finalCandidates.length !== 1) {
+    return {
+      visitor: null,
+      user: null,
+      reason: finalCandidates.length > 1 ? "ambiguous" : "none",
+      candidateCount: finalCandidates.length,
+    };
+  }
+
+  return { ...finalCandidates[0], reason: "matched" };
+};
+
+const assignFirstTapNfcUidToVisitor = async ({ visitor, user, normalizedCardId }) => {
+  if (!visitor || !user || !normalizedCardId) return null;
+
+  user.physicalNfcUid = normalizedCardId;
+  if (!String(user.nfcCardId || "").trim() || !isLegacySafePassToken(user.nfcCardId)) {
+    user.nfcCardId = normalizedCardId;
+  }
+  user.status = "active";
+  user.isActive = true;
+  user.visitorId = visitor._id;
+  user.accessPermissions = {
+    canAccess: getVisitorCardAccessAreas(visitor),
+    restrictedAreas: user.accessPermissions?.restrictedAreas || [],
+    timeRestrictions: getVisitorCardTimeRestrictions(visitor),
+    cardActive: true,
+  };
+
+  visitor.physicalNfcUid = normalizedCardId;
+  visitor.nfcCardId = normalizedCardId;
+  visitor.safePassId = visitor.safePassId || getUserSafePassId(user) || "";
+
+  await Promise.all([user.save(), visitor.save()]);
+  return { visitor, user };
 };
 
 const findVisitorForUser = async (user) => {

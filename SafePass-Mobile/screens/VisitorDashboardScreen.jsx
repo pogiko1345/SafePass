@@ -2147,6 +2147,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         
         // Play success sound/feedback
         if (Platform.OS !== 'web') {
+          Vibration.vibrate(90);
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
         
@@ -2186,6 +2187,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         setNfcStatus({ type: 'error', message: response.message || 'Access denied' });
         
         if (Platform.OS !== 'web') {
+          Vibration.vibrate([0, 80, 70, 140]);
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
         
@@ -2198,6 +2200,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     } catch (error) {
       console.error("NFC tap processing error:", error);
       setNfcStatus({ type: 'error', message: 'Failed to process tap. Please try again.' });
+      if (Platform.OS !== "web") {
+        Vibration.vibrate([0, 80, 70, 140]);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      }
       
       showVisitorAlert(
         "Error",
