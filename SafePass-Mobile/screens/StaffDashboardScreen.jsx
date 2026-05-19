@@ -1626,6 +1626,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       office: appointment?.appointmentDepartment || appointment?.assignedOffice || "Assigned department",
       staff: appointment?.assignedStaffName || profileName,
       status: getStatusMeta(getAppointmentStatus(appointment)).label,
+      submitted: formatDateTime(appointment?.createdAt || appointment?.registeredAt || appointment?.updatedAt),
     }));
 
   const handlePrintAppointmentTable = async ({
@@ -1633,6 +1634,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     subtitle,
     records,
     emptyMessage,
+    totalLabel = "appointments",
   }) => {
     const rows = buildAppointmentPrintRows(records);
     if (rows.length === 0) {
@@ -1658,9 +1660,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           { key: "office", label: "Office" },
           { key: "staff", label: "Staff" },
           { key: "status", label: "Status" },
+          { key: "submitted", label: "Submitted" },
         ],
         rows,
-        totalLabel: "appointments",
+        totalLabel,
         dialogTitle: title,
         printedBy,
         generatedAt: new Date(),
@@ -1671,11 +1674,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     }
   };
 
-  const renderTablePrintButton = ({ label = "Print Table", records, title, subtitle, emptyMessage }) => (
+  const renderTablePrintButton = ({ label = "Print Table", records, title, subtitle, emptyMessage, totalLabel }) => (
     <TouchableOpacity
-      style={[styles.sectionActionButton, (!records || records.length === 0) && styles.disabledAction]}
-      onPress={() => handlePrintAppointmentTable({ title, subtitle, records, emptyMessage })}
-      disabled={!records || records.length === 0}
+      style={styles.sectionActionButton}
+      onPress={() => handlePrintAppointmentTable({ title, subtitle, records, emptyMessage, totalLabel })}
     >
       <Ionicons name="print-outline" size={16} color="#0A3D91" />
       <Text style={styles.sectionActionButtonText}>{label}</Text>
@@ -2551,6 +2553,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             title: "Pending Appointment Requests",
             subtitle: "Generated from the staff dashboard pending appointment request table.",
             emptyMessage: "There are no pending appointment requests to print.",
+            totalLabel: "requests",
           })}
           <TouchableOpacity style={styles.sectionActionIconButton} onPress={loadData}>
             <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
@@ -2635,6 +2638,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
               title: "Appointment Records",
               subtitle: "Generated from the staff dashboard appointment records table.",
               emptyMessage: "There are no appointment records to print.",
+              totalLabel: "appointments",
             })}
             <TouchableOpacity style={styles.sectionActionIconButton} onPress={loadData}>
               <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
