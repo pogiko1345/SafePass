@@ -13628,11 +13628,9 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
       updates.status = updates.isActive ? "active" : "inactive";
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { ...updates, updatedAt: new Date() },
-      { new: true, runValidators: true },
-    ).select("-password");
+    existingUser.set({ ...updates, updatedAt: new Date() });
+    await existingUser.save();
+    const user = await User.findById(existingUser._id).select("-password");
 
     const visitorSync = await syncVisitorRecordsForUserUpdate(existingUser, user);
 

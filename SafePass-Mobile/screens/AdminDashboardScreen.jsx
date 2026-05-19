@@ -4787,6 +4787,9 @@ const loadDashboardData = useCallback(async () => {
       const message = String(error?.message || "");
       if (message.toLowerCase().includes("username already")) {
         Alert.alert("Username Already Used", "This username is already registered. Please use another username.");
+      } else if (message.toLowerCase().includes("email already") || message.toLowerCase().includes("email is already")) {
+        setEditUserErrors((currentValue) => ({ ...currentValue, email: "This email address is already registered." }));
+        Alert.alert("Email Already Used", "This email is already registered. Please use another email address.");
       } else if (message.toLowerCase().includes("staff id already")) {
         Alert.alert("Staff ID Already Used", "This staff ID is already registered. Please use another staff ID.");
       } else if (message.toLowerCase().includes("nfc card") || message.toLowerCase().includes("card uid")) {
