@@ -2499,20 +2499,21 @@ const createWrongOfficeScanNotifications = async ({
   visitorUser,
   tapLocation,
   deviceId,
+  movementLog = null,
   action = "scan",
 }) => {
   const assignedOffice = getAssignedAppointmentOffice(visitor) || "Assigned office";
   const scannedOffice = tapLocation?.office || "Unknown checkpoint";
   const scannedAt = new Date();
   const message =
-    `${visitor.fullName} scanned at ${scannedOffice}, but their assigned office is ${assignedOffice}.`;
+    `${visitor.fullName} entered ${scannedOffice}, but their assigned office is ${assignedOffice}.`;
 
   await Promise.all([
     createRoleNotification({
-      title: "Wrong Office Scan",
-      message: `This is not your assigned office/room. Assigned office: ${assignedOffice}. Scanned office: ${scannedOffice}.`,
+      title: "Wrong Room Warning",
+      message: `You entered ${scannedOffice}, but you are assigned to ${assignedOffice}. Please leave this room and proceed to your assigned office or ask staff for help.`,
       type: "warning",
-      severity: "medium",
+      severity: "high",
       targetRole: "visitor",
       targetUser: visitorUser?._id || null,
       relatedVisitor: visitor._id,
@@ -2524,13 +2525,14 @@ const createWrongOfficeScanNotifications = async ({
         scannedAt,
         deviceId,
         action,
+        movementLogId: movementLog?._id || null,
       },
     }),
     createRoleNotification({
-      title: "Wrong Office Scan",
-      message,
-      type: "warning",
-      severity: "medium",
+      title: "Unauthorized Room Entry",
+      message: `${message} Please verify and assist the visitor.`,
+      type: "alert",
+      severity: "high",
       targetRole: "security",
       relatedVisitor: visitor._id,
       relatedUser: visitorUser?._id || null,
@@ -2542,6 +2544,7 @@ const createWrongOfficeScanNotifications = async ({
         scannedAt,
         deviceId,
         action,
+        movementLogId: movementLog?._id || null,
       },
     }),
   ]);
@@ -3255,6 +3258,29 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     if (wrongOfficeScan) {
       const assignedOffice = getAssignedAppointmentOffice(visitor) || "Assigned office";
       const scannedOffice = tapLocation.office || "Unknown checkpoint";
+      const movementLog = await createVisitorMovementLog({
+        visitor,
+        visitorUser: cardUser,
+        nfcCardId: normalizedCardId,
+        tapLocation,
+        expectedDestination: assignedOffice,
+        status: "wrong_location",
+        message: `${visitor.fullName} entered ${scannedOffice}, but their assigned destination is ${assignedOffice}.`,
+        metadata: {
+          deviceId,
+          source: "device_location_tap",
+          visitorStatus: visitor.status,
+          approvalStatus: visitor.approvalStatus,
+          appointmentStatus: visitor.appointmentStatus,
+        },
+      });
+
+      visitor.updateCurrentLocation(tapLocation, {
+        deviceId,
+        action: "wrong_location",
+        statusLabel: `Unauthorized room entry at ${scannedOffice}`,
+      });
+      await visitor.save();
 
       await AccessLog.create({
         userId: cardUser._id,
@@ -3273,11 +3299,13 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
           tapLocation,
           assignedOffice,
           scannedOffice,
+          movementLogId: movementLog._id,
           visitorStatus: visitor.status,
           approvalStatus: visitor.approvalStatus,
           appointmentStatus: visitor.appointmentStatus,
+          currentLocation: visitor.currentLocation,
         },
-        notes: `${visitor.fullName} scanned at ${scannedOffice}, but their assigned office is ${assignedOffice}.`,
+        notes: `${visitor.fullName} entered ${scannedOffice}, but their assigned office is ${assignedOffice}.`,
       });
 
       await createWrongOfficeScanNotifications({
@@ -3285,15 +3313,18 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
         visitorUser: cardUser,
         tapLocation,
         deviceId,
+        movementLog,
         action: shouldCheckIn ? "check_in" : "location_update",
       });
 
       return res.status(403).json({
         success: false,
         code: "WRONG_OFFICE_SCAN",
-        message: "This is not your assigned office/room.",
+        message: `You entered ${scannedOffice}, but you are assigned to ${assignedOffice}. Please leave this room and proceed to your assigned office or ask staff for help.`,
         assignedOffice,
         scannedOffice,
+        currentLocation: visitor.currentLocation,
+        movementLog,
       });
     }
 
@@ -4679,6 +4710,63 @@ const createAppointmentTimezoneDate = ({ year, month, day, hour = 0, minute = 0 
     APPOINTMENT_TIMEZONE_OFFSET_MINUTES * 60 * 1000;
   const date = new Date(utcTimestamp);
   return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getAppointmentDuplicateDayKey = (value) => {
+  const parts = getAppointmentDateParts(value);
+  if (!parts) return "";
+  return `${parts.year}-${String(parts.month + 1).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+};
+
+const normalizeAppointmentDuplicateText = (value = "") =>
+  String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const getApprovedAppointmentDuplicateKey = (visitor = {}) => {
+  const email = normalizeAppointmentDuplicateText(visitor.email);
+  const purpose = normalizeAppointmentDuplicateText(
+    visitor.purposeOfVisit || visitor.customPurposeOfVisit || visitor.purposeCategory,
+  );
+  const day = getAppointmentDuplicateDayKey(visitor.visitDate);
+  if (!email || !purpose || !day) return "";
+  return `${email}|${purpose}|${day}`;
+};
+
+const closeDuplicateApprovedAppointments = async (approvedVisitor) => {
+  const duplicateKey = getApprovedAppointmentDuplicateKey(approvedVisitor);
+  if (!duplicateKey) return 0;
+
+  const normalizedEmail = String(approvedVisitor.email || "").trim().toLowerCase();
+  const candidates = await Visitor.find({
+    _id: { $ne: approvedVisitor._id },
+    email: normalizedEmail,
+    requestCategory: "appointment",
+    approvalStatus: "approved",
+    appointmentStatus: { $in: ["approved", "adjusted"] },
+    status: { $nin: ["checked_in", "checked_out", "cancelled", "rejected", "expired", "no_show"] },
+  });
+
+  const duplicates = candidates.filter(
+    (candidate) => getApprovedAppointmentDuplicateKey(candidate) === duplicateKey,
+  );
+  const closedAt = new Date();
+
+  await Promise.all(
+    duplicates.map(async (duplicate) => {
+      duplicate.appointmentStatus = "cancelled";
+      duplicate.status = "cancelled";
+      duplicate.appointmentCancelledAt = closedAt;
+      duplicate.appointmentCancellationReason =
+        "Duplicate approved appointment automatically closed. Latest approved request kept.";
+      duplicate.currentLocation = {
+        ...(duplicate.currentLocation || {}),
+        isActive: false,
+        lastSeenAt: duplicate.currentLocation?.lastSeenAt || closedAt,
+      };
+      await duplicate.save();
+    }),
+  );
+
+  return duplicates.length;
 };
 
 const getNextSchoolOfficeOpenAt = (value = new Date()) => {
@@ -11715,6 +11803,7 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
 
     visitor.approveAppointment(req.user, req.body?.note || "");
     await visitor.save();
+    const duplicateAppointmentsClosed = await closeDuplicateApprovedAppointments(visitor);
 
     let visitorUser = await User.findOne({ email: visitor.email });
     const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
@@ -11781,13 +11870,18 @@ app.put("/api/staff/appointments/:id/approve", authMiddleware, async (req, res) 
         visitDate: visitor.visitDate,
         visitTime: visitor.visitTime,
         purposeOfVisit: visitor.purposeOfVisit,
+        duplicateAppointmentsClosed,
       },
     });
 
     res.json({
       success: true,
-      message: "Appointment approved successfully",
+      message:
+        duplicateAppointmentsClosed > 0
+          ? "Appointment approved successfully. Duplicate approved appointment was closed."
+          : "Appointment approved successfully",
       visitor: updatedVisitorPayload,
+      duplicateAppointmentsClosed,
     });
   } catch (error) {
     console.error("Staff approve appointment error:", error);

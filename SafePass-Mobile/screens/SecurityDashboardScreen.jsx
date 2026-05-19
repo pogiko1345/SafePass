@@ -761,6 +761,51 @@ export default function SecurityDashboardScreen({ navigation }) {
     return Math.max(0, COMPLETED_VISITOR_HISTORY_DAYS - elapsedDays);
   };
 
+  const getVisitorDuplicateDayKey = (value) => {
+    const date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 10);
+  };
+
+  const normalizeDuplicateText = (value = "") =>
+    String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+  const getApprovedDuplicateKey = (visitor = {}) => {
+    const email = normalizeDuplicateText(visitor.email);
+    const purpose = normalizeDuplicateText(
+      visitor.purposeOfVisit || visitor.customPurposeOfVisit || visitor.purposeCategory,
+    );
+    const day = getVisitorDuplicateDayKey(visitor.visitDate);
+    if (!email || !purpose || !day) return "";
+    return `${email}|${purpose}|${day}`;
+  };
+
+  const dedupeApprovedVisitors = (items = []) => {
+    const visitorMap = new Map();
+    const passthrough = [];
+
+    items.forEach((visitor) => {
+      const key = getApprovedDuplicateKey(visitor);
+      if (!key) {
+        passthrough.push(visitor);
+        return;
+      }
+
+      const existing = visitorMap.get(key);
+      const visitorTime = new Date(
+        visitor.updatedAt || visitor.staffActionAt || visitor.approvedAt || visitor.registeredAt || 0,
+      ).getTime();
+      const existingTime = new Date(
+        existing?.updatedAt || existing?.staffActionAt || existing?.approvedAt || existing?.registeredAt || 0,
+      ).getTime();
+      if (!existing || visitorTime > existingTime) {
+        visitorMap.set(key, visitor);
+      }
+    });
+
+    return [...passthrough, ...visitorMap.values()];
+  };
+
   const deriveVisitorCollections = (all = []) => {
     const active = all.filter((visitor) => visitor.status === 'checked_in');
     const pending = all.filter(
@@ -768,19 +813,19 @@ export default function SecurityDashboardScreen({ navigation }) {
         visitor.appointmentStatus === 'pending' ||
         (!visitor.appointmentStatus && visitor.approvalStatus === 'pending'),
     );
-    const approved = all.filter(
+    const approved = dedupeApprovedVisitors(all.filter(
       (visitor) =>
         isCheckInAllowedNow(visitor) &&
         visitor.status !== 'checked_in' &&
         visitor.status !== 'checked_out',
-    );
-    const notReady = all.filter(
+    ));
+    const notReady = dedupeApprovedVisitors(all.filter(
       (visitor) =>
         hasApprovedVisitWindow(visitor) &&
         !isCheckInAllowedNow(visitor) &&
         visitor.status !== 'checked_in' &&
         visitor.status !== 'checked_out',
-    );
+    ));
     const completed = all.filter(
       (visitor) =>
         visitor.status === 'checked_out' &&
