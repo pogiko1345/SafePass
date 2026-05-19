@@ -684,6 +684,8 @@ export default StyleSheet.create({
     alignItems: "stretch",
     gap: 12,
     marginBottom: 18,
+    position: "relative",
+    zIndex: 30,
   },
 
   recordToolbarCard: {
@@ -694,6 +696,8 @@ export default StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#FFFFFF",
     padding: 14,
+    position: "relative",
+    zIndex: 30,
   },
 
   recordToolbarHeader: {
@@ -752,7 +756,7 @@ export default StyleSheet.create({
     flexBasis: width < 760 ? "100%" : 180,
     minWidth: width < 760 ? "100%" : 160,
     position: "relative",
-    zIndex: 2,
+    zIndex: 60,
   },
 
   recordToolbarLabel: {
@@ -795,10 +799,11 @@ export default StyleSheet.create({
 
   recordToolbarDropdownMenu: {
     position: Platform.OS === "web" ? "absolute" : "relative",
-    top: Platform.OS === "web" ? 68 : undefined,
+    bottom: Platform.OS === "web" ? 48 : undefined,
     left: 0,
     right: 0,
-    zIndex: 50,
+    zIndex: 100,
+    elevation: 24,
     maxHeight: 210,
     borderWidth: 1,
     borderColor: "#D8E8FF",

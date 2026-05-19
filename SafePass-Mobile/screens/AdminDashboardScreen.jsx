@@ -4543,17 +4543,17 @@ const loadDashboardData = useCallback(async () => {
   const openUserDataViewPanel = (userItem) => {
     setSelectedUser(userItem);
     setEditUserErrors({});
-    setShowViewUserModal(false);
+    setUserDataPanelMode(null);
+    setShowViewUserModal(true);
     setShowEditUserModal(false);
-    setUserDataPanelMode("view");
   };
 
   const openUserDataEditPanel = (userItem) => {
     setSelectedUser(userItem);
     populateEditUserData(userItem);
+    setUserDataPanelMode(null);
     setShowViewUserModal(false);
-    setShowEditUserModal(false);
-    setUserDataPanelMode("edit");
+    setShowEditUserModal(true);
   };
 
   const handleEditUser = (userItem) => {
@@ -8331,8 +8331,6 @@ const loadDashboardData = useCallback(async () => {
               </View>
             </View>
           </View>
-
-          {renderUserDataPanel()}
 
           {false ? (
           <View
@@ -13362,12 +13360,23 @@ const loadDashboardData = useCallback(async () => {
                   </View>
                   <View style={[styles.userEditorHalfField, styles.inputGroup]}>
                     <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Email</Text>
-                    <View style={[styles.userEditorReadonlyCard, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
-                      <Ionicons name="mail-outline" size={16} color="#64748B" />
-                      <Text style={[styles.userEditorReadonlyText, isDarkMode && styles.darkText]}>
-                        {editUserData.email || "No email available"}
-                      </Text>
-                    </View>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        editUserErrors.email && styles.inputErrorState,
+                        isDarkMode && { backgroundColor: "#334155", borderColor: "#475569", color: "#F1F5F9" },
+                      ]}
+                      value={editUserData.email}
+                      onChangeText={(text) => {
+                        setEditUserData({ ...editUserData, email: text });
+                        setEditUserErrors((currentValue) => ({ ...currentValue, email: null }));
+                      }}
+                      placeholder="user@example.com"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                    />
+                    {renderEditUserFieldError("email")}
                   </View>
                 </View>
                 <View style={styles.userEditorGrid}>
