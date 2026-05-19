@@ -1843,6 +1843,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           undefined,
         email: selectedVisitorForNfc.email,
         cardId: normalizedCardId,
+        force: true,
       });
       const assignedCardId = response?.card?.cardNumber || normalizedCardId;
       setVisitorNfcUid("");
