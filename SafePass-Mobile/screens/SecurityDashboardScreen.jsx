@@ -892,8 +892,37 @@ export default function SecurityDashboardScreen({ navigation }) {
     };
   };
 
-  const getVisitorTrackingIdentity = (visitor = {}) =>
-    String(visitor?.nfcCardId || visitor?.safePassId || visitor?.email || visitor?._id || "").toLowerCase();
+  const getVisitorTrackingIdentity = (visitor = {}) => {
+    const relatedUserId =
+      visitor?.relatedUser?._id ||
+      visitor?.sourceVisitor?.relatedUser?._id ||
+      visitor?.relatedUser ||
+      visitor?.sourceVisitor?.relatedUser ||
+      visitor?.userId ||
+      visitor?.sourceVisitor?.userId ||
+      visitor?.accountId ||
+      visitor?.sourceVisitor?.accountId ||
+      "";
+    const candidates = [
+      relatedUserId,
+      visitor?.safePassId,
+      visitor?.sourceVisitor?.safePassId,
+      visitor?.physicalNfcUid,
+      visitor?.sourceVisitor?.physicalNfcUid,
+      visitor?.phoneNfcUid,
+      visitor?.sourceVisitor?.phoneNfcUid,
+      visitor?.virtualNfcToken,
+      visitor?.sourceVisitor?.virtualNfcToken,
+      visitor?.nfcCardId,
+      visitor?.sourceVisitor?.nfcCardId,
+      visitor?.email,
+      visitor?.sourceVisitor?.email,
+      visitor?._id,
+      visitor?.visitorId,
+    ];
+
+    return String(candidates.find(Boolean) || "").trim().toLowerCase();
+  };
 
   const getVisitorTrackingTimestamp = (visitor = {}) =>
     new Date(
@@ -1081,8 +1110,8 @@ export default function SecurityDashboardScreen({ navigation }) {
         };
       });
 
-  const normalizeLiveVisitorLocations = (liveVisitors = []) =>
-    liveVisitors.map((visitor, index) => {
+  const normalizeLiveVisitorLocations = (liveVisitors = []) => {
+    const normalizedVisitors = liveVisitors.map((visitor, index) => {
       const matchedVisitor =
         visitors.all.find(
           (existingVisitor) => String(existingVisitor?._id) === String(visitor?.visitorId),
@@ -1160,6 +1189,20 @@ export default function SecurityDashboardScreen({ navigation }) {
         wrongLocationAlerts: visitor.wrongLocationAlerts || [],
       };
     });
+    const visitorMap = new Map();
+
+    normalizedVisitors.forEach((visitor) => {
+      const identity = getVisitorTrackingIdentity(visitor);
+      if (!identity) return;
+
+      const existingVisitor = visitorMap.get(identity);
+      if (!existingVisitor || getVisitorTrackingTimestamp(visitor) > getVisitorTrackingTimestamp(existingVisitor)) {
+        visitorMap.set(identity, visitor);
+      }
+    });
+
+    return Array.from(visitorMap.values());
+  };
 
   const deriveAccessLogs = (all = []) =>
     all

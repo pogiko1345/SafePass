@@ -5411,6 +5411,37 @@ const buildLiveVisitorLocationPayload = (visitor = {}) => {
   };
 };
 
+const getLiveVisitorIdentity = (visitor = {}) => {
+  const relatedUserId =
+    visitor.relatedUser?._id ||
+    visitor.relatedUser ||
+    visitor.userId ||
+    visitor.accountId ||
+    "";
+  const candidates = [
+    relatedUserId,
+    visitor.safePassId,
+    visitor.physicalNfcUid,
+    visitor.phoneNfcUid,
+    visitor.virtualNfcToken,
+    visitor.nfcCardId,
+    visitor.email,
+    visitor._id,
+  ];
+
+  return String(candidates.find(Boolean) || "").trim().toLowerCase();
+};
+
+const getLiveVisitorTimestamp = (visitor = {}) =>
+  new Date(
+    visitor.currentLocation?.lastSeenAt ||
+      visitor.checkedInAt ||
+      visitor.updatedAt ||
+      visitor.registeredAt ||
+      visitor.createdAt ||
+      0,
+  ).getTime() || 0;
+
 const buildLivePresencePayload = (attendanceRecord = {}) => {
   const history = Array.isArray(attendanceRecord.checkpointHistory)
     ? attendanceRecord.checkpointHistory
@@ -5460,12 +5491,15 @@ const getActiveLiveVisitors = async (limit = 200) => {
   const latestByVisitor = new Map();
 
   activeVisitors.forEach((visitor) => {
-    const identity = String(visitor?._id || "");
-    if (!identity || latestByVisitor.has(identity)) {
+    const identity = getLiveVisitorIdentity(visitor);
+    if (!identity) {
       return;
     }
 
-    latestByVisitor.set(identity, visitor);
+    const existingVisitor = latestByVisitor.get(identity);
+    if (!existingVisitor || getLiveVisitorTimestamp(visitor) > getLiveVisitorTimestamp(existingVisitor)) {
+      latestByVisitor.set(identity, visitor);
+    }
   });
 
   return Array.from(latestByVisitor.values());
