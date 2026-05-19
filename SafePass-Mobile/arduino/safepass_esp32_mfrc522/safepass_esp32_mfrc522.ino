@@ -1,142 +1,139 @@
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
-#include <SPI.h>
-#include <MFRC522.h>
+#include <WiFiClientSecure.h>
+#include <Wire.h>
+#include <Adafruit_PN532.h>
 
-// Install the "MFRC522" library from the Arduino Library Manager.
-// Wiring for many ESP32 dev boards:
-// SDA/SS -> GPIO 5, SCK -> GPIO 18, MOSI -> GPIO 23, MISO -> GPIO 19, RST -> GPIO 22.
+#define SDA_PIN 21
+#define SCL_PIN 22
 
-#define SS_PIN 5
-#define RST_PIN 22
+Adafruit_PN532 nfc(SDA_PIN, SCL_PIN);
 
-const char* wifiSsid = "Sean's iPhone";
-const char* wifiPassword = "24446666688888889";
+const char* WIFI_NAME = "PLDTHOMEFIBRUh5BN_2.4G";
+const char* WIFI_PASS = "Pacer115_";
 
-const char* apiUrl = "https://safepass-052h.onrender.com/api/device/location-tap";
-const char* deviceKey = "71eb2b8fbdfa47b2b2334fde89cc99b583a39709997d4434859ad645dbce89e4";
+const char* API_URL = "https://safepass-052h.onrender.com/api/device/location-tap";
+const char* DEVICE_KEY = "71eb2b8fbdfa47b2b2334fde89cc99b583a39709997d4434859ad645dbce89e4";
 
-// Reader identity. The backend maps these IDs to the exact Floor3 map position.
-// For the entrance/lobby reader, keep this as reader_1/main_gate.
-// For room readers, change readerId/checkpointId to values like registrar,
-// accounting, conference_room, it_room, faculty_room, etc.
-const char* deviceId = "arduino-reader-01";
-const char* readerId = "reader_1";
-const char* gateId = "gate_1";
-const char* checkpointId = "main_gate";
-const char* locationName = "Entrance / Lobby";
+const char* READER_ID = "pn532_reader";
+const char* ACTION = "auto";
 
-MFRC522 rfid(SS_PIN, RST_PIN);
-
+unsigned long lastTapTime = 0;
 String lastUid = "";
-unsigned long lastTapAt = 0;
-unsigned long lastWifiRetryAt = 0;
-const unsigned long duplicateCooldownMs = 3000;
-const unsigned long wifiConnectTimeoutMs = 20000;
-const unsigned long wifiRetryIntervalMs = 5000;
+const unsigned long TAP_COOLDOWN_MS = 3000;
 
-String wifiStatusLabel(wl_status_t status) {
-  switch (status) {
-    case WL_IDLE_STATUS: return "IDLE";
-    case WL_NO_SSID_AVAIL: return "SSID NOT FOUND";
-    case WL_SCAN_COMPLETED: return "SCAN COMPLETED";
-    case WL_CONNECTED: return "CONNECTED";
-    case WL_CONNECT_FAILED: return "CONNECT FAILED";
-    case WL_CONNECTION_LOST: return "CONNECTION LOST";
-    case WL_DISCONNECTED: return "DISCONNECTED";
-    default: return "UNKNOWN";
-  }
-}
-
-void printNearbyNetworks() {
-  Serial.println("Scanning nearby Wi-Fi networks...");
-  int networkCount = WiFi.scanNetworks();
-  if (networkCount <= 0) {
-    Serial.println("No Wi-Fi networks found. Check antenna, board, and router distance.");
-    return;
-  }
-
-  for (int i = 0; i < networkCount; i++) {
-    Serial.print("  ");
-    Serial.print(i + 1);
-    Serial.print(". ");
-    Serial.print(WiFi.SSID(i));
-    Serial.print(" | RSSI ");
-    Serial.print(WiFi.RSSI(i));
-    Serial.print(" dBm | Channel ");
-    Serial.println(WiFi.channel(i));
-  }
-}
-
-bool connectToWifi() {
-  if (WiFi.status() == WL_CONNECTED) {
-    return true;
-  }
-
-  WiFi.mode(WIFI_STA);
-  WiFi.setSleep(false);
-  WiFi.disconnect(true);
-  delay(250);
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
 
   Serial.println();
-  Serial.print("Connecting to Wi-Fi SSID: ");
-  Serial.println(wifiSsid);
-  WiFi.begin(wifiSsid, wifiPassword);
+  Serial.println("SafePass ESP32 PN532 Reader Starting...");
 
-  unsigned long startedAt = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - startedAt < wifiConnectTimeoutMs) {
+  Wire.begin(SDA_PIN, SCL_PIN);
+
+  connectToWifi();
+  setupPN532();
+
+  Serial.println("Ready. Tap NFC card...");
+}
+
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected. Reconnecting...");
+    connectToWifi();
+  }
+
+  uint8_t uid[7];
+  uint8_t uidLength;
+
+  bool cardFound = nfc.readPassiveTargetID(
+    PN532_MIFARE_ISO14443A,
+    uid,
+    &uidLength,
+    1000
+  );
+
+  if (cardFound) {
+    String uidString = uidToString(uid, uidLength);
+
+    if (uidString == lastUid && millis() - lastTapTime < TAP_COOLDOWN_MS) {
+      return;
+    }
+
+    lastUid = uidString;
+    lastTapTime = millis();
+
+    Serial.println();
+    Serial.print("Card UID: ");
+    Serial.println(uidString);
+
+    sendTapToSafePass(uidString);
+  }
+}
+
+void connectToWifi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_NAME, WIFI_PASS);
+
+  Serial.print("Connecting to WiFi SSID: ");
+  Serial.println(WIFI_NAME);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 40) {
     delay(500);
     Serial.print(".");
+    attempts++;
   }
 
   Serial.println();
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.print("Wi-Fi failed. Status: ");
-    Serial.println(wifiStatusLabel(WiFi.status()));
-    Serial.println("Tip: ESP32 only connects to 2.4GHz Wi-Fi. Use the router SSID without 5G/5GHz.");
-    printNearbyNetworks();
-    return false;
-  }
 
-  Serial.print("Connected. IP: ");
-  Serial.println(WiFi.localIP());
-  return true;
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("WiFi connected");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("WiFi failed.");
+    Serial.println("Make sure this Wi-Fi is 2.4GHz. ESP32 cannot connect to 5GHz.");
+  }
 }
 
-String readUid() {
-  String uid = "";
+void setupPN532() {
+  nfc.begin();
 
-  for (byte i = 0; i < rfid.uid.size; i++) {
-    if (rfid.uid.uidByte[i] < 0x10) {
-      uid += "0";
+  uint32_t versiondata = nfc.getFirmwareVersion();
+
+  if (!versiondata) {
+    Serial.println("PN532 not found. Check wiring.");
+    while (1) {
+      delay(1000);
     }
-    uid += String(rfid.uid.uidByte[i], HEX);
   }
 
-  uid.toUpperCase();
-  return uid;
+  Serial.print("PN532 found. Firmware version: ");
+  Serial.print((versiondata >> 16) & 0xFF, DEC);
+  Serial.print(".");
+  Serial.println((versiondata >> 8) & 0xFF, DEC);
+
+  nfc.SAMConfig();
 }
 
-String buildJsonPayload(const String& uid) {
-  String payload = "{";
-  payload += "\"nfcCardId\":\"" + uid + "\",";
-  payload += "\"deviceId\":\"" + String(deviceId) + "\",";
-  payload += "\"readerId\":\"" + String(readerId) + "\",";
-  payload += "\"gateId\":\"" + String(gateId) + "\",";
-  payload += "\"checkpointId\":\"" + String(checkpointId) + "\",";
-  payload += "\"location\":\"" + String(locationName) + "\",";
-  payload += "\"deviceKey\":\"" + String(deviceKey) + "\",";
-  payload += "\"action\":\"auto\",";
-  payload += "\"tapAction\":\"auto\",";
-  payload += "\"source\":\"arduino_tap\"";
-  payload += "}";
-  return payload;
+String uidToString(uint8_t *uid, uint8_t uidLength) {
+  String uidString = "";
+
+  for (uint8_t i = 0; i < uidLength; i++) {
+    if (uid[i] < 0x10) {
+      uidString += "0";
+    }
+    uidString += String(uid[i], HEX);
+  }
+
+  uidString.toUpperCase();
+  return uidString;
 }
 
-void postTap(const String& uid) {
-  if (!connectToWifi()) {
-    Serial.println("Tap not sent because Wi-Fi is not connected.");
+void sendTapToSafePass(String uid) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Cannot send. WiFi not connected.");
     return;
   }
 
@@ -144,65 +141,34 @@ void postTap(const String& uid) {
   client.setInsecure();
 
   HTTPClient http;
-  http.begin(client, apiUrl);
+  http.begin(client, API_URL);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("x-device-key", deviceKey);
+  http.addHeader("x-device-key", DEVICE_KEY);
 
-  String payload = buildJsonPayload(uid);
-  int statusCode = http.POST(payload);
+  String body = "{";
+  body += "\"pn532Uid\":\"" + uid + "\",";
+  body += "\"readerId\":\"" + String(READER_ID) + "\",";
+  body += "\"deviceId\":\"esp32-pn532-01\",";
+  body += "\"action\":\"" + String(ACTION) + "\"";
+  body += "}";
+
+  Serial.println("Sending to SafePass...");
+  Serial.println(body);
+
+  int httpCode = http.POST(body);
   String response = http.getString();
 
-  Serial.print("UID: ");
-  Serial.println(uid);
-  Serial.print("Reader: ");
-  Serial.print(readerId);
-  Serial.print(" / Checkpoint: ");
-  Serial.println(checkpointId);
-  Serial.print("HTTP ");
-  Serial.println(statusCode);
+  Serial.print("HTTP Code: ");
+  Serial.println(httpCode);
+
+  Serial.println("Response:");
   Serial.println(response);
 
+  if (httpCode == 200) {
+    Serial.println("Tap sent successfully.");
+  } else {
+    Serial.println("Tap failed. Check UID assignment, device key, visitor approval, or backend logs.");
+  }
+
   http.end();
-}
-
-void setup() {
-  Serial.begin(115200);
-  delay(1200);
-  Serial.println();
-  Serial.println("Booting SafePass ESP32 RFID reader...");
-  SPI.begin();
-  rfid.PCD_Init();
-  byte readerVersion = rfid.PCD_ReadRegister(rfid.VersionReg);
-  Serial.print("MFRC522 firmware version: 0x");
-  Serial.println(readerVersion, HEX);
-  if (readerVersion == 0x00 || readerVersion == 0xFF) {
-    Serial.println("RFID reader not detected. Check SDA/SS, SCK, MOSI, MISO, RST, 3.3V, and GND wiring.");
-  }
-
-  connectToWifi();
-  Serial.println("SafePass RFID reader is ready.");
-}
-
-void loop() {
-  if (WiFi.status() != WL_CONNECTED && millis() - lastWifiRetryAt > wifiRetryIntervalMs) {
-    lastWifiRetryAt = millis();
-    connectToWifi();
-  }
-
-  if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
-    delay(50);
-    return;
-  }
-
-  String uid = readUid();
-  unsigned long now = millis();
-
-  if (uid != lastUid || now - lastTapAt > duplicateCooldownMs) {
-    lastUid = uid;
-    lastTapAt = now;
-    postTap(uid);
-  }
-
-  rfid.PICC_HaltA();
-  rfid.PCD_StopCrypto1();
 }

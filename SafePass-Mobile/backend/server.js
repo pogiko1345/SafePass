@@ -1839,6 +1839,26 @@ const CHECKPOINT_LOCATIONS = {
     office: "Entrance / Lobby",
     coordinates: { x: 6.8, y: 40 },
   },
+  pn532: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  pn532_reader: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  pn532_reader_1: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
+  pn532_gate: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
   lobby: {
     floor: "ground",
     office: "Lobby",
@@ -2890,13 +2910,17 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       req.body?.nfcCardId ||
         req.body?.cardId ||
         req.body?.uid ||
+        req.body?.pn532Uid ||
+        req.body?.pn532UID ||
+        req.body?.cardUID ||
+        req.body?.cardUid ||
         req.body?.tagId ||
         "",
     )
       .trim()
       .toUpperCase();
     const normalizedCardId = normalizeNfcCardId(cardId);
-    const deviceId = String(req.body?.deviceId || "arduino-reader").trim();
+    const deviceId = String(req.body?.deviceId || req.body?.readerId || "pn532-reader").trim();
     const tapLocation = getTapLocationFromRequest(req.body || {});
     const tapAction = String(req.body?.action || req.body?.tapAction || "auto")
       .trim()
@@ -3412,13 +3436,17 @@ app.post(
         req.body?.nfcCardId ||
           req.body?.cardId ||
           req.body?.uid ||
+          req.body?.pn532Uid ||
+          req.body?.pn532UID ||
+          req.body?.cardUID ||
+          req.body?.cardUid ||
           req.body?.tagId ||
           "",
       )
         .trim()
         .toUpperCase();
       const normalizedCardId = normalizeNfcCardId(cardId);
-      const deviceId = String(req.body?.deviceId || "mobile-checkpoint-station").trim();
+      const deviceId = String(req.body?.deviceId || req.body?.readerId || "pn532-reader").trim();
       const tapLocation = getTapLocationFromRequest(req.body || {});
       const tapAction = String(req.body?.action || req.body?.tapAction || "auto")
         .trim()
@@ -3968,6 +3996,10 @@ app.post("/api/nfc/office-tap", officeTapAccessMiddleware, async (req, res) => {
       req.body?.nfcCardId ||
         req.body?.cardId ||
         req.body?.uid ||
+        req.body?.pn532Uid ||
+        req.body?.pn532UID ||
+        req.body?.cardUID ||
+        req.body?.cardUid ||
         req.body?.tagId ||
         "",
     )

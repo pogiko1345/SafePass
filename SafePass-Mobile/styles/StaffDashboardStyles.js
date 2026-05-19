@@ -545,6 +545,16 @@ export default StyleSheet.create({
     gap: 10,
   },
 
+  activeVisitPageGrid: {
+    flexDirection: width > 900 ? "row" : "column",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  activeVisitPageItem: {
+    width: width > 900 ? "48%" : "100%",
+  },
+
   activeVisitItem: {
     borderRadius: 14,
     borderWidth: 1,
