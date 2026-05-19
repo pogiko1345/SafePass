@@ -46,7 +46,12 @@ const STATION_FEED_PAGE_SIZE = 6;
 const MAX_STATION_EVENTS = 100;
 
 const triggerTapFeedback = async (type = "success") => {
-  if (Platform.OS === "web") return;
+  if (Platform.OS === "web") {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate(type === "error" ? [80, 70, 140] : 90);
+    }
+    return;
+  }
 
   if (type === "error") {
     Vibration.vibrate([0, 80, 70, 140]);
@@ -232,11 +237,71 @@ const getPersonDetails = (response = {}) => {
   };
 };
 
+const PN532_ACTIVITY_TYPES = new Set([
+  "arduino_location_tap",
+  "nfc_card_checkin",
+  "nfc_card_checkout",
+  "first_nfc_tap_assigned",
+  "early_office_scan",
+  "wrong_office_scan",
+]);
+
+const isPn532AccessLog = (log = {}) => {
+  const metadata = log.metadata || {};
+  const deviceId = String(metadata.deviceId || "").toLowerCase();
+  const checkpointId = String(metadata.tapLocation?.checkpointId || "").toLowerCase();
+  const activityType = String(log.activityType || "").toLowerCase();
+  return (
+    PN532_ACTIVITY_TYPES.has(activityType) ||
+    deviceId.includes("pn532") ||
+    checkpointId.includes("pn532")
+  );
+};
+
+const buildPn532EventFromLog = (log = {}) => {
+  const metadata = log.metadata || {};
+  const tapLocation = metadata.tapLocation || {};
+  const success = String(log.status || "").toLowerCase() === "granted";
+  const action = metadata.action || log.activityType || "pn532_tap";
+  const nfcCardId = log.nfcCardId || metadata.targetCardId || "";
+  const checkpoint =
+    tapLocation.office ||
+    log.location ||
+    tapLocation.checkpointId ||
+    metadata.deviceId ||
+    "PN532 reader";
+
+  return {
+    success,
+    message:
+      log.notes ||
+      (success ? "PN532 tap processed." : "PN532 tap was blocked."),
+    timestamp: log.timestamp || new Date().toISOString(),
+    checkpoint,
+    action,
+    userType: metadata.userType || log.actorRole || "visitor",
+    name: log.userName || (success ? "SafePass user" : "Unknown NFC card"),
+    program: checkpoint,
+    yearSection: success ? "" : "Not assigned or blocked",
+    campusId: "",
+    visitDate: "",
+    visitTime: "",
+    visitSchedule: "",
+    purpose: "",
+    attendanceScope: "PN532 device tap",
+    nfcCardId,
+    status: log.status || "processed",
+    source: "pn532",
+    raw: log,
+  };
+};
+
 export default function NFCScanScreen({ navigation }) {
   const cardInputRef = useRef(null);
   const readerBufferRef = useRef("");
   const readerBufferTimerRef = useRef(null);
   const lastReaderInputAtRef = useRef(0);
+  const lastPn532LogIdRef = useRef("");
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -251,6 +316,13 @@ export default function NFCScanScreen({ navigation }) {
   const [stationEvents, setStationEvents] = useState(() => readStoredStationEvents());
   const [stationFeedPage, setStationFeedPage] = useState(1);
   const [latestResult, setLatestResult] = useState(null);
+  const [pn532Monitor, setPn532Monitor] = useState({
+    loading: false,
+    online: false,
+    lastCheckedAt: null,
+    lastEvent: null,
+    message: "Waiting for PN532 device taps.",
+  });
 
   const checkpointOptions = useMemo(
     () => buildCheckpointOptions(mapRooms, mapRoomPositions),
@@ -280,6 +352,10 @@ export default function NFCScanScreen({ navigation }) {
   const selectedCheckpoint = useMemo(
     () => checkpointOptions.find((checkpoint) => checkpoint.key === selectedCheckpointKey) || checkpointOptions[0],
     [checkpointOptions, selectedCheckpointKey],
+  );
+  const isOperatorAllowed = useMemo(
+    () => ALLOWED_ROLES.has(String(user?.role || "").toLowerCase()),
+    [user?.role],
   );
   const selectedActionMeta = useMemo(() => getActionMeta(selectedAction), [selectedAction]);
   const latestTone = useMemo(() => getResultTone(latestResult), [latestResult]);
@@ -424,6 +500,66 @@ export default function NFCScanScreen({ navigation }) {
     });
     setStationFeedPage(1);
   };
+
+  const pollPn532DeviceLogs = async ({ announceNew = true } = {}) => {
+    if (!isOperatorAllowed) return;
+
+    setPn532Monitor((current) => ({ ...current, loading: true }));
+    try {
+      const response = await ApiService.getAccessLogs(1, 20, { all: true });
+      const logs = Array.isArray(response?.accessLogs) ? response.accessLogs : [];
+      const latestPn532Log = logs.find(isPn532AccessLog);
+
+      if (!latestPn532Log) {
+        setPn532Monitor({
+          loading: false,
+          online: false,
+          lastCheckedAt: new Date().toISOString(),
+          lastEvent: null,
+          message: "No PN532 taps found yet. Tap a card on the ESP32 reader.",
+        });
+        return;
+      }
+
+      const event = buildPn532EventFromLog(latestPn532Log);
+      const logId = String(latestPn532Log._id || `${event.timestamp}-${event.nfcCardId}`);
+      const isNewLog = logId && logId !== lastPn532LogIdRef.current;
+      lastPn532LogIdRef.current = logId;
+
+      setPn532Monitor({
+        loading: false,
+        online: true,
+        lastCheckedAt: new Date().toISOString(),
+        lastEvent: event,
+        message: event.success ? "PN532 scan received." : "PN532 scan received but blocked.",
+      });
+
+      if (announceNew && isNewLog) {
+        setLatestResult(event);
+        recordLocalEvent(event);
+        await triggerTapFeedback(event.success ? "success" : "error");
+      }
+    } catch (error) {
+      setPn532Monitor((current) => ({
+        ...current,
+        loading: false,
+        online: false,
+        lastCheckedAt: new Date().toISOString(),
+        message: error?.message || "Could not check PN532 device logs.",
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (loading || !isOperatorAllowed) return undefined;
+
+    pollPn532DeviceLogs({ announceNew: false });
+    const interval = setInterval(() => {
+      pollPn532DeviceLogs({ announceNew: true });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [loading, isOperatorAllowed]);
 
   const focusReader = () => {
     globalThis.requestAnimationFrame?.(() => cardInputRef.current?.focus?.());
@@ -783,6 +919,79 @@ export default function NFCScanScreen({ navigation }) {
                     </>
                   )}
                 </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.pn532Panel}>
+              <View style={styles.pn532PanelHeader}>
+                <View>
+                  <Text style={styles.readerPanelLabel}>PN532 Device</Text>
+                  <Text style={styles.pn532PanelTitle}>
+                    {pn532Monitor.lastEvent?.nfcCardId
+                      ? `Last UID: ${pn532Monitor.lastEvent.nfcCardId}`
+                      : "Waiting for PN532 scan"}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.focusButton}
+                  onPress={() => pollPn532DeviceLogs({ announceNew: true })}
+                  disabled={pn532Monitor.loading}
+                >
+                  {pn532Monitor.loading ? (
+                    <ActivityIndicator size="small" color="#0A3D91" />
+                  ) : (
+                    <Ionicons name="refresh-outline" size={16} color="#0A3D91" />
+                  )}
+                  <Text style={styles.focusButtonText}>Check</Text>
+                </TouchableOpacity>
+              </View>
+              <View
+                style={[
+                  styles.pn532StatusCard,
+                  pn532Monitor.lastEvent?.success === false && styles.pn532StatusCardError,
+                  pn532Monitor.lastEvent?.success === true && styles.pn532StatusCardSuccess,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.pn532StatusIcon,
+                    pn532Monitor.lastEvent?.success === false && styles.pn532StatusIconError,
+                    pn532Monitor.lastEvent?.success === true && styles.pn532StatusIconSuccess,
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      pn532Monitor.lastEvent?.success === false
+                        ? "close-circle-outline"
+                        : pn532Monitor.lastEvent?.success === true
+                          ? "checkmark-circle-outline"
+                          : "radio-outline"
+                    }
+                    size={20}
+                    color={
+                      pn532Monitor.lastEvent?.success === false
+                        ? "#B91C1C"
+                        : pn532Monitor.lastEvent?.success === true
+                          ? "#166534"
+                          : "#0A3D91"
+                    }
+                  />
+                </View>
+                <View style={styles.pn532StatusCopy}>
+                  <Text style={styles.pn532StatusTitle}>
+                    {pn532Monitor.lastEvent?.name || "No PN532 tap received"}
+                  </Text>
+                  <Text style={styles.pn532StatusText}>
+                    {pn532Monitor.lastEvent?.message || pn532Monitor.message}
+                  </Text>
+                  <Text style={styles.pn532StatusMeta}>
+                    {[
+                      pn532Monitor.lastEvent?.checkpoint,
+                      pn532Monitor.lastEvent?.status ? formatRoleLabel(pn532Monitor.lastEvent.status) : "",
+                      pn532Monitor.lastEvent?.timestamp ? formatDateTime(pn532Monitor.lastEvent.timestamp) : "",
+                    ].filter(Boolean).join(" | ") || "The latest PN532 UID/result will appear here."}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -2061,6 +2270,82 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "900",
     color: "#0F172A",
+  },
+  pn532Panel: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#BBD7FF",
+    ...CARD_SHADOW,
+  },
+  pn532PanelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  pn532PanelTitle: {
+    marginTop: 4,
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+  pn532StatusCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    padding: 14,
+  },
+  pn532StatusCardSuccess: {
+    borderColor: "#86EFAC",
+    backgroundColor: "#F0FDF4",
+  },
+  pn532StatusCardError: {
+    borderColor: "#FCA5A5",
+    backgroundColor: "#FEF2F2",
+  },
+  pn532StatusIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#DBEAFE",
+  },
+  pn532StatusIconSuccess: {
+    backgroundColor: "#DCFCE7",
+  },
+  pn532StatusIconError: {
+    backgroundColor: "#FEE2E2",
+  },
+  pn532StatusCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pn532StatusTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  pn532StatusText: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  pn532StatusMeta: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "800",
+    color: "#64748B",
   },
   focusButton: {
     flexDirection: "row",

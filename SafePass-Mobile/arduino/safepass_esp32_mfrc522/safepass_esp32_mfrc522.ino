@@ -31,8 +31,15 @@ const char* ACTION = "auto";
 
 // Tap cooldown
 unsigned long lastTapTime = 0;
-String lastUid = "";
+String lastTapKey = "";
 const unsigned long TAP_COOLDOWN_MS = 3000;
+
+// Android HCE AID: F0 + ASCII "SAFEPASS"
+uint8_t SELECT_SAFEPASS_AID[] = {
+  0x00, 0xA4, 0x04, 0x00, 0x09,
+  0xF0, 0x53, 0x41, 0x46, 0x45, 0x50, 0x41, 0x53, 0x53,
+  0x00
+};
 
 void setup() {
   Serial.begin(115200);
@@ -71,19 +78,28 @@ void loop() {
 
   String uidString = uidToString(uid, uidLength);
 
-  if (isDuplicateTap(uidString)) {
-    return;
-  }
-
-  lastUid = uidString;
-  lastTapTime = millis();
-
   Serial.println();
   Serial.println("Card detected");
   Serial.print("UID: ");
   Serial.println(uidString);
 
-  sendTapToSafePass(uidString);
+  String virtualCardToken = readSafePassVirtualCardToken();
+  if (virtualCardToken.length() > 0) {
+    Serial.print("Virtual SafePass token: ");
+    Serial.println(virtualCardToken);
+  } else {
+    Serial.println("No virtual SafePass token found. Falling back to UID.");
+  }
+
+  String tapKey = virtualCardToken.length() > 0 ? virtualCardToken : uidString;
+  if (isDuplicateTap(tapKey)) {
+    return;
+  }
+
+  lastTapKey = tapKey;
+  lastTapTime = millis();
+
+  sendTapToSafePass(uidString, virtualCardToken);
 }
 
 void ensureWifiConnected() {
@@ -158,11 +174,46 @@ String uidToString(uint8_t* uid, uint8_t uidLength) {
   return uidString;
 }
 
-bool isDuplicateTap(String uid) {
-  return uid == lastUid && millis() - lastTapTime < TAP_COOLDOWN_MS;
+bool isDuplicateTap(String tapKey) {
+  return tapKey == lastTapKey && millis() - lastTapTime < TAP_COOLDOWN_MS;
 }
 
-void sendTapToSafePass(String uid) {
+bool isSafePassTokenChar(char c) {
+  return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+}
+
+String readSafePassVirtualCardToken() {
+  uint8_t response[64];
+  uint8_t responseLength = sizeof(response);
+
+  bool ok = nfc.inDataExchange(
+    SELECT_SAFEPASS_AID,
+    sizeof(SELECT_SAFEPASS_AID),
+    response,
+    &responseLength
+  );
+
+  if (!ok || responseLength < 3) {
+    return "";
+  }
+
+  if (response[responseLength - 2] != 0x90 || response[responseLength - 1] != 0x00) {
+    return "";
+  }
+
+  String token = "";
+  for (uint8_t i = 0; i < responseLength - 2; i++) {
+    char c = (char)response[i];
+    if (isSafePassTokenChar(c)) {
+      token += c;
+    }
+  }
+
+  token.toUpperCase();
+  return token;
+}
+
+void sendTapToSafePass(String uid, String virtualCardToken) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("Cannot send tap. Wi-Fi is not connected.");
     return;
@@ -178,6 +229,10 @@ void sendTapToSafePass(String uid) {
 
   String body = "{";
   body += "\"pn532Uid\":\"" + uid + "\",";
+  body += "\"uid\":\"" + uid + "\",";
+  if (virtualCardToken.length() > 0) {
+    body += "\"virtualCardToken\":\"" + virtualCardToken + "\",";
+  }
   body += "\"readerId\":\"" + String(READER_ID) + "\",";
   body += "\"deviceId\":\"" + String(DEVICE_ID) + "\",";
   body += "\"action\":\"" + String(ACTION) + "\"";
