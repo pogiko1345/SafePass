@@ -46,7 +46,12 @@ const STATION_FEED_PAGE_SIZE = 6;
 const MAX_STATION_EVENTS = 100;
 
 const triggerTapFeedback = async (type = "success") => {
-  if (Platform.OS === "web") return;
+  if (Platform.OS === "web") {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate(type === "error" ? [80, 70, 140] : 90);
+    }
+    return;
+  }
 
   if (type === "error") {
     Vibration.vibrate([0, 80, 70, 140]);
