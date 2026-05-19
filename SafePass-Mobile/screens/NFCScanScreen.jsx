@@ -22,6 +22,14 @@ import {
 import { normalizeMapSettingsPayload } from "../utils/mapSettingsUtils";
 
 const ENTRY_CHECKPOINTS = [
+  {
+    key: "pn532_reader",
+    label: "PN532 Lobby Reader",
+    floor: "ground",
+    office: "Entrance / Lobby",
+    icon: "radio-outline",
+    coordinates: { x: 6.8, y: 40 },
+  },
   { key: "main-gate", label: "Main Gate", floor: "ground", office: "Main Gate", icon: "log-in-outline" },
 ];
 
@@ -451,13 +459,18 @@ export default function NFCScanScreen({ navigation }) {
     try {
       const response = await ApiService.submitCheckpointTap({
         nfcCardId: normalizedCardId,
+        uid: normalizedCardId,
+        cardUid: normalizedCardId,
+        pn532Uid: normalizedCardId,
         action: selectedAction,
         floor: selectedCheckpoint.floor,
         office: selectedCheckpoint.office,
         checkpointId: selectedCheckpoint.key,
         checkpointName: selectedCheckpoint.label,
         coordinates: selectedCheckpoint.coordinates || undefined,
-        deviceId: "mobile-checkpoint-station",
+        readerId: selectedCheckpoint.key,
+        deviceId: selectedCheckpoint.key === "pn532_reader" ? "esp32-pn532-01" : "mobile-checkpoint-station",
+        source: selectedCheckpoint.key === "pn532_reader" ? "pn532_reader" : "mobile-checkpoint-station",
       });
       const personDetails = getPersonDetails(response);
 

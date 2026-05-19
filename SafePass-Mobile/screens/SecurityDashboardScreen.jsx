@@ -912,11 +912,33 @@ export default function SecurityDashboardScreen({ navigation }) {
         "",
     ).toLowerCase();
 
+  const getVisitorCurrentOfficeLabel = (visitor = {}) =>
+    String(
+      visitor?.location?.office ||
+        visitor?.currentLocation?.office ||
+        visitor?.sourceVisitor?.currentLocation?.office ||
+        visitor?.currentLocation?.checkpointId ||
+        visitor?.location?.checkpointId ||
+        "",
+    ).trim();
+
+  const isLobbyOrGateLocation = (office = "") => {
+    const normalizedOffice = String(office || "").trim().toLowerCase();
+    return ["lobby", "entrance", "gate", "main gate", "front desk"].some((keyword) =>
+      normalizedOffice.includes(keyword),
+    );
+  };
+
   const getVisitorMapState = (visitor = {}) => {
     if (visitor?.wrongLocationAlerts?.length) return "attention";
     const action = getVisitorLocationAction(visitor);
     if (action === "office_departure") return "left_office";
-    if (["check_in", "location_update"].includes(action)) return "inside_office";
+    if (action === "check_in" && isLobbyOrGateLocation(getVisitorCurrentOfficeLabel(visitor))) {
+      return "in_lobby";
+    }
+    if (["check_in", "location_update"].includes(action)) {
+      return isLobbyOrGateLocation(getVisitorCurrentOfficeLabel(visitor)) ? "in_lobby" : "inside_office";
+    }
     if (String(visitor?.status || visitor?.sourceVisitor?.status || "").toLowerCase() === "checked_in") {
       return "checked_in";
     }
@@ -930,6 +952,9 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
     if (state === "inside_office") {
       return { label: "Inside Office", color: BRAND.blue, icon: "business-outline" };
+    }
+    if (state === "in_lobby") {
+      return { label: "In Lobby", color: BRAND.success, icon: "log-in-outline" };
     }
     if (state === "left_office") {
       return { label: "Left Office", color: BRAND.warning, icon: "walk-outline" };
@@ -1690,6 +1715,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       }
       if (mapStatusFilter === "attention") return isMapAttentionVisitor(visitor);
       if (mapStatusFilter === "inside_office") return getVisitorMapState(visitor) === "inside_office";
+      if (mapStatusFilter === "in_lobby") return getVisitorMapState(visitor) === "in_lobby";
       if (mapStatusFilter === "left_office") return getVisitorMapState(visitor) === "left_office";
       if (mapStatusFilter === "wrong_office") return Boolean(visitor?.wrongLocationAlerts?.length);
       return true;
@@ -3780,6 +3806,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     const mapFilterOptions = [
       { key: "all", label: "All" },
       { key: "attention", label: "Needs attention" },
+      { key: "in_lobby", label: "In lobby" },
       { key: "inside_office", label: "Inside office" },
       { key: "left_office", label: "Left office" },
       { key: "wrong_office", label: "Wrong office" },
@@ -5988,6 +6015,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           options={[
             { key: "all", label: "All" },
             { key: "attention", label: "Needs attention" },
+            { key: "in_lobby", label: "In lobby" },
             { key: "inside_office", label: "Inside office" },
             { key: "left_office", label: "Left office" },
             { key: "wrong_office", label: "Wrong office" },

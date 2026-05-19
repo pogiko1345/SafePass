@@ -850,6 +850,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         color: "#0A3D91",
         submodules: [
           { key: "appointment-request", label: "Appointment Request", badge: stats.pending },
+          { key: "active-visits", label: "Active Visits", badge: activeStaffVisits.length },
           { key: "appointment-record", label: "Appointment Record", badge: appointmentRecords.length },
         ],
       },
@@ -861,7 +862,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         submodules: [{ key: "account-info", label: "My Profile", badge: 0 }],
       },
     ],
-    [appointmentRecords.length, stats.pending],
+    [activeStaffVisits.length, appointmentRecords.length, stats.pending],
   );
 
   const getSelectedSubmoduleMeta = () => {
@@ -875,6 +876,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         return {
           title: "Appointment Record",
           subtitle: "Browse appointment history, statuses, and visitor scheduling details in one organized table.",
+        };
+      case "active-visits":
+        return {
+          title: "Active Visits",
+          subtitle: "Manage checked-in visitors assigned to your office, then mark them done or redirect them.",
         };
       case "account-info":
         return {
@@ -922,6 +928,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
     if (submoduleKey === "appointment-record") {
       setFilter("all");
+    }
+
+    if (submoduleKey === "active-visits") {
+      setFilter("approved");
     }
   };
 
@@ -2682,6 +2692,84 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     </>
   );
 
+  const renderActiveVisitsContent = () => (
+    <View style={[styles.sectionCard, mobileDarkModeEnabled && styles.darkSectionCard]}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionHeaderCopy}>
+          <Text style={[styles.sectionTitle, mobileDarkModeEnabled && styles.darkText]}>Active Visits</Text>
+          <Text style={[styles.sectionSubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>
+            Visitors checked in by security and currently assigned to your office.
+          </Text>
+        </View>
+        <View style={styles.sectionActionRow}>
+          <View style={styles.activeVisitCountBadge}>
+            <Text style={styles.activeVisitCountText}>{activeStaffVisits.length}</Text>
+          </View>
+          <TouchableOpacity style={styles.sectionActionIconButton} onPress={loadData}>
+            <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {activeStaffVisits.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="walk-outline" size={42} color="#94A3B8" />
+          <Text style={[styles.emptyTitle, mobileDarkModeEnabled && styles.darkText]}>No active visits yet</Text>
+          <Text style={[styles.emptySubtitle, mobileDarkModeEnabled && styles.darkMutedText]}>
+            Ask security to tap Arrived/check in an approved visitor. They will show here and on the campus map.
+          </Text>
+          <TouchableOpacity style={styles.emptyRefreshButton} onPress={loadData}>
+            <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
+            <Text style={styles.emptyRefreshButtonText}>Refresh active visits</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.activeVisitPageGrid}>
+          {activeStaffVisits.map((appointment) => (
+            <HomeHoverPressable
+              key={appointment._id}
+              style={[styles.activeVisitItem, styles.activeVisitPageItem]}
+              onPress={() => openVisitManagementModal(appointment)}
+            >
+              <View style={styles.activeVisitTopRow}>
+                <View style={styles.activeVisitAvatar}>
+                  <Ionicons name="person-outline" size={18} color="#047857" />
+                </View>
+                <View style={styles.activeVisitCopy}>
+                  <Text style={styles.activeVisitName} numberOfLines={1}>
+                    {appointment.fullName || "Visitor"}
+                  </Text>
+                  <Text style={styles.activeVisitMeta} numberOfLines={1}>
+                    {appointment.currentLocation?.office ||
+                      appointment.currentDestination?.office ||
+                      appointment.appointmentDepartment ||
+                      "Inside campus"}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.todaySchedulePurpose} numberOfLines={2}>
+                {appointment.purposeOfVisit || "No visit purpose provided"}
+              </Text>
+              <View style={styles.activeVisitFooter}>
+                <Text style={styles.activeVisitTime}>
+                  Checked in {formatRelativeTime(appointment.checkedInAt)}
+                </Text>
+                <TouchableOpacity
+                  style={styles.activeVisitManageButton}
+                  onPress={() => openVisitManagementModal(appointment)}
+                >
+                  <Text style={styles.activeVisitManageText}>Manage</Text>
+                </TouchableOpacity>
+              </View>
+            </HomeHoverPressable>
+          ))}
+        </View>
+      )}
+
+      {detailAppointment ? renderAppointmentDetailPanel() : null}
+    </View>
+  );
+
   const renderAccountInfoContent = () => (
     <>
       <View style={[styles.sectionCard, mobileDarkModeEnabled && styles.darkSectionCard]}>
@@ -3088,6 +3176,10 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
     if (selectedSubmodule === "appointment-record") {
       return renderAppointmentRecordContent();
+    }
+
+    if (selectedSubmodule === "active-visits") {
+      return renderActiveVisitsContent();
     }
 
     if (selectedSubmodule === "account-info") {

@@ -57,7 +57,7 @@ const REMEMBERED_SESSION_DURATION_MS =
   Platform.OS === "web"
     ? WEB_REMEMBERED_SESSION_DURATION_MS
     : TRUST_DEVICE_DURATION_MS;
-const HEALTH_CHECK_TIMEOUT_MS = 20000;
+const HEALTH_CHECK_TIMEOUT_MS = 45000;
 const REMEMBERED_SESSION_EXPIRES_AT_KEY = "rememberedSessionExpiresAt";
 const SENSITIVE_STORAGE_KEYS = [
   "userToken",
@@ -2081,7 +2081,13 @@ generateRandomPassword(length = 10) {
       }
       const data = await response.json();
       return data.status === "OK";
-    } catch {
+    } catch (error) {
+      const isAbortError = error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("abort");
+      const logMethod = isAbortError ? console.warn : console.error;
+      logMethod(
+        `[ApiService] Health check ${isAbortError ? "timed out" : "failed"} via ${API_BASE_URL}:`,
+        error,
+      );
       return false;
     }
   }
@@ -2180,7 +2186,12 @@ ApiService.prototype.testConnection = async function testConnectionWithAndroidFa
         return true;
       }
     } catch (error) {
-      console.error(`[ApiService] Health check failed via ${baseUrl}:`, error);
+      const isAbortError = error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("abort");
+      const logMethod = isAbortError ? console.warn : console.error;
+      logMethod(
+        `[ApiService] Health check ${isAbortError ? "timed out" : "failed"} via ${baseUrl}:`,
+        error,
+      );
     }
   }
 
