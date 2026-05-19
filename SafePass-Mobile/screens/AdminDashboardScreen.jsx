@@ -68,7 +68,7 @@ const HoverBubble = ({ children, style, hoverScale = 1.05, onPress, ...props }) 
     if (Platform.OS !== "web") return;
     Animated.spring(scale, {
       toValue,
-      useNativeDriver: true,
+      useNativeDriver: false,
       tension: 180,
       friction: 12,
     }).start();

@@ -58,13 +58,13 @@ const SidebarHoverPressable = ({
     Animated.parallel([
       Animated.spring(scale, {
         toValue: scaleValue,
-        useNativeDriver: true,
+        useNativeDriver: false,
         tension: 180,
         friction: 12,
       }),
       Animated.spring(lift, {
         toValue: liftValue,
-        useNativeDriver: true,
+        useNativeDriver: false,
         tension: 180,
         friction: 12,
       }),
