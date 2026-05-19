@@ -1294,11 +1294,12 @@ export default function SecurityDashboardScreen({ navigation }) {
       }
 
       const normalizedRole = normalizeRole(cachedUser?.role);
-      if (!cachedUser || !canAccessSecurityDashboard(normalizedRole)) {
-        navigation.replace("Login");
+      const normalizedUser = { ...cachedUser, role: normalizedRole };
+      if (!cachedUser || !canAccessSecurityDashboard(normalizedUser)) {
+        const fallbackRoute = normalizedRole === "staff" ? "StaffDashboard" : "Login";
+        navigation.replace(fallbackRoute);
         return null;
       }
-      const normalizedUser = { ...cachedUser, role: normalizedRole };
       setUser(normalizedUser);
       setSecurityProfileForm(buildSecurityProfileForm(normalizedUser));
 
@@ -1306,7 +1307,15 @@ export default function SecurityDashboardScreen({ navigation }) {
         .then((profileResponse) => {
           const profileUser = profileResponse?.user || null;
           if (!profileUser) return;
-          const refreshedUser = { ...normalizedUser, ...profileUser, role: normalizedRole };
+          const refreshedUser = {
+            ...normalizedUser,
+            ...profileUser,
+            role: normalizeRole(profileUser.role || normalizedRole),
+          };
+          if (!canAccessSecurityDashboard(refreshedUser)) {
+            navigation.replace(refreshedUser.role === "staff" ? "StaffDashboard" : "Login");
+            return;
+          }
           setUser(refreshedUser);
           setSecurityProfileForm(buildSecurityProfileForm(refreshedUser));
         })
