@@ -72,7 +72,7 @@ const SidebarHoverPressable = ({ children, style, hoverScale = 1.035, onPress, d
     if (Platform.OS !== "web") return;
     Animated.spring(scale, {
       toValue,
-      useNativeDriver: true,
+      useNativeDriver: false,
       tension: 180,
       friction: 12,
     }).start();
