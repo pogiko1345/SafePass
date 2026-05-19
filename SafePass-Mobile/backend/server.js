@@ -11705,18 +11705,30 @@ app.get("/api/staff/appointments", authMiddleware, async (req, res) => {
 
     const { status = "all", limit = 100 } = req.query;
     const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 200);
+    const flowScope =
+      status === "pending" || status === "rejected"
+        ? [{ approvalFlow: "staff" }]
+        : [
+            { approvalFlow: "staff" },
+            {
+              status: "checked_in",
+              appointmentStatus: { $in: ["approved", "adjusted"] },
+            },
+          ];
     const query = {
       requestCategory: "appointment",
-      approvalFlow: "staff",
+      $and: [{ $or: flowScope }],
     };
 
     if (normalizedRole === "staff") {
       const staffDepartmentQuery = getStaffDepartmentQuery(req.user.department);
-      query.$or = [
-        { assignedStaff: req.user._id },
-        { appointmentDepartment: staffDepartmentQuery },
-        { assignedOffice: staffDepartmentQuery },
-      ];
+      query.$and.push({
+        $or: [
+          { assignedStaff: req.user._id },
+          { appointmentDepartment: staffDepartmentQuery },
+          { assignedOffice: staffDepartmentQuery },
+        ],
+      });
     }
 
     if (status === "pending") {
@@ -13403,10 +13415,12 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
 
     if (updates.parentName !== undefined) {
       updates.parentName = String(updates.parentName || "").trim();
+      updates.guardianName = updates.parentName;
     }
 
     if (updates.guardianName !== undefined) {
       updates.guardianName = String(updates.guardianName || "").trim();
+      updates.parentName = updates.guardianName;
     }
 
     if (updates.parentEmail !== undefined) {
@@ -13419,6 +13433,7 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
         });
       }
       updates.parentEmail = normalizedParentEmail;
+      updates.guardianEmail = normalizedParentEmail;
     }
 
     if (updates.guardianEmail !== undefined) {
@@ -13431,6 +13446,7 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
         });
       }
       updates.guardianEmail = normalizedGuardianEmail;
+      updates.parentEmail = normalizedGuardianEmail;
     }
 
     if (updates.studentId !== undefined) {
