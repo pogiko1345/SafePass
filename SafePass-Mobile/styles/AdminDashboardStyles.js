@@ -4582,6 +4582,8 @@ export default StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+    zIndex: 9999,
+    elevation: 999,
   },
 
   modalContent: {
@@ -4686,6 +4688,8 @@ export default StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    zIndex: 10000,
+    elevation: 1000,
   },
 
   userProfileHero: {
@@ -4836,6 +4840,8 @@ export default StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    zIndex: 10000,
+    elevation: 1000,
   },
 
   userEditorSubtitle: {
