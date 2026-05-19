@@ -474,6 +474,29 @@ const formatDateInputValue = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const sanitizeDateInputValue = (value) =>
+  String(value || "")
+    .replace(/[^\d-]/g, "")
+    .slice(0, 10);
+
+const parseDateInputValue = (value) => {
+  const sanitizedValue = sanitizeDateInputValue(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sanitizedValue)) return null;
+
+  const [year, month, day] = sanitizedValue.split("-").map(Number);
+  const parsedDate = new Date(year, month - 1, day);
+
+  if (
+    parsedDate.getFullYear() !== year ||
+    parsedDate.getMonth() !== month - 1 ||
+    parsedDate.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsedDate;
+};
+
 const formatTimeInputValue = (date) => {
   if (!date) return "";
   const d = new Date(date);
@@ -1108,6 +1131,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     endDate: null,
   });
   const [activeFilterDateField, setActiveFilterDateField] = useState(null);
+  const exactDateInputRefs = useRef({});
   const [expandedFilterSections, setExpandedFilterSections] = useState({});
 
   // Settings States
@@ -1203,6 +1227,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [appointmentSearchTerm, setAppointmentSearchTerm] = useState("");
   const [appointmentFilterDraft, setAppointmentFilterDraft] = useState(createAppointmentFilterDraft);
   const [appointmentAppliedFilters, setAppointmentAppliedFilters] = useState(createAppointmentFilterDraft);
+  const [showAppointmentFilterDatePicker, setShowAppointmentFilterDatePicker] = useState(false);
+  const appointmentDateInputRef = useRef(null);
   const [appointmentManagementOptions, setAppointmentManagementOptions] = useState(DEFAULT_APPOINTMENT_MANAGEMENT_OPTIONS);
   const [appointmentOptionDrafts, setAppointmentOptionDrafts] = useState({
     offices: "",
@@ -2813,6 +2839,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   };
 
   const applyAppointmentFilters = () => {
+    if (appointmentFilterDraft.date && !parseDateInputValue(appointmentFilterDraft.date)) {
+      Alert.alert("Invalid Date", "Please use a valid date in YYYY-MM-DD format.");
+      return;
+    }
+
     setAppointmentAppliedFilters({ ...appointmentFilterDraft });
     setAppointmentRecordsPage(1);
     setStaffDropdownOpen(null);
@@ -4482,18 +4513,7 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
-  const handleEditUser = (userItem) => {
-    if (selectedSubmodule !== "data-management") {
-      handleViewUser(userItem);
-      publishAdminNotice(
-        "info",
-        "Account records are view-only",
-        "Open User Data Management to edit account details.",
-      );
-      return;
-    }
-
-    setSelectedUser(userItem);
+  const populateEditUserData = (userItem) => {
     setEditUserErrors({});
     setEditUserData({
       id: userItem._id || userItem.id,
@@ -4518,15 +4538,44 @@ const loadDashboardData = useCallback(async () => {
       status: isUserActive(userItem) ? "active" : "inactive",
       isActive: isUserActive(userItem),
     });
+  };
+
+  const openUserDataViewPanel = (userItem) => {
+    setSelectedUser(userItem);
+    setEditUserErrors({});
+    setShowViewUserModal(false);
+    setShowEditUserModal(false);
+    setUserDataPanelMode("view");
+  };
+
+  const openUserDataEditPanel = (userItem) => {
+    setSelectedUser(userItem);
+    populateEditUserData(userItem);
+    setShowViewUserModal(false);
+    setShowEditUserModal(false);
     setUserDataPanelMode("edit");
   };
 
-  const handleViewUser = (userItem) => {
-    setSelectedUser(userItem);
-    if (selectedSubmodule === "data-management") {
-      setUserDataPanelMode("view");
+  const handleEditUser = (userItem) => {
+    if (selectedSubmodule !== "data-management") {
+      handleViewUser(userItem);
+      publishAdminNotice(
+        "info",
+        "Account records are view-only",
+        "Open User Data Management to edit account details.",
+      );
       return;
     }
+
+    openUserDataEditPanel(userItem);
+  };
+
+  const handleViewUser = (userItem) => {
+    if (selectedSubmodule === "data-management") {
+      openUserDataViewPanel(userItem);
+      return;
+    }
+    setSelectedUser(userItem);
     setShowViewUserModal(true);
   };
 
@@ -5575,6 +5624,39 @@ const loadDashboardData = useCallback(async () => {
     </View>
   );
 
+  const handleExactDateInputChange = (field, value) => {
+    const nextDate = parseDateInputValue(value);
+    if (!nextDate) return;
+
+    if (field === "request-start") {
+      setRequestDateRange((currentRange) => ({ ...currentRange, startDate: nextDate }));
+    } else if (field === "request-end") {
+      setRequestDateRange((currentRange) => ({ ...currentRange, endDate: nextDate }));
+    } else if (field === "history-start") {
+      setHistoryDateRange((currentRange) => ({ ...currentRange, startDate: nextDate }));
+      setHistoryPage(1);
+    } else if (field === "history-end") {
+      setHistoryDateRange((currentRange) => ({ ...currentRange, endDate: nextDate }));
+      setHistoryPage(1);
+    }
+  };
+
+  const openExactDatePicker = (field, fallbackPicker) => {
+    if (Platform.OS === "web" && field) {
+      const input = exactDateInputRefs.current[field];
+      if (input?.showPicker) {
+        input.showPicker();
+      } else if (input?.click) {
+        input.click();
+      } else if (input?.focus) {
+        input.focus();
+      }
+      return;
+    }
+
+    fallbackPicker?.();
+  };
+
   const renderDateRangeControls = ({
     accent = "#1C6DD0",
     startDate,
@@ -5582,6 +5664,8 @@ const loadDashboardData = useCallback(async () => {
     onPickStart,
     onPickEnd,
     onClear,
+    startField,
+    endField,
   }) => (
     <View style={styles.recordsDateRangeWrap}>
       <Text style={[styles.recordsFilterGroupLabel, isDarkMode && styles.darkTextSecondary]}>
@@ -5593,26 +5677,62 @@ const loadDashboardData = useCallback(async () => {
             styles.recordsDateButton,
             isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
           ]}
-          onPress={onPickStart}
+          onPress={() => openExactDatePicker(startField, onPickStart)}
           activeOpacity={0.85}
         >
           <Ionicons name="calendar-outline" size={14} color={accent} />
           <Text style={[styles.recordsDateButtonText, isDarkMode && styles.darkText]}>
             {startDate ? formatFilterDateLabel(startDate) : "Start Date"}
           </Text>
+          {Platform.OS === "web" && startField ? (
+            <input
+              ref={(element) => {
+                exactDateInputRefs.current[startField] = element;
+              }}
+              type="date"
+              value={formatDateInputValue(startDate)}
+              onChange={(event) => handleExactDateInputChange(startField, event.target.value)}
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: 0,
+                pointerEvents: "none",
+              }}
+              aria-label="Select start date"
+              tabIndex={-1}
+            />
+          ) : null}
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.recordsDateButton,
             isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
           ]}
-          onPress={onPickEnd}
+          onPress={() => openExactDatePicker(endField, onPickEnd)}
           activeOpacity={0.85}
         >
           <Ionicons name="calendar-clear-outline" size={14} color={accent} />
           <Text style={[styles.recordsDateButtonText, isDarkMode && styles.darkText]}>
             {endDate ? formatFilterDateLabel(endDate) : "End Date"}
           </Text>
+          {Platform.OS === "web" && endField ? (
+            <input
+              ref={(element) => {
+                exactDateInputRefs.current[endField] = element;
+              }}
+              type="date"
+              value={formatDateInputValue(endDate)}
+              onChange={(event) => handleExactDateInputChange(endField, event.target.value)}
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: 0,
+                pointerEvents: "none",
+              }}
+              aria-label="Select end date"
+              tabIndex={-1}
+            />
+          ) : null}
         </TouchableOpacity>
         {(startDate || endDate) ? (
           <TouchableOpacity style={styles.recordsDateClearButton} onPress={onClear} activeOpacity={0.85}>
@@ -5754,11 +5874,13 @@ const loadDashboardData = useCallback(async () => {
         ...currentRange,
         startDate: date,
       }));
+      setHistoryPage(1);
     } else if (activeFilterDateField === "history-end") {
       setHistoryDateRange((currentRange) => ({
         ...currentRange,
         endDate: date,
       }));
+      setHistoryPage(1);
     }
   };
 
@@ -7703,7 +7825,7 @@ const loadDashboardData = useCallback(async () => {
           </View>
           <View style={styles.userDataPanelActions}>
             {!isEditing ? (
-              <TouchableOpacity style={styles.dataManagementPrimaryButton} onPress={() => handleEditUser(selectedUser)}>
+              <TouchableOpacity style={styles.dataManagementPrimaryButton} onPress={() => openUserDataEditPanel(selectedUser)}>
                 <Ionicons name="create-outline" size={15} color="#FFFFFF" />
                 <Text style={styles.dataManagementPrimaryButtonText}>Edit</Text>
               </TouchableOpacity>
@@ -7896,7 +8018,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={styles.userDataPanelFooter}>
               <TouchableOpacity
                 style={[styles.dataManagementGhostButton, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor }]}
-                onPress={() => selectedUser && handleViewUser(selectedUser)}
+                onPress={() => selectedUser && openUserDataViewPanel(selectedUser)}
               >
                 <Ionicons name="arrow-back-outline" size={15} color="#0A3D91" />
                 <Text style={styles.dataManagementGhostButtonText}>Cancel</Text>
@@ -8139,14 +8261,20 @@ const loadDashboardData = useCallback(async () => {
                     <View style={styles.adminTableActionRow}>
                       <TouchableOpacity
                         style={[styles.adminTableActionButton, { borderColor: "rgba(59,130,246,0.24)", backgroundColor: "rgba(59,130,246,0.12)" }]}
-                        onPress={() => handleViewUser(userItem)}
+                        onPress={() => openUserDataViewPanel(userItem)}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel={`View ${userItem.firstName || "user"} ${userItem.lastName || ""}`}
                       >
                         <Ionicons name="eye-outline" size={14} color="#0A3D91" />
                         <Text style={[styles.adminTableActionText, { color: "#0A3D91" }]}>View</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.adminTableActionButton, { borderColor: "rgba(16,185,129,0.24)", backgroundColor: "rgba(16,185,129,0.12)" }]}
-                        onPress={() => handleEditUser(userItem)}
+                        onPress={() => openUserDataEditPanel(userItem)}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit ${userItem.firstName || "user"} ${userItem.lastName || ""}`}
                       >
                         <Ionicons name="create-outline" size={14} color="#10B981" />
                         <Text style={[styles.adminTableActionText, { color: "#10B981" }]}>Edit</Text>
@@ -8637,9 +8765,6 @@ const loadDashboardData = useCallback(async () => {
                             <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleEditRoom(room)}>
                               <Ionicons name="create-outline" size={16} color="#0A3D91" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.modularInlineButton} onPress={() => handleDeleteRoom(room)}>
-                              <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                            </TouchableOpacity>
                           </View>
                         </View>
                       ))}
@@ -8759,6 +8884,21 @@ const loadDashboardData = useCallback(async () => {
     const hasFilters = Object.entries(appointmentAppliedFilters).some(([key, value]) =>
       key === "date" ? Boolean(value) : value !== "all",
     );
+    const openAppointmentDatePicker = () => {
+      if (Platform.OS === "web") {
+        const input = appointmentDateInputRef.current;
+        if (input?.showPicker) {
+          input.showPicker();
+        } else if (input?.click) {
+          input.click();
+        } else if (input?.focus) {
+          input.focus();
+        }
+        return;
+      }
+
+      setShowAppointmentFilterDatePicker(true);
+    };
 
     return (
       <View style={styles.appointmentRecordsToolbar}>
@@ -8836,16 +8976,49 @@ const loadDashboardData = useCallback(async () => {
                   isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor },
                 ]}
               >
-                <Ionicons name="calendar-outline" size={15} color="#64748B" />
-                <TextInput
-                  style={[styles.appointmentToolbarInput, isDarkMode && styles.darkText]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
-                  value={appointmentFilterDraft.date}
-                  onChangeText={(value) =>
-                    setAppointmentFilterDraft((current) => ({ ...current, date: value.trim() }))
-                  }
-                />
+                <TouchableOpacity onPress={openAppointmentDatePicker} accessibilityRole="button" accessibilityLabel="Open appointment date calendar">
+                  <Ionicons name="calendar-outline" size={15} color="#64748B" />
+                </TouchableOpacity>
+                {Platform.OS === "web" ? (
+                  <input
+                    ref={appointmentDateInputRef}
+                    type="date"
+                    value={appointmentFilterDraft.date}
+                    onChange={(event) =>
+                      setAppointmentFilterDraft((current) => ({
+                        ...current,
+                        date: sanitizeDateInputValue(event.target.value),
+                      }))
+                    }
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      border: "none",
+                      outline: "none",
+                      background: "transparent",
+                      color: isDarkMode ? "#F8FAFC" : "#0F172A",
+                      fontSize: 13,
+                      paddingTop: 9,
+                      paddingBottom: 9,
+                    }}
+                  />
+                ) : (
+                  <TextInput
+                    style={[styles.appointmentToolbarInput, isDarkMode && styles.darkText]}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
+                    value={appointmentFilterDraft.date}
+                    onChangeText={(value) =>
+                      setAppointmentFilterDraft((current) => ({
+                        ...current,
+                        date: sanitizeDateInputValue(value.trim()),
+                      }))
+                    }
+                    keyboardType="number-pad"
+                    inputMode="numeric"
+                    maxLength={10}
+                  />
+                )}
               </View>
             </View>
 
@@ -9028,6 +9201,23 @@ const loadDashboardData = useCallback(async () => {
           </View>
 
           {renderAppointmentRecordsToolbar()}
+
+          {showAppointmentFilterDatePicker && Platform.OS !== "web" ? (
+            <DateTimePicker
+              value={parseDateInputValue(appointmentFilterDraft.date) || new Date()}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              onChange={(event, date) => {
+                setShowAppointmentFilterDatePicker(false);
+                if (date) {
+                  setAppointmentFilterDraft((current) => ({
+                    ...current,
+                    date: formatDateInputValue(date),
+                  }));
+                }
+              }}
+            />
+          ) : null}
 
           {renderAdminTable({
             rows: paginatedAppointmentRecords,
@@ -10425,9 +10615,14 @@ const loadDashboardData = useCallback(async () => {
                   accent: "#1C6DD0",
                   startDate: historyDateRange.startDate,
                   endDate: historyDateRange.endDate,
+                  startField: "history-start",
+                  endField: "history-end",
                   onPickStart: () => setActiveFilterDateField("history-start"),
                   onPickEnd: () => setActiveFilterDateField("history-end"),
-                  onClear: () => setHistoryDateRange({ startDate: null, endDate: null }),
+                  onClear: () => {
+                    setHistoryDateRange({ startDate: null, endDate: null });
+                    setHistoryPage(1);
+                  },
                 }),
               })}
 
