@@ -312,14 +312,14 @@ const groupAppointmentsByDate = (appointments = []) => {
   }, new Map());
 
   return Array.from(groupedAppointments.entries())
-    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+    .sort(([leftKey], [rightKey]) => rightKey.localeCompare(leftKey))
     .map(([dateKey, entries]) => ({
       dateKey,
       label:
         dateKey === "unscheduled"
           ? "Schedule pending"
           : formatDate(entries[0]?.visitDate || entries[0]?.visitTime),
-      entries: [...entries].sort(compareAppointmentsBySchedule),
+      entries: [...entries].sort(compareAppointmentsByLatestSchedule),
     }));
 };
 
@@ -641,9 +641,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const appointmentRecords = useMemo(
     () =>
-      appointments.filter((item) =>
-        ["approved", "adjusted", "adjustment_pending", "completed", "rejected"].includes(getAppointmentStatus(item)),
-      ),
+      appointments
+        .filter((item) =>
+          ["approved", "adjusted", "adjustment_pending", "completed", "rejected"].includes(getAppointmentStatus(item)),
+        )
+        .sort(compareAppointmentsByLatestSchedule),
     [appointments],
   );
 
@@ -668,7 +670,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       nextAppointments = appointmentRecords.filter((item) => getAppointmentStatus(item) === filter);
     }
 
-    return nextAppointments.filter((item) => matchesAppointmentSearch(item, recordSearchTerm));
+    return nextAppointments
+      .filter((item) => matchesAppointmentSearch(item, recordSearchTerm))
+      .sort(compareAppointmentsByLatestSchedule);
   }, [appointmentRecords, filter, recordSearchTerm]);
 
   const mobileHistoryAppointments = useMemo(

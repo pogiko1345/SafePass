@@ -762,6 +762,36 @@ const getRequestStatus = (request) => {
   return approvalStatus || visitStatus || "unknown";
 };
 
+const getAppointmentRecordLatestSortValue = (record = {}) => {
+  const candidates = [
+    record.updatedAt,
+    record.staffActionAt,
+    record.approvedAt,
+    record.appointmentRequestedAt,
+    record.visitTime,
+    record.visitDate,
+    record.scheduledVisitStart,
+    record.createdAt,
+    record.registeredAt,
+  ];
+
+  for (const value of candidates) {
+    const date = value ? new Date(value) : null;
+    if (date && !Number.isNaN(date.getTime())) {
+      return date.getTime();
+    }
+  }
+
+  return 0;
+};
+
+const compareAppointmentRecordsByLatest = (left, right) => {
+  const timeDifference =
+    getAppointmentRecordLatestSortValue(right) - getAppointmentRecordLatestSortValue(left);
+  if (timeDifference !== 0) return timeDifference;
+  return String(right?._id || "").localeCompare(String(left?._id || ""));
+};
+
 const AdminSectionShell = ({
   title,
   subtitle,
@@ -2009,7 +2039,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   );
 
   const appointmentRecords = useMemo(
-    () => appointmentRequests.filter((request) => getRequestStatus(request) === "approved"),
+    () =>
+      appointmentRequests
+        .filter((request) => getRequestStatus(request) === "approved")
+        .sort(compareAppointmentRecordsByLatest),
     [appointmentRequests],
   );
   const appointmentRecordFilterOptions = useMemo(() => {
@@ -2107,7 +2140,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
           item.visitTime ? formatTime(item.visitTime) : "",
         ],
       ]);
-    });
+    }).sort(compareAppointmentRecordsByLatest);
   }, [appointmentAppliedFilters, appointmentRecords, appointmentSearchTerm]);
 
   const appointmentRecordsItemsPerPage = 6;
