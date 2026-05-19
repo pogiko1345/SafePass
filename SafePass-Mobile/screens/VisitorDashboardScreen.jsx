@@ -15,6 +15,7 @@ import {
   Animated,
   Easing,
   AppState,
+  NativeModules,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +43,7 @@ const visitorBrandLogo = require("../assets/LogoSapphireAppIcon.png");
 const visitorSchoolLogo = require("../assets/LogoSapphire.jpg");
 const Storage =
   Platform.OS === "web" ? require("../utils/webStorage").default : AsyncStorage;
+const SafePassHce = NativeModules.SafePassHce;
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== "web") {
@@ -688,6 +690,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const appointmentWebDateInputRef = useRef(null);
   const shownVisitorWarningIdsRef = useRef(new Set());
   const visitorWarningCheckInFlightRef = useRef(false);
+  const syncedVirtualNfcTokenRef = useRef("");
   const dashboardHeroAnim = useRef(new Animated.Value(0)).current;
   const dashboardContentAnim = useRef(new Animated.Value(0)).current;
   const visitorTransitionAnim = useRef(new Animated.Value(1)).current;
@@ -1727,6 +1730,30 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     });
   };
 
+  const syncAndroidVirtualNfcToken = async (profileResponse = {}) => {
+    if (Platform.OS !== "android" || !SafePassHce?.setVirtualCardToken) return;
+
+    try {
+      let token =
+        profileResponse?.account?.virtualNfcToken ||
+        profileResponse?.visitor?.virtualNfcToken ||
+        "";
+
+      if (!token) {
+        const tokenResponse = await ApiService.ensureVisitorVirtualNfcToken();
+        token = tokenResponse?.virtualNfcToken || "";
+      }
+
+      const normalizedToken = String(token || "").trim().toUpperCase();
+      if (!normalizedToken || syncedVirtualNfcTokenRef.current === normalizedToken) return;
+
+      await SafePassHce.setVirtualCardToken(normalizedToken);
+      syncedVirtualNfcTokenRef.current = normalizedToken;
+    } catch (error) {
+      console.log("Virtual NFC token sync skipped:", error?.message || error);
+    }
+  };
+
   const loadVisitorData = async ({ silent = false, force = false } = {}) => {
     if (!silent) {
       setIsLoading(true);
@@ -1753,6 +1780,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       }
 
       const profileResponse = await ApiService.getVisitorProfile();
+      await syncAndroidVirtualNfcToken(profileResponse);
       const accountSafePassId =
         profileResponse?.account?.nfcCardId ||
         currentUser?.nfcCardId ||

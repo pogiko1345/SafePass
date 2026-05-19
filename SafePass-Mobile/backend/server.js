@@ -122,6 +122,7 @@ const getUserPhysicalNfcUid = (user = {}) => {
 };
 
 const getUserPhoneNfcUid = (user = {}) => normalizeSubmittedNfcCardId(user?.phoneNfcUid || "");
+const getUserVirtualNfcToken = (user = {}) => normalizeSubmittedNfcCardId(user?.virtualNfcToken || "");
 
 const buildNfcCredentialQuery = (rawCardId = "", normalizedCardId = "") => {
   const candidates = Array.from(
@@ -136,10 +137,13 @@ const buildNfcCredentialQuery = (rawCardId = "", normalizedCardId = "") => {
     $or: [
       { physicalNfcUid: { $in: candidates } },
       { phoneNfcUid: { $in: candidates } },
+      { virtualNfcToken: { $in: candidates } },
       { nfcCardId: { $in: candidates } },
     ],
   };
 };
+
+const generateVirtualNfcToken = () => `5AFE${crypto.randomBytes(14).toString("hex").toUpperCase()}`;
 
 const generateSafePassAccountId = async (createdAt = new Date()) => {
   const createdDate = new Date(createdAt);
@@ -2911,7 +2915,9 @@ app.get("/api/test", (req, res) => {
 app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
   try {
     const cardId = String(
-      req.body?.nfcCardId ||
+      req.body?.virtualCardToken ||
+        req.body?.virtualNfcToken ||
+        req.body?.nfcCardId ||
         req.body?.cardId ||
         req.body?.uid ||
         req.body?.pn532Uid ||
@@ -2945,7 +2951,7 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
     }
 
     let cardUser = await User.findOne(buildNfcCredentialQuery(cardId, normalizedCardId)).select(
-      "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions department position scheduleProfile course yearLevel section studentId parentName parentEmail guardianName guardianEmail emergencyContact",
+      "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid virtualNfcToken role status accessPermissions department position scheduleProfile course yearLevel section studentId parentName parentEmail guardianName guardianEmail emergencyContact",
     );
 
     let firstTapAssignment = null;
@@ -3469,7 +3475,9 @@ app.post(
   async (req, res) => {
     try {
       const cardId = String(
-        req.body?.nfcCardId ||
+        req.body?.virtualCardToken ||
+          req.body?.virtualNfcToken ||
+          req.body?.nfcCardId ||
           req.body?.cardId ||
           req.body?.uid ||
           req.body?.pn532Uid ||
@@ -3505,7 +3513,7 @@ app.post(
       }
 
       let cardUser = await User.findOne(buildNfcCredentialQuery(cardId, normalizedCardId)).select(
-        "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions department position scheduleProfile course yearLevel section studentId teacherId employeeId parentName parentEmail guardianName guardianEmail emergencyContact",
+        "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid virtualNfcToken role status accessPermissions department position scheduleProfile course yearLevel section studentId teacherId employeeId parentName parentEmail guardianName guardianEmail emergencyContact",
       );
 
       let firstTapAssignment = null;
@@ -4061,7 +4069,9 @@ app.post(
 app.post("/api/nfc/office-tap", officeTapAccessMiddleware, async (req, res) => {
   try {
     const cardId = String(
-      req.body?.nfcCardId ||
+      req.body?.virtualCardToken ||
+        req.body?.virtualNfcToken ||
+        req.body?.nfcCardId ||
         req.body?.cardId ||
         req.body?.uid ||
         req.body?.pn532Uid ||
@@ -4117,7 +4127,7 @@ app.post("/api/nfc/office-tap", officeTapAccessMiddleware, async (req, res) => {
       ? await User.findOne({
           ...buildNfcCredentialQuery(cardId, normalizedCardId),
           role: "visitor",
-        }).select("_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status")
+        }).select("_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid virtualNfcToken role status")
       : null;
 
     const visitorQuery = req.body?.visitorId
@@ -4804,6 +4814,7 @@ const getVisitorAccountPayload = (user = {}) => ({
   nfcCardId: getUserPhysicalNfcUid(user),
   physicalNfcUid: getUserPhysicalNfcUid(user),
   phoneNfcUid: getUserPhoneNfcUid(user),
+  virtualNfcToken: getUserVirtualNfcToken(user),
   cardActive: isUserSafePassCardActive(user),
   accessPermissions: {
     canAccess: user.accessPermissions?.canAccess || [],
@@ -4867,6 +4878,37 @@ const activateVisitorSafePassCardForUser = async (user, visitor = {}) => {
   return safePassId;
 };
 
+const ensureVirtualNfcTokenForVisitor = async (user, visitor = null) => {
+  if (!user || normalizeUserRoleValue(user.role) !== "visitor") return "";
+
+  let token = getUserVirtualNfcToken(user);
+  if (!token) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidate = generateVirtualNfcToken();
+      const existing = await User.exists({ virtualNfcToken: candidate });
+      if (!existing) {
+        token = candidate;
+        break;
+      }
+    }
+  }
+
+  if (!token) {
+    throw new Error("Unable to generate virtual NFC token.");
+  }
+
+  user.virtualNfcToken = token;
+  await user.save();
+
+  const visitorRecord = visitor || (await findVisitorForUser(user));
+  if (visitorRecord && visitorRecord.virtualNfcToken !== token) {
+    visitorRecord.virtualNfcToken = token;
+    await visitorRecord.save();
+  }
+
+  return token;
+};
+
 const isEmptyPhysicalNfcUid = (value = "") => !normalizeSubmittedNfcCardId(value);
 
 const findApprovedVisitorForFirstNfcTap = async (normalizedCardId = "") => {
@@ -4875,7 +4917,7 @@ const findApprovedVisitorForFirstNfcTap = async (normalizedCardId = "") => {
   }
 
   const duplicateUser = await User.findOne(buildNfcCredentialQuery(normalizedCardId, normalizedCardId)).select(
-    "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions",
+    "_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid virtualNfcToken role status accessPermissions",
   );
   if (duplicateUser) {
     return { visitor: null, user: duplicateUser, reason: "already_assigned" };
@@ -4905,7 +4947,7 @@ const findApprovedVisitorForFirstNfcTap = async (normalizedCardId = "") => {
         ...(visitor.email ? [{ email: String(visitor.email).trim().toLowerCase() }] : []),
         { visitorId: visitor._id },
       ],
-    }).select("_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid role status accessPermissions");
+    }).select("_id email firstName lastName nfcCardId safePassId physicalNfcUid phoneNfcUid virtualNfcToken role status accessPermissions");
 
     if (!visitorUser || !isEmptyPhysicalNfcUid(visitorUser.physicalNfcUid)) {
       continue;
@@ -5281,6 +5323,7 @@ const buildVisitorProfilePayload = async (visitorUser) => {
     visitorPayload.safePassId = getUserSafePassId(visitorUser) || visitorPayload.safePassId || "";
     visitorPayload.physicalNfcUid = getUserPhysicalNfcUid(visitorUser) || visitorPayload.physicalNfcUid || "";
     visitorPayload.phoneNfcUid = getUserPhoneNfcUid(visitorUser) || visitorPayload.phoneNfcUid || "";
+    visitorPayload.virtualNfcToken = getUserVirtualNfcToken(visitorUser) || visitorPayload.virtualNfcToken || "";
     visitorPayload.nfcCardId = visitorPayload.physicalNfcUid;
 
     return {
@@ -6113,6 +6156,32 @@ app.get("/api/visitor/profile", authMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get visitor profile",
+    });
+  }
+});
+
+app.post("/api/visitor/virtual-nfc-token", authMiddleware, async (req, res) => {
+  try {
+    if (normalizeUserRoleValue(req.user.role) !== "visitor") {
+      return res.status(403).json({
+        success: false,
+        message: "Only visitor accounts can use a virtual NFC card.",
+      });
+    }
+
+    const visitor = await findVisitorForUser(req.user);
+    const token = await ensureVirtualNfcTokenForVisitor(req.user, visitor);
+
+    res.json({
+      success: true,
+      virtualNfcToken: token,
+      visitorId: visitor?._id || null,
+    });
+  } catch (error) {
+    console.error("Ensure virtual NFC token error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to prepare virtual NFC card.",
     });
   }
 });

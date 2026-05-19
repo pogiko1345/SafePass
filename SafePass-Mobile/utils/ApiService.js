@@ -962,6 +962,17 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async ensureVisitorVirtualNfcToken() {
+    try {
+      return await this.fetch("/visitor/virtual-nfc-token", {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error("Ensure visitor virtual NFC token error:", error);
+      throw error;
+    }
+  }
+
   async getVisitorAccessLogs(visitorId) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/logs`);

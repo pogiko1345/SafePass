@@ -71,6 +71,7 @@ role: {
   safePassId: { type: String, unique: true, sparse: true, trim: true },
   physicalNfcUid: { type: String, unique: true, sparse: true, trim: true, uppercase: true },
   phoneNfcUid: { type: String, unique: true, sparse: true, trim: true, uppercase: true },
+  virtualNfcToken: { type: String, unique: true, sparse: true, trim: true, uppercase: true },
   cardExpiry: {
     type: Date,
     default: () => {
@@ -143,6 +144,10 @@ userSchema.pre("save", async function () {
     this.phoneNfcUid = undefined;
   }
 
+  if (this.virtualNfcToken === null || this.virtualNfcToken === "") {
+    this.virtualNfcToken = undefined;
+  }
+
   if (this.safePassId) {
     this.safePassId = String(this.safePassId).trim();
   }
@@ -153,6 +158,10 @@ userSchema.pre("save", async function () {
 
   if (this.phoneNfcUid) {
     this.phoneNfcUid = String(this.phoneNfcUid).trim().toUpperCase();
+  }
+
+  if (this.virtualNfcToken) {
+    this.virtualNfcToken = String(this.virtualNfcToken).trim().toUpperCase();
   }
 
   if (this.email) {

@@ -106,6 +106,13 @@ const visitorSchema = new mongoose.Schema({
     uppercase: true,
     index: true,
   },
+  virtualNfcToken: {
+    type: String,
+    default: "",
+    trim: true,
+    uppercase: true,
+    index: true,
+  },
   idNumber: { 
     type: String, 
     default: "",
