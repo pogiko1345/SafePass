@@ -9,10 +9,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Vibration,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import ApiService from "../utils/ApiService";
 import { describeRfidReaderInput, normalizeRfidReaderInput } from "../utils/rfidReaderUtils";
 import {
@@ -34,9 +36,7 @@ const ENTRY_CHECKPOINTS = [
 ];
 
 const ACTION_OPTIONS = [
-  { key: "auto", label: "Auto", subtitle: "Gate decides", icon: "sync-outline", color: "#0A3D91" },
-  { key: "check_in", label: "Check In", subtitle: "Force arrival", icon: "log-in-outline", color: "#16A34A" },
-  { key: "check_out", label: "Check Out", subtitle: "Force departure", icon: "log-out-outline", color: "#DC2626" },
+  { key: "auto", label: "Auto", subtitle: "Reader decides", icon: "sync-outline", color: "#0A3D91" },
   { key: "location", label: "Location", subtitle: "Track movement", icon: "location-outline", color: "#7C3AED" },
 ];
 
@@ -44,6 +44,19 @@ const ALLOWED_ROLES = new Set(["admin", "security", "guard", "staff"]);
 const STATION_EVENTS_STORAGE_KEY = "safepass:nfc-scan:station-events:v1";
 const STATION_FEED_PAGE_SIZE = 6;
 const MAX_STATION_EVENTS = 100;
+
+const triggerTapFeedback = async (type = "success") => {
+  if (Platform.OS === "web") return;
+
+  if (type === "error") {
+    Vibration.vibrate([0, 80, 70, 140]);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    return;
+  }
+
+  Vibration.vibrate(90);
+  await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+};
 
 const readStoredStationEvents = () => {
   if (Platform.OS !== "web" || typeof window === "undefined") return [];
@@ -501,6 +514,7 @@ export default function NFCScanScreen({ navigation }) {
 
       setLatestResult(event);
       recordLocalEvent(event);
+      await triggerTapFeedback("success");
       focusReader();
     } catch (error) {
       const errorData = error?.data || {};
@@ -530,6 +544,7 @@ export default function NFCScanScreen({ navigation }) {
       };
       setLatestResult(failedEvent);
       recordLocalEvent(failedEvent);
+      await triggerTapFeedback("error");
       Alert.alert("Tap Failed", failedEvent.message);
     } finally {
       setBusy(false);
