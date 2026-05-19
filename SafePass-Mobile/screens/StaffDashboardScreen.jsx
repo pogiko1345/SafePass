@@ -725,6 +725,18 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     [appointments],
   );
 
+  const activeStaffVisits = useMemo(
+    () =>
+      appointments
+        .filter((item) => isActiveStaffVisit(item))
+        .sort(
+          (firstItem, secondItem) =>
+            new Date(secondItem.checkedInAt || secondItem.updatedAt || 0) -
+            new Date(firstItem.checkedInAt || firstItem.updatedAt || 0),
+        ),
+    [appointments],
+  );
+
   const nextUpcomingAppointment = useMemo(() => {
     const now = new Date();
 
@@ -2245,6 +2257,68 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         </View>
 
         <View style={styles.homeWorkspaceSide}>
+      <View style={[styles.sectionCard, styles.activeVisitsCard]}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderCopy}>
+            <Text style={styles.sectionTitle}>Active Visits</Text>
+            <Text style={styles.sectionSubtitle}>
+              Checked-in visitors currently assigned to your office.
+            </Text>
+          </View>
+          <View style={styles.activeVisitCountBadge}>
+            <Text style={styles.activeVisitCountText}>{activeStaffVisits.length}</Text>
+          </View>
+        </View>
+
+        {activeStaffVisits.length === 0 ? (
+          <View style={styles.compactEmptyState}>
+            <Ionicons name="walk-outline" size={34} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No active visits</Text>
+            <Text style={styles.emptySubtitle}>
+              When security checks in a visitor for your office, they will appear here.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.activeVisitList}>
+            {activeStaffVisits.slice(0, 6).map((appointment) => (
+              <HomeHoverPressable
+                key={appointment._id}
+                style={styles.activeVisitItem}
+                onPress={() => openVisitManagementModal(appointment)}
+              >
+                <View style={styles.activeVisitTopRow}>
+                  <View style={styles.activeVisitAvatar}>
+                    <Ionicons name="person-outline" size={18} color="#047857" />
+                  </View>
+                  <View style={styles.activeVisitCopy}>
+                    <Text style={styles.activeVisitName} numberOfLines={1}>
+                      {appointment.fullName || "Visitor"}
+                    </Text>
+                    <Text style={styles.activeVisitMeta} numberOfLines={1}>
+                      {appointment.currentLocation?.office ||
+                        appointment.currentDestination?.office ||
+                        appointment.appointmentDepartment ||
+                        "Inside campus"}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.activeVisitFooter}>
+                  <Text style={styles.activeVisitTime}>
+                    Checked in {formatRelativeTime(appointment.checkedInAt)}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.activeVisitManageButton}
+                    onPress={() => openVisitManagementModal(appointment)}
+                  >
+                    <Text style={styles.activeVisitManageText}>Manage</Text>
+                  </TouchableOpacity>
+                </View>
+              </HomeHoverPressable>
+            ))}
+          </View>
+        )}
+      </View>
+
       <View style={[styles.sectionCard, styles.notificationsCard]}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderCopy}>

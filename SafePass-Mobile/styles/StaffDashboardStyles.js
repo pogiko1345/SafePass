@@ -461,6 +461,7 @@ export default StyleSheet.create({
   homeWorkspaceSide: {
     flex: 1,
     minWidth: width > 1180 ? 360 : 0,
+    gap: width > 900 ? 14 : 12,
   },
 
   todayScheduleList: {
@@ -510,6 +511,116 @@ export default StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     color: "#64748B",
+  },
+
+  activeVisitsCard: {
+    borderColor: "#BBF7D0",
+  },
+
+  activeVisitCountBadge: {
+    minWidth: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "#DCFCE7",
+    borderWidth: 1,
+    borderColor: "#86EFAC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  activeVisitCountText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#047857",
+  },
+
+  compactEmptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 18,
+    paddingHorizontal: 8,
+  },
+
+  activeVisitList: {
+    gap: 10,
+  },
+
+  activeVisitItem: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D1FAE5",
+    backgroundColor: "#F0FDF4",
+    padding: 12,
+    ...webHover({
+      cursor: "pointer",
+      transition: "all 0.18s ease",
+      ":hover": {
+        backgroundColor: "#FFFFFF",
+        borderColor: "#86EFAC",
+        boxShadow: "0px 8px 18px rgba(15, 23, 42, 0.07)",
+      },
+    }),
+  },
+
+  activeVisitTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  activeVisitAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: "#DCFCE7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  activeVisitCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  activeVisitName: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  activeVisitMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#047857",
+  },
+
+  activeVisitFooter: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  activeVisitTime: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  activeVisitManageButton: {
+    borderRadius: 999,
+    backgroundColor: "#047857",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+
+  activeVisitManageText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
 
   homeInsightAction: {
