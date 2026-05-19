@@ -60,6 +60,14 @@
           "locationWhenInUsePermission": "SafePass uses your location while you are checked in so security can monitor active visitor presence."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "appVariant": "full",
+      "appDisplayName": "Sapphire International Aviation Academy",
+      "appOrganization": "Sapphire International Aviation Academy",
+      "eas": {
+        "projectId": "b7043c15-cb4c-4f94-a9bc-3af130c25647"
+      }
+    }
   }
 }
