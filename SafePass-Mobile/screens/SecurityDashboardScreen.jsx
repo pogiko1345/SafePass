@@ -277,6 +277,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const operationalDataSignatureRef = useRef("");
   const notificationDataSignatureRef = useRef("");
   const visitorNfcInputRef = useRef(null);
+  const visitorNfcLastInputAtRef = useRef(0);
   const authRedirectHandledRef = useRef(false);
   
   // Dashboard Data
@@ -1799,7 +1800,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       return;
     }
 
-    const normalizedCardId = normalizeRfidReaderInput(scannedValue);
+    const normalizedCardId = getCleanVisitorNfcUid(scannedValue);
     const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
     setVisitorNfcPinnedVisitor(selectedVisitorForNfc);
     if (!normalizedCardId) {
@@ -1872,7 +1873,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
 
     const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
-    const scannedCard = normalizeRfidReaderInput(visitorNfcUid);
+    const scannedCard = getCleanVisitorNfcUid(visitorNfcUid);
     const cardToRemove = scannedCard || currentCard;
     setVisitorNfcPinnedVisitor(selectedVisitorForNfc);
     if (!cardToRemove) {
@@ -2101,6 +2102,42 @@ export default function SecurityDashboardScreen({ navigation }) {
     return true;
   };
 
+  const collapseRepeatedVisitorNfcUid = (value = "") => {
+    const normalizedValue = normalizeRfidReaderInput(value);
+
+    if (
+      normalizedValue.length >= 8 &&
+      normalizedValue.length % 2 === 0 &&
+      normalizedValue.slice(0, normalizedValue.length / 2) === normalizedValue.slice(normalizedValue.length / 2)
+    ) {
+      return normalizedValue.slice(0, normalizedValue.length / 2);
+    }
+
+    return normalizedValue;
+  };
+
+  const normalizeVisitorNfcUidInput = (value = "") => {
+    const normalizedValue = collapseRepeatedVisitorNfcUid(value);
+    const now = Date.now();
+    const previousValue = visitorNfcUid;
+    const timeSinceLastInput = now - visitorNfcLastInputAtRef.current;
+    visitorNfcLastInputAtRef.current = now;
+
+    const isFreshScannerBurst = timeSinceLastInput > 250;
+    if (
+      previousValue &&
+      normalizedValue.length > previousValue.length &&
+      normalizedValue.startsWith(previousValue) &&
+      isFreshScannerBurst
+    ) {
+      return normalizedValue.slice(previousValue.length);
+    }
+
+    return normalizedValue;
+  };
+
+  const getCleanVisitorNfcUid = (value = "") => collapseRepeatedVisitorNfcUid(value);
+
   const getVisitorAssignedNfcUid = (visitor) =>
     [
       visitor?.physicalNfcUid,
@@ -2110,7 +2147,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       visitor?.relatedUser?.nfcCardId,
       visitor?.account?.nfcCardId,
     ]
-      .map((value) => normalizeRfidReaderInput(value))
+      .map((value) => getCleanVisitorNfcUid(value))
       .find((value) => isVisitorPhysicalNfcUid(value)) || "";
 
   const getVisitorNfcDetailRows = (visitor) => [
@@ -3135,7 +3172,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderVisitorNfcAssignmentPanel = () => {
     const hasPinnedOnlyVisitor = !assignableNfcVisitors.length && Boolean(selectedVisitorForNfc);
     const selectedVisitorCurrentUid = getVisitorAssignedNfcUid(selectedVisitorForNfc);
-    const scannedNfcUid = normalizeRfidReaderInput(visitorNfcUid);
+    const scannedNfcUid = getCleanVisitorNfcUid(visitorNfcUid);
     const canRemoveNfcUid = Boolean(selectedVisitorCurrentUid || scannedNfcUid);
 
     return (
@@ -3271,9 +3308,13 @@ export default function SecurityDashboardScreen({ navigation }) {
               ref={visitorNfcInputRef}
               style={styles.visitorNfcUidInput}
               value={visitorNfcUid}
-              onChangeText={(value) => setVisitorNfcUid(normalizeRfidReaderInput(value))}
+              onChangeText={(value) => {
+                setVisitorNfcUid(normalizeVisitorNfcUidInput(value));
+                if (visitorNfcStatus?.type === "error") setVisitorNfcStatus(null);
+              }}
               onSubmitEditing={(event) => handleAssignVisitorNfc(event?.nativeEvent?.text)}
               onFocus={() => {
+                visitorNfcLastInputAtRef.current = Date.now();
                 if (visitorNfcStatus?.type === "error") setVisitorNfcStatus(null);
               }}
               placeholder="Tap visitor card on USB reader"
