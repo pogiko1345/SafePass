@@ -805,9 +805,30 @@ const ATTENDANCE_USER_TYPES = ["student", "teacher", "staff", "security", "guard
 
 const normalizeUserRoleValue = (value = "") => {
   const normalized = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-  if (["security_officer", "security_guard", "guard_officer"].includes(normalized)) return "security";
+  if (
+    [
+      "security_staff",
+      "security_officer",
+      "security_guard",
+      "guard_officer",
+    ].includes(normalized)
+  ) {
+    return "security";
+  }
   if (normalized === "academic_teacher" || normalized === "faculty") return "teacher";
   return normalized;
+};
+
+const hasSecurityOperatorPrivileges = (user = {}) => {
+  const normalizedRole = normalizeUserRoleValue(user?.role);
+  if (["admin", "security", "guard"].includes(normalizedRole)) return true;
+
+  const department = String(user?.department || "").trim().toLowerCase();
+  const position = String(user?.position || "").trim().toLowerCase();
+  return (
+    normalizedRole === "staff" &&
+    (department.includes("security") || position.includes("security"))
+  );
 };
 
 const toObjectIdOrNull = (value) => {
@@ -13845,7 +13866,7 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
   try {
     const requesterRole = normalizeUserRoleValue(req.user?.role);
     const canAssignAnyUser = requesterRole === "admin";
-    const canAssignVisitorOnly = ["security", "guard"].includes(requesterRole);
+    const canAssignVisitorOnly = hasSecurityOperatorPrivileges(req.user) && !canAssignAnyUser;
 
     if (!canAssignAnyUser && !canAssignVisitorOnly) {
       return res.status(403).json({ success: false, message: "Access denied" });
@@ -14049,7 +14070,7 @@ app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
   try {
     const requesterRole = normalizeUserRoleValue(req.user?.role);
     const canRevokeAnyUser = requesterRole === "admin";
-    const canRevokeVisitorOnly = ["security", "guard"].includes(requesterRole);
+    const canRevokeVisitorOnly = hasSecurityOperatorPrivileges(req.user) && !canRevokeAnyUser;
 
     if (!canRevokeAnyUser && !canRevokeVisitorOnly) {
       return res.status(403).json({ success: false, message: "Access denied" });
