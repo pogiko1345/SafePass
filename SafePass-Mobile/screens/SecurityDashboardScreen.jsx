@@ -1294,11 +1294,12 @@ export default function SecurityDashboardScreen({ navigation }) {
       }
 
       const normalizedRole = normalizeRole(cachedUser?.role);
-      if (!cachedUser || !canAccessSecurityDashboard(normalizedRole)) {
-        navigation.replace("Login");
+      const normalizedUser = { ...cachedUser, role: normalizedRole };
+      if (!cachedUser || !canAccessSecurityDashboard(normalizedUser)) {
+        const fallbackRoute = normalizedRole === "staff" ? "StaffDashboard" : "Login";
+        navigation.replace(fallbackRoute);
         return null;
       }
-      const normalizedUser = { ...cachedUser, role: normalizedRole };
       setUser(normalizedUser);
       setSecurityProfileForm(buildSecurityProfileForm(normalizedUser));
 
@@ -1306,7 +1307,15 @@ export default function SecurityDashboardScreen({ navigation }) {
         .then((profileResponse) => {
           const profileUser = profileResponse?.user || null;
           if (!profileUser) return;
-          const refreshedUser = { ...normalizedUser, ...profileUser, role: normalizedRole };
+          const refreshedUser = {
+            ...normalizedUser,
+            ...profileUser,
+            role: normalizeRole(profileUser.role || normalizedRole),
+          };
+          if (!canAccessSecurityDashboard(refreshedUser)) {
+            navigation.replace(refreshedUser.role === "staff" ? "StaffDashboard" : "Login");
+            return;
+          }
           setUser(refreshedUser);
           setSecurityProfileForm(buildSecurityProfileForm(refreshedUser));
         })
@@ -1843,6 +1852,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           undefined,
         email: selectedVisitorForNfc.email,
         cardId: normalizedCardId,
+        force: true,
       });
       const assignedCardId = response?.card?.cardNumber || normalizedCardId;
       setVisitorNfcUid("");
@@ -1873,12 +1883,11 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
 
     const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
-    const scannedCard = getCleanVisitorNfcUid(visitorNfcUid);
-    const cardToRemove = scannedCard || currentCard;
+    const cardToRemove = currentCard;
     setVisitorNfcPinnedVisitor(selectedVisitorForNfc);
     if (!cardToRemove) {
-      setVisitorNfcStatus({ type: "error", message: "Scan a card UID or choose a visitor with an assigned UID first." });
-      Alert.alert("Card UID Required", "Scan a card UID or choose a visitor with an assigned UID first.");
+      setVisitorNfcStatus({ type: "error", message: "Choose a visitor with an assigned UID before removing it." });
+      Alert.alert("No UID Assigned", "Choose a visitor with an assigned UID before removing it.");
       return;
     }
 
@@ -1886,18 +1895,15 @@ export default function SecurityDashboardScreen({ navigation }) {
       setVisitorNfcBusy(true);
       setVisitorNfcStatus({
         type: "info",
-        message: scannedCard
-          ? `Removing scanned UID ${cardToRemove} from the visitor account using it...`
-          : `Unassigning ${cardToRemove} from ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...`,
+        message: `Unassigning ${cardToRemove} from ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...`,
       });
       const response = await ApiService.revokeNfcCard({
-        userId: scannedCard
-          ? undefined
-          : selectedVisitorForNfc.userId ||
+        userId:
+          selectedVisitorForNfc.userId ||
             selectedVisitorForNfc.relatedUser?._id ||
             selectedVisitorForNfc.accountId ||
             undefined,
-        email: scannedCard ? undefined : selectedVisitorForNfc.email,
+        email: selectedVisitorForNfc.email,
         cardId: cardToRemove,
       });
       setSelectedVisitorNfcId(getVisitorNfcIdentity(response?.visitor || selectedVisitorForNfc));
@@ -1909,9 +1915,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
       setVisitorNfcStatus({
         type: "success",
-        message: scannedCard
-          ? `Scanned UID ${cardToRemove} was removed successfully.`
-          : response?.message || "Visitor UID unassigned successfully.",
+        message: response?.message || `UID ${cardToRemove} was unassigned successfully.`,
       });
     } catch (error) {
       setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to unassign this card UID." });
@@ -3173,7 +3177,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     const hasPinnedOnlyVisitor = !assignableNfcVisitors.length && Boolean(selectedVisitorForNfc);
     const selectedVisitorCurrentUid = getVisitorAssignedNfcUid(selectedVisitorForNfc);
     const scannedNfcUid = getCleanVisitorNfcUid(visitorNfcUid);
-    const canRemoveNfcUid = Boolean(selectedVisitorCurrentUid || scannedNfcUid);
+    const canRemoveNfcUid = Boolean(selectedVisitorCurrentUid);
 
     return (
     <View style={styles.visitorNfcPanel}>
@@ -3339,7 +3343,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 >
                   <Ionicons name="unlink-outline" size={16} color="#B91C1C" />
                   <Text style={styles.visitorNfcUnassignButtonText}>
-                    {scannedNfcUid ? "Remove Scanned UID" : "Unassign UID"}
+                    Unassign Current UID
                   </Text>
                 </TouchableOpacity>
               ) : null}

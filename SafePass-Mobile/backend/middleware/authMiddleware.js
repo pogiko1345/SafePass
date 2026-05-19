@@ -2,9 +2,28 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const normalizeRole = (role = "") => {
-  const normalized = String(role || "").trim().toLowerCase();
-  if (normalized === "guard") return "security";
+  const normalized = String(role || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (
+    [
+      "guard",
+      "security_staff",
+      "security_officer",
+      "security_guard",
+      "guard_officer",
+    ].includes(normalized)
+  ) {
+    return "security";
+  }
   return normalized;
+};
+
+const isSecurityDepartmentUser = (user = {}) => {
+  const role = normalizeRole(user?.role);
+  if (role === "security") return true;
+
+  const department = String(user?.department || "").trim().toLowerCase();
+  const position = String(user?.position || "").trim().toLowerCase();
+  return role === "staff" && (department.includes("security") || position.includes("security"));
 };
 
 const getRequiredEnvValue = (name) => {
@@ -43,7 +62,9 @@ const requireRoles = (...roles) => {
 
   return (req, res, next) => {
     const userRole = normalizeRole(req.user?.role);
-    if (!userRole || !allowedRoles.has(userRole)) {
+    const securityDepartmentAllowed =
+      allowedRoles.has("security") && isSecurityDepartmentUser(req.user);
+    if (!userRole || (!allowedRoles.has(userRole) && !securityDepartmentAllowed)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
@@ -55,6 +76,7 @@ const requireRoles = (...roles) => {
 
 module.exports = {
   authMiddleware,
+  isSecurityDepartmentUser,
   normalizeRole,
   requireRoles,
 };

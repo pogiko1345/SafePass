@@ -1676,11 +1676,11 @@ async rejectVisitor(visitorId, reason) {
     }
   }
 
-  async assignNfcCard({ userId, email, cardId, nfcCardId, uid } = {}) {
+  async assignNfcCard({ userId, email, cardId, nfcCardId, uid, force = false } = {}) {
     try {
       const response = await this.fetch("/nfc-cards/assign", {
         method: "POST",
-        body: { userId, email, cardId, nfcCardId, uid },
+        body: { userId, email, cardId, nfcCardId, uid, force },
       });
       return response;
     } catch (error) {

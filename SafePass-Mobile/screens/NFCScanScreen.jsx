@@ -85,6 +85,15 @@ const writeStoredStationEvents = (events = []) => {
   }
 };
 
+const getStationEventSignature = (event = {}) =>
+  [
+    event.success ? "ok" : "blocked",
+    String(event.nfcCardId || "").trim().toUpperCase(),
+    String(event.action || "").trim().toLowerCase(),
+    String(event.checkpoint || "").trim().toLowerCase(),
+    String(event.message || "").trim().toLowerCase(),
+  ].join("|");
+
 const CARD_SHADOW = Platform.select({
   web: { boxShadow: "0px 14px 34px rgba(15, 23, 42, 0.08)" },
   ios: {
@@ -494,11 +503,34 @@ export default function NFCScanScreen({ navigation }) {
 
   const recordLocalEvent = (event) => {
     setStationEvents((currentEvents) => {
+      const eventSignature = getStationEventSignature(event);
+      const recentDuplicate = currentEvents.find((existingEvent) => {
+        const existingTime = new Date(existingEvent?.timestamp || 0).getTime();
+        const eventTime = new Date(event?.timestamp || 0).getTime();
+        return (
+          getStationEventSignature(existingEvent) === eventSignature &&
+          Number.isFinite(existingTime) &&
+          Number.isFinite(eventTime) &&
+          Math.abs(eventTime - existingTime) < 60000
+        );
+      });
+
+      if (recentDuplicate) {
+        return currentEvents;
+      }
+
       const nextEvents = [event, ...currentEvents].slice(0, MAX_STATION_EVENTS);
       writeStoredStationEvents(nextEvents);
       return nextEvents;
     });
     setStationFeedPage(1);
+  };
+
+  const clearStationFeed = () => {
+    writeStoredStationEvents([]);
+    setStationEvents([]);
+    setStationFeedPage(1);
+    setLatestResult(null);
   };
 
   const pollPn532DeviceLogs = async ({ announceNew = true } = {}) => {
@@ -1253,10 +1285,18 @@ export default function NFCScanScreen({ navigation }) {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Station Feed</Text>
-            <Text style={styles.sectionHint}>
-              This device | Page {Math.min(stationFeedPage, stationFeedTotalPages)} of {stationFeedTotalPages}
-            </Text>
+            <View>
+              <Text style={styles.sectionTitle}>Station Feed</Text>
+              <Text style={styles.sectionHint}>
+                This device | Page {Math.min(stationFeedPage, stationFeedTotalPages)} of {stationFeedTotalPages}
+              </Text>
+            </View>
+            {stationEvents.length ? (
+              <TouchableOpacity style={styles.clearFeedButton} onPress={clearStationFeed}>
+                <Ionicons name="trash-outline" size={15} color="#B91C1C" />
+                <Text style={styles.clearFeedButtonText}>Clear Feed</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
           {stationEvents.length === 0 ? (
             <View style={styles.emptyState}>
@@ -1621,7 +1661,8 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 12,
     marginBottom: 12,
   },
   sectionHeaderRow: {
@@ -1711,6 +1752,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#64748B",
+  },
+  clearFeedButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  clearFeedButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#B91C1C",
   },
   selectedCheckpointBanner: {
     flexDirection: "row",

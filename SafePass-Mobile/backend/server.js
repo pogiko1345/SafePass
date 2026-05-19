@@ -805,9 +805,30 @@ const ATTENDANCE_USER_TYPES = ["student", "teacher", "staff", "security", "guard
 
 const normalizeUserRoleValue = (value = "") => {
   const normalized = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-  if (["security_officer", "security_guard", "guard_officer"].includes(normalized)) return "security";
+  if (
+    [
+      "security_staff",
+      "security_officer",
+      "security_guard",
+      "guard_officer",
+    ].includes(normalized)
+  ) {
+    return "security";
+  }
   if (normalized === "academic_teacher" || normalized === "faculty") return "teacher";
   return normalized;
+};
+
+const hasSecurityOperatorPrivileges = (user = {}) => {
+  const normalizedRole = normalizeUserRoleValue(user?.role);
+  if (["admin", "security", "guard"].includes(normalizedRole)) return true;
+
+  const department = String(user?.department || "").trim().toLowerCase();
+  const position = String(user?.position || "").trim().toLowerCase();
+  return (
+    normalizedRole === "staff" &&
+    (department.includes("security") || position.includes("security"))
+  );
 };
 
 const toObjectIdOrNull = (value) => {
@@ -13845,15 +13866,16 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
   try {
     const requesterRole = normalizeUserRoleValue(req.user?.role);
     const canAssignAnyUser = requesterRole === "admin";
-    const canAssignVisitorOnly = ["security", "guard"].includes(requesterRole);
+    const canAssignVisitorOnly = hasSecurityOperatorPrivileges(req.user) && !canAssignAnyUser;
 
     if (!canAssignAnyUser && !canAssignVisitorOnly) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const { userId, email, cardId, nfcCardId, uid } = req.body || {};
+    const { userId, email, cardId, nfcCardId, uid, force } = req.body || {};
     const normalizedCardId = normalizeNfcCardId(cardId || nfcCardId || uid);
     const normalizedEmail = String(email || "").trim().toLowerCase();
+    const forceReassign = force === true || String(force || "").toLowerCase() === "true";
 
     if (!normalizedCardId) {
       return res.status(400).json({
@@ -13894,11 +13916,41 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
       ],
     }).select("_id email role nfcCardId safePassId physicalNfcUid phoneNfcUid");
 
-    if (existingCardOwner && String(existingCardOwner._id) !== String(user._id)) {
+    if (existingCardOwner && String(existingCardOwner._id) !== String(user._id) && !forceReassign) {
       return res.status(409).json({
         success: false,
         message: `Card ${normalizedCardId} is already assigned to ${existingCardOwner.email}.`,
       });
+    }
+
+    if (existingCardOwner && String(existingCardOwner._id) !== String(user._id) && forceReassign) {
+      const existingOwnerRole = normalizeUserRoleValue(existingCardOwner.role);
+      if (canAssignVisitorOnly && existingOwnerRole !== "visitor") {
+        return res.status(403).json({
+          success: false,
+          message: "Security can only move NFC cards between visitor accounts.",
+        });
+      }
+
+      const oldOwnerSafePassId = getUserSafePassId(existingCardOwner);
+      existingCardOwner.physicalNfcUid = undefined;
+      existingCardOwner.phoneNfcUid = undefined;
+      if (!isLegacySafePassToken(existingCardOwner.nfcCardId)) {
+        existingCardOwner.nfcCardId = oldOwnerSafePassId || undefined;
+      }
+      await existingCardOwner.save();
+
+      if (existingOwnerRole === "visitor") {
+        await Visitor.updateMany(
+          { email: existingCardOwner.email },
+          {
+            $set: {
+              nfcCardId: "",
+              physicalNfcUid: "",
+            },
+          },
+        );
+      }
     }
 
     const targetRole = normalizeUserRoleValue(user.role);
@@ -13950,8 +14002,16 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
       metadata: {
         previousCardId,
         assignedCardId: normalizedCardId,
+        forceReassign,
+        previousOwnerEmail:
+          existingCardOwner && String(existingCardOwner._id) !== String(user._id)
+            ? existingCardOwner.email
+            : "",
       },
-      notes: `Assigned NFC card ${normalizedCardId} to ${user.email}`,
+      notes:
+        forceReassign && existingCardOwner && String(existingCardOwner._id) !== String(user._id)
+          ? `Moved NFC card ${normalizedCardId} from ${existingCardOwner.email} to ${user.email}`
+          : `Assigned NFC card ${normalizedCardId} to ${user.email}`,
     });
 
     const linkedVisitor =
@@ -13977,7 +14037,10 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      message: "NFC card assigned successfully",
+      message:
+        forceReassign && existingCardOwner && String(existingCardOwner._id) !== String(user._id)
+          ? "NFC card moved and assigned successfully"
+          : "NFC card assigned successfully",
       visitor: linkedVisitor,
       card: {
         id: user._id,
@@ -14007,7 +14070,7 @@ app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
   try {
     const requesterRole = normalizeUserRoleValue(req.user?.role);
     const canRevokeAnyUser = requesterRole === "admin";
-    const canRevokeVisitorOnly = ["security", "guard"].includes(requesterRole);
+    const canRevokeVisitorOnly = hasSecurityOperatorPrivileges(req.user) && !canRevokeAnyUser;
 
     if (!canRevokeAnyUser && !canRevokeVisitorOnly) {
       return res.status(403).json({ success: false, message: "Access denied" });
