@@ -1351,6 +1351,18 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async redirectStaffAppointment(visitorId, redirectData = {}) {
+    try {
+      return await this.fetch(`/staff/appointments/${visitorId}/redirect`, {
+        method: "PUT",
+        body: redirectData,
+      });
+    } catch (error) {
+      console.error("Redirect staff appointment error:", error);
+      throw error;
+    }
+  }
+
   async rejectStaffAppointment(visitorId, reason) {
     try {
       return await this.fetch(`/staff/appointments/${visitorId}/reject`, {

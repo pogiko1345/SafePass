@@ -2022,6 +2022,22 @@ export default StyleSheet.create({
     color: "#334155",
   },
 
+  visitManagementActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 4,
+  },
+
+  visitManagementDoneButton: {
+    backgroundColor: "#047857",
+    borderColor: "#047857",
+  },
+
+  visitManagementDoneButtonText: {
+    color: "#FFFFFF",
+  },
+
   detailSectionTitle: {
     fontSize: 13,
     fontWeight: "800",
@@ -2269,6 +2285,61 @@ export default StyleSheet.create({
     textAlignVertical: "top",
   },
 
+  redirectOfficeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 16,
+  },
+
+  redirectOfficeChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FBFE",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+
+  redirectOfficeChipSelected: {
+    borderColor: "#0A3D91",
+    backgroundColor: "#EEF5FF",
+  },
+
+  redirectOfficeChipDisabled: {
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F1F5F9",
+    opacity: 0.68,
+  },
+
+  redirectOfficeChipText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#334155",
+  },
+
+  redirectOfficeChipTextSelected: {
+    color: "#0A3D91",
+  },
+
+  redirectOfficeChipTextDisabled: {
+    color: "#94A3B8",
+  },
+
+  visitManagementSummary: {
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#DBE3F0",
+    backgroundColor: "#F8FBFE",
+    padding: 14,
+    gap: 12,
+  },
+
+  visitManagementSummaryRow: {
+    gap: 4,
+  },
+
   modalActionRow: {
     flexDirection: "row",
     gap: 12,
@@ -2301,6 +2372,22 @@ export default StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     color: "#FFFFFF",
+  },
+
+  modalSecondaryAction: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    alignItems: "center",
+  },
+
+  modalSecondaryActionText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0A3D91",
   },
 
   modalReject: {

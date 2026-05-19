@@ -2321,10 +2321,29 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     );
   };
 
+  const getAppointmentSlotDateTime = (timeOption, dateValue = appointmentForm.preferredDate) => {
+    const date = getValidDate(dateValue);
+    const time = getValidDate(timeOption);
+    if (!date || !time) return null;
+    const combinedDateTime = new Date(date);
+    combinedDateTime.setHours(time.getHours(), time.getMinutes(), 0, 0);
+    return Number.isNaN(combinedDateTime.getTime()) ? null : combinedDateTime;
+  };
+
+  const isAppointmentTimeSlotPassed = (timeOption, dateValue = appointmentForm.preferredDate) => {
+    const slotDateTime = getAppointmentSlotDateTime(timeOption, dateValue);
+    if (!slotDateTime) return false;
+    return slotDateTime < new Date(Date.now() - 60 * 1000);
+  };
+
   const isAppointmentTimeSlotFull = (timeOption) =>
     Boolean(getAppointmentSlotInfo(timeOption)?.isFull);
 
   const getAppointmentSlotStatusText = (timeOption) => {
+    if (isAppointmentTimeSlotPassed(timeOption)) {
+      return "Time has passed";
+    }
+
     const slot = getAppointmentSlotInfo(timeOption);
     if (!slot) {
       return isLoadingAppointmentSlots ? "Checking slots..." : "Select office to view slots";
@@ -2555,7 +2574,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const handleAppointmentSlotTimeSelect = (timeOption) => {
-    if (isLoadingAppointmentSlots || isAppointmentTimeSlotFull(timeOption)) return;
+    if (
+      isLoadingAppointmentSlots ||
+      isAppointmentTimeSlotFull(timeOption) ||
+      isAppointmentTimeSlotPassed(timeOption)
+    ) {
+      return;
+    }
     setHasAppointmentDraft(true);
     setAppointmentForm((prev) => ({ ...prev, preferredTime: timeOption }));
   };
@@ -2646,13 +2671,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 {group.options.map((option) => {
                   const isSelected = isSameAppointmentTime(option, selectedTime);
                   const isFull = isAppointmentTimeSlotFull(option);
-                  const isDisabled = isLoadingAppointmentSlots || isFull;
+                  const isPassed = isAppointmentTimeSlotPassed(option);
+                  const isUnavailable = isFull || isPassed;
+                  const isDisabled = isLoadingAppointmentSlots || isUnavailable;
                   return (
                     <TouchableOpacity
                       key={`${group.label}-${option.getHours()}-${option.getMinutes()}`}
                       style={[
                         visitorDashboardStyles.mobileTimeSlotButton,
-                        isFull && visitorDashboardStyles.mobileTimeSlotButtonUnavailable,
+                        isUnavailable && visitorDashboardStyles.mobileTimeSlotButtonUnavailable,
                         isSelected && visitorDashboardStyles.mobileTimeSlotButtonSelected,
                       ]}
                       disabled={isDisabled}
@@ -2662,11 +2689,21 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       <Text
                         style={[
                           visitorDashboardStyles.mobileTimeSlotText,
-                          isFull && visitorDashboardStyles.mobileTimeSlotTextUnavailable,
+                          isUnavailable && visitorDashboardStyles.mobileTimeSlotTextUnavailable,
                           isSelected && visitorDashboardStyles.mobileTimeSlotTextSelected,
                         ]}
                       >
                         {formatTime(option)}
+                      </Text>
+                      <Text
+                        style={[
+                          visitorDashboardStyles.mobileTimeSlotMeta,
+                          isUnavailable && visitorDashboardStyles.mobileTimeSlotMetaUnavailable,
+                          isSelected && visitorDashboardStyles.mobileTimeSlotMetaSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {getAppointmentSlotStatusText(option)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -2790,13 +2827,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   {group.options.map((option) => {
                     const isSelected = isSameAppointmentTime(option, selectedTime);
                     const isFull = isAppointmentTimeSlotFull(option);
-                    const isDisabled = isLoadingAppointmentSlots || isFull;
+                    const isPassed = isAppointmentTimeSlotPassed(option);
+                    const isUnavailable = isFull || isPassed;
+                    const isDisabled = isLoadingAppointmentSlots || isUnavailable;
                     return (
                       <TouchableOpacity
                         key={`${group.label}-${option.getHours()}-${option.getMinutes()}`}
                         style={[
                           visitorDashboardStyles.webTimeSlotButton,
-                          isFull && visitorDashboardStyles.webTimeSlotButtonUnavailable,
+                          isUnavailable && visitorDashboardStyles.webTimeSlotButtonUnavailable,
                           isSelected && visitorDashboardStyles.webTimeSlotButtonSelected,
                         ]}
                         disabled={isDisabled}
@@ -2805,11 +2844,21 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                         <Text
                           style={[
                             visitorDashboardStyles.webTimeSlotText,
-                            isFull && visitorDashboardStyles.webTimeSlotTextUnavailable,
+                            isUnavailable && visitorDashboardStyles.webTimeSlotTextUnavailable,
                             isSelected && visitorDashboardStyles.webTimeSlotTextSelected,
                           ]}
                         >
                           {formatTime(option)}
+                        </Text>
+                        <Text
+                          style={[
+                            visitorDashboardStyles.webTimeSlotMeta,
+                            isUnavailable && visitorDashboardStyles.webTimeSlotMetaUnavailable,
+                            isSelected && visitorDashboardStyles.webTimeSlotMetaSelected,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {getAppointmentSlotStatusText(option)}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -3199,6 +3248,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
+    if (isAppointmentTimeSlotPassed(preferredTime, preferredDate)) {
+      showVisitorAlert(
+        "Time Slot Passed",
+        "That appointment time has already passed. Please choose another available time slot.",
+      );
+      return;
+    }
+
     if (!selectedDepartments.length) {
       showVisitorAlert("Missing Details", "Please choose at least one office to visit.");
       return;
@@ -3330,6 +3387,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       showVisitorAlert(
         "Choose An Available Time",
         "Please choose one of the available appointment time slots. Custom times like 2:45 PM are not available.",
+      );
+      return;
+    }
+
+    if (isAppointmentTimeSlotPassed(preferredTime, preferredDate)) {
+      showVisitorAlert(
+        "Time Slot Passed",
+        "That appointment time has already passed. Please choose another available time slot.",
       );
       return;
     }
@@ -5712,6 +5777,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                       {appointmentTimeOptions.map((option) => {
                         const isSelected = isSameAppointmentTime(appointmentForm.preferredTime, option);
                         const isFull = isAppointmentTimeSlotFull(option);
+                        const isPassed = isAppointmentTimeSlotPassed(option);
+                        const isUnavailable = isFull || isPassed;
                         return (
                           <TouchableOpacity
                             key={`${option.getHours()}-${option.getMinutes()}`}
@@ -5719,9 +5786,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                               visitorDashboardStyles.pickerOptionItem,
                               isVisitorDarkMode && visitorDashboardStyles.darkOptionItem,
                               isSelected && visitorDashboardStyles.pickerOptionItemActive,
-                              isFull && visitorDashboardStyles.pickerOptionItemDisabled,
+                              isUnavailable && visitorDashboardStyles.pickerOptionItemDisabled,
                             ]}
-                            disabled={isFull}
+                            disabled={isUnavailable}
                             onPress={() => {
                               setHasAppointmentDraft(true);
                               setAppointmentForm((prev) => ({ ...prev, preferredTime: option }));
@@ -5734,7 +5801,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                                   visitorDashboardStyles.pickerOptionText,
                                   isVisitorDarkMode && visitorDashboardStyles.darkPrimaryText,
                                   isSelected && visitorDashboardStyles.pickerOptionTextActive,
-                                  isFull && visitorDashboardStyles.pickerOptionTextDisabled,
+                                  isUnavailable && visitorDashboardStyles.pickerOptionTextDisabled,
                                 ]}
                               >
                                 {formatTime(option)}
@@ -5743,7 +5810,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                                 style={[
                                  visitorDashboardStyles.pickerOptionMeta,
                                   isVisitorDarkMode && visitorDashboardStyles.darkMutedText,
-                                  isFull && visitorDashboardStyles.pickerOptionMetaFull,
+                                  isUnavailable && visitorDashboardStyles.pickerOptionMetaFull,
                                 ]}
                               >
                                 {getAppointmentSlotStatusText(option)}
@@ -5751,7 +5818,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             </View>
                             {isSelected ? (
                               <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
-                            ) : isFull ? (
+                            ) : isUnavailable ? (
                               <Ionicons name="lock-closed-outline" size={18} color="#DC2626" />
                             ) : null}
                           </TouchableOpacity>
@@ -7159,13 +7226,16 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                             appointmentEditForm.preferredTime &&
                             new Date(appointmentEditForm.preferredTime).getHours() === option.getHours() &&
                             new Date(appointmentEditForm.preferredTime).getMinutes() === option.getMinutes();
+                          const isPassed = isAppointmentTimeSlotPassed(option, appointmentEditForm.preferredDate);
                           return (
                             <TouchableOpacity
                               key={`edit-${option.getHours()}-${option.getMinutes()}`}
                               style={[
                                 visitorDashboardStyles.pickerOptionItem,
                                 isSelected && visitorDashboardStyles.pickerOptionItemActive,
+                                isPassed && visitorDashboardStyles.pickerOptionItemDisabled,
                               ]}
+                              disabled={isPassed}
                               onPress={() => {
                                 setAppointmentEditForm((prev) => ({ ...prev, preferredTime: option }));
                                 setShowEditAppointmentTimePicker(false);
@@ -7175,11 +7245,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                                 style={[
                                   visitorDashboardStyles.pickerOptionText,
                                   isSelected && visitorDashboardStyles.pickerOptionTextActive,
+                                  isPassed && visitorDashboardStyles.pickerOptionTextDisabled,
                                 ]}
                               >
                                 {formatTime(option)}
                               </Text>
-                              {isSelected ? <Ionicons name="checkmark-circle" size={18} color="#0A3D91" /> : null}
+                              {isPassed ? (
+                                <Text style={[visitorDashboardStyles.pickerOptionMeta, visitorDashboardStyles.pickerOptionMetaFull]}>
+                                  Time has passed
+                                </Text>
+                              ) : isSelected ? (
+                                <Ionicons name="checkmark-circle" size={18} color="#0A3D91" />
+                              ) : null}
                             </TouchableOpacity>
                           );
                         })}

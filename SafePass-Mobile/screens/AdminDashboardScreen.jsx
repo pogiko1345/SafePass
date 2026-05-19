@@ -307,7 +307,7 @@ for (let hour = 7; hour <= 18; hour += 1) {
       value: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
       hour,
       minute,
-      capacity: 2,
+      capacity: 3,
       enabled: true,
     });
   }
@@ -2687,7 +2687,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     enabled: existing.enabled !== false,
   });
 
-  const buildAppointmentTimeSlotOption = (value, existing = {}, capacityValue = existing.capacity ?? existing.limit ?? 2) => {
+  const buildAppointmentTimeSlotOption = (value, existing = {}, capacityValue = existing.capacity ?? existing.limit ?? 3) => {
     const normalized = String(value || "").trim();
     const match = normalized.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
     if (!match) return null;
@@ -2762,7 +2762,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         ? buildAppointmentTimeSlotOption(
             draft,
             option,
-            appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 2,
+            appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 3,
           )
         : buildAppointmentTextOption(groupKey, draft, option);
 
@@ -9208,7 +9208,7 @@ const loadDashboardData = useCallback(async () => {
                           style={[styles.appointmentOptionCapacityInput, isDarkMode && styles.darkInput]}
                           placeholder="Slots"
                           placeholderTextColor={isDarkMode ? "#64748B" : "#94A3B8"}
-                          value={String(appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 2)}
+                          value={String(appointmentSlotCapacityDrafts[option.id] ?? option.capacity ?? option.limit ?? 3)}
                           keyboardType="number-pad"
                           onChangeText={(value) =>
                             setAppointmentSlotCapacityDrafts((prev) => ({ ...prev, [option.id]: value }))
@@ -9234,7 +9234,7 @@ const loadDashboardData = useCallback(async () => {
                           <>
                             <Ionicons name="people-outline" size={13} color="#64748B" />
                             <Text style={[styles.appointmentOptionStatusText, isDarkMode && styles.darkTextSecondary]}>
-                              {option.capacity || option.limit || 2} slots
+                              {option.capacity || option.limit || 3} slots
                             </Text>
                           </>
                         ) : null}
@@ -9262,7 +9262,7 @@ const loadDashboardData = useCallback(async () => {
                         if (groupKey === "timeSlots") {
                           setAppointmentSlotCapacityDrafts((prev) => ({
                             ...prev,
-                            [option.id]: String(option.capacity || option.limit || 2),
+                            [option.id]: String(option.capacity || option.limit || 3),
                           }));
                         }
                       }}

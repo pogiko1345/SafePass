@@ -321,6 +321,30 @@ const visitorSchema = new mongoose.Schema({
     default: "",
     trim: true,
   },
+  appointmentRedirectedAt: {
+    type: Date,
+    default: null,
+  },
+  appointmentRedirectedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  appointmentRedirectFrom: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  appointmentRedirectTo: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+  appointmentRedirectNote: {
+    type: String,
+    default: "",
+    trim: true,
+  },
   runningLateNotifiedAt: {
     type: Date,
     default: null,
@@ -951,6 +975,77 @@ visitorSchema.methods = {
     this.checkedInBy = null;
     this.checkedOutBy = null;
     this.overstayAlertedAt = null;
+    this.syncWorkflowState();
+    return this;
+  },
+
+  redirectAppointmentToOffice(staffUser, {
+    office = "",
+    assignedStaff = null,
+    assignedStaffName = "",
+    note = "",
+    wasApproved = false,
+  } = {}) {
+    const targetOffice = String(office || "").trim();
+    const previousOffice =
+      this.appointmentDepartment ||
+      this.assignedOffice ||
+      this.host ||
+      this.currentDestination?.office ||
+      "";
+
+    this.requestCategory = "appointment";
+    this.approvalFlow = "staff";
+    this.appointmentDepartment = targetOffice;
+    this.assignedOffice = targetOffice;
+    this.host = targetOffice;
+    this.assignedStaff = assignedStaff || null;
+    this.assignedStaffName = String(assignedStaffName || "").trim();
+    this.staffActionBy = staffUser?._id || null;
+    this.staffActionAt = new Date();
+    this.appointmentStatus = wasApproved ? "rescheduled" : "pending";
+    this.appointmentRedirectedAt = new Date();
+    this.appointmentRedirectedBy = staffUser?._id || null;
+    this.appointmentRedirectFrom = previousOffice;
+    this.appointmentRedirectTo = targetOffice;
+    this.appointmentRedirectNote = String(
+      note || `Redirected from ${previousOffice || "previous office"} to ${targetOffice}.`,
+    ).trim();
+    this.staffAdjustmentNote = this.appointmentRedirectNote;
+    this.staffRejectionReason = "";
+    this.appointmentCompletedAt = null;
+    this.appointmentCompletedBy = null;
+    this.appointmentCompletionNote = "";
+    this.appointmentCancelledAt = null;
+    this.appointmentCancelledBy = null;
+    this.appointmentCancellationReason = "";
+    this.visitExpiredAt = null;
+    this.noShowMarkedAt = null;
+    this.overstayAlertedAt = null;
+
+    this.currentDestination = {
+      office: targetOffice,
+      floor: "",
+      checkpointId: "",
+      reason: this.appointmentRedirectNote,
+      status: "redirected",
+      updatedBy: staffUser?._id || null,
+      updatedAt: new Date(),
+    };
+    this.destinationHistory = [
+      ...(Array.isArray(this.destinationHistory) ? this.destinationHistory : []),
+      {
+        fromOffice: previousOffice,
+        toOffice: targetOffice,
+        floor: "",
+        checkpointId: "",
+        reason: this.appointmentRedirectNote,
+        status: "redirected",
+        updatedBy: staffUser?._id || null,
+        updatedAt: new Date(),
+      },
+    ].slice(-25);
+
     this.syncWorkflowState();
     return this;
   },

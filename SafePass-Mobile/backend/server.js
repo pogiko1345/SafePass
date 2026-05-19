@@ -4434,7 +4434,7 @@ const formatDepartmentLabel = (value = "") =>
     .replace(/\s+/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
-const APPOINTMENT_SLOT_LIMIT = DEFAULT_APPOINTMENT_SLOT_LIMIT || 2;
+const APPOINTMENT_SLOT_LIMIT = DEFAULT_APPOINTMENT_SLOT_LIMIT || 3;
 const APPOINTMENT_SLOT_STATUSES = ["pending", "approved", "adjusted", "adjustment_pending", "rescheduled"];
 const APPOINTMENT_PURPOSE_OPTIONS = DEFAULT_APPOINTMENT_PURPOSE_OPTIONS;
 const APPOINTMENT_DEPARTMENT_OPTIONS = DEFAULT_APPOINTMENT_DEPARTMENT_OPTIONS;
@@ -5617,6 +5617,14 @@ const countStaffAppointmentsForSlot = async ({
 
   return Visitor.countDocuments(query);
 };
+
+const findActiveStaffForDepartment = (departmentLabel = "") =>
+  User.findOne({
+    role: "staff",
+    isActive: true,
+    status: "active",
+    department: getStaffDepartmentQuery(departmentLabel),
+  }).sort({ lastLogin: -1, createdAt: 1 });
 
 const getStaffDepartmentQuery = (department = "") => {
   const normalizedDepartment = normalizeDepartmentValue(department);
@@ -11656,6 +11664,242 @@ app.put("/api/staff/appointments/:id/adjust", authMiddleware, async (req, res) =
     res.status(500).json({
       success: false,
       message: "Failed to adjust appointment",
+    });
+  }
+});
+
+app.put("/api/staff/appointments/:id/redirect", authMiddleware, async (req, res) => {
+  try {
+    if (!["staff", "admin"].includes(String(req.user.role).toLowerCase())) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const targetOffice = String(
+      req.body?.office ||
+        req.body?.appointmentDepartment ||
+        req.body?.assignedOffice ||
+        req.body?.department ||
+        "",
+    ).trim();
+    const redirectNote = String(req.body?.note || req.body?.reason || "").trim();
+
+    if (!targetOffice) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose the office that should review this appointment.",
+      });
+    }
+
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (visitor.requestCategory !== "appointment" || visitor.approvalFlow !== "staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Only staff appointment requests can be redirected here.",
+      });
+    }
+
+    if (!isStaffAllowedForAppointment(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only redirect appointments assigned to your department.",
+      });
+    }
+
+    const appointmentStatus = String(visitor.appointmentStatus || "pending").toLowerCase();
+    if (!["pending", "rescheduled", "approved", "adjusted"].includes(appointmentStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only active appointment requests can be redirected.",
+      });
+    }
+
+    const activeAppointmentOptions = await getAppointmentOptions({ activeOnly: true });
+    const enabledOfficeLabels = activeAppointmentOptions.offices.map((option) => option.label);
+    if (!isAllowedOption(targetOffice, enabledOfficeLabels)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose an enabled office from Appointment Management.",
+      });
+    }
+
+    const previousOffice = visitor.appointmentDepartment || visitor.assignedOffice || visitor.host || "";
+    if (normalizeDepartmentValue(previousOffice) === normalizeDepartmentValue(targetOffice)) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment is already assigned to that office.",
+      });
+    }
+
+    const routedStaff = await findActiveStaffForDepartment(targetOffice);
+    if (!routedStaff) {
+      return res.status(400).json({
+        success: false,
+        message: `No active staff account is assigned to ${targetOffice}. Please choose another office or contact admin.`,
+      });
+    }
+
+    const appointmentDateTime = getCombinedAppointmentDateTime(visitor.visitDate, visitor.visitTime);
+    if (!appointmentDateTime || appointmentDateTime < new Date(Date.now() - 60 * 1000)) {
+      return res.status(400).json({
+        success: false,
+        message: "This appointment schedule is no longer valid. Please adjust the schedule instead.",
+      });
+    }
+
+    const configuredSlot = findAppointmentConfiguredSlot(activeAppointmentOptions.timeSlots, appointmentDateTime);
+    if (!configuredSlot) {
+      return res.status(400).json({
+        success: false,
+        message: "The appointment time is no longer an enabled slot. Please adjust the schedule instead.",
+      });
+    }
+
+    const slotLimit = getAppointmentSlotLimit(configuredSlot);
+    const targetSlotCount = await countStaffAppointmentsForSlot({
+      assignedStaff: routedStaff._id,
+      visitDate: visitor.visitDate,
+      visitTime: visitor.visitTime,
+      excludeVisitorId: visitor._id,
+    });
+
+    if (targetSlotCount >= slotLimit) {
+      return res.status(409).json({
+        success: false,
+        code: "APPOINTMENT_SLOT_FULL",
+        message: `${formatDepartmentLabel(targetOffice)} is already full for that time. Please adjust the appointment or choose another office.`,
+        limit: slotLimit,
+        currentCount: targetSlotCount,
+      });
+    }
+
+    const wasApproved = ["approved", "adjusted"].includes(appointmentStatus);
+    const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
+    const visitSchedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+    const finalOffice = formatDepartmentLabel(targetOffice);
+    const finalNote =
+      redirectNote ||
+      `${getFullName(req.user) || "Staff"} redirected this request from ${previousOffice || "the previous office"} to ${finalOffice}.`;
+
+    visitor.redirectAppointmentToOffice(req.user, {
+      office: finalOffice,
+      assignedStaff: routedStaff._id,
+      assignedStaffName: getFullName(routedStaff),
+      note: finalNote,
+      wasApproved,
+    });
+    await visitor.save();
+
+    const updatedVisitor = await Visitor.findById(visitor._id)
+      .populate("assignedStaff", "firstName lastName email department")
+      .populate("staffActionBy", "firstName lastName email department");
+    const [updatedVisitorPayload] = await attachSafePassIdsToVisitors([updatedVisitor]);
+
+    await Promise.all([
+      createRoleNotification({
+        title: "Appointment Redirected",
+        message: `${visitor.fullName}'s appointment for ${visitSchedule} was redirected from ${previousOffice || "the previous office"} to ${finalOffice}.`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "admin",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "staff_redirected_appointment",
+          previousOffice,
+          targetOffice: finalOffice,
+          note: finalNote,
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+        },
+      }),
+      createRoleNotification({
+        title: "Redirected Appointment Request",
+        message: `${visitor.fullName}'s request was redirected from ${previousOffice || "another office"} to ${finalOffice}. Please review it.`,
+        type: "visitor",
+        severity: "medium",
+        targetRole: "staff",
+        targetUser: routedStaff._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "staff_redirected_appointment",
+          previousOffice,
+          targetOffice: finalOffice,
+          note: finalNote,
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+        },
+      }),
+      visitorUser
+        ? createRoleNotification({
+            title: "Appointment Sent To Another Office",
+            message: `Your appointment request was moved from ${previousOffice || "the previous office"} to ${finalOffice}. The ${finalOffice} staff will review it next.`,
+            type: "info",
+            severity: "medium",
+            targetRole: "visitor",
+            targetUser: visitorUser._id,
+            relatedVisitor: visitor._id,
+            relatedUser: visitorUser._id,
+            metadata: {
+              activityType: "staff_redirected_appointment",
+              previousOffice,
+              targetOffice: finalOffice,
+              note: finalNote,
+            },
+          })
+        : Promise.resolve(),
+      wasApproved
+        ? createRoleNotification({
+            title: "Approved Appointment Redirected",
+            message: `${visitor.fullName}'s approved appointment changed from ${previousOffice || "the previous office"} to ${finalOffice}. Staff review is required before entry.`,
+            type: "warning",
+            severity: "medium",
+            targetRole: "security",
+            relatedVisitor: visitor._id,
+            relatedUser: visitorUser?._id || null,
+            metadata: {
+              activityType: "staff_redirected_approved_appointment",
+              previousOffice,
+              targetOffice: finalOffice,
+              note: finalNote,
+              visitDate: visitor.visitDate,
+              visitTime: visitor.visitTime,
+            },
+          })
+        : Promise.resolve(),
+    ]);
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "staff_redirected_appointment",
+      status: "pending",
+      location: finalOffice,
+      notes: `${getFullName(req.user)} redirected ${visitor.fullName}'s appointment from ${previousOffice || "the previous office"} to ${finalOffice}.`,
+      metadata: {
+        previousOffice,
+        targetOffice: finalOffice,
+        note: finalNote,
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Appointment sent to ${finalOffice}. The visitor and target office were notified.`,
+      visitor: updatedVisitorPayload,
+    });
+  } catch (error) {
+    console.error("Staff redirect appointment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to redirect appointment",
     });
   }
 });
