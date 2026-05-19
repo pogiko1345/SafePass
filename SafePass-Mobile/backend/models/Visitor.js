@@ -321,6 +321,15 @@ const visitorSchema = new mongoose.Schema({
     default: "",
     trim: true,
   },
+  runningLateNotifiedAt: {
+    type: Date,
+    default: null,
+  },
+  runningLateReason: {
+    type: String,
+    default: "",
+    trim: true,
+  },
   previousVisitDate: {
     type: Date,
     default: null,
@@ -338,6 +347,10 @@ const visitorSchema = new mongoose.Schema({
     default: null,
   },
   overstayAlertedAt: {
+    type: Date,
+    default: null,
+  },
+  officeDepartureAlertedAt: {
     type: Date,
     default: null,
   },
@@ -1110,6 +1123,10 @@ visitorSchema.methods = {
       statusLabel,
       isActive,
     };
+
+    if (action !== "office_departure") {
+      this.officeDepartureAlertedAt = null;
+    }
 
     this.currentLocation = nextLocation;
     this.locationHistory.push({

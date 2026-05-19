@@ -1712,6 +1712,77 @@ const ensureOverstayAlerts = async () => {
       visitor.overstayAlertedAt = new Date();
       await visitor.save();
     }
+
+    const officeAwayMinutes = Math.max(
+      5,
+      parseInt(process.env.VISITOR_OFFICE_DEPARTURE_ALERT_MINUTES || "15", 10),
+    );
+    const officeAwayThreshold = new Date(Date.now() - officeAwayMinutes * 60 * 1000);
+    const visitorsAwayFromOffice = await Visitor.find({
+      requestCategory: "appointment",
+      status: "checked_in",
+      checkedOutAt: null,
+      "currentLocation.action": "office_departure",
+      "currentLocation.lastSeenAt": { $ne: null, $lte: officeAwayThreshold },
+      officeDepartureAlertedAt: null,
+    }).limit(50);
+
+    for (const visitor of visitorsAwayFromOffice) {
+      const visitorUser = await User.findOne({ email: visitor.email });
+      const lastOffice = visitor.currentLocation?.office || visitor.assignedOffice || visitor.appointmentDepartment || "the office";
+      const lastSeenAt = visitor.currentLocation?.lastSeenAt || new Date();
+
+      await createRoleNotification({
+        title: "Visitor Away From Office",
+        message: `${visitor.fullName} left ${lastOffice} more than ${officeAwayMinutes} minutes ago and has not checked out or tapped another office. Please verify their location.`,
+        type: "warning",
+        severity: "high",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_office_departure_overdue",
+          office: lastOffice,
+          leftOfficeAt: lastSeenAt,
+          thresholdMinutes: officeAwayMinutes,
+          currentLocation: visitor.currentLocation || null,
+        },
+      });
+
+      await createRoleNotification({
+        title: "Visitor Away From Office",
+        message: `${visitor.fullName} has been away from ${lastOffice} for more than ${officeAwayMinutes} minutes.`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "admin",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_office_departure_overdue",
+          office: lastOffice,
+          leftOfficeAt: lastSeenAt,
+          thresholdMinutes: officeAwayMinutes,
+        },
+      });
+
+      await createSystemActivity({
+        actorUser: null,
+        relatedVisitor: visitor,
+        relatedUser: visitorUser,
+        activityType: "visitor_office_departure_overdue",
+        status: "warning",
+        location: lastOffice,
+        notes: `${visitor.fullName} left ${lastOffice} and has not checked out or tapped another office after ${officeAwayMinutes} minutes.`,
+        metadata: {
+          leftOfficeAt: lastSeenAt,
+          thresholdMinutes: officeAwayMinutes,
+          currentLocation: visitor.currentLocation || null,
+        },
+      });
+
+      visitor.officeDepartureAlertedAt = new Date();
+      await visitor.save();
+    }
   } catch (error) {
     console.error("Ensure overstay alerts error:", error);
   }
@@ -2195,6 +2266,7 @@ const getVisitorCheckInLocation = (visitor, source = "mobile_app") => {
 };
 
 const CHECK_IN_GRACE_PERIOD_MINUTES = 15;
+const EARLY_LOBBY_CHECK_IN_MINUTES = 20;
 const GATE_CHECKPOINT_IDS = new Set([
   "main_gate",
   "gate",
@@ -2211,6 +2283,40 @@ const GATE_CHECKPOINT_IDS = new Set([
 
 const isGateCheckpoint = (location = {}) =>
   GATE_CHECKPOINT_IDS.has(normalizeCheckpointId(location.checkpointId || location.office));
+
+const getAppointmentTimingState = (visitor = {}, nowValue = new Date()) => {
+  const checkInWindow = getAppointmentCheckInWindow(visitor);
+  if (!checkInWindow) {
+    return {
+      hasSchedule: false,
+      earlyMinutes: 0,
+      lateMinutes: 0,
+      beforeSchedule: false,
+      afterGrace: false,
+      inEarlyLobbyWindow: false,
+    };
+  }
+
+  const now = nowValue instanceof Date ? nowValue : new Date(nowValue);
+  const earlyMinutes = Math.ceil((checkInWindow.scheduledAt.getTime() - now.getTime()) / 60000);
+  const lateMinutes = Math.floor((now.getTime() - checkInWindow.scheduledAt.getTime()) / 60000);
+
+  return {
+    hasSchedule: true,
+    scheduledAt: checkInWindow.scheduledAt,
+    graceUntil: checkInWindow.graceUntil,
+    earlyMinutes: Math.max(0, earlyMinutes),
+    lateMinutes: Math.max(0, lateMinutes),
+    beforeSchedule: now < checkInWindow.scheduledAt,
+    afterGrace: now > checkInWindow.graceUntil,
+    inEarlyLobbyWindow:
+      now < checkInWindow.scheduledAt &&
+      earlyMinutes <= EARLY_LOBBY_CHECK_IN_MINUTES,
+  };
+};
+
+const isBeforeAppointmentOfficeAccessTime = (visitor = {}) =>
+  getAppointmentTimingState(visitor).beforeSchedule;
 
 const isSameCheckpointLocation = (left = {}, right = {}) => {
   const leftCheckpoint = normalizeCheckpointId(left?.checkpointId || left?.office);
@@ -3026,6 +3132,39 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       !shouldCheckOut &&
       (shouldCheckIn || visitor.status === "checked_in");
 
+    if (
+      !isMainGateTap &&
+      visitor.status === "checked_in" &&
+      isBeforeAppointmentOfficeAccessTime(visitor)
+    ) {
+      const scheduleLabel = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+      await AccessLog.create({
+        userId: cardUser._id,
+        userEmail: cardUser.email,
+        userName: visitor.fullName,
+        actorRole: "device",
+        location: tapLocation.office,
+        accessType: "system",
+        activityType: "early_office_scan",
+        status: "denied",
+        nfcCardId: normalizedCardId,
+        relatedVisitor: visitor._id,
+        relatedUser: cardUser._id,
+        metadata: { deviceId, tapLocation, visitDate: visitor.visitDate, visitTime: visitor.visitTime },
+        notes: `${visitor.fullName} arrived early and must wait in the lobby until ${scheduleLabel}.`,
+      });
+
+      return res.status(403).json({
+        success: false,
+        userType: "visitor",
+        action: "location_update",
+        code: "WAIT_IN_LOBBY",
+        message: `Please wait in the lobby until your appointment time: ${scheduleLabel}.`,
+        nfcCardId: normalizedCardId,
+        visitor: getVisitorTapPayload({ visitor, visitorUser: cardUser, nfcCardId: normalizedCardId }),
+      });
+    }
+
     if (wrongOfficeScan) {
       const assignedOffice = getAssignedAppointmentOffice(visitor) || "Assigned office";
       const scannedOffice = tapLocation.office || "Unknown checkpoint";
@@ -3128,7 +3267,9 @@ app.post("/api/device/location-tap", validateDeviceKey, async (req, res) => {
       visitor.updateCurrentLocation(tapLocation, {
         deviceId,
         action: "check_in",
-        statusLabel: `Inside ${tapLocation.office || "checkpoint"}`,
+        statusLabel: checkInEligibility.lobbyOnly
+          ? "Waiting in lobby"
+          : `Inside ${tapLocation.office || "checkpoint"}`,
       });
       action = "check_in";
       accessType = "entry";
@@ -3557,6 +3698,39 @@ app.post(
       let activityType = "station_location_tap";
       let responseMessage = "Visitor location updated";
 
+      if (
+        !isMainGateTap &&
+        visitor.status === "checked_in" &&
+        isBeforeAppointmentOfficeAccessTime(visitor)
+      ) {
+        const scheduleLabel = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+        await AccessLog.create({
+          userId: req.user._id,
+          userEmail: req.user.email,
+          userName: operatorName,
+          actorRole: operatorRole || "security",
+          location: tapLocation.office,
+          accessType: "system",
+          activityType: "early_office_scan",
+          status: "denied",
+          nfcCardId: normalizedCardId,
+          relatedVisitor: visitor._id,
+          relatedUser: cardUser._id,
+          metadata: { deviceId, tapLocation, visitDate: visitor.visitDate, visitTime: visitor.visitTime },
+          notes: `${visitor.fullName} arrived early and must wait in the lobby until ${scheduleLabel}.`,
+        });
+
+        return res.status(403).json({
+          success: false,
+          userType: "visitor",
+          action: "location_update",
+          code: "WAIT_IN_LOBBY",
+          message: `Please wait in the lobby until your appointment time: ${scheduleLabel}.`,
+          nfcCardId: normalizedCardId,
+          visitor: getVisitorTapPayload({ visitor, visitorUser: cardUser, nfcCardId: normalizedCardId }),
+        });
+      }
+
       if (shouldCheckOut) {
         visitor.markCheckedOut(req.user._id);
         visitor.updateCurrentLocation(tapLocation, {
@@ -3624,7 +3798,9 @@ app.post(
         visitor.updateCurrentLocation(tapLocation, {
           deviceId,
           action: "check_in",
-          statusLabel: `Inside ${tapLocation.office || "checkpoint"}`,
+          statusLabel: checkInEligibility.lobbyOnly
+            ? "Waiting in lobby"
+            : `Inside ${tapLocation.office || "checkpoint"}`,
         });
         action = "check_in";
         accessType = "entry";
@@ -3928,6 +4104,27 @@ app.post("/api/nfc/office-tap", officeTapAccessMiddleware, async (req, res) => {
         success: false,
         code: "OFFICE_TRACKING_NOT_ACTIVE",
         message: "Visitor must be checked in with an approved appointment before office tracking works.",
+      });
+    }
+
+    if (!isGateCheckpoint(tapLocation) && isBeforeAppointmentOfficeAccessTime(visitor)) {
+      const scheduleLabel = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+      await createVisitorMovementLog({
+        visitor,
+        visitorUser,
+        nfcCardId: normalizedCardId,
+        tapLocation,
+        expectedDestination: "Lobby waiting area",
+        status: "waiting",
+        message: `Visitor arrived early and must wait in the lobby until ${scheduleLabel}.`,
+        metadata: { deviceId, visitDate: visitor.visitDate, visitTime: visitor.visitTime },
+        tappedAt,
+      });
+
+      return res.status(403).json({
+        success: false,
+        code: "WAIT_IN_LOBBY",
+        message: `Please wait in the lobby until your appointment time: ${scheduleLabel}.`,
       });
     }
 
@@ -4952,6 +5149,7 @@ const buildLiveVisitorLocationPayload = (visitor = {}) => {
     lastScanTime,
     status: currentLocation.isActive === false ? "exited" : "inside",
     statusLabel,
+    action: currentLocation.action || "",
     source: currentLocation.source || "checkpoint",
     checkedInAt: visitor.checkedInAt,
     movementHistory: visitor.recentMovementHistory || [],
@@ -5360,17 +5558,26 @@ const getVisitorCheckInEligibility = (visitor) => {
     };
   }
 
-  const now = new Date();
-  if (now < checkInWindow.scheduledAt) {
+  const timingState = getAppointmentTimingState(visitor);
+  if (timingState.beforeSchedule && timingState.inEarlyLobbyWindow) {
+    return {
+      allowed: true,
+      earlyArrival: true,
+      lobbyOnly: true,
+      message: `Early arrival accepted. Please wait in the lobby until your scheduled appointment time: ${formatVisitSchedule(visitor.visitDate, visitor.visitTime)}.`,
+    };
+  }
+
+  if (timingState.beforeSchedule) {
     const scheduleLabel = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
     return {
       allowed: false,
       statusCode: 400,
-      message: `Check-in opens at your scheduled appointment time: ${scheduleLabel}.`,
+      message: `You may check in up to ${EARLY_LOBBY_CHECK_IN_MINUTES} minutes early and wait in the lobby. Your scheduled appointment is ${scheduleLabel}.`,
     };
   }
 
-  if (now > checkInWindow.graceUntil) {
+  if (timingState.afterGrace) {
     return {
       allowed: false,
       statusCode: 400,
@@ -5415,21 +5622,47 @@ const getStaffDepartmentQuery = (department = "") => {
   const normalizedDepartment = normalizeDepartmentValue(department);
   const aliasGroups = {
     registrar: ["Registrar", "Registrar's Office"],
-    accounting: ["Accounting", "Finance", "Finance Office", "Cashier"],
+    "registrar's office": ["Registrar", "Registrar's Office"],
+    accounting: ["Accounting", "Accounting Office", "Finance", "Finance Office", "Cashier"],
+    "accounting office": ["Accounting", "Accounting Office", "Finance", "Finance Office", "Cashier"],
+    cashier: ["Cashier", "Accounting", "Accounting Office", "Finance", "Finance Office"],
     guidance: ["Guidance", "Guidance Office", "Student Services"],
-    administration: ["Administration", "Administration Office"],
-    admissions: ["Admissions", "Admissions Office"],
-    "information desk": ["Information Desk", "Lobby", "Front Desk"],
+    "guidance office": ["Guidance", "Guidance Office", "Student Services"],
+    administration: ["Administration", "Administration Office", "Admissions", "Admissions Office"],
+    "administration office": ["Administration", "Administration Office", "Admissions", "Admissions Office"],
+    admissions: ["Admissions", "Admissions Office", "Administration", "Administration Office"],
+    "information desk": ["Information Desk", "Lobby", "Front Desk", "Entrance / Lobby"],
+    lobby: ["Information Desk", "Lobby", "Front Desk", "Entrance / Lobby"],
+    "front desk": ["Information Desk", "Lobby", "Front Desk", "Entrance / Lobby"],
     "flight operations": ["Flight Operations"],
-    training: ["Training", "Head of Training Room"],
-    "i.t room": ["I.T Room", "IT Room"],
-    "faculty room": ["Faculty Room"],
-    laboratory: ["Laboratory"],
+    training: ["Training", "Head of Training Room", "Head Of Training Room"],
+    "head of training room": ["Training", "Head of Training Room", "Head Of Training Room"],
+    "i.t room": ["I.T Room", "IT Room", "Information Technology"],
+    "it room": ["I.T Room", "IT Room", "Information Technology"],
+    "faculty room": ["Faculty Room", "Academic Department", "Academics"],
+    "academy director": ["Academy Director", "Administration", "Administration Office"],
+    chairman: ["Chairman", "Administration", "Administration Office"],
+    clinic: ["Clinic", "Student Services", "Guidance"],
+    "conference room": ["Conference Room", "Administration", "Administration Office"],
+    "file room": ["File Room", "Registrar", "Registrar's Office", "Administration"],
+    storage: ["Storage", "Administration", "Administration Office"],
+    laboratory: ["Laboratory", "Academic Department", "Academics"],
     tesda: ["TESDA"],
-    workshop: ["Workshop", "Tools Room"],
-    library: ["Library"],
+    workshop: ["Workshop", "Tools Room", "Academic Department", "Academics"],
+    "tools room": ["Tools Room", "Workshop", "Academic Department", "Academics"],
+    library: ["Library", "Student Services", "Academic Department", "Academics"],
     "student services": ["Student Services", "Students Lounge"],
+    "students lounge": ["Students Lounge", "Student Services"],
     sto: ["STO"],
+    "mock up": ["Mock Up", "Training", "Academic Department", "Academics"],
+    "classroom 1": ["Classroom 1", "Faculty Room", "Academic Department", "Academics"],
+    "classroom 2": ["Classroom 2", "Faculty Room", "Academic Department", "Academics"],
+    "classroom 3": ["Classroom 3", "Faculty Room", "Academic Department", "Academics"],
+    "classroom 4": ["Classroom 4", "Faculty Room", "Academic Department", "Academics"],
+    "classroom 5": ["Classroom 5", "Faculty Room", "Academic Department", "Academics"],
+    "classroom 6": ["Classroom 6", "Faculty Room", "Academic Department", "Academics"],
+    "classroom 7": ["Classroom 7", "Faculty Room", "Academic Department", "Academics"],
+    "classroom 8": ["Classroom 8", "Faculty Room", "Academic Department", "Academics"],
   };
 
   const labels = aliasGroups[normalizedDepartment] || [department];
@@ -10399,25 +10632,6 @@ app.put("/api/visitors/:userId/visit", authMiddleware, async (req, res) => {
         },
       });
 
-      await createRoleNotification({
-        title: "Appointment Request Queued",
-        message: `${visitor.fullName} requested an appointment for ${visitor.appointmentDepartment || visitor.assignedOffice}. Security will handle gate entry after staff approval.`,
-        type: "info",
-        severity: "low",
-        targetRole: "security",
-        relatedVisitor: visitor._id,
-        relatedUser: user._id,
-        metadata: {
-          activityType: "visitor_appointment_request",
-          visitDate: visitor.visitDate,
-          visitTime: visitor.visitTime,
-          purposeOfVisit: visitor.purposeOfVisit,
-          department: visitor.appointmentDepartment || visitor.assignedOffice,
-          assignedStaff: routedStaff._id,
-          pendingStaffApproval: true,
-        },
-      });
-
       await createSystemActivity({
         actorUser: user,
         relatedVisitor: visitor,
@@ -10707,6 +10921,9 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
       visitTime: appointmentDateTime,
       reason,
     });
+    if (!wasApproved && !wasStaffAdjustmentPending) {
+      visitor.approvalStatus = "pending";
+    }
     await visitor.save();
 
     const originalSchedule = formatVisitSchedule(originalVisitDate, originalVisitTime);
@@ -10775,27 +10992,25 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
       });
     }
 
-    await createRoleNotification({
-      title: wasApproved ? "Approved Appointment Rescheduled" : "Visitor Appointment Rescheduled",
-      message: wasApproved
-        ? `${visitor.fullName}'s approved appointment changed from ${originalSchedule} to ${newSchedule}. Staff review is required before entry.`
-        : `${visitor.fullName} updated their appointment from ${originalSchedule} to ${newSchedule}. Security should use the new schedule when preparing visitor entry.`,
-      type: "warning",
-      severity: "medium",
-      targetRole: "security",
-      relatedVisitor: visitor._id,
-      relatedUser: visitorUser?._id || null,
-      metadata: {
-        activityType: wasApproved
-          ? "visitor_rescheduled_approved_appointment"
-          : "visitor_rescheduled_appointment",
-        originalVisitDate,
-        originalVisitTime,
-        newVisitDate: visitor.visitDate,
-        newVisitTime: visitor.visitTime,
-        reason,
-      },
-    });
+    if (wasApproved) {
+      await createRoleNotification({
+        title: "Approved Appointment Rescheduled",
+        message: `${visitor.fullName}'s approved appointment changed from ${originalSchedule} to ${newSchedule}. Staff review is required before entry.`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_rescheduled_approved_appointment",
+          originalVisitDate,
+          originalVisitTime,
+          newVisitDate: visitor.visitDate,
+          newVisitTime: visitor.visitTime,
+          reason,
+        },
+      });
+    }
 
     await createSystemActivity({
       actorUser: req.user,
@@ -10829,6 +11044,103 @@ app.put("/api/visitors/:id/appointment/reschedule", authMiddleware, async (req, 
     res.status(500).json({
       success: false,
       message: "Failed to reschedule appointment.",
+    });
+  }
+});
+
+app.put("/api/visitors/:id/appointment/running-late", authMiddleware, async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (!isVisitorOwner(req.user, visitor)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only update your own appointment.",
+      });
+    }
+
+    await applyAppointmentLifecycleIfNeeded(visitor);
+
+    const appointmentStatus = String(visitor.appointmentStatus || "").toLowerCase();
+    if (
+      visitor.requestCategory !== "appointment" ||
+      visitor.approvalFlow !== "staff" ||
+      !["approved", "adjusted"].includes(appointmentStatus)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Only approved appointments can send a late arrival notice.",
+      });
+    }
+
+    const timingState = getAppointmentTimingState(visitor);
+    if (timingState.afterGrace) {
+      return res.status(400).json({
+        success: false,
+        message: `The ${CHECK_IN_GRACE_PERIOD_MINUTES}-minute grace period has already passed. Please request a new appointment or contact the office directly.`,
+      });
+    }
+
+    const reason = String(req.body?.reason || "Visitor reported they may arrive late.").trim();
+    const visitorUser = await User.findOne({ email: visitor.email, role: "visitor" });
+    const assignedStaffUser = visitor.assignedStaff
+      ? await User.findById(visitor.assignedStaff)
+      : null;
+    const schedule = formatVisitSchedule(visitor.visitDate, visitor.visitTime);
+
+    visitor.runningLateNotifiedAt = new Date();
+    visitor.runningLateReason = reason;
+    await visitor.save();
+
+    if (assignedStaffUser) {
+      await createRoleNotification({
+        title: "Visitor May Be Late",
+        message: `${visitor.fullName} says they may be late for ${schedule}. SafePass allows a ${CHECK_IN_GRACE_PERIOD_MINUTES}-minute grace period after the scheduled time.`,
+        type: "warning",
+        severity: "medium",
+        targetRole: "staff",
+        targetUser: assignedStaffUser._id,
+        relatedVisitor: visitor._id,
+        relatedUser: visitorUser?._id || null,
+        metadata: {
+          activityType: "visitor_running_late",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          graceMinutes: CHECK_IN_GRACE_PERIOD_MINUTES,
+          reason,
+        },
+      });
+    }
+
+    await createSystemActivity({
+      actorUser: req.user,
+      relatedVisitor: visitor,
+      relatedUser: visitorUser,
+      activityType: "visitor_running_late",
+      status: "warning",
+      location: visitor.appointmentDepartment || visitor.assignedOffice || "Appointment",
+      notes: `${visitor.fullName} reported they may arrive late for ${schedule}.`,
+      metadata: {
+        visitDate: visitor.visitDate,
+        visitTime: visitor.visitTime,
+        graceMinutes: CHECK_IN_GRACE_PERIOD_MINUTES,
+        reason,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Thanks for the update. The office has been notified. Please arrive within the ${CHECK_IN_GRACE_PERIOD_MINUTES}-minute grace period if possible.`,
+      visitor,
+    });
+  } catch (error) {
+    console.error("Visitor running late notice error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to send late arrival notice.",
     });
   }
 });
@@ -12694,6 +13006,23 @@ app.put("/api/admin/users/:id", authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error("Update user error:", error);
+    if (error?.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || error.keyValue || {})[0] || "field";
+      return res.status(400).json({
+        success: false,
+        message: `${duplicateField} is already registered`,
+        field: duplicateField,
+      });
+    }
+
+    if (error?.name === "ValidationError") {
+      const firstValidationError = Object.values(error.errors || {})[0];
+      return res.status(400).json({
+        success: false,
+        message: firstValidationError?.message || "Please check the account details and try again.",
+      });
+    }
+
     res.status(500).json({ success: false, message: "Failed to update user" });
   }
 });
@@ -13030,9 +13359,22 @@ app.post("/api/nfc-cards/assign", authMiddleware, async (req, res) => {
       });
     }
 
-    const user = userId
-      ? await User.findById(userId)
-      : await User.findOne({ email: normalizedEmail });
+    let user = null;
+    if (canAssignVisitorOnly && normalizedEmail) {
+      user = await User.findOne({ email: normalizedEmail, role: "visitor" });
+    }
+
+    if (!user && userId) {
+      user = await User.findById(userId);
+    }
+
+    if (!user && normalizedEmail) {
+      user = await User.findOne(
+        canAssignVisitorOnly
+          ? { email: normalizedEmail, role: "visitor" }
+          : { email: normalizedEmail },
+      );
+    }
 
     if (!user) {
       return res.status(404).json({
@@ -13170,14 +13512,47 @@ app.put("/api/nfc-cards/:id/revoke", authMiddleware, async (req, res) => {
 
     const normalizedEmail = String(req.body?.email || req.query?.email || "").trim().toLowerCase();
     const paramId = String(req.params.id || "").trim();
-    const user = mongoose.Types.ObjectId.isValid(paramId)
-      ? await User.findById(paramId)
-      : await User.findOne({ email: normalizedEmail || paramId.toLowerCase() });
+    const normalizedCardId = normalizeNfcCardId(
+      req.body?.cardId ||
+        req.body?.nfcCardId ||
+        req.body?.uid ||
+        req.query?.cardId ||
+        req.query?.nfcCardId ||
+        req.query?.uid ||
+        paramId,
+    );
+    let user = null;
+    if (canRevokeVisitorOnly && normalizedEmail) {
+      user = await User.findOne({ email: normalizedEmail, role: "visitor" });
+    }
+
+    if (!user && mongoose.Types.ObjectId.isValid(paramId)) {
+      user = await User.findById(paramId);
+    }
+
+    if (!user) {
+      const lookupEmail = normalizedEmail || paramId.toLowerCase();
+      user = await User.findOne(
+        canRevokeVisitorOnly
+          ? { email: lookupEmail, role: "visitor" }
+          : { email: lookupEmail },
+      );
+    }
+
+    if (!user && normalizedCardId) {
+      user = await User.findOne({
+        ...(canRevokeVisitorOnly ? { role: "visitor" } : {}),
+        $or: [
+          { physicalNfcUid: exactTextMatch(normalizedCardId) },
+          { nfcCardId: exactTextMatch(normalizedCardId) },
+        ],
+      });
+    }
 
     if (!user) {
       return res
         .status(404)
-        .json({ success: false, message: "User not found" });
+        .json({ success: false, message: "No visitor account is assigned to that NFC UID." });
     }
 
     const targetRole = normalizeUserRoleValue(user.role);

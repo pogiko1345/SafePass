@@ -1183,6 +1183,193 @@ export default StyleSheet.create({
     }),
   },
 
+  mapToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    marginBottom: spacing.sm,
+  },
+
+  mapToolbarCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  mapToolbarTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: "900",
+    color: colors.gray[900],
+  },
+
+  mapToolbarMeta: {
+    marginTop: 3,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[500],
+  },
+
+  mapToolbarRefresh: {
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: colors.primarySoft,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+
+  mapToolbarRefreshText: {
+    fontSize: fontSize.sm,
+    fontWeight: "900",
+    color: colors.primary,
+  },
+
+  mapFilterScroll: {
+    marginBottom: spacing.sm,
+  },
+
+  mapFilterRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingRight: spacing.md,
+  },
+
+  mapFilterChip: {
+    minHeight: 36,
+    paddingHorizontal: 13,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mapFilterChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+
+  mapFilterChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: "900",
+    color: colors.gray[600],
+  },
+
+  mapFilterChipTextActive: {
+    color: colors.white,
+  },
+
+  mapAttentionPanel: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+  },
+
+  mapAttentionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  mapAttentionTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: "900",
+    color: colors.gray[900],
+  },
+
+  mapAttentionSubtitle: {
+    marginTop: 3,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    color: colors.gray[500],
+  },
+
+  mapAttentionCount: {
+    minWidth: 32,
+    textAlign: "center",
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: colors.dangerLight,
+    color: colors.danger,
+    fontSize: fontSize.sm,
+    fontWeight: "900",
+  },
+
+  mapAttentionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+  },
+
+  mapAttentionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mapAttentionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  mapAttentionName: {
+    fontSize: fontSize.base,
+    fontWeight: "900",
+    color: colors.gray[900],
+  },
+
+  mapAttentionReason: {
+    marginTop: 2,
+    fontSize: fontSize.sm,
+    lineHeight: 17,
+    fontWeight: "700",
+    color: colors.gray[600],
+  },
+
+  mapAttentionTime: {
+    fontSize: fontSize.xs,
+    fontWeight: "900",
+    color: colors.gray[400],
+  },
+
+  mapAttentionEmpty: {
+    minHeight: 52,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  mapAttentionEmptyText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+    color: colors.gray[500],
+  },
+
   mapContainer: {
     backgroundColor: colors.white,
     borderRadius: 20,
@@ -4492,9 +4679,14 @@ export default StyleSheet.create({
 
   hoverCardBadge: {
     alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
   },
 
   hoverCardBadgeText: {

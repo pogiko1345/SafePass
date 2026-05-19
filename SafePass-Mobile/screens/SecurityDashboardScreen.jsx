@@ -328,6 +328,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   // Map and tracking states
   const [selectedFloor, setSelectedFloor] = useState('ground');
   const [selectedOffice, setSelectedOffice] = useState('all');
+  const [mapStatusFilter, setMapStatusFilter] = useState("all");
   const [hoveredVisitor, setHoveredVisitor] = useState(null);
   const [visitorLocations, setVisitorLocations] = useState([]);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -784,7 +785,19 @@ export default function SecurityDashboardScreen({ navigation }) {
         visitor.status === 'checked_out' &&
         isWithinCompletedHistoryWindow(visitor),
     );
-    const allVisible = [...active, ...approved, ...completed].sort(
+    const securityStatusUpdates = all.filter((visitor) => {
+      const appointmentStatus = String(visitor?.appointmentStatus || "").toLowerCase();
+      const approvalStatus = String(visitor?.approvalStatus || "").toLowerCase();
+      return (
+        approvalStatus === "approved" &&
+        ["rescheduled", "cancelled"].includes(appointmentStatus)
+      );
+    });
+    const allVisible = [...active, ...approved, ...notReady, ...completed, ...securityStatusUpdates]
+      .filter((visitor, index, items) =>
+        index === items.findIndex((item) => String(item?._id) === String(visitor?._id)),
+      )
+      .sort(
       (a, b) => new Date(b.updatedAt || b.createdAt || b.visitDate) - new Date(a.updatedAt || a.createdAt || a.visitDate)
     );
 
@@ -891,6 +904,77 @@ export default function SecurityDashboardScreen({ navigation }) {
         0,
     ).getTime() || 0;
 
+  const getVisitorLocationAction = (visitor = {}) =>
+    String(
+      visitor?.location?.action ||
+        visitor?.currentLocation?.action ||
+        visitor?.sourceVisitor?.currentLocation?.action ||
+        "",
+    ).toLowerCase();
+
+  const getVisitorMapState = (visitor = {}) => {
+    if (visitor?.wrongLocationAlerts?.length) return "attention";
+    const action = getVisitorLocationAction(visitor);
+    if (action === "office_departure") return "left_office";
+    if (["check_in", "location_update"].includes(action)) return "inside_office";
+    if (String(visitor?.status || visitor?.sourceVisitor?.status || "").toLowerCase() === "checked_in") {
+      return "checked_in";
+    }
+    return "unknown";
+  };
+
+  const getVisitorMapStateMeta = (visitor = {}) => {
+    const state = getVisitorMapState(visitor);
+    if (state === "attention") {
+      return { label: "Needs Attention", color: BRAND.danger, icon: "warning-outline" };
+    }
+    if (state === "inside_office") {
+      return { label: "Inside Office", color: BRAND.blue, icon: "business-outline" };
+    }
+    if (state === "left_office") {
+      return { label: "Left Office", color: BRAND.warning, icon: "walk-outline" };
+    }
+    if (state === "checked_in") {
+      return { label: "Checked In", color: BRAND.success, icon: "checkmark-circle-outline" };
+    }
+    return { label: "Tracking", color: BRAND.muted, icon: "radio-outline" };
+  };
+
+  const isMapAttentionVisitor = (visitor = {}) => {
+    if (visitor?.wrongLocationAlerts?.length) return true;
+    if (getVisitorMapState(visitor) === "left_office") return true;
+    const timestamp = new Date(
+      visitor?.location?.timestamp ||
+        visitor?.currentLocation?.lastSeenAt ||
+        visitor?.sourceVisitor?.currentLocation?.lastSeenAt ||
+        0,
+    ).getTime();
+    return timestamp > 0 && Date.now() - timestamp > 15 * 60 * 1000;
+  };
+
+  const getMapAttentionReason = (visitor = {}) => {
+    if (visitor?.wrongLocationAlerts?.length) {
+      const alert = visitor.wrongLocationAlerts[0];
+      return `Wrong office: ${alert?.actualLocation || visitor?.location?.office || "unknown office"}`;
+    }
+    if (getVisitorMapState(visitor) === "left_office") {
+      return "Left office; waiting for next tap or checkout.";
+    }
+    if (isMapAttentionVisitor(visitor)) {
+      return "No recent tap for more than 15 minutes.";
+    }
+    return "No action needed.";
+  };
+
+  const getMapLastUpdatedLabel = (items = visitorLocations) => {
+    const latestTimestamp = Math.max(
+      0,
+      ...items.map((visitor) => getVisitorTrackingTimestamp(visitor)).filter(Boolean),
+    );
+    if (!latestTimestamp) return "No live updates yet";
+    return `Updated ${getFreshnessLabel(latestTimestamp)}`;
+  };
+
   const dedupeActiveTrackedVisitors = (activeVisitors = []) => {
     const visitorMap = new Map();
 
@@ -963,6 +1047,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               liveLocation?.source ||
               (sharedMapLocation ? 'shared_map_position' : null) ||
               (hasAssignedCoordinates ? 'assigned_office' : 'system_estimate'),
+            action: liveLocation?.action || "",
             statusLabel: liveLocation?.statusLabel || "Inside campus",
             checkpointId: liveLocation?.checkpointId || sharedMapLocation?.officeId || "",
           },
@@ -1029,6 +1114,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           coordinates: resolvedCoordinates,
           timestamp: visitor.lastScanTime || new Date(),
           source: sharedMapLocation ? "shared_map_position" : visitor.source || "checkpoint",
+          action: visitor.action || matchedVisitor?.currentLocation?.action || "",
           statusLabel: visitor.statusLabel || "Inside campus",
           checkpointId: visitor.checkpointId || sharedMapLocation?.officeId || "",
         },
@@ -1039,6 +1125,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           coordinates: resolvedCoordinates,
           lastSeenAt: visitor.lastScanTime || matchedVisitor?.currentLocation?.lastSeenAt || null,
           source: sharedMapLocation ? "shared_map_position" : visitor.source || matchedVisitor?.currentLocation?.source || "checkpoint",
+          action: visitor.action || matchedVisitor?.currentLocation?.action || "",
           statusLabel: visitor.statusLabel || matchedVisitor?.currentLocation?.statusLabel || "Inside campus",
           checkpointId: visitor.checkpointId || matchedVisitor?.currentLocation?.checkpointId || sharedMapLocation?.officeId || "",
           isActive: matchedVisitor?.currentLocation?.isActive ?? visitor.status !== "exited",
@@ -1601,6 +1688,10 @@ export default function SecurityDashboardScreen({ navigation }) {
       ) {
         return false;
       }
+      if (mapStatusFilter === "attention") return isMapAttentionVisitor(visitor);
+      if (mapStatusFilter === "inside_office") return getVisitorMapState(visitor) === "inside_office";
+      if (mapStatusFilter === "left_office") return getVisitorMapState(visitor) === "left_office";
+      if (mapStatusFilter === "wrong_office") return Boolean(visitor?.wrongLocationAlerts?.length);
       return true;
     });
   };
@@ -1755,30 +1846,46 @@ export default function SecurityDashboardScreen({ navigation }) {
     }
 
     const currentCard = getVisitorAssignedNfcUid(selectedVisitorForNfc);
+    const scannedCard = normalizeRfidReaderInput(visitorNfcUid);
+    const cardToRemove = scannedCard || currentCard;
     setVisitorNfcPinnedVisitor(selectedVisitorForNfc);
-    if (!currentCard) {
-      setVisitorNfcStatus({ type: "error", message: "This visitor has no assigned UID to remove." });
-      Alert.alert("No UID Assigned", "This visitor has no assigned UID to remove.");
+    if (!cardToRemove) {
+      setVisitorNfcStatus({ type: "error", message: "Scan a card UID or choose a visitor with an assigned UID first." });
+      Alert.alert("Card UID Required", "Scan a card UID or choose a visitor with an assigned UID first.");
       return;
     }
 
     try {
       setVisitorNfcBusy(true);
-      setVisitorNfcStatus({ type: "info", message: `Unassigning ${currentCard} from ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...` });
+      setVisitorNfcStatus({
+        type: "info",
+        message: scannedCard
+          ? `Removing scanned UID ${cardToRemove} from the visitor account using it...`
+          : `Unassigning ${cardToRemove} from ${selectedVisitorForNfc.fullName || selectedVisitorForNfc.email}...`,
+      });
       const response = await ApiService.revokeNfcCard({
-        userId:
-          selectedVisitorForNfc.userId ||
-          selectedVisitorForNfc.relatedUser?._id ||
-          selectedVisitorForNfc.accountId ||
-          undefined,
-        email: selectedVisitorForNfc.email,
+        userId: scannedCard
+          ? undefined
+          : selectedVisitorForNfc.userId ||
+            selectedVisitorForNfc.relatedUser?._id ||
+            selectedVisitorForNfc.accountId ||
+            undefined,
+        email: scannedCard ? undefined : selectedVisitorForNfc.email,
+        cardId: cardToRemove,
       });
       setSelectedVisitorNfcId(getVisitorNfcIdentity(response?.visitor || selectedVisitorForNfc));
-      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, "", response?.visitor);
+      const updatedVisitorEmail = response?.visitor?.email || selectedVisitorForNfc.email;
+      applyVisitorNfcCardUpdate(updatedVisitorEmail, "", response?.visitor);
       await refreshData();
-      applyVisitorNfcCardUpdate(selectedVisitorForNfc.email, "", response?.visitor);
+      applyVisitorNfcCardUpdate(updatedVisitorEmail, "", response?.visitor);
+      setVisitorNfcUid("");
       setTimeout(() => visitorNfcInputRef.current?.focus?.(), 100);
-      setVisitorNfcStatus({ type: "success", message: response?.message || "Visitor UID unassigned successfully." });
+      setVisitorNfcStatus({
+        type: "success",
+        message: scannedCard
+          ? `Scanned UID ${cardToRemove} was removed successfully.`
+          : response?.message || "Visitor UID unassigned successfully.",
+      });
     } catch (error) {
       setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to unassign this card UID." });
       Alert.alert("Unassign Failed", error?.message || "Unable to unassign this card UID.");
@@ -1891,22 +1998,30 @@ export default function SecurityDashboardScreen({ navigation }) {
     return approvalStatus === "approved";
   };
 
+  const getVisitorScheduleDates = (visitor) =>
+    [visitor?.visitDate, visitor?.visitTime]
+      .map((value) => {
+        const date = new Date(value || "");
+        return Number.isNaN(date.getTime()) ? null : date;
+      })
+      .filter(Boolean);
+
   const getVisitDayRelation = (visitor) => {
-    const visitDateValue = visitor?.visitDate || visitor?.visitTime;
-    if (!visitDateValue) return "unknown";
-
-    const visitDate = new Date(visitDateValue);
-    if (Number.isNaN(visitDate.getTime())) return "unknown";
-
-    const visitDayStart = new Date(visitDate);
-    visitDayStart.setHours(0, 0, 0, 0);
-    const visitDayEnd = new Date(visitDayStart);
-    visitDayEnd.setDate(visitDayEnd.getDate() + 1);
-
+    const scheduleDates = getVisitorScheduleDates(visitor);
+    if (!scheduleDates.length) return "unknown";
     const now = new Date();
-    if (now < visitDayStart) return "future";
-    if (now >= visitDayEnd) return "past";
-    return "today";
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    if (scheduleDates.some((date) => date >= todayStart && date < todayEnd)) {
+      return "today";
+    }
+    if (scheduleDates.some((date) => date >= todayEnd)) {
+      return "future";
+    }
+    return "past";
   };
 
   const isVisitorScheduledTodayForNfc = (visitor) => {
@@ -2497,7 +2612,8 @@ export default function SecurityDashboardScreen({ navigation }) {
       ...(visitors.approved || []),
       ...(visitors.notReady || []),
       ...Object.values(visitorNfcLocalVisitors || {}),
-    ].forEach((visitor) => {
+      visitorNfcPinnedVisitor,
+    ].filter(Boolean).forEach((visitor) => {
       if (!isVisitorScheduledTodayForNfc(visitor)) return;
 
       const email = String(visitor?.email || "").trim().toLowerCase();
@@ -2546,6 +2662,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   }, [
     visitorNfcSearch,
     visitorNfcLocalVisitors,
+    visitorNfcPinnedVisitor,
     visitors.all,
     visitors.active,
     visitors.approved,
@@ -2716,6 +2833,11 @@ export default function SecurityDashboardScreen({ navigation }) {
             visitor.currentLocation?.statusLabel ||
             sourceVisitor.currentLocation?.statusLabel ||
             "Inside campus",
+          action:
+            visitor.location?.action ||
+            visitor.currentLocation?.action ||
+            sourceVisitor.currentLocation?.action ||
+            "",
           isActive: true,
         },
       };
@@ -2986,6 +3108,9 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const renderVisitorNfcAssignmentPanel = () => {
     const hasPinnedOnlyVisitor = !assignableNfcVisitors.length && Boolean(selectedVisitorForNfc);
+    const selectedVisitorCurrentUid = getVisitorAssignedNfcUid(selectedVisitorForNfc);
+    const scannedNfcUid = normalizeRfidReaderInput(visitorNfcUid);
+    const canRemoveNfcUid = Boolean(selectedVisitorCurrentUid || scannedNfcUid);
 
     return (
     <View style={styles.visitorNfcPanel}>
@@ -3086,10 +3211,10 @@ export default function SecurityDashboardScreen({ navigation }) {
               })}
             </ScrollView>
             {hasPinnedOnlyVisitor ? (
-              <View style={[styles.visitorNfcStatus, styles.visitorNfcStatusSuccess]}>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#047857" />
-                <Text style={[styles.visitorNfcStatusText, styles.visitorNfcStatusTextSuccess]}>
-                  Keeping the selected visitor visible while the list refreshes.
+              <View style={styles.visitorNfcStatus}>
+                <Ionicons name="sync-outline" size={16} color="#0A3D91" />
+                <Text style={styles.visitorNfcStatusText}>
+                  Showing the selected visitor while today's list refreshes. UID status is shown above.
                 </Text>
               </View>
             ) : null}
@@ -3101,7 +3226,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               <Text style={styles.visitorNfcSelectedName}>{selectedVisitorForNfc.fullName || "Visitor"}</Text>
               <Text style={styles.visitorNfcSelectedMeta}>
                 {selectedVisitorForNfc.email || "No email"} | Current UID:{" "}
-                {getVisitorAssignedNfcUid(selectedVisitorForNfc) || "None"}
+                {selectedVisitorCurrentUid || "None"}
               </Text>
             </View>
 
@@ -3139,14 +3264,16 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Ionicons name="radio-outline" size={16} color="#0A3D91" />
                 <Text style={styles.visitorNfcHintText}>{describeRfidReaderInput(visitorNfcUid)}</Text>
               </View>
-              {getVisitorAssignedNfcUid(selectedVisitorForNfc) ? (
+              {canRemoveNfcUid ? (
                 <TouchableOpacity
                   style={[styles.visitorNfcUnassignButton, visitorNfcBusy && styles.visitorNfcAssignButtonDisabled]}
                   onPress={() => handleUnassignVisitorNfc()}
                   disabled={visitorNfcBusy}
                 >
                   <Ionicons name="unlink-outline" size={16} color="#B91C1C" />
-                  <Text style={styles.visitorNfcUnassignButtonText}>Unassign UID</Text>
+                  <Text style={styles.visitorNfcUnassignButtonText}>
+                    {scannedNfcUid ? "Remove Scanned UID" : "Unassign UID"}
+                  </Text>
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity
@@ -3160,7 +3287,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                   <>
                     <Ionicons name="link-outline" size={16} color="#FFFFFF" />
                     <Text style={styles.visitorNfcAssignButtonText}>
-                      {getVisitorAssignedNfcUid(selectedVisitorForNfc) ? "Replace UID" : "Assign UID"}
+                      {selectedVisitorCurrentUid ? "Replace UID" : "Assign UID"}
                     </Text>
                   </>
                 )}
@@ -3647,16 +3774,55 @@ export default function SecurityDashboardScreen({ navigation }) {
   );
 
   // Render Map Tab
-  const renderMapTab = () => (
+  const renderMapTab = () => {
+    const visibleLocations = getFilteredVisitorLocations();
+    const attentionLocations = visibleLocations.filter(isMapAttentionVisitor);
+    const mapFilterOptions = [
+      { key: "all", label: "All" },
+      { key: "attention", label: "Needs attention" },
+      { key: "inside_office", label: "Inside office" },
+      { key: "left_office", label: "Left office" },
+      { key: "wrong_office", label: "Wrong office" },
+    ];
+
+    return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.mapSectionFull}>
+        <View style={styles.mapToolbar}>
+          <View style={styles.mapToolbarCopy}>
+            <Text style={styles.mapToolbarTitle}>Campus Map</Text>
+            <Text style={styles.mapToolbarMeta}>{getMapLastUpdatedLabel(visitorLocations)}</Text>
+          </View>
+          <TouchableOpacity style={styles.mapToolbarRefresh} onPress={refreshData}>
+            <Ionicons name="refresh-outline" size={16} color="#0A3D91" />
+            <Text style={styles.mapToolbarRefreshText}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mapFilterScroll}>
+          <View style={styles.mapFilterRow}>
+            {mapFilterOptions.map((option) => {
+              const isActive = mapStatusFilter === option.key;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[styles.mapFilterChip, isActive && styles.mapFilterChipActive]}
+                  onPress={() => setMapStatusFilter(option.key)}
+                >
+                  <Text style={[styles.mapFilterChipText, isActive && styles.mapFilterChipTextActive]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
         <SharedMonitoringMap
           title="Live Visitor Tracking Map"
           iconName="map-outline"
           iconColor="#10B981"
           actionLabel="Full Screen"
           onActionPress={() => setShowMapModal(true)}
-          visitors={getFilteredVisitorLocations()}
+          visitors={visibleLocations}
           floors={floors}
           offices={offices}
           selectedFloor={selectedFloor}
@@ -3676,16 +3842,61 @@ export default function SecurityDashboardScreen({ navigation }) {
           backgroundColor="#FFFFFF"
           borderColor="#E5E7EB"
           summaryItems={[
-            { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
-            { label: "Approved", value: visitors.approved.length || 0, color: "#0A3D91" },
-            { label: "Checked In", value: visitors.active.length || 0, color: "#F59E0B" },
+            { label: "Checked In", value: visitors.active.length || 0, color: "#10B981", helper: "On campus" },
+            {
+              label: "Entered Office",
+              value: visibleLocations.filter((visitor) =>
+                ["check_in", "location_update"].includes(getVisitorLocationAction(visitor)),
+              ).length,
+              color: "#0A3D91",
+              helper: "Latest tap inside",
+            },
+            {
+              label: "Left Office",
+              value: visibleLocations.filter((visitor) => getVisitorLocationAction(visitor) === "office_departure").length,
+              color: "#F59E0B",
+              helper: "Waiting for next tap",
+            },
+            { label: "Needs Attention", value: attentionLocations.length, color: "#DC2626", helper: "Verify now" },
           ]}
           statusLabel="Security monitoring"
           showFloorNavigation={false}
         />
+        <View style={styles.mapAttentionPanel}>
+          <View style={styles.mapAttentionHeader}>
+            <View>
+              <Text style={styles.mapAttentionTitle}>Needs Attention</Text>
+              <Text style={styles.mapAttentionSubtitle}>Wrong office, left-office, or stale visitor movement.</Text>
+            </View>
+            <Text style={styles.mapAttentionCount}>{attentionLocations.length}</Text>
+          </View>
+          {attentionLocations.length ? (
+            attentionLocations.slice(0, 5).map((visitor) => {
+              const stateMeta = getVisitorMapStateMeta(visitor);
+              return (
+                <TouchableOpacity key={visitor.id} style={styles.mapAttentionItem} onPress={() => handleVisitorSelect(visitor)}>
+                  <View style={[styles.mapAttentionIcon, { backgroundColor: `${stateMeta.color}18` }]}>
+                    <Ionicons name={stateMeta.icon} size={18} color={stateMeta.color} />
+                  </View>
+                  <View style={styles.mapAttentionCopy}>
+                    <Text style={styles.mapAttentionName} numberOfLines={1}>{visitor.name}</Text>
+                    <Text style={styles.mapAttentionReason} numberOfLines={2}>{getMapAttentionReason(visitor)}</Text>
+                  </View>
+                  <Text style={styles.mapAttentionTime}>{getFreshnessLabel(visitor.location?.timestamp)}</Text>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <View style={styles.mapAttentionEmpty}>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#10B981" />
+              <Text style={styles.mapAttentionEmptyText}>No visitor needs attention on this floor.</Text>
+            </View>
+          )}
+        </View>
       </View>
     </ScrollView>
-  );
+    );
+  };
 
   const renderRecordFilterDropdown = ({ id, label, value, options, onSelect, icon = "filter-outline" }) => {
     const isOpen = recordFilterDropdownOpen === id;
@@ -4799,7 +5010,9 @@ export default function SecurityDashboardScreen({ navigation }) {
           {hoverVisitors.length > 1 ? `${hoverVisitors.length} visitors here` : "Visitor details"}
         </Text>
         <View style={styles.hoverVisitorGrid}>
-          {hoverVisitors.slice(0, 3).map((visitor) => (
+          {hoverVisitors.slice(0, 3).map((visitor) => {
+            const stateMeta = getVisitorMapStateMeta(visitor);
+            return (
             <TouchableOpacity
               key={visitor.id}
               style={styles.hoverVisitorTile}
@@ -4815,22 +5028,30 @@ export default function SecurityDashboardScreen({ navigation }) {
                 )}
                 <View style={styles.hoverCardInfo}>
                   <Text style={styles.hoverCardName} numberOfLines={1}>{visitor.name}</Text>
-                  <Text style={styles.hoverCardPurpose} numberOfLines={1}>{visitor.purpose}</Text>
+                  <Text style={styles.hoverCardPurpose} numberOfLines={1}>{visitor.purpose || "On-site visitor"}</Text>
                 </View>
+              </View>
+              <View style={[styles.hoverCardBadge, { backgroundColor: `${stateMeta.color}18`, borderColor: `${stateMeta.color}55` }]}>
+                <Ionicons name={stateMeta.icon} size={13} color={stateMeta.color} />
+                <Text style={[styles.hoverCardBadgeText, { color: stateMeta.color }]}>{stateMeta.label}</Text>
               </View>
               <View style={styles.hoverCardDetails}>
                 <View style={styles.hoverCardDetail}>
-                  <Ionicons name="call-outline" size={13} color="#6B7280" />
-                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>{visitor.phone}</Text>
-                </View>
-                <View style={styles.hoverCardDetail}>
-                  <Ionicons name="location-outline" size={13} color="#6B7280" />
-                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>{visitor.location.office}</Text>
-                </View>
-                <View style={styles.hoverCardDetail}>
-                  <Ionicons name="radio-outline" size={13} color="#6B7280" />
+                  <Ionicons name="business-outline" size={13} color="#6B7280" />
                   <Text style={styles.hoverCardDetailText} numberOfLines={1}>
-                    {visitor.location.statusLabel || visitor.trackingStatus || "Inside campus"}
+                    Current: {visitor.location?.office || "Campus checkpoint"}
+                  </Text>
+                </View>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="navigate-outline" size={13} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>
+                    Expected: {visitor.expectedDestination || "Assigned destination"}
+                  </Text>
+                </View>
+                <View style={styles.hoverCardDetail}>
+                  <Ionicons name="alert-circle-outline" size={13} color="#6B7280" />
+                  <Text style={styles.hoverCardDetailText} numberOfLines={1}>
+                    {getMapAttentionReason(visitor)}
                   </Text>
                 </View>
                 <View style={styles.hoverCardDetail}>
@@ -4840,8 +5061,12 @@ export default function SecurityDashboardScreen({ navigation }) {
                   </Text>
                 </View>
               </View>
+              <View style={styles.hoverCardButton}>
+                <Text style={styles.hoverCardButtonText}>Open Details</Text>
+              </View>
             </TouchableOpacity>
-          ))}
+          );
+          })}
         </View>
       </View>
     );
@@ -5732,7 +5957,7 @@ export default function SecurityDashboardScreen({ navigation }) {
 
   const renderMobileMap = () => {
     const liveVisitors = getFilteredVisitorLocations();
-    const priorityVisitors = [...liveVisitors].sort((left, right) => {
+    const priorityVisitors = liveVisitors.filter(isMapAttentionVisitor).sort((left, right) => {
       const leftAlertCount = left?.wrongLocationAlerts?.length || 0;
       const rightAlertCount = right?.wrongLocationAlerts?.length || 0;
       if (leftAlertCount !== rightAlertCount) return rightAlertCount - leftAlertCount;
@@ -5759,6 +5984,18 @@ export default function SecurityDashboardScreen({ navigation }) {
             setSelectedOffice("all");
           }}
         />
+        <MobileFilterChips
+          options={[
+            { key: "all", label: "All" },
+            { key: "attention", label: "Needs attention" },
+            { key: "inside_office", label: "Inside office" },
+            { key: "left_office", label: "Left office" },
+            { key: "wrong_office", label: "Wrong office" },
+          ]}
+          value={mapStatusFilter}
+          onChange={setMapStatusFilter}
+        />
+        <Text style={securityMobileStyles.mapUpdatedText}>{getMapLastUpdatedLabel(visitorLocations)}</Text>
         <View style={securityMobileStyles.mobileMapCard}>
           <SharedMonitoringMap
             title="Live Visitor Map"
@@ -5788,9 +6025,21 @@ export default function SecurityDashboardScreen({ navigation }) {
             borderColor="#E2E8F0"
             mapBackgroundColor="#F8FBFE"
             summaryItems={[
-              { label: "Live", value: liveVisitors.length || 0, color: BRAND.success },
-              { label: "Approved", value: visitors.approved.length || 0, color: BRAND.blue },
-              { label: "Inside", value: visitors.active.length || 0, color: BRAND.warning },
+              { label: "Checked In", value: visitors.active.length || 0, color: BRAND.success, helper: "On campus" },
+              {
+                label: "Entered Office",
+                value: liveVisitors.filter((visitor) =>
+                  ["check_in", "location_update"].includes(getVisitorLocationAction(visitor)),
+                ).length,
+                color: BRAND.blue,
+                helper: "Latest tap inside",
+              },
+              {
+                label: "Left Office",
+                value: liveVisitors.filter((visitor) => getVisitorLocationAction(visitor) === "office_departure").length,
+                color: BRAND.warning,
+                helper: "Waiting for next tap",
+              },
             ]}
             statusLabel="Security map"
             showFloorNavigation={false}
@@ -5829,7 +6078,7 @@ export default function SecurityDashboardScreen({ navigation }) {
         </View>
         <View style={securityMobileStyles.sectionHeader}>
           <Text style={securityMobileStyles.sectionTitle}>Needs Attention</Text>
-          <Text style={securityMobileStyles.sectionCount}>{liveVisitors.length}</Text>
+          <Text style={securityMobileStyles.sectionCount}>{priorityVisitors.length}</Text>
         </View>
         {priorityVisitors.length ? (
           priorityVisitors.slice(0, 8).map((visitor) => (
@@ -5843,7 +6092,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             >
               <View style={securityMobileStyles.locationPin}>
                 <Ionicons
-                  name={visitor.wrongLocationAlerts?.length ? "warning-outline" : "location-outline"}
+                  name={getVisitorMapStateMeta(visitor).icon}
                   size={18}
                   color="#FFFFFF"
                 />
@@ -5851,18 +6100,16 @@ export default function SecurityDashboardScreen({ navigation }) {
               <View style={securityMobileStyles.locationCopy}>
                 <Text style={securityMobileStyles.locationName}>{visitor.name}</Text>
                 <Text style={securityMobileStyles.locationMeta}>{visitor.location?.office || "Campus checkpoint"}</Text>
-                {visitor.wrongLocationAlerts?.length ? (
-                  <Text style={[securityMobileStyles.locationFreshness, { color: BRAND.danger }]}>
-                    Expected: {visitor.expectedDestination || "Assigned destination"}
-                  </Text>
-                ) : null}
+                <Text style={[securityMobileStyles.locationFreshness, { color: BRAND.danger }]}>
+                  {getMapAttentionReason(visitor)}
+                </Text>
                 <Text style={securityMobileStyles.locationFreshness}>{getFreshnessLabel(visitor.location?.timestamp)}</Text>
               </View>
               <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
             </TouchableOpacity>
           ))
         ) : (
-          <MobileEmptyState dark={mobileDarkModeEnabled} icon="map-outline" title="No live markers" message="Visitor markers will appear after NFC checkpoint taps." />
+          <MobileEmptyState dark={mobileDarkModeEnabled} icon="checkmark-circle-outline" title="No attention needed" message="Wrong-office, left-office, and stale movement alerts will appear here." />
         )}
       </>
     );
@@ -6169,9 +6416,21 @@ export default function SecurityDashboardScreen({ navigation }) {
             textPrimary="#FFFFFF"
             textSecondary="#CBD5E1"
             summaryItems={[
-              { label: "Live", value: getFilteredVisitorLocations().length || 0, color: "#10B981" },
-              { label: "Approved", value: visitors.approved.length || 0, color: "#8EC5FF" },
-              { label: "Checked In", value: visitors.active.length || 0, color: "#FBBF24" },
+              { label: "Checked In", value: visitors.active.length || 0, color: "#10B981", helper: "On campus" },
+              {
+                label: "Entered Office",
+                value: getFilteredVisitorLocations().filter((visitor) =>
+                  ["check_in", "location_update"].includes(getVisitorLocationAction(visitor)),
+                ).length,
+                color: "#8EC5FF",
+                helper: "Latest tap inside",
+              },
+              {
+                label: "Left Office",
+                value: getFilteredVisitorLocations().filter((visitor) => getVisitorLocationAction(visitor) === "office_departure").length,
+                color: "#FBBF24",
+                helper: "Waiting for next tap",
+              },
             ]}
             statusLabel="Security monitoring"
             showFloorNavigation={false}
@@ -7509,6 +7768,13 @@ const securityMobileStyles = StyleSheet.create({
   mobileMapWrapper: {
     borderRadius: 16,
     minHeight: 620,
+  },
+  mapUpdatedText: {
+    marginTop: -2,
+    marginBottom: 6,
+    fontSize: 12,
+    fontWeight: "800",
+    color: BRAND.muted,
   },
   mapActionRow: {
     flexDirection: "row",

@@ -192,17 +192,20 @@ export default StyleSheet.create({
 
   visitorMarker: {
     position: "absolute",
-    width: 16,
-    height: 16,
+    width: 24,
+    height: 24,
     zIndex: 10,
   },
 
   visitorMarkerDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    borderWidth: 1,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 4,
+    borderRadius: 11,
+    borderWidth: 1.5,
     borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -216,9 +219,9 @@ export default StyleSheet.create({
   },
 
   visitorMarkerDotCluster: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -255,19 +258,19 @@ export default StyleSheet.create({
   },
 
   visitorMarkerCountText: {
-    fontSize: 8,
+    fontSize: 8.5,
     fontWeight: "900",
     color: "#FFFFFF",
-    lineHeight: 10,
+    lineHeight: 11,
   },
 
   visitorMarkerPulse: {
     position: "absolute",
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    top: -2.5,
-    left: -2.5,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    top: -5,
+    left: -5,
   },
 
   visitorMarkerSourceBadge: {
@@ -597,42 +600,47 @@ export default StyleSheet.create({
     position: "absolute",
     bottom: 16,
     left: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    right: 16,
+    maxWidth: 520,
+    backgroundColor: "rgba(255, 255, 255, 0.96)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#DCE5F1",
     zIndex: 20,
   },
 
   floorLegendTitle: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#6B7280",
-    marginBottom: 6,
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 8,
+    textTransform: "uppercase",
   },
 
   floorLegendItems: {
     flexDirection: "row",
-    gap: 12,
+    flexWrap: "wrap",
+    gap: 10,
   },
 
   floorLegendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
   },
 
   floorLegendColor: {
     width: 12,
     height: 12,
-    borderRadius: 2,
+    borderRadius: 6,
   },
 
   floorLegendText: {
-    fontSize: 10,
-    color: "#4B5563",
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#334155",
   },
 
   hoverCard: {
@@ -724,9 +732,14 @@ export default StyleSheet.create({
 
   hoverCardBadge: {
     alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
   },
 
   hoverCardBadgeText: {

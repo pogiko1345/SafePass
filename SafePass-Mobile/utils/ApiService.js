@@ -1217,6 +1217,19 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async notifyVisitorRunningLate(visitorId, lateNoticeData = {}) {
+    try {
+      const response = await this.fetch(`/visitors/${visitorId}/appointment/running-late`, {
+        method: "PUT",
+        body: lateNoticeData,
+      });
+      return response;
+    } catch (error) {
+      console.error("Notify visitor running late error:", error);
+      throw error;
+    }
+  }
+
   async acceptVisitorAppointmentAdjustment(visitorId) {
     try {
       const response = await this.fetch(`/visitors/${visitorId}/appointment/accept-adjustment`, {
@@ -1659,14 +1672,17 @@ async rejectVisitor(visitorId, reason) {
         typeof userIdOrTarget === "object" && userIdOrTarget !== null
           ? userIdOrTarget
           : { userId: userIdOrTarget };
-      const identifier = target.userId || target.email;
+      const identifier = target.userId || target.email || target.cardId || target.nfcCardId || target.uid;
       if (!identifier) {
-        throw new Error("User ID or email is required to revoke an NFC card.");
+        throw new Error("User ID, email, or card UID is required to revoke an NFC card.");
       }
       const response = await this.fetch(`/nfc-cards/${encodeURIComponent(identifier)}/revoke`, {
         method: "PUT",
         body: {
           email: target.email,
+          cardId: target.cardId,
+          nfcCardId: target.nfcCardId,
+          uid: target.uid,
         },
       });
       return response;

@@ -62,22 +62,44 @@ const APPOINTMENT_PURPOSE_OPTIONS = [
 ];
 
 const APPOINTMENT_DEPARTMENT_OPTIONS = [
+  "Academy Director",
+  "Accounting Office",
   "Registrar",
+  "Registrar's Office",
   "Accounting",
-  "Information Desk",
-  "Guidance",
   "Administration",
+  "Admissions",
   "Cashier",
-  "Flight Operations",
-  "Training",
-  "I.T Room",
+  "Chairman",
+  "Clinic",
+  "Conference Room",
   "Faculty Room",
+  "File Room",
+  "Flight Operations",
+  "Guidance",
+  "Head Of Training Room",
+  "Information Desk",
+  "I.T Room",
   "Laboratory",
-  "TESDA",
-  "Workshop",
   "Library",
-  "Student Services",
+  "Lobby",
+  "Mock Up",
   "STO",
+  "Storage",
+  "Student Services",
+  "Students Lounge",
+  "TESDA",
+  "Tools Room",
+  "Training",
+  "Workshop",
+  "Classroom 1",
+  "Classroom 2",
+  "Classroom 3",
+  "Classroom 4",
+  "Classroom 5",
+  "Classroom 6",
+  "Classroom 7",
+  "Classroom 8",
 ];
 
 const DEFAULT_APPOINTMENT_TIME_SLOTS = [];
@@ -301,21 +323,43 @@ const getDateFromTimeSlot = (slot = {}) => {
 
 const VISITOR_OFFICE_MAP_ALIASES = {
   Registrar: "ground-registrar",
+  "Registrar's Office": "ground-registrar",
   Accounting: "ground-accounting",
+  "Accounting Office": "ground-accounting",
   Cashier: "ground-cashier",
   "Information Desk": "ground-lobby",
+  Lobby: "ground-lobby",
   Guidance: "ground-offices",
   Administration: "ground-offices",
+  Admissions: "ground-offices",
+  "File Room": "ground-file-room",
+  Storage: "ground-storage",
+  Clinic: "ground-clinic",
+  "Conference Room": "ground-conference-room",
+  Chairman: "ground-chairman",
   "Flight Operations": "flight-operations",
   Training: "head-of-training-room",
+  "Head Of Training Room": "head-of-training-room",
   "I.T Room": "it-room",
   "Faculty Room": "faculty-room",
+  "Academy Director": "academy-director",
+  "Mock Up": "second-mock-up",
   Laboratory: "second-laboratory",
   TESDA: "second-tesda",
   Workshop: "third-workshop",
+  "Tools Room": "third-tools-room",
   Library: "third-library",
   "Student Services": "ground-staff",
+  "Students Lounge": "third-students-lounge",
   STO: "sto",
+  "Classroom 1": "second-classroom-1",
+  "Classroom 2": "second-classroom-2",
+  "Classroom 3": "second-classroom-3",
+  "Classroom 4": "second-classroom-4",
+  "Classroom 5": "second-classroom-5",
+  "Classroom 6": "second-classroom-6",
+  "Classroom 7": "second-classroom-7",
+  "Classroom 8": "second-classroom-8",
 };
 
 const getVisitorDestinationInfo = (
@@ -573,6 +617,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
   const [isUpdatingAppointment, setIsUpdatingAppointment] = useState(false);
   const [isVerifyingAppointmentId, setIsVerifyingAppointmentId] = useState(false);
+  const [isSendingLateNotice, setIsSendingLateNotice] = useState(false);
   const [isVirtualTapLoading, setIsVirtualTapLoading] = useState(false);
   const [isCheckInLoading, setIsCheckInLoading] = useState(false);
   const [isCheckOutLoading, setIsCheckOutLoading] = useState(false);
@@ -2503,6 +2548,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     return left.getHours() === right.getHours() && left.getMinutes() === right.getMinutes();
   };
 
+  const isConfiguredAppointmentTime = (timeValue) => {
+    const time = getValidDate(timeValue);
+    if (!time) return false;
+    return appointmentTimeOptions.some((option) => isSameAppointmentTime(option, time));
+  };
+
   const handleAppointmentSlotTimeSelect = (timeOption) => {
     if (isLoadingAppointmentSlots || isAppointmentTimeSlotFull(timeOption)) return;
     setHasAppointmentDraft(true);
@@ -3275,6 +3326,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return;
     }
 
+    if (!isConfiguredAppointmentTime(preferredTime)) {
+      showVisitorAlert(
+        "Choose An Available Time",
+        "Please choose one of the available appointment time slots. Custom times like 2:45 PM are not available.",
+      );
+      return;
+    }
+
     const combinedDateTime = new Date(preferredDate);
     combinedDateTime.setHours(preferredTime.getHours(), preferredTime.getMinutes(), 0, 0);
     if (Number.isNaN(combinedDateTime.getTime())) {
@@ -3331,6 +3390,46 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         { text: "Update", onPress: submitAppointmentReschedule },
       ],
     );
+  };
+
+  const canSendRunningLateNotice = (record = visitor) => {
+    if (!record?._id || record.runningLateNotifiedAt) return false;
+    const appointmentStatus = String(record.appointmentStatus || "").toLowerCase();
+    const visitStatus = String(record.status || "").toLowerCase();
+    const isStaffAppointment =
+      record.approvalFlow === "staff" || Boolean(record.assignedStaff || record.appointmentDepartment);
+    return (
+      isStaffAppointment &&
+      ["approved", "adjusted"].includes(appointmentStatus) &&
+      !["checked_in", "checked_out", "cancelled", "rejected", "expired", "no_show"].includes(visitStatus)
+    );
+  };
+
+  const notifyRunningLate = async (target = visitor) => {
+    if (!target?._id || isSendingLateNotice) return;
+
+    setIsSendingLateNotice(true);
+    try {
+      const response = await ApiService.notifyVisitorRunningLate(target._id, {
+        reason: "Visitor reported they may arrive late.",
+      });
+      const message =
+        response?.message ||
+        "The office has been notified. Please arrive within the 15-minute grace period if possible.";
+
+      showVisitorPushNotice({
+        title: "Office Notified",
+        message,
+        type: "warning",
+      });
+      showVisitorAlert("Office Notified", message);
+      await loadVisitorData();
+    } catch (error) {
+      console.error("Notify running late error:", error);
+      showVisitorAlert("Notice Failed", error?.message || "Unable to notify the office right now.");
+    } finally {
+      setIsSendingLateNotice(false);
+    }
   };
 
   const submitAppointmentCancellation = async () => {
@@ -7643,9 +7742,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.checkInArrivalGuideCard}>
                 <Text style={visitorDashboardStyles.checkInArrivalGuideTitle}>What happens after check-in?</Text>
                 {[
-                  "Your visitor status will switch to checked in.",
-                  "Security and admin monitoring will receive your arrival event.",
-                  "Your access activity will be recorded in the dashboard history.",
+                  "You may check in up to 20 minutes early and wait in the lobby.",
+                  "Please enter the office only when your appointment time starts.",
+                  "You have a 15-minute grace period if you are running late.",
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.checkInArrivalGuideRow}>
                     <View style={visitorDashboardStyles.checkInArrivalGuideIcon}>
@@ -7655,6 +7754,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                   </View>
                 ))}
               </View>
+
+              {canSendRunningLateNotice(visitor) ? (
+                <TouchableOpacity
+                  style={visitorDashboardStyles.accessFlowLateNoticeButton}
+                  onPress={() => notifyRunningLate(visitor)}
+                  disabled={isSendingLateNotice}
+                >
+                  {isSendingLateNotice ? (
+                    <ActivityIndicator size="small" color="#0A3D91" />
+                  ) : (
+                    <>
+                      <Ionicons name="time-outline" size={18} color="#0A3D91" />
+                      <Text style={visitorDashboardStyles.accessFlowLateNoticeButtonText}>
+                        Tell Office I May Be Late
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              ) : null}
 
               <View style={visitorDashboardStyles.accessFlowFooter}>
                 <TouchableOpacity

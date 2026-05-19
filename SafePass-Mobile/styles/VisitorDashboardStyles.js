@@ -3347,6 +3347,28 @@ export default StyleSheet.create({
     color: "#475569",
   },
 
+  accessFlowLateNoticeButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    paddingVertical: width <= 390 ? 12 : 14,
+    paddingHorizontal: 16,
+    minHeight: 48,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  accessFlowLateNoticeButtonText: {
+    flexShrink: 1,
+    fontSize: width <= 390 ? 13.5 : 15,
+    fontWeight: "800",
+    color: "#0A3D91",
+    textAlign: "center",
+  },
+
   accessFlowPrimaryButton: {
     flex: 1,
     borderRadius: 16,

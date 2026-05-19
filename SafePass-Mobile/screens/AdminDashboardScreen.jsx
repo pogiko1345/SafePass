@@ -250,22 +250,44 @@ const normalizeMapText = (value = "") =>
 
 const DEFAULT_APPOINTMENT_MANAGEMENT_OPTIONS = {
   offices: [
+    "Academy Director",
+    "Accounting Office",
     "Registrar",
+    "Registrar's Office",
     "Accounting",
-    "Information Desk",
-    "Guidance",
     "Administration",
+    "Admissions",
     "Cashier",
-    "Flight Operations",
-    "Training",
-    "I.T Room",
+    "Chairman",
+    "Clinic",
+    "Conference Room",
     "Faculty Room",
+    "File Room",
+    "Flight Operations",
+    "Guidance",
+    "Head Of Training Room",
+    "Information Desk",
+    "I.T Room",
     "Laboratory",
-    "TESDA",
-    "Workshop",
     "Library",
-    "Student Services",
+    "Lobby",
+    "Mock Up",
     "STO",
+    "Storage",
+    "Student Services",
+    "Students Lounge",
+    "TESDA",
+    "Tools Room",
+    "Training",
+    "Workshop",
+    "Classroom 1",
+    "Classroom 2",
+    "Classroom 3",
+    "Classroom 4",
+    "Classroom 5",
+    "Classroom 6",
+    "Classroom 7",
+    "Classroom 8",
   ].map((label) => ({ id: `office-${normalizeTextToId(label)}`, label, enabled: true })),
   purposes: ["Enrollment", "Payment", "Inquiry", "Document Request", "Other"].map((label) => ({
     id: `purpose-${normalizeTextToId(label)}`,
@@ -4443,6 +4465,16 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const handleEditUser = (userItem) => {
+    if (selectedSubmodule !== "data-management") {
+      handleViewUser(userItem);
+      publishAdminNotice(
+        "info",
+        "Account records are view-only",
+        "Open User Data Management to edit account details.",
+      );
+      return;
+    }
+
     setSelectedUser(userItem);
     setEditUserErrors({});
     setEditUserData({
@@ -4468,11 +4500,7 @@ const loadDashboardData = useCallback(async () => {
       status: isUserActive(userItem) ? "active" : "inactive",
       isActive: isUserActive(userItem),
     });
-    if (selectedSubmodule === "data-management") {
-      setUserDataPanelMode("edit");
-      return;
-    }
-    setShowEditUserModal(true);
+    setUserDataPanelMode("edit");
   };
 
   const handleViewUser = (userItem) => {
@@ -4675,6 +4703,11 @@ const loadDashboardData = useCallback(async () => {
   // FIXED: Handle Delete User
   const handleDeleteUser = async () => {
     if (!ensureAdminAccess()) return;
+    if (selectedSubmodule !== "data-management") {
+      Alert.alert("View Only", "Account Records are read-only. Open User Data Management to remove accounts.");
+      return;
+    }
+
     const selectedId = selectedUser?._id || selectedUser?.id;
     if (!selectedId) {
       Alert.alert("Error", "Cannot find user ID. Please refresh and try again.");
@@ -7660,6 +7693,7 @@ const loadDashboardData = useCallback(async () => {
                 placeholder="First name"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("firstName")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Last Name</Text>
@@ -7670,6 +7704,7 @@ const loadDashboardData = useCallback(async () => {
                 placeholder="Last name"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("lastName")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Username</Text>
@@ -7681,6 +7716,7 @@ const loadDashboardData = useCallback(async () => {
                 autoCapitalize="none"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("username")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Email</Text>
@@ -7693,6 +7729,7 @@ const loadDashboardData = useCallback(async () => {
                 autoCapitalize="none"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("email")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Phone</Text>
@@ -7705,6 +7742,7 @@ const loadDashboardData = useCallback(async () => {
                 maxLength={16}
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("phone")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Employee ID</Text>
@@ -7715,6 +7753,7 @@ const loadDashboardData = useCallback(async () => {
                 placeholder="Staff / Security ID"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("employeeId")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Department</Text>
@@ -7725,6 +7764,7 @@ const loadDashboardData = useCallback(async () => {
                 placeholder="Department"
                 placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
               />
+              {renderEditUserFieldError("department")}
             </View>
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Position</Text>
@@ -7739,7 +7779,7 @@ const loadDashboardData = useCallback(async () => {
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Role</Text>
               <View style={styles.userDataCompactOptions}>
-                {["staff", "security", "admin", "visitor"].map((role) => (
+                {["student", "teacher", "staff", "security", "admin", "visitor"].map((role) => (
                   <TouchableOpacity
                     key={role}
                     style={[
@@ -7754,7 +7794,49 @@ const loadDashboardData = useCallback(async () => {
                   </TouchableOpacity>
                 ))}
               </View>
+              {renderEditUserFieldError("role")}
             </View>
+            {String(editUserData.role || "").toLowerCase() === "student" ? (
+              <>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Student ID</Text>
+                  <TextInput
+                    style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
+                    value={editUserData.studentId}
+                    onChangeText={(text) => setEditUserData({ ...editUserData, studentId: text })}
+                    placeholder="Student ID"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                  />
+                  {renderEditUserFieldError("studentId")}
+                </View>
+                <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                  <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Parent Email</Text>
+                  <TextInput
+                    style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
+                    value={editUserData.parentEmail}
+                    onChangeText={(text) => setEditUserData({ ...editUserData, parentEmail: text })}
+                    placeholder="parent@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                  />
+                  {renderEditUserFieldError("parentEmail")}
+                </View>
+              </>
+            ) : null}
+            {String(editUserData.role || "").toLowerCase() === "teacher" ? (
+              <View style={[styles.userEditorHalfField, styles.inputGroup]}>
+                <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Academic Staff ID</Text>
+                <TextInput
+                  style={[styles.input, isDarkMode && { backgroundColor: "#111827", borderColor: theme.borderColor, color: "#F8FBFE" }]}
+                  value={editUserData.teacherId}
+                  onChangeText={(text) => setEditUserData({ ...editUserData, teacherId: text })}
+                  placeholder="Academic staff ID"
+                  placeholderTextColor={isDarkMode ? "#64748B" : "#9CA3AF"}
+                />
+                {renderEditUserFieldError("teacherId")}
+              </View>
+            ) : null}
             <View style={[styles.userEditorHalfField, styles.inputGroup]}>
               <Text style={[styles.inputLabel, isDarkMode && styles.darkText]}>Status</Text>
               <View style={styles.userDataCompactOptions}>
@@ -7773,6 +7855,7 @@ const loadDashboardData = useCallback(async () => {
                   </TouchableOpacity>
                 ))}
               </View>
+              {renderEditUserFieldError("status")}
             </View>
             <View style={styles.userDataPanelFooter}>
               <TouchableOpacity
@@ -7785,10 +7868,10 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity
                 style={[
                   styles.dataManagementPrimaryButton,
-                  (!editUserReadiness.isValid || processingId === "edit-user") && styles.submitButtonDisabled,
+                  processingId === "edit-user" && styles.submitButtonDisabled,
                 ]}
                 onPress={confirmEditUser}
-                disabled={!editUserReadiness.isValid || processingId === "edit-user"}
+                disabled={processingId === "edit-user"}
               >
                 <Ionicons name="save-outline" size={15} color="#FFFFFF" />
                 <Text style={styles.dataManagementPrimaryButtonText}>
@@ -11023,10 +11106,9 @@ const loadDashboardData = useCallback(async () => {
                   {
                     key: "actions",
                     label: "Actions",
-                    width: 320,
+                    width: 130,
                     render: (userItem) => {
                       const roleColor = getRoleColor(userItem.role);
-                      const userIsActive = isUserActive(userItem);
                       return (
                         <View style={styles.adminTableActionRow}>
                           <TouchableOpacity
@@ -11035,48 +11117,6 @@ const loadDashboardData = useCallback(async () => {
                           >
                             <Ionicons name="eye-outline" size={14} color={roleColor} />
                             <Text style={[styles.adminTableActionText, { color: roleColor }]}>View</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.adminTableActionButton, { borderColor: `${userManagementConfig.accent}30`, backgroundColor: `${userManagementConfig.accent}12` }]}
-                            onPress={() => handleEditUser(userItem)}
-                          >
-                            <Ionicons name="create-outline" size={14} color={userManagementConfig.accent} />
-                            <Text style={[styles.adminTableActionText, { color: userManagementConfig.accent }]}>Edit</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[
-                              styles.adminTableActionButton,
-                              {
-                                borderColor: userIsActive ? "rgba(245,158,11,0.24)" : "rgba(16,185,129,0.24)",
-                                backgroundColor: userIsActive ? "rgba(245,158,11,0.12)" : "rgba(16,185,129,0.12)",
-                              },
-                            ]}
-                            onPress={() => handleToggleUserStatus(userItem)}
-                            disabled={processingId === `toggle-user-${userItem._id || userItem.id}`}
-                          >
-                            <Ionicons
-                              name={userIsActive ? "pause-circle-outline" : "checkmark-circle-outline"}
-                              size={14}
-                              color={userIsActive ? "#F59E0B" : "#10B981"}
-                            />
-                            <Text
-                              style={[
-                                styles.adminTableActionText,
-                                { color: userIsActive ? "#F59E0B" : "#10B981" },
-                              ]}
-                            >
-                              {userIsActive ? "Deactivate" : "Activate"}
-                            </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.adminTableActionButton, { borderColor: "rgba(239,68,68,0.22)", backgroundColor: "rgba(239,68,68,0.12)" }]}
-                            onPress={() => {
-                              setSelectedUser(userItem);
-                              setShowDeleteUserModal(true);
-                            }}
-                          >
-                            <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                            <Text style={[styles.adminTableActionText, { color: "#EF4444" }]}>Remove</Text>
                           </TouchableOpacity>
                         </View>
                       );
@@ -12904,17 +12944,19 @@ const loadDashboardData = useCallback(async () => {
               >
                 <Text style={[styles.cancelButtonText, isDarkMode && styles.darkTextSecondary]}>Close</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={() => {
-                  if (selectedUser) {
-                    handleEditUser(selectedUser);
-                    setShowViewUserModal(false);
-                  }
-                }}
-              >
-                <Text style={styles.submitButtonText}>Edit User</Text>
-              </TouchableOpacity>
+              {selectedSubmodule === "data-management" ? (
+                <TouchableOpacity
+                  style={styles.submitButton}
+                  onPress={() => {
+                    if (selectedUser) {
+                      handleEditUser(selectedUser);
+                      setShowViewUserModal(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.submitButtonText}>Edit User</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         </View>
@@ -13354,10 +13396,10 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity
                 style={[
                   styles.submitButton,
-                  (!editUserReadiness.isValid || processingId === "edit-user") && styles.submitButtonDisabled,
+                  processingId === "edit-user" && styles.submitButtonDisabled,
                 ]}
                 onPress={confirmEditUser}
-                disabled={!editUserReadiness.isValid || processingId === "edit-user"}
+                disabled={processingId === "edit-user"}
               >
                 {processingId === "edit-user" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Save Changes</Text>}
               </TouchableOpacity>
