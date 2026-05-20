@@ -21,5 +21,15 @@ module.exports = async function (env, argv) {
     );
   }
 
+  if (argv?.mode === 'production' || env?.mode === 'production') {
+    config.devtool = false;
+  }
+
+  config.performance = {
+    ...(config.performance || {}),
+    maxEntrypointSize: 800 * 1024,
+    maxAssetSize: 800 * 1024,
+  };
+
   return config;
 };

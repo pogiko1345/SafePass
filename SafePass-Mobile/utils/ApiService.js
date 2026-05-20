@@ -51,6 +51,54 @@ const logApiDebug = (...args) => {
     console.log(...args);
   }
 };
+const API_ERROR_LOG_THROTTLE_MS = 30000;
+const apiErrorLogTimestamps = new Map();
+const shouldLogApiError = (key) => {
+  if (API_DEBUG_ENABLED) return true;
+  const now = Date.now();
+  const previous = apiErrorLogTimestamps.get(key) || 0;
+  if (now - previous < API_ERROR_LOG_THROTTLE_MS) return false;
+  apiErrorLogTimestamps.set(key, now);
+  return true;
+};
+const logApiFetchError = ({ url, baseUrl, error }) => {
+  const message = String(error?.message || "");
+  const isNetworkError = message.includes("Network request failed");
+  const status = error?.status ? `:${error.status}` : "";
+  const logKey = `${baseUrl}|${url}|${isNetworkError ? "network" : message || status || "error"}`;
+  if (!shouldLogApiError(logKey)) return;
+
+  const logMethod = isNetworkError ? console.warn : console.error;
+  logMethod(`[ApiService] Fetch error for ${url} via ${baseUrl}:`, error);
+};
+const logApiHealthError = ({ baseUrl, error }) => {
+  const isAbortError = error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("abort");
+  const logKey = `${baseUrl}|health|${isAbortError ? "timeout" : String(error?.message || "error")}`;
+  if (!shouldLogApiError(logKey)) return;
+
+  const logMethod = isAbortError ? console.warn : console.error;
+  logMethod(
+    `[ApiService] Health check ${isAbortError ? "timed out" : "failed"} via ${baseUrl}:`,
+    error,
+  );
+};
+const logApiOperationError = (operation, error) => {
+  const message = String(error?.message || "");
+  const isFetchError =
+    error?.status ||
+    error?.data ||
+    message.includes("Network request failed") ||
+    message.includes("Cannot connect to the SafePass server");
+  if (!API_DEBUG_ENABLED && isFetchError) return;
+
+  const status = error?.status ? `:${error.status}` : "";
+  const logKey = `operation|${operation}|${message || status || "error"}`;
+  if (!shouldLogApiError(logKey)) return;
+
+  const isNetworkError = message.includes("Network request failed");
+  const logMethod = isNetworkError ? console.warn : console.error;
+  logMethod(`${operation}:`, error);
+};
 const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const WEB_REMEMBERED_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const REMEMBERED_SESSION_DURATION_MS =
@@ -1061,7 +1109,7 @@ async verifyCredentials(email, password) {
       const response = await this.fetch(`/visitors${queryString ? `?${queryString}` : ''}`);
       return response;
     } catch (error) {
-      console.error("Get visitors error:", error);
+      logApiOperationError("Get visitors error", error);
       throw error;
     }
   }
@@ -1073,7 +1121,7 @@ async verifyCredentials(email, password) {
         `/security/live-visitor-locations${queryString ? `?${queryString}` : ""}`,
       );
     } catch (error) {
-      console.error("Get security live visitor locations error:", error);
+      logApiOperationError("Get security live visitor locations error", error);
       throw error;
     }
   }
@@ -1085,7 +1133,7 @@ async verifyCredentials(email, password) {
         `/security/live-presence${queryString ? `?${queryString}` : ""}`,
       );
     } catch (error) {
-      console.error("Get security live presence error:", error);
+      logApiOperationError("Get security live presence error", error);
       throw error;
     }
   }
@@ -1105,7 +1153,7 @@ async verifyCredentials(email, password) {
       const queryString = new URLSearchParams(filters).toString();
       return await this.fetch(`/attendance${queryString ? `?${queryString}` : ""}`);
     } catch (error) {
-      console.error("Get attendance error:", error);
+      logApiOperationError("Get attendance error", error);
       throw error;
     }
   }
@@ -1684,7 +1732,7 @@ async rejectVisitor(visitorId, reason) {
       });
       return response;
     } catch (error) {
-      console.error("Assign NFC card error:", error);
+      logApiOperationError("Assign NFC card error", error);
       throw error;
     }
   }
@@ -1710,7 +1758,7 @@ async rejectVisitor(visitorId, reason) {
       });
       return response;
     } catch (error) {
-      console.error("Revoke NFC card error:", error);
+      logApiOperationError("Revoke NFC card error", error);
       throw error;
     }
   }
@@ -1932,7 +1980,7 @@ generateRandomPassword(length = 10) {
       const response = await this.fetch(`/notifications${queryString ? `?${queryString}` : ''}`);
       return response;
     } catch (error) {
-      console.error("Get notifications error:", error);
+      logApiOperationError("Get notifications error", error);
       throw error;
     }
   }
@@ -2093,12 +2141,7 @@ generateRandomPassword(length = 10) {
       const data = await response.json();
       return data.status === "OK";
     } catch (error) {
-      const isAbortError = error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("abort");
-      const logMethod = isAbortError ? console.warn : console.error;
-      logMethod(
-        `[ApiService] Health check ${isAbortError ? "timed out" : "failed"} via ${API_BASE_URL}:`,
-        error,
-      );
+      logApiHealthError({ baseUrl: API_BASE_URL, error });
       return false;
     }
   }
@@ -2158,7 +2201,7 @@ ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, option
       return data;
     } catch (error) {
       lastError = error;
-      console.error(`[ApiService] Fetch error for ${url} via ${baseUrl}:`, error);
+      logApiFetchError({ url, baseUrl, error });
 
       if (!String(error?.message || "").includes("Network request failed")) {
         throw error;
@@ -2197,12 +2240,7 @@ ApiService.prototype.testConnection = async function testConnectionWithAndroidFa
         return true;
       }
     } catch (error) {
-      const isAbortError = error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("abort");
-      const logMethod = isAbortError ? console.warn : console.error;
-      logMethod(
-        `[ApiService] Health check ${isAbortError ? "timed out" : "failed"} via ${baseUrl}:`,
-        error,
-      );
+      logApiHealthError({ baseUrl, error });
     }
   }
 
