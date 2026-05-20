@@ -39,6 +39,7 @@ if (Platform.OS !== "web") {
 const formatDate = (value) =>
   value
     ? new Date(value).toLocaleDateString("en-US", {
+        timeZone: "Asia/Manila",
         month: "short",
         day: "numeric",
         year: "numeric",
@@ -50,21 +51,26 @@ const formatTime = (value, fallback = "N/A") => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return fallback;
   return parsed.toLocaleTimeString("en-US", {
+    timeZone: "Asia/Manila",
     hour: "2-digit",
     minute: "2-digit",
   });
 };
 
-const isSameCalendarDay = (value, referenceDate = new Date()) => {
-  if (!value) return false;
-  const target = new Date(value);
-  if (Number.isNaN(target.getTime())) return false;
+const getPhilippineDateKey = (value) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+};
 
-  return (
-    target.getFullYear() === referenceDate.getFullYear() &&
-    target.getMonth() === referenceDate.getMonth() &&
-    target.getDate() === referenceDate.getDate()
-  );
+const isSameCalendarDay = (value, referenceDate = new Date()) => {
+  return Boolean(value && getPhilippineDateKey(value) === getPhilippineDateKey(referenceDate));
 };
 
 const formatDuration = (minutes, fallback = "0 min") => {
@@ -490,15 +496,10 @@ export default function StudentDashboardScreen({ navigation }) {
 
   const monthStats = useMemo(() => {
     const now = new Date();
+    const currentMonthKey = getPhilippineDateKey(now).slice(0, 7);
     const monthRecords = attendance.filter((item) => {
       const value = item?.attendanceDate || item?.checkInTime || item?.createdAt;
-      const date = value ? new Date(value) : null;
-      return (
-        date &&
-        !Number.isNaN(date.getTime()) &&
-        date.getFullYear() === now.getFullYear() &&
-        date.getMonth() === now.getMonth()
-      );
+      return getPhilippineDateKey(value).slice(0, 7) === currentMonthKey;
     });
     const present = monthRecords.filter((item) =>
       ["present", "inside", "checked_out", "completed"].includes(String(item.status || "").toLowerCase()),

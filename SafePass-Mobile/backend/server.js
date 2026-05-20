@@ -840,18 +840,43 @@ const toObjectIdOrNull = (value) => {
   }
 };
 
-const getStartOfDay = (value = new Date()) => {
+const ATTENDANCE_TIMEZONE_OFFSET_MINUTES = Number.isFinite(
+  Number(process.env.ATTENDANCE_TIMEZONE_OFFSET_MINUTES),
+)
+  ? Number(process.env.ATTENDANCE_TIMEZONE_OFFSET_MINUTES)
+  : 8 * 60;
+
+const getAttendanceTimezoneParts = (value = new Date()) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  date.setHours(0, 0, 0, 0);
-  return date;
+  const shiftedDate = new Date(date.getTime() + ATTENDANCE_TIMEZONE_OFFSET_MINUTES * 60 * 1000);
+  return {
+    year: shiftedDate.getUTCFullYear(),
+    month: shiftedDate.getUTCMonth(),
+    day: shiftedDate.getUTCDate(),
+    hour: shiftedDate.getUTCHours(),
+    minute: shiftedDate.getUTCMinutes(),
+  };
+};
+
+const createAttendanceTimezoneDate = ({ year, month, day, hour = 0, minute = 0 } = {}) => {
+  const utcTimestamp =
+    Date.UTC(year, month, day, hour, minute, 0, 0) -
+    ATTENDANCE_TIMEZONE_OFFSET_MINUTES * 60 * 1000;
+  const date = new Date(utcTimestamp);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getStartOfDay = (value = new Date()) => {
+  const parts = getAttendanceTimezoneParts(value);
+  if (!parts) return null;
+  return createAttendanceTimezoneDate({ year: parts.year, month: parts.month, day: parts.day });
 };
 
 const getEndOfDay = (value = new Date()) => {
-  const date = getStartOfDay(value);
-  if (!date) return null;
-  date.setDate(date.getDate() + 1);
-  return date;
+  const parts = getAttendanceTimezoneParts(value);
+  if (!parts) return null;
+  return createAttendanceTimezoneDate({ year: parts.year, month: parts.month, day: parts.day + 1 });
 };
 
 const parseDateRangeQuery = ({ dateFrom, dateTo, startDate, endDate } = {}) => {
@@ -906,8 +931,11 @@ const evaluateLateAttendance = (user = {}, timestamp = new Date()) => {
     return { isLate: false, lateMinutes: 0, status: "present" };
   }
 
-  const target = new Date(timestamp);
-  const actualMinutes = target.getHours() * 60 + target.getMinutes();
+  const target = getAttendanceTimezoneParts(timestamp);
+  if (!target) {
+    return { isLate: false, lateMinutes: 0, status: "present" };
+  }
+  const actualMinutes = target.hour * 60 + target.minute;
   const effectiveStart = scheduledStartMinutes + Math.max(0, graceMinutes);
   const lateMinutes = Math.max(0, actualMinutes - effectiveStart);
   return {
@@ -1273,6 +1301,7 @@ const buildStudentParentAttendanceEmail = ({
     ? `${studentName} has checked out and left the campus.`
     : `${studentName} has checked in and entered the school.`;
   const timeLabel = new Date(timestamp).toLocaleString([], {
+    timeZone: "Asia/Manila",
     month: "short",
     day: "numeric",
     year: "numeric",
