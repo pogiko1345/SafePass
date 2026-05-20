@@ -4547,9 +4547,10 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const populateEditUserData = (userItem) => {
+    const editableUserId = getId(userItem) || userItem?._id || userItem?.id || "";
     setEditUserErrors({});
     setEditUserData({
-      id: userItem._id || userItem.id,
+      id: editableUserId,
       firstName: userItem.firstName || "",
       lastName: userItem.lastName || "",
       username: userItem.username || "",
@@ -4635,7 +4636,12 @@ const loadDashboardData = useCallback(async () => {
   // FIXED: Confirm Edit User
   const confirmEditUser = async () => {
     if (!ensureAdminAccess()) return;
-    const selectedId = editUserData.id;
+    const selectedId = editUserData.id || getId(selectedUser);
+    if (!selectedId) {
+      Alert.alert("Cannot Save", "This user record is missing an account ID. Please refresh and try again.");
+      return;
+    }
+
     const {
       isValid,
       normalizedEmail,
@@ -4724,7 +4730,7 @@ const loadDashboardData = useCallback(async () => {
         updatePayload.section = editUserData.section;
       }
       
-      const response = await ApiService.updateUser(editUserData.id, updatePayload);
+      const response = await ApiService.updateUser(selectedId, updatePayload);
       if (response && (response.success || response.user)) {
         const savedUser = response.user || updatePayload;
         const normalizedSavedUser = isEditingStudent
@@ -4737,16 +4743,28 @@ const loadDashboardData = useCallback(async () => {
             }
           : savedUser;
         const updatedUsers = allUsers.map(user => {
+<<<<<<< HEAD
           if ((user._id === editUserData.id || user.id === editUserData.id)) {
             return { ...user, ...normalizedSavedUser };
+=======
+          const userId = getId(user) || user?._id || user?.id;
+          if (String(userId) === String(selectedId)) {
+            return { ...user, ...savedUser };
+>>>>>>> e1e36a30147c7ad4a19b4fe6b50c1e9527f0634f
           }
           return user;
         });
 
+<<<<<<< HEAD
         const updatedSelectedUser = selectedUser && (
           selectedUser._id === editUserData.id || selectedUser.id === editUserData.id
         )
           ? { ...selectedUser, ...normalizedSavedUser }
+=======
+        const selectedUserId = getId(selectedUser) || selectedUser?._id || selectedUser?.id;
+        const updatedSelectedUser = selectedUser && String(selectedUserId) === String(selectedId)
+          ? { ...selectedUser, ...savedUser }
+>>>>>>> e1e36a30147c7ad4a19b4fe6b50c1e9527f0634f
           : selectedUser;
         
         setAllUsers(updatedUsers);
@@ -4772,14 +4790,27 @@ const loadDashboardData = useCallback(async () => {
       console.error("Update user error:", error);
       publishAdminNotice("error", "Update failed", error?.message || "Unable to update the selected user.");
       const message = String(error?.message || "");
+      const field = error?.data?.field;
+      if (field) {
+        setEditUserErrors((currentValue) => ({
+          ...currentValue,
+          [field]: error?.data?.message || error?.message || "Please review this field.",
+        }));
+      }
+
       if (message.toLowerCase().includes("username already")) {
         Alert.alert("Username Already Used", "This username is already registered. Please use another username.");
+<<<<<<< HEAD
       } else if (message.toLowerCase().includes("email already") || message.toLowerCase().includes("email is already")) {
         setEditUserErrors((currentValue) => ({ ...currentValue, email: "This email address is already registered." }));
         Alert.alert("Email Already Used", "This email is already registered. Please use another email address.");
       } else if (message.toLowerCase().includes("parent email") || message.toLowerCase().includes("guardian email")) {
         setEditUserErrors((currentValue) => ({ ...currentValue, parentEmail: "Enter a valid parent or guardian email address." }));
         Alert.alert("Parent Email Error", message || "Please enter a valid parent or guardian email address.");
+=======
+      } else if (message.toLowerCase().includes("email already") || message.toLowerCase().includes("email address")) {
+        Alert.alert("Email Already Used", "This email is already registered or invalid. Please use another email address.");
+>>>>>>> e1e36a30147c7ad4a19b4fe6b50c1e9527f0634f
       } else if (message.toLowerCase().includes("staff id already")) {
         Alert.alert("Staff ID Already Used", "This staff ID is already registered. Please use another staff ID.");
       } else if (message.toLowerCase().includes("nfc card") || message.toLowerCase().includes("card uid")) {

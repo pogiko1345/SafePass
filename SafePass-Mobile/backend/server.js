@@ -802,6 +802,8 @@ const sendPhoneOtp = async ({ phoneNumber, otpCode, provider }) => {
 };
 
 const ATTENDANCE_USER_TYPES = ["student", "teacher", "staff", "security", "guard", "visitor"];
+const SAFEPASS_TIME_ZONE = String(process.env.SAFEPASS_TIME_ZONE || "Asia/Manila").trim();
+const SAFEPASS_TIME_ZONE_LABEL = String(process.env.SAFEPASS_TIME_ZONE_LABEL || "Philippine Time").trim();
 
 const normalizeUserRoleValue = (value = "") => {
   const normalized = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -877,6 +879,20 @@ const getEndOfDay = (value = new Date()) => {
   const parts = getAttendanceTimezoneParts(value);
   if (!parts) return null;
   return createAttendanceTimezoneDate({ year: parts.year, month: parts.month, day: parts.day + 1 });
+};
+
+const formatSafePassDateTime = (value = new Date()) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "N/A";
+
+  return date.toLocaleString("en-US", {
+    timeZone: SAFEPASS_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const parseDateRangeQuery = ({ dateFrom, dateTo, startDate, endDate } = {}) => {
@@ -1300,6 +1316,7 @@ const buildStudentParentAttendanceEmail = ({
   const statusLine = isCheckOut
     ? `${studentName} has checked out and left the campus.`
     : `${studentName} has checked in and entered the school.`;
+<<<<<<< HEAD
   const timeLabel = new Date(timestamp).toLocaleString([], {
     timeZone: "Asia/Manila",
     month: "short",
@@ -1308,6 +1325,9 @@ const buildStudentParentAttendanceEmail = ({
     hour: "2-digit",
     minute: "2-digit",
   });
+=======
+  const timeLabel = `${formatSafePassDateTime(timestamp)} (${SAFEPASS_TIME_ZONE_LABEL})`;
+>>>>>>> e1e36a30147c7ad4a19b4fe6b50c1e9527f0634f
   const locationLabel = tapLocation?.office || "Main Gate";
   const programLine = [student.course, student.yearLevel, student.section].filter(Boolean).join(" - ") || "Not specified";
   const greeting = parentName ? `Good day, ${parentName}.` : "Good day.";

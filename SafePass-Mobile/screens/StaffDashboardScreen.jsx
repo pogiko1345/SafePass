@@ -2551,14 +2551,6 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </Text>
         </View>
         <View style={styles.sectionActionRow}>
-          {renderTablePrintButton({
-            label: "Print Requests",
-            records: filteredRequestAppointments,
-            title: "Pending Appointment Requests",
-            subtitle: "Generated from the staff dashboard pending appointment request table.",
-            emptyMessage: "There are no pending appointment requests to print.",
-            totalLabel: "requests",
-          })}
           <TouchableOpacity style={styles.sectionActionIconButton} onPress={loadData}>
             <Ionicons name="refresh-outline" size={20} color="#1C6DD0" />
           </TouchableOpacity>
