@@ -698,19 +698,76 @@ export default function SecurityDashboardScreen({ navigation }) {
       read: normalizeNotificationReadState(notification, currentUserId),
     }));
 
+  const SECURITY_ACTION_ALERT_TYPES = new Set([
+    "wrong_office_scan",
+    "office_wrong_location",
+    "visitor_office_departure_overdue",
+    "visitor_overstay_alert",
+    "visitor_reported",
+  ]);
+
   const isActiveAlertNotification = (notification) => {
     if (!notification || notification.read) {
       return false;
     }
 
+    const activityType = String(notification.metadata?.activityType || "").toLowerCase();
     const type = String(notification.type || "").toLowerCase();
     const severity = String(notification.severity || "").toLowerCase();
+    const title = String(notification.title || "").toLowerCase();
+
+    if (SECURITY_ACTION_ALERT_TYPES.has(activityType)) {
+      return true;
+    }
 
     return (
-      type === "alert" ||
-      type.includes("security") ||
-      severity === "high" ||
-      severity === "medium"
+      type === "alert" &&
+      severity === "high" &&
+      (
+        title.includes("unauthorized") ||
+        title.includes("wrong") ||
+        title.includes("overstay") ||
+        title.includes("reported") ||
+        title.includes("away from office")
+      )
+    );
+  };
+
+  const getAlertNotificationKey = (notification = {}) => {
+    const activityType = String(notification.metadata?.activityType || notification.type || "alert").toLowerCase();
+    const visitorId =
+      notification.relatedVisitor?._id ||
+      notification.relatedVisitor ||
+      notification.metadata?.visitorId ||
+      notification.metadata?.visitorName ||
+      notification.title ||
+      notification._id;
+    const location =
+      notification.metadata?.scannedOffice ||
+      notification.metadata?.actualLocation ||
+      notification.metadata?.office ||
+      "";
+    return [activityType, visitorId, location].map((value) => String(value || "").toLowerCase()).join(":");
+  };
+
+  const getSpecificSecurityAlerts = (items = []) => {
+    const alertMap = new Map();
+
+    items
+      .filter(isActiveAlertNotification)
+      .forEach((notification) => {
+        const key = getAlertNotificationKey(notification);
+        const existingAlert = alertMap.get(key);
+        if (
+          !existingAlert ||
+          new Date(notification.createdAt || 0).getTime() > new Date(existingAlert.createdAt || 0).getTime()
+        ) {
+          alertMap.set(key, notification);
+        }
+      });
+
+    return Array.from(alertMap.values()).sort(
+      (left, right) => new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime(),
     );
   };
 
@@ -1646,7 +1703,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime(),
         );
       const unreadNotifications = normalizedNotifications.filter((notification) => !notification.read);
-      const alertNotifications = unreadNotifications.filter(isActiveAlertNotification);
+      const alertNotifications = getSpecificSecurityAlerts(unreadNotifications);
       const nextSignature = buildNotificationDataSignature(normalizedNotifications);
 
       if (!force && notificationDataSignatureRef.current === nextSignature) {
@@ -4555,7 +4612,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-circle-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyStateTitle}>No Active Alerts</Text>
-            <Text style={styles.emptyStateSubtitle}>All systems are operating normally</Text>
+            <Text style={styles.emptyStateSubtitle}>Only wrong-room, overstay, overdue movement, and visitor report alerts appear here.</Text>
           </View>
         )}
       </View>
@@ -6128,7 +6185,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         ))
       ) : (
-        <MobileEmptyState dark={mobileDarkModeEnabled} icon="shield-checkmark-outline" title="No active alerts" message="Warnings and unread security alerts will appear here." />
+        <MobileEmptyState dark={mobileDarkModeEnabled} icon="shield-checkmark-outline" title="No active alerts" message="Only wrong-room, overstay, overdue movement, and visitor report alerts appear here." />
       )}
 
       <View style={securityMobileStyles.sectionHeader}>
