@@ -29,6 +29,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import ApiService from "../utils/ApiService";
 import { canAccessSecurityDashboard, normalizeRole } from "../utils/authFlow";
 import {
+  formatSafePassDate,
+  formatSafePassDateTime,
+  formatSafePassTime,
+} from "../utils/dateTimeUtils";
+import {
   BRAND,
   MobileBottomNav,
   MobileEmptyState,
@@ -63,7 +68,18 @@ const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
 const SECURITY_LIVE_REFRESH_INTERVAL_MS = 10000;
 const SECURITY_OPERATIONAL_REFRESH_INTERVAL_MS = 60000;
 const SECURITY_NOTIFICATION_REFRESH_INTERVAL_MS = 30000;
+const SECURITY_DASHBOARD_LOG_THROTTLE_MS = 30000;
+const securityDashboardLogTimestamps = new Map();
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const logSecurityDashboardLoadError = (key, label, error) => {
+  const now = Date.now();
+  const lastLoggedAt = securityDashboardLogTimestamps.get(key) || 0;
+  if (now - lastLoggedAt < SECURITY_DASHBOARD_LOG_THROTTLE_MS) return;
+
+  securityDashboardLogTimestamps.set(key, now);
+  console.error(label, error);
+};
 
 const SidebarHoverPressable = ({ children, style, hoverScale = 1.035, onPress, disabled, ...props }) => {
   const scale = useRef(new Animated.Value(1)).current;
@@ -122,15 +138,7 @@ const getAppointmentTimeSortValue = (appointment) => {
 };
 
 const formatDate = (date) => {
-  if (!date) return "N/A";
-  const parsedDate = new Date(date);
-  if (Number.isNaN(parsedDate.getTime())) return "N/A";
-
-  return parsedDate.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatSafePassDate(date);
 };
 
 const compareAppointmentsBySchedule = (left, right) => {
@@ -1585,7 +1593,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       }));
       return true;
     } catch (error) {
-      console.error("Load operational data error:", error);
+      logSecurityDashboardLoadError("operational-data", "Load operational data error:", error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -1601,7 +1609,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       );
       return true;
     } catch (error) {
-      console.error("Load live visitor locations error:", error);
+      logSecurityDashboardLoadError("live-visitor-locations", "Load live visitor locations error:", error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -1623,7 +1631,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       }));
       return true;
     } catch (error) {
-      console.error("Load security live presence error:", error);
+      logSecurityDashboardLoadError("live-presence", "Load security live presence error:", error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -1650,7 +1658,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       setAttendanceRecords(Array.isArray(response?.attendance) ? response.attendance : []);
       return true;
     } catch (error) {
-      console.error("Load security attendance records error:", error);
+      logSecurityDashboardLoadError("attendance-records", "Load security attendance records error:", error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -1724,7 +1732,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       }));
       return true;
     } catch (error) {
-      console.error("Load notifications error:", error);
+      logSecurityDashboardLoadError("notifications", "Load notifications error:", error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -2183,28 +2191,15 @@ export default function SecurityDashboardScreen({ navigation }) {
   }, [visitors.all, selectedVisitor?._id]);
 
   const formatDate = (date) => {
-    if (!date) return 'N/A';
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return formatSafePassDate(date);
   };
 
   const formatTime = (date) => {
-    if (!date) return 'N/A';
-    const d = new Date(date);
-    return d.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatSafePassTime(date);
   };
 
   const formatDateTime = (date) => {
-    if (!date) return 'N/A';
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', {
+    return formatSafePassDateTime(date, {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',

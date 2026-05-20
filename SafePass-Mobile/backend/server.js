@@ -1316,18 +1316,7 @@ const buildStudentParentAttendanceEmail = ({
   const statusLine = isCheckOut
     ? `${studentName} has checked out and left the campus.`
     : `${studentName} has checked in and entered the school.`;
-<<<<<<< HEAD
-  const timeLabel = new Date(timestamp).toLocaleString([], {
-    timeZone: "Asia/Manila",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-=======
   const timeLabel = `${formatSafePassDateTime(timestamp)} (${SAFEPASS_TIME_ZONE_LABEL})`;
->>>>>>> e1e36a30147c7ad4a19b4fe6b50c1e9527f0634f
   const locationLabel = tapLocation?.office || "Main Gate";
   const programLine = [student.course, student.yearLevel, student.section].filter(Boolean).join(" - ") || "Not specified";
   const greeting = parentName ? `Good day, ${parentName}.` : "Good day.";

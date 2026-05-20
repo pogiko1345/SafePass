@@ -26,6 +26,11 @@ import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
 import ApiService from "../utils/ApiService";
 import IDScannerService from "../utils/IDScannerService";
+import {
+  formatSafePassDate,
+  formatSafePassDateTime,
+  formatSafePassTime,
+} from "../utils/dateTimeUtils";
 import CampusMap from "../components/CampusMap";
 import visitorDashboardStyles from "../styles/VisitorDashboardStyles";
 import {
@@ -3795,9 +3800,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return formatSafePassDate(dateString, {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
@@ -3805,9 +3808,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const formatTime = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
+    return formatSafePassTime(dateString, {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
@@ -3815,9 +3816,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const formatDateTime = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return formatSafePassDateTime(dateString, {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',

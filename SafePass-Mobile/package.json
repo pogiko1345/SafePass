@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "web:visitor": "node scripts/runVisitorWeb.js start",
-    "build:web": "expo export:web",
+    "build:web": "node scripts/cleanWebOutput.js && expo export:web",
     "build:web:visitor": "node scripts/runVisitorWeb.js build",
     "vercel-build": "npm run build:web"
   },

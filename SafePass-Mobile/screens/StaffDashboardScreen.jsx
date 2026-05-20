@@ -26,6 +26,11 @@ import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import ApiService from "../utils/ApiService";
+import {
+  formatSafePassDate,
+  formatSafePassDateTime,
+  formatSafePassTime,
+} from "../utils/dateTimeUtils";
 import { printRecordsTable } from "../utils/printUtils";
 import {
   BRAND,
@@ -105,32 +110,13 @@ const HomeHoverPressable = ({ children, style, hoverScale = 1.018, hoverLift = -
 );
 
 const formatDate = (value) =>
-  value
-    ? new Date(value).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "N/A";
+  formatSafePassDate(value);
 
 const formatTime = (value) =>
-  value
-    ? new Date(value).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "N/A";
+  formatSafePassTime(value);
 
 const formatDateTime = (value) =>
-  value
-    ? new Date(value).toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "N/A";
+  formatSafePassDateTime(value);
 
 const formatRelativeTime = (value) => {
   if (!value) return "No timestamp";
