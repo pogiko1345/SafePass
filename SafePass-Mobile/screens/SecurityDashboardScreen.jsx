@@ -6251,6 +6251,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 color: BRAND.warning,
                 helper: "Waiting for next tap",
               },
+              { label: "Needs Attention", value: priorityVisitors.length, color: BRAND.danger, helper: "Verify now" },
             ]}
             statusLabel="Security map"
             showFloorNavigation={false}
@@ -6641,6 +6642,12 @@ export default function SecurityDashboardScreen({ navigation }) {
                 value: getFilteredVisitorLocations().filter((visitor) => getVisitorLocationAction(visitor) === "office_departure").length,
                 color: "#FBBF24",
                 helper: "Waiting for next tap",
+              },
+              {
+                label: "Needs Attention",
+                value: getFilteredVisitorLocations().filter(isMapAttentionVisitor).length,
+                color: "#F87171",
+                helper: "Verify now",
               },
             ]}
             statusLabel="Security monitoring"
