@@ -1109,7 +1109,13 @@ export default function SecurityDashboardScreen({ navigation }) {
         0,
     ).getTime();
 
+  const isVisitorAwaitingNextCheckpoint = (visitor = {}) => {
+    const action = getVisitorLocationAction(visitor);
+    return action === "office_departure";
+  };
+
   const isVisitorMovementStale = (visitor = {}) => {
+    if (!isVisitorAwaitingNextCheckpoint(visitor)) return false;
     const timestamp = getVisitorLocationTimestamp(visitor);
     return timestamp > 0 && Date.now() - timestamp > 15 * 60 * 1000;
   };
@@ -1158,13 +1164,14 @@ export default function SecurityDashboardScreen({ navigation }) {
   const getMapAttentionReason = (visitor = {}) => {
     if (hasActiveWrongLocationAlert(visitor)) {
       const alert = visitor.wrongLocationAlerts[0];
-      return `Wrong office: ${alert?.actualLocation || visitor?.location?.office || "unknown office"}`;
-    }
-    if (getVisitorMapState(visitor) === "left_office") {
-      return "Left office; waiting for next tap or checkout.";
+      const actualOffice = alert?.actualLocation || visitor?.location?.office || "unknown office";
+      const expectedOffice = getVisitorExpectedOfficeLabel(visitor);
+      return expectedOffice
+        ? `Wrong office: ${actualOffice}. Expected: ${expectedOffice}.`
+        : `Wrong office: ${actualOffice}.`;
     }
     if (isMapAttentionVisitor(visitor)) {
-      return "No recent tap for more than 15 minutes.";
+      return "Left office more than 15 minutes ago. Verify next checkpoint or checkout.";
     }
     return "No action needed.";
   };
@@ -4128,7 +4135,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           <View style={styles.mapAttentionHeader}>
             <View>
               <Text style={styles.mapAttentionTitle}>Needs Attention</Text>
-              <Text style={styles.mapAttentionSubtitle}>Wrong office, left-office, or stale visitor movement.</Text>
+              <Text style={styles.mapAttentionSubtitle}>Wrong office or overdue left-office movement.</Text>
             </View>
             <Text style={styles.mapAttentionCount}>{attentionLocations.length}</Text>
           </View>
@@ -6373,7 +6380,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             </TouchableOpacity>
           ))
         ) : (
-          <MobileEmptyState dark={mobileDarkModeEnabled} icon="checkmark-circle-outline" title="No attention needed" message="Wrong-office, left-office, and stale movement alerts will appear here." />
+          <MobileEmptyState dark={mobileDarkModeEnabled} icon="checkmark-circle-outline" title="No attention needed" message="Wrong-office and overdue left-office movement alerts will appear here." />
         )}
       </>
     );
