@@ -802,6 +802,8 @@ const sendPhoneOtp = async ({ phoneNumber, otpCode, provider }) => {
 };
 
 const ATTENDANCE_USER_TYPES = ["student", "teacher", "staff", "security", "guard", "visitor"];
+const SAFEPASS_TIME_ZONE = String(process.env.SAFEPASS_TIME_ZONE || "Asia/Manila").trim();
+const SAFEPASS_TIME_ZONE_LABEL = String(process.env.SAFEPASS_TIME_ZONE_LABEL || "Philippine Time").trim();
 
 const normalizeUserRoleValue = (value = "") => {
   const normalized = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -852,6 +854,20 @@ const getEndOfDay = (value = new Date()) => {
   if (!date) return null;
   date.setDate(date.getDate() + 1);
   return date;
+};
+
+const formatSafePassDateTime = (value = new Date()) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "N/A";
+
+  return date.toLocaleString("en-US", {
+    timeZone: SAFEPASS_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const parseDateRangeQuery = ({ dateFrom, dateTo, startDate, endDate } = {}) => {
@@ -1272,13 +1288,7 @@ const buildStudentParentAttendanceEmail = ({
   const statusLine = isCheckOut
     ? `${studentName} has checked out and left the campus.`
     : `${studentName} has checked in and entered the school.`;
-  const timeLabel = new Date(timestamp).toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const timeLabel = `${formatSafePassDateTime(timestamp)} (${SAFEPASS_TIME_ZONE_LABEL})`;
   const locationLabel = tapLocation?.office || "Main Gate";
   const programLine = [student.course, student.yearLevel, student.section].filter(Boolean).join(" - ") || "Not specified";
   const greeting = parentName ? `Good day, ${parentName}.` : "Good day.";
