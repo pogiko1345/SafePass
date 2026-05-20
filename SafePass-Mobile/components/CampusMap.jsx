@@ -426,6 +426,8 @@ const CampusMap = ({
     ).toLowerCase();
 
   const getVisitorMarkerColor = (visitor, freshness) => {
+    if (visitor?.markerColor) return visitor.markerColor;
+    if (visitor?.mapState === "attention" || visitor?.needsAttention) return "#DC2626";
     if (visitor?.wrongLocationAlerts?.length) return "#DC2626";
     const action = getVisitorMovementAction(visitor);
     if (action === "office_departure") return "#F59E0B";

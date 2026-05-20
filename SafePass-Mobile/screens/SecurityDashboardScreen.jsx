@@ -997,6 +997,38 @@ export default function SecurityDashboardScreen({ navigation }) {
         "",
     ).trim();
 
+  const normalizeMapOfficeLabel = (office = "") =>
+    String(office || "")
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\boffice\b/g, "")
+      .replace(/\broom\b/g, "")
+      .trim();
+
+  const getVisitorExpectedOfficeLabel = (visitor = {}) =>
+    String(
+      visitor?.expectedDestination ||
+        visitor?.currentDestination?.office ||
+        visitor?.sourceVisitor?.currentDestination?.office ||
+        visitor?.appointmentDepartment ||
+        visitor?.sourceVisitor?.appointmentDepartment ||
+        visitor?.assignedOffice ||
+        visitor?.sourceVisitor?.assignedOffice ||
+        visitor?.host ||
+        visitor?.sourceVisitor?.host ||
+        "",
+    ).trim();
+
+  const isVisitorAtExpectedOffice = (visitor = {}) => {
+    const currentOffice = normalizeMapOfficeLabel(getVisitorCurrentOfficeLabel(visitor));
+    const expectedOffice = normalizeMapOfficeLabel(getVisitorExpectedOfficeLabel(visitor));
+    return Boolean(currentOffice && expectedOffice && currentOffice === expectedOffice);
+  };
+
+  const hasActiveWrongLocationAlert = (visitor = {}) =>
+    Boolean(visitor?.wrongLocationAlerts?.length) && !isVisitorAtExpectedOffice(visitor);
+
   const isLobbyOrGateLocation = (office = "") => {
     const normalizedOffice = String(office || "").trim().toLowerCase();
     return ["lobby", "entrance", "gate", "main gate", "front desk"].some((keyword) =>
@@ -1004,8 +1036,21 @@ export default function SecurityDashboardScreen({ navigation }) {
     );
   };
 
+  const getVisitorLocationTimestamp = (visitor = {}) =>
+    new Date(
+      visitor?.location?.timestamp ||
+        visitor?.currentLocation?.lastSeenAt ||
+        visitor?.sourceVisitor?.currentLocation?.lastSeenAt ||
+        0,
+    ).getTime();
+
+  const isVisitorMovementStale = (visitor = {}) => {
+    const timestamp = getVisitorLocationTimestamp(visitor);
+    return timestamp > 0 && Date.now() - timestamp > 15 * 60 * 1000;
+  };
+
   const getVisitorMapState = (visitor = {}) => {
-    if (visitor?.wrongLocationAlerts?.length) return "attention";
+    if (hasActiveWrongLocationAlert(visitor) || isVisitorMovementStale(visitor)) return "attention";
     const action = getVisitorLocationAction(visitor);
     if (action === "office_departure") return "left_office";
     if (action === "check_in" && isLobbyOrGateLocation(getVisitorCurrentOfficeLabel(visitor))) {
@@ -1026,7 +1071,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       return { label: "Needs Attention", color: BRAND.danger, icon: "warning-outline" };
     }
     if (state === "inside_office") {
-      return { label: "Inside Office", color: BRAND.blue, icon: "business-outline" };
+      return { label: "Entered Office", color: BRAND.blue, icon: "business-outline" };
     }
     if (state === "in_lobby") {
       return { label: "In Lobby", color: BRAND.success, icon: "log-in-outline" };
@@ -1041,19 +1086,12 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const isMapAttentionVisitor = (visitor = {}) => {
-    if (visitor?.wrongLocationAlerts?.length) return true;
-    if (getVisitorMapState(visitor) === "left_office") return true;
-    const timestamp = new Date(
-      visitor?.location?.timestamp ||
-        visitor?.currentLocation?.lastSeenAt ||
-        visitor?.sourceVisitor?.currentLocation?.lastSeenAt ||
-        0,
-    ).getTime();
-    return timestamp > 0 && Date.now() - timestamp > 15 * 60 * 1000;
+    if (hasActiveWrongLocationAlert(visitor)) return true;
+    return isVisitorMovementStale(visitor);
   };
 
   const getMapAttentionReason = (visitor = {}) => {
-    if (visitor?.wrongLocationAlerts?.length) {
+    if (hasActiveWrongLocationAlert(visitor)) {
       const alert = visitor.wrongLocationAlerts[0];
       return `Wrong office: ${alert?.actualLocation || visitor?.location?.office || "unknown office"}`;
     }
@@ -1109,7 +1147,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           Number.isFinite(Number(assignedDestination?.coordinates?.x)) &&
           Number.isFinite(Number(assignedDestination?.coordinates?.y));
 
-        return {
+        const normalizedVisitor = {
           id: visitor._id,
           _id: visitor._id,
           name: visitor.fullName,
@@ -1153,6 +1191,12 @@ export default function SecurityDashboardScreen({ navigation }) {
           },
           movement: visitor.locationHistory || [],
         };
+        const mapState = getVisitorMapState(normalizedVisitor);
+        return {
+          ...normalizedVisitor,
+          mapState,
+          markerColor: getVisitorMapStateMeta(normalizedVisitor).color,
+        };
       });
 
   const normalizeLiveVisitorLocations = (liveVisitors = []) => {
@@ -1186,7 +1230,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               y: 15 + ((index * 23) % 70),
             });
 
-      return {
+      const normalizedVisitor = {
         id: visitor.visitorId,
         _id: visitor.visitorId,
         name: matchedVisitor?.fullName || visitor.name,
@@ -1232,6 +1276,12 @@ export default function SecurityDashboardScreen({ navigation }) {
         },
         movement: visitor.movementHistory || matchedVisitor?.locationHistory || [],
         wrongLocationAlerts: visitor.wrongLocationAlerts || [],
+      };
+      const mapState = getVisitorMapState(normalizedVisitor);
+      return {
+        ...normalizedVisitor,
+        mapState,
+        markerColor: getVisitorMapStateMeta(normalizedVisitor).color,
       };
     });
     const visitorMap = new Map();
@@ -1815,7 +1865,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       if (mapStatusFilter === "inside_office") return getVisitorMapState(visitor) === "inside_office";
       if (mapStatusFilter === "in_lobby") return getVisitorMapState(visitor) === "in_lobby";
       if (mapStatusFilter === "left_office") return getVisitorMapState(visitor) === "left_office";
-      if (mapStatusFilter === "wrong_office") return Boolean(visitor?.wrongLocationAlerts?.length);
+      if (mapStatusFilter === "wrong_office") return hasActiveWrongLocationAlert(visitor);
       return true;
     });
   };
@@ -2724,8 +2774,8 @@ export default function SecurityDashboardScreen({ navigation }) {
     ].filter((visitor) => visitor?.status !== "checked_out");
 
     return actionableVisitors.sort((left, right) => {
-      const leftAlertCount = left?.wrongLocationAlerts?.length || 0;
-      const rightAlertCount = right?.wrongLocationAlerts?.length || 0;
+      const leftAlertCount = hasActiveWrongLocationAlert(left) ? 1 : 0;
+      const rightAlertCount = hasActiveWrongLocationAlert(right) ? 1 : 0;
       if (leftAlertCount !== rightAlertCount) return rightAlertCount - leftAlertCount;
 
       const leftCheckedIn = left?.status === "checked_in" ? 1 : 0;
@@ -2752,7 +2802,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const mobileWrongLocationCount = useMemo(
     () =>
       [...(visitors.active || []), ...(visitors.approved || [])].filter(
-        (visitor) => visitor?.wrongLocationAlerts?.length,
+        (visitor) => hasActiveWrongLocationAlert(visitor),
       ).length,
     [visitors.active, visitors.approved],
   );
@@ -4006,7 +4056,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             {
               label: "Entered Office",
               value: visibleLocations.filter((visitor) =>
-                ["check_in", "location_update"].includes(getVisitorLocationAction(visitor)),
+                getVisitorMapState(visitor) === "inside_office",
               ).length,
               color: "#0A3D91",
               helper: "Latest tap inside",
@@ -6118,8 +6168,8 @@ export default function SecurityDashboardScreen({ navigation }) {
   const renderMobileMap = () => {
     const liveVisitors = getFilteredVisitorLocations();
     const priorityVisitors = liveVisitors.filter(isMapAttentionVisitor).sort((left, right) => {
-      const leftAlertCount = left?.wrongLocationAlerts?.length || 0;
-      const rightAlertCount = right?.wrongLocationAlerts?.length || 0;
+      const leftAlertCount = hasActiveWrongLocationAlert(left) ? 1 : 0;
+      const rightAlertCount = hasActiveWrongLocationAlert(right) ? 1 : 0;
       if (leftAlertCount !== rightAlertCount) return rightAlertCount - leftAlertCount;
 
       return (
@@ -6190,7 +6240,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               {
                 label: "Entered Office",
                 value: liveVisitors.filter((visitor) =>
-                  ["check_in", "location_update"].includes(getVisitorLocationAction(visitor)),
+                  getVisitorMapState(visitor) === "inside_office",
                 ).length,
                 color: BRAND.blue,
                 helper: "Latest tap inside",
@@ -6247,7 +6297,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               key={visitor.id}
               style={[
                 securityMobileStyles.locationCard,
-                visitor.wrongLocationAlerts?.length && securityMobileStyles.locationCardAlert,
+                isMapAttentionVisitor(visitor) && securityMobileStyles.locationCardAlert,
               ]}
               onPress={() => handleVisitorSelect(visitor)}
             >
@@ -6303,7 +6353,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Text style={securityMobileStyles.locationMeta}>
                   Expected: {locationItem.expectedDestination || "Assigned destination"}
                 </Text>
-                {locationItem.wrongLocationAlerts?.length ? (
+                {hasActiveWrongLocationAlert(locationItem) ? (
                   <Text style={[securityMobileStyles.locationFreshness, { color: BRAND.danger }]}>
                     Wrong-office alert: {locationItem.wrongLocationAlerts[0]?.actualLocation || "Unknown office"}
                   </Text>
@@ -6581,7 +6631,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               {
                 label: "Entered Office",
                 value: getFilteredVisitorLocations().filter((visitor) =>
-                  ["check_in", "location_update"].includes(getVisitorLocationAction(visitor)),
+                  getVisitorMapState(visitor) === "inside_office",
                 ).length,
                 color: "#8EC5FF",
                 helper: "Latest tap inside",
