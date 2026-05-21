@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   Platform,
+  AppState,
   Animated,
   StatusBar,
   Dimensions,
@@ -49,6 +50,7 @@ import {
   isValidPhilippineMobileNumber,
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
+import { MobileConnectionBanner } from "../components/mobile/MobileRoleComponents";
 import {
   buildDepartmentFilterOptions,
   countMapActivitiesByFilter,
@@ -60,10 +62,17 @@ import styles from "../styles/AdminDashboardStyles";
 const { width, height } = Dimensions.get("window");
 const ADMIN_BLUE = "#1C6DD0";
 const ADMIN_BLUE_DARK = "#0A3D91";
+const SMART_REFRESH_MIN_INTERVAL_MS = 30000;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const Storage = Platform.OS === "web"
   ? require("../utils/webStorage").default
   : require("@react-native-async-storage/async-storage").default;
+
+const isSafePassConnectionError = (error) =>
+  Boolean(error?.isSafePassConnectionError) ||
+  String(error?.code || "") === "SAFEPASS_CONNECTION_ERROR" ||
+  String(error?.message || "").includes("Cannot connect to the SafePass server") ||
+  String(error?.message || "").includes("Network request failed");
 
 const HoverBubble = ({ children, style, hoverScale = 1.05, onPress, ...props }) => {
   const scale = useRef(new Animated.Value(1)).current;
@@ -891,7 +900,6 @@ const AdminFeedbackBanner = ({ notice, isDarkMode, theme, onDismiss }) => {
 };
 
 const ADMIN_MAP_FLOORS = ADMIN_MODULE_FLOORS;
-const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
 const ADMIN_MAP_ACTIVITY_TYPES = new Set([
   "visitor_registration_request",
   "visitor_appointment_request",
@@ -1101,11 +1109,13 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const dataManagementScrollViewRef = useRef(null);
   const authErrorHandledRef = useRef(false);
   const adminMapRefreshRef = useRef(false);
+  const smartRefreshAtRef = useRef(0);
 
   // User State
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [connectionIssue, setConnectionIssue] = useState(null);
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [expandedModule, setExpandedModule] = useState("account-management");
   const [selectedSubmodule, setSelectedSubmodule] = useState("dashboard");
@@ -1285,6 +1295,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [lastUserSavedAt, setLastUserSavedAt] = useState(null);
   const [showViewUserModal, setShowViewUserModal] = useState(false);
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
@@ -2945,9 +2956,19 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         console.error("Failed to load visit requests:", response);
       }
     } catch (error) {
-      console.error("Load visit requests error:", error);
+      if (!isSafePassConnectionError(error)) {
+        console.error("Load visit requests error:", error);
+      }
       if (isAuthError(error)) {
         await handleAuthError();
+        return;
+      }
+      if (isSafePassConnectionError(error)) {
+        setConnectionIssue({
+          title: "SafePass server unavailable",
+          message: error?.message || "Check your connection or try again.",
+          updatedAt: Date.now(),
+        });
         return;
       }
       if (!silent) {
@@ -2984,9 +3005,19 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         console.error("Failed to load users:", response);
       }
     } catch (error) {
-      console.error("Load users error:", error);
+      if (!isSafePassConnectionError(error)) {
+        console.error("Load users error:", error);
+      }
       if (isAuthError(error)) {
         await handleAuthError();
+        return;
+      }
+      if (isSafePassConnectionError(error)) {
+        setConnectionIssue({
+          title: "SafePass server unavailable",
+          message: error?.message || "Check your connection or try again.",
+          updatedAt: Date.now(),
+        });
         return;
       }
       Alert.alert("Error", "Failed to load users. Please check your connection.");
@@ -3034,9 +3065,19 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         completedVisits: snapshot.completedVisits ?? prev.completedVisits,
       }));
     } catch (error) {
-      console.error("Load admin stats error:", error);
+      if (!isSafePassConnectionError(error)) {
+        console.error("Load admin stats error:", error);
+      }
       if (isAuthError(error)) {
         await handleAuthError();
+        return;
+      }
+      if (isSafePassConnectionError(error)) {
+        setConnectionIssue({
+          title: "SafePass server unavailable",
+          message: error?.message || "Check your connection or try again.",
+          updatedAt: Date.now(),
+        });
       }
     }
   }, [handleAuthError]);
@@ -3053,10 +3094,19 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       setAttendanceRecords(Array.isArray(attendanceResponse?.attendance) ? attendanceResponse.attendance : []);
       setAttendanceSummary(summaryResponse?.summary || null);
     } catch (error) {
-      console.error("Load attendance records error:", error);
+      if (!isSafePassConnectionError(error)) {
+        console.error("Load attendance records error:", error);
+      }
       if (isAuthError(error)) {
         await handleAuthError();
         return;
+      }
+      if (isSafePassConnectionError(error)) {
+        setConnectionIssue({
+          title: "SafePass server unavailable",
+          message: error?.message || "Check your connection or try again.",
+          updatedAt: Date.now(),
+        });
       }
       setAttendanceRecords([]);
       setAttendanceSummary(null);
@@ -3087,10 +3137,21 @@ const loadDashboardData = useCallback(async () => {
       loadRecentActivities(),
       loadAppointmentManagementOptions(),
     ]);
+    setConnectionIssue(null);
   } catch (error) {
-    console.error("Load dashboard error:", error);
+    if (!isSafePassConnectionError(error)) {
+      console.error("Load dashboard error:", error);
+    }
     if (isAuthError(error)) {
       await handleAuthError();
+      return;
+    }
+    if (isSafePassConnectionError(error)) {
+      setConnectionIssue({
+        title: "SafePass server unavailable",
+        message: error?.message || "Check your connection or try again.",
+        updatedAt: Date.now(),
+      });
       return;
     }
     Alert.alert("Error", "Failed to load dashboard data. Please try again.");
@@ -3227,15 +3288,56 @@ const loadDashboardData = useCallback(async () => {
     }
   };
 
+  const smartRefreshAdminData = useCallback(async () => {
+    const now = Date.now();
+    if (now - smartRefreshAtRef.current < SMART_REFRESH_MIN_INTERVAL_MS) return;
+    smartRefreshAtRef.current = now;
+
+    await Promise.allSettled([
+      loadAdminStats(),
+      loadAllVisitRequests({ silent: true }),
+      loadAdminLiveVisitorLocations(),
+      loadRecentActivities(),
+      selectedSubmodule === "attendance-records" ? loadAttendanceRecords() : Promise.resolve(),
+    ]);
+  }, [
+    loadAdminStats,
+    loadAllVisitRequests,
+    loadRecentActivities,
+    loadAttendanceRecords,
+    selectedSubmodule,
+  ]);
+
   useEffect(() => {
     const isMapVisible = activeMenu === "webmap" || showAdminMapModal || showAdminMapDock;
     if (!isMapVisible) return undefined;
 
     refreshAdminMapData();
-    const interval = setInterval(refreshAdminMapData, LIVE_MAP_REFRESH_INTERVAL_MS);
-
-    return () => clearInterval(interval);
+    return undefined;
   }, [activeMenu, showAdminMapModal, showAdminMapDock]);
+
+  useEffect(() => {
+    const unsubscribeNavigationFocus = navigation?.addListener?.("focus", smartRefreshAdminData);
+    const appStateSubscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        smartRefreshAdminData();
+      }
+    });
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.addEventListener("focus", smartRefreshAdminData);
+      return () => {
+        unsubscribeNavigationFocus?.();
+        appStateSubscription?.remove?.();
+        window.removeEventListener("focus", smartRefreshAdminData);
+      };
+    }
+
+    return () => {
+      unsubscribeNavigationFocus?.();
+      appStateSubscription?.remove?.();
+    };
+  }, [navigation, smartRefreshAdminData]);
 
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 100],
@@ -4584,6 +4686,7 @@ const loadDashboardData = useCallback(async () => {
 
   const openUserDataEditPanel = (userItem) => {
     setSelectedUser(userItem);
+    setLastUserSavedAt(null);
     populateEditUserData(userItem);
     setUserDataPanelMode(null);
     setShowViewUserModal(false);
@@ -4651,6 +4754,9 @@ const loadDashboardData = useCallback(async () => {
     } = validateEditUserForm();
     const isEditingSecurity = isSecurityRole(editUserData.role);
     const isEditingStudent = String(editUserData.role || "").toLowerCase() === "student";
+    const previousParentEmail = String(selectedUser?.parentEmail || selectedUser?.guardianEmail || "")
+      .trim()
+      .toLowerCase();
 
     if (!isValid) {
       Alert.alert("Validation Error", "Please review the highlighted fields before saving changes.");
@@ -4759,13 +4865,18 @@ const loadDashboardData = useCallback(async () => {
         setStaffUsers(updatedUsers.filter(u => u.role === "staff"));
         setGuardUsers(updatedUsers.filter(u => u.role === "security" || u.role === "guard"));
         setSelectedUser(updatedSelectedUser);
+        setLastUserSavedAt(new Date());
         
-        publishAdminNotice(
-          "success",
-          "User updated",
-          `${editUserData.firstName} ${editUserData.lastName}'s account details were saved.`,
-        );
-        Alert.alert("Success", "User has been updated successfully!");
+        const savedParentEmail = String(normalizedSavedUser?.parentEmail || normalizedSavedUser?.guardianEmail || "")
+          .trim()
+          .toLowerCase();
+        const parentEmailChanged = isEditingStudent && savedParentEmail && savedParentEmail !== previousParentEmail;
+        const updateMessage = parentEmailChanged
+          ? `Student details were saved. Parent email is now ${savedParentEmail}.`
+          : `${editUserData.firstName} ${editUserData.lastName}'s account details were saved.`;
+
+        publishAdminNotice("success", parentEmailChanged ? "Parent email updated" : "User updated", updateMessage);
+        Alert.alert(parentEmailChanged ? "Parent Email Updated" : "Success", updateMessage);
         setShowEditUserModal(false);
         if (userDataPanelMode === "edit") {
           setUserDataPanelMode("view");
@@ -11808,6 +11919,16 @@ const loadDashboardData = useCallback(async () => {
             onDismiss={() => setAdminNotice(null)}
           />
 
+          <View style={{ paddingHorizontal: isAdminMobileLayout ? 16 : 28, paddingTop: connectionIssue ? 14 : 0 }}>
+            <MobileConnectionBanner
+              dark={isDarkMode}
+              visible={!!connectionIssue}
+              title={connectionIssue?.title}
+              message={connectionIssue?.message}
+              onRetry={loadDashboardData}
+            />
+          </View>
+
           {renderSelectedModuleContent()}
         </View>
         </View>
@@ -13290,6 +13411,11 @@ const loadDashboardData = useCallback(async () => {
                 <Text style={[styles.userEditorSubtitle, isDarkMode && styles.darkTextSecondary]}>
                   Update account details, role, and operational status.
                 </Text>
+                {lastUserSavedAt ? (
+                  <Text style={[styles.userEditorSubtitle, { color: "#047857", marginTop: 4 }]}>
+                    Saved just now at {formatSafePassTime(lastUserSavedAt)}.
+                  </Text>
+                ) : null}
               </View>
               <TouchableOpacity onPress={() => setShowEditUserModal(false)}>
                 <Ionicons name="close" size={24} color={isDarkMode ? "#94A3B8" : "#6B7280"} />

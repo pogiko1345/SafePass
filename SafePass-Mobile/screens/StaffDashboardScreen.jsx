@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   Platform,
+  AppState,
   StatusBar,
   LayoutAnimation,
   UIManager,
@@ -35,6 +36,7 @@ import { printRecordsTable } from "../utils/printUtils";
 import {
   BRAND,
   MobileBottomNav,
+  MobileConnectionBanner,
   MobileEmptyState,
   MobileFilterChips,
   MobileLoadingState,
@@ -45,6 +47,13 @@ import ToastNotice from "../components/shared/ToastNotice";
 import styles from "../styles/StaffDashboardStyles";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const SMART_REFRESH_MIN_INTERVAL_MS = 30000;
+
+const isSafePassConnectionError = (error) =>
+  Boolean(error?.isSafePassConnectionError) ||
+  String(error?.code || "") === "SAFEPASS_CONNECTION_ERROR" ||
+  String(error?.message || "").includes("Cannot connect to the SafePass server") ||
+  String(error?.message || "").includes("Network request failed");
 
 const SidebarHoverPressable = ({
   children,
@@ -196,13 +205,13 @@ const getAppointmentStatus = (appointment) => {
 
 const getStaffActionHint = (appointment) => {
   const status = getAppointmentStatus(appointment);
-  if (status === "pending") return "Waiting for your decision";
-  if (status === "rescheduled") return "Visitor requested a new schedule";
+  if (isActiveStaffVisit(appointment)) return "Manage the active visit: mark done or redirect";
+  if (status === "pending") return "Appointment request needs approval, adjustment, redirect, or rejection";
+  if (status === "rescheduled") return "Visitor requested a new schedule. Review before approval";
   if (status === "adjustment_pending") return "Waiting for visitor confirmation";
-  if (appointment?.status === "checked_in" && !appointment?.checkedOutAt) return "Visitor is currently inside";
-  if (status === "approved" || status === "adjusted") return "Scheduled for your office";
-  if (status === "completed") return "Visit completed";
-  if (status === "rejected") return "Request declined";
+  if (status === "approved" || status === "adjusted") return "Approved and ready for security check-in";
+  if (status === "completed") return "Visit completed by staff";
+  if (status === "rejected") return "Request declined with reason";
   if (status === "no_show") return "Visitor did not arrive";
   return getStatusMeta(status).label;
 };
@@ -216,6 +225,65 @@ const isActiveStaffVisit = (appointment) =>
   appointment?.status === "checked_in" &&
   !appointment?.checkedOutAt &&
   !appointment?.appointmentCompletedAt;
+
+const getStaffVisitPhase = (appointment) => {
+  if (isActiveStaffVisit(appointment)) {
+    const currentOffice = appointment?.currentLocation?.office;
+    const expectedOffice =
+      appointment?.currentDestination?.office ||
+      appointment?.appointmentDepartment ||
+      appointment?.assignedOffice ||
+      "assigned office";
+    return {
+      label: currentOffice ? "Visitor in office" : "Visitor checked in",
+      detail: currentOffice
+        ? `${currentOffice} is the latest checkpoint. Expected destination: ${expectedOffice}.`
+        : `Security checked this visitor in. Wait for the office tap, then mark Done or Redirect if needed.`,
+      icon: currentOffice ? "business-outline" : "log-in-outline",
+      color: "#047857",
+    };
+  }
+
+  const status = getAppointmentStatus(appointment);
+  if (["pending", "rescheduled"].includes(status)) {
+    return {
+      label: "Appointment request",
+      detail: "Use Approve, Adjust, Redirect, or Reject before the visitor can enter.",
+      icon: "mail-unread-outline",
+      color: "#D97706",
+    };
+  }
+  if (["approved", "adjusted"].includes(status)) {
+    return {
+      label: "Ready for security",
+      detail: "The visitor is approved. Security will check them in when they arrive.",
+      icon: "shield-checkmark-outline",
+      color: "#0A3D91",
+    };
+  }
+  if (status === "adjustment_pending") {
+    return {
+      label: "Waiting for visitor",
+      detail: "The visitor must confirm the adjusted schedule before entry.",
+      icon: "help-circle-outline",
+      color: "#7C3AED",
+    };
+  }
+  if (status === "completed") {
+    return {
+      label: "Visit completed",
+      detail: "This appointment is closed and kept for records.",
+      icon: "checkmark-done-outline",
+      color: "#475569",
+    };
+  }
+  return {
+    label: getStatusMeta(status).label,
+    detail: getStaffActionHint(appointment),
+    icon: "information-circle-outline",
+    color: getStatusMeta(status).color,
+  };
+};
 
 const matchesAppointmentSearch = (appointment, searchTerm) => {
   const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
@@ -416,6 +484,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     title: "",
     message: "",
   });
+  const smartRefreshAtRef = useRef(0);
 
   const loadStaffThemePreference = useCallback(async () => {
     try {
@@ -509,20 +578,31 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       if (notificationResponse.status === "fulfilled") {
         setNotifications(notificationResponse.value?.notifications || []);
       } else {
-        console.error("Staff notifications error:", notificationResponse.reason);
+        if (!isSafePassConnectionError(notificationResponse.reason)) {
+          console.error("Staff notifications error:", notificationResponse.reason);
+        }
         setNotifications([]);
       }
 
       if (attendanceResponse.status === "fulfilled") {
         setAttendance(Array.isArray(attendanceResponse.value?.attendance) ? attendanceResponse.value.attendance : []);
       } else {
-        console.error("Staff attendance error:", attendanceResponse.reason);
+        if (!isSafePassConnectionError(attendanceResponse.reason)) {
+          console.error("Staff attendance error:", attendanceResponse.reason);
+        }
         setAttendance([]);
       }
+      setLoadError("");
     } catch (error) {
-      console.error("Load staff dashboard error:", error);
+      if (!isSafePassConnectionError(error)) {
+        console.error("Load staff dashboard error:", error);
+      }
       setLoadError(error?.message || "Failed to load staff dashboard.");
-      Alert.alert("Error", error?.message || "Failed to load staff dashboard.");
+      if (isSafePassConnectionError(error)) {
+        return;
+      } else {
+        Alert.alert("Error", error?.message || "Failed to load staff dashboard.");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -532,6 +612,36 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const smartRefreshStaffData = useCallback(() => {
+    const now = Date.now();
+    if (now - smartRefreshAtRef.current < SMART_REFRESH_MIN_INTERVAL_MS) return;
+    smartRefreshAtRef.current = now;
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const unsubscribeNavigationFocus = navigation?.addListener?.("focus", smartRefreshStaffData);
+    const appStateSubscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        smartRefreshStaffData();
+      }
+    });
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.addEventListener("focus", smartRefreshStaffData);
+      return () => {
+        unsubscribeNavigationFocus?.();
+        appStateSubscription?.remove?.();
+        window.removeEventListener("focus", smartRefreshStaffData);
+      };
+    }
+
+    return () => {
+      unsubscribeNavigationFocus?.();
+      appStateSubscription?.remove?.();
+    };
+  }, [navigation, smartRefreshStaffData]);
 
   useEffect(() => {
     const isNewArchitectureEnabled = Boolean(globalThis?.nativeFabricUIManager);
@@ -1863,6 +1973,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   const renderAppointmentDetailPanel = () => {
     if (!detailAppointment) return null;
+    const detailVisitPhase = getStaffVisitPhase(detailAppointment);
 
     return (
       <View style={styles.detailPanelCard}>
@@ -1927,6 +2038,11 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                 {getStatusMeta(getAppointmentStatus(detailAppointment)).label}
               </Text>
             </View>
+          </View>
+
+          <View style={[styles.detailNoteCard, { borderLeftWidth: 4, borderLeftColor: detailVisitPhase.color }]}>
+            <Text style={styles.detailLabel}>{detailVisitPhase.label}</Text>
+            <Text style={styles.detailNoteText}>{detailVisitPhase.detail}</Text>
           </View>
 
           <View style={styles.detailTimelineSection}>
@@ -3254,6 +3370,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     const isProcessing = processingId === appointment._id;
     const canManageVisit = isActiveStaffVisit(appointment);
     const actionHint = getStaffActionHint(appointment);
+    const visitPhase = getStaffVisitPhase(appointment);
 
     return (
       <TouchableOpacity
@@ -3301,6 +3418,14 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             <Text style={[staffMobileStyles.metaPillText, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]} numberOfLines={1}>
               {appointment.appointmentDepartment || appointment.assignedOffice || user?.department || "Office"}
             </Text>
+          </View>
+        </View>
+
+        <View style={[staffMobileStyles.visitPhasePanel, mobileDarkModeEnabled && staffMobileStyles.darkPill]}>
+          <Ionicons name={visitPhase.icon} size={16} color={visitPhase.color} />
+          <View style={staffMobileStyles.visitPhaseCopy}>
+            <Text style={[staffMobileStyles.visitPhaseTitle, { color: visitPhase.color }]}>{visitPhase.label}</Text>
+            <Text style={[staffMobileStyles.visitPhaseText, mobileDarkModeEnabled && staffMobileStyles.darkMutedText]}>{visitPhase.detail}</Text>
           </View>
         </View>
 
@@ -3769,6 +3894,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BRAND.blue} />}
         >
+          <MobileConnectionBanner
+            dark={mobileDarkModeEnabled}
+            visible={!!loadError && !!user}
+            title="SafePass server unavailable"
+            message={loadError}
+            onRetry={() => {
+              setRefreshing(true);
+              loadData();
+            }}
+            style={{ marginBottom: 14 }}
+          />
           {content}
         </ScrollView>
         <MobileBottomNav
@@ -3874,6 +4010,17 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             }
             contentContainerStyle={styles.scrollContent}
           >
+            <MobileConnectionBanner
+              dark={mobileDarkModeEnabled}
+              visible={!!loadError && !!user}
+              title="SafePass server unavailable"
+              message={loadError}
+              onRetry={() => {
+                setRefreshing(true);
+                loadData();
+              }}
+              style={{ marginBottom: 16 }}
+            />
             <View style={[styles.pageHeaderCard, mobileDarkModeEnabled && styles.darkPageHeaderCard]}>
               <Text style={[styles.pageEyebrow, mobileDarkModeEnabled && styles.darkMutedText]}>Staff Module</Text>
               <Text style={[styles.pageTitle, mobileDarkModeEnabled && styles.darkText]}>{selectedSubmoduleMeta.title}</Text>
@@ -4611,6 +4758,31 @@ const staffMobileStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     color: "#475569",
+  },
+  visitPhasePanel: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "#F8FBFE",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  visitPhaseCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  visitPhaseTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  visitPhaseText: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
   },
   cardActions: {
     flexDirection: "row",

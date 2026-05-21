@@ -36,6 +36,7 @@ import {
 import {
   BRAND,
   MobileBottomNav,
+  MobileConnectionBanner,
   MobileEmptyState,
   MobileFilterChips,
   MobileLoadingState,
@@ -64,11 +65,9 @@ import {
   normalizeMapSettingsPayload,
 } from "../utils/mapSettingsUtils";
 
-const LIVE_MAP_REFRESH_INTERVAL_MS = 5000;
-const SECURITY_LIVE_REFRESH_INTERVAL_MS = 10000;
 const SECURITY_OPERATIONAL_REFRESH_INTERVAL_MS = 60000;
-const SECURITY_NOTIFICATION_REFRESH_INTERVAL_MS = 30000;
 const SECURITY_DASHBOARD_LOG_THROTTLE_MS = 30000;
+const SMART_REFRESH_MIN_INTERVAL_MS = 30000;
 const securityDashboardLogTimestamps = new Map();
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -80,6 +79,12 @@ const logSecurityDashboardLoadError = (key, label, error) => {
   securityDashboardLogTimestamps.set(key, now);
   console.error(label, error);
 };
+
+const isSafePassConnectionError = (error) =>
+  Boolean(error?.isSafePassConnectionError) ||
+  String(error?.code || "") === "SAFEPASS_CONNECTION_ERROR" ||
+  String(error?.message || "").includes("Cannot connect to the SafePass server") ||
+  String(error?.message || "").includes("Network request failed");
 
 const SidebarHoverPressable = ({ children, style, hoverScale = 1.035, onPress, disabled, ...props }) => {
   const scale = useRef(new Animated.Value(1)).current;
@@ -230,6 +235,48 @@ const SECURITY_ATTENDANCE_STATUS_OPTIONS = [
   { value: "completed", label: "Completed" },
 ];
 
+const getOptionLabel = (options = [], value, fallback = "All") =>
+  options.find((option) => option.value === value || option.key === value)?.label || fallback;
+
+const buildAttendanceEmptyCopy = ({ scope, dateFilter, statusFilter, search }) => {
+  const scopeLabel = getOptionLabel(SECURITY_ATTENDANCE_SCOPE_OPTIONS, scope, "people").toLowerCase();
+  const dateLabel = getOptionLabel(SECURITY_ATTENDANCE_DATE_OPTIONS, dateFilter, "selected dates").toLowerCase();
+  const statusLabel = getOptionLabel(SECURITY_ATTENDANCE_STATUS_OPTIONS, statusFilter, "all statuses").toLowerCase();
+  const trimmedSearch = String(search || "").trim();
+
+  if (trimmedSearch) {
+    return {
+      title: "No matching attendance records",
+      subtitle: `No ${scopeLabel} records match "${trimmedSearch}" for ${dateLabel} and ${statusLabel}.`,
+    };
+  }
+
+  return {
+    title: `No ${scopeLabel} attendance found`,
+    subtitle: `There are no ${statusLabel} records for ${scopeLabel} in ${dateLabel}. Try another date range or person type.`,
+  };
+};
+
+const getFriendlyNfcErrorMessage = (error, actionLabel = "update this UID") => {
+  const status = Number(error?.status || error?.data?.status || 0);
+  const message = String(error?.message || error?.data?.message || "").trim();
+  const lowered = message.toLowerCase();
+
+  if (status === 403 || lowered.includes("access denied")) {
+    return `Access denied. Please sign in with a Security or Admin account that has NFC card permissions, then try to ${actionLabel}.`;
+  }
+
+  if (status === 409 || lowered.includes("already assigned")) {
+    return `${message || "This UID is already assigned to another account."} Use Replace UID to move it to the selected visitor.`;
+  }
+
+  if (status === 404 || lowered.includes("not found")) {
+    return message || "No matching visitor account was found for this UID action. Refresh the visitor list and try again.";
+  }
+
+  return message || `Unable to ${actionLabel}. Please try again.`;
+};
+
 const getSecurityAttendanceDateRange = (shortcut = "today") => {
   const now = new Date();
   const toDate = now.toISOString().slice(0, 10);
@@ -268,6 +315,7 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [securityProfileSaving, setSecurityProfileSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [connectionIssue, setConnectionIssue] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(isDesktop);
   
   // Logout Modal State
@@ -282,11 +330,23 @@ export default function SecurityDashboardScreen({ navigation }) {
   const liveMapRefreshRef = useRef(false);
   const securityLiveRefreshRef = useRef(false);
   const lastOperationalRefreshAtRef = useRef(0);
+  const smartRefreshAtRef = useRef(0);
   const operationalDataSignatureRef = useRef("");
   const notificationDataSignatureRef = useRef("");
   const visitorNfcInputRef = useRef(null);
   const visitorNfcLastInputAtRef = useRef(0);
   const authRedirectHandledRef = useRef(false);
+
+  const clearConnectionIssue = () => setConnectionIssue(null);
+  const noteConnectionIssue = (error) => {
+    if (!isSafePassConnectionError(error)) return false;
+    setConnectionIssue({
+      title: "SafePass server unavailable",
+      message: error?.message || "Check your internet connection or try again.",
+      updatedAt: Date.now(),
+    });
+    return true;
+  };
   
   // Dashboard Data
   const [dashboardStats, setDashboardStats] = useState({
@@ -308,6 +368,13 @@ export default function SecurityDashboardScreen({ navigation }) {
   const [attendanceDateFilter, setAttendanceDateFilter] = useState("today");
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState("all");
   const [attendanceSearch, setAttendanceSearch] = useState("");
+  const [attendancePage, setAttendancePage] = useState(1);
+  const [attendancePagination, setAttendancePagination] = useState({
+    page: 1,
+    limit: 25,
+    total: 0,
+    pages: 1,
+  });
   const [recentAccess, setRecentAccess] = useState([]);
   const [alerts, setAlerts] = useState([]);
   
@@ -561,31 +628,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     initializeScreen();
     requestPermissions();
     
-    const liveRefreshInterval = setInterval(() => {
-      refreshSecurityLiveData();
-    }, SECURITY_LIVE_REFRESH_INTERVAL_MS);
-    const notificationRefreshInterval = setInterval(() => {
-      loadNotifications();
-    }, SECURITY_NOTIFICATION_REFRESH_INTERVAL_MS);
-    
-    return () => {
-      clearInterval(liveRefreshInterval);
-      clearInterval(notificationRefreshInterval);
-    };
-  }, []);
-
-  useEffect(() => {
-    const appStateSubscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") {
-        refreshSecurityLiveData();
-        loadNotifications();
-        loadMapSettings();
-      }
-    });
-
-    return () => {
-      appStateSubscription?.remove?.();
-    };
+    return undefined;
   }, []);
 
   useEffect(() => {
@@ -1598,9 +1641,11 @@ export default function SecurityDashboardScreen({ navigation }) {
         recentAccess: combinedLogs.length,
         occupancyRate: 0,
       }));
+      clearConnectionIssue();
       return true;
     } catch (error) {
       logSecurityDashboardLoadError("operational-data", "Load operational data error:", error);
+      noteConnectionIssue(error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -1614,9 +1659,11 @@ export default function SecurityDashboardScreen({ navigation }) {
       setVisitorLocations(
         normalizeLiveVisitorLocations(Array.isArray(response?.visitors) ? response.visitors : []),
       );
+      clearConnectionIssue();
       return true;
     } catch (error) {
       logSecurityDashboardLoadError("live-visitor-locations", "Load live visitor locations error:", error);
+      noteConnectionIssue(error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -1636,9 +1683,11 @@ export default function SecurityDashboardScreen({ navigation }) {
         ...current,
         activeUsers: summary.total || presence.length,
       }));
+      clearConnectionIssue();
       return true;
     } catch (error) {
       logSecurityDashboardLoadError("live-presence", "Load security live presence error:", error);
+      noteConnectionIssue(error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -1651,7 +1700,8 @@ export default function SecurityDashboardScreen({ navigation }) {
     try {
       const query = {
         ...getSecurityAttendanceDateRange(attendanceDateFilter),
-        limit: 200,
+        page: attendancePage,
+        limit: attendancePagination.limit,
       };
       if (attendanceScope === "security") {
         query.module = "security_monitoring";
@@ -1663,9 +1713,17 @@ export default function SecurityDashboardScreen({ navigation }) {
 
       const response = await ApiService.getAttendance(query);
       setAttendanceRecords(Array.isArray(response?.attendance) ? response.attendance : []);
+      setAttendancePagination((current) => ({
+        page: response?.pagination?.page || attendancePage,
+        limit: response?.pagination?.limit || current.limit,
+        total: response?.pagination?.total || 0,
+        pages: Math.max(1, response?.pagination?.pages || 1),
+      }));
+      clearConnectionIssue();
       return true;
     } catch (error) {
       logSecurityDashboardLoadError("attendance-records", "Load security attendance records error:", error);
+      noteConnectionIssue(error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -1737,9 +1795,11 @@ export default function SecurityDashboardScreen({ navigation }) {
         ...current,
         activeAlerts: alertNotifications.length,
       }));
+      clearConnectionIssue();
       return true;
     } catch (error) {
       logSecurityDashboardLoadError("notifications", "Load notifications error:", error);
+      noteConnectionIssue(error);
       if (isAuthError(error)) {
         await handleAuthExpired();
       }
@@ -2078,8 +2138,9 @@ export default function SecurityDashboardScreen({ navigation }) {
           : `NFC card assigned successfully. Current UID: ${assignedCardId}.`,
       });
     } catch (error) {
-      setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to assign this card UID." });
-      Alert.alert("Assign Failed", error?.message || "Unable to assign this card UID.");
+      const friendlyMessage = getFriendlyNfcErrorMessage(error, currentCard ? "replace this UID" : "assign this UID");
+      setVisitorNfcStatus({ type: "error", message: friendlyMessage });
+      Alert.alert(currentCard ? "Replace UID Failed" : "Assign UID Failed", friendlyMessage);
     } finally {
       setVisitorNfcBusy(false);
     }
@@ -2128,12 +2189,49 @@ export default function SecurityDashboardScreen({ navigation }) {
         message: response?.message || `UID ${cardToRemove} was unassigned successfully.`,
       });
     } catch (error) {
-      setVisitorNfcStatus({ type: "error", message: error?.message || "Unable to unassign this card UID." });
-      Alert.alert("Unassign Failed", error?.message || "Unable to unassign this card UID.");
+      const friendlyMessage = getFriendlyNfcErrorMessage(error, "remove this UID");
+      setVisitorNfcStatus({ type: "error", message: friendlyMessage });
+      Alert.alert("Remove UID Failed", friendlyMessage);
     } finally {
       setVisitorNfcBusy(false);
     }
   };
+
+  async function smartRefreshSecurityData() {
+    const now = Date.now();
+    if (now - smartRefreshAtRef.current < SMART_REFRESH_MIN_INTERVAL_MS) return;
+    smartRefreshAtRef.current = now;
+
+    await Promise.allSettled([
+      refreshSecurityLiveData(),
+      loadNotifications(user),
+      loadMapSettings(),
+    ]);
+  }
+
+  useEffect(() => {
+    const appStateSubscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        smartRefreshSecurityData();
+      }
+    });
+
+    const unsubscribeNavigationFocus = navigation?.addListener?.("focus", smartRefreshSecurityData);
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.addEventListener("focus", smartRefreshSecurityData);
+      return () => {
+        appStateSubscription?.remove?.();
+        unsubscribeNavigationFocus?.();
+        window.removeEventListener("focus", smartRefreshSecurityData);
+      };
+    }
+
+    return () => {
+      appStateSubscription?.remove?.();
+      unsubscribeNavigationFocus?.();
+    };
+  }, [navigation, user]);
 
   const refreshSecurityLiveData = async () => {
     if (securityLiveRefreshRef.current) return;
@@ -2144,7 +2242,6 @@ export default function SecurityDashboardScreen({ navigation }) {
       const refreshTasks = [
         loadLiveVisitorLocations(),
         loadSecurityLivePresence(),
-        loadSecurityAttendanceRecords(),
       ];
 
       if (shouldRefreshOperationalData) {
@@ -2180,9 +2277,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     if (!isMapVisible) return undefined;
 
     refreshLiveMapData();
-    const interval = setInterval(refreshLiveMapData, LIVE_MAP_REFRESH_INTERVAL_MS);
-
-    return () => clearInterval(interval);
+    return undefined;
   }, [activeTab, showMapModal]);
 
   useEffect(() => {
@@ -3207,6 +3302,17 @@ export default function SecurityDashboardScreen({ navigation }) {
     );
   }, [filteredAttendanceRecords]);
 
+  const attendanceEmptyCopy = useMemo(
+    () =>
+      buildAttendanceEmptyCopy({
+        scope: attendanceScope,
+        dateFilter: attendanceDateFilter,
+        statusFilter: attendanceStatusFilter,
+        search: attendanceSearch,
+      }),
+    [attendanceScope, attendanceDateFilter, attendanceStatusFilter, attendanceSearch],
+  );
+
   useEffect(() => {
     setAppointmentRecordsPage(1);
   }, [visitorFilter, searchQuery]);
@@ -3224,9 +3330,32 @@ export default function SecurityDashboardScreen({ navigation }) {
   }, [reportSearchQuery, reportStatusFilter]);
 
   useEffect(() => {
+    setAttendancePage(1);
+  }, [attendanceScope, attendanceDateFilter, attendanceStatusFilter, attendanceSearch]);
+
+  useEffect(() => {
+    setAttendancePage((currentPageValue) =>
+      Math.min(currentPageValue, Math.max(1, attendancePagination.pages || 1)),
+    );
+  }, [attendancePagination.pages]);
+
+  useEffect(() => {
     if (!user) return;
     loadSecurityAttendanceRecords();
-  }, [attendanceScope, attendanceDateFilter, attendanceStatusFilter]);
+  }, [attendanceScope, attendanceDateFilter, attendanceStatusFilter, attendancePage]);
+
+  useEffect(() => {
+    if (!user) return;
+    const searchRefresh = setTimeout(() => {
+      if (attendancePage !== 1) {
+        setAttendancePage(1);
+        return;
+      }
+      loadSecurityAttendanceRecords();
+    }, 450);
+
+    return () => clearTimeout(searchRefresh);
+  }, [attendanceSearch]);
 
   const renderAppointmentPagination = () => (
     <View style={styles.appointmentRecordsPaginationRow}>
@@ -4655,6 +4784,7 @@ export default function SecurityDashboardScreen({ navigation }) {
             setAttendanceScope("all");
             setAttendanceDateFilter("today");
             setAttendanceStatusFilter("all");
+            setAttendancePage(1);
           },
           filterGroups: [
             {
@@ -4721,7 +4851,7 @@ export default function SecurityDashboardScreen({ navigation }) {
                 <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsOfficeCell]}>Location</Text>
                 <Text style={[styles.appointmentRecordsHeaderCell, styles.appointmentRecordsContactCell]}>NFC UID</Text>
               </View>
-              {filteredAttendanceRecords.slice(0, 150).map((record, index) => (
+              {filteredAttendanceRecords.map((record, index) => (
                 <View
                   key={record?._id || `${record?.name}-${record?.attendanceDate}-${index}`}
                   style={styles.appointmentRecordsTableRow}
@@ -4765,10 +4895,43 @@ export default function SecurityDashboardScreen({ navigation }) {
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="clipboard-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyStateTitle}>No attendance records found</Text>
-            <Text style={styles.emptyStateSubtitle}>NFC check-ins and check-outs will appear here after cards are tapped.</Text>
+            <Text style={styles.emptyStateTitle}>{attendanceEmptyCopy.title}</Text>
+            <Text style={styles.emptyStateSubtitle}>{attendanceEmptyCopy.subtitle}</Text>
+            <TouchableOpacity
+              style={styles.emptyRefreshButton}
+              onPress={() => {
+                setAttendanceScope("all");
+                setAttendanceDateFilter("today");
+                setAttendanceStatusFilter("all");
+                setAttendanceSearch("");
+                setAttendancePage(1);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Reset attendance filters"
+            >
+              <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
+              <Text style={styles.emptyRefreshButtonText}>Reset filters</Text>
+            </TouchableOpacity>
           </View>
         )}
+        {attendanceRecords.length > 0 ||
+        attendancePagination.total > 0 ||
+        attendanceScope !== "all" ||
+        attendanceDateFilter !== "today" ||
+        attendanceStatusFilter !== "all" ||
+        String(attendanceSearch || "").trim()
+          ? renderSecurityTablePagination({
+              currentPage: attendancePagination.page || attendancePage,
+              totalPages: Math.max(1, attendancePagination.pages || 1),
+              totalItems: attendancePagination.total || filteredAttendanceRecords.length,
+              itemLabel: "attendance records",
+              onPrevious: () => setAttendancePage((currentValue) => Math.max(1, currentValue - 1)),
+              onNext: () =>
+                setAttendancePage((currentValue) =>
+                  Math.min(Math.max(1, attendancePagination.pages || 1), currentValue + 1),
+                ),
+            })
+          : null}
       </View>
     </ScrollView>
   );
@@ -6744,6 +6907,14 @@ export default function SecurityDashboardScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshData} tintColor={BRAND.blue} />}
         >
+          <MobileConnectionBanner
+            dark={mobileDarkModeEnabled}
+            visible={!!connectionIssue}
+            title={connectionIssue?.title}
+            message={connectionIssue?.message}
+            onRetry={refreshData}
+            style={{ marginBottom: 14 }}
+          />
           {content}
         </ScrollView>
         <MobileBottomNav dark={mobileDarkModeEnabled} tabs={securityMobileTabs} activeTab={securityMobileTab} onChange={handleMobileTabChange} />
@@ -6857,6 +7028,16 @@ export default function SecurityDashboardScreen({ navigation }) {
               </View>
             </View>
             </View>
+          </View>
+
+          <View style={{ paddingHorizontal: 24 }}>
+            <MobileConnectionBanner
+              visible={!!connectionIssue}
+              title={connectionIssue?.title}
+              message={connectionIssue?.message}
+              onRetry={refreshData}
+              style={{ marginBottom: 14 }}
+            />
           </View>
 
           {/* Tab Content */}

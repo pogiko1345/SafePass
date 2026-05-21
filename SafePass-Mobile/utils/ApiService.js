@@ -99,6 +99,14 @@ const logApiOperationError = (operation, error) => {
   const logMethod = isNetworkError ? console.warn : console.error;
   logMethod(`${operation}:`, error);
 };
+const createSafePassConnectionError = () => {
+  const error = new Error(
+    "Cannot connect to the SafePass server. Please check your internet connection and try again."
+  );
+  error.isSafePassConnectionError = true;
+  error.code = "SAFEPASS_CONNECTION_ERROR";
+  return error;
+};
 const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const WEB_REMEMBERED_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const REMEMBERED_SESSION_DURATION_MS =
@@ -399,9 +407,7 @@ async fetch(url, options = {}) {
   } catch (error) {
     console.error(`❌ FETCH ERROR for ${url}:`, error);
     if (error.message.includes("Network request failed")) {
-      throw new Error(
-        "Cannot connect to the SafePass server. Please check your internet connection and try again."
-      );
+      throw createSafePassConnectionError();
     }
     throw error;
   }
@@ -2210,9 +2216,7 @@ ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, option
   }
 
   if (String(lastError?.message || "").includes("Network request failed")) {
-    throw new Error(
-      "Cannot connect to the SafePass server. Please check your internet connection and try again."
-    );
+    throw createSafePassConnectionError();
   }
 
   throw lastError || new Error("Cannot connect to backend.");

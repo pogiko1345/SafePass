@@ -9480,7 +9480,18 @@ app.get(
         query.location = { $regex: String(req.query.location).trim(), $options: "i" };
       }
       if (req.query.search) {
-        query.name = { $regex: String(req.query.search).trim(), $options: "i" };
+        const searchPattern = { $regex: String(req.query.search).trim(), $options: "i" };
+        query.$or = [
+          { name: searchPattern },
+          { userType: searchPattern },
+          { role: searchPattern },
+          { status: searchPattern },
+          { location: searchPattern },
+          { checkpointIn: searchPattern },
+          { checkpointOut: searchPattern },
+          { nfcCardId: searchPattern },
+          { sourceDeviceId: searchPattern },
+        ];
       }
 
       const [records, total] = await Promise.all([

@@ -81,6 +81,40 @@ export const MobileLoadingState = ({ message = "Loading...", dark = false }) => 
   </View>
 );
 
+export const MobileConnectionBanner = ({
+  visible = false,
+  title = "SafePass server unavailable",
+  message = "Check your internet connection or try again.",
+  actionLabel = "Retry",
+  onRetry,
+  dark = false,
+  style,
+}) => {
+  if (!visible) return null;
+
+  return (
+    <View style={[mobileStyles.connectionBanner, dark && mobileStyles.darkConnectionBanner, style]}>
+      <View style={mobileStyles.connectionIcon}>
+        <Ionicons name="cloud-offline-outline" size={18} color={BRAND.warning} />
+      </View>
+      <View style={mobileStyles.connectionCopy}>
+        <Text style={[mobileStyles.connectionTitle, dark && mobileStyles.darkText]}>{title}</Text>
+        <Text style={[mobileStyles.connectionMessage, dark && mobileStyles.darkMuted]}>{message}</Text>
+      </View>
+      {onRetry ? (
+        <TouchableOpacity
+          style={mobileStyles.connectionAction}
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel={actionLabel}
+        >
+          <Text style={mobileStyles.connectionActionText}>{actionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+};
+
 export const MobileSearchField = ({ value, onChangeText, placeholder = "Search", onClear, dark = false }) => (
   <View style={[mobileStyles.searchField, dark && mobileStyles.darkControl]}>
     <Ionicons name="search-outline" size={18} color="#64748B" />
@@ -194,6 +228,54 @@ export const mobileStyles = StyleSheet.create({
     fontWeight: "700",
     color: "#334155",
     textAlign: "center",
+  },
+  connectionBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    backgroundColor: "#FFFBEB",
+  },
+  darkConnectionBanner: {
+    backgroundColor: "#241A0A",
+    borderColor: "#92400E",
+  },
+  connectionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  connectionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  connectionTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: BRAND.ink,
+  },
+  connectionMessage: {
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 16,
+    color: BRAND.muted,
+  },
+  connectionAction: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: BRAND.blue,
+  },
+  connectionActionText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   statusBadge: {
     alignSelf: "flex-start",

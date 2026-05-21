@@ -43,12 +43,21 @@ import {
   buildManagedMapLabels,
   normalizeMapSettingsPayload,
 } from "../utils/mapSettingsUtils";
+import {
+  MobileConnectionBanner,
+} from "../components/mobile/MobileRoleComponents";
 
 const visitorBrandLogo = require("../assets/LogoSapphireAppIcon.png");
 const visitorSchoolLogo = require("../assets/LogoSapphire.jpg");
 const Storage =
   Platform.OS === "web" ? require("../utils/webStorage").default : AsyncStorage;
 const SafePassHce = NativeModules.SafePassHce;
+
+const isSafePassConnectionError = (error) =>
+  Boolean(error?.isSafePassConnectionError) ||
+  String(error?.code || "") === "SAFEPASS_CONNECTION_ERROR" ||
+  String(error?.message || "").includes("Cannot connect to the SafePass server") ||
+  String(error?.message || "").includes("Network request failed");
 
 let DateTimePickerComponent = null;
 if (Platform.OS !== "web") {
@@ -195,8 +204,7 @@ const getStoredVisitorIdType = (visitorRecord = {}) => {
 
 const PHONE_TRACKING_INTERVAL_MS = 15000;
 const PHONE_TRACKING_DISTANCE_METERS = 8;
-const VISITOR_PENDING_REFRESH_INTERVAL_MS = 5000;
-const VISITOR_LIVE_REFRESH_INTERVAL_MS = 5000;
+const SMART_REFRESH_MIN_INTERVAL_MS = 30000;
 const VISITOR_CONNECTIVITY_REMINDER_KEY = "visitorConnectivityReminderShown";
 const VISITOR_SELECTED_SECTION_KEY = "visitorDashboardSelectedSection";
 const VISITOR_APPOINTMENT_SCREEN_KEY = "visitorDashboardAppointmentScreen";
@@ -597,6 +605,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [appointmentFeedback, setAppointmentFeedback] = useState(null);
   const [appointmentHistory, setAppointmentHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [connectionIssue, setConnectionIssue] = useState(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showVisitorMapFullscreen, setShowVisitorMapFullscreen] = useState(false);
   const [showAppointmentDatePicker, setShowAppointmentDatePicker] = useState(false);
@@ -685,6 +694,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const nativeNfcUnavailableLoggedRef = useRef(false);
   const lastVisitorStatusRef = useRef(null);
   const hasLoadedVisitorRef = useRef(false);
+  const smartRefreshAtRef = useRef(0);
   const visitorProfileSignatureRef = useRef("");
   const currentUserSignatureRef = useRef("");
   const dashboardScrollRef = useRef(null);
@@ -803,11 +813,9 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
     loadVisitorMapSettings();
     const unsubscribe = navigation?.addListener?.("focus", loadVisitorMapSettings);
-    const refreshTimer = setInterval(loadVisitorMapSettings, VISITOR_LIVE_REFRESH_INTERVAL_MS);
 
     return () => {
       isMounted = false;
-      clearInterval(refreshTimer);
       unsubscribe?.();
     };
   }, [navigation]);
@@ -1268,18 +1276,36 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     };
   }, []);
 
+  const smartRefreshVisitorData = () => {
+    const now = Date.now();
+    if (now - smartRefreshAtRef.current < SMART_REFRESH_MIN_INTERVAL_MS) return;
+    smartRefreshAtRef.current = now;
+    loadVisitorData({ silent: true });
+    checkNfcSupport();
+  };
+
   useEffect(() => {
     const appStateSubscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
-        loadVisitorData({ silent: true });
-        checkNfcSupport();
+        smartRefreshVisitorData();
       }
     });
+    const unsubscribeNavigationFocus = navigation?.addListener?.("focus", smartRefreshVisitorData);
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.addEventListener("focus", smartRefreshVisitorData);
+      return () => {
+        appStateSubscription?.remove?.();
+        unsubscribeNavigationFocus?.();
+        window.removeEventListener("focus", smartRefreshVisitorData);
+      };
+    }
 
     return () => {
       appStateSubscription?.remove?.();
+      unsubscribeNavigationFocus?.();
     };
-  }, []);
+  }, [navigation, visitor?._id, visitor?.status, visitor?.approvalStatus, visitor?.appointmentStatus]);
 
   useEffect(() => {
     const status = String(visitor?.status || "").toLowerCase();
@@ -1296,11 +1322,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return undefined;
     }
 
-    const refreshTimer = setInterval(() => {
-      loadVisitorData({ silent: true });
-    }, VISITOR_PENDING_REFRESH_INTERVAL_MS);
-
-    return () => clearInterval(refreshTimer);
+    return undefined;
   }, [visitor?._id, visitor?.status, visitor?.approvalStatus, visitor?.appointmentStatus]);
 
   useEffect(() => {
@@ -1322,11 +1344,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       return undefined;
     }
 
-    const refreshTimer = setInterval(() => {
-      loadVisitorData({ silent: true });
-    }, VISITOR_LIVE_REFRESH_INTERVAL_MS);
-
-    return () => clearInterval(refreshTimer);
+    return undefined;
   }, [visitor?._id, visitor?.status, visitor?.approvalStatus, visitor?.appointmentStatus]);
 
   useEffect(() => () => {
@@ -1850,8 +1868,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       }
 
       await maybeShowVisitorWarning(currentUser);
+      setConnectionIssue(null);
     } catch (error) {
-      console.error("Load visitor data error:", error);
+      if (!isSafePassConnectionError(error)) {
+        console.error("Load visitor data error:", error);
+      }
       const isProfileMissing =
         error?.status === 404 ||
         String(error?.message || "").includes("404") ||
@@ -1860,6 +1881,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
       if (isProfileMissing) {
         setVisitor(null);
+      } else if (isSafePassConnectionError(error)) {
+        setConnectionIssue({
+          title: "SafePass server unavailable",
+          message: error?.message || "Check your internet connection or try again.",
+          updatedAt: Date.now(),
+        });
       } else {
         showVisitorAlert("Error", "Failed to load visitor data");
       }
@@ -3873,18 +3900,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
 
   const getStatusText = () => {
     if (hasVisitorSchedulePassed(visitor)) return "Visit Time Passed";
-    if (visitor?.approvalStatus === "pending") return "Pending Admin Approval";
-    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "Pending";
-    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "Reschedule Requested";
-    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjustment_pending") return "Confirm Schedule";
-    if (visitor?.approvalFlow === "staff" && ["approved", "adjusted"].includes(visitor?.appointmentStatus)) return "Approved";
-    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "cancelled") return "Appointment Cancelled";
-    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "Appointment Declined";
+    if (visitor?.approvalStatus === "pending") return "Waiting for admin review";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "pending") return "Waiting for staff review";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rescheduled") return "Reschedule sent to staff";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "adjustment_pending") return "Confirm new schedule";
+    if (visitor?.approvalFlow === "staff" && ["approved", "adjusted"].includes(visitor?.appointmentStatus)) return "Approved, ready for NFC";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "cancelled") return "Appointment cancelled";
+    if (visitor?.approvalFlow === "staff" && visitor?.appointmentStatus === "rejected") return "Appointment declined";
     switch(visitor?.status) {
-      case 'checked_in': return 'Checked In';
-      case 'approved': return 'Approved';
-      case 'pending': return 'Pending Approval';
-      case 'checked_out': return 'Checked Out';
+      case 'checked_in': return 'Checked in';
+      case 'approved': return 'Approved, ready for NFC';
+      case 'pending': return 'Waiting for review';
+      case 'checked_out': return 'Visit completed';
       case 'expired': return 'Expired';
       case 'no_show': return 'No Show';
       case 'rejected': return 'Rejected';
@@ -3914,18 +3941,18 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   };
 
   const getAppointmentStatusText = (record = {}) => {
-    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "Pending";
-    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "Reschedule Requested";
-    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjustment_pending") return "Needs Your Confirmation";
-    if (record?.approvalFlow === "staff" && ["approved", "adjusted"].includes(record?.appointmentStatus)) return "Approved";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "pending") return "Waiting for staff review";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rescheduled") return "Reschedule sent to staff";
+    if (record?.approvalFlow === "staff" && record?.appointmentStatus === "adjustment_pending") return "Needs your confirmation";
+    if (record?.approvalFlow === "staff" && ["approved", "adjusted"].includes(record?.appointmentStatus)) return "Approved, ready for NFC";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "cancelled") return "Cancelled";
     if (record?.approvalFlow === "staff" && record?.appointmentStatus === "rejected") return "Declined";
-    if (record?.approvalStatus === "pending") return "Pending";
+    if (record?.approvalStatus === "pending") return "Waiting for review";
     switch (record?.status) {
-      case "checked_in": return "Checked In";
-      case "approved": return "Approved";
-      case "pending": return "Pending";
-      case "checked_out": return "Completed";
+      case "checked_in": return "Checked in";
+      case "approved": return "Approved, ready for NFC";
+      case "pending": return "Waiting for review";
+      case "checked_out": return "Visit completed";
       case "expired": return "Expired";
       case "no_show": return "No-Show";
       case "rejected": return "Rejected";
@@ -4130,16 +4157,25 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       dateSortValue: getAppointmentDateSortValue(record),
       timeSortValue: getAppointmentTimeSortValue(record),
       description:
-        String(record?.appointmentStatus || "").toLowerCase() === "adjustment_pending"
-          ? `Staff proposed this schedule. Confirm it if you are available, or choose another date and time.`
-          :
-        record?.appointmentCancellationReason ||
-        record?.appointmentRescheduleReason ||
-        record?.staffAdjustmentNote ||
-        record?.staffApprovalNote ||
-        record?.staffRejectionReason ||
-        record?.approvalNotes ||
-        "Track the latest status of your submitted visit request here.",
+        String(record?.appointmentStatus || "").toLowerCase() === "pending"
+          ? "Your request is with the selected office. Staff will approve, adjust, redirect, or decline it."
+          : String(record?.appointmentStatus || "").toLowerCase() === "rescheduled"
+            ? "Your reschedule request was sent to staff. Wait for their confirmation before visiting."
+            : String(record?.appointmentStatus || "").toLowerCase() === "adjustment_pending"
+              ? "Staff proposed this schedule. Confirm it if you are available, or choose another date and time."
+              : ["approved", "adjusted"].includes(String(record?.appointmentStatus || "").toLowerCase())
+                ? "You are approved. Bring your NFC card or assigned UID and proceed to security at your scheduled time."
+                : String(record?.appointmentStatus || "").toLowerCase() === "cancelled"
+                  ? (record?.appointmentCancellationReason || "This appointment was cancelled and can no longer be used for entry.")
+                  : String(record?.appointmentStatus || "").toLowerCase() === "rejected"
+                    ? (record?.staffRejectionReason || record?.approvalNotes || "This request was declined by the office.")
+                    : record?.appointmentCancellationReason ||
+                      record?.appointmentRescheduleReason ||
+                      record?.staffAdjustmentNote ||
+                      record?.staffApprovalNote ||
+                      record?.staffRejectionReason ||
+                      record?.approvalNotes ||
+                      "Track the latest status of your submitted visit request here.",
     };
   };
   const appointmentSourceRecords = [
@@ -6733,6 +6769,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   return (
     <SafeAreaView style={[visitorDashboardStyles.safeArea, isVisitorDarkMode && visitorDashboardStyles.darkSafeArea]}>
       <StatusBar barStyle="light-content" backgroundColor="#061A2E" />
+      <MobileConnectionBanner
+        dark={isVisitorDarkMode}
+        visible={!!connectionIssue}
+        title={connectionIssue?.title}
+        message={connectionIssue?.message}
+        onRetry={() => loadVisitorData({ force: true })}
+        style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 4 }}
+      />
 
       {isVisitorHomeSection ? (
         <LinearGradient
