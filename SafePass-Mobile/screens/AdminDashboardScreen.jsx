@@ -1278,6 +1278,8 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const [appointmentSlotCapacityDrafts, setAppointmentSlotCapacityDrafts] = useState({});
   const [editingAppointmentOption, setEditingAppointmentOption] = useState(null);
   const [isSavingAppointmentOptions, setIsSavingAppointmentOptions] = useState(false);
+  const [savingAppointmentOptionKey, setSavingAppointmentOptionKey] = useState(null);
+  const [pendingAdminConfirm, setPendingAdminConfirm] = useState(null);
   const [activeAppointmentConfigTab, setActiveAppointmentConfigTab] = useState("offices");
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState(null);
@@ -2729,9 +2731,10 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     }
   }, []);
 
-  const saveAppointmentManagementOptions = async (nextOptions, successMessage) => {
+  const saveAppointmentManagementOptions = async (nextOptions, successMessage, savingKey = "appointment-options") => {
     if (!ensureAdminAccess()) return;
     setIsSavingAppointmentOptions(true);
+    setSavingAppointmentOptionKey(savingKey);
     try {
       const response = await ApiService.updateAdminAppointmentOptions(nextOptions);
       if (response?.success) {
@@ -2748,6 +2751,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       publishAdminNotice("error", "Options update failed", error?.message || "Unable to save appointment options.");
     } finally {
       setIsSavingAppointmentOptions(false);
+      setSavingAppointmentOptionKey(null);
     }
   };
 
@@ -2787,12 +2791,12 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     };
   };
 
-  const updateAppointmentOptionGroup = (groupKey, updater, message) => {
+  const updateAppointmentOptionGroup = (groupKey, updater, message, savingKey) => {
     const nextOptions = {
       ...appointmentManagementOptions,
       [groupKey]: updater(appointmentManagementOptions[groupKey] || []),
     };
-    saveAppointmentManagementOptions(nextOptions, message);
+    saveAppointmentManagementOptions(nextOptions, message, savingKey || groupKey);
   };
 
   const handleAddAppointmentOption = (groupKey) => {
@@ -2816,6 +2820,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       groupKey,
       (items) => [...items, newOption],
       `${newOption.label} was added to the visitor appointment form.`,
+      `${groupKey}:add`,
     );
     setAppointmentOptionDrafts((prev) => ({ ...prev, [groupKey]: "" }));
   };
@@ -2845,6 +2850,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       groupKey,
       (items) => items.map((item) => (item.id === option.id ? updatedOption : item)),
       `${updatedOption.label} was updated in the visitor appointment form.`,
+      `${groupKey}:${option.id}:edit`,
     );
     setEditingAppointmentOption(null);
     setAppointmentSlotCapacityDrafts((prev) => {
@@ -2860,15 +2866,36 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
       groupKey,
       (items) => items.map((item) => (item.id === option.id ? { ...item, enabled: item.enabled === false } : item)),
       `${option.label} was ${option.enabled === false ? "enabled" : "disabled"}.`,
+      `${groupKey}:${option.id}:toggle`,
     );
   };
 
   const handleDeleteAppointmentOption = (groupKey, option) => {
-    updateAppointmentOptionGroup(
-      groupKey,
-      (items) => items.map((item) => (item.id === option.id ? { ...item, enabled: false, deleted: true } : item)),
-      `${option.label} was removed from the visitor appointment form.`,
-    );
+    setPendingAdminConfirm({
+      title: "Remove Option",
+      message: `Remove "${option.label || option.value}" from the visitor appointment form? You can add it again later if needed.`,
+      icon: "trash-outline",
+      confirmLabel: "Remove",
+      destructive: true,
+      onConfirm: () => {
+        updateAppointmentOptionGroup(
+          groupKey,
+          (items) => items.map((item) => (item.id === option.id ? { ...item, enabled: false, deleted: true } : item)),
+          `${option.label} was removed from the visitor appointment form.`,
+          `${groupKey}:${option.id}:delete`,
+        );
+      },
+    });
+  };
+
+  const confirmPendingAdminAction = () => {
+    const action = pendingAdminConfirm?.onConfirm;
+    setPendingAdminConfirm(null);
+    action?.();
+  };
+
+  const cancelPendingAdminAction = () => {
+    setPendingAdminConfirm(null);
   };
 
   const applyAppointmentSearch = () => {
@@ -5226,6 +5253,7 @@ const loadDashboardData = useCallback(async () => {
         printedBy,
         generatedAt,
       });
+      publishAdminNotice("success", "Print view ready", `${users.length} account ${users.length === 1 ? "record" : "records"} sent to the browser print dialog.`);
     } catch (error) {
       console.error("Print error:", error);
       Alert.alert("Error", "Failed to generate print view. Please try again.");
@@ -5282,6 +5310,7 @@ const loadDashboardData = useCallback(async () => {
         ],
         rows,
       });
+      publishAdminNotice("success", "Print view ready", `${rows.length} ${rows.length === 1 ? "record" : "records"} sent to the browser print dialog.`);
     } catch (error) {
       console.error("Print request table error:", error);
       Alert.alert("Error", "Failed to generate the printable table.");
@@ -5318,6 +5347,7 @@ const loadDashboardData = useCallback(async () => {
         ],
         rows,
       });
+      publishAdminNotice("success", "Print view ready", `${rows.length} report ${rows.length === 1 ? "row" : "rows"} sent to the browser print dialog.`);
     } catch (error) {
       console.error("Print report table error:", error);
       Alert.alert("Error", "Failed to generate the printable report.");
@@ -5438,6 +5468,9 @@ const loadDashboardData = useCallback(async () => {
     keyExtractor,
     emptyTitle = "No records found",
     emptySubtitle = "There is nothing to display in this table yet.",
+    emptyIcon = "reader-outline",
+    emptyActionLabel = "",
+    onEmptyAction,
     minTableHeight,
   }) => {
     const availableTableWidth = Platform.OS === "web"
@@ -5483,9 +5516,15 @@ const loadDashboardData = useCallback(async () => {
     if (!rows.length) {
       return (
         <View style={[styles.emptyState, styles.userEmptyState, isDarkMode && { backgroundColor: "#0F172A" }]}>
-          <Ionicons name="reader-outline" size={56} color="#CBD5E1" />
+          <Ionicons name={emptyIcon} size={56} color="#CBD5E1" />
           <Text style={[styles.emptyStateTitle, isDarkMode && styles.darkText]}>{emptyTitle}</Text>
           <Text style={[styles.emptyStateSubtitle, isDarkMode && styles.darkTextSecondary]}>{emptySubtitle}</Text>
+          {onEmptyAction ? (
+            <TouchableOpacity style={styles.emptyStateActionButton} onPress={onEmptyAction}>
+              <Ionicons name="refresh-outline" size={15} color="#FFFFFF" />
+              <Text style={styles.emptyStateActionText}>{emptyActionLabel || "Refresh"}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       );
     }
@@ -8304,6 +8343,9 @@ const loadDashboardData = useCallback(async () => {
               keyExtractor: (userItem) => userItem._id || userItem.id || userItem.email,
               emptyTitle: "No users found",
               emptySubtitle: "Try clearing the search or filter to find the account you want to manage.",
+              emptyIcon: "people-outline",
+              emptyActionLabel: "Reload Users",
+              onEmptyAction: loadAllUsers,
               minTableHeight: 372,
               columns: [
                 {
@@ -9374,6 +9416,9 @@ const loadDashboardData = useCallback(async () => {
             keyExtractor: (request) => request._id || request.id || request.email,
             emptyTitle: "No appointment records",
             emptySubtitle: "Pending appointment requests will appear here only after staff approval.",
+            emptyIcon: "calendar-outline",
+            emptyActionLabel: "Reload Appointments",
+            onEmptyAction: loadAllVisitRequests,
             columns: [
               {
                 key: "visitor",
@@ -9509,8 +9554,14 @@ const loadDashboardData = useCallback(async () => {
             onPress={() => handleAddAppointmentOption(groupKey)}
             hoverScale={1.04}
           >
-            <Ionicons name="add-outline" size={17} color="#FFFFFF" />
-            <Text style={styles.appointmentOptionAddText}>Add</Text>
+            {savingAppointmentOptionKey === `${groupKey}:add` ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="add-outline" size={17} color="#FFFFFF" />
+                <Text style={styles.appointmentOptionAddText}>Add</Text>
+              </>
+            )}
           </HoverBubble>
         </View>
 
@@ -9522,11 +9573,17 @@ const loadDashboardData = useCallback(async () => {
         >
           {options.length ? options.map((option) => {
             const isEditing = editingId === option.id;
+            const optionKey = `${groupKey}:${option.id}`;
+            const savingAction = savingAppointmentOptionKey?.startsWith(`${optionKey}:`)
+              ? savingAppointmentOptionKey.split(":").pop()
+              : null;
+            const isRowSaving = Boolean(savingAction);
             return (
               <View
                 key={option.id || option.label}
                 style={[
                   styles.appointmentOptionItem,
+                  isRowSaving && styles.appointmentOptionItemSaving,
                   {
                     borderColor: theme.borderColor,
                     backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
@@ -9589,8 +9646,14 @@ const loadDashboardData = useCallback(async () => {
                       disabled={isSavingAppointmentOptions}
                       onPress={() => handleSaveEditedAppointmentOption(groupKey, option)}
                     >
-                      <Ionicons name="checkmark-outline" size={15} color="#0A3D91" />
-                      <Text style={styles.appointmentOptionMiniText}>Save</Text>
+                      {savingAction === "edit" ? (
+                        <ActivityIndicator size="small" color="#0A3D91" />
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark-outline" size={15} color="#0A3D91" />
+                          <Text style={styles.appointmentOptionMiniText}>Save</Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
@@ -9615,14 +9678,22 @@ const loadDashboardData = useCallback(async () => {
                     disabled={isSavingAppointmentOptions}
                     onPress={() => handleToggleAppointmentOption(groupKey, option)}
                   >
-                    <Ionicons name={option.enabled === false ? "eye-outline" : "eye-off-outline"} size={15} color="#475569" />
+                    {savingAction === "toggle" ? (
+                      <ActivityIndicator size="small" color="#475569" />
+                    ) : (
+                      <Ionicons name={option.enabled === false ? "eye-outline" : "eye-off-outline"} size={15} color="#475569" />
+                    )}
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.appointmentOptionMiniButton}
+                    style={[styles.appointmentOptionMiniButton, styles.appointmentOptionDeleteButton]}
                     disabled={isSavingAppointmentOptions}
                     onPress={() => handleDeleteAppointmentOption(groupKey, option)}
                   >
-                    <Ionicons name="trash-outline" size={15} color="#475569" />
+                    {savingAction === "delete" ? (
+                      <ActivityIndicator size="small" color="#EF4444" />
+                    ) : (
+                      <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -9948,6 +10019,9 @@ const loadDashboardData = useCallback(async () => {
               keyExtractor: (visitor) => visitor._id || visitor.id || `${visitor.email}-${visitor.visitDate}`,
               emptyTitle: "No report records",
               emptySubtitle: "There are no report rows to display with the current filters.",
+              emptyIcon: "document-text-outline",
+              emptyActionLabel: "Reload Records",
+              onEmptyAction: loadAllVisitRequests,
               columns: [
                 {
                   key: "visitor",
@@ -10160,6 +10234,9 @@ const loadDashboardData = useCallback(async () => {
             keyExtractor: (record) => record._id || `${record.email}-${record.reportedAt}-${record.reportReason}`,
             emptyTitle: "No security reports",
             emptySubtitle: "Reports submitted by security or guard accounts will appear here.",
+            emptyIcon: "shield-checkmark-outline",
+            emptyActionLabel: "Reload Reports",
+            onEmptyAction: loadAllVisitRequests,
             columns: [
               {
                 key: "visitor",
@@ -13856,6 +13933,52 @@ const loadDashboardData = useCallback(async () => {
                 disabled={processingId === "edit-user"}
               >
                 {processingId === "edit-user" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Save Changes</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Admin Confirm Modal */}
+      <Modal
+        visible={!!pendingAdminConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelPendingAdminAction}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModal, isDarkMode && { backgroundColor: theme.cardBackground, borderColor: theme.borderColor }]}>
+            <View
+              style={[
+                styles.confirmIconWrap,
+                pendingAdminConfirm?.destructive ? styles.confirmIconDanger : styles.confirmIconInfo,
+              ]}
+            >
+              <Ionicons
+                name={pendingAdminConfirm?.icon || "help-circle-outline"}
+                size={30}
+                color={pendingAdminConfirm?.destructive ? "#EF4444" : ADMIN_BLUE}
+              />
+            </View>
+            <Text style={[styles.confirmTitle, isDarkMode && styles.darkText]}>{pendingAdminConfirm?.title}</Text>
+            <Text style={[styles.confirmMessage, isDarkMode && styles.darkTextSecondary]}>
+              {pendingAdminConfirm?.message}
+            </Text>
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity
+                style={[styles.confirmCancel, isDarkMode && { backgroundColor: "#334155" }]}
+                onPress={cancelPendingAdminAction}
+              >
+                <Text style={[styles.confirmCancelText, isDarkMode && styles.darkTextSecondary]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  { backgroundColor: pendingAdminConfirm?.destructive ? "#EF4444" : ADMIN_BLUE },
+                ]}
+                onPress={confirmPendingAdminAction}
+              >
+                <Text style={styles.confirmButtonText}>{pendingAdminConfirm?.confirmLabel || "Confirm"}</Text>
               </TouchableOpacity>
             </View>
           </View>
