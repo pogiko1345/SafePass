@@ -1525,7 +1525,6 @@ async rejectVisitor(visitorId, reason) {
         body: {
           to: visitor.email,
           visitorName: visitor.fullName,
-          password: visitor.temporaryPassword,
           visitDate: visitor.visitDate,
           visitTime: visitor.visitTime,
           purpose: visitor.purposeOfVisit

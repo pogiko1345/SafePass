@@ -4029,7 +4029,7 @@ const loadDashboardData = useCallback(async () => {
 
         Alert.alert(
           "Visitor Approved",
-          `${approvedVisitor.fullName || request.fullName || "Visitor"} has been approved successfully.\n\nThe visitor account is now active.\nEmail: ${approvedVisitor.email || request.email || "N/A"}\nPassword: ${approvedVisitor.temporaryPassword || "Use the registration password"}`,
+          `${approvedVisitor.fullName || request.fullName || "Visitor"} has been approved successfully.\n\nThe visitor account has been updated.\nEmail: ${approvedVisitor.email || request.email || "N/A"}\n\nIf this visitor needs a password, they should use the activation or password reset link sent to their email.`,
         );
       } else {
         Alert.alert("Error", response?.message || "Failed to approve request");
@@ -4604,7 +4604,6 @@ const loadDashboardData = useCallback(async () => {
           employeeId: createdAccountId,
           nfcCardId: createdNfcCardId,
           idLabel: isAcademicStaffAccount ? "Academic Staff ID" : isStudentAccount ? "Student ID" : "Employee ID",
-          temporaryPassword: emailDelivery.temporaryPassword || response.temporaryPassword || "",
           status: response.user?.status || (isAcademicAccessAccount ? "Active" : "Pending activation"),
           deliveryNote,
         });
@@ -14035,12 +14034,6 @@ const loadDashboardData = useCallback(async () => {
                 <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Status</Text>
                 <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary?.status || "N/A"}</Text>
               </View>
-              {createdUserSummary?.temporaryPassword ? (
-                <View style={styles.createSuccessRow}>
-                  <Text style={[styles.createSuccessLabel, isDarkMode && styles.darkTextSecondary]}>Temporary Password</Text>
-                  <Text style={[styles.createSuccessValue, isDarkMode && styles.darkText]}>{createdUserSummary.temporaryPassword}</Text>
-                </View>
-              ) : null}
             </View>
 
             <View style={[styles.createSuccessNote, isDarkMode && { backgroundColor: "#172554", borderColor: "#041E42" }]}>

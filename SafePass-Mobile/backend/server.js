@@ -1401,8 +1401,35 @@ const sendStudentParentAttendanceEmail = async ({ student, action, timestamp, ta
 };
 
 // ========== ENHANCED CORS CONFIGURATION ==========
+const corsAllowedOrigins = Array.from(
+  new Set(
+    [
+      process.env.FRONTEND_URL || "https://sapphiresafepass2.vercel.app",
+      process.env.CORS_ORIGINS,
+      process.env.ALLOWED_ORIGINS,
+      "http://localhost:19006",
+      "http://localhost:8081",
+      "http://localhost:3000",
+    ]
+      .flatMap((value) => String(value || "").split(","))
+      .map((value) => value.trim().replace(/\/$/, ""))
+      .filter(Boolean),
+  ),
+);
+
 const corsOptions = {
-  origin: true,
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    const normalizedOrigin = String(origin || "").replace(/\/$/, "");
+    if (corsAllowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
@@ -6256,14 +6283,12 @@ const userData = {
         `Welcome to Sapphire Aviation - Your ${user.role.toUpperCase()} Account`,
         `Dear ${user.firstName} ${user.lastName},\n\n` +
           `Your account has been created successfully!\n\n` +
-          `Login Credentials:\n` +
+          `Account details:\n` +
           `Email: ${user.email}\n` +
-          `Password: ${req.body.password}\n\n` +
           `Role: ${user.role.toUpperCase()}\n` +
           `Employee ID: ${user.employeeId || "N/A"}\n\n` +
-          `Please login to the app and change your password for security.\n\n` +
-          `Thank you,\n` +
-          `Sapphire Aviation Security Team`,
+          `Please sign in using the password you created. If you need a new password, use the password reset option on the login screen.\n\n` +
+          getSupportEmailSignature(),
       );
       console.log(`📧 Welcome email sent to: ${user.email}`);
     }
@@ -6416,7 +6441,7 @@ app.post("/api/login", async (req, res) => {
 
     // Only disclose account state after the password is valid.
     if (user.status === "inactive" || user.status === "suspended") {
-      const isActivationPending = ["staff", "security", "guard", "student", "teacher"].includes(String(user.role || "").toLowerCase()) &&
+      const isActivationPending = ["visitor", "staff", "security", "guard", "student", "teacher"].includes(String(user.role || "").toLowerCase()) &&
         user.passwordResetTokenHash &&
         user.passwordResetExpiresAt &&
         user.passwordResetExpiresAt > new Date();
@@ -7480,11 +7505,6 @@ app.post("/api/visitors/register", async (req, res) => {
         nfcCardId: user.nfcCardId,
         isVerified: user.isVerified,
       },
-      credentials: {
-        username: user.username,
-        email: user.email,
-        password,
-      },
     });
   } catch (error) {
     console.error("Visitor registration error:", error);
@@ -7755,15 +7775,10 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     // Resolve the visitor's permanent SafePass account ID.
     let realNfcCardId = null;
 
-    // Generate temporary password if not already set
-    const tempPassword =
-      visitor.temporaryPassword ||
-      `VIS${Math.random().toString(36).slice(-8).toUpperCase()}`;
-
     // Update visitor status - THIS IS THE KEY PART
     console.log("\n📝 UPDATING VISITOR...");
     visitor.approveRegistration(req.user._id, adminNotes || "");
-    visitor.temporaryPassword = tempPassword;
+    visitor.temporaryPassword = undefined;
 
     await visitor.save();
     console.log("✅ Visitor updated in database");
@@ -7780,22 +7795,29 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
         ? await activateVisitorSafePassCardForUser(user, visitor)
         : await generateSafePassAccountId(new Date());
     console.log("SafePass Account ID:", realNfcCardId);
+    let setupLink = "";
+    let setupToken = null;
 
     if (!user) {
       console.log("📝 Creating new user account...");
+      setupToken = createPasswordSetupToken(48);
+      setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(visitor.email)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
       // Create user account for the visitor
       const userData = {
         firstName: visitor.fullName.split(" ")[0] || "Visitor",
         lastName: visitor.fullName.split(" ").slice(1).join(" ") || "User",
         email: visitor.email,
-        password: tempPassword,
+        password: generateTemporaryPassword(),
         phone: visitor.phoneNumber,
         role: "visitor",
-        status: "active",
-        isActive: true,
+        status: "inactive",
+        isActive: false,
+        isVerified: false,
         visitorId: visitor._id,
         nfcCardId: realNfcCardId,
         safePassId: realNfcCardId,
+        passwordResetTokenHash: setupToken.tokenHash,
+        passwordResetExpiresAt: setupToken.expiresAt,
         accessPermissions: {
           canAccess: [],
           restrictedAreas: [],
@@ -7821,9 +7843,15 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       user.phone = visitor.phoneNumber || user.phone;
       user.role = "visitor";
       user.visitorId = visitor._id;
-      user.password = tempPassword;
-      user.status = "active";
-      user.isActive = true;
+      if (user.status === "inactive" || user.isActive === false) {
+        setupToken = createPasswordSetupToken(48);
+        setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(user.email)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
+        user.passwordResetTokenHash = setupToken.tokenHash;
+        user.passwordResetExpiresAt = setupToken.expiresAt;
+      } else {
+        user.status = "active";
+        user.isActive = true;
+      }
       user.safePassId = realNfcCardId;
       if (!getUserPhysicalNfcUid(user)) {
         user.nfcCardId = realNfcCardId;
@@ -7847,7 +7875,27 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     sendEmail(
       visitor.email,
       "Visitor Registration Approved - Sapphire Aviation",
-      `Dear ${visitor.fullName},\n\nYour visitor registration has been approved!\n\nLogin Credentials:\nEmail: ${visitor.email}\nPassword: ${tempPassword}\n\nVisit Details:\nPurpose: ${visitor.purposeOfVisit}\nDate: ${new Date(visitor.visitDate).toLocaleDateString()}\nTime: ${new Date(visitor.visitTime).toLocaleTimeString()}\n\nThank you,\nSapphire Aviation Security Team`,
+      [
+        `Dear ${visitor.fullName},`,
+        "",
+        "Your visitor registration has been approved.",
+        "",
+        "Visit Details:",
+        `Purpose: ${visitor.purposeOfVisit}`,
+        `Date: ${new Date(visitor.visitDate).toLocaleDateString()}`,
+        `Time: ${new Date(visitor.visitTime).toLocaleTimeString()}`,
+        "",
+        setupLink
+          ? "To activate your SafePass visitor account, open the secure setup link below and create your password:"
+          : "You may sign in using your existing SafePass visitor account.",
+        setupLink || `Email: ${visitor.email}`,
+        "",
+        setupLink
+          ? "This secure link expires in 48 hours."
+          : "If you forgot your password, use the password reset option on the login screen.",
+        "",
+        getSupportEmailSignature(),
+      ].join("\n"),
     );
 
     // Create notification for security
@@ -7893,7 +7941,6 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
         email: visitor.email,
         status: visitor.status,
         approvalStatus: visitor.approvalStatus,
-        temporaryPassword: tempPassword,
         nfcCardId: getUserPhysicalNfcUid(user),
         physicalNfcUid: getUserPhysicalNfcUid(user),
         phoneNfcUid: getUserPhoneNfcUid(user),
@@ -8502,8 +8549,7 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
     const setupToken = createPasswordSetupToken(48);
     const setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(normalizedEmail)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
     const resolvedNfcCardId = requestedNfcCardId || "";
-    const requestedStatus = String(req.body.status || "active").trim().toLowerCase();
-    const createAsActive = requestedStatus !== "inactive";
+    const createAsActive = false;
 
     const user = new User({
       firstName: normalizedFirstName,
@@ -8517,17 +8563,17 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
       guardianName: isTeacherAccount ? "" : String(req.body.guardianName || req.body.parentName || "").trim(),
       guardianEmail: isTeacherAccount ? "" : normalizedParentEmail,
       role: requestedRole,
-      status: createAsActive ? "active" : "inactive",
-      isActive: createAsActive,
-      isVerified: createAsActive,
+      status: "inactive",
+      isActive: false,
+      isVerified: false,
       [academicIdField]: normalizedAcademicId,
       course: String(req.body.course || "").trim(),
       yearLevel: String(req.body.yearLevel || "").trim(),
       section: String(req.body.section || "").trim(),
       nfcCardId: resolvedNfcCardId,
       physicalNfcUid: resolvedNfcCardId,
-      passwordResetTokenHash: createAsActive ? "" : setupToken.tokenHash,
-      passwordResetExpiresAt: createAsActive ? null : setupToken.expiresAt,
+      passwordResetTokenHash: setupToken.tokenHash,
+      passwordResetExpiresAt: setupToken.expiresAt,
     });
 
     await user.save();
@@ -8546,14 +8592,10 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
         `Login email: ${user.email}`,
         `${academicLabel} ID: ${user[academicIdField]}`,
         "",
-        createAsActive
-          ? `Temporary password: ${temporaryPassword}`
-          : "To activate your account, open the secure setup link below and create your password:",
-        createAsActive ? "Please sign in and change your password from your profile." : setupLink,
+        "To activate your account, open the secure setup link below and create your password:",
+        setupLink,
         "",
-        createAsActive
-          ? "Keep this password private. Your account is active and ready for first login."
-          : "This secure link expires in 48 hours. Your account remains inactive until you complete this step.",
+        "This secure link expires in 48 hours. Your account remains inactive until you complete this step.",
         "",
         getSupportEmailSignature(),
       ].join("\n"),
@@ -8576,8 +8618,7 @@ app.post("/api/admin/students/create", authMiddleware, async (req, res) => {
         delivered: credentialEmailDelivered,
         simulated: Boolean(credentialEmail?.simulated),
         error: credentialEmail?.error || "",
-        temporaryPassword: createAsActive ? temporaryPassword : undefined,
-        setupLink: !createAsActive && credentialEmail?.simulated ? setupLink : undefined,
+        setupLink: credentialEmail?.simulated ? setupLink : undefined,
       },
     });
   } catch (error) {
@@ -9139,13 +9180,12 @@ app.get("/api/auth/debug-otp/:phone", async (req, res) => {
 // Send approval email
 app.post("/api/emails/send-approval", authMiddleware, async (req, res) => {
   try {
-    const { to, visitorName, password, visitDate, visitTime, purpose } =
-      req.body;
+    const { to, visitorName, visitDate, visitTime, purpose } = req.body;
 
     sendEmail(
       to,
       "Visitor Registration Approved - Sapphire Aviation",
-      `Dear ${visitorName},\n\nYour visitor registration has been approved!\n\nLogin Credentials:\nEmail: ${to}\nPassword: ${password}\n\nVisit Details:\nPurpose: ${purpose}\nDate: ${new Date(visitDate).toLocaleDateString()}\nTime: ${new Date(visitTime).toLocaleTimeString()}\n\nPlease keep these credentials safe.\n\nThank you,\nSapphire Aviation Security Team`,
+      `Dear ${visitorName},\n\nYour visitor registration has been approved.\n\nVisit Details:\nPurpose: ${purpose}\nDate: ${new Date(visitDate).toLocaleDateString()}\nTime: ${new Date(visitTime).toLocaleTimeString()}\n\nPlease sign in using your SafePass visitor account. If you need a new password, use the password reset option on the login screen.\n\n${getSupportEmailSignature()}`,
     );
 
     res.json({
