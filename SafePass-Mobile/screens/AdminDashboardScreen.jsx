@@ -2072,9 +2072,9 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
         .map((label) => ({ label, value: normalizeFilterValue(label) }));
     };
 
-    const configuredOffices = appointmentManagementOptions.offices || [];
-    const configuredPurposes = appointmentManagementOptions.purposes || [];
-    const configuredTimeSlots = appointmentManagementOptions.timeSlots || [];
+    const configuredOffices = (appointmentManagementOptions.offices || []).filter((option) => !option.deleted);
+    const configuredPurposes = (appointmentManagementOptions.purposes || []).filter((option) => !option.deleted);
+    const configuredTimeSlots = (appointmentManagementOptions.timeSlots || []).filter((slot) => !slot.deleted);
     const recordTimeOptions = appointmentRecords
       .map((record) => {
         const value = formatTimeInputValue(record.visitTime);
@@ -2866,7 +2866,7 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
   const handleDeleteAppointmentOption = (groupKey, option) => {
     updateAppointmentOptionGroup(
       groupKey,
-      (items) => items.filter((item) => item.id !== option.id),
+      (items) => items.map((item) => (item.id === option.id ? { ...item, enabled: false, deleted: true } : item)),
       `${option.label} was removed from the visitor appointment form.`,
     );
   };
@@ -9463,7 +9463,7 @@ const loadDashboardData = useCallback(async () => {
   );
 
   const renderAppointmentOptionManager = ({ title, subtitle, groupKey, placeholder, icon }) => {
-    const options = appointmentManagementOptions[groupKey] || [];
+    const options = (appointmentManagementOptions[groupKey] || []).filter((option) => !option.deleted);
     const editingId =
       editingAppointmentOption?.groupKey === groupKey ? editingAppointmentOption.optionId : null;
     const enabledCount = options.filter((option) => option.enabled !== false).length;

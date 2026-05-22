@@ -85,6 +85,7 @@ const toAppointmentOption = (value, prefix) => {
           id: `${prefix}-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`,
           label,
           enabled: true,
+          deleted: false,
         }
       : null;
   }
@@ -98,6 +99,7 @@ const toAppointmentOption = (value, prefix) => {
       `${prefix}-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`,
     label,
     enabled: value?.enabled !== false,
+    deleted: value?.deleted === true,
   };
 };
 
@@ -134,14 +136,19 @@ const toAppointmentTimeSlot = (slot) => {
   const parsed = parseTimeSlotValue(slot);
   if (!parsed) return null;
   const value = `${String(parsed.hour).padStart(2, "0")}:${String(parsed.minute).padStart(2, "0")}`;
+  const capacity = Number(slot?.capacity ?? slot?.limit ?? DEFAULT_APPOINTMENT_SLOT_LIMIT);
   return {
     id: String(slot?.id || "").trim() || `slot-${value.replace(":", "-")}`,
     label: String(slot?.label || "").trim() || formatTimeSlotLabel(parsed),
     value,
     hour: parsed.hour,
     minute: parsed.minute,
-    capacity: DEFAULT_APPOINTMENT_SLOT_LIMIT,
+    capacity:
+      Number.isInteger(capacity) && capacity >= 1 && capacity <= 50
+        ? capacity
+        : DEFAULT_APPOINTMENT_SLOT_LIMIT,
     enabled: slot?.enabled !== false,
+    deleted: slot?.deleted === true,
   };
 };
 

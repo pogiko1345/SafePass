@@ -24,6 +24,7 @@ const appSettingsSchema = new mongoose.Schema(
           id: { type: String, trim: true },
           label: { type: String, trim: true },
           enabled: { type: Boolean, default: true },
+          deleted: { type: Boolean, default: false },
         },
       ],
       purposes: [
@@ -31,6 +32,7 @@ const appSettingsSchema = new mongoose.Schema(
           id: { type: String, trim: true },
           label: { type: String, trim: true },
           enabled: { type: Boolean, default: true },
+          deleted: { type: Boolean, default: false },
         },
       ],
       timeSlots: [
@@ -40,7 +42,9 @@ const appSettingsSchema = new mongoose.Schema(
           value: { type: String, trim: true },
           hour: { type: Number },
           minute: { type: Number },
+          capacity: { type: Number },
           enabled: { type: Boolean, default: true },
+          deleted: { type: Boolean, default: false },
         },
       ],
     },
