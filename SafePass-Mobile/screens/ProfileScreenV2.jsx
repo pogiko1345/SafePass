@@ -140,11 +140,15 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         label: "Security Team",
         icon: "shield-checkmark-outline",
         gradients: ["#DC2626", "#F97316"],
+        webGradients: ["#06162E", "#0A3D91", "#123C7C"],
+        tone: "security",
       },
       guard: {
         label: "Security Team",
         icon: "shield-checkmark-outline",
         gradients: ["#DC2626", "#F97316"],
+        webGradients: ["#06162E", "#0A3D91", "#123C7C"],
+        tone: "security",
       },
       staff: {
         label: "Staff Member",
@@ -172,6 +176,8 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
 
   const currentProfile = editMode ? editedProfile : profile;
   const isDarkProfile = darkModeEnabled;
+  const isSecurityProfile = roleConfig.tone === "security";
+  const heroUsesDarkHeader = isDarkProfile || !isDesktop || isSecurityProfile;
   const themedCardStyle = [styles.card, isDarkProfile && styles.darkCard];
   const themedTitleStyle = [styles.cardTitle, isDarkProfile && styles.darkText];
   const themedMutedStyle = [styles.muted, isDarkProfile && styles.darkMuted];
@@ -1029,22 +1035,43 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
 
             <View style={[styles.hero, isDesktop ? styles.webHero : styles.mobileHero]}>
               <LinearGradient
-                colors={isDesktop && !isDarkProfile ? ["#FFFFFF", "#FFFFFF"] : roleConfig.gradients}
+                colors={
+                  heroUsesDarkHeader
+                    ? isDesktop && isSecurityProfile
+                      ? roleConfig.webGradients || roleConfig.gradients
+                      : roleConfig.gradients
+                    : ["#FFFFFF", "#FFFFFF"]
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[
                   styles.heroGradient,
                   isDesktop && styles.webHeroGradient,
                   !isDesktop && styles.mobileHeroGradient,
+                  isDesktop && isSecurityProfile && styles.securityWebHeroGradient,
                   isDesktop && isDarkProfile && styles.darkCard,
                 ]}
               >
+                {isDesktop && isSecurityProfile ? (
+                  <View pointerEvents="none" style={styles.securityHeroBackdrop}>
+                    <View style={styles.securityHeroBand} />
+                    <View style={styles.securityHeroPanel} />
+                    <View style={styles.securityHeroSignal}>
+                      <Ionicons name="shield-checkmark-outline" size={92} color="rgba(255,255,255,0.1)" />
+                    </View>
+                  </View>
+                ) : null}
                 <View style={[styles.heroTop, !isDesktop && styles.mobileHeroTop]}>
                   <TouchableOpacity
-                    style={[styles.iconBtn, isDesktop && styles.webHeroIconBtn, !isDesktop && styles.mobileIconBtn]}
+                    style={[
+                      styles.iconBtn,
+                      isDesktop && styles.webHeroIconBtn,
+                      isDesktop && isSecurityProfile && styles.securityHeroIconBtn,
+                      !isDesktop && styles.mobileIconBtn,
+                    ]}
                     onPress={() => navigation.goBack()}
                   >
-                    <Ionicons name="arrow-back" size={20} color={isDesktop && !isDarkProfile ? "#0F172A" : "#FFFFFF"} />
+                    <Ionicons name="arrow-back" size={20} color={heroUsesDarkHeader ? "#FFFFFF" : "#0F172A"} />
                   </TouchableOpacity>
                   {!isDesktop ? <Text style={styles.mobileHeroTitle}>Profile</Text> : null}
                   <View style={styles.heroActions}>
@@ -1052,13 +1079,17 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                       <>
                         {isDesktop ? (
                           <TouchableOpacity
-                            style={[styles.iconBtn, styles.webHeroIconBtn]}
+                            style={[
+                              styles.iconBtn,
+                              styles.webHeroIconBtn,
+                              isSecurityProfile && styles.securityHeroIconBtn,
+                            ]}
                             onPress={shareProfile}
                           >
                             <Ionicons
                               name="share-social-outline"
                               size={20}
-                              color={isDarkProfile ? "#FFFFFF" : "#0F172A"}
+                              color={heroUsesDarkHeader ? "#FFFFFF" : "#0F172A"}
                             />
                           </TouchableOpacity>
                         ) : null}
@@ -1102,15 +1133,15 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                     </View>
                   )}
                 </TouchableOpacity>
-                <Text style={[styles.heroKicker, isDesktop && styles.webHeroKicker, !isDesktop && styles.mobileHeroKicker]}>SafePass Profile</Text>
-                <Text style={[styles.heroName, isDesktop && !isDarkProfile && styles.webHeroName, !isDesktop && styles.mobileHeroName]}>
+                <Text style={[styles.heroKicker, isDesktop && !heroUsesDarkHeader && styles.webHeroKicker, !isDesktop && styles.mobileHeroKicker]}>SafePass Profile</Text>
+                <Text style={[styles.heroName, isDesktop && !heroUsesDarkHeader && styles.webHeroName, !isDesktop && styles.mobileHeroName]}>
                   {currentProfile.firstName} {currentProfile.lastName}
                 </Text>
                 <View style={styles.rolePill}>
                   <Ionicons name={roleConfig.icon} size={14} color="#0F172A" />
                   <Text style={styles.rolePillText}>{roleConfig.label}</Text>
                 </View>
-                <Text style={[styles.heroSub, isDesktop && !isDarkProfile && styles.webHeroSub, !isDesktop && styles.mobileHeroSub]}>{identityLine}</Text>
+                <Text style={[styles.heroSub, isDesktop && !heroUsesDarkHeader && styles.webHeroSub, !isDesktop && styles.mobileHeroSub]}>{identityLine}</Text>
               </LinearGradient>
             </View>
             <View style={[styles.shell, isDesktop && styles.shellDesktop]}>
@@ -1457,6 +1488,45 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     borderRadius: 18,
   },
+  securityWebHeroGradient: {
+    minHeight: 288,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  securityHeroBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  securityHeroBand: {
+    position: "absolute",
+    top: -44,
+    right: -90,
+    width: 460,
+    height: 170,
+    transform: [{ rotate: "-14deg" }],
+    backgroundColor: "rgba(255,255,255,0.11)",
+  },
+  securityHeroPanel: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 78,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(3,7,18,0.18)",
+  },
+  securityHeroSignal: {
+    position: "absolute",
+    right: 58,
+    bottom: 40,
+    width: 144,
+    height: 144,
+    borderRadius: 72,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   mobileHeroGradient: {
     paddingHorizontal: 18,
     paddingTop: Platform.select({ ios: 36, android: 22, web: 22 }),
@@ -1502,6 +1572,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FBFE",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+  },
+  securityHeroIconBtn: {
+    backgroundColor: "rgba(255,255,255,0.13)",
+    borderColor: "rgba(255,255,255,0.28)",
   },
   editBtn: {
     flexDirection: "row",
