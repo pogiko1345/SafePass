@@ -1407,6 +1407,8 @@ const corsAllowedOrigins = Array.from(
       process.env.FRONTEND_URL || "https://sapphiresafepass2.vercel.app",
       process.env.CORS_ORIGINS,
       process.env.ALLOWED_ORIGINS,
+      "https://siaacentrixsafepass.com",
+      "https://www.siaacentrixsafepass.com",
       "http://localhost:19006",
       "http://localhost:8081",
       "http://localhost:3000",
