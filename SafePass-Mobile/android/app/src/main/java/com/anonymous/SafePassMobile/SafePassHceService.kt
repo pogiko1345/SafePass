@@ -1,8 +1,16 @@
 package com.anonymous.SafePassMobile
 
 import android.content.Context
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.nfc.cardemulation.HostApduService
 import android.os.Bundle
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import java.nio.charset.StandardCharsets
 
 class SafePassHceService : HostApduService() {
@@ -56,7 +64,37 @@ class SafePassHceService : HostApduService() {
 
     if (token.isBlank()) return STATUS_NOT_FOUND
 
+    playTapFeedback()
     return concat(token.toByteArray(StandardCharsets.UTF_8), STATUS_SUCCESS)
+  }
+
+  private fun playTapFeedback() {
+    try {
+      val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val manager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        manager.defaultVibrator
+      } else {
+        @Suppress("DEPRECATION")
+        getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+      }
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        vibrator.vibrate(VibrationEffect.createOneShot(90, VibrationEffect.DEFAULT_AMPLITUDE))
+      } else {
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(90)
+      }
+    } catch (_: Exception) {
+      // HCE must always answer quickly even when vibration is unavailable.
+    }
+
+    try {
+      val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+      tone.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
+      Handler(Looper.getMainLooper()).postDelayed({ tone.release() }, 220)
+    } catch (_: Exception) {
+      // Some devices silence app tones; the NFC response should still succeed.
+    }
   }
 
   override fun onDeactivated(reason: Int) {

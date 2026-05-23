@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Vibration,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -45,8 +46,32 @@ const STATION_EVENTS_STORAGE_KEY = "safepass:nfc-scan:station-events:v1";
 const STATION_FEED_PAGE_SIZE = 6;
 const MAX_STATION_EVENTS = 100;
 
+const playWebTapDing = (type = "success") => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const context = new AudioContext();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = type === "error" ? 240 : 880;
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.16);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.17);
+    window.setTimeout(() => context.close?.(), 260);
+  } catch (error) {
+    // Browsers can block sound outside user gestures. Vibration/result UI still confirms the tap.
+  }
+};
+
 const triggerTapFeedback = async (type = "success") => {
   if (Platform.OS === "web") {
+    playWebTapDing(type);
     if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
       navigator.vibrate(type === "error" ? [80, 70, 140] : 90);
     }
@@ -150,6 +175,33 @@ const formatRoleLabel = (role = "") =>
 const getActionMeta = (actionKey = "auto") =>
   ACTION_OPTIONS.find((item) => item.key === actionKey) || ACTION_OPTIONS[0];
 
+const getCredentialType = ({ cardId = "", physicalNfcUid = "", phoneNfcUid = "", virtualNfcToken = "", credentialType = "" } = {}) => {
+  const explicitType = String(credentialType || "").trim().toLowerCase();
+  if (explicitType) return explicitType;
+  const normalizedCardId = normalizeRfidReaderInput(cardId);
+  if (!normalizedCardId) return "";
+  if (normalizeRfidReaderInput(virtualNfcToken) === normalizedCardId || normalizedCardId.startsWith("5AFE")) {
+    return "virtual_card";
+  }
+  if (normalizeRfidReaderInput(phoneNfcUid) === normalizedCardId) return "phone_uid";
+  if (normalizeRfidReaderInput(physicalNfcUid) === normalizedCardId) return "physical_uid";
+  return "nfc_uid";
+};
+
+const getCredentialLabel = (event = {}) => {
+  const credentialType = getCredentialType({
+    cardId: event.nfcCardId,
+    physicalNfcUid: event.physicalNfcUid,
+    phoneNfcUid: event.phoneNfcUid,
+    virtualNfcToken: event.virtualNfcToken,
+    credentialType: event.credentialType,
+  });
+  if (credentialType === "virtual_card") return "Virtual Card ID";
+  if (credentialType === "phone_uid") return "Phone NFC UID";
+  if (credentialType === "physical_uid") return "Physical Card UID";
+  return "NFC UID";
+};
+
 const getFloorName = (floorId = "") =>
   MONITORING_MAP_FLOORS.find((floor) => floor.id === floorId)?.name || formatRoleLabel(floorId || "Floor");
 
@@ -242,7 +294,11 @@ const getPersonDetails = (response = {}) => {
     purpose: person.purposeOfVisit || person.purpose || "",
     attendanceScope: person.attendanceScope || "",
     safePassId: person.safePassId || response.safePassId || "",
-    nfcCardId: person.physicalNfcUid || person.nfcCardId || response.nfcCardId || response.attendance?.nfcCardId || "",
+    nfcCardId: response.nfcCardId || response.attendance?.nfcCardId || person.nfcCardId || person.physicalNfcUid || person.virtualNfcToken || "",
+    physicalNfcUid: person.physicalNfcUid || "",
+    phoneNfcUid: person.phoneNfcUid || "",
+    virtualNfcToken: person.virtualNfcToken || response.virtualNfcToken || "",
+    credentialType: person.nfcCredentialType || response.nfcCredentialType || "",
   };
 };
 
@@ -273,6 +329,11 @@ const buildPn532EventFromLog = (log = {}) => {
   const success = String(log.status || "").toLowerCase() === "granted";
   const action = metadata.action || log.activityType || "pn532_tap";
   const nfcCardId = log.nfcCardId || metadata.targetCardId || "";
+  const relatedUser = log.relatedUser || {};
+  const relatedVisitor = log.relatedVisitor || {};
+  const virtualNfcToken = metadata.virtualNfcToken || relatedUser.virtualNfcToken || relatedVisitor.virtualNfcToken || "";
+  const physicalNfcUid = metadata.physicalNfcUid || relatedUser.physicalNfcUid || relatedVisitor.physicalNfcUid || "";
+  const phoneNfcUid = metadata.phoneNfcUid || relatedUser.phoneNfcUid || relatedVisitor.phoneNfcUid || "";
   const checkpoint =
     tapLocation.office ||
     log.location ||
@@ -289,7 +350,7 @@ const buildPn532EventFromLog = (log = {}) => {
     checkpoint,
     action,
     userType: metadata.userType || log.actorRole || "visitor",
-    name: log.userName || (success ? "SafePass user" : "Unknown NFC card"),
+    name: log.userName || relatedVisitor.fullName || relatedUser.name || (success ? "SafePass user" : "Unknown NFC card"),
     program: checkpoint,
     yearSection: success ? "" : "Not assigned or blocked",
     campusId: "",
@@ -299,6 +360,10 @@ const buildPn532EventFromLog = (log = {}) => {
     purpose: "",
     attendanceScope: "PN532 device tap",
     nfcCardId,
+    physicalNfcUid,
+    phoneNfcUid,
+    virtualNfcToken,
+    credentialType: metadata.credentialType || getCredentialType({ cardId: nfcCardId, physicalNfcUid, phoneNfcUid, virtualNfcToken }),
     status: log.status || "processed",
     source: "pn532",
     raw: log,
@@ -306,6 +371,7 @@ const buildPn532EventFromLog = (log = {}) => {
 };
 
 export default function NFCScanScreen({ navigation }) {
+  const { width: viewportWidth } = useWindowDimensions();
   const cardInputRef = useRef(null);
   const readerBufferRef = useRef("");
   const readerBufferTimerRef = useRef(null);
@@ -368,6 +434,8 @@ export default function NFCScanScreen({ navigation }) {
   );
   const selectedActionMeta = useMemo(() => getActionMeta(selectedAction), [selectedAction]);
   const latestTone = useMemo(() => getResultTone(latestResult), [latestResult]);
+  const isCompactStation = viewportWidth < 820;
+  const isNarrowStation = viewportWidth < 520;
   const stationFeedTotalPages = useMemo(
     () => Math.max(1, Math.ceil(stationEvents.length / STATION_FEED_PAGE_SIZE)),
     [stationEvents.length],
@@ -672,6 +740,15 @@ export default function NFCScanScreen({ navigation }) {
         purpose: personDetails.purpose,
         attendanceScope: personDetails.attendanceScope,
         nfcCardId: personDetails.nfcCardId || normalizedCardId,
+        physicalNfcUid: personDetails.physicalNfcUid,
+        phoneNfcUid: personDetails.phoneNfcUid,
+        virtualNfcToken: personDetails.virtualNfcToken,
+        credentialType: personDetails.credentialType || getCredentialType({
+          cardId: personDetails.nfcCardId || normalizedCardId,
+          physicalNfcUid: personDetails.physicalNfcUid,
+          phoneNfcUid: personDetails.phoneNfcUid,
+          virtualNfcToken: personDetails.virtualNfcToken,
+        }),
         status:
           response?.attendance?.status ||
           response?.visitor?.status ||
@@ -707,6 +784,15 @@ export default function NFCScanScreen({ navigation }) {
         purpose: personDetails.purpose,
         attendanceScope: personDetails.attendanceScope,
         nfcCardId: personDetails.nfcCardId || normalizedCardId,
+        physicalNfcUid: personDetails.physicalNfcUid,
+        phoneNfcUid: personDetails.phoneNfcUid,
+        virtualNfcToken: personDetails.virtualNfcToken,
+        credentialType: personDetails.credentialType || getCredentialType({
+          cardId: personDetails.nfcCardId || normalizedCardId,
+          physicalNfcUid: personDetails.physicalNfcUid,
+          phoneNfcUid: personDetails.phoneNfcUid,
+          virtualNfcToken: personDetails.virtualNfcToken,
+        }),
         status: "denied",
         raw: errorData,
       };
@@ -768,18 +854,21 @@ export default function NFCScanScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, isCompactStation && styles.contentCompact]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.headerCard}>
-          <View style={styles.headerMainRow}>
+        <View style={[styles.headerCard, isCompactStation && styles.headerCardCompact]}>
+          <View style={[styles.headerMainRow, isCompactStation && styles.headerMainRowCompact]}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <Ionicons name="arrow-back" size={22} color="#0A3D91" />
             </TouchableOpacity>
             <View style={styles.headerCopy}>
               <Text style={styles.headerEyebrow}>Checkpoint Station</Text>
-              <Text style={styles.headerTitle}>NFC Tap Console</Text>
+              <Text style={[styles.headerTitle, isCompactStation && styles.headerTitleCompact]}>
+                NFC Tap Console
+              </Text>
               <Text style={styles.headerSubtitle}>
                 Process campus attendance, visitor arrival, departure, and location taps from one
                 dedicated reader station.
@@ -813,7 +902,7 @@ export default function NFCScanScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={styles.operatorCard}>
+        <View style={[styles.operatorCard, isCompactStation && styles.operatorCardCompact]}>
           <View style={styles.operatorIdentity}>
             <View style={styles.operatorAvatar}>
               <Text style={styles.operatorAvatarText}>
@@ -845,27 +934,28 @@ export default function NFCScanScreen({ navigation }) {
           </View>
         ) : null}
 
-        <View style={styles.stationLayout}>
-          <View style={styles.stationPrimary}>
+        <View style={[styles.stationLayout, isCompactStation && styles.stationLayoutCompact]}>
+          <View style={[styles.stationPrimary, isCompactStation && styles.stationPrimaryCompact]}>
             <View
               style={[
                 styles.tapPad,
+                isCompactStation && styles.tapPadCompact,
                 { backgroundColor: latestTone.background, borderColor: latestTone.border },
                 busy && styles.tapPadBusy,
               ]}
             >
-              <View style={styles.tapPadStatusRow}>
+              <View style={[styles.tapPadStatusRow, isNarrowStation && styles.tapPadStatusRowCompact]}>
                 <View style={[styles.tapPadStatusPill, { borderColor: latestTone.border }]}>
                   <View style={[styles.tapPadStatusDot, { backgroundColor: latestTone.icon }]} />
                   <Text style={[styles.tapPadStatusText, { color: latestTone.icon }]}>
                     {busy ? "Reader Processing" : "Reader Armed"}
                   </Text>
                 </View>
-                <Text style={styles.tapPadTimestamp}>
+                <Text style={[styles.tapPadTimestamp, isNarrowStation && styles.tapPadTimestampCompact]}>
                   {latestResult ? formatDateTime(latestResult.timestamp) : "No taps yet"}
                 </Text>
               </View>
-              <View style={[styles.tapPadIcon, { backgroundColor: `${latestTone.icon}18` }]}>
+              <View style={[styles.tapPadIcon, isCompactStation && styles.tapPadIconCompact, { backgroundColor: `${latestTone.icon}18` }]}>
                 {busy ? (
                   <ActivityIndicator size="large" color={latestTone.icon} />
                 ) : (
@@ -876,14 +966,14 @@ export default function NFCScanScreen({ navigation }) {
                   />
                 )}
               </View>
-              <Text style={[styles.tapPadTitle, { color: latestTone.icon }]}>
+              <Text style={[styles.tapPadTitle, isCompactStation && styles.tapPadTitleCompact, { color: latestTone.icon }]}>
                 {busy ? "Processing Tap" : latestResult ? latestTone.label : "Ready To Tap"}
               </Text>
               <Text style={styles.tapPadSubtitle}>
                 {latestResult?.message ||
                   "Place the card on the USB reader. The station will record the selected action immediately."}
               </Text>
-              <View style={styles.tapPadMetaRow}>
+              <View style={[styles.tapPadMetaRow, isNarrowStation && styles.tapPadMetaRowCompact]}>
                 <View style={styles.tapPadMetaCard}>
                   <Text style={styles.tapPadMetaLabel}>Mode</Text>
                   <Text style={styles.tapPadMetaValue}>{selectedActionMeta.label}</Text>
@@ -896,7 +986,7 @@ export default function NFCScanScreen({ navigation }) {
             </View>
 
             <View style={styles.readerPanel}>
-              <View style={styles.readerPanelHeader}>
+              <View style={[styles.readerPanelHeader, isNarrowStation && styles.readerPanelHeaderCompact]}>
                 <View>
                   <Text style={styles.readerPanelLabel}>USB Reader</Text>
                   <Text style={styles.readerPanelTitle}>{describeRfidReaderInput(cardId)}</Text>
@@ -918,15 +1008,17 @@ export default function NFCScanScreen({ navigation }) {
                 onSubmitEditing={(event) => handleSubmitTap(event?.nativeEvent?.text)}
                 returnKeyType="done"
                 blurOnSubmit={false}
-                showSoftInputOnFocus={false}
+                showSoftInputOnFocus={Platform.OS === "web" ? false : true}
               />
               <View style={styles.readerHintCard}>
                 <Ionicons name="information-circle-outline" size={16} color="#0A3D91" />
                 <Text style={styles.readerHintText}>
-                  This station auto-arms the reader. Tap a card anywhere on this screen.
+                  {Platform.OS === "web"
+                    ? "This station auto-arms the reader. Tap a card anywhere on this screen."
+                    : "On mobile, paste or type the UID, then process the tap. PN532 device taps still appear below."}
                 </Text>
               </View>
-              <View style={styles.inlineActions}>
+              <View style={[styles.inlineActions, isNarrowStation && styles.inlineActionsCompact]}>
                 <TouchableOpacity
                   style={styles.secondaryButton}
                   onPress={() => {
@@ -1019,6 +1111,9 @@ export default function NFCScanScreen({ navigation }) {
                   <Text style={styles.pn532StatusMeta}>
                     {[
                       pn532Monitor.lastEvent?.checkpoint,
+                      pn532Monitor.lastEvent?.nfcCardId
+                        ? `${getCredentialLabel(pn532Monitor.lastEvent)}: ${pn532Monitor.lastEvent.nfcCardId}`
+                        : "",
                       pn532Monitor.lastEvent?.status ? formatRoleLabel(pn532Monitor.lastEvent.status) : "",
                       pn532Monitor.lastEvent?.timestamp ? formatDateTime(pn532Monitor.lastEvent.timestamp) : "",
                     ].filter(Boolean).join(" | ") || "The latest PN532 UID/result will appear here."}
@@ -1108,16 +1203,26 @@ export default function NFCScanScreen({ navigation }) {
                   </View>
                 ) : null}
                 <View style={[styles.resultMetaCard, styles.resultMetaCardWide]}>
-                  <Text style={styles.resultMetaLabel}>NFC UID</Text>
+                  <Text style={styles.resultMetaLabel}>
+                    {latestResult ? getCredentialLabel(latestResult) : "NFC UID"}
+                  </Text>
                   <Text style={styles.resultMetaValue}>
                     {latestResult?.nfcCardId || "N/A"}
                   </Text>
                 </View>
+                {latestResult?.virtualNfcToken && latestResult.virtualNfcToken !== latestResult.nfcCardId ? (
+                  <View style={[styles.resultMetaCard, styles.resultMetaCardWide]}>
+                    <Text style={styles.resultMetaLabel}>Stored Virtual Card ID</Text>
+                    <Text style={styles.resultMetaValue}>
+                      {latestResult.virtualNfcToken}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             </View>
           </View>
 
-          <View style={styles.stationSide}>
+          <View style={[styles.stationSide, isCompactStation && styles.stationSideCompact]}>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Check Flow</Text>
               <View style={styles.actionGrid}>
@@ -1234,7 +1339,7 @@ export default function NFCScanScreen({ navigation }) {
               </View>
 
               <ScrollView style={styles.checkpointListScroll} showsVerticalScrollIndicator={false}>
-                <View style={styles.checkpointGrid}>
+                <View style={[styles.checkpointGrid, isNarrowStation && styles.checkpointGridCompact]}>
                   {visibleCheckpoints.map((checkpoint) => {
                     const selected = checkpoint.key === selectedCheckpointKey;
                     return (
@@ -1311,7 +1416,11 @@ export default function NFCScanScreen({ navigation }) {
               {paginatedStationEvents.map((event, index) => (
                 <View
                   key={`${event.timestamp}-${index}`}
-                  style={[styles.feedRow, index > 0 && styles.feedRowBorder]}
+                  style={[
+                    styles.feedRow,
+                    isNarrowStation && styles.feedRowCompact,
+                    index > 0 && styles.feedRowBorder,
+                  ]}
                 >
                   <View
                     style={[
@@ -1328,13 +1437,13 @@ export default function NFCScanScreen({ navigation }) {
                   <View style={styles.feedCopy}>
                     <Text style={styles.feedTitle}>{event.name}</Text>
                     <Text style={styles.feedSubtitle}>
-                      {[formatRoleLabel(event.userType), event.program, event.yearSection, formatRoleLabel(event.action), event.checkpoint]
+                      {[formatRoleLabel(event.userType), getCredentialLabel(event), event.program, event.yearSection, formatRoleLabel(event.action), event.checkpoint]
                         .filter(Boolean)
                         .join(" | ")}
                     </Text>
                     <Text style={styles.feedTimestamp}>{formatDateTime(event.timestamp)}</Text>
                   </View>
-                  <View style={styles.feedStatusBadge}>
+                  <View style={[styles.feedStatusBadge, isNarrowStation && styles.feedStatusBadgeCompact]}>
                     <Text style={styles.feedStatusText}>
                       {event.success ? "OK" : "BLOCKED"}
                     </Text>
@@ -1471,6 +1580,10 @@ const styles = StyleSheet.create({
     padding: 22,
     paddingBottom: 34,
   },
+  contentCompact: {
+    padding: 12,
+    paddingBottom: 24,
+  },
   headerCard: {
     backgroundColor: "#071D3A",
     borderRadius: 24,
@@ -1480,11 +1593,18 @@ const styles = StyleSheet.create({
     borderColor: "#123C74",
     ...CARD_SHADOW,
   },
+  headerCardCompact: {
+    borderRadius: 18,
+    padding: 16,
+  },
   headerMainRow: {
     flexDirection: "row",
     gap: 16,
     alignItems: "flex-start",
     flexWrap: "wrap",
+  },
+  headerMainRowCompact: {
+    gap: 12,
   },
   backButton: {
     width: 46,
@@ -1509,6 +1629,10 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: "900",
     color: "#FFFFFF",
+  },
+  headerTitleCompact: {
+    fontSize: 24,
+    lineHeight: 30,
   },
   headerSubtitle: {
     marginTop: 8,
@@ -1820,7 +1944,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#0F172A",
     paddingVertical: 10,
-    outlineStyle: "none",
+    ...(Platform.OS === "web" ? { outlineStyle: "none" } : {}),
   },
   checkpointSearchClear: {
     width: 28,
@@ -1951,6 +2075,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     marginTop: 12,
+  },
+  inlineActionsCompact: {
+    flexDirection: "column",
   },
   secondaryButton: {
     flex: 1,
@@ -2099,6 +2226,9 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 6,
   },
+  feedRowCompact: {
+    alignItems: "flex-start",
+  },
   feedRowBorder: {
     marginTop: 14,
     paddingTop: 14,
@@ -2142,6 +2272,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFF6FF",
     paddingHorizontal: 10,
     paddingVertical: 6,
+  },
+  feedStatusBadgeCompact: {
+    alignSelf: "flex-start",
   },
   feedStatusText: {
     fontSize: 11,
@@ -2197,14 +2330,24 @@ const styles = StyleSheet.create({
     gap: 20,
     marginBottom: 16,
   },
+  stationLayoutCompact: {
+    gap: 14,
+  },
   stationPrimary: {
     flex: 1.15,
     flexBasis: 520,
     gap: 16,
   },
+  stationPrimaryCompact: {
+    flexBasis: "100%",
+    gap: 12,
+  },
   stationSide: {
     flex: 0.85,
     flexBasis: 360,
+  },
+  stationSideCompact: {
+    flexBasis: "100%",
   },
   tapPad: {
     minHeight: 310,
@@ -2214,6 +2357,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     ...CARD_SHADOW,
+  },
+  tapPadCompact: {
+    minHeight: 250,
+    borderRadius: 18,
+    padding: 16,
+    paddingTop: 78,
   },
   tapPadBusy: {
     opacity: 0.88,
@@ -2228,10 +2377,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.72)",
   },
+  tapPadIconCompact: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    marginBottom: 12,
+  },
   tapPadTitle: {
     fontSize: 28,
     fontWeight: "900",
     textAlign: "center",
+  },
+  tapPadTitleCompact: {
+    fontSize: 23,
+    lineHeight: 29,
   },
   tapPadSubtitle: {
     marginTop: 10,
@@ -2250,6 +2409,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  tapPadStatusRowCompact: {
+    alignItems: "flex-start",
+    flexDirection: "column",
+    gap: 8,
   },
   tapPadStatusPill: {
     flexDirection: "row",
@@ -2275,12 +2439,18 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#64748B",
   },
+  tapPadTimestampCompact: {
+    maxWidth: "100%",
+  },
   tapPadMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
     marginTop: 20,
     alignSelf: "stretch",
+  },
+  tapPadMetaRowCompact: {
+    flexDirection: "column",
   },
   tapPadMetaCard: {
     flex: 1,
@@ -2336,12 +2506,21 @@ const styles = StyleSheet.create({
     borderColor: "#BBD7FF",
     ...CARD_SHADOW,
   },
+  operatorCardCompact: {
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: 12,
+  },
   pn532PanelHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
     marginBottom: 12,
+  },
+  readerPanelHeaderCompact: {
+    alignItems: "flex-start",
+    flexWrap: "wrap",
   },
   pn532PanelTitle: {
     marginTop: 4,
@@ -2422,6 +2601,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+  },
+  checkpointGridCompact: {
+    flexDirection: "column",
   },
   checkpointListScroll: {
     maxHeight: 330,

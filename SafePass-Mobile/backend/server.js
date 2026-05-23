@@ -124,6 +124,16 @@ const getUserPhysicalNfcUid = (user = {}) => {
 const getUserPhoneNfcUid = (user = {}) => normalizeSubmittedNfcCardId(user?.phoneNfcUid || "");
 const getUserVirtualNfcToken = (user = {}) => normalizeSubmittedNfcCardId(user?.virtualNfcToken || "");
 
+const getNfcCredentialTypeForUser = (user = {}, submittedCardId = "") => {
+  const normalizedSubmitted = normalizeSubmittedNfcCardId(submittedCardId);
+  if (!normalizedSubmitted) return "";
+  if (normalizeSubmittedNfcCardId(getUserVirtualNfcToken(user)) === normalizedSubmitted) return "virtual_card";
+  if (normalizeSubmittedNfcCardId(getUserPhoneNfcUid(user)) === normalizedSubmitted) return "phone_uid";
+  if (normalizeSubmittedNfcCardId(getUserPhysicalNfcUid(user)) === normalizedSubmitted) return "physical_uid";
+  if (normalizeSubmittedNfcCardId(user?.nfcCardId || "") === normalizedSubmitted) return "account_card";
+  return "unknown";
+};
+
 const buildNfcCredentialQuery = (rawCardId = "", normalizedCardId = "") => {
   const candidates = Array.from(
     new Set(
@@ -5412,6 +5422,8 @@ const getVisitorTapPayload = ({ visitor, visitorUser, nfcCardId = "" } = {}) => 
     nfcCardId: nfcCardId || getUserPhysicalNfcUid(visitorUser) || visitor.physicalNfcUid || visitor.nfcCardId || "",
     physicalNfcUid: getUserPhysicalNfcUid(visitorUser) || visitor.physicalNfcUid || "",
     phoneNfcUid: getUserPhoneNfcUid(visitorUser) || visitor.phoneNfcUid || "",
+    virtualNfcToken: getUserVirtualNfcToken(visitorUser) || visitor.virtualNfcToken || "",
+    nfcCredentialType: getNfcCredentialTypeForUser(visitorUser, nfcCardId || visitor.physicalNfcUid || visitor.nfcCardId || ""),
   };
 };
 
@@ -5424,6 +5436,8 @@ const getCampusUserTapPayload = ({ user = {}, nfcCardId = "" } = {}) => ({
   nfcCardId: nfcCardId || getUserPhysicalNfcUid(user) || user?.nfcCardId || "",
   physicalNfcUid: getUserPhysicalNfcUid(user),
   phoneNfcUid: getUserPhoneNfcUid(user),
+  virtualNfcToken: getUserVirtualNfcToken(user),
+  nfcCredentialType: getNfcCredentialTypeForUser(user, nfcCardId || getUserPhysicalNfcUid(user) || user?.nfcCardId || ""),
   department: user?.department || "",
   position: user?.position || "",
   course: user?.course || "",

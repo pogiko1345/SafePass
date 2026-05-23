@@ -5049,6 +5049,15 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     visitor?.safePassId ||
     currentUser?.safePassId ||
     "Assigned on account creation";
+  const visitorVirtualNfcToken =
+    visitor?.virtualNfcToken ||
+    currentUser?.virtualNfcToken ||
+    "";
+  const visitorVirtualNfcDisplay = visitorVirtualNfcToken
+    ? visitorVirtualNfcToken
+    : Platform.OS === "android"
+      ? "Syncing to this phone"
+      : "Physical card required";
 
   const renderSectionIntro = () => (
     <ScrollReveal
@@ -5349,9 +5358,11 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               </View>
 
               <View style={visitorDashboardStyles.approvedVirtualNfcCardNumberRow}>
-                <Text style={visitorDashboardStyles.approvedVirtualNfcCardLabel}>SafePass ID</Text>
+                <Text style={visitorDashboardStyles.approvedVirtualNfcCardLabel}>
+                  {visitorVirtualNfcToken ? "Virtual Card ID" : "SafePass ID"}
+                </Text>
                 <Text style={visitorDashboardStyles.approvedVirtualNfcCardNumber}>
-                  {visitorSafePassId}
+                  {visitorVirtualNfcToken || visitorSafePassId}
                 </Text>
               </View>
             </LinearGradient>
@@ -5389,7 +5400,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               <View style={visitorDashboardStyles.approvedCompactActionCopy}>
                 <Text style={visitorDashboardStyles.approvedCompactActionTitle}>Tap At Lobby</Text>
                 <Text style={visitorDashboardStyles.approvedCompactActionText}>
-                  Use your NFC card at the reader.
+                  Use your phone or assigned card at the reader.
                 </Text>
               </View>
             </AnimatedPressable>
@@ -7682,13 +7693,19 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                     </View>
 
                     <View style={visitorDashboardStyles.virtualNfcIdBand}>
-                      <Text style={visitorDashboardStyles.virtualNfcPreviewLabel}>SafePass ID</Text>
+                      <Text style={visitorDashboardStyles.virtualNfcPreviewLabel}>Virtual Card ID</Text>
                       <Text style={visitorDashboardStyles.virtualNfcPreviewId}>
-                        {visitorSafePassId}
+                        {visitorVirtualNfcDisplay}
                       </Text>
                     </View>
 
                     <View style={visitorDashboardStyles.virtualNfcDetailsGrid}>
+                      <View style={visitorDashboardStyles.virtualNfcDetailCard}>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaLabel}>SafePass ID</Text>
+                        <Text style={visitorDashboardStyles.virtualNfcPreviewMetaValue}>
+                          {visitorSafePassId}
+                        </Text>
+                      </View>
                       <View style={visitorDashboardStyles.virtualNfcDetailCard}>
                         <Text style={visitorDashboardStyles.virtualNfcPreviewMetaLabel}>Purpose</Text>
                         <Text style={visitorDashboardStyles.virtualNfcPreviewMetaValue}>
@@ -7730,7 +7747,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                           Ready To Tap
                         </Text>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintText}>
-                          Tap your assigned NFC card at the PN532 lobby reader for check-in or check-out.
+                          Tap this phone on Android, or tap your assigned physical NFC card at the PN532 reader.
                         </Text>
                       </View>
                     </View>
@@ -7746,7 +7763,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               >
                 {[
                   "Use the card view above to confirm your approved visitor details.",
-                  "Tap your assigned physical NFC card at the lobby reader to enter or leave campus.",
+                  "On Android, the SafePass APK can present this virtual card to the PN532 reader.",
+                  "You can still tap your assigned physical NFC card at the lobby reader.",
                   "Security and admin monitoring will record the reader tap automatically.",
                 ].map((item) => (
                   <View key={item} style={visitorDashboardStyles.virtualNfcInfoRow}>
