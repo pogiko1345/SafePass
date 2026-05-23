@@ -68,10 +68,6 @@ router.post('/register', async (req, res) => {
 
     await user.save();
 
-    // Store temporary password in visitor record
-    visitor.temporaryPassword = tempPassword;
-    await visitor.save();
-
     // Notify admin about new registration
     await notifyAdminNewVisitor({
       ...visitor.toObject(),
@@ -86,10 +82,6 @@ router.post('/register', async (req, res) => {
         fullName: visitor.fullName,
         email: visitor.email,
         status: 'pending'
-      },
-      credentials: {
-        email: user.email,
-        password: tempPassword
       }
     });
   } catch (error) {

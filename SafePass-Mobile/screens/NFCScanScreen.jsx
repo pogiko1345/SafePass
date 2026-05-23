@@ -43,6 +43,7 @@ const ACTION_OPTIONS = [
 
 const ALLOWED_ROLES = new Set(["admin", "security", "guard", "staff"]);
 const STATION_EVENTS_STORAGE_KEY = "safepass:nfc-scan:station-events:v1";
+const STATION_READER_CHECKPOINT_KEY = "safepass:nfc-scan:reader-checkpoint:v1";
 const STATION_FEED_PAGE_SIZE = 6;
 const MAX_STATION_EVENTS = 100;
 
@@ -107,6 +108,24 @@ const writeStoredStationEvents = (events = []) => {
     );
   } catch (error) {
     // Ignore device storage failures; the live station can still process taps.
+  }
+};
+
+const readStoredReaderCheckpointKey = () => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return "";
+  try {
+    return String(window.localStorage.getItem(STATION_READER_CHECKPOINT_KEY) || "").trim();
+  } catch (error) {
+    return "";
+  }
+};
+
+const writeStoredReaderCheckpointKey = (checkpointKey = "") => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STATION_READER_CHECKPOINT_KEY, String(checkpointKey || "").trim());
+  } catch (error) {
+    // The reader can still work; it will just fall back to the default office next load.
   }
 };
 
@@ -384,7 +403,9 @@ export default function NFCScanScreen({ navigation }) {
   const [mapRooms, setMapRooms] = useState(MONITORING_MAP_OFFICES);
   const [mapRoomPositions, setMapRoomPositions] = useState({});
   const [selectedFloorKey, setSelectedFloorKey] = useState(MONITORING_MAP_FLOORS[0].id);
-  const [selectedCheckpointKey, setSelectedCheckpointKey] = useState(ENTRY_CHECKPOINTS[0].key);
+  const [selectedCheckpointKey, setSelectedCheckpointKey] = useState(
+    () => readStoredReaderCheckpointKey() || ENTRY_CHECKPOINTS[0].key,
+  );
   const [checkpointSearch, setCheckpointSearch] = useState("");
   const [selectedAction, setSelectedAction] = useState("auto");
   const [cardId, setCardId] = useState("");
@@ -601,23 +622,32 @@ export default function NFCScanScreen({ navigation }) {
     setLatestResult(null);
   };
 
-  const pollPn532DeviceLogs = async ({ announceNew = true } = {}) => {
+  const pollPn532DeviceLogs = async ({ announceNew = true, manual = false } = {}) => {
     if (!isOperatorAllowed) return;
 
-    setPn532Monitor((current) => ({ ...current, loading: true }));
+    setPn532Monitor((current) => ({
+      ...current,
+      loading: true,
+      message:
+        manual || !current.message || current.message.includes("Failed to fetch")
+          ? "Checking PN532 device logs..."
+          : current.message,
+    }));
     try {
       const response = await ApiService.getAccessLogs(1, 20, { all: true });
       const logs = Array.isArray(response?.accessLogs) ? response.accessLogs : [];
       const latestPn532Log = logs.find(isPn532AccessLog);
 
       if (!latestPn532Log) {
-        setPn532Monitor({
+        setPn532Monitor((current) => ({
           loading: false,
-          online: false,
+          online: current.lastEvent ? current.online : true,
           lastCheckedAt: new Date().toISOString(),
-          lastEvent: null,
-          message: "No PN532 taps found yet. Tap a card on the ESP32 reader.",
-        });
+          lastEvent: current.lastEvent,
+          message: current.lastEvent
+            ? "No newer PN532 taps yet. Auto-refresh is still checking."
+            : "No PN532 taps found yet. Tap a card on the ESP32 reader.",
+        }));
         return;
       }
 
@@ -643,9 +673,12 @@ export default function NFCScanScreen({ navigation }) {
       setPn532Monitor((current) => ({
         ...current,
         loading: false,
-        online: false,
+        online: Boolean(current.lastEvent),
         lastCheckedAt: new Date().toISOString(),
-        message: error?.message || "Could not check PN532 device logs.",
+        message:
+          manual || !current.lastEvent
+            ? "Could not reach the SafePass server. Auto-refresh will keep retrying."
+            : "Auto-refresh could not reach the server. Keeping the latest PN532 tap on screen.",
       }));
     }
   };
@@ -690,8 +723,15 @@ export default function NFCScanScreen({ navigation }) {
     setSelectedFloorKey(floorKey);
     setCheckpointSearch("");
     if (firstCheckpointForFloor) {
-      setSelectedCheckpointKey(firstCheckpointForFloor.key);
+      handleSelectCheckpoint(firstCheckpointForFloor.key);
+      return;
     }
+    setTimeout(focusReader, 80);
+  };
+
+  const handleSelectCheckpoint = (checkpointKey) => {
+    setSelectedCheckpointKey(checkpointKey);
+    writeStoredReaderCheckpointKey(checkpointKey);
     setTimeout(focusReader, 80);
   };
 
@@ -1058,7 +1098,7 @@ export default function NFCScanScreen({ navigation }) {
                 </View>
                 <TouchableOpacity
                   style={styles.focusButton}
-                  onPress={() => pollPn532DeviceLogs({ announceNew: true })}
+                  onPress={() => pollPn532DeviceLogs({ announceNew: true, manual: true })}
                   disabled={pn532Monitor.loading}
                 >
                   {pn532Monitor.loading ? (
@@ -1269,10 +1309,10 @@ export default function NFCScanScreen({ navigation }) {
               <View style={styles.sectionHeaderRow}>
                 <View>
                   <Text style={styles.sectionTitle}>Checkpoint</Text>
-                  <Text style={styles.sectionSubtitle}>Pick the reader location for this station.</Text>
+                  <Text style={styles.sectionSubtitle}>Assign this physical reader to one office.</Text>
                 </View>
                 <View style={styles.floorCountBadge}>
-                  <Text style={styles.floorCountText}>{visibleCheckpoints.length} offices</Text>
+                  <Text style={styles.floorCountText}>1 reader</Text>
                 </View>
               </View>
 
@@ -1346,10 +1386,7 @@ export default function NFCScanScreen({ navigation }) {
                       <TouchableOpacity
                         key={checkpoint.key}
                         style={[styles.checkpointCard, selected && styles.checkpointCardActive]}
-                        onPress={() => {
-                          setSelectedCheckpointKey(checkpoint.key);
-                          setTimeout(focusReader, 80);
-                        }}
+                        onPress={() => handleSelectCheckpoint(checkpoint.key)}
                       >
                         <View style={[styles.checkpointIcon, selected && styles.checkpointIconActive]}>
                           <Ionicons

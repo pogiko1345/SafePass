@@ -17,9 +17,9 @@ const getAppointmentOptions = async ({ activeOnly = false } = {}) => {
   if (!activeOnly) return options;
 
   return {
-    offices: options.offices.filter((option) => option.enabled !== false),
-    purposes: options.purposes.filter((option) => option.enabled !== false),
-    timeSlots: options.timeSlots.filter((slot) => slot.enabled !== false),
+    offices: options.offices.filter((option) => !option.deleted && option.enabled !== false),
+    purposes: options.purposes.filter((option) => !option.deleted && option.enabled !== false),
+    timeSlots: options.timeSlots.filter((slot) => !slot.deleted && slot.enabled !== false),
   };
 };
 

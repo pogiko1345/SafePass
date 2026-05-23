@@ -798,6 +798,7 @@ visitorSchema.methods = {
     this.overstayAlertedAt = null;
     this.assignedStaff = assignedStaff || null;
     this.assignedStaffName = String(assignedStaffName || "").trim();
+    const assignedStaffId = assignedStaff?._id || assignedStaff || null;
     this.checkedInAt = null;
     this.checkedOutAt = null;
     this.checkedInBy = null;
@@ -809,7 +810,7 @@ visitorSchema.methods = {
         checkpointId: "",
         reason: "Initial appointment destination",
         status: "initial",
-        updatedBy: staffUser?._id || null,
+        updatedBy: assignedStaffId,
         updatedAt: new Date(),
       };
     }

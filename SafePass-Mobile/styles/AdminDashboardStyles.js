@@ -1000,7 +1000,8 @@ export default StyleSheet.create({
   },
 
   appointmentRecordsToolbar: {
-    position: "relative",
+    position: isWeb && width >= 960 ? "sticky" : "relative",
+    top: isWeb && width >= 960 ? 10 : undefined,
     zIndex: 1000,
     flexDirection: width < 1180 ? "column" : "row",
     alignItems: "flex-start",
@@ -1468,6 +1469,15 @@ export default StyleSheet.create({
     justifyContent: "center",
     gap: 4,
     backgroundColor: "#FFFFFF",
+  },
+
+  appointmentOptionDeleteButton: {
+    borderColor: "#FECACA",
+    backgroundColor: "#FFF7F7",
+  },
+
+  appointmentOptionItemSaving: {
+    opacity: 0.72,
   },
 
   appointmentOptionMiniText: {
@@ -5146,6 +5156,22 @@ export default StyleSheet.create({
     alignItems: "center",
   },
 
+  confirmIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  confirmIconDanger: {
+    backgroundColor: "#FEE2E2",
+  },
+
+  confirmIconInfo: {
+    backgroundColor: "#EEF5FF",
+  },
+
   confirmTitle: {
     fontSize: 18,
     fontWeight: "700",
@@ -5340,6 +5366,25 @@ export default StyleSheet.create({
     fontSize: 13,
     color: "#64748B",
     textAlign: "center",
+    maxWidth: 420,
+    lineHeight: 19,
+  },
+
+  emptyStateActionButton: {
+    marginTop: 18,
+    minHeight: 38,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: "#0A3D91",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  emptyStateActionText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
 
   inputHint: {
