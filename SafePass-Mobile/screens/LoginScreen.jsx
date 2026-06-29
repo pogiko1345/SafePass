@@ -12,6 +12,7 @@ import {
   StatusBar,
   Modal,
   Animated,
+  Easing,
   Image,
   Linking,
   LogBox,
@@ -22,6 +23,8 @@ import loginStyles from "../styles/LoginStyles";
 import { brandColors } from "../styles/brandColors";
 import { Ionicons } from "@expo/vector-icons";
 import SocialDock from "../components/SocialDock";
+import AviationSplash from "../components/AviationSplash";
+import { useAviationTransition } from "../utils/AviationTransitionContext";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import ApiService from "../utils/ApiService";
@@ -67,14 +70,17 @@ if (__DEV__) {
 }
 
 export default function LoginScreen({ navigation, route }) {
+  const startAviationTransition = useAviationTransition();
   // Get role from navigation params
   const {
     role = IS_VISITOR_ONLY_APP ? "visitor" : "campus",
     initialEmail = "",
     initialPassword = "",
+    skipArrivalSplash = false,
   } = route?.params || {};
   const effectiveRole = IS_VISITOR_ONLY_APP ? "visitor" : normalizeRole(role) || "campus";
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const showDesktopLoginDesign = isWeb && viewportWidth >= 1080;
   const isCompactLogin = viewportWidth <= 420;
   const isTabletLogin = viewportWidth >= 768;
   const loginHorizontalPadding = isCompactLogin ? 12 : 20;
@@ -98,7 +104,7 @@ export default function LoginScreen({ navigation, route }) {
   };
   const cardResponsiveStyle = {
     marginHorizontal: loginHorizontalPadding,
-    marginTop: isCompactLogin ? -12 : -30,
+    marginTop: isCompactLogin ? 2 : -30,
     padding: isCompactLogin ? 14 : 24,
     ...(isWeb ? { maxWidth: loginMaxContentWidth } : null),
   };
@@ -156,11 +162,9 @@ export default function LoginScreen({ navigation, route }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showLoginSplash, setShowLoginSplash] = useState(false);
   const [loginSplashMessage, setLoginSplashMessage] = useState("Signing you in...");
   const [apiConnected, setApiConnected] = useState(true);
   const [errors, setErrors] = useState({});
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [loginError, setLoginError] = useState("");
   const [loginSuccessMessage, setLoginSuccessMessage] = useState("");
   const [biometricLoginReady, setBiometricLoginReady] = useState(false);
@@ -171,16 +175,37 @@ export default function LoginScreen({ navigation, route }) {
   const [isLoginOtpBusy, setIsLoginOtpBusy] = useState(false);
   const [loginOtpResendAvailableAt, setLoginOtpResendAvailableAt] = useState(null);
   const [loginOtpResendSecondsLeft, setLoginOtpResendSecondsLeft] = useState(0);
+  const [characterLook, setCharacterLook] = useState({ x: 0, y: 0 });
+  const [arrivalVisible, setArrivalVisible] = useState(!skipArrivalSplash);
+  const [transitionBusy, setTransitionBusy] = useState(false);
+  const hasHandledInitialFocusRef = useRef(false);
 
   // Animation values
-  const fadeAnim = useRef(new Animated.Value(0.96)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const cardAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(skipArrivalSplash ? 1 : 0)).current;
+  const loginExitAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(skipArrivalSplash ? 0 : 14)).current;
   const logoPulseAnim = useRef(new Animated.Value(0)).current;
   const statusPulseAnim = useRef(new Animated.Value(1)).current;
   const loginButtonPressAnim = useRef(new Animated.Value(1)).current;
   const loginButtonHoverAnim = useRef(new Animated.Value(0)).current;
   const loginButtonFloatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      setTransitionBusy(false);
+      if (!hasHandledInitialFocusRef.current) {
+        hasHandledInitialFocusRef.current = true;
+        return;
+      }
+      if (route?.params?.skipArrivalSplash) {
+        navigation.setParams?.({ skipArrivalSplash: false });
+        return;
+      }
+      setArrivalVisible(true);
+    });
+
+    return unsubscribe;
+  }, [navigation, route?.params?.skipArrivalSplash]);
 
   // ============ FORGOT PASSWORD STATES ============
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -213,26 +238,29 @@ export default function LoginScreen({ navigation, route }) {
   const loginButtonRef = useRef(null);
 
   // ============ ANIMATIONS ============
-  useEffect(() => {
+  const playLoginEntrance = () => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(14);
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 500,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.timing(cardAnim, {
-        toValue: 1,
-        duration: 620,
-        delay: 120,
+        duration: 540,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
+  };
 
+  useEffect(() => {
+    if (skipArrivalSplash) {
+      playLoginEntrance();
+    }
     const logoPulse = Animated.loop(
       Animated.sequence([
         Animated.timing(logoPulseAnim, {
@@ -275,7 +303,6 @@ export default function LoginScreen({ navigation, route }) {
         }),
       ])
     );
-
     logoPulse.start();
     statusPulse.start();
     buttonFloat.start();
@@ -285,13 +312,26 @@ export default function LoginScreen({ navigation, route }) {
       statusPulse.stop();
       buttonFloat.stop();
     };
-  }, [cardAnim, fadeAnim, loginButtonFloatAnim, logoPulseAnim, slideAnim, statusPulseAnim]);
+  }, [fadeAnim, loginButtonFloatAnim, logoPulseAnim, skipArrivalSplash, slideAnim, statusPulseAnim]);
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
       document.title = `Login | ${APP_ORGANIZATION_NAME}`;
     }
   }, []);
+
+  useEffect(() => {
+    if (!isWeb || typeof window === "undefined") return undefined;
+
+    const handleMouseMove = (event) => {
+      const nextX = Math.max(-1, Math.min(1, (event.clientX - viewportWidth / 2) / (viewportWidth / 2)));
+      const nextY = Math.max(-1, Math.min(1, (event.clientY - viewportHeight / 2) / (viewportHeight / 2)));
+      setCharacterLook({ x: nextX, y: nextY });
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [viewportHeight, viewportWidth]);
 
   const normalizeLoginIdentifier = (value) => {
     const trimmedValue = String(value || "").trim();
@@ -464,7 +504,6 @@ export default function LoginScreen({ navigation, route }) {
       
       if (isNewRegistration === 'true') {
         await ApiService.clearAuth();
-        setIsCheckingAuth(false);
         return;
       }
       
@@ -523,8 +562,6 @@ export default function LoginScreen({ navigation, route }) {
         await ApiService.clearAuth();
         setLoginError(SESSION_EXPIRED_MESSAGE);
       }
-    } finally {
-      setIsCheckingAuth(false);
     }
   };
 
@@ -1061,7 +1098,6 @@ export default function LoginScreen({ navigation, route }) {
       const verifyResponse = await ApiService.verifyCredentials(normalizedIdentifier, password);
       
       if (verifyResponse.success) {
-        setShowLoginSplash(true);
         setPendingVisitorOtpEmail("");
         setLoginOtpCode("");
         setLoginOtpError("");
@@ -1146,7 +1182,6 @@ export default function LoginScreen({ navigation, route }) {
         setLoginError(errorMessage || "Unable to sign in. Please try again.");
       }
     } finally {
-      setShowLoginSplash(false);
       setIsLoading(false);
     }
   };
@@ -1264,20 +1299,6 @@ export default function LoginScreen({ navigation, route }) {
     }).start();
   };
 
-  // ============ SPLASH SCREEN ============
-  if (isCheckingAuth) {
-    return (
-      <View style={loginStyles.splashContainer}>
-        <StatusBar barStyle="light-content" backgroundColor={brandColors.navy} />
-        <View style={loginStyles.splashLogoCard}>
-          <Image source={Logo} resizeMode="contain" style={loginStyles.splashLogo} />
-        </View>
-        <ActivityIndicator size="large" color={brandColors.surface} />
-        <Text style={loginStyles.splashText}>Restoring your session...</Text>
-      </View>
-    );
-  }
-
   const inferredRole = inferCampusRoleFromIdentifier(email);
   const displayRole = effectiveRole === "campus" ? inferredRole : effectiveRole;
   const roleConfig = getRoleConfig(displayRole);
@@ -1325,7 +1346,83 @@ export default function LoginScreen({ navigation, route }) {
       onPress: () => openExternalLink("https://www.youtube.com/@sapphireaviation5105"),
     },
   ];
-  const showDesktopLoginDesign = isWeb && viewportWidth >= 1080;
+  const handleLoginFooterLink = (topic) => {
+    if (transitionBusy) return;
+    setTransitionBusy(true);
+    if (startAviationTransition) {
+      startAviationTransition({
+        mode: "journey",
+        message: "Departing secure login...",
+        arrivalMessage: "Arriving at help center...",
+        duration: 2500,
+        onBeforeFade: () => {
+          navigation.navigate("Help", {
+            topic,
+            timestamp: Date.now(),
+          });
+        },
+        onDone: () => setTransitionBusy(false),
+      });
+      return;
+    }
+
+    navigation.navigate("Help", { topic });
+  };
+  const handleVisitorAccess = () => {
+    if (transitionBusy) return;
+    setTransitionBusy(true);
+    if (startAviationTransition) {
+      startAviationTransition({
+        mode: "journey",
+        message: "Departing secure login...",
+        arrivalMessage: "Arriving at visitor registration...",
+        duration: 2500,
+        onBeforeFade: () => {
+          navigation.navigate("VisitorRegister", {
+            timestamp: Date.now(),
+          });
+        },
+        onDone: () => setTransitionBusy(false),
+      });
+      return;
+    }
+
+    navigation.navigate("VisitorRegister");
+  };
+  const handleBackToHome = () => {
+    if (transitionBusy) return;
+    setTransitionBusy(true);
+    Animated.timing(loginExitAnim, {
+      toValue: 0.985,
+      duration: 140,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: Platform.OS !== "web",
+    }).start(() => {
+      if (startAviationTransition) {
+        startAviationTransition({
+          mode: "journey",
+          message: "Departing secure login...",
+          arrivalMessage: "Arriving at campus access...",
+          duration: 2500,
+          onBeforeFade: () => {
+            loginExitAnim.setValue(1);
+            navigation.navigate("RoleSelect", {
+              skipArrivalSplash: true,
+              timestamp: Date.now(),
+            });
+          },
+          onDone: () => setTransitionBusy(false),
+        });
+        return;
+      }
+      loginExitAnim.setValue(1);
+      setTransitionBusy(false);
+      navigation.navigate("RoleSelect", {
+        skipArrivalSplash: true,
+        timestamp: Date.now(),
+      });
+    });
+  };
   const logoPulseStyle = {
     transform: [
       {
@@ -1336,16 +1433,114 @@ export default function LoginScreen({ navigation, route }) {
       },
     ],
   };
-  const cardEntranceStyle = {
-    opacity: cardAnim,
+  const loginExitTranslate = loginExitAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 0],
+  });
+  const loginScreenEntryStyle = {
+    flex: 1,
+    opacity: Animated.multiply(fadeAnim, loginExitAnim),
     transform: [
       {
-        translateY: cardAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [28, 0],
-        }),
+        translateY: Animated.add(slideAnim, loginExitTranslate),
       },
     ],
+  };
+  const renderLoginCharacterScene = (compact = false) => {
+    const lookScale = compact ? 2.2 : 4.5;
+    const pupilLookStyle = {
+      transform: [
+        { translateX: characterLook.x * lookScale },
+        { translateY: characterLook.y * lookScale },
+      ],
+    };
+    const handleCharacterMouseMove = (event) => {
+      if (!isWeb) return;
+
+      const nativeEvent = event?.nativeEvent || {};
+      const offsetX = Number(nativeEvent.offsetX ?? nativeEvent.layerX ?? 0);
+      const offsetY = Number(nativeEvent.offsetY ?? nativeEvent.layerY ?? 0);
+      const sceneWidth = compact ? 220 : 430;
+      const sceneHeight = compact ? 86 : 310;
+      const nextX = Math.max(-1, Math.min(1, (offsetX - sceneWidth / 2) / (sceneWidth / 2)));
+      const nextY = Math.max(-1, Math.min(1, (offsetY - sceneHeight / 2) / (sceneHeight / 2)));
+
+      setCharacterLook({ x: nextX, y: nextY });
+    };
+
+    return (
+    <View
+      onMouseMove={handleCharacterMouseMove}
+      onMouseLeave={() => isWeb && setCharacterLook({ x: 0, y: 0 })}
+      style={[
+        loginStyles.characterScene,
+        compact && loginStyles.characterSceneCompact,
+      ]}
+    >
+      <View style={[
+        loginStyles.characterBlock,
+        loginStyles.characterBlueTall,
+        compact && loginStyles.characterBlueTallCompact,
+      ]}>
+        <View style={[loginStyles.characterPilotCap, compact && loginStyles.characterPilotCapCompact]}>
+          <View style={[loginStyles.characterPilotCapBadge, compact && loginStyles.characterPilotCapBadgeCompact]} />
+        </View>
+        <View style={[loginStyles.characterHeadsetBand, compact && loginStyles.characterHeadsetBandCompact]} />
+        <View style={[loginStyles.characterHeadsetCup, loginStyles.characterHeadsetCupLeft, compact && loginStyles.characterHeadsetCupCompact, compact && loginStyles.characterHeadsetCupLeftCompact]} />
+        <View style={[loginStyles.characterHeadsetCup, loginStyles.characterHeadsetCupRight, compact && loginStyles.characterHeadsetCupCompact, compact && loginStyles.characterHeadsetCupRightCompact]} />
+        <View style={[loginStyles.characterEyesRow, compact && loginStyles.characterEyesRowCompact]}>
+          <View style={loginStyles.characterEye}>
+            <View style={[loginStyles.characterEyeDot, pupilLookStyle]} />
+          </View>
+          <View style={loginStyles.characterEye}>
+            <View style={[loginStyles.characterEyeDot, pupilLookStyle]} />
+          </View>
+        </View>
+      </View>
+      <View style={[
+        loginStyles.characterBlock,
+        loginStyles.characterNavyMid,
+        compact && loginStyles.characterNavyMidCompact,
+      ]}>
+        <View style={[loginStyles.characterShieldBadge, compact && loginStyles.characterShieldBadgeCompact]}>
+          <Ionicons name="shield-checkmark" size={compact ? 8 : 15} color={brandColors.surface} />
+        </View>
+        <View style={[loginStyles.characterEyesRowSmall, compact && loginStyles.characterEyesRowSmallCompact]}>
+          <View style={loginStyles.characterEyeSmall}>
+            <View style={[loginStyles.characterEyeDotSmall, pupilLookStyle]} />
+          </View>
+          <View style={loginStyles.characterEyeSmall}>
+            <View style={[loginStyles.characterEyeDotSmall, pupilLookStyle]} />
+          </View>
+        </View>
+      </View>
+      <View style={[
+        loginStyles.characterBlock,
+        loginStyles.characterSkyRound,
+        compact && loginStyles.characterSkyRoundCompact,
+      ]}>
+        <View style={[loginStyles.characterPupilRow, compact && loginStyles.characterPupilRowCompact]}>
+          <View style={[loginStyles.characterPupil, pupilLookStyle]} />
+          <View style={[loginStyles.characterPupil, pupilLookStyle]} />
+        </View>
+      </View>
+      <View style={[
+        loginStyles.characterBlock,
+        loginStyles.characterGoldRound,
+        compact && loginStyles.characterGoldRoundCompact,
+      ]}>
+        <View style={[loginStyles.characterVisitorBadge, compact && loginStyles.characterVisitorBadgeCompact]}>
+          <View style={[loginStyles.characterVisitorBadgeDot, compact && loginStyles.characterVisitorBadgeDotCompact]} />
+          <View style={[loginStyles.characterVisitorBadgeLine, compact && loginStyles.characterVisitorBadgeLineCompact]} />
+        </View>
+        <View style={[loginStyles.characterPupilRowGold, compact && loginStyles.characterPupilRowGoldCompact]}>
+          <View style={[loginStyles.characterPupil, pupilLookStyle]} />
+          <View style={[loginStyles.characterPupil, pupilLookStyle]} />
+        </View>
+        <View style={[loginStyles.characterMouth, compact && loginStyles.characterMouthCompact]} />
+      </View>
+    </View>
+    );
   };
 
   return (
@@ -1357,15 +1552,26 @@ export default function LoginScreen({ navigation, route }) {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <Animated.View style={loginScreenEntryStyle}>
           <ScrollView 
-            contentContainerStyle={loginStyles.scrollContainer}
+            style={showDesktopLoginDesign && loginStyles.desktopScrollLock}
+            contentContainerStyle={[
+              loginStyles.scrollContainer,
+              showDesktopLoginDesign && loginStyles.scrollContainerDesktop,
+            ]}
             showsVerticalScrollIndicator={false}
+            scrollEnabled={!showDesktopLoginDesign}
             keyboardShouldPersistTaps="handled"
             bounces={false}
           >
             {/* Header with Logo */}
-            <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
+            <View style={showDesktopLoginDesign && loginStyles.loginDesktopFrame}>
+              {showDesktopLoginDesign ? (
+                <View pointerEvents="none" style={loginStyles.desktopLoginDesign}>
+                  <View style={loginStyles.desktopSkyWash} />
+                </View>
+              ) : null}
+              {!showDesktopLoginDesign ? (
               <View style={[loginStyles.header, headerResponsiveStyle]}>
                 <View style={loginStyles.headerGlowOne} />
                 <View style={loginStyles.headerGlowTwo} />
@@ -1414,6 +1620,7 @@ export default function LoginScreen({ navigation, route }) {
                   </Animated.View>
                 </View>
               </View>
+              ) : null}
 
               {/* Login Stage */}
               <View
@@ -1422,32 +1629,125 @@ export default function LoginScreen({ navigation, route }) {
                   showDesktopLoginDesign && loginStyles.loginStageDesktop,
                 ]}
               >
-                {showDesktopLoginDesign ? (
-                  <View pointerEvents="none" style={loginStyles.desktopLoginDesign}>
-                    <View style={loginStyles.desktopColorWashLeft} />
-                    <View style={loginStyles.desktopColorWashRight} />
-                    <View style={[loginStyles.desktopDesignRail, loginStyles.desktopDesignRailLeft]}>
-                      <View style={loginStyles.desktopDesignLineLong} />
-                      <View style={loginStyles.desktopDesignLineShort} />
-                      <View style={loginStyles.desktopDesignLineMedium} />
+                <View style={[
+                  loginStyles.loginContentLayout,
+                  showDesktopLoginDesign && loginStyles.loginContentLayoutDesktop,
+                ]}>
+                  {showDesktopLoginDesign ? (
+                    <View style={loginStyles.loginVisualPanel}>
+                      <View style={loginStyles.loginVisualBrand}>
+                        <View style={loginStyles.loginVisualLogoCard}>
+                          <Image source={Logo} style={loginStyles.loginVisualLogo} resizeMode="contain" />
+                        </View>
+                        <View style={loginStyles.loginVisualBrandCopy}>
+                          <Text style={loginStyles.loginVisualEyebrow}>Sapphire International Aviation Academy</Text>
+                          <Text style={loginStyles.loginVisualTitle}>SafePass Smart Campus</Text>
+                        </View>
+                      </View>
+                      <View style={loginStyles.loginVisualContactCard}>
+                        <View style={loginStyles.loginVisualContactDetails}>
+                          <Text style={loginStyles.loginVisualMetaText}>
+                            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date().toLocaleDateString()}
+                          </Text>
+                          <Text style={loginStyles.loginVisualMetaText}>Secure Campus Access System v2.0</Text>
+                          <Text style={loginStyles.loginVisualContactTitle}>
+                            Sapphire International Aviation Academy
+                          </Text>
+                          <Text style={loginStyles.loginVisualContactLine}>Tel No: (02) 7091 - 3362</Text>
+                          <Text style={loginStyles.loginVisualContactLine}>Mobile No: 0917 580 4858</Text>
+                          <Text style={loginStyles.loginVisualCopyright}>
+                            Copyright 2024. Sapphire International Aviation Academy
+                          </Text>
+                        </View>
+                        <View style={loginStyles.loginVisualSocialDock}>
+                          <SocialDock links={socialLinks} showTray={false} />
+                        </View>
+                      </View>
+                      <View style={loginStyles.loginVisualIntro}>
+                        <Text style={loginStyles.loginVisualHeading}>Campus Login</Text>
+                        <Text style={loginStyles.loginVisualSubtitle}>
+                          Secure access for students, staff, visitors, security, and admins.
+                        </Text>
+                        <Animated.View style={[
+                          loginStyles.loginVisualStatusBadge,
+                          {
+                            backgroundColor: apiConnected ? brandColors.success : brandColors.danger,
+                            transform: [{ scale: statusPulseAnim }],
+                          },
+                        ]}>
+                          <View style={loginStyles.statusDot} />
+                          <Text style={loginStyles.statusText}>
+                            {apiConnected ? "SERVER CONNECTED" : "SERVER CHECK FAILED"}
+                          </Text>
+                        </Animated.View>
+                      </View>
+                      <View style={loginStyles.loginVisualCenter}>
+                        {renderLoginCharacterScene(false)}
+                      </View>
+                      <View style={loginStyles.loginVisualFooter}>
+                        <TouchableOpacity
+                          onPress={() => handleLoginFooterLink("privacy")}
+                          disabled={transitionBusy}
+                          activeOpacity={0.75}
+                          accessibilityRole="link"
+                          accessibilityLabel="Open privacy policy"
+                          {...(isWeb && {
+                            onKeyPress: (e) => handleKeyPress(e, () => handleLoginFooterLink("privacy")),
+                            tabIndex: 0,
+                          })}
+                        >
+                          <Text style={loginStyles.loginVisualFooterText}>Privacy Policy</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleLoginFooterLink("terms")}
+                          disabled={transitionBusy}
+                          activeOpacity={0.75}
+                          accessibilityRole="link"
+                          accessibilityLabel="Open terms of service"
+                          {...(isWeb && {
+                            onKeyPress: (e) => handleKeyPress(e, () => handleLoginFooterLink("terms")),
+                            tabIndex: 0,
+                          })}
+                        >
+                          <Text style={loginStyles.loginVisualFooterText}>Terms of Service</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleLoginFooterLink("contact")}
+                          disabled={transitionBusy}
+                          activeOpacity={0.75}
+                          accessibilityRole="link"
+                          accessibilityLabel="Open contact support"
+                          {...(isWeb && {
+                            onKeyPress: (e) => handleKeyPress(e, () => handleLoginFooterLink("contact")),
+                            tabIndex: 0,
+                          })}
+                        >
+                          <Text style={loginStyles.loginVisualFooterText}>Contact</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <View style={[loginStyles.desktopDesignRail, loginStyles.desktopDesignRailRight]}>
-                      <View style={loginStyles.desktopDesignLineMedium} />
-                      <View style={loginStyles.desktopDesignLineLong} />
-                      <View style={loginStyles.desktopDesignLineShort} />
+                  ) : (
+                    <View style={loginStyles.mobileCharacterDock}>
+                      {renderLoginCharacterScene(true)}
                     </View>
-                  </View>
-                ) : null}
+                  )}
 
-                <Animated.View style={[loginStyles.card, cardResponsiveStyle, cardEntranceStyle]}>
+                <Animated.View
+                  style={[
+                    loginStyles.card,
+                    cardResponsiveStyle,
+                    showDesktopLoginDesign && loginStyles.cardDesktopSplit,
+                  ]}
+                >
                 {/* Back to Role Select */}
                 {!IS_VISITOR_ONLY_APP && (
                   <TouchableOpacity
-                    style={loginStyles.backToRoleButton}
-                    onPress={() => navigation.navigate("RoleSelect")}
+                    style={[loginStyles.backToRoleButton, transitionBusy && { opacity: 0.7 }]}
+                    onPress={handleBackToHome}
+                    disabled={transitionBusy}
                     activeOpacity={0.7}
                     {...(isWeb && {
-                      onKeyPress: (e) => handleKeyPress(e, () => navigation.navigate("RoleSelect")),
+                      onKeyPress: (e) => handleKeyPress(e, handleBackToHome),
                       tabIndex: 0,
                     })}
                   >
@@ -1716,12 +2016,12 @@ export default function LoginScreen({ navigation, route }) {
                       ref={loginButtonRef}
                       style={[
                         loginStyles.loginButton,
-                        isLoading && loginStyles.buttonDisabled
+                        (isLoading || transitionBusy) && loginStyles.buttonDisabled
                       ]}
                       onPress={handleLogin}
                       onPressIn={() => animateButtonPress(0.98)}
                       onPressOut={() => animateButtonPress(1)}
-                      disabled={isLoading}
+                      disabled={isLoading || transitionBusy}
                       activeOpacity={0.8}
                       {...(isWeb && {
                         onMouseEnter: () => animateButtonHover(1),
@@ -1732,7 +2032,9 @@ export default function LoginScreen({ navigation, route }) {
                     >
                       {isLoading ? (
                         <>
-                          <ActivityIndicator color={brandColors.surface} />
+                          <View style={loginStyles.loginButtonBusyIcon}>
+                            <Ionicons name="sync-outline" size={15} color={brandColors.surface} />
+                          </View>
                           <Text style={loginStyles.loginButtonText}>{loginButtonLabel}</Text>
                         </>
                       ) : (
@@ -1768,8 +2070,12 @@ export default function LoginScreen({ navigation, route }) {
                         </View>
                       </View>
                       <TouchableOpacity
-                        style={loginStyles.visitorAccessButton}
-                        onPress={() => navigation.navigate("VisitorRegister")}
+                        style={[
+                          loginStyles.visitorAccessButton,
+                          transitionBusy && { opacity: 0.7 },
+                        ]}
+                        onPress={handleVisitorAccess}
+                        disabled={transitionBusy}
                         activeOpacity={0.85}
                       >
                         <Text style={loginStyles.visitorAccessButtonText}>Create Account</Text>
@@ -1789,10 +2095,12 @@ export default function LoginScreen({ navigation, route }) {
                   </View>
                 )}
                 </Animated.View>
+                </View>
 
               </View>
 
               {/* Footer */}
+              {!showDesktopLoginDesign ? (
               <View style={[loginStyles.footer, footerResponsiveStyle]}>
                 <Text style={loginStyles.footerText}>
                   {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date().toLocaleDateString()}
@@ -1810,7 +2118,8 @@ export default function LoginScreen({ navigation, route }) {
                   </Text>
                 </View>
               </View>
-            </Animated.View>
+              ) : null}
+            </View>
           </ScrollView>
         </Animated.View>
 
@@ -2253,32 +2562,17 @@ export default function LoginScreen({ navigation, route }) {
         </Modal>
       </KeyboardAvoidingView>
 
-      <Modal
-        visible={showLoginSplash}
-        transparent={true}
-        animationType="fade"
-        statusBarTranslucent
-      >
-        <View style={loginStyles.loginSplashOverlay}>
-          <View style={loginStyles.loginSplashCard}>
-            <View style={loginStyles.loginSplashLogoRing}>
-              <Image
-                source={Logo}
-                style={loginStyles.loginSplashLogo}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={loginStyles.loginSplashTitle}>Welcome Back</Text>
-            <Text style={loginStyles.loginSplashMessage}>{loginSplashMessage}</Text>
-            <View style={loginStyles.loginSplashLoadingRow}>
-              <ActivityIndicator size="small" color={brandColors.blue} />
-              <Text style={loginStyles.loginSplashLoadingText}>
-                Securing your account access...
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {arrivalVisible ? (
+        <AviationSplash
+          mode="landing"
+          message="Arriving at secure login..."
+          duration={1450}
+          onDone={() => {
+            setArrivalVisible(false);
+            playLoginEntrance();
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

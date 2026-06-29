@@ -13,7 +13,7 @@ import { brandColors } from "../styles/brandColors";
 const isWeb = Platform.OS === "web";
 const shadowColor = brandColors.text;
 
-export default function SocialDock({ links = [] }) {
+export default function SocialDock({ links = [], showTray = true }) {
   const entranceAnim = useRef(new Animated.Value(0)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
 
@@ -68,8 +68,8 @@ export default function SocialDock({ links = [] }) {
   };
 
   return (
-    <Animated.View style={[styles.shell, dockStyle]}>
-      <Animated.View style={[styles.track, floatStyle]}>
+    <Animated.View style={[styles.shell, !showTray && styles.shellInline, dockStyle]}>
+      <Animated.View style={[styles.track, !showTray && styles.trackTransparent, floatStyle]}>
         {links.map((link, index) => (
           <SocialDockButton key={link.label} link={link} index={index} />
         ))}
@@ -152,6 +152,11 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 4,
   },
+  shellInline: {
+    width: "auto",
+    marginTop: 0,
+    marginBottom: 0,
+  },
   track: {
     flexDirection: "row",
     alignItems: "center",
@@ -173,6 +178,22 @@ const styles = StyleSheet.create({
       android: { elevation: 5 },
       web: {
         boxShadow: "0px 14px 30px rgba(15, 23, 42, 0.14)",
+      },
+    }),
+  },
+  trackTransparent: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderColor: "transparent",
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0,
+      },
+      android: { elevation: 0 },
+      web: {
+        boxShadow: "none",
       },
     }),
   },

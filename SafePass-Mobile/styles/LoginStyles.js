@@ -23,124 +23,32 @@ export default StyleSheet.create({
     paddingBottom: isSmallPhone ? 18 : 28,
   },
 
-  splashContainer: {
+  scrollContainerDesktop: {
+    flexGrow: 1,
+    height: "100%",
+    paddingBottom: 0,
+    overflow: "hidden",
+  },
+
+  desktopScrollLock: {
+    height: "100%",
+    maxHeight: "100%",
+    overflow: "hidden",
+  },
+
+  loginDesktopFrame: {
     flex: 1,
-    backgroundColor: brandColors.navy,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-
-  splashLogoCard: {
-    width: 116,
-    height: 116,
-    borderRadius: 28,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 18,
-  },
-
-  splashLogo: {
-    width: 96,
-    height: 54,
-  },
-
-  splashText: {
-    marginTop: 16,
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: 0.4,
-  },
-
-  loginSplashOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(4, 30, 66, 0.58)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-
-  loginSplashCard: {
+    minHeight: "100%",
     width: "100%",
-    maxWidth: 340,
-    backgroundColor: brandColors.surface,
-    borderRadius: 24,
-    paddingHorizontal: 28,
-    paddingVertical: 30,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: brandColors.border,
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: "#F8FBFE",
     ...Platform.select({
-      ios: {
-        shadowColor,
-        shadowOffset: { width: 0, height: 18 },
-        shadowOpacity: 0.16,
-        shadowRadius: 28,
-      },
-      android: {
-        elevation: 10,
-      },
       web: {
-        boxShadow: "0px 24px 60px rgba(15, 23, 42, 0.18)",
+        backgroundImage:
+          "linear-gradient(180deg, #F8FBFE 0%, #EEF5FF 48%, #F8FBFE 100%)",
       },
     }),
-  },
-
-  loginSplashLogoRing: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: brandColors.blueSoft,
-    borderWidth: 4,
-    borderColor: brandColors.blueBorder,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 18,
-  },
-
-  loginSplashLogo: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: brandColors.surface,
-  },
-
-  loginSplashTitle: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: brandColors.text,
-    marginBottom: 8,
-    textAlign: "center",
-  },
-
-  loginSplashMessage: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: brandColors.textMuted,
-    textAlign: "center",
-    marginBottom: 18,
-  },
-
-  loginSplashLoadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: brandColors.surfaceSoft,
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "#DCE5F0",
-  },
-
-  loginSplashLoadingText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: brandColors.blue,
   },
 
   header: {
@@ -331,52 +239,125 @@ export default StyleSheet.create({
 
   loginStageDesktop: {
     maxWidth: 1320,
+    flex: 1,
     alignSelf: "center",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 34,
-    paddingBottom: 10,
+    paddingTop: 28,
+    paddingBottom: 18,
     position: "relative",
-    overflow: "hidden",
+    overflow: "visible",
+    backgroundColor: "transparent",
+    zIndex: 1,
   },
 
   desktopLoginDesign: {
     position: "absolute",
     left: 0,
     right: 0,
-    top: -18,
-    bottom: 4,
+    top: 0,
+    bottom: 0,
     zIndex: 0,
+    overflow: "hidden",
+    opacity: 1,
+  },
+
+  desktopSkyWash: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(238,245,255,0.36)",
+    ...Platform.select({
+      web: {
+        backgroundImage:
+          "radial-gradient(circle at 10% 18%, rgba(183,213,246,0.38), rgba(238,245,255,0) 28%), radial-gradient(circle at 90% 22%, rgba(28,109,208,0.12), rgba(238,245,255,0) 30%), radial-gradient(circle at 50% 92%, rgba(183,213,246,0.24), rgba(238,245,255,0) 24%)",
+      },
+    }),
   },
 
   desktopColorWashLeft: {
     position: "absolute",
-    left: 36,
-    top: 24,
-    width: 320,
-    height: 430,
-    borderRadius: 8,
-    backgroundColor: "rgba(183, 213, 246, 0.22)",
+    left: "5%",
+    top: 38,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "rgba(183, 213, 246, 0.16)",
     ...Platform.select({
       web: {
-        backgroundImage: "linear-gradient(145deg, rgba(183,213,246,0.34), rgba(244,248,252,0))",
+        backgroundImage: "radial-gradient(circle, rgba(183,213,246,0.28), rgba(244,248,252,0) 68%)",
       },
     }),
   },
 
   desktopColorWashRight: {
     position: "absolute",
-    right: 36,
-    top: 64,
-    width: 320,
-    height: 390,
-    borderRadius: 8,
-    backgroundColor: "rgba(238, 245, 255, 0.72)",
+    right: "4%",
+    top: 70,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: "rgba(28, 109, 208, 0.08)",
     ...Platform.select({
       web: {
-        backgroundImage: "linear-gradient(145deg, rgba(238,245,255,0), rgba(28,109,208,0.12))",
+        backgroundImage: "radial-gradient(circle, rgba(28,109,208,0.12), rgba(244,248,252,0) 70%)",
       },
     }),
+  },
+
+  desktopRunwayGlow: {
+    position: "absolute",
+    left: "18%",
+    right: "18%",
+    bottom: 54,
+    height: 92,
+    borderRadius: 8,
+    backgroundColor: "rgba(28,109,208,0.035)",
+    ...Platform.select({
+      web: {
+        backgroundImage:
+          "linear-gradient(90deg, rgba(28,109,208,0), rgba(28,109,208,0.12), rgba(28,109,208,0))",
+      },
+    }),
+  },
+
+  desktopFlightPath: {
+    position: "absolute",
+    top: 92,
+    right: "8%",
+    width: 260,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    opacity: 0.58,
+  },
+
+  desktopFlightPathLine: {
+    flex: 1,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(28,109,208,0.14)",
+  },
+
+  desktopRunwayMarks: {
+    position: "absolute",
+    left: "24%",
+    right: "24%",
+    bottom: 82,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    opacity: 0.22,
+  },
+
+  desktopRunwayMark: {
+    width: 56,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: brandColors.blueBorder,
+    transform: [{ rotate: "-8deg" }],
   },
 
   desktopDesignRail: {
@@ -421,6 +402,575 @@ export default StyleSheet.create({
     transform: [{ rotate: "-12deg" }],
   },
 
+  loginContentLayout: {
+    width: "100%",
+    alignItems: "center",
+  },
+
+  loginContentLayoutDesktop: {
+    maxWidth: 1120,
+    minHeight: 620,
+    flexDirection: "row",
+    alignItems: "stretch",
+    justifyContent: "center",
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: brandColors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(216,231,243,0.95)",
+    zIndex: 2,
+    transform: [{ perspective: 1500 }, { rotateX: "1.2deg" }],
+    ...Platform.select({
+      web: {
+        transformStyle: "preserve-3d",
+        boxShadow:
+          "0px 34px 80px rgba(4,30,66,0.18), 0px 14px 34px rgba(28,109,208,0.12), inset 0px 1px 0px rgba(255,255,255,0.9)",
+      },
+    }),
+  },
+
+  loginVisualPanel: {
+    flex: 1,
+    minWidth: 0,
+    padding: 34,
+    justifyContent: "space-between",
+    backgroundColor: brandColors.navy,
+    borderRightWidth: 1,
+    borderRightColor: "rgba(255,255,255,0.14)",
+    ...Platform.select({
+      web: {
+        backgroundImage: `linear-gradient(145deg, #041D44 0%, ${brandColors.navy} 44%, #0B4EA2 100%)`,
+        boxShadow: "inset -18px 0px 32px rgba(4,30,66,0.18)",
+      },
+    }),
+  },
+
+  loginVisualBrand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    zIndex: 2,
+  },
+
+  loginVisualLogoCard: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    backgroundColor: brandColors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loginVisualLogo: {
+    width: 42,
+    height: 42,
+  },
+
+  loginVisualBrandCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  loginVisualEyebrow: {
+    color: "rgba(255,255,255,0.74)",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0,
+  },
+
+  loginVisualTitle: {
+    marginTop: 3,
+    color: brandColors.surface,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+
+  loginVisualCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 18,
+  },
+
+  loginVisualIntro: {
+    marginTop: 28,
+    maxWidth: 420,
+    zIndex: 2,
+  },
+
+  loginVisualHeading: {
+    color: brandColors.surface,
+    fontSize: 36,
+    lineHeight: 42,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+
+  loginVisualSubtitle: {
+    marginTop: 10,
+    color: "rgba(255,255,255,0.84)",
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "700",
+  },
+
+  loginVisualStatusBadge: {
+    marginTop: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+  },
+
+  loginVisualContactCard: {
+    width: "100%",
+    marginTop: 24,
+    padding: 14,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(216,232,255,0.24)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+  },
+
+  loginVisualContactDetails: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  loginVisualMetaText: {
+    color: "rgba(216,232,255,0.78)",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+  },
+
+  loginVisualContactTitle: {
+    color: brandColors.surface,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "900",
+    marginTop: 6,
+    marginBottom: 4,
+  },
+
+  loginVisualContactLine: {
+    color: "#D8E8FF",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+  },
+
+  loginVisualCopyright: {
+    color: "rgba(216,232,255,0.68)",
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "700",
+    marginTop: 6,
+  },
+
+  loginVisualSocialDock: {
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loginVisualFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 22,
+    zIndex: 2,
+  },
+
+  loginVisualFooterText: {
+    color: "rgba(255,255,255,0.68)",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  mobileCharacterDock: {
+    width: "100%",
+    alignItems: "center",
+    marginTop: -14,
+    marginBottom: isSmallPhone ? 8 : 12,
+    zIndex: 1,
+  },
+
+  characterScene: {
+    width: 430,
+    height: 310,
+    position: "relative",
+  },
+
+  characterSceneCompact: {
+    width: 220,
+    height: 86,
+    overflow: "hidden",
+  },
+
+  characterBlock: {
+    position: "absolute",
+    bottom: 0,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+
+  characterBlueTall: {
+    left: 70,
+    width: 142,
+    height: 286,
+    backgroundColor: brandColors.blue,
+  },
+
+  characterBlueTallCompact: {
+    left: 36,
+    width: 72,
+    height: 78,
+  },
+
+  characterPilotCap: {
+    position: "absolute",
+    top: -15,
+    left: 32,
+    width: 78,
+    height: 23,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 7,
+    backgroundColor: brandColors.surface,
+    borderWidth: 2,
+    borderColor: "#D8E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  characterPilotCapCompact: {
+    top: -8,
+    left: 16,
+    width: 39,
+    height: 12,
+    borderTopLeftRadius: 9,
+    borderTopRightRadius: 9,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    borderWidth: 1,
+  },
+
+  characterPilotCapBadge: {
+    width: 22,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: brandColors.gold,
+  },
+
+  characterPilotCapBadgeCompact: {
+    width: 11,
+    height: 3,
+  },
+
+  characterHeadsetBand: {
+    position: "absolute",
+    top: 19,
+    left: 27,
+    width: 88,
+    height: 52,
+    borderTopWidth: 4,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderColor: "#D8E8FF",
+    borderTopLeftRadius: 44,
+    borderTopRightRadius: 44,
+    opacity: 0.92,
+  },
+
+  characterHeadsetBandCompact: {
+    top: 6,
+    left: 14,
+    width: 44,
+    height: 28,
+    borderTopWidth: 2,
+  },
+
+  characterHeadsetCup: {
+    position: "absolute",
+    top: 52,
+    width: 14,
+    height: 26,
+    borderRadius: 7,
+    backgroundColor: brandColors.navy,
+    borderWidth: 2,
+    borderColor: "#D8E8FF",
+  },
+
+  characterHeadsetCupLeft: {
+    left: 21,
+  },
+
+  characterHeadsetCupRight: {
+    right: 21,
+  },
+
+  characterHeadsetCupCompact: {
+    top: 22,
+    width: 7,
+    height: 13,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+
+  characterHeadsetCupLeftCompact: {
+    left: 10,
+  },
+
+  characterHeadsetCupRightCompact: {
+    right: 10,
+  },
+
+  characterNavyMid: {
+    left: 205,
+    width: 96,
+    height: 218,
+    backgroundColor: "#061A2E",
+  },
+
+  characterNavyMidCompact: {
+    left: 102,
+    width: 48,
+    height: 60,
+  },
+
+  characterShieldBadge: {
+    position: "absolute",
+    top: 96,
+    left: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(28,109,208,0.96)",
+    borderWidth: 2,
+    borderColor: "#D8E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  characterShieldBadgeCompact: {
+    top: 29,
+    left: 7,
+    width: 17,
+    height: 17,
+    borderRadius: 8.5,
+    borderWidth: 1,
+  },
+
+  characterSkyRound: {
+    left: 12,
+    width: 184,
+    height: 142,
+    borderTopLeftRadius: 92,
+    borderTopRightRadius: 92,
+    backgroundColor: brandColors.sky,
+  },
+
+  characterSkyRoundCompact: {
+    left: 2,
+    width: 92,
+    height: 42,
+    borderTopLeftRadius: 46,
+    borderTopRightRadius: 46,
+  },
+
+  characterGoldRound: {
+    left: 282,
+    width: 112,
+    height: 166,
+    borderTopLeftRadius: 56,
+    borderTopRightRadius: 56,
+    backgroundColor: brandColors.gold,
+  },
+
+  characterGoldRoundCompact: {
+    left: 142,
+    width: 58,
+    height: 50,
+    borderTopLeftRadius: 29,
+    borderTopRightRadius: 29,
+  },
+
+  characterVisitorBadge: {
+    position: "absolute",
+    top: 112,
+    left: 14,
+    width: 48,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: brandColors.surface,
+    borderWidth: 2,
+    borderColor: "rgba(4,30,66,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+
+  characterVisitorBadgeCompact: {
+    top: 35,
+    left: 7,
+    width: 25,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1,
+    gap: 2,
+  },
+
+  characterVisitorBadgeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: brandColors.blue,
+  },
+
+  characterVisitorBadgeDotCompact: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+
+  characterVisitorBadgeLine: {
+    width: 26,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: "#94A3B8",
+  },
+
+  characterVisitorBadgeLineCompact: {
+    width: 14,
+    height: 2,
+  },
+
+  characterEyesRow: {
+    position: "absolute",
+    top: 42,
+    left: 42,
+    flexDirection: "row",
+    gap: 22,
+  },
+
+  characterEyesRowCompact: {
+    top: 15,
+    left: 21,
+    gap: 10,
+  },
+
+  characterEyesRowSmall: {
+    position: "absolute",
+    top: 34,
+    left: 24,
+    flexDirection: "row",
+    gap: 16,
+  },
+
+  characterEyesRowSmallCompact: {
+    top: 12,
+    left: 10,
+    gap: 8,
+  },
+
+  characterEye: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: brandColors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+
+  characterEyeSmall: {
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
+    backgroundColor: brandColors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+
+  characterEyeDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#061A2E",
+  },
+
+  characterEyeDotSmall: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: brandColors.text,
+  },
+
+  characterPupilRow: {
+    position: "absolute",
+    top: 66,
+    left: 68,
+    flexDirection: "row",
+    gap: 24,
+  },
+
+  characterPupilRowCompact: {
+    top: 18,
+    left: 30,
+    gap: 12,
+  },
+
+  characterPupilRowGold: {
+    position: "absolute",
+    top: 42,
+    left: 34,
+    flexDirection: "row",
+    gap: 20,
+  },
+
+  characterPupilRowGoldCompact: {
+    top: 14,
+    left: 16,
+    gap: 10,
+  },
+
+  characterPupil: {
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
+    backgroundColor: brandColors.text,
+  },
+
+  characterMouth: {
+    position: "absolute",
+    top: 88,
+    left: 28,
+    width: 58,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: brandColors.text,
+  },
+
+  characterMouthCompact: {
+    top: 28,
+    left: 14,
+    width: 30,
+    height: 3,
+  },
+
   card: {
     backgroundColor: "#FFFFFF",
     marginTop: -32,
@@ -444,6 +994,23 @@ export default StyleSheet.create({
       maxWidth: 520,
       alignSelf: "center",
       width: "100%",
+    }),
+  },
+
+  cardDesktopSplit: {
+    flex: 0.92,
+    marginTop: 0,
+    marginHorizontal: 0,
+    borderWidth: 0,
+    borderRadius: 0,
+    alignSelf: "stretch",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.96)",
+    ...Platform.select({
+      web: {
+        maxWidth: 500,
+        boxShadow: "inset 18px 0px 32px rgba(15,23,42,0.035)",
+      },
     }),
   },
 
@@ -729,9 +1296,20 @@ export default StyleSheet.create({
     letterSpacing: 0.4,
   },
 
+  loginButtonBusyIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+
   buttonDisabled: {
     backgroundColor: "#94A3B8",
-    opacity: 0.78,
+    opacity: 0.9,
   },
 
   twoFactorInfo: {

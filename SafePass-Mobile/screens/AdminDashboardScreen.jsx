@@ -815,7 +815,7 @@ const AdminSectionShell = ({
       styles.adminSectionShell,
       {
         backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
-        borderColor: theme.borderColor,
+        borderColor: isDarkMode ? "rgba(148, 163, 184, 0.14)" : theme.borderColor,
       },
     ]}
   >
@@ -829,7 +829,7 @@ const AdminSectionShell = ({
                 styles.adminSectionShellBadge,
                 {
                   backgroundColor: isDarkMode ? "#0F172A" : "#EFF6FF",
-                  borderColor: theme.borderColor,
+                  borderColor: isDarkMode ? "rgba(148, 163, 184, 0.14)" : theme.borderColor,
                 },
               ]}
             >
@@ -898,6 +898,38 @@ const AdminFeedbackBanner = ({ notice, isDarkMode, theme, onDismiss }) => {
     </View>
   );
 };
+
+const AdminThemeToggle = ({ isDarkMode, onToggle, compact = false }) => (
+  <TouchableOpacity
+    style={[
+      styles.adminThemeToggle,
+      isDarkMode && styles.adminThemeToggleDark,
+      compact && styles.adminThemeToggleCompact,
+    ]}
+    onPress={() => onToggle(!isDarkMode)}
+    activeOpacity={0.84}
+    accessibilityRole="button"
+    accessibilityLabel={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+  >
+    <View
+      style={[
+        styles.adminThemeToggleIcon,
+        isDarkMode && styles.adminThemeToggleIconDark,
+      ]}
+    >
+      <Ionicons
+        name={isDarkMode ? "moon" : "sunny"}
+        size={compact ? 15 : 16}
+        color={isDarkMode ? "#DBEAFE" : "#0A3D91"}
+      />
+    </View>
+    {!compact ? (
+      <Text style={[styles.adminThemeToggleText, isDarkMode && styles.adminThemeToggleTextDark]}>
+        {isDarkMode ? "Dark" : "Light"}
+      </Text>
+    ) : null}
+  </TouchableOpacity>
+);
 
 const ADMIN_MAP_FLOORS = ADMIN_MODULE_FLOORS;
 const ADMIN_MAP_ACTIVITY_TYPES = new Set([
@@ -3375,28 +3407,34 @@ const loadDashboardData = useCallback(async () => {
   const getDynamicStyles = () => {
     if (isDarkMode) {
       return {
-        backgroundColor: "#0F172A",
-        cardBackground: "#1E293B",
-        textPrimary: "#F1F5F9",
-        textSecondary: "#94A3B8",
-        borderColor: "#334155",
-        headerBackground: "#1E293B",
-        sidebarBackground: "#0F172A",
-        inputBackground: "#334155",
+        backgroundColor: "#0A1020",
+        cardBackground: "#111827",
+        cardElevated: "#151F31",
+        surfaceMuted: "#0F172A",
+        textPrimary: "#F8FAFC",
+        textSecondary: "#A7B3C6",
+        borderColor: "rgba(148, 163, 184, 0.16)",
+        subtleBorderColor: "rgba(148, 163, 184, 0.10)",
+        headerBackground: "#0F2A55",
+        sidebarBackground: "#080F1D",
+        inputBackground: "#121C2E",
         successBg: "#064E3B",
         warningBg: "#78350F",
         errorBg: "#7F1D1D",
-        infoBg: "#1E3A5F",
+        infoBg: "#102A4A",
       };
     }
     return {
-      backgroundColor: "#F8FBFE",
+      backgroundColor: "#F5F8FC",
       cardBackground: "#FFFFFF",
-      textPrimary: "#1E293B",
+      cardElevated: "#FFFFFF",
+      surfaceMuted: "#F8FBFE",
+      textPrimary: "#0F172A",
       textSecondary: "#64748B",
-      borderColor: "#E2E8F0",
+      borderColor: "#E2EAF3",
+      subtleBorderColor: "#EDF2F8",
       headerBackground: "#FFFFFF",
-      sidebarBackground: "#1E3A5F",
+      sidebarBackground: "#FFFFFF",
       inputBackground: "#F8FBFE",
       successBg: "#EEF5FF",
       warningBg: "#FEF3C7",
@@ -3406,6 +3444,9 @@ const loadDashboardData = useCallback(async () => {
   };
 
   const theme = getDynamicStyles();
+  const dashboardLineColor = isDarkMode
+    ? theme.subtleBorderColor
+    : "#E6EEF7";
 
   const mapActivities = useMemo(
     () =>
@@ -5070,12 +5111,19 @@ const loadDashboardData = useCallback(async () => {
     );
   };
 
+  const handleThemeModeChange = (value) => {
+    setIsDarkMode(value);
+    setSettings((prev) => ({ ...prev, darkMode: value }));
+    storageSetItem("isDarkMode", JSON.stringify(value));
+    storageSetItem("darkModeEnabled", String(value));
+  };
+
   const updateSetting = (key, value) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
     if (key === "darkMode") {
-      setIsDarkMode(value);
-      storageSetItem("isDarkMode", JSON.stringify(value));
+      handleThemeModeChange(value);
+      return;
     }
+    setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
   const saveSettings = async () => {
@@ -6866,7 +6914,7 @@ const loadDashboardData = useCallback(async () => {
             styles.dashboardOverviewPanel,
             {
               backgroundColor: theme.cardBackground,
-              borderColor: theme.borderColor,
+              borderColor: dashboardLineColor,
             },
           ]}
         >
@@ -6887,7 +6935,7 @@ const loadDashboardData = useCallback(async () => {
                 styles.dashboardOverviewRefresh,
                 {
                   backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
-                  borderColor: theme.borderColor,
+                  borderColor: dashboardLineColor,
                 },
               ]}
               onPress={loadDashboardData}
@@ -6912,7 +6960,7 @@ const loadDashboardData = useCallback(async () => {
                   {
                     width: width > 760 ? "32%" : "100%",
                     backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
-                    borderColor: theme.borderColor,
+                    borderColor: dashboardLineColor,
                   },
                 ]}
               >
@@ -6947,7 +6995,7 @@ const loadDashboardData = useCallback(async () => {
                 {
                   width: width > 1100 ? "24%" : width > 760 ? "48%" : "100%",
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.borderColor,
+                  borderColor: dashboardLineColor,
                 },
               ]}
               onPress={() => handleMenuAction(item.action)}
@@ -6991,7 +7039,7 @@ const loadDashboardData = useCallback(async () => {
                 {
                   width: width > 1100 ? "24%" : width > 760 ? "48%" : "100%",
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.borderColor,
+                  borderColor: dashboardLineColor,
                 },
               ]}
             >
@@ -9517,14 +9565,15 @@ const loadDashboardData = useCallback(async () => {
       <View
         style={[
           styles.appointmentOptionCard,
+          isDarkMode && styles.appointmentOptionCardDark,
           {
-            backgroundColor: isDarkMode ? theme.cardBackground : "#FFFFFF",
-            borderColor: theme.borderColor,
+            backgroundColor: isDarkMode ? "#111827" : "#FFFFFF",
+            borderColor: isDarkMode ? "rgba(148, 163, 184, 0.14)" : theme.borderColor,
           },
         ]}
       >
         <View style={styles.appointmentOptionHeader}>
-          <View style={styles.appointmentOptionIcon}>
+          <View style={[styles.appointmentOptionIcon, isDarkMode && styles.appointmentOptionIconDark]}>
             <Ionicons name={icon} size={20} color="#0A3D91" />
           </View>
           <View style={styles.appointmentOptionTitleBlock}>
@@ -9533,8 +9582,8 @@ const loadDashboardData = useCallback(async () => {
               {subtitle}
             </Text>
           </View>
-          <View style={styles.appointmentOptionCountBadge}>
-            <Text style={styles.appointmentOptionCountText}>
+          <View style={[styles.appointmentOptionCountBadge, isDarkMode && styles.appointmentOptionCountBadgeDark]}>
+            <Text style={[styles.appointmentOptionCountText, isDarkMode && styles.darkTextSecondary]}>
               {enabledCount}/{options.length || 0}
             </Text>
           </View>
@@ -9583,9 +9632,10 @@ const loadDashboardData = useCallback(async () => {
                 key={option.id || option.label}
                 style={[
                   styles.appointmentOptionItem,
+                  isDarkMode && styles.appointmentOptionItemDark,
                   isRowSaving && styles.appointmentOptionItemSaving,
                   {
-                    borderColor: theme.borderColor,
+                    borderColor: isDarkMode ? "rgba(148, 163, 184, 0.12)" : theme.borderColor,
                     backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
                   },
                 ]}
@@ -9642,7 +9692,7 @@ const loadDashboardData = useCallback(async () => {
                 <View style={styles.appointmentOptionActions}>
                   {isEditing ? (
                     <TouchableOpacity
-                      style={styles.appointmentOptionMiniButton}
+                      style={[styles.appointmentOptionMiniButton, isDarkMode && styles.appointmentOptionMiniButtonDark]}
                       disabled={isSavingAppointmentOptions}
                       onPress={() => handleSaveEditedAppointmentOption(groupKey, option)}
                     >
@@ -9657,7 +9707,7 @@ const loadDashboardData = useCallback(async () => {
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      style={styles.appointmentOptionMiniButton}
+                      style={[styles.appointmentOptionMiniButton, isDarkMode && styles.appointmentOptionMiniButtonDark]}
                       disabled={isSavingAppointmentOptions}
                       onPress={() => {
                         setEditingAppointmentOption({ groupKey, optionId: option.id });
@@ -9674,7 +9724,7 @@ const loadDashboardData = useCallback(async () => {
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
-                    style={styles.appointmentOptionMiniButton}
+                    style={[styles.appointmentOptionMiniButton, isDarkMode && styles.appointmentOptionMiniButtonDark]}
                     disabled={isSavingAppointmentOptions}
                     onPress={() => handleToggleAppointmentOption(groupKey, option)}
                   >
@@ -9685,7 +9735,12 @@ const loadDashboardData = useCallback(async () => {
                     )}
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.appointmentOptionMiniButton, styles.appointmentOptionDeleteButton]}
+                    style={[
+                      styles.appointmentOptionMiniButton,
+                      styles.appointmentOptionDeleteButton,
+                      isDarkMode && styles.appointmentOptionMiniButtonDark,
+                      isDarkMode && styles.appointmentOptionDeleteButtonDark,
+                    ]}
                     disabled={isSavingAppointmentOptions}
                     onPress={() => handleDeleteAppointmentOption(groupKey, option)}
                   >
@@ -9766,8 +9821,8 @@ const loadDashboardData = useCallback(async () => {
             }
           >
             <View style={styles.appointmentManagementOverview}>
-              <View style={styles.appointmentManagementIntroCard}>
-                <View style={styles.appointmentManagementIntroIcon}>
+              <View style={[styles.appointmentManagementIntroCard, isDarkMode && styles.appointmentManagementIntroCardDark]}>
+                <View style={[styles.appointmentManagementIntroIcon, isDarkMode && styles.appointmentManagementIntroIconDark]}>
                   <Ionicons name="options-outline" size={22} color={ADMIN_BLUE} />
                 </View>
                 <View style={styles.appointmentManagementIntroCopy}>
@@ -9790,13 +9845,14 @@ const loadDashboardData = useCallback(async () => {
                     key={item.label}
                     style={[
                       styles.appointmentManagementStatCard,
+                      isDarkMode && styles.appointmentManagementStatCardDark,
                       {
                         backgroundColor: isDarkMode ? theme.cardBackground : "#F8FBFE",
-                        borderColor: theme.borderColor,
+                        borderColor: isDarkMode ? "rgba(148, 163, 184, 0.12)" : theme.borderColor,
                       },
                     ]}
                   >
-                    <View style={styles.appointmentManagementStatIcon}>
+                    <View style={[styles.appointmentManagementStatIcon, isDarkMode && styles.appointmentManagementStatIconDark]}>
                       <Ionicons name={item.icon} size={16} color={ADMIN_BLUE} />
                     </View>
                     <View>
@@ -9813,7 +9869,7 @@ const loadDashboardData = useCallback(async () => {
             </View>
 
             <View style={styles.appointmentConfigWorkspace}>
-              <View style={[styles.appointmentConfigTabs, isDarkMode && { backgroundColor: "#0F172A", borderColor: theme.borderColor }]}>
+              <View style={[styles.appointmentConfigTabs, isDarkMode && styles.appointmentConfigTabsDark]}>
                 {configSections.map((section) => {
                   const isActive = activeAppointmentConfigTab === section.key;
                   const count = appointmentManagementOptions[section.key]?.length || 0;
@@ -9823,7 +9879,7 @@ const loadDashboardData = useCallback(async () => {
                       style={[
                         styles.appointmentConfigTab,
                         isActive && styles.appointmentConfigTabActive,
-                        isDarkMode && !isActive && { backgroundColor: "#111827", borderColor: theme.borderColor },
+                        isDarkMode && !isActive && styles.appointmentConfigTabDark,
                       ]}
                       onPress={() => {
                         setActiveAppointmentConfigTab(section.key);
@@ -9858,9 +9914,10 @@ const loadDashboardData = useCallback(async () => {
                 <View
                   style={[
                     styles.appointmentConfigSideCard,
+                    isDarkMode && styles.appointmentConfigSideCardDark,
                     {
                       backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
-                      borderColor: theme.borderColor,
+                      borderColor: isDarkMode ? "rgba(148, 163, 184, 0.14)" : theme.borderColor,
                     },
                   ]}
                 >
@@ -10764,94 +10821,118 @@ const loadDashboardData = useCallback(async () => {
                 </View>
               </View>
 
-              {renderAdminRecordToolbar({
-                searchTitle: "Search Visitor History",
-                searchValue: historySearchTerm,
-                onSearchChange: (value) => {
-                  setHistorySearchTerm(value);
-                  setHistorySearchQuery(value.trim());
-                  setHistoryPage(1);
-                },
-                searchPlaceholder: "Search visitor, email, office, purpose, status, or date...",
-                searchSubtitle: "Find visitor records by name, email, office, purpose, status, or exact date.",
-                hasSearch: Boolean(historySearchTerm || historySearchQuery),
-                onClearSearch: () => {
-                  setHistorySearchTerm("");
-                  setHistorySearchQuery("");
-                  setHistoryPage(1);
-                },
-                filterTitle: "Filters",
-                filterSubtitle: "Narrow visitor history by status, date, office, and time order.",
-                hasFilters:
-                  historyFilter !== "all" ||
-                  historyDateFilter !== "all" ||
-                  historyOfficeFilter !== "all" ||
-                  historySortOrder !== "newest" ||
-                  Boolean(historyDateRange.startDate || historyDateRange.endDate),
-                onResetFilters: () => {
-                  setHistoryFilter("all");
-                  setHistoryDateFilter("all");
-                  setHistoryOfficeFilter("all");
-                  setHistoryDateRange({ startDate: null, endDate: null });
-                  setHistorySortOrder("newest");
-                  setHistoryPage(1);
-                },
-                filterGroups: [
+              <View
+                style={[
+                  styles.historyToolbarWrap,
                   {
-                    label: "Status",
-                    value: historyFilter,
-                    icon: "layers-outline",
-                    options: historyFilters.map((filter) => ({
-                      label: `${filter.label}${typeof filter.count === "number" ? ` (${filter.count})` : ""}`,
-                      value: filter.key,
-                    })),
-                    onSelect: setHistoryFilter,
+                    backgroundColor: isDarkMode ? "#0F172A" : "#F8FBFE",
+                    borderColor: isDarkMode ? "rgba(148, 163, 184, 0.16)" : theme.borderColor,
                   },
-                  {
-                    label: "Date Range",
-                    value: historyDateFilter,
-                    icon: "calendar-outline",
-                    options: dateShortcutFilters.map((filter) => ({
-                      label: filter.label,
-                      value: filter.key,
-                    })),
-                    onSelect: setHistoryDateFilter,
-                  },
-                  {
-                    label: "Office",
-                    value: historyOfficeFilter,
-                    icon: "business-outline",
-                    options: historyOfficeFilterOptions.map((filter) => ({
-                      label: `${filter.label}${typeof filter.count === "number" ? ` (${filter.count})` : ""}`,
-                      value: filter.key,
-                    })),
-                    onSelect: setHistoryOfficeFilter,
-                  },
-                  {
-                    label: "Time Order",
-                    value: historySortOrder,
-                    icon: "swap-vertical-outline",
-                    options: [
-                      { label: "Newest First", value: "newest" },
-                      { label: "Oldest First", value: "oldest" },
-                    ],
-                    onSelect: setHistorySortOrder,
-                  },
-                ],
-                filterFooter: renderDateRangeControls({
-                  accent: "#1C6DD0",
-                  startDate: historyDateRange.startDate,
-                  endDate: historyDateRange.endDate,
-                  startField: "history-start",
-                  endField: "history-end",
-                  onPickStart: () => setActiveFilterDateField("history-start"),
-                  onPickEnd: () => setActiveFilterDateField("history-end"),
-                  onClear: () => {
-                    setHistoryDateRange({ startDate: null, endDate: null });
+                ]}
+              >
+                {renderAdminRecordToolbar({
+                  searchTitle: "Search Visitor History",
+                  searchValue: historySearchTerm,
+                  onSearchChange: (value) => {
+                    setHistorySearchTerm(value);
+                    setHistorySearchQuery(value.trim());
                     setHistoryPage(1);
                   },
-                }),
-              })}
+                  searchPlaceholder: "Search visitor, email, office, purpose, status, or date...",
+                  searchSubtitle: "Find visitor records by name, email, office, purpose, status, or exact date.",
+                  hasSearch: Boolean(historySearchTerm || historySearchQuery),
+                  onClearSearch: () => {
+                    setHistorySearchTerm("");
+                    setHistorySearchQuery("");
+                    setHistoryPage(1);
+                  },
+                  filterTitle: "Filters",
+                  filterSubtitle: "Narrow visitor history by status, date, office, and time order.",
+                  hasFilters:
+                    historyFilter !== "all" ||
+                    historyDateFilter !== "all" ||
+                    historyOfficeFilter !== "all" ||
+                    historySortOrder !== "newest" ||
+                    Boolean(historyDateRange.startDate || historyDateRange.endDate),
+                  onResetFilters: () => {
+                    setHistoryFilter("all");
+                    setHistoryDateFilter("all");
+                    setHistoryOfficeFilter("all");
+                    setHistoryDateRange({ startDate: null, endDate: null });
+                    setHistorySortOrder("newest");
+                    setHistoryPage(1);
+                  },
+                  filterGroups: [
+                    {
+                      label: "Status",
+                      value: historyFilter,
+                      icon: "layers-outline",
+                      options: historyFilters.map((filter) => ({
+                        label: `${filter.label}${typeof filter.count === "number" ? ` (${filter.count})` : ""}`,
+                        value: filter.key,
+                      })),
+                      onSelect: setHistoryFilter,
+                    },
+                    {
+                      label: "Date Range",
+                      value: historyDateFilter,
+                      icon: "calendar-outline",
+                      options: dateShortcutFilters.map((filter) => ({
+                        label: filter.label,
+                        value: filter.key,
+                      })),
+                      onSelect: setHistoryDateFilter,
+                    },
+                    {
+                      label: "Office",
+                      value: historyOfficeFilter,
+                      icon: "business-outline",
+                      options: historyOfficeFilterOptions.map((filter) => ({
+                        label: `${filter.label}${typeof filter.count === "number" ? ` (${filter.count})` : ""}`,
+                        value: filter.key,
+                      })),
+                      onSelect: setHistoryOfficeFilter,
+                    },
+                    {
+                      label: "Time Order",
+                      value: historySortOrder,
+                      icon: "swap-vertical-outline",
+                      options: [
+                        { label: "Newest First", value: "newest" },
+                        { label: "Oldest First", value: "oldest" },
+                      ],
+                      onSelect: setHistorySortOrder,
+                    },
+                  ],
+                  filterFooter: renderDateRangeControls({
+                    accent: "#1C6DD0",
+                    startDate: historyDateRange.startDate,
+                    endDate: historyDateRange.endDate,
+                    startField: "history-start",
+                    endField: "history-end",
+                    onPickStart: () => setActiveFilterDateField("history-start"),
+                    onPickEnd: () => setActiveFilterDateField("history-end"),
+                    onClear: () => {
+                      setHistoryDateRange({ startDate: null, endDate: null });
+                      setHistoryPage(1);
+                    },
+                  }),
+                })}
+              </View>
+
+              <View style={styles.historyResultsHeader}>
+                <View>
+                  <Text style={[styles.historyResultsTitle, { color: theme.textPrimary }]}>
+                    Visitor Identification
+                  </Text>
+                  <Text style={[styles.historyResultsSubtitle, { color: theme.textSecondary }]}>
+                    Names, SafePass IDs, NFC UIDs, schedules, and status.
+                  </Text>
+                </View>
+                <Text style={[styles.historyResultsCount, { color: theme.textSecondary }]}>
+                  {filteredHistory.length} record{filteredHistory.length === 1 ? "" : "s"}
+                </Text>
+              </View>
 
               {filteredHistory.length === 0 ? (
                 <View style={styles.emptyHistoryState}>
@@ -11762,7 +11843,7 @@ const loadDashboardData = useCallback(async () => {
 
   return (
     <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? "#0F172A" : "#F4F8FC"} />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.backgroundColor} />
       <View style={[styles.mainContainer, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
         {isAdminMobileLayout && showAdminMobileMenu ? (
           <TouchableOpacity
@@ -11777,7 +11858,10 @@ const loadDashboardData = useCallback(async () => {
           style={[
             styles.sidebar,
             isAdminMobileLayout && styles.mobileSidebar,
-            isDarkMode && { backgroundColor: theme.sidebarBackground },
+            isDarkMode && {
+              backgroundColor: theme.sidebarBackground,
+              borderRightColor: "rgba(148, 163, 184, 0.16)",
+            },
           ]}
         >
           <ScrollView ref={sidebarScrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.sidebarContent}>
@@ -11929,7 +12013,13 @@ const loadDashboardData = useCallback(async () => {
         <View style={styles.adminContentShell}>
         <View style={[styles.contentArea, isDarkMode && { backgroundColor: theme.backgroundColor }]}>
           {isAdminMobileLayout ? (
-            <View style={[styles.mobileAdminTopBar, isDarkMode && styles.darkSidebarPanel]}>
+            <View
+              style={[
+                styles.mobileAdminTopBar,
+                isDarkMode && styles.darkSidebarPanel,
+                isDarkMode && { borderBottomColor: "rgba(148, 163, 184, 0.14)" },
+              ]}
+            >
               <TouchableOpacity
                 style={[styles.mobileAdminMenuButton, isDarkMode && styles.darkSidebarButton]}
                 onPress={() => setShowAdminMobileMenu(true)}
@@ -11951,9 +12041,24 @@ const loadDashboardData = useCallback(async () => {
               <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.mobileAdminProfileButton}>
                 <Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text>
               </TouchableOpacity>
+              <AdminThemeToggle
+                isDarkMode={isDarkMode}
+                onToggle={handleThemeModeChange}
+                compact
+              />
             </View>
           ) : null}
-          <Animated.View style={[styles.header, isAdminMobileLayout && styles.headerMobileCompact, { opacity: headerOpacity }, isDarkMode && { backgroundColor: ADMIN_BLUE_DARK, borderBottomColor: "#B7D5F6" }]}>
+          <Animated.View
+            style={[
+              styles.header,
+              isAdminMobileLayout && styles.headerMobileCompact,
+              { opacity: headerOpacity },
+              isDarkMode && {
+                backgroundColor: ADMIN_BLUE_DARK,
+                borderBottomColor: "rgba(183, 213, 246, 0.18)",
+              },
+            ]}
+          >
             <View style={styles.headerTop}>
             <View style={styles.headerCopy}>
               <Text style={styles.headerTitle}>
@@ -11983,6 +12088,10 @@ const loadDashboardData = useCallback(async () => {
               </View>
             </View>
               <View style={styles.headerActions}>
+                <AdminThemeToggle
+                  isDarkMode={isDarkMode}
+                  onToggle={handleThemeModeChange}
+                />
                 <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.profileButton}><View style={[styles.profileIcon, isDarkMode && { backgroundColor: "#1C6DD0" }]}><Text style={styles.profileInitials}>{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</Text></View></TouchableOpacity>
               </View>
             </View>

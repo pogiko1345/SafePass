@@ -64,7 +64,7 @@
   "devDependencies": {
     "@babel/core": "^7.22.9",
     "webpack": "^5.88.0",
-    "webpack-dev-server": "^5.2.3"
+    "webpack-dev-server": "^4.15.2"
   },
   "expo": {
     "doctor": {

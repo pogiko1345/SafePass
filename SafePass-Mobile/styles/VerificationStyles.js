@@ -36,8 +36,8 @@ export default StyleSheet.create({
     width: "100%",
     alignSelf: "center",
     paddingHorizontal: isSmallPhone ? 14 : 20,
-    paddingVertical: isSmallPhone ? 16 : 24,
-    gap: 18,
+    paddingVertical: isSmallPhone ? 12 : 16,
+    gap: 14,
     ...(isDesktop
       ? {
           flexDirection: "row",
@@ -46,7 +46,7 @@ export default StyleSheet.create({
           maxWidth: 1180,
           width: "100%",
           alignSelf: "center",
-          paddingTop: 28,
+          paddingTop: 16,
         }
       : {}),
   },
@@ -175,8 +175,8 @@ export default StyleSheet.create({
   panelMetaRow: {
     flexDirection: isSmallPhone ? "column" : "row",
     flexWrap: isSmallPhone ? "nowrap" : "wrap",
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 14,
   },
 
   panelMetaCard: {
@@ -188,8 +188,8 @@ export default StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#E6EDF7",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
 
   panelMetaLabel: {
@@ -213,7 +213,7 @@ export default StyleSheet.create({
     width: "100%",
     backgroundColor: "#FFFFFF",
     borderRadius: 34,
-    padding: isSmallPhone ? 18 : 24,
+    padding: isSmallPhone ? 16 : 18,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     ...(isDesktop ? { maxWidth: 680 } : {}),
@@ -236,18 +236,18 @@ export default StyleSheet.create({
   progressRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 22,
+    marginBottom: 14,
   },
 
   progressStep: {
     alignItems: "center",
-    gap: 8,
+    gap: 5,
   },
 
   progressDot: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: "#E5E7EB",
     alignItems: "center",
     justifyContent: "center",
@@ -281,17 +281,17 @@ export default StyleSheet.create({
   // ============ USER INFO CARD ============
   userInfoCard: {
     backgroundColor: "#F8FBFE",
-    borderRadius: 22,
-    padding: 16,
+    borderRadius: 16,
+    padding: 12,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
 
   avatarContainer: {
-    marginRight: 16,
+    marginRight: 12,
   },
 
   userInfoCopy: {
@@ -299,9 +299,9 @@ export default StyleSheet.create({
   },
 
   avatarGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -487,8 +487,8 @@ export default StyleSheet.create({
   // ============ OTP CARD ============
   otpCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 26,
-    padding: isSmallPhone ? 18 : 22,
+    borderRadius: 18,
+    padding: isSmallPhone ? 14 : 16,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     ...Platform.select({
@@ -505,55 +505,55 @@ export default StyleSheet.create({
 
   otpHeader: {
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 14,
   },
 
   otpIconContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 10,
   },
 
   otpTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
     color: "#111827",
-    marginBottom: 8,
-    letterSpacing: -0.3,
+    marginBottom: 5,
+    letterSpacing: 0,
   },
 
   otpSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#6B7280",
-    marginBottom: 4,
+    marginBottom: 2,
   },
 
   phoneNumberDisplay: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "700",
     color: "#0A3D91",
-    marginTop: 4,
+    marginTop: 2,
   },
 
   otpNoticeCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
+    gap: 10,
     backgroundColor: "#ECFDF5",
     borderWidth: 1,
     borderColor: "#A7F3D0",
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 18,
+    borderRadius: 14,
+    padding: 11,
+    marginBottom: 12,
   },
 
   otpNoticeIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#D1FAE5",
@@ -565,29 +565,29 @@ export default StyleSheet.create({
   },
 
   otpNoticeTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "800",
     color: "#064E3B",
   },
 
   otpNoticeMessage: {
-    marginTop: 3,
-    fontSize: 13,
-    lineHeight: 18,
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: "700",
     color: "#065F46",
   },
 
   otpNoticeDetail: {
-    marginTop: 4,
-    fontSize: 12,
-    lineHeight: 17,
+    marginTop: 2,
+    fontSize: 11,
+    lineHeight: 15,
     color: "#047857",
   },
 
   otpNoticeDismiss: {
-    width: 30,
-    height: 30,
+    width: 26,
+    height: 26,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
@@ -596,32 +596,83 @@ export default StyleSheet.create({
 
   otpInputContainer: {
     width: "100%",
-    marginBottom: 20,
+    marginBottom: 10,
   },
 
-  otpInput: {
+  otpCodeEntry: {
     width: "100%",
-    height: isSmallPhone ? 60 : 68,
+    minHeight: isSmallPhone ? 50 : 54,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: isSmallPhone ? 5 : 8,
     borderWidth: 2,
     borderColor: "#E2E8F0",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    fontSize: isSmallPhone ? 28 : 32,
-    fontWeight: "700",
-    color: "#111827",
-    textAlign: "center",
-    letterSpacing: isSmallPhone ? 8 : 12,
+    borderRadius: 14,
+    paddingHorizontal: isSmallPhone ? 7 : 10,
+    paddingVertical: 8,
     backgroundColor: "#FFFFFF",
+    position: "relative",
     ...Platform.select({
       web: {
-        transition: "border-color 0.2s ease",
-        outlineStyle: "none",
-        outlineWidth: 0,
-        ":focus": {
-          borderColor: "#0A3D91",
-        },
+        cursor: "text",
+        transition: "border-color 0.2s ease, box-shadow 0.2s ease",
       },
     }),
+  },
+
+  otpCodeEntryCompact: {
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+
+  otpDigitBox: {
+    flex: 1,
+    maxWidth: 46,
+    minWidth: isSmallPhone ? 32 : 38,
+    height: isSmallPhone ? 38 : 42,
+    borderRadius: 10,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  otpDigitBoxCompact: {
+    minWidth: 30,
+    height: 38,
+  },
+
+  otpDigitBoxActive: {
+    borderColor: "#0A3D91",
+    borderWidth: 2,
+    backgroundColor: "#FFFFFF",
+  },
+
+  otpDigitBoxFilled: {
+    borderColor: "#B7D5F6",
+    backgroundColor: "#FFFFFF",
+  },
+
+  otpDigitText: {
+    fontSize: isSmallPhone ? 20 : 23,
+    lineHeight: isSmallPhone ? 24 : 28,
+    fontWeight: "800",
+    color: "#041E42",
+    textAlign: "center",
+  },
+
+  otpHiddenInput: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    opacity: 0.02,
+    color: "transparent",
+    backgroundColor: "transparent",
+    ...(Platform.OS === "web" ? { outlineStyle: "none" } : {}),
   },
 
   otpInputError: {
@@ -632,7 +683,7 @@ export default StyleSheet.create({
   otpErrorText: {
     fontSize: 12,
     color: "#EF4444",
-    marginTop: 8,
+    marginTop: 6,
     textAlign: "center",
     fontWeight: "500",
   },
@@ -641,12 +692,12 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 24,
-    gap: 8,
+    marginBottom: 14,
+    gap: 6,
   },
 
   timerText: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#6B7280",
     fontWeight: "500",
   },
@@ -656,20 +707,20 @@ export default StyleSheet.create({
   },
 
   verifyButton: {
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: "hidden",
-    marginBottom: 16,
+    marginBottom: 10,
   },
 
   verifyGradient: {
-    paddingVertical: 16,
+    paddingVertical: 13,
     alignItems: "center",
     justifyContent: "center",
   },
 
   verifyButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     letterSpacing: 0.5,
   },
@@ -678,11 +729,11 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingVertical: 11,
+    borderRadius: 12,
     backgroundColor: "#F8FBFE",
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 10,
   },
 
   resendButtonText: {
@@ -699,7 +750,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
+    paddingVertical: 5,
     gap: 6,
   },
 
@@ -714,7 +765,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 20,
+    paddingTop: 12,
     paddingBottom: 4,
     gap: 8,
   },

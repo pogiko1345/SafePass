@@ -7266,16 +7266,17 @@ export default StyleSheet.create({
   bottomNavBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    gap: 7,
     width: "100%",
-    maxWidth: 420,
+    maxWidth: 430,
     paddingHorizontal: 7,
     paddingVertical: 7,
     borderRadius: 32,
     backgroundColor: "rgba(255,255,255,0.98)",
     borderWidth: 1,
     borderColor: "#DCE7F3",
-    overflow: "hidden",
+    overflow: "visible",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -7288,18 +7289,55 @@ export default StyleSheet.create({
     }),
   },
 
+  bottomNavBarCompact: {
+    maxWidth: 390,
+    gap: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+
   bottomNavItem: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 1,
+    flexBasis: 48,
+    minWidth: 48,
+    minHeight: 46,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    paddingVertical: 9,
-    borderRadius: 22,
+    gap: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 24,
     zIndex: 2,
   },
 
+  bottomNavItemCompact: {
+    flexBasis: 46,
+    minWidth: 46,
+    minHeight: 44,
+    paddingHorizontal: 11,
+  },
+
   bottomNavItemActive: {
-    backgroundColor: "transparent",
+    backgroundColor: "#061A2E",
+    gap: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#061A2E",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+      },
+      android: { elevation: 2 },
+      web: { boxShadow: "0px 10px 18px rgba(6,26,46,0.18)" },
+    }),
+  },
+
+  bottomNavItemExpanded: {
+    flexGrow: 1,
+    flexBasis: width <= 390 ? 134 : 148,
+    maxWidth: width <= 390 ? 142 : 160,
   },
 
   bottomNavActiveIndicator: {
@@ -7323,7 +7361,9 @@ export default StyleSheet.create({
   },
 
   bottomNavLabel: {
-    fontSize: width <= 390 ? 10 : 10.5,
+    flexShrink: 1,
+    minWidth: 0,
+    fontSize: width <= 390 ? 11 : 11.5,
     fontWeight: "900",
     color: "#64748B",
   },
@@ -7435,5 +7475,13 @@ export default StyleSheet.create({
 
   darkBottomNavLabel: {
     color: "#CBD5E1",
+  },
+
+  darkBottomNavItem: {
+    backgroundColor: "transparent",
+  },
+
+  darkBottomNavItemActive: {
+    backgroundColor: "#0A3D91",
   },
 });

@@ -27,6 +27,7 @@ import {
   isValidPhilippineMobileNumber,
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
+import { useAviationTransition } from "../utils/AviationTransitionContext";
 
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({
@@ -43,6 +44,7 @@ const SuccessModal = ({
   onConfirm,
   onVerifyOtp,
   onResendOtp,
+  isTransitioning = false,
 }) => {
   return (
     <Modal
@@ -62,7 +64,7 @@ const SuccessModal = ({
             </LinearGradient>
           </View>
           <Text style={visitorRegisterStyles.successTitle}>
-            {isVerified ? "Account Verified" : "Verify Your Email"}
+            {isVerified ? "Account Verified" : "You're almost there!"}
           </Text>
           <Text style={visitorRegisterStyles.successMessage}>
             {isVerified
@@ -82,18 +84,35 @@ const SuccessModal = ({
           {!isVerified ? (
             <View style={visitorRegisterStyles.otpVerifyBox}>
               <Text style={visitorRegisterStyles.otpLabel}>Verification Code</Text>
-              <TextInput
+              <View
                 style={[
-                  visitorRegisterStyles.otpInput,
-                  otpError && visitorRegisterStyles.otpInputError,
+                  visitorRegisterStyles.otpCodeEntry,
+                  otpError && visitorRegisterStyles.otpCodeEntryError,
                 ]}
-                value={otpValue}
-                onChangeText={(value) => onOtpChange(String(value || "").replace(/\D/g, "").slice(0, 6))}
-                placeholder="6-digit code"
-                placeholderTextColor="#94A3B8"
-                keyboardType="number-pad"
-                maxLength={6}
-              />
+              >
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <View
+                    key={`otp-${index}`}
+                    style={[
+                      visitorRegisterStyles.otpDigitBox,
+                      otpValue[index] && visitorRegisterStyles.otpDigitBoxFilled,
+                    ]}
+                  >
+                    <Text style={visitorRegisterStyles.otpDigitText}>
+                      {otpValue[index] || ""}
+                    </Text>
+                  </View>
+                ))}
+                <TextInput
+                  style={visitorRegisterStyles.otpHiddenInput}
+                  value={otpValue}
+                  onChangeText={(value) => onOtpChange(String(value || "").replace(/\D/g, "").slice(0, 6))}
+                  placeholder=""
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus
+                />
+              </View>
               {otpError ? (
                 <Text style={visitorRegisterStyles.otpErrorText}>{otpError}</Text>
               ) : (
@@ -150,9 +169,10 @@ const SuccessModal = ({
             style={[
               visitorRegisterStyles.successButton,
               !isVerified && visitorRegisterStyles.successButtonMuted,
+              isTransitioning && { opacity: 0.78 },
             ]}
             onPress={onConfirm}
-            disabled={!isVerified}
+            disabled={!isVerified || isTransitioning}
             activeOpacity={0.7}
           >
             <LinearGradient
@@ -171,7 +191,7 @@ const SuccessModal = ({
   );
 };
 
-const ExistingAccountModal = ({ visible, email, onLogin, onEditEmail }) => (
+const ExistingAccountModal = ({ visible, email, onLogin, onEditEmail, isTransitioning = false }) => (
   <Modal visible={visible} transparent animationType="fade" onRequestClose={onEditEmail}>
     <View style={visitorRegisterStyles.modalOverlay}>
       <View style={visitorRegisterStyles.existingAccountModal}>
@@ -193,7 +213,14 @@ const ExistingAccountModal = ({ visible, email, onLogin, onEditEmail }) => (
           ) : null}
         </LinearGradient>
         <View style={visitorRegisterStyles.existingAccountActions}>
-          <TouchableOpacity style={visitorRegisterStyles.existingAccountLoginButton} onPress={onLogin}>
+          <TouchableOpacity
+            style={[
+              visitorRegisterStyles.existingAccountLoginButton,
+              isTransitioning && { opacity: 0.78 },
+            ]}
+            onPress={onLogin}
+            disabled={isTransitioning}
+          >
             <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
             <Text style={visitorRegisterStyles.existingAccountLoginText}>Go to Login</Text>
           </TouchableOpacity>
@@ -416,14 +443,17 @@ const AnimatedFieldCard = ({ children, focused, style }) => {
   );
 };
 
-export default function VisitorRegisterScreen({ navigation }) {
+export default function VisitorRegisterScreen({ navigation, route }) {
+  const startAviationTransition = useAviationTransition();
+  const shouldReturnHome = route?.params?.fromHome || !navigation.canGoBack();
   const { width: viewportWidth } = useWindowDimensions();
   const isCompactRegister = viewportWidth <= 420;
   const isTabletRegister = viewportWidth >= 768;
-  const useTwoColumnFields = viewportWidth >= 640;
+  const isDesktopRegister = viewportWidth >= 980;
+  const useTwoColumnFields = isDesktopRegister || viewportWidth >= 640;
   const registerHorizontalMargin = isCompactRegister ? 12 : 16;
   const registerShellMaxWidth = Math.min(
-    860,
+    isDesktopRegister ? 1240 : 860,
     Math.max(viewportWidth - registerHorizontalMargin * 2, 300),
   );
   const headerResponsiveStyle = {
@@ -452,12 +482,16 @@ export default function VisitorRegisterScreen({ navigation }) {
   const formShellResponsiveStyle = Platform.OS === "web"
     ? { maxWidth: registerShellMaxWidth }
     : null;
+  const formShellDesktopStyle = isDesktopRegister
+    ? visitorRegisterStyles.formShellDesktop
+    : null;
   const sectionCardResponsiveStyle = {
     marginHorizontal: registerHorizontalMargin,
   };
-  const contentResponsiveStyle = {
-    padding: isCompactRegister ? 16 : 22,
-  };
+  const contentResponsiveStyle = [
+    { padding: isCompactRegister ? 16 : 22 },
+    isDesktopRegister && visitorRegisterStyles.contentDesktop,
+  ];
   const sectionHeaderResponsiveStyle = isCompactRegister
     ? { flexDirection: "column", alignItems: "flex-start" }
     : null;
@@ -476,11 +510,15 @@ export default function VisitorRegisterScreen({ navigation }) {
     width: useTwoColumnFields ? "48.5%" : "100%",
     flexGrow: useTwoColumnFields ? 0 : 1,
   };
+  const formCardDesktopStyle = isDesktopRegister
+    ? visitorRegisterStyles.formCardDesktop
+    : null;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDataPrivacy, setShowDataPrivacy] = useState(false);
   const [existingAccountEmail, setExistingAccountEmail] = useState("");
+  const [transitionBusy, setTransitionBusy] = useState(false);
   const [privacySubmissionError, setPrivacySubmissionError] = useState("");
   const [formData, setFormData] = useState({
     fullName: "",
@@ -521,7 +559,46 @@ export default function VisitorRegisterScreen({ navigation }) {
   const secondaryHoverAnim = useRef(new Animated.Value(0)).current;
   const continueHoverAnim = useRef(new Animated.Value(0)).current;
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      setTransitionBusy(false);
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const goToVisitorLogin = (overrides = {}) => {
+    if (transitionBusy) return;
+    setTransitionBusy(true);
+    const navigateToLogin = () => {
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: "Login",
+            params: {
+              role: "visitor",
+              skipArrivalSplash: true,
+              ...overrides,
+            },
+          },
+        ],
+      });
+    };
+
+    if (startAviationTransition) {
+      startAviationTransition({
+        mode: "journey",
+        message: "Departing visitor registration...",
+        arrivalMessage: "Arriving at secure login...",
+        duration: 2500,
+        onBeforeFade: navigateToLogin,
+        onDone: () => setTransitionBusy(false),
+      });
+      return;
+    }
+
+    setTransitionBusy(false);
     navigation.reset({
       index: 0,
       routes: [
@@ -537,14 +614,42 @@ export default function VisitorRegisterScreen({ navigation }) {
   };
 
   const handleBack = () => {
-    if (navigation.canGoBack()) {
+    if (transitionBusy) return;
+    setTransitionBusy(true);
+    if (startAviationTransition) {
+      startAviationTransition({
+        mode: "journey",
+        message: "Departing visitor registration...",
+        arrivalMessage: shouldReturnHome
+          ? "Arriving at campus access..."
+          : "Returning to previous page...",
+        duration: 2500,
+        onBeforeFade: () => {
+          if (!shouldReturnHome && navigation.canGoBack()) {
+            navigation.goBack();
+            return;
+          }
+
+          navigation.navigate("RoleSelect", {
+            skipArrivalSplash: true,
+            timestamp: Date.now(),
+          });
+        },
+        onDone: () => setTransitionBusy(false),
+      });
+      return;
+    }
+
+    if (!shouldReturnHome && navigation.canGoBack()) {
+      setTransitionBusy(false);
       navigation.goBack();
       return;
     }
 
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "RoleSelect" }],
+    setTransitionBusy(false);
+    navigation.navigate("RoleSelect", {
+      skipArrivalSplash: true,
+      timestamp: Date.now(),
     });
   };
 
@@ -1109,7 +1214,6 @@ export default function VisitorRegisterScreen({ navigation }) {
   const registrationProgressPercentage = Math.round(
     (completionCount / totalRegistrationFields) * 100,
   );
-
   const fieldConfig = {
     fullName: {
       label: "Full Name",
@@ -1287,6 +1391,7 @@ export default function VisitorRegisterScreen({ navigation }) {
           bounces={false}
           contentContainerStyle={visitorRegisterStyles.scrollContainer}
         >
+          {!isDesktopRegister ? (
           <Animated.View style={headerEntranceStyle}>
             <LinearGradient
               colors={["#041E42", "#0A3D91", "#0A3D91"]}
@@ -1306,6 +1411,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                     onMouseEnter: () => animateHover(topBackHoverAnim, 1),
                     onMouseLeave: () => animateHover(topBackHoverAnim, 0),
                   })}
+                  disabled={transitionBusy}
                 >
                   <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
                 </TouchableOpacity>
@@ -1367,72 +1473,92 @@ export default function VisitorRegisterScreen({ navigation }) {
             </View>
             </LinearGradient>
           </Animated.View>
+          ) : null}
 
           <Animated.View
-            style={[visitorRegisterStyles.formShell, formShellResponsiveStyle, formEntranceStyle]}
+            style={[
+              visitorRegisterStyles.formShell,
+              formShellResponsiveStyle,
+              formShellDesktopStyle,
+              formEntranceStyle,
+            ]}
           >
-            <Animated.View
+            <View
               style={[
-                visitorRegisterStyles.progressContainer,
-                sectionCardResponsiveStyle,
-                progressFloatStyle,
+                visitorRegisterStyles.registerPane,
+                isDesktopRegister && visitorRegisterStyles.registerPaneDesktop,
               ]}
             >
-              <View style={visitorRegisterStyles.progressHeader}>
-                <Text style={visitorRegisterStyles.progressTitle}>
-                  Registration Progress
-                </Text>
-                <Text style={visitorRegisterStyles.progressPercentage}>
-                  {registrationProgressPercentage}%
-                </Text>
-              </View>
-              <View style={visitorRegisterStyles.progressBarContainer}>
-                <View
-                  style={[
-                    visitorRegisterStyles.progressBar,
-                    { width: `${registrationProgressPercentage}%` },
-                  ]}
-                />
-              </View>
-              <View style={visitorRegisterStyles.progressMetaRow}>
-                <Text style={visitorRegisterStyles.progressMetaText}>
-                  {completionCount} of {totalRegistrationFields} required details complete
-                </Text>
-                <Text style={visitorRegisterStyles.progressMetaText}>
-                  {registrationProgressPercentage === 100
-                    ? "Ready to create"
-                    : "Complete all fields"}
-                </Text>
-              </View>
-              <View style={visitorRegisterStyles.progressChecklist}>
-                {registrationFields.map((field) => {
-                  const isComplete = fieldCompletion[field.key];
-                  return (
-                    <View
-                      key={field.key}
-                      style={[
-                        visitorRegisterStyles.progressChip,
-                        isComplete && visitorRegisterStyles.progressChipComplete,
-                      ]}
-                    >
-                      <Ionicons
-                        name={isComplete ? "checkmark-circle" : field.icon}
-                        size={14}
-                        color={isComplete ? "#0A3D91" : "#94A3B8"}
-                      />
-                      <Text
+            <View
+              style={[
+                visitorRegisterStyles.registerFormPane,
+                isDesktopRegister && visitorRegisterStyles.registerFormPaneDesktop,
+              ]}
+            >
+            {!isDesktopRegister ? (
+              <Animated.View
+                style={[
+                  visitorRegisterStyles.progressContainer,
+                  sectionCardResponsiveStyle,
+                  progressFloatStyle,
+                ]}
+              >
+                <View style={visitorRegisterStyles.progressHeader}>
+                  <Text style={visitorRegisterStyles.progressTitle}>
+                    Registration Progress
+                  </Text>
+                  <Text style={visitorRegisterStyles.progressPercentage}>
+                    {registrationProgressPercentage}%
+                  </Text>
+                </View>
+                <View style={visitorRegisterStyles.progressBarContainer}>
+                  <View
+                    style={[
+                      visitorRegisterStyles.progressBar,
+                      { width: `${registrationProgressPercentage}%` },
+                    ]}
+                  />
+                </View>
+                <View style={visitorRegisterStyles.progressMetaRow}>
+                  <Text style={visitorRegisterStyles.progressMetaText}>
+                    {completionCount} of {totalRegistrationFields} required details complete
+                  </Text>
+                  <Text style={visitorRegisterStyles.progressMetaText}>
+                    {registrationProgressPercentage === 100
+                      ? "Ready to create"
+                      : "Complete all fields"}
+                  </Text>
+                </View>
+                <View style={visitorRegisterStyles.progressChecklist}>
+                  {registrationFields.map((field) => {
+                    const isComplete = fieldCompletion[field.key];
+                    return (
+                      <View
+                        key={field.key}
                         style={[
-                          visitorRegisterStyles.progressChipText,
-                          isComplete && visitorRegisterStyles.progressChipTextComplete,
+                          visitorRegisterStyles.progressChip,
+                          isComplete && visitorRegisterStyles.progressChipComplete,
                         ]}
                       >
-                        {field.label}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </Animated.View>
+                        <Ionicons
+                          name={isComplete ? "checkmark-circle" : field.icon}
+                          size={14}
+                          color={isComplete ? "#0A3D91" : "#94A3B8"}
+                        />
+                        <Text
+                          style={[
+                            visitorRegisterStyles.progressChipText,
+                            isComplete && visitorRegisterStyles.progressChipTextComplete,
+                          ]}
+                        >
+                          {field.label}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </Animated.View>
+            ) : null}
 
             <View style={[visitorRegisterStyles.content, contentResponsiveStyle]}>
               <View style={[visitorRegisterStyles.sectionHeader, sectionHeaderResponsiveStyle]}>
@@ -1453,7 +1579,16 @@ export default function VisitorRegisterScreen({ navigation }) {
                 </View>
               </View>
 
-              {renderStepInsights()}
+              {isDesktopRegister ? null : renderStepInsights()}
+
+              <View style={visitorRegisterStyles.formNoticeCard}>
+                <View style={visitorRegisterStyles.formNoticeIcon}>
+                  <Ionicons name="information-circle-outline" size={18} color="#0A3D91" />
+                </View>
+                <Text style={visitorRegisterStyles.formNoticeText}>
+                  Use an email you can open now. We will send your verification code there.
+                </Text>
+              </View>
 
               <View style={[visitorRegisterStyles.formGrid, formGridResponsiveStyle]}>
                 {Object.entries(fieldConfig).map(([field, config]) => {
@@ -1470,6 +1605,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                     style={[
                       visitorRegisterStyles.formCard,
                       formCardResponsiveStyle,
+                      formCardDesktopStyle,
                       isFocused && visitorRegisterStyles.formCardFocused,
                       errors[field] && visitorRegisterStyles.formCardError,
                     ]}
@@ -1612,7 +1748,10 @@ export default function VisitorRegisterScreen({ navigation }) {
                   ]}
                 >
                   <TouchableOpacity
-                    style={visitorRegisterStyles.secondaryActionButton}
+                    style={[
+                      visitorRegisterStyles.secondaryActionButton,
+                      transitionBusy && { opacity: 0.7 },
+                    ]}
                     onPress={handleBack}
                     onPressIn={() => animatePress(secondaryPressAnim, 0.98)}
                     onPressOut={() => animatePress(secondaryPressAnim, 1)}
@@ -1621,6 +1760,7 @@ export default function VisitorRegisterScreen({ navigation }) {
                       onMouseEnter: () => animateHover(secondaryHoverAnim, 1),
                       onMouseLeave: () => animateHover(secondaryHoverAnim, 0),
                     })}
+                    disabled={transitionBusy}
                   >
                     <Ionicons name="arrow-back" size={18} color="#475569" />
                     <Text style={visitorRegisterStyles.secondaryActionText}>
@@ -1667,6 +1807,52 @@ export default function VisitorRegisterScreen({ navigation }) {
                 </Animated.View>
               </View>
             </View>
+            </View>
+
+            {isDesktopRegister ? (
+              <LinearGradient
+                colors={["#EEF5FF", "#D8E8FF"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={visitorRegisterStyles.registerSidePanel}
+              >
+                <View style={visitorRegisterStyles.sideBrandRow}>
+                  <Image source={Logo} style={visitorRegisterStyles.sideLogo} resizeMode="contain" />
+                  <View style={visitorRegisterStyles.sideBrandCopy}>
+                    <Text style={visitorRegisterStyles.sideBrandEyebrow}>Sapphire Access Portal</Text>
+                    <Text style={visitorRegisterStyles.sideBrandTitle}>SafePass Visitor Registration</Text>
+                  </View>
+                </View>
+
+                <View style={visitorRegisterStyles.sideHeroCopy}>
+                  <Text style={visitorRegisterStyles.sideTitle}>Create your visitor account</Text>
+                  <Text style={visitorRegisterStyles.sideSubtitle}>
+                    Sign up once, verify your email, then request and track campus visits from your dashboard.
+                  </Text>
+                </View>
+
+                <View style={visitorRegisterStyles.sideTrustList}>
+                  {[
+                    ["mail-unread-outline", "Email verification before account access"],
+                    ["calendar-outline", "Appointment requests after login"],
+                    ["shield-checkmark-outline", "Secure records for campus access"],
+                  ].map(([icon, label]) => (
+                    <View key={label} style={visitorRegisterStyles.sideTrustItem}>
+                      <Ionicons name={icon} size={18} color="#0A3D91" />
+                      <Text style={visitorRegisterStyles.sideTrustText}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={visitorRegisterStyles.sideMiniCard}>
+                  <Text style={visitorRegisterStyles.sideMiniTitle}>What happens next?</Text>
+                  <Text style={visitorRegisterStyles.sideMiniText}>
+                    Your OTP code is sent to your email after this form. Keep the page open while checking your inbox.
+                  </Text>
+                </View>
+              </LinearGradient>
+            ) : null}
+            </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1680,6 +1866,7 @@ export default function VisitorRegisterScreen({ navigation }) {
       <ExistingAccountModal
         visible={Boolean(existingAccountEmail)}
         email={existingAccountEmail}
+        isTransitioning={transitionBusy}
         onLogin={() => {
           const email = existingAccountEmail || formData.email;
           setExistingAccountEmail("");
@@ -1719,6 +1906,7 @@ export default function VisitorRegisterScreen({ navigation }) {
         onConfirm={handleSuccessConfirm}
         onVerifyOtp={handleVerifyRegistrationOtp}
         onResendOtp={handleResendRegistrationOtp}
+        isTransitioning={transitionBusy}
       />
     </SafeAreaView>
   );

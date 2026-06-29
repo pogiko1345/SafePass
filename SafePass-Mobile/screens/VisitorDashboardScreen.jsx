@@ -627,7 +627,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [visitorPushNotice, setVisitorPushNotice] = useState(null);
   const [visitorWarningNotice, setVisitorWarningNotice] = useState(null);
   const [visitorAlert, setVisitorAlert] = useState(null);
-  const [bottomNavMeasuredWidth, setBottomNavMeasuredWidth] = useState(0);
   const [isVisitorDarkMode, setIsVisitorDarkMode] = useState(false);
   const [dashboardScrollY, setDashboardScrollY] = useState(0);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
@@ -709,7 +708,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const dashboardHeroAnim = useRef(new Animated.Value(0)).current;
   const dashboardContentAnim = useRef(new Animated.Value(0)).current;
   const visitorTransitionAnim = useRef(new Animated.Value(1)).current;
-  const bottomNavAnim = useRef(new Animated.Value(0)).current;
   const isCompactVirtualCardView = viewportWidth <= 540;
   const isWideAppointmentView = viewportWidth >= 780;
   const commandMetricCardWidth = isWideVisitorDashboard
@@ -1048,12 +1046,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const compactApprovedGradientStyle = isCompactVisitorDashboard
     ? visitorDashboardStyles.approvedHeroGradientCompact
     : null;
-  const bottomNavEstimatedWidth = Math.min(
-    Math.max(viewportWidth - (isCompactVisitorDashboard ? 24 : 36), 0),
-    420,
-  );
-  const bottomNavBarWidth = bottomNavMeasuredWidth || bottomNavEstimatedWidth;
-  const bottomNavItemWidth = Math.max((bottomNavBarWidth - 14) / VISITOR_MODULES.length, 0);
   const approvedSectionHeaderResponsiveStyle = viewportWidth <= 560
     ? { marginBottom: 12 }
     : null;
@@ -1246,20 +1238,6 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       scrollDashboardToTop(false);
     }
   }, [selectedVisitorSection, selectedAppointmentScreen, isAppointmentScreenTransitioning]);
-
-  useEffect(() => {
-    const selectedIndex = Math.max(
-      VISITOR_MODULES.findIndex((module) => module.id === selectedVisitorSection),
-      0,
-    );
-
-    Animated.spring(bottomNavAnim, {
-      toValue: selectedIndex,
-      friction: 8,
-      tension: 90,
-      useNativeDriver: Platform.OS !== "web",
-    }).start();
-  }, [selectedVisitorSection, bottomNavAnim]);
 
   useEffect(() => {
     loadVisitorData();
@@ -4934,32 +4912,12 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const renderBottomNavigation = () => (
     <View style={visitorDashboardStyles.bottomNavShell}>
       <View
-        style={[visitorDashboardStyles.bottomNavBar, isVisitorDarkMode && visitorDashboardStyles.darkBottomNavBar]}
-        onLayout={(event) => {
-          const nextWidth = Math.round(event.nativeEvent.layout.width);
-          if (nextWidth > 0 && nextWidth !== bottomNavMeasuredWidth) {
-            setBottomNavMeasuredWidth(nextWidth);
-          }
-        }}
+        style={[
+          visitorDashboardStyles.bottomNavBar,
+          isCompactVisitorDashboard && visitorDashboardStyles.bottomNavBarCompact,
+          isVisitorDarkMode && visitorDashboardStyles.darkBottomNavBar,
+        ]}
       >
-        <Animated.View
-          style={[
-            visitorDashboardStyles.bottomNavActiveIndicator,
-            { pointerEvents: "none" },
-            {
-              width: bottomNavItemWidth,
-              transform: [
-                {
-                  translateX: bottomNavAnim.interpolate({
-                    inputRange: VISITOR_MODULES.map((_, index) => index),
-                    outputRange: VISITOR_MODULES.map((_, index) => index * bottomNavItemWidth),
-                    extrapolate: "clamp",
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
         {VISITOR_MODULES.map((module) => {
           const isActive = selectedVisitorSection === module.id;
 
@@ -4968,26 +4926,36 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               key={module.id}
               style={[
                 visitorDashboardStyles.bottomNavItem,
+                isCompactVisitorDashboard && visitorDashboardStyles.bottomNavItemCompact,
                 isActive && visitorDashboardStyles.bottomNavItemActive,
+                isActive && visitorDashboardStyles.bottomNavItemExpanded,
+                isVisitorDarkMode && visitorDashboardStyles.darkBottomNavItem,
+                isVisitorDarkMode && isActive && visitorDashboardStyles.darkBottomNavItemActive,
               ]}
               onPress={() => handleVisitorSectionChange(module.id)}
               activeOpacity={0.9}
               pressScale={0.94}
+              accessibilityRole="tab"
+              accessibilityLabel={module.label}
+              accessibilityState={{ selected: isActive }}
             >
               <Ionicons
                 name={module.icon}
                 size={20}
                 color={isActive ? "#FFFFFF" : isVisitorDarkMode ? "#CBD5E1" : "#64748B"}
               />
-              <Text
-                style={[
-                  visitorDashboardStyles.bottomNavLabel,
-                  isVisitorDarkMode && visitorDashboardStyles.darkBottomNavLabel,
-                  isActive && visitorDashboardStyles.bottomNavLabelActive,
-                ]}
-              >
-                {module.label}
-              </Text>
+              {isActive ? (
+                <Animated.Text
+                  numberOfLines={1}
+                  style={[
+                    visitorDashboardStyles.bottomNavLabel,
+                    isVisitorDarkMode && visitorDashboardStyles.darkBottomNavLabel,
+                    visitorDashboardStyles.bottomNavLabelActive,
+                  ]}
+                >
+                  {module.label}
+                </Animated.Text>
+              ) : null}
             </AnimatedPressable>
           );
         })}

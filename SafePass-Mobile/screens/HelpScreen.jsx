@@ -17,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import helpStyles from "../styles/HelpStyles";
 import { brandColors, sapphireGradient } from "../styles/brandColors";
 import Logo from "../assets/LogoSapphire.jpg";
+import { useAviationTransition } from "../utils/AviationTransitionContext";
 
 const CONTACT_OPTIONS = [
   {
@@ -94,6 +95,37 @@ const QUICK_GUIDES = [
   },
 ];
 
+const SUPPORT_TOPICS = [
+  {
+    id: "login",
+    title: "Cannot sign in",
+    description: "Password, role access, or account status issues.",
+    icon: "log-in-outline",
+    faq: "login",
+  },
+  {
+    id: "otp",
+    title: "OTP or verification",
+    description: "Codes, email verification, and trusted device help.",
+    icon: "keypad-outline",
+    faq: "otp",
+  },
+  {
+    id: "visitor",
+    title: "Visitor appointment",
+    description: "Registration, appointment requests, passes, and check-in.",
+    icon: "calendar-outline",
+    faq: "visitor",
+  },
+  {
+    id: "privacy",
+    title: "Privacy and terms",
+    description: "Data protection, account use, and access rules.",
+    icon: "document-text-outline",
+    faq: "privacy",
+  },
+];
+
 const FAQS = [
   {
     id: "login",
@@ -143,13 +175,48 @@ const FAQS = [
     answer:
       "Yes. Account details, visitor records, access logs, and attendance activity are handled through the secured SafePass backend for approval and monitoring purposes.",
   },
+  {
+    id: "terms",
+    question: "What are the SafePass terms of use?",
+    answer:
+      "Use SafePass only with your own campus or visitor account. Keep login details private, follow campus access rules, and contact support if account information, visit records, or access permissions need correction.",
+  },
 ];
 
-export default function HelpScreen({ navigation }) {
-  const [expandedFaq, setExpandedFaq] = useState(FAQS[0].id);
+export default function HelpScreen({ navigation, route }) {
+  const startAviationTransition = useAviationTransition();
+  const requestedTopic = route?.params?.topic;
+  const shouldReturnHome = route?.params?.fromHome || !navigation?.canGoBack?.();
+  const getInitialFaq = () => {
+    if (requestedTopic === "privacy") return "privacy";
+    if (requestedTopic === "terms") return "terms";
+    return FAQS[0].id;
+  };
+  const [expandedFaq, setExpandedFaq] = useState(getInitialFaq);
+  const [transitionBusy, setTransitionBusy] = useState(false);
   const isWeb = Platform.OS === "web";
   const heroAnim = useRef(new Animated.Value(0)).current;
   const contentAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      setTransitionBusy(false);
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  useEffect(() => {
+    if (requestedTopic === "privacy") {
+      setExpandedFaq("privacy");
+    }
+    if (requestedTopic === "terms") {
+      setExpandedFaq("terms");
+    }
+    if (requestedTopic === "contact") {
+      setExpandedFaq(null);
+    }
+  }, [requestedTopic]);
 
   useEffect(() => {
     Animated.sequence([
@@ -166,12 +233,66 @@ export default function HelpScreen({ navigation }) {
     ]).start();
   }, [contentAnim, heroAnim]);
 
-  const handleBack = () => {
-    if (navigation?.canGoBack?.()) {
+  const goHomeWithTransition = (fallback = "navigate") => {
+    if (transitionBusy) return;
+    setTransitionBusy(true);
+    if (startAviationTransition) {
+      startAviationTransition({
+        mode: "journey",
+        message: "Departing help center...",
+        arrivalMessage:
+          fallback === "goBack" && !shouldReturnHome
+            ? "Returning to previous page..."
+            : "Arriving at campus access...",
+        duration: 2500,
+        onBeforeFade: () => {
+          if (fallback === "goBack" && !shouldReturnHome && navigation?.canGoBack?.()) {
+            navigation.goBack();
+            return;
+          }
+          navigation.navigate("RoleSelect", {
+            skipArrivalSplash: true,
+            timestamp: Date.now(),
+          });
+        },
+        onDone: () => setTransitionBusy(false),
+      });
+      return;
+    }
+
+    if (fallback === "goBack" && !shouldReturnHome && navigation?.canGoBack?.()) {
       navigation.goBack();
       return;
     }
-    navigation.replace("RoleSelect");
+    navigation.navigate("RoleSelect");
+  };
+
+  const goLoginWithTransition = () => {
+    if (transitionBusy) return;
+    setTransitionBusy(true);
+    if (startAviationTransition) {
+      startAviationTransition({
+        mode: "journey",
+        message: "Departing help center...",
+        arrivalMessage: "Arriving at secure login...",
+        duration: 2500,
+        onBeforeFade: () => {
+          navigation.navigate("Login", {
+            role: "campus",
+            skipArrivalSplash: true,
+            timestamp: Date.now(),
+          });
+        },
+        onDone: () => setTransitionBusy(false),
+      });
+      return;
+    }
+
+    navigation.navigate("Login");
+  };
+
+  const handleBack = () => {
+    goHomeWithTransition(navigation?.canGoBack?.() && !shouldReturnHome ? "goBack" : "navigate");
   };
 
   const heroEntranceStyle = {
@@ -232,8 +353,9 @@ export default function HelpScreen({ navigation }) {
         >
           <Animated.View style={[helpStyles.heroInner, heroEntranceStyle]}>
             <TouchableOpacity
-              style={helpStyles.backButton}
+              style={[helpStyles.backButton, transitionBusy && { opacity: 0.7 }]}
               onPress={handleBack}
+              disabled={transitionBusy}
               activeOpacity={0.8}
               accessibilityLabel="Go back"
               accessibilityRole="button"
@@ -283,10 +405,47 @@ export default function HelpScreen({ navigation }) {
         </LinearGradient>
 
         <Animated.View style={[helpStyles.pageShell, contentEntranceStyle]}>
+          <View style={helpStyles.topicPanel}>
+            <View style={helpStyles.topicHeader}>
+              <Text style={helpStyles.sectionEyebrow}>Start Here</Text>
+              <Text style={helpStyles.topicTitle}>What do you need help with?</Text>
+            </View>
+            <View style={helpStyles.topicGrid}>
+              {SUPPORT_TOPICS.map((topic) => (
+                <TouchableOpacity
+                  key={topic.id}
+                  style={[
+                    helpStyles.topicCard,
+                    expandedFaq === topic.faq && helpStyles.topicCardActive,
+                  ]}
+                  onPress={() => setExpandedFaq(topic.faq)}
+                  activeOpacity={0.84}
+                  accessibilityRole="button"
+                  accessibilityLabel={topic.title}
+                  {...(isWeb && {
+                    onKeyPress: (e) => handleKeyPress(e, () => setExpandedFaq(topic.faq)),
+                    tabIndex: 0,
+                  })}
+                >
+                  <View style={helpStyles.topicIcon}>
+                    <Ionicons name={topic.icon} size={19} color={brandColors.blue} />
+                  </View>
+                  <View style={helpStyles.topicCopy}>
+                    <Text style={helpStyles.topicCardTitle}>{topic.title}</Text>
+                    <Text style={helpStyles.topicCardText}>{topic.description}</Text>
+                  </View>
+                  <Ionicons name="arrow-forward-outline" size={16} color={brandColors.blue} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           <View style={helpStyles.sectionCard}>
             <View style={helpStyles.sectionHeader}>
               <Text style={helpStyles.sectionEyebrow}>Support Channels</Text>
-              <Text style={helpStyles.sectionTitle}>Reach the right team quickly</Text>
+              <Text style={helpStyles.sectionTitle}>
+                {requestedTopic === "contact" ? "Contact SafePass support" : "Reach the right team quickly"}
+              </Text>
               <Text style={helpStyles.sectionSubtitle}>
                 Choose the contact path that best fits the issue you are
                 dealing with.
@@ -325,7 +484,7 @@ export default function HelpScreen({ navigation }) {
                   </View>
                   <View style={helpStyles.contactLinkRow}>
                     <Text style={[helpStyles.contactLinkText, { color: item.accent }]}>
-                      Open
+                      {item.id === "email" ? "Send email" : item.id === "call" ? "Call now" : "Open site"}
                     </Text>
                     <Ionicons name="arrow-forward" size={16} color={item.accent} />
                   </View>
@@ -363,7 +522,9 @@ export default function HelpScreen({ navigation }) {
 
           <View style={helpStyles.sectionCard}>
             <View style={helpStyles.sectionHeader}>
-              <Text style={helpStyles.sectionEyebrow}>FAQ</Text>
+              <Text style={helpStyles.sectionEyebrow}>
+                {requestedTopic === "privacy" ? "Privacy Policy" : requestedTopic === "terms" ? "Terms of Service" : "FAQ"}
+              </Text>
               <Text style={helpStyles.sectionTitle}>Common answers</Text>
               <Text style={helpStyles.sectionSubtitle}>
                 Expand a topic below to see the answer.
@@ -376,7 +537,7 @@ export default function HelpScreen({ navigation }) {
                 return (
                   <TouchableOpacity
                     key={faq.id}
-                    style={helpStyles.faqItem}
+                    style={[helpStyles.faqItem, expanded && helpStyles.faqItemActive]}
                     onPress={() => setExpandedFaq(expanded ? null : faq.id)}
                     activeOpacity={0.85}
                   >
@@ -392,7 +553,9 @@ export default function HelpScreen({ navigation }) {
                       />
                     </View>
                     {expanded && (
-                      <Text style={helpStyles.faqAnswer}>{faq.answer}</Text>
+                      <View style={helpStyles.faqAnswerBox}>
+                        <Text style={helpStyles.faqAnswer}>{faq.answer}</Text>
+                      </View>
                     )}
                   </TouchableOpacity>
                 );
@@ -414,15 +577,17 @@ export default function HelpScreen({ navigation }) {
             </View>
             <View style={helpStyles.ctaActions}>
               <TouchableOpacity
-                style={helpStyles.secondaryCta}
-                onPress={() => navigation.navigate("RoleSelect")}
+                style={[helpStyles.secondaryCta, transitionBusy && { opacity: 0.7 }]}
+                onPress={() => goHomeWithTransition("navigate")}
+                disabled={transitionBusy}
                 activeOpacity={0.85}
               >
                 <Text style={helpStyles.secondaryCtaText}>Back Home</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={helpStyles.primaryCta}
-                onPress={() => navigation.navigate("Login")}
+                style={[helpStyles.primaryCta, transitionBusy && { opacity: 0.7 }]}
+                onPress={goLoginWithTransition}
+                disabled={transitionBusy}
                 activeOpacity={0.85}
               >
                 <Text style={helpStyles.primaryCtaText}>Go to Login</Text>

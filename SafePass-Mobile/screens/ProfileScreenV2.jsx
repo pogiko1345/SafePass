@@ -119,6 +119,11 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   }, []);
 
   useEffect(() => {
+    const unsubscribe = navigation?.addListener?.("focus", loadPreferences);
+    return unsubscribe;
+  }, [navigation]);
+
+  useEffect(() => {
     if (profile) savePreferences();
   }, [
     notificationsEnabled,
@@ -198,7 +203,9 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
       const [notifications, biometric, darkMode, language] = await Promise.all([
         Storage.getItem("notificationsEnabled"),
         Storage.getItem("biometricEnabled"),
-        Storage.getItem("darkModeEnabled"),
+        Storage.getItem("darkModeEnabled").then(async (value) =>
+          value !== null ? value : Storage.getItem("isDarkMode"),
+        ),
         Storage.getItem("selectedLanguage"),
       ]);
       if (notifications !== null)
@@ -217,6 +224,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         Storage.setItem("notificationsEnabled", String(notificationsEnabled)),
         Storage.setItem("biometricEnabled", String(biometricEnabled)),
         Storage.setItem("darkModeEnabled", String(darkModeEnabled)),
+        Storage.setItem("isDarkMode", JSON.stringify(darkModeEnabled)),
         Storage.setItem("selectedLanguage", selectedLanguage),
       ]);
     } catch (e) {

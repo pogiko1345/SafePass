@@ -65,6 +65,7 @@ export default function VerificationScreen({ navigation, route }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const otpInputRef = useRef(null);
   
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -684,7 +685,7 @@ export default function VerificationScreen({ navigation, route }) {
                             colors={['#EEF5FF', '#D8E8FF']}
                             style={verificationStyles.otpIconContainer}
                           >
-                            <Ionicons name="key-outline" size={30} color="#0A3D91" />
+                            <Ionicons name="key-outline" size={22} color="#0A3D91" />
                           </LinearGradient>
                           <Text style={verificationStyles.otpTitle}>Enter Verification Code</Text>
                           <Text style={verificationStyles.otpSubtitle}>
@@ -716,26 +717,49 @@ export default function VerificationScreen({ navigation, route }) {
                         ) : null}
 
                         <View style={verificationStyles.otpInputContainer}>
-                          <TextInput
+                          <TouchableOpacity
                             style={[
-                              verificationStyles.otpInput,
+                              verificationStyles.otpCodeEntry,
                               otpError && verificationStyles.otpInputError,
-                              isCompactWidth && {
-                                height: 62,
-                                fontSize: 28,
-                                letterSpacing: 6,
-                                paddingHorizontal: 10,
-                              },
+                              isCompactWidth && verificationStyles.otpCodeEntryCompact,
                             ]}
-                            placeholder="000000"
-                            placeholderTextColor="#9CA3AF"
-                            value={otpCode}
-                            onChangeText={handleOtpChange}
-                            keyboardType="numeric"
-                            maxLength={6}
-                            autoFocus={true}
-                            editable={!isLoading}
-                          />
+                            activeOpacity={0.9}
+                            onPress={() => otpInputRef.current?.focus()}
+                            disabled={isLoading}
+                          >
+                            {Array.from({ length: 6 }).map((_, index) => {
+                              const digit = otpCode[index] || "";
+                              const isActive = otpCode.length === index && !isLoading;
+
+                              return (
+                                <View
+                                  key={`otp-digit-${index}`}
+                                  style={[
+                                    verificationStyles.otpDigitBox,
+                                    digit && verificationStyles.otpDigitBoxFilled,
+                                    isActive && verificationStyles.otpDigitBoxActive,
+                                    isCompactWidth && verificationStyles.otpDigitBoxCompact,
+                                  ]}
+                                >
+                                  <Text style={verificationStyles.otpDigitText}>
+                                    {digit || " "}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                            <TextInput
+                              ref={otpInputRef}
+                              style={verificationStyles.otpHiddenInput}
+                              value={otpCode}
+                              onChangeText={handleOtpChange}
+                              keyboardType="numeric"
+                              maxLength={6}
+                              autoFocus={true}
+                              editable={!isLoading}
+                              textContentType="oneTimeCode"
+                              autoComplete="one-time-code"
+                            />
+                          </TouchableOpacity>
                           {otpError && (
                             <Text style={verificationStyles.otpErrorText}>{otpError}</Text>
                           )}
@@ -754,10 +778,10 @@ export default function VerificationScreen({ navigation, route }) {
                         <TouchableOpacity
                           style={[
                             verificationStyles.verifyButton,
-                            isLoading && verificationStyles.buttonDisabled
+                            (isLoading || otpCode.length !== 6) && verificationStyles.buttonDisabled
                           ]}
                           onPress={verifyOtp}
-                          disabled={isLoading}
+                          disabled={isLoading || otpCode.length !== 6}
                           activeOpacity={0.8}
                         >
                           <LinearGradient

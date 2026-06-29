@@ -1,20 +1,22 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
   Linking,
   Platform,
-  ScrollView,
   StatusBar,
   Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
+  Easing,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import SocialDock from "../components/SocialDock";
+import AviationSplash from "../components/AviationSplash";
+import { useAviationTransition } from "../utils/AviationTransitionContext";
 import roleSelectStyles from "../styles/RoleSelectStyles";
 import { brandColors, sapphireGradient } from "../styles/brandColors";
 import Logo from "../assets/LogoSapphire.jpg";
@@ -55,15 +57,36 @@ const metrics = [
   ["Monitoring", "Real time"],
 ];
 
-export default function RoleSelectScreen({ navigation }) {
+const accessPreviewItems = [
+  { label: "Visitor Pass", value: "Ready", icon: "qr-code-outline", accent: brandColors.success },
+  { label: "Gate Scan", value: "Online", icon: "radio-outline", accent: brandColors.sky },
+  { label: "Security Desk", value: "Live", icon: "shield-checkmark-outline", accent: brandColors.blue },
+];
+
+export default function RoleSelectScreen({ navigation, route }) {
+  const startAviationTransition = useAviationTransition();
   const { width } = useWindowDimensions();
   const isWide = width >= 900;
   const isCompact = width < 720;
   const isPhone = width < 480;
+  const [introVisible, setIntroVisible] = useState(true);
+  const [takeoffVisible, setTakeoffVisible] = useState(false);
+  const [returnJourneyVisible, setReturnJourneyVisible] = useState(false);
+  const [journeyArrivalMessage, setJourneyArrivalMessage] = useState("Arriving at secure login...");
+  const pendingNavigationRef = useRef(null);
+  const hasHandledInitialFocusRef = useRef(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const screenEnterAnim = useRef(new Animated.Value(0)).current;
   const heroAnim = useRef(new Animated.Value(0)).current;
+  const heroEyebrowAnim = useRef(new Animated.Value(0)).current;
+  const heroTitleAnim = useRef(new Animated.Value(0)).current;
+  const heroBodyAnim = useRef(new Animated.Value(0)).current;
+  const heroVisualIntroAnim = useRef(new Animated.Value(0)).current;
   const mobileFeatureAnim = useRef(new Animated.Value(0)).current;
   const mobileVisitorAnim = useRef(new Animated.Value(0)).current;
   const desktopFeatureAnim = useRef(new Animated.Value(0)).current;
+  const footerAnim = useRef(new Animated.Value(0)).current;
+  const pageTransitionAnim = useRef(new Animated.Value(1)).current;
   const schoolCardFloatAnim = useRef(new Animated.Value(0)).current;
   const mobileBadgePulseAnim = useRef(new Animated.Value(0)).current;
   const buttonPressAnim = useRef(new Animated.Value(1)).current;
@@ -74,28 +97,99 @@ export default function RoleSelectScreen({ navigation }) {
   const contactHoverAnim = useRef(new Animated.Value(0)).current;
   const visitorLinkHoverAnim = useRef(new Animated.Value(0)).current;
   const visitorLinkPressAnim = useRef(new Animated.Value(1)).current;
+  const footerButtonPressAnim = useRef(new Animated.Value(1)).current;
+  const footerButtonHoverAnim = useRef(new Animated.Value(0)).current;
+  const featureHoverAnims = useRef(platformHighlights.map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.timing(heroAnim, {
+    const unsubscribe = navigation.addListener("focus", () => {
+      if (!hasHandledInitialFocusRef.current) {
+        hasHandledInitialFocusRef.current = true;
+        return;
+      }
+      if (route?.params?.returnJourneySplash) {
+        setIntroVisible(false);
+        setReturnJourneyVisible(true);
+        navigation.setParams?.({ returnJourneySplash: false });
+        return;
+      }
+      if (route?.params?.skipArrivalSplash) {
+        navigation.setParams?.({ skipArrivalSplash: false });
+        return;
+      }
+      setIntroVisible(true);
+    });
+
+    return unsubscribe;
+  }, [navigation, route?.params?.returnJourneySplash, route?.params?.skipArrivalSplash]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(screenEnterAnim, {
         toValue: 1,
-        duration: 560,
+        duration: 460,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: Platform.OS !== "web",
       }),
-      Animated.parallel([
-        Animated.timing(mobileVisitorAnim, {
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(heroAnim, {
+            toValue: 1,
+            duration: 520,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: Platform.OS !== "web",
+          }),
+          Animated.stagger(90, [
+            Animated.timing(heroEyebrowAnim, {
+              toValue: 1,
+              duration: 520,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: Platform.OS !== "web",
+            }),
+            Animated.timing(heroTitleAnim, {
+              toValue: 1,
+              duration: 620,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: Platform.OS !== "web",
+            }),
+            Animated.timing(heroBodyAnim, {
+              toValue: 1,
+              duration: 560,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: Platform.OS !== "web",
+            }),
+            Animated.timing(heroVisualIntroAnim, {
+              toValue: 1,
+              duration: 620,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: Platform.OS !== "web",
+            }),
+          ]),
+        ]),
+        Animated.parallel([
+          Animated.timing(mobileVisitorAnim, {
+            toValue: 1,
+            duration: 340,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: Platform.OS !== "web",
+          }),
+          Animated.timing(mobileFeatureAnim, {
+            toValue: 1,
+            duration: 390,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: Platform.OS !== "web",
+          }),
+          Animated.timing(desktopFeatureAnim, {
+            toValue: 1,
+            duration: 410,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: Platform.OS !== "web",
+          }),
+        ]),
+        Animated.timing(footerAnim, {
           toValue: 1,
-          duration: 360,
-          useNativeDriver: Platform.OS !== "web",
-        }),
-        Animated.timing(mobileFeatureAnim, {
-          toValue: 1,
-          duration: 420,
-          useNativeDriver: Platform.OS !== "web",
-        }),
-        Animated.timing(desktopFeatureAnim, {
-          toValue: 1,
-          duration: 440,
+          duration: 340,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: Platform.OS !== "web",
         }),
       ]),
@@ -134,29 +228,97 @@ export default function RoleSelectScreen({ navigation }) {
 
     if (Platform.OS === "web" && typeof document !== "undefined") {
       document.title = "SafePass Smart Campus | Sapphire International Aviation Academy";
+      const previousScrollBehavior = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior = "smooth";
+      return () => {
+        schoolFloat.stop();
+        badgePulse.stop();
+        document.documentElement.style.scrollBehavior = previousScrollBehavior;
+      };
     }
 
     return () => {
       schoolFloat.stop();
       badgePulse.stop();
     };
-  }, [desktopFeatureAnim, heroAnim, mobileBadgePulseAnim, mobileFeatureAnim, mobileVisitorAnim, schoolCardFloatAnim]);
+  }, [
+    desktopFeatureAnim,
+    footerAnim,
+    heroAnim,
+    heroBodyAnim,
+    heroEyebrowAnim,
+    heroTitleAnim,
+    heroVisualIntroAnim,
+    mobileBadgePulseAnim,
+    mobileFeatureAnim,
+    mobileVisitorAnim,
+    schoolCardFloatAnim,
+    screenEnterAnim,
+  ]);
+
+  const navigateWithTransition = (callback, arrivalMessage = "Arriving at destination...") => {
+    pendingNavigationRef.current = callback;
+    setJourneyArrivalMessage(arrivalMessage);
+    Animated.timing(pageTransitionAnim, {
+      toValue: 0,
+      duration: 180,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: Platform.OS !== "web",
+    }).start(({ finished }) => {
+      if (!finished) return;
+      if (startAviationTransition) {
+        startAviationTransition({
+          mode: "journey",
+          message: "Preparing for departure...",
+          arrivalMessage,
+          duration: 2500,
+          onBeforeFade: () => {
+            pendingNavigationRef.current?.();
+            pendingNavigationRef.current = null;
+            pageTransitionAnim.setValue(1);
+          },
+        });
+        return;
+      }
+      setTakeoffVisible(true);
+      setTimeout(() => pageTransitionAnim.setValue(1), 80);
+    });
+  };
+
+  const handleTakeoffDone = () => {
+    setTakeoffVisible(false);
+    if (pendingNavigationRef.current) {
+      pendingNavigationRef.current();
+      pendingNavigationRef.current = null;
+    }
+  };
 
   const handleLogin = () => {
-    navigation.navigate("Login", {
-      role: "campus",
-      timestamp: Date.now(),
-    });
+    navigateWithTransition(() => {
+      navigation.navigate("Login", {
+        role: "campus",
+        timestamp: Date.now(),
+        skipArrivalSplash: true,
+      });
+    }, "Arriving at secure login...");
   };
 
   const handleContact = () => {
-    navigation.navigate("Help");
+    navigateWithTransition(() => {
+      navigation.navigate("Help", {
+        fromHome: true,
+        timestamp: Date.now(),
+      });
+    }, "Arriving at help center...");
   };
 
   const handleVisitorRegister = () => {
-    navigation.navigate("VisitorRegister", {
-      timestamp: Date.now(),
-    });
+    navigateWithTransition(() => {
+      navigation.navigate("VisitorRegister", {
+        timestamp: Date.now(),
+        fromHome: true,
+      });
+    }, "Arriving at visitor registration...");
   };
 
   const handleKeyPress = (event, handler) => {
@@ -266,12 +428,203 @@ export default function RoleSelectScreen({ navigation }) {
       },
     ],
   };
-  const schoolCardFloatStyle = {
+  const heroEyebrowRevealStyle = {
+    opacity: heroEyebrowAnim,
     transform: [
       {
-        translateY: schoolCardFloatAnim.interpolate({
+        translateY: heroEyebrowAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, -8],
+          outputRange: [24, 0],
+        }),
+      },
+    ],
+  };
+  const heroTitleRevealStyle = {
+    opacity: heroTitleAnim,
+    transform: [
+      {
+        translateY: heroTitleAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [34, 0],
+        }),
+      },
+    ],
+  };
+  const heroBodyRevealStyle = {
+    opacity: heroBodyAnim,
+    transform: [
+      {
+        translateY: heroBodyAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [28, 0],
+        }),
+      },
+    ],
+  };
+  const heroVisualIntroStyle = {
+    opacity: heroVisualIntroAnim,
+    transform: [
+      {
+        translateY: heroVisualIntroAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [44, 0],
+        }),
+      },
+      {
+        scale: heroVisualIntroAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.965, 1],
+        }),
+      },
+    ],
+  };
+  const screenEnterTranslate = screenEnterAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 0],
+  });
+  const pageExitTranslate = pageTransitionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-12, 0],
+  });
+  const screenShellMotionStyle = {
+    opacity: Animated.multiply(screenEnterAnim, pageTransitionAnim),
+    transform: [
+      {
+        translateY: Animated.add(screenEnterTranslate, pageExitTranslate),
+      },
+    ],
+  };
+  const platformScrollRevealStyle = {
+    opacity: scrollY.interpolate({
+      inputRange: [80, 220],
+      outputRange: [0.72, 1],
+      extrapolate: "clamp",
+    }),
+    transform: [
+      {
+        translateY: scrollY.interpolate({
+          inputRange: [80, 260],
+          outputRange: [20, 0],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+  };
+  const footerScrollRevealStyle = {
+    opacity: scrollY.interpolate({
+      inputRange: [430, 650],
+      outputRange: [0.68, 1],
+      extrapolate: "clamp",
+    }),
+    transform: [
+      {
+        translateY: scrollY.interpolate({
+          inputRange: [430, 690],
+          outputRange: [22, 0],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+  };
+  const footerEntranceStyle = {
+    opacity: footerAnim,
+    transform: [
+      {
+        translateY: footerAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [18, 0],
+        }),
+      },
+    ],
+  };
+  const metricDockMotionStyle = {
+    opacity: scrollY.interpolate({
+      inputRange: [0, 170],
+      outputRange: [1, 0.86],
+      extrapolate: "clamp",
+    }),
+    transform: [
+      {
+        translateY: scrollY.interpolate({
+          inputRange: [0, 220],
+          outputRange: [0, -10],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+  };
+  const pageMotionStyle = {
+    transform: [
+      {
+        scale: pageTransitionAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.992, 1],
+        }),
+      },
+    ],
+  };
+  const heroScrollStyle = {
+    transform: [
+      {
+        translateY: scrollY.interpolate({
+          inputRange: [0, 520],
+          outputRange: [0, -34],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+  };
+  const heroVisualScrollTranslate = scrollY.interpolate({
+    inputRange: [0, 520],
+    outputRange: [0, -54],
+    extrapolate: "clamp",
+  });
+  const schoolFloatTranslate = schoolCardFloatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -8],
+  });
+  const heroVisualMotionStyle = {
+    opacity: scrollY.interpolate({
+      inputRange: [0, 520],
+      outputRange: [1, 0.82],
+      extrapolate: "clamp",
+    }),
+    transform: [
+      {
+        translateY: Animated.add(heroVisualScrollTranslate, schoolFloatTranslate),
+      },
+      {
+        scale: scrollY.interpolate({
+          inputRange: [0, 520],
+          outputRange: [1, 0.955],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+  };
+  const mobileHeroScrollStyle = {
+    transform: [
+      {
+        translateY: scrollY.interpolate({
+          inputRange: [0, 260],
+          outputRange: [0, -10],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+  };
+  const mobileSectionScrollStyle = {
+    opacity: scrollY.interpolate({
+      inputRange: [40, 180],
+      outputRange: [0.82, 1],
+      extrapolate: "clamp",
+    }),
+    transform: [
+      {
+        translateY: scrollY.interpolate({
+          inputRange: [40, 220],
+          outputRange: [18, 0],
+          extrapolate: "clamp",
         }),
       },
     ],
@@ -325,12 +678,17 @@ export default function RoleSelectScreen({ navigation }) {
     return (
       <SafeAreaView style={roleSelectStyles.mobileSafeArea}>
         <StatusBar barStyle="light-content" backgroundColor={brandColors.navy} />
-        <ScrollView
-          style={roleSelectStyles.mobilePage}
+        <Animated.ScrollView
+          style={[roleSelectStyles.mobilePage, screenShellMotionStyle]}
           contentContainerStyle={roleSelectStyles.mobileScrollContent}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: Platform.OS !== "web" },
+          )}
         >
-          <Animated.View style={entranceStyle}>
+          <Animated.View style={[entranceStyle, pageMotionStyle, mobileHeroScrollStyle]}>
             <LinearGradient
               colors={sapphireGradient}
               start={{ x: 0, y: 0 }}
@@ -370,6 +728,18 @@ export default function RoleSelectScreen({ navigation }) {
               </View>
             </View>
 
+            <View style={roleSelectStyles.mobileAccessSummary}>
+              {accessPreviewItems.map((item) => (
+                <View key={item.label} style={roleSelectStyles.mobileAccessSummaryItem}>
+                  <Ionicons name={item.icon} size={16} color="#FFFFFF" />
+                  <View style={roleSelectStyles.mobileAccessSummaryCopy}>
+                    <Text style={roleSelectStyles.mobileAccessSummaryValue}>{item.value}</Text>
+                    <Text style={roleSelectStyles.mobileAccessSummaryLabel}>{item.label}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
             <View style={roleSelectStyles.mobileActionStack}>
               <Animated.View style={{ transform: [{ scale: mobileLoginPressAnim }] }}>
                 <TouchableOpacity
@@ -399,7 +769,7 @@ export default function RoleSelectScreen({ navigation }) {
             </LinearGradient>
           </Animated.View>
 
-          <Animated.View style={[roleSelectStyles.mobileSection, mobileFeatureEntranceStyle]}>
+          <Animated.View style={[roleSelectStyles.mobileSection, mobileFeatureEntranceStyle, mobileSectionScrollStyle]}>
             <Animated.View
               style={[
                 roleSelectStyles.mobileVisitorCard,
@@ -442,11 +812,32 @@ export default function RoleSelectScreen({ navigation }) {
             </View>
           </Animated.View>
 
-          <View style={roleSelectStyles.mobileFooter}>
+          <Animated.View style={[roleSelectStyles.mobileFooter, footerEntranceStyle]}>
             <SocialDock links={socialLinks} />
             <Text style={roleSelectStyles.mobileVersionText}>SafePass Smart Campus v2.1.0</Text>
-          </View>
-        </ScrollView>
+          </Animated.View>
+        </Animated.ScrollView>
+        {introVisible ? (
+          <AviationSplash mode="landing" message="Arriving at campus access..." duration={1500} onDone={() => setIntroVisible(false)} />
+        ) : null}
+        {takeoffVisible ? (
+          <AviationSplash
+            mode="journey"
+            message="Preparing for departure..."
+            arrivalMessage={journeyArrivalMessage}
+            duration={2700}
+            onDone={handleTakeoffDone}
+          />
+        ) : null}
+        {returnJourneyVisible ? (
+          <AviationSplash
+            mode="journey"
+            message="Departing secure login..."
+            arrivalMessage="Arriving at campus access..."
+            duration={2700}
+            onDone={() => setReturnJourneyVisible(false)}
+          />
+        ) : null}
       </SafeAreaView>
     );
   }
@@ -454,10 +845,15 @@ export default function RoleSelectScreen({ navigation }) {
   return (
     <SafeAreaView style={roleSelectStyles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={brandColors.navy} />
-      <ScrollView
-        style={roleSelectStyles.page}
+      <Animated.ScrollView
+        style={[roleSelectStyles.page, screenShellMotionStyle]}
         contentContainerStyle={roleSelectStyles.scrollContainer}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: Platform.OS !== "web" },
+        )}
       >
         <View style={roleSelectStyles.navShell}>
           <View style={[roleSelectStyles.navBar, isPhone && roleSelectStyles.navBarPhone]}>
@@ -487,25 +883,52 @@ export default function RoleSelectScreen({ navigation }) {
           </View>
         </View>
 
-        <Animated.View style={[roleSelectStyles.heroSection, isPhone && roleSelectStyles.heroSectionPhone, entranceStyle]}>
+        <Animated.View
+          style={[
+            roleSelectStyles.heroSection,
+            isPhone && roleSelectStyles.heroSectionPhone,
+            entranceStyle,
+            pageMotionStyle,
+            heroScrollStyle,
+          ]}
+        >
           <View style={[roleSelectStyles.heroGrid, !isWide && roleSelectStyles.heroGridStacked]}>
             <View style={[roleSelectStyles.heroCopy, !isWide && roleSelectStyles.heroCopyCentered]}>
-              <Text style={[roleSelectStyles.heroEyebrow, !isWide && roleSelectStyles.heroTextCentered]}>
+              <Animated.Text
+                style={[
+                  roleSelectStyles.heroEyebrow,
+                  !isWide && roleSelectStyles.heroTextCentered,
+                  heroEyebrowRevealStyle,
+                ]}
+              >
                 SafePass Smart Campus
-              </Text>
-              <Text style={[roleSelectStyles.heroTitle, !isWide && roleSelectStyles.heroTextCentered]}>
+              </Animated.Text>
+              <Animated.Text
+                style={[
+                  roleSelectStyles.heroTitle,
+                  !isWide && roleSelectStyles.heroTextCentered,
+                  heroTitleRevealStyle,
+                ]}
+              >
                 Sapphire International Aviation Academy
-              </Text>
-              <Text style={[roleSelectStyles.heroDescription, !isWide && roleSelectStyles.heroTextCentered]}>
+              </Animated.Text>
+              <Animated.Text
+                style={[
+                  roleSelectStyles.heroDescription,
+                  !isWide && roleSelectStyles.heroTextCentered,
+                  heroBodyRevealStyle,
+                ]}
+              >
                 One secure platform for campus ID, attendance, visitor access, staff office presence,
                 and security monitoring.
-              </Text>
+              </Animated.Text>
 
-              <View
+              <Animated.View
                 style={[
                   roleSelectStyles.heroActions,
                   !isWide && roleSelectStyles.heroActionsCentered,
                   isPhone && roleSelectStyles.heroActionsPhone,
+                  heroBodyRevealStyle,
                 ]}
               >
                 <Animated.View style={loginButtonMotion}>
@@ -543,9 +966,9 @@ export default function RoleSelectScreen({ navigation }) {
                     <Text style={roleSelectStyles.secondaryButtonText}>Contact Help</Text>
                   </TouchableOpacity>
                 </Animated.View>
-              </View>
+              </Animated.View>
 
-              <Animated.View style={visitorLinkMotion}>
+              <Animated.View style={[heroBodyRevealStyle, visitorLinkMotion]}>
                 <TouchableOpacity
                   style={[roleSelectStyles.visitorLink, !isWide && roleSelectStyles.visitorLinkCentered]}
                   onPress={handleVisitorRegister}
@@ -571,33 +994,66 @@ export default function RoleSelectScreen({ navigation }) {
                 roleSelectStyles.heroVisual,
                 !isWide && roleSelectStyles.heroVisualCentered,
                 isPhone && roleSelectStyles.heroVisualPhone,
-                schoolCardFloatStyle,
+                heroVisualIntroStyle,
               ]}
             >
-              <View style={roleSelectStyles.schoolCard}>
-                <Image source={Logo} style={roleSelectStyles.schoolLogo} resizeMode="contain" />
-                <Text style={roleSelectStyles.schoolCardLabel}>Sapphire International Aviation Academy</Text>
-                <Text style={roleSelectStyles.schoolCardTitle}>Smart campus access is ready</Text>
-                <View style={roleSelectStyles.schoolCardDivider} />
-                <View style={roleSelectStyles.statusRow}>
-                  <View style={roleSelectStyles.statusDot} />
-                  <Text style={roleSelectStyles.statusText}>Server-connected campus workflow</Text>
+              <Animated.View style={[roleSelectStyles.heroVisualStack, heroVisualMotionStyle]}>
+                <View style={roleSelectStyles.schoolCard}>
+                  <View style={roleSelectStyles.schoolCardTopRow}>
+                    <Image source={Logo} style={roleSelectStyles.schoolLogo} resizeMode="contain" />
+                    <View style={roleSelectStyles.schoolCardBadge}>
+                      <Ionicons name="checkmark-circle" size={14} color={brandColors.success} />
+                      <Text style={roleSelectStyles.schoolCardBadgeText}>Active</Text>
+                    </View>
+                  </View>
+                  <Text style={roleSelectStyles.schoolCardLabel}>Sapphire International Aviation Academy</Text>
+                  <Text style={roleSelectStyles.schoolCardTitle}>Smart campus access is ready</Text>
+                  <View style={roleSelectStyles.schoolCardDivider} />
+                  <View style={roleSelectStyles.statusRow}>
+                    <View style={roleSelectStyles.statusDot} />
+                    <Text style={roleSelectStyles.statusText}>Server-connected campus workflow</Text>
+                  </View>
                 </View>
-              </View>
+
+                <View style={roleSelectStyles.accessPreviewCard}>
+                  <View style={roleSelectStyles.accessPreviewHeader}>
+                    <Text style={roleSelectStyles.accessPreviewEyebrow}>Live Access Preview</Text>
+                    <Ionicons name="pulse-outline" size={18} color="#D8E8FF" />
+                  </View>
+                  <View style={roleSelectStyles.accessPreviewGrid}>
+                    {accessPreviewItems.map((item) => (
+                      <View key={item.label} style={roleSelectStyles.accessPreviewItem}>
+                        <View style={[roleSelectStyles.accessPreviewIcon, { backgroundColor: `${item.accent}22` }]}>
+                          <Ionicons name={item.icon} size={18} color="#FFFFFF" />
+                        </View>
+                        <Text style={roleSelectStyles.accessPreviewValue}>{item.value}</Text>
+                        <Text style={roleSelectStyles.accessPreviewLabel}>{item.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={roleSelectStyles.accessTimeline}>
+                    <View style={roleSelectStyles.accessTimelineDot} />
+                    <View style={roleSelectStyles.accessTimelineLine} />
+                    <View style={roleSelectStyles.accessTimelineDot} />
+                    <View style={roleSelectStyles.accessTimelineLine} />
+                    <View style={roleSelectStyles.accessTimelineDot} />
+                  </View>
+                </View>
+              </Animated.View>
             </Animated.View>
           </View>
 
-          <View style={[roleSelectStyles.metricDock, isCompact && roleSelectStyles.metricDockCompact]}>
+          <Animated.View style={[roleSelectStyles.metricDock, isCompact && roleSelectStyles.metricDockCompact, metricDockMotionStyle]}>
             {metrics.map(([label, value]) => (
               <View key={label} style={roleSelectStyles.metricItem}>
                 <Text style={roleSelectStyles.metricValue}>{value}</Text>
                 <Text style={roleSelectStyles.metricLabel}>{label}</Text>
               </View>
             ))}
-          </View>
+          </Animated.View>
         </Animated.View>
 
-        <Animated.View style={[roleSelectStyles.platformSection, desktopFeatureEntranceStyle]}>
+        <Animated.View style={[roleSelectStyles.platformSection, desktopFeatureEntranceStyle, platformScrollRevealStyle]}>
           <Text style={roleSelectStyles.sectionKicker}>Platform Coverage</Text>
           <Text style={roleSelectStyles.sectionTitle}>Built for every campus role</Text>
           <Text style={roleSelectStyles.sectionSubtitle}>
@@ -606,19 +1062,50 @@ export default function RoleSelectScreen({ navigation }) {
           </Text>
 
           <View style={roleSelectStyles.featureGrid}>
-            {platformHighlights.map((item) => (
-              <Animated.View key={item.title} style={[roleSelectStyles.featureCard, desktopFeatureEntranceStyle]}>
+            {platformHighlights.map((item, index) => {
+              const cardScrollTranslate = scrollY.interpolate({
+                inputRange: [210 + index * 26, 430 + index * 26],
+                outputRange: [46, 0],
+                extrapolate: "clamp",
+              });
+              const cardHoverTranslate = featureHoverAnims[index].interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, -6],
+              });
+              const cardMotionStyle = {
+                opacity: scrollY.interpolate({
+                  inputRange: [180 + index * 22, 360 + index * 22],
+                  outputRange: [0, 1],
+                  extrapolate: "clamp",
+                }),
+                transform: [
+                  {
+                    translateY: Animated.add(cardScrollTranslate, cardHoverTranslate),
+                  },
+                ],
+              };
+
+              return (
+              <Animated.View
+                key={item.title}
+                style={[roleSelectStyles.featureCard, cardMotionStyle]}
+                {...(isWeb && {
+                  onMouseEnter: () => animateHover(featureHoverAnims[index], 1),
+                  onMouseLeave: () => animateHover(featureHoverAnims[index], 0),
+                })}
+              >
                 <View style={roleSelectStyles.featureIcon}>
                   <Ionicons name={item.icon} size={22} color={brandColors.blue} />
                 </View>
                 <Text style={roleSelectStyles.featureTitle}>{item.title}</Text>
                 <Text style={roleSelectStyles.featureText}>{item.description}</Text>
               </Animated.View>
-            ))}
+              );
+            })}
           </View>
         </Animated.View>
 
-        <View style={roleSelectStyles.footerBand}>
+        <Animated.View style={[roleSelectStyles.footerBand, footerEntranceStyle, footerScrollRevealStyle]}>
           <View style={roleSelectStyles.footerCard}>
             <View style={roleSelectStyles.footerTextWrap}>
               <Text style={roleSelectStyles.footerTitle}>Need help getting in?</Text>
@@ -626,18 +1113,63 @@ export default function RoleSelectScreen({ navigation }) {
                 Contact support for login, visitor registration, OTP, or account access questions.
               </Text>
             </View>
-            <TouchableOpacity style={roleSelectStyles.footerButton} onPress={handleContact} activeOpacity={0.84}>
-              <Ionicons name="headset-outline" size={18} color={brandColors.blue} />
-              <Text style={roleSelectStyles.footerButtonText}>Open Help</Text>
-            </TouchableOpacity>
+            <Animated.View
+              style={{
+                transform: [
+                  { scale: footerButtonPressAnim },
+                  {
+                    translateY: footerButtonHoverAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -3],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <TouchableOpacity
+                style={roleSelectStyles.footerButton}
+                onPress={handleContact}
+                onPressIn={() => animatePressValue(footerButtonPressAnim, 0.98)}
+                onPressOut={() => animatePressValue(footerButtonPressAnim, 1)}
+                activeOpacity={0.84}
+                {...(isWeb && {
+                  onMouseEnter: () => animateHover(footerButtonHoverAnim, 1),
+                  onMouseLeave: () => animateHover(footerButtonHoverAnim, 0),
+                })}
+              >
+                <Ionicons name="headset-outline" size={18} color={brandColors.blue} />
+                <Text style={roleSelectStyles.footerButtonText}>Open Help</Text>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
-        </View>
+        </Animated.View>
 
         <View style={roleSelectStyles.socialWrap}>
           <SocialDock links={socialLinks} />
           <Text style={roleSelectStyles.versionText}>SafePass Smart Campus v2.1.0</Text>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+      {introVisible ? (
+        <AviationSplash mode="landing" message="Arriving at campus access..." duration={1500} onDone={() => setIntroVisible(false)} />
+      ) : null}
+        {takeoffVisible ? (
+          <AviationSplash
+            mode="journey"
+            message="Preparing for departure..."
+            arrivalMessage={journeyArrivalMessage}
+            duration={2700}
+            onDone={handleTakeoffDone}
+          />
+      ) : null}
+      {returnJourneyVisible ? (
+        <AviationSplash
+          mode="journey"
+          message="Departing secure login..."
+          arrivalMessage="Arriving at campus access..."
+          duration={2700}
+          onDone={() => setReturnJourneyVisible(false)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

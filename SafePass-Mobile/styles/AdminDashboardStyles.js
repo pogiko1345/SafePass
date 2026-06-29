@@ -10,7 +10,7 @@ export default StyleSheet.create({
   
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F8FC",
+    backgroundColor: "#F5F8FC",
   },
 
   loadingContainer: {
@@ -39,7 +39,7 @@ export default StyleSheet.create({
   mainContainer: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: "#F4F8FC",
+    backgroundColor: "#F5F8FC",
   },
 
   // ============================================
@@ -54,11 +54,11 @@ export default StyleSheet.create({
     borderBottomRightRadius: 0,
     overflow: "hidden",
     borderRightWidth: 1,
-    borderRightColor: "#E2E8F0",
-    padding: 16,
+    borderRightColor: "#E8EEF6",
+    padding: 14,
     ...Platform.select({
       web: {
-        boxShadow: "8px 0px 24px rgba(15, 23, 42, 0.04)",
+        boxShadow: "10px 0px 30px rgba(15, 23, 42, 0.035)",
       },
     }),
   },
@@ -68,13 +68,13 @@ export default StyleSheet.create({
   },
 
   sidebarHeader: {
-    padding: 14,
+    padding: 12,
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#D8E6F5",
+    borderColor: "#E4ECF5",
     backgroundColor: "#FFFFFF",
-    marginBottom: 18,
+    marginBottom: 14,
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -83,15 +83,15 @@ export default StyleSheet.create({
         shadowRadius: 18,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 12px 22px rgba(15, 23, 42, 0.06)" },
+      web: { boxShadow: "0px 12px 24px rgba(15, 23, 42, 0.045)" },
     }),
   },
 
   sidebarLogoImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginBottom: 14,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: "#D8E6F5",
   },
@@ -107,11 +107,11 @@ export default StyleSheet.create({
   },
 
   sidebarBrand: {
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: "800",
     color: "#0F172A",
-    marginBottom: 10,
+    marginBottom: 8,
     textAlign: "center",
   },
 
@@ -119,10 +119,10 @@ export default StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: "#EEF5FF",
+    backgroundColor: "#F3F8FF",
     borderWidth: 1,
-    borderColor: "#B7D5F6",
-    marginBottom: 18,
+    borderColor: "#CFE3FA",
+    marginBottom: 12,
   },
 
   sidebarRoleText: {
@@ -134,12 +134,12 @@ export default StyleSheet.create({
 
   sidebarStats: {
     flexDirection: "row",
-    backgroundColor: "#F8FBFE",
-    borderRadius: 18,
-    padding: 14,
+    backgroundColor: "#FAFCFF",
+    borderRadius: 14,
+    padding: 11,
     width: "100%",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E8EEF6",
   },
 
   sidebarStat: {
@@ -162,7 +162,7 @@ export default StyleSheet.create({
   sidebarStatDivider: {
     width: 1,
     height: 30,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#E8EEF6",
   },
 
   sidebarMenuItem: {
@@ -184,9 +184,9 @@ export default StyleSheet.create({
   },
 
   sidebarMenuItemActive: {
-    backgroundColor: "#EEF5FF",
+    backgroundColor: "#F0F7FF",
     borderWidth: 1,
-    borderColor: "#9EC5F8",
+    borderColor: "#C7DCF6",
   },
 
   sidebarMenuIcon: {
@@ -236,25 +236,25 @@ export default StyleSheet.create({
     paddingHorizontal: 16,
     marginHorizontal: 14,
     marginTop: 14,
-    borderRadius: 18,
+    borderRadius: 14,
     marginBottom: 12,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: "rgba(255,255,255,0.88)",
     borderWidth: 1,
-    borderColor: "#D9E4F0",
+    borderColor: "#E3EBF4",
     ...webHover({
       cursor: "pointer",
       transition: "all 0.18s ease",
       ":hover": {
-        backgroundColor: "#EEF5FF",
-        borderColor: "#9EC5F8",
+        backgroundColor: "#F0F7FF",
+        borderColor: "#C7DCF6",
         transform: "translateX(3px)",
       },
     }),
   },
 
   sidebarOverviewButtonActive: {
-    backgroundColor: "#EEF5FF",
-    borderColor: "#9EC5F8",
+    backgroundColor: "#F0F7FF",
+    borderColor: "#C7DCF6",
   },
 
   sidebarModuleGroup: {
@@ -264,15 +264,15 @@ export default StyleSheet.create({
 
   sidebarModuleCard: {
     borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: "rgba(255,255,255,0.88)",
     borderWidth: 1,
-    borderColor: "#D9E4F0",
+    borderColor: "#E3EBF4",
     overflow: "hidden",
     ...webHover({
       transition: "all 0.18s ease",
       ":hover": {
-        borderColor: "#B7D5F6",
-        boxShadow: "0px 10px 22px rgba(15, 23, 42, 0.07)",
+        borderColor: "#C7DCF6",
+        boxShadow: "0px 10px 22px rgba(15, 23, 42, 0.05)",
       },
     }),
   },
@@ -293,8 +293,8 @@ export default StyleSheet.create({
   },
 
   sidebarModuleButtonActive: {
-    backgroundColor: "#EEF5FF",
-    borderColor: "#9EC5F8",
+    backgroundColor: "#F0F7FF",
+    borderColor: "#C7DCF6",
   },
 
   sidebarModuleCopy: {
@@ -321,19 +321,22 @@ export default StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FAFCFF",
+    borderWidth: 1,
+    borderColor: "transparent",
     ...webHover({
       cursor: "pointer",
       transition: "all 0.18s ease",
       ":hover": {
-        backgroundColor: "#EEF5FF",
+        backgroundColor: "#F0F7FF",
         transform: "translateX(3px)",
       },
     }),
   },
 
   sidebarSubmoduleButtonActive: {
-    backgroundColor: "#EEF5FF",
+    backgroundColor: "#F0F7FF",
+    borderColor: "#D5E6FA",
   },
 
   sidebarSubmoduleLabel: {
@@ -370,7 +373,7 @@ export default StyleSheet.create({
     paddingHorizontal: 16,
     marginHorizontal: 14,
     marginTop: 14,
-    borderRadius: 18,
+    borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.9)",
     borderWidth: 1,
     borderColor: "#D9E4F0",
@@ -395,7 +398,7 @@ export default StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: "#D9E4F0",
-    borderRadius: 18,
+    borderRadius: 14,
     backgroundColor: "#FFFFFF",
   },
 
@@ -500,37 +503,38 @@ export default StyleSheet.create({
     borderRightWidth: 1,
   },
   darkSidebarPanel: {
-    backgroundColor: "#111827",
-    borderColor: "#253248",
+    backgroundColor: "#080F1D",
+    borderColor: "rgba(148, 163, 184, 0.10)",
   },
   darkSidebarCard: {
-    backgroundColor: "#111827",
-    borderColor: "#253248",
+    backgroundColor: "#0F172A",
+    borderColor: "rgba(148, 163, 184, 0.12)",
   },
   darkSidebarButton: {
-    backgroundColor: "#111827",
-    borderColor: "#253248",
+    backgroundColor: "#0F172A",
+    borderColor: "rgba(148, 163, 184, 0.10)",
   },
   darkSidebarButtonActive: {
-    backgroundColor: "#1E293B",
-    borderColor: "#3B82F6",
+    backgroundColor: "rgba(28, 109, 208, 0.14)",
+    borderColor: "rgba(96, 165, 250, 0.32)",
   },
   darkSidebarModuleButton: {
-    backgroundColor: "#111827",
+    backgroundColor: "#0F172A",
   },
   darkSidebarSubmoduleButton: {
-    backgroundColor: "#0F172A",
+    backgroundColor: "#111827",
+    borderColor: "rgba(148, 163, 184, 0.08)",
   },
   darkSidebarStats: {
     backgroundColor: "#0F172A",
-    borderColor: "#253248",
+    borderColor: "rgba(148, 163, 184, 0.10)",
   },
   darkSidebarRoleBadge: {
-    backgroundColor: "#1E3A8A",
-    borderColor: "#3B82F6",
+    backgroundColor: "rgba(28, 109, 208, 0.18)",
+    borderColor: "rgba(96, 165, 250, 0.32)",
   },
   darkSidebarMutedText: {
-    color: "#CBD5E1",
+    color: "#A7B3C6",
   },
 
   // ============================================
@@ -539,7 +543,7 @@ export default StyleSheet.create({
 
   contentArea: {
     flex: 1,
-    backgroundColor: "#F4F8FC",
+    backgroundColor: "#F3F7FB",
   },
 
   mobileAdminTopBar: {
@@ -549,7 +553,7 @@ export default StyleSheet.create({
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255,255,255,0.96)",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
     zIndex: 5,
@@ -658,8 +662,8 @@ export default StyleSheet.create({
   },
 
   pageContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingHorizontal: 22,
+    paddingTop: 18,
     paddingBottom: 26,
   },
 
@@ -671,11 +675,11 @@ export default StyleSheet.create({
   },
 
   adminSectionShell: {
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 20,
-    marginBottom: 20,
-    backgroundColor: "rgba(255,255,255,0.88)",
+    padding: 18,
+    marginBottom: 18,
+    backgroundColor: "rgba(255,255,255,0.96)",
     ...Platform.select({
       ios: {
         shadowColor: "#0F172A",
@@ -684,7 +688,7 @@ export default StyleSheet.create({
         shadowRadius: 28,
       },
       android: { elevation: 4 },
-      web: { boxShadow: "0px 16px 40px rgba(15,23,42,0.08)" },
+      web: { boxShadow: "0px 14px 34px rgba(15,23,42,0.06)" },
     }),
   },
 
@@ -693,7 +697,7 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 16,
     flexWrap: "wrap",
   },
 
@@ -794,19 +798,28 @@ export default StyleSheet.create({
     alignItems: width < 760 ? "flex-start" : "center",
     gap: 14,
     borderWidth: 1,
-    borderColor: "#D8E8FF",
-    borderRadius: 18,
+    borderColor: "#E7EEF6",
+    borderRadius: 16,
     backgroundColor: "#F8FBFE",
     padding: 16,
+  },
+
+  appointmentManagementIntroCardDark: {
+    borderColor: "rgba(148, 163, 184, 0.14)",
+    backgroundColor: "#0F172A",
   },
 
   appointmentManagementIntroIcon: {
     width: 48,
     height: 48,
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#EEF5FF",
+  },
+
+  appointmentManagementIntroIconDark: {
+    backgroundColor: "rgba(96, 165, 250, 0.14)",
   },
 
   appointmentManagementIntroCopy: {
@@ -847,6 +860,11 @@ export default StyleSheet.create({
     paddingVertical: 12,
   },
 
+  appointmentManagementStatCardDark: {
+    backgroundColor: "#0F172A",
+    borderColor: "rgba(148, 163, 184, 0.12)",
+  },
+
   appointmentManagementStatIcon: {
     width: 34,
     height: 34,
@@ -854,6 +872,10 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#EEF5FF",
+  },
+
+  appointmentManagementStatIconDark: {
+    backgroundColor: "rgba(96, 165, 250, 0.14)",
   },
 
   appointmentManagementStatValue: {
@@ -899,10 +921,15 @@ export default StyleSheet.create({
     gap: 8,
     flexWrap: "wrap",
     borderWidth: 1,
-    borderColor: "#D8E8FF",
-    borderRadius: 18,
+    borderColor: "#E7EEF6",
+    borderRadius: 16,
     backgroundColor: "#F8FBFE",
     padding: 6,
+  },
+
+  appointmentConfigTabsDark: {
+    backgroundColor: "#0F172A",
+    borderColor: "rgba(148, 163, 184, 0.14)",
   },
 
   appointmentConfigTab: {
@@ -918,6 +945,11 @@ export default StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
     backgroundColor: "#FFFFFF",
+  },
+
+  appointmentConfigTabDark: {
+    backgroundColor: "#111827",
+    borderColor: "rgba(148, 163, 184, 0.10)",
   },
 
   appointmentConfigTabActive: {
@@ -976,6 +1008,11 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,
+  },
+
+  appointmentConfigSideCardDark: {
+    backgroundColor: "#0F172A",
+    borderColor: "rgba(148, 163, 184, 0.14)",
   },
 
   appointmentConfigConnectionList: {
@@ -1291,6 +1328,13 @@ export default StyleSheet.create({
     elevation: 2,
   },
 
+  appointmentOptionCardDark: {
+    backgroundColor: "#111827",
+    borderColor: "rgba(148, 163, 184, 0.14)",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+
   appointmentOptionHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1305,6 +1349,10 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#EEF5FF",
+  },
+
+  appointmentOptionIconDark: {
+    backgroundColor: "rgba(96, 165, 250, 0.14)",
   },
 
   appointmentOptionTitleBlock: {
@@ -1330,6 +1378,10 @@ export default StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: "#F1F5F9",
+  },
+
+  appointmentOptionCountBadgeDark: {
+    backgroundColor: "rgba(96, 165, 250, 0.12)",
   },
 
   appointmentOptionCountText: {
@@ -1390,6 +1442,11 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 11,
+  },
+
+  appointmentOptionItemDark: {
+    backgroundColor: "#0F172A",
+    borderColor: "rgba(148, 163, 184, 0.12)",
   },
 
   appointmentOptionItemMain: {
@@ -1471,9 +1528,19 @@ export default StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
+  appointmentOptionMiniButtonDark: {
+    backgroundColor: "#111827",
+    borderColor: "rgba(148, 163, 184, 0.16)",
+  },
+
   appointmentOptionDeleteButton: {
     borderColor: "#FECACA",
     backgroundColor: "#FFF7F7",
+  },
+
+  appointmentOptionDeleteButtonDark: {
+    borderColor: "rgba(248, 113, 113, 0.30)",
+    backgroundColor: "rgba(127, 29, 29, 0.24)",
   },
 
   appointmentOptionItemSaving: {
@@ -2058,6 +2125,64 @@ export default StyleSheet.create({
     alignItems: "center",
     gap: 10,
     flexShrink: 0,
+  },
+
+  adminThemeToggle: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(191, 219, 254, 0.8)",
+    backgroundColor: "rgba(255,255,255,0.92)",
+    ...Platform.select({
+      web: {
+        cursor: "pointer",
+        transition: "transform 0.18s ease, background-color 0.18s ease",
+        ":hover": {
+          transform: "translateY(-1px)",
+          backgroundColor: "#FFFFFF",
+        },
+      },
+    }),
+  },
+
+  adminThemeToggleDark: {
+    backgroundColor: "rgba(15, 23, 42, 0.38)",
+    borderColor: "rgba(183, 213, 246, 0.34)",
+  },
+
+  adminThemeToggleCompact: {
+    width: 38,
+    height: 38,
+    minHeight: 38,
+    paddingHorizontal: 0,
+    justifyContent: "center",
+  },
+
+  adminThemeToggleIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF5FF",
+  },
+
+  adminThemeToggleIconDark: {
+    backgroundColor: "rgba(96, 165, 250, 0.18)",
+  },
+
+  adminThemeToggleText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#0A3D91",
+  },
+
+  adminThemeToggleTextDark: {
+    color: "#DBEAFE",
   },
 
   headerPrintButton: {
@@ -3024,23 +3149,23 @@ export default StyleSheet.create({
     flex: 1,
     minWidth: (width - sidebarWidth - 56) / 2,
     backgroundColor: "#FFF",
-    borderRadius: 24,
+    borderRadius: 18,
     padding: 18,
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E7EEF6",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.06,
-        shadowRadius: 18,
+        shadowOpacity: 0.045,
+        shadowRadius: 16,
       },
-      android: { elevation: 3 },
+      android: { elevation: 2 },
       web: {
-        boxShadow: "0px 14px 32px rgba(15,23,42,0.07)",
+        boxShadow: "0px 12px 28px rgba(15,23,42,0.055)",
       },
     }),
   },
@@ -3262,16 +3387,16 @@ export default StyleSheet.create({
   quickActionCard: {
     minWidth: 220,
     backgroundColor: "#FFF",
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 16,
     minHeight: 132,
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E7EEF6",
     shadowColor: "#0F172A",
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.045,
     shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 14,
+    shadowRadius: 12,
     elevation: 2,
   },
 
@@ -3317,7 +3442,7 @@ export default StyleSheet.create({
 
   dashboardFlowCard: {
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E7EEF6",
     borderRadius: 20,
     padding: 18,
     marginBottom: 16,
@@ -3333,7 +3458,7 @@ export default StyleSheet.create({
     alignItems: "center",
     gap: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E7EEF6",
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -3377,11 +3502,11 @@ export default StyleSheet.create({
   overviewCard: {
     flex: 1,
     backgroundColor: "#FFF",
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 16,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E7EEF6",
   },
 
   overviewValue: {
@@ -6696,6 +6821,49 @@ export default StyleSheet.create({
     paddingVertical: 4,
   },
 
+  historyToolbarWrap: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 4,
+    marginBottom: 18,
+  },
+
+  historyResultsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    gap: 12,
+    paddingTop: 2,
+    paddingBottom: 12,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(148, 163, 184, 0.22)",
+    flexWrap: "wrap",
+  },
+
+  historyResultsTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  historyResultsSubtitle: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  historyResultsCount: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
   historyItem: {
     backgroundColor: "#F8FBFE",
     borderRadius: 14,
@@ -6804,61 +6972,61 @@ export default StyleSheet.create({
   // ============================================
 
   darkText: {
-    color: '#F1F5F9',
+    color: "#F8FAFC",
   },
 
   darkTextSecondary: {
-    color: '#94A3B8',
+    color: "#A7B3C6",
   },
 
   darkCard: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: "#111827",
+    borderColor: "rgba(148, 163, 184, 0.16)",
   },
 
   darkHeader: {
-    backgroundColor: '#1E293B',
-    borderBottomColor: '#334155',
+    backgroundColor: "#111827",
+    borderBottomColor: "rgba(148, 163, 184, 0.14)",
   },
 
   darkSidebar: {
-    backgroundColor: '#0F172A',
+    backgroundColor: "#080F1D",
   },
 
   darkBorder: {
-    borderColor: '#334155',
+    borderColor: "rgba(148, 163, 184, 0.14)",
   },
 
   darkInput: {
-    backgroundColor: '#334155',
-    borderColor: '#475569',
-    color: '#F1F5F9',
+    backgroundColor: "#121C2E",
+    borderColor: "rgba(148, 163, 184, 0.16)",
+    color: "#F8FAFC",
   },
 
   darkStatCard: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: "#111827",
+    borderColor: "rgba(148, 163, 184, 0.14)",
   },
 
   darkChartCard: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: "#111827",
+    borderColor: "rgba(148, 163, 184, 0.14)",
   },
 
   darkWelcomeBanner: {
-    backgroundColor: '#1E3A5F',
+    backgroundColor: "#0F2A55",
   },
 
   darkModal: {
-    backgroundColor: '#1E293B',
+    backgroundColor: "#111827",
   },
 
   darkModalHeader: {
-    borderBottomColor: '#334155',
+    borderBottomColor: "rgba(148, 163, 184, 0.14)",
   },
 
   darkModalFooter: {
-    borderTopColor: '#334155',
+    borderTopColor: "rgba(148, 163, 184, 0.14)",
   },
 
   // ============================================

@@ -188,6 +188,98 @@ export default StyleSheet.create({
     marginTop: -14,
   },
 
+  topicPanel: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D8E8FF",
+    padding: isWide ? 18 : 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: brandColors.text,
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.08,
+        shadowRadius: 24,
+      },
+      android: { elevation: 4 },
+      web: { boxShadow: "0 18px 40px rgba(15, 23, 42, 0.08)" },
+    }),
+  },
+
+  topicHeader: {
+    flexDirection: isWide ? "row" : "column",
+    alignItems: isWide ? "center" : "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  topicTitle: {
+    color: brandColors.text,
+    fontSize: isSmallPhone ? 19 : 22,
+    fontWeight: "900",
+  },
+
+  topicGrid: {
+    flexDirection: isTablet ? "row" : "column",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  topicCard: {
+    flex: 1,
+    minWidth: isTablet ? 240 : "100%",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: brandColors.border,
+    backgroundColor: brandColors.surfaceSoft,
+    minHeight: 86,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    ...webHover({ cursor: "pointer" }),
+    ...webHover({
+      transitionDuration: "180ms",
+      transitionProperty: "border-color, background-color, transform",
+    }),
+  },
+
+  topicCardActive: {
+    borderColor: brandColors.blueBorder,
+    backgroundColor: brandColors.blueSoft,
+  },
+
+  topicIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: brandColors.blueBorder,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  topicCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  topicCardTitle: {
+    color: brandColors.text,
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 3,
+  },
+
+  topicCardText: {
+    color: brandColors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+  },
+
   sectionCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 8,
@@ -308,6 +400,7 @@ export default StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: brandColors.border,
+    minHeight: 34,
   },
 
   contactLinkText: {
@@ -329,6 +422,7 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: brandColors.border,
     minHeight: 172,
+    justifyContent: "flex-start",
   },
 
   guideIconWrap: {
@@ -367,6 +461,11 @@ export default StyleSheet.create({
     ...webHover({ cursor: "pointer" }),
   },
 
+  faqItemActive: {
+    borderColor: brandColors.blueBorder,
+    backgroundColor: "#FFFFFF",
+  },
+
   faqQuestionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -389,11 +488,14 @@ export default StyleSheet.create({
     lineHeight: 20,
   },
 
-  faqAnswer: {
+  faqAnswerBox: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: brandColors.border,
+  },
+
+  faqAnswer: {
     fontSize: 13,
     lineHeight: 21,
     color: brandColors.textMuted,

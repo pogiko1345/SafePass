@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { AppState, View, Text, ActivityIndicator, Platform, Image } from "react-native";
+import { AppState, View, Text, Platform, Image } from "react-native";
 import {
   CommonActions,
   DefaultTheme,
@@ -8,6 +8,8 @@ import {
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { brandColors } from "./styles/brandColors";
+import AviationSplash from "./components/AviationSplash";
+import { AviationTransitionContext } from "./utils/AviationTransitionContext";
 
 // ============ ONLY VISITOR, SECURITY, ADMIN SCREENS ============
 import LoginScreen from "./screens/LoginScreen";
@@ -247,31 +249,14 @@ class ChunkLoadRecoveryBoundary extends React.Component {
 }
 
 const ScreenFallback = () => (
-  <View
-    style={{
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      backgroundColor: brandColors.background,
-      paddingHorizontal: 24,
-    }}
-  >
-    <Image
-      source={SCHOOL_LOGO}
-      resizeMode="contain"
-      style={{
-        width: 116,
-        height: 54,
-        marginBottom: 18,
-      }}
-    />
-    <ActivityIndicator size="large" color={brandColors.blue} />
+  <View style={{ flex: 1, backgroundColor: brandColors.navy }}>
+    <AviationSplash mode="landing" message="Landing campus access..." duration={1600} />
   </View>
 );
 
 const DEFAULT_STACK_TRANSITION = {
-  animation: "slide_from_right",
-  animationDuration: 320,
+  animation: "fade",
+  animationDuration: 220,
   animationTypeForReplace: "push",
   gestureEnabled: true,
   fullScreenGestureEnabled: true,
@@ -280,7 +265,15 @@ const DEFAULT_STACK_TRANSITION = {
 
 const VISITOR_STACK_TRANSITION = {
   ...DEFAULT_STACK_TRANSITION,
-  animationDuration: 300,
+  animationDuration: 220,
+};
+
+const AUTH_STACK_TRANSITION = {
+  ...DEFAULT_STACK_TRANSITION,
+  animation: "fade",
+  animationDuration: 220,
+  animationTypeForReplace: "pop",
+  gestureDirection: "horizontal",
 };
 
 let logoutCallback = null;
@@ -292,6 +285,33 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isNewRegistration, setIsNewRegistration] = useState(false);
+  const [aviationTransition, setAviationTransition] = useState(null);
+  const transitionActionRef = useRef(null);
+  const transitionDoneRef = useRef(null);
+
+  const startAviationTransition = useCallback((options = {}) => {
+    transitionActionRef.current = options.onBeforeFade || null;
+    transitionDoneRef.current = options.onDone || null;
+    setAviationTransition({
+      mode: options.mode || "journey",
+      message: options.message || "Preparing for departure...",
+      arrivalMessage: options.arrivalMessage || "Arriving at destination...",
+      duration: options.duration || 2500,
+    });
+  }, []);
+
+  const handleAviationTransitionBeforeFade = useCallback(() => {
+    const action = transitionActionRef.current;
+    transitionActionRef.current = null;
+    action?.();
+  }, []);
+
+  const handleAviationTransitionDone = useCallback(() => {
+    const done = transitionDoneRef.current;
+    transitionDoneRef.current = null;
+    setAviationTransition(null);
+    done?.();
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
@@ -563,113 +583,12 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: brandColors.navy,
-          paddingHorizontal: 24,
-        }}
-      >
-        <View
-          style={{
-            width: "100%",
-            maxWidth: 360,
-            backgroundColor: brandColors.surface,
-            borderRadius: 8,
-            paddingVertical: 28,
-            paddingHorizontal: 24,
-            alignItems: "center",
-            shadowColor: brandColors.text,
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.08,
-            shadowRadius: 24,
-            elevation: 4,
-          }}
-        >
-          <View
-            style={{
-              width: 116,
-              height: 116,
-              borderRadius: 28,
-              backgroundColor: "#FFFFFF",
-              borderWidth: 1,
-              borderColor: "#E2E8F0",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 18,
-              shadowColor: brandColors.text,
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.08,
-              shadowRadius: 18,
-              elevation: 3,
-            }}
-          >
-            <Image
-              source={SCHOOL_LOGO}
-              resizeMode="contain"
-              style={{
-                width: 96,
-                height: 54,
-              }}
-            />
-          </View>
-          <Text
-            style={{
-              fontSize: 24,
-              fontWeight: "800",
-              color: brandColors.text,
-              textAlign: "center",
-            }}
-          >
-            {APP_NAME}
-          </Text>
-          <Text
-            style={{
-              marginTop: 6,
-              fontSize: 13,
-              lineHeight: 19,
-              color: brandColors.textMuted,
-              textAlign: "center",
-            }}
-          >
-            {APP_ORGANIZATION}
-          </Text>
-          <View
-            style={{
-              width: 56,
-              height: 4,
-              borderRadius: 999,
-              backgroundColor: brandColors.blue,
-              marginTop: 16,
-              marginBottom: 20,
-            }}
-          />
-          <ActivityIndicator size="large" color={brandColors.blue} />
-          <Text
-            style={{
-              marginTop: 16,
-              fontSize: 14,
-              fontWeight: "600",
-              color: brandColors.text,
-              textAlign: "center",
-            }}
-          >
-            Restoring your session
-          </Text>
-          <Text
-            style={{
-              marginTop: 6,
-              fontSize: 12,
-              lineHeight: 18,
-              color: brandColors.textMuted,
-              textAlign: "center",
-            }}
-          >
-            Keeping you signed in and opening the right dashboard.
-          </Text>
-        </View>
+      <View style={{ flex: 1, backgroundColor: brandColors.navy }}>
+        <AviationSplash
+          mode="landing"
+          message="Restoring your campus session..."
+          duration={1900}
+        />
       </View>
     );
   }
@@ -700,30 +619,39 @@ export default function App() {
 
   return (
     <View style={{ flex: 1, backgroundColor: brandColors.background }} onTouchStart={resetIdleTimer}>
-      <NavigationContainer
-        ref={navigationRef}
-        theme={SAFE_PASS_NAV_THEME}
-        linking={Platform.OS === "web" ? WEB_LINKING : undefined}
-        documentTitle={{
-          enabled: Platform.OS === "web",
-          formatter: (_options, route) =>
-            WEB_ROUTE_TITLES[route?.name] || `${APP_NAME} | ${APP_ORGANIZATION}`,
-        }}
-      >
-      <ChunkLoadRecoveryBoundary>
-      <Suspense fallback={<ScreenFallback />}>
-        <Stack.Navigator
-          initialRouteName={initialRoute}
-          screenOptions={{
-            headerShown: false,
-            ...DEFAULT_STACK_TRANSITION,
+      <AviationTransitionContext.Provider value={startAviationTransition}>
+        <NavigationContainer
+          ref={navigationRef}
+          theme={SAFE_PASS_NAV_THEME}
+          linking={Platform.OS === "web" ? WEB_LINKING : undefined}
+          documentTitle={{
+            enabled: Platform.OS === "web",
+            formatter: (_options, route) =>
+              WEB_ROUTE_TITLES[route?.name] || `${APP_NAME} | ${APP_ORGANIZATION}`,
           }}
         >
+        <ChunkLoadRecoveryBoundary>
+        <Suspense fallback={<ScreenFallback />}>
+          <Stack.Navigator
+            initialRouteName={initialRoute}
+            screenOptions={{
+              headerShown: false,
+              ...DEFAULT_STACK_TRANSITION,
+            }}
+          >
         {/* Auth & Role Selection */}
         {!IS_VISITOR_ONLY_APP && (
-          <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
+          <Stack.Screen
+            name="RoleSelect"
+            component={RoleSelectScreen}
+            options={AUTH_STACK_TRANSITION}
+          />
         )}
-        <Stack.Screen name="Login" initialParams={passwordResetLinkParams}>
+        <Stack.Screen
+          name="Login"
+          initialParams={passwordResetLinkParams}
+          options={AUTH_STACK_TRANSITION}
+        >
           {(props) => (
             <LoginScreen
               {...props}
@@ -858,10 +786,18 @@ export default function App() {
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="Settings" component={SettingsScreen} />
         )}
-        </Stack.Navigator>
-      </Suspense>
-      </ChunkLoadRecoveryBoundary>
-      </NavigationContainer>
+          </Stack.Navigator>
+        </Suspense>
+        </ChunkLoadRecoveryBoundary>
+        </NavigationContainer>
+        {aviationTransition ? (
+          <AviationSplash
+            {...aviationTransition}
+            onBeforeFade={handleAviationTransitionBeforeFade}
+            onDone={handleAviationTransitionDone}
+          />
+        ) : null}
+      </AviationTransitionContext.Provider>
     </View>
   );
 }

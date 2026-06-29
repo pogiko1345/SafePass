@@ -142,6 +142,46 @@ export default StyleSheet.create({
     fontWeight: "800",
   },
 
+  mobileAccessSummary: {
+    marginTop: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(216,232,255,0.24)",
+    backgroundColor: "rgba(2,16,38,0.18)",
+    padding: 9,
+    gap: 8,
+  },
+
+  mobileAccessSummaryItem: {
+    minHeight: 40,
+    borderRadius: 8,
+    backgroundColor: "rgba(238,245,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingHorizontal: 10,
+  },
+
+  mobileAccessSummaryCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  mobileAccessSummaryValue: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  mobileAccessSummaryLabel: {
+    color: "#B7D5F6",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+
   mobileActionStack: {
     marginTop: 16,
     gap: 10,
@@ -324,9 +364,163 @@ export default StyleSheet.create({
     backgroundColor: brandColors.background,
   },
 
+  introOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    backgroundColor: brandColors.navy,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  introContent: {
+    width: "100%",
+    maxWidth: 360,
+    paddingHorizontal: 24,
+    alignItems: "center",
+  },
+
+  introLogo: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 18,
+  },
+
+  introEyebrow: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 12,
+  },
+
+  introRunwayScene: {
+    width: "100%",
+    height: 116,
+    justifyContent: "flex-end",
+    marginBottom: 12,
+  },
+
+  introPlane: {
+    position: "absolute",
+    left: "50%",
+    bottom: 18,
+    width: 92,
+    height: 44,
+    marginLeft: -46,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  introPlaneBody: {
+    width: 76,
+    height: 18,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    position: "relative",
+    borderWidth: 1,
+    borderColor: "rgba(216,232,255,0.72)",
+  },
+
+  introPlaneNose: {
+    position: "absolute",
+    right: -8,
+    top: 2,
+    width: 18,
+    height: 14,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+    backgroundColor: "#FFFFFF",
+    transform: [{ skewX: "-16deg" }],
+  },
+
+  introPlaneWindowRow: {
+    position: "absolute",
+    left: 22,
+    top: 5,
+    flexDirection: "row",
+    gap: 5,
+    zIndex: 2,
+  },
+
+  introPlaneWindow: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: brandColors.blue,
+  },
+
+  introPlaneTail: {
+    position: "absolute",
+    left: -4,
+    top: -10,
+    width: 20,
+    height: 18,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 10,
+    backgroundColor: "#D8E8FF",
+    transform: [{ rotate: "-18deg" }],
+  },
+
+  introPlaneWing: {
+    position: "absolute",
+    left: 32,
+    top: 12,
+    width: 34,
+    height: 14,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 14,
+    backgroundColor: "#B7D5F6",
+    transform: [{ skewX: "-28deg" }],
+  },
+
+  introRunway: {
+    height: 2,
+    width: "100%",
+    borderRadius: 999,
+    backgroundColor: "rgba(216,232,255,0.38)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+
+  introRunwayDash: {
+    width: 42,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.72)",
+  },
+
+  introCaption: {
+    color: "#D8E8FF",
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 12,
+  },
+
+  introProgressTrack: {
+    width: "100%",
+    height: 3,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: "rgba(216,232,255,0.18)",
+  },
+
+  introProgressFill: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: brandColors.sky,
+  },
+
   page: {
     flex: 1,
     backgroundColor: brandColors.background,
+    ...(isWeb && {
+      scrollBehavior: "smooth",
+    }),
   },
 
   scrollContainer: {
@@ -338,6 +532,13 @@ export default StyleSheet.create({
     backgroundColor: brandColors.navy,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
+    ...(isWeb && {
+      position: "sticky",
+      top: 0,
+      zIndex: 20,
+      backdropFilter: "blur(14px)",
+      boxShadow: "0px 12px 34px rgba(2, 16, 38, 0.16)",
+    }),
   },
 
   navBar: {
@@ -414,7 +615,13 @@ export default StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     justifyContent: "center",
-    ...(isWeb && { cursor: "pointer" }),
+    ...(isWeb && {
+      cursor: "pointer",
+      transition: "background-color 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.24s ease",
+      ":hover": {
+        backgroundColor: "rgba(238,245,255,0.1)",
+      },
+    }),
   },
 
   navLinkText: {
@@ -430,7 +637,14 @@ export default StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 11,
     justifyContent: "center",
-    ...(isWeb && { cursor: "pointer" }),
+    ...(isWeb && {
+      cursor: "pointer",
+      transition: "filter 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)",
+      ":hover": {
+        filter: "brightness(1.08)",
+        transform: "translateY(-1px)",
+      },
+    }),
   },
 
   navLoginText: {
@@ -447,6 +661,11 @@ export default StyleSheet.create({
     paddingTop: isSmallPhone ? 44 : 70,
     paddingBottom: 34,
     backgroundColor: brandColors.navy,
+    ...(isWeb && {
+      backgroundImage:
+        "radial-gradient(circle at 82% 18%, rgba(28,109,208,0.32), transparent 30%), radial-gradient(circle at 18% 82%, rgba(183,213,246,0.12), transparent 28%)",
+      willChange: "transform, opacity",
+    }),
   },
 
   heroSectionPhone: {
@@ -551,7 +770,10 @@ export default StyleSheet.create({
     paddingHorizontal: 24,
     ...(isWeb && {
       cursor: "pointer",
-      transition: "background-color 0.2s ease, transform 0.2s ease",
+      transition: "background-color 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.24s ease",
+      ":hover": {
+        filter: "brightness(1.08)",
+      },
     }),
   },
 
@@ -574,7 +796,11 @@ export default StyleSheet.create({
     paddingHorizontal: 22,
     ...(isWeb && {
       cursor: "pointer",
-      transition: "border-color 0.2s ease, transform 0.2s ease",
+      transition: "border-color 0.24s ease, transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.24s ease",
+      ":hover": {
+        borderColor: "rgba(216,232,255,0.58)",
+        backgroundColor: "rgba(238,245,255,0.2)",
+      },
     }),
   },
 
@@ -599,7 +825,11 @@ export default StyleSheet.create({
     backgroundColor: "rgba(238,245,255,0.1)",
     ...(isWeb && {
       cursor: "pointer",
-      transition: "border-color 0.2s ease, background-color 0.2s ease",
+      transition: "border-color 0.24s ease, background-color 0.24s ease",
+      ":hover": {
+        borderColor: "rgba(216,232,255,0.62)",
+        backgroundColor: "rgba(238,245,255,0.16)",
+      },
     }),
   },
 
@@ -616,7 +846,7 @@ export default StyleSheet.create({
 
   heroVisual: {
     width: "100%",
-    maxWidth: 390,
+    maxWidth: 430,
     alignItems: "center",
   },
 
@@ -626,6 +856,11 @@ export default StyleSheet.create({
 
   heroVisualPhone: {
     maxWidth: "100%",
+  },
+
+  heroVisualStack: {
+    width: "100%",
+    gap: 14,
   },
 
   schoolCard: {
@@ -644,10 +879,19 @@ export default StyleSheet.create({
       },
       android: { elevation: 8 },
       web: {
-        boxShadow: "0px 24px 70px rgba(0,0,0,0.35)",
+        boxShadow: "0px 26px 74px rgba(0,0,0,0.32)",
         backdropFilter: "blur(12px)",
+        willChange: "transform, opacity",
       },
     }),
+  },
+
+  schoolCardTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 14,
+    marginBottom: isSmallPhone ? 18 : 24,
   },
 
   schoolLogo: {
@@ -655,7 +899,24 @@ export default StyleSheet.create({
     height: isSmallPhone ? 82 : 104,
     borderRadius: isSmallPhone ? 41 : 52,
     backgroundColor: "#FFFFFF",
-    marginBottom: isSmallPhone ? 18 : 26,
+  },
+
+  schoolCardBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.34)",
+    backgroundColor: "rgba(16,185,129,0.14)",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+
+  schoolCardBadgeText: {
+    color: "#D1FAE5",
+    fontSize: 11,
+    fontWeight: "900",
   },
 
   schoolCardLabel: {
@@ -700,6 +961,97 @@ export default StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: "700",
+  },
+
+  accessPreviewCard: {
+    width: "100%",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(216,232,255,0.28)",
+    backgroundColor: "rgba(2, 16, 38, 0.24)",
+    padding: isSmallPhone ? 14 : 16,
+    ...Platform.select({
+      web: {
+        backdropFilter: "blur(10px)",
+        boxShadow: "0px 20px 46px rgba(0,0,0,0.2)",
+        willChange: "transform, opacity",
+      },
+    }),
+  },
+
+  accessPreviewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 13,
+  },
+
+  accessPreviewEyebrow: {
+    color: "#D8E8FF",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  accessPreviewGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  accessPreviewItem: {
+    flex: 1,
+    minHeight: 108,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(216,232,255,0.18)",
+    backgroundColor: "rgba(238,245,255,0.1)",
+    padding: 11,
+    justifyContent: "space-between",
+  },
+
+  accessPreviewIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+
+  accessPreviewValue: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  accessPreviewLabel: {
+    color: "#B7D5F6",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800",
+  },
+
+  accessTimeline: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 14,
+    paddingHorizontal: 4,
+  },
+
+  accessTimelineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: brandColors.success,
+  },
+
+  accessTimelineLine: {
+    flex: 1,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(183,213,246,0.38)",
   },
 
   metricDock: {
@@ -749,6 +1101,10 @@ export default StyleSheet.create({
     paddingTop: isSmallPhone ? 34 : 50,
     paddingBottom: isSmallPhone ? 34 : 48,
     alignItems: "center",
+    ...(isWeb && {
+      backgroundImage:
+        "linear-gradient(180deg, rgba(248,251,254,1) 0%, rgba(255,255,255,1) 100%)",
+    }),
   },
 
   sectionKicker: {
@@ -809,7 +1165,17 @@ export default StyleSheet.create({
         shadowRadius: 16,
       },
       android: { elevation: 2 },
-      web: { boxShadow: "0px 10px 24px rgba(15,23,42,0.06)" },
+      web: {
+        cursor: "default",
+        boxShadow: "0px 10px 24px rgba(15,23,42,0.06)",
+        transition: "box-shadow 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.24s ease, background-color 0.24s ease",
+        willChange: "transform",
+        ":hover": {
+          borderColor: "#B7D5F6",
+          backgroundColor: "#FFFFFF",
+          boxShadow: "0px 18px 36px rgba(15,23,42,0.1)",
+        },
+      },
     }),
   },
 
@@ -846,6 +1212,9 @@ export default StyleSheet.create({
     paddingHorizontal: isSmallPhone ? 18 : 32,
     paddingVertical: 26,
     alignItems: "center",
+    ...(isWeb && {
+      backgroundImage: "linear-gradient(180deg, #FFFFFF 0%, #F8FBFE 100%)",
+    }),
   },
 
   footerCard: {
@@ -892,7 +1261,14 @@ export default StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    ...(isWeb && { cursor: "pointer" }),
+    ...(isWeb && {
+      cursor: "pointer",
+      transition: "background-color 0.24s ease, border-color 0.24s ease",
+      ":hover": {
+        backgroundColor: "#D8E8FF",
+        borderColor: "#9EC5F8",
+      },
+    }),
   },
 
   footerButtonText: {
