@@ -53,7 +53,7 @@ export default function AviationSplash({
       mode === "journey"
         ? progressAnim.interpolate({
             inputRange: [0, 0.4, 0.47, 0.55, 0.64, 1],
-            outputRange: [1, 1, 0, 0, 1, 1],
+            outputRange: [1, 1, 0.86, 0.86, 1, 1],
             extrapolate: "clamp",
           })
         : 1,

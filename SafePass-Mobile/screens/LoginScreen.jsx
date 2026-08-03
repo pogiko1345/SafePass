@@ -81,6 +81,7 @@ export default function LoginScreen({ navigation, route }) {
   const effectiveRole = IS_VISITOR_ONLY_APP ? "visitor" : normalizeRole(role) || "campus";
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const showDesktopLoginDesign = isWeb && viewportWidth >= 1080;
+  const shouldLockDesktopScroll = showDesktopLoginDesign && viewportHeight >= 760;
   const isCompactLogin = viewportWidth <= 420;
   const isTabletLogin = viewportWidth >= 768;
   const loginHorizontalPadding = isCompactLogin ? 12 : 20;
@@ -1554,13 +1555,13 @@ export default function LoginScreen({ navigation, route }) {
       >
         <Animated.View style={loginScreenEntryStyle}>
           <ScrollView 
-            style={showDesktopLoginDesign && loginStyles.desktopScrollLock}
+            style={shouldLockDesktopScroll && loginStyles.desktopScrollLock}
             contentContainerStyle={[
               loginStyles.scrollContainer,
-              showDesktopLoginDesign && loginStyles.scrollContainerDesktop,
+              shouldLockDesktopScroll && loginStyles.scrollContainerDesktop,
             ]}
             showsVerticalScrollIndicator={false}
-            scrollEnabled={!showDesktopLoginDesign}
+            scrollEnabled={!shouldLockDesktopScroll}
             keyboardShouldPersistTaps="handled"
             bounces={false}
           >
