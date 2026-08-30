@@ -908,6 +908,30 @@ const CampusMap = ({
             },
           ]}
         />
+        {/* Animated Directional Chevron Waypoints */}
+        <Animated.View
+          style={[
+            styles.routeStartMarker,
+            {
+              left: `${(start.x + end.x) / 2}%`,
+              top: `${(start.y + end.y) / 2}%`,
+              backgroundColor: "rgba(10, 61, 145, 0.85)",
+              transform: [
+                { translateX: -10 },
+                { translateY: -10 },
+                { scale: markerInverseScale },
+                {
+                  scale: routePulseAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.9, 1.2],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name="arrow-forward" size={10} color="#FFFFFF" />
+        </Animated.View>
         <Animated.View
           style={[
             styles.routeStartMarker,
@@ -928,7 +952,7 @@ const CampusMap = ({
   const clampScale = (scale) => Math.max(0.5, Math.min(maxMapScale, scale));
 
   const handleZoomIn = () => {
-    const newScale = clampScale(mapScale + 0.2);
+    const newScale = clampScale(mapScale + 0.25);
     mapScaleRef.current = newScale;
     setMapScale(newScale);
     Animated.spring(scaleAnim, {
@@ -938,7 +962,7 @@ const CampusMap = ({
   };
 
   const handleZoomOut = () => {
-    const newScale = clampScale(mapScale - 0.2);
+    const newScale = clampScale(mapScale - 0.25);
     mapScaleRef.current = newScale;
     setMapScale(newScale);
     const nextPan = clampPan(mapPanRef.current, newScale);
@@ -971,6 +995,35 @@ const CampusMap = ({
         useNativeDriver: Platform.OS !== "web",
       }),
     ]).start();
+  };
+
+  const handleCenterDestination = () => {
+    const normalizedActiveFloor = normalizeFloorId(activeFloor);
+    const marker = destinationMarkers.find(
+      (item) => normalizeFloorId(item.floor) === normalizedActiveFloor,
+    );
+    if (!marker) {
+      handleReset();
+      return;
+    }
+    const position = marker.position || getOfficePosition(marker.officeId);
+    if (!position) {
+      handleReset();
+      return;
+    }
+    const targetScale = Math.min(maxMapScale, 1.8);
+    const mapWidth = mapSizeRef.current.width || viewportWidth || 320;
+    const mapHeight = mapSizeRef.current.height || 500;
+    const targetX = (50 - Number(position.x || 50)) * (mapWidth / 100) * 0.8;
+    const targetY = (50 - Number(position.y || 50)) * (mapHeight / 100) * 0.8;
+    const clamped = clampPan({ x: targetX, y: targetY }, targetScale);
+    mapScaleRef.current = targetScale;
+    setMapScale(targetScale);
+    setPanPosition(clamped, true);
+    Animated.spring(scaleAnim, {
+      toValue: targetScale,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
   };
 
   const floorPlanImage = getFloorPlanImage();
@@ -1099,6 +1152,13 @@ const CampusMap = ({
             accessibilityLabel="Zoom map out"
           >
             <Ionicons name="remove" size={20} color="#0A3D91" />
+          </MapPressable>
+          <MapPressable
+            style={styles.mapControlButton}
+            onPress={handleCenterDestination}
+            accessibilityLabel="Center on destination"
+          >
+            <Ionicons name="navigate-outline" size={19} color="#0A3D91" />
           </MapPressable>
           <MapPressable
             style={styles.mapControlButton}

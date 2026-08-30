@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Modal,
   Platform,
   RefreshControl,
   ScrollView,
@@ -17,12 +19,38 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import ApiService from "../utils/ApiService";
-import { describeRfidReaderInput, normalizeRfidReaderInput } from "../utils/rfidReaderUtils";
+import {
+  describeRfidReaderInput,
+  normalizeRfidReaderInput,
+  formatRfidHex,
+  isRfidUid,
+  playRfidChime,
+  RfidKeystrokeBuffer,
+  Esp32SerialGateway,
+  RfidOfflineQueue,
+} from "../utils/rfidReaderUtils";
 import {
   MONITORING_MAP_FLOORS,
   MONITORING_MAP_OFFICES,
 } from "../utils/monitoringMapConfig";
 import { normalizeMapSettingsPayload } from "../utils/mapSettingsUtils";
+
+let NfcManager = null;
+let NfcEvents = null;
+let NfcTech = null;
+let Ndef = null;
+
+if (Platform.OS !== "web") {
+  try {
+    const nfcModule = require("react-native-nfc-manager");
+    NfcManager = nfcModule.default || nfcModule;
+    NfcEvents = nfcModule.NfcEvents;
+    NfcTech = nfcModule.NfcTech;
+    Ndef = nfcModule.Ndef;
+  } catch (err) {
+    console.log("react-native-nfc-manager not available in this environment:", err?.message);
+  }
+}
 
 const ENTRY_CHECKPOINTS = [
   {
@@ -412,6 +440,20 @@ export default function NFCScanScreen({ navigation }) {
   const [stationEvents, setStationEvents] = useState(() => readStoredStationEvents());
   const [stationFeedPage, setStationFeedPage] = useState(1);
   const [latestResult, setLatestResult] = useState(null);
+  const [mobileNfcStatus, setMobileNfcStatus] = useState({
+    supported: false,
+    enabled: false,
+    active: false,
+    checked: false,
+  });
+  const [isScanningMobile, setIsScanningMobile] = useState(false);
+  const serialGatewayRef = useRef(new Esp32SerialGateway());
+  const [serialStatus, setSerialStatus] = useState({ connected: false, port: null });
+  const [serialLogs, setSerialLogs] = useState([]);
+  const [showHardwareModal, setShowHardwareModal] = useState(false);
+  const [showSimulateModal, setShowSimulateModal] = useState(false);
+  const [offlinePendingCount, setOfflinePendingCount] = useState(0);
+  const radarPulseAnim = useRef(new Animated.Value(1)).current;
   const [pn532Monitor, setPn532Monitor] = useState({
     loading: false,
     online: false,
@@ -505,7 +547,173 @@ export default function NFCScanScreen({ navigation }) {
 
   useEffect(() => {
     loadUser();
+    checkOfflineQueue();
   }, []);
+
+  const checkOfflineQueue = async () => {
+    const pending = await RfidOfflineQueue.getPendingTaps();
+    setOfflinePendingCount(pending.length);
+  };
+
+  const syncOfflineQueue = async () => {
+    const pending = await RfidOfflineQueue.getPendingTaps();
+    if (!pending.length) {
+      Alert.alert("Offline Queue", "No queued offline taps to sync.");
+      return;
+    }
+    setBusy(true);
+    let syncedCount = 0;
+    for (const tap of pending) {
+      try {
+        await ApiService.submitCheckpointTap(tap);
+        await RfidOfflineQueue.removeTap(tap.id);
+        syncedCount++;
+      } catch (e) {
+        console.warn("Failed to sync queued tap:", e);
+      }
+    }
+    setBusy(false);
+    await checkOfflineQueue();
+    Alert.alert("Sync Complete", `Successfully synced ${syncedCount} queued tap(s) to server.`);
+  };
+
+  // Mobile Native NFC Management
+  const initMobileNfc = async () => {
+    if (Platform.OS === "web" || !NfcManager) {
+      setMobileNfcStatus({ supported: false, enabled: false, active: false, checked: true });
+      return;
+    }
+    try {
+      const supported = Boolean(await NfcManager.isSupported());
+      if (!supported) {
+        setMobileNfcStatus({ supported: false, enabled: false, active: false, checked: true });
+        return;
+      }
+      await NfcManager.start();
+      const enabled = Boolean(await NfcManager.isEnabled());
+      setMobileNfcStatus({ supported: true, enabled, active: enabled, checked: true });
+      if (enabled) {
+        startMobileNfcListening();
+      }
+    } catch (error) {
+      console.warn("NFC init error:", error);
+      setMobileNfcStatus({ supported: false, enabled: false, active: false, checked: true });
+    }
+  };
+
+  const startMobileNfcListening = async () => {
+    if (Platform.OS === "web" || !NfcManager || !NfcEvents) return;
+    try {
+      setIsScanningMobile(true);
+      NfcManager.setEventListener(NfcEvents.DiscoverTag, async (tag) => {
+        let rawUid = tag?.id || tag?.uid || "";
+        if (!rawUid && tag?.ndefMessage && tag.ndefMessage[0]) {
+          try {
+            rawUid = Ndef.text.decodePayload(tag.ndefMessage[0].payload);
+          } catch (e) {}
+        }
+        const normalized = normalizeRfidReaderInput(rawUid);
+        if (normalized) {
+          await triggerTapFeedback("success");
+          handleSubmitTap(normalized);
+        }
+      });
+      await NfcManager.registerTagEvent();
+    } catch (err) {
+      console.warn("startMobileNfcListening error:", err);
+    }
+  };
+
+  const stopMobileNfcListening = async () => {
+    if (Platform.OS === "web" || !NfcManager || !NfcEvents) return;
+    try {
+      setIsScanningMobile(false);
+      await NfcManager.unregisterTagEvent();
+      NfcManager.setEventListener(NfcEvents.DiscoverTag, () => {});
+    } catch (err) {}
+  };
+
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      initMobileNfc();
+      return () => {
+        stopMobileNfcListening();
+      };
+    }
+  }, []);
+
+  // Radar Pulse Animation
+  useEffect(() => {
+    if (isScanningMobile) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(radarPulseAnim, {
+            toValue: 1.15,
+            duration: 800,
+            useNativeDriver: Platform.OS !== "web",
+          }),
+          Animated.timing(radarPulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: Platform.OS !== "web",
+          }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+  }, [isScanningMobile]);
+
+  // Web Serial Gateway Event Listeners
+  useEffect(() => {
+    if (Platform.OS !== "web") return undefined;
+    const gateway = serialGatewayRef.current;
+    const unsubScan = gateway.on("scan", (event) => {
+      if (event?.uid) {
+        handleSubmitTap(event.uid);
+      }
+    });
+    const unsubStatus = gateway.on("status", (status) => {
+      setSerialStatus(status);
+    });
+    const unsubLog = gateway.on("log", (log) => {
+      setSerialLogs((prev) => [
+        `[${new Date().toLocaleTimeString()}] ${log}`,
+        ...prev.slice(0, 49),
+      ]);
+    });
+    return () => {
+      unsubScan();
+      unsubStatus();
+      unsubLog();
+    };
+  }, [selectedAction, selectedCheckpointKey, isOperatorAllowed]);
+
+  // Web USB Wedge Scanner Keystroke Buffer
+  useEffect(() => {
+    if (loading || Platform.OS !== "web" || !isOperatorAllowed) return undefined;
+    const wedgeScanner = new RfidKeystrokeBuffer({
+      onScan: (scannedUid) => {
+        handleSubmitTap(scannedUid);
+      },
+    });
+    wedgeScanner.start();
+    return () => wedgeScanner.stop();
+  }, [loading, isOperatorAllowed, selectedAction, selectedCheckpointKey]);
+
+  const handleConnectSerial = async () => {
+    try {
+      await serialGatewayRef.current.connect({ baudRate: 115200 });
+    } catch (error) {
+      Alert.alert("Hardware Connection", error?.message || "Could not connect to USB serial device.");
+    }
+  };
+
+  const handleDisconnectSerial = async () => {
+    try {
+      await serialGatewayRef.current.disconnect();
+    } catch (error) {}
+  };
 
   useEffect(() => {
     if (loading) return undefined;
@@ -585,6 +793,7 @@ export default function NFCScanScreen({ navigation }) {
     setRefreshing(true);
     try {
       await loadUser();
+      await checkOfflineQueue();
     } finally {
       setRefreshing(false);
     }
@@ -974,6 +1183,114 @@ export default function NFCScanScreen({ navigation }) {
           </View>
         ) : null}
 
+        {/* Hardware Status & Multi-Channel Scanner Bar */}
+        <View style={styles.hardwareBar}>
+          {Platform.OS !== "web" ? (
+            <View style={styles.hardwareChannelRow}>
+              <View
+                style={[
+                  styles.hardwareBadge,
+                  mobileNfcStatus.enabled ? styles.hardwareBadgeActive : styles.hardwareBadgeWarning,
+                ]}
+              >
+                <Animated.View
+                  style={[
+                    styles.hardwareBadgeDot,
+                    mobileNfcStatus.enabled && {
+                      transform: [{ scale: radarPulseAnim }],
+                      backgroundColor: "#10B981",
+                    },
+                  ]}
+                />
+                <Text style={styles.hardwareBadgeText}>
+                  {mobileNfcStatus.enabled
+                    ? "📱 Native NFC Active • Tap Card to Back of Phone"
+                    : mobileNfcStatus.supported
+                    ? "📱 NFC Disabled on Device"
+                    : "📱 NFC Scanner Ready (Simulated / Wedge)"}
+                </Text>
+              </View>
+              {mobileNfcStatus.supported && !mobileNfcStatus.enabled ? (
+                <TouchableOpacity
+                  style={styles.hardwareSettingsBtn}
+                  onPress={() => {
+                    try {
+                      NfcManager?.goToNfcSetting?.();
+                    } catch (e) {}
+                  }}
+                >
+                  <Ionicons name="settings-outline" size={14} color="#0A3D91" />
+                  <Text style={styles.hardwareSettingsBtnText}>Open NFC Settings</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.hardwareChannelRow}>
+              <View style={styles.hardwareBadgeGroup}>
+                <View style={[styles.hardwareBadge, styles.hardwareBadgeActive]}>
+                  <View style={[styles.hardwareBadgeDot, { backgroundColor: "#10B981" }]} />
+                  <Text style={styles.hardwareBadgeText}>⌨️ USB Wedge Buffer Active</Text>
+                </View>
+                {Esp32SerialGateway.isSupported() ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.hardwareActionChip,
+                      serialStatus.connected && styles.hardwareActionChipActive,
+                    ]}
+                    onPress={serialStatus.connected ? handleDisconnectSerial : handleConnectSerial}
+                  >
+                    <Ionicons
+                      name={serialStatus.connected ? "link" : "hardware-chip-outline"}
+                      size={15}
+                      color={serialStatus.connected ? "#166534" : "#0A3D91"}
+                    />
+                    <Text
+                      style={[
+                        styles.hardwareActionChipText,
+                        serialStatus.connected && styles.hardwareActionChipTextActive,
+                      ]}
+                    >
+                      {serialStatus.connected ? "ESP32 USB Connected" : "Connect ESP32 / Arduino"}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  style={styles.hardwareActionChip}
+                  onPress={() => setShowHardwareModal(true)}
+                >
+                  <Ionicons name="terminal-outline" size={15} color="#0A3D91" />
+                  <Text style={styles.hardwareActionChipText}>Hardware Console</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.hardwareActionChip}
+                  onPress={() => setShowSimulateModal(true)}
+                >
+                  <Ionicons name="flash-outline" size={15} color="#D97706" />
+                  <Text style={[styles.hardwareActionChipText, { color: "#D97706" }]}>
+                    Test Cards / HCE
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Offline Queue Sync Banner */}
+        {offlinePendingCount > 0 ? (
+          <View style={styles.offlineBanner}>
+            <View style={styles.offlineBannerCopy}>
+              <Ionicons name="cloud-offline-outline" size={20} color="#B45309" />
+              <Text style={styles.offlineBannerText}>
+                {offlinePendingCount} offline checkpoint tap{offlinePendingCount === 1 ? "" : "s"} stored locally.
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.offlineSyncButton} onPress={syncOfflineQueue} disabled={busy}>
+              <Ionicons name="sync-outline" size={15} color="#FFFFFF" />
+              <Text style={styles.offlineSyncButtonText}>Sync Now</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         <View style={[styles.stationLayout, isCompactStation && styles.stationLayoutCompact]}>
           <View style={[styles.stationPrimary, isCompactStation && styles.stationPrimaryCompact]}>
             <View
@@ -988,14 +1305,21 @@ export default function NFCScanScreen({ navigation }) {
                 <View style={[styles.tapPadStatusPill, { borderColor: latestTone.border }]}>
                   <View style={[styles.tapPadStatusDot, { backgroundColor: latestTone.icon }]} />
                   <Text style={[styles.tapPadStatusText, { color: latestTone.icon }]}>
-                    {busy ? "Reader Processing" : "Reader Armed"}
+                    {busy ? "Reader Processing" : isScanningMobile ? "Native NFC Scanning" : "Reader Armed"}
                   </Text>
                 </View>
                 <Text style={[styles.tapPadTimestamp, isNarrowStation && styles.tapPadTimestampCompact]}>
                   {latestResult ? formatDateTime(latestResult.timestamp) : "No taps yet"}
                 </Text>
               </View>
-              <View style={[styles.tapPadIcon, isCompactStation && styles.tapPadIconCompact, { backgroundColor: `${latestTone.icon}18` }]}>
+              <Animated.View
+                style={[
+                  styles.tapPadIcon,
+                  isCompactStation && styles.tapPadIconCompact,
+                  { backgroundColor: `${latestTone.icon}18` },
+                  isScanningMobile && { transform: [{ scale: radarPulseAnim }] },
+                ]}
+              >
                 {busy ? (
                   <ActivityIndicator size="large" color={latestTone.icon} />
                 ) : (
@@ -1005,13 +1329,15 @@ export default function NFCScanScreen({ navigation }) {
                     color={latestTone.icon}
                   />
                 )}
-              </View>
+              </Animated.View>
               <Text style={[styles.tapPadTitle, isCompactStation && styles.tapPadTitleCompact, { color: latestTone.icon }]}>
                 {busy ? "Processing Tap" : latestResult ? latestTone.label : "Ready To Tap"}
               </Text>
               <Text style={styles.tapPadSubtitle}>
                 {latestResult?.message ||
-                  "Place the card on the USB reader. The station will record the selected action immediately."}
+                  (Platform.OS === "web"
+                    ? "Place the card on the USB / ESP32 reader, or type keystrokes. Auto-captures immediately."
+                    : "Hold physical card or Android phone with SafePass HCE near this device.")}
               </Text>
               <View style={[styles.tapPadMetaRow, isNarrowStation && styles.tapPadMetaRowCompact]}>
                 <View style={styles.tapPadMetaCard}>
@@ -1511,11 +1837,145 @@ export default function NFCScanScreen({ navigation }) {
                   </Text>
                   <Ionicons name="chevron-forward-outline" size={16} color={stationFeedPage >= stationFeedTotalPages ? "#94A3B8" : "#0A3D91"} />
                 </TouchableOpacity>
-              </View>
-            </>
-          )}
         </View>
       </ScrollView>
+
+      {/* Hardware Console Modal */}
+      <Modal
+        visible={showHardwareModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowHardwareModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Ionicons name="terminal-outline" size={22} color="#0A3D91" />
+                <Text style={styles.modalTitle}>Hardware Scanner Console</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowHardwareModal(false)}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <View style={styles.consoleStatusRow}>
+                <View style={styles.consoleStatusPill}>
+                  <View
+                    style={[
+                      styles.consoleStatusDot,
+                      { backgroundColor: serialStatus.connected ? "#10B981" : "#EF4444" },
+                    ]}
+                  />
+                  <Text style={styles.consoleStatusText}>
+                    Web Serial: {serialStatus.connected ? "Connected (115200)" : "Disconnected"}
+                  </Text>
+                </View>
+                <View style={styles.consoleActionsRow}>
+                  {Esp32SerialGateway.isSupported() ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.consoleBtn,
+                        serialStatus.connected && styles.consoleBtnDanger,
+                      ]}
+                      onPress={serialStatus.connected ? handleDisconnectSerial : handleConnectSerial}
+                    >
+                      <Text style={styles.consoleBtnText}>
+                        {serialStatus.connected ? "Disconnect" : "Connect Port"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.consoleUnavailableText}>
+                      Web Serial unavailable in this browser
+                    </Text>
+                  )}
+                  <TouchableOpacity
+                    style={styles.consoleBtnOutline}
+                    onPress={() => setSerialLogs([])}
+                  >
+                    <Text style={styles.consoleBtnOutlineText}>Clear Log</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.terminalContainer}>
+                <Text style={styles.terminalHeader}>ESP32 / ARDUINO SERIAL STREAM</Text>
+                <ScrollView style={styles.terminalScroll} nestedScrollEnabled>
+                  {serialLogs.length === 0 ? (
+                    <Text style={styles.terminalEmptyText}>
+                      No serial packets received yet. Connect a USB device or send card taps.
+                    </Text>
+                  ) : (
+                    serialLogs.map((logLine, idx) => (
+                      <Text key={idx} style={styles.terminalLine}>
+                        {logLine}
+                      </Text>
+                    ))
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Simulate Card / HCE Modal */}
+      <Modal
+        visible={showSimulateModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSimulateModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Ionicons name="flash-outline" size={22} color="#D97706" />
+                <Text style={styles.modalTitle}>Test Tap / Android HCE Simulator</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowSimulateModal(false)}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <Text style={styles.simSubtitle}>
+                Select a preset virtual card or Android HCE pass to test check-in / check-out processing:
+              </Text>
+              <View style={styles.simPresetList}>
+                {[
+                  { label: "Registered Visitor Card", uid: "04A1B2C3D4", type: "Visitor Physical Tag" },
+                  { label: "Student RFID Pass", uid: "087E2396", type: "Student NFC UID" },
+                  { label: "Faculty / Staff Card", uid: "A1B2C3D4E5", type: "Staff Tag" },
+                  { label: "Android SafePass HCE Pass", uid: "5AFE99887766", type: "Android HCE Token" },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.uid}
+                    style={styles.simPresetCard}
+                    onPress={() => {
+                      setShowSimulateModal(false);
+                      handleSubmitTap(item.uid);
+                    }}
+                  >
+                    <View>
+                      <Text style={styles.simPresetTitle}>{item.label}</Text>
+                      <Text style={styles.simPresetMeta}>UID: {formatRfidHex(item.uid)} • {item.type}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#0A3D91" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2739,5 +3199,302 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     color: "#0F172A",
+  },
+  hardwareBar: {
+    marginBottom: 16,
+  },
+  hardwareChannelRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+  },
+  hardwareBadgeGroup: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+  },
+  hardwareBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  hardwareBadgeActive: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0",
+  },
+  hardwareBadgeWarning: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+  },
+  hardwareBadgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#94A3B8",
+  },
+  hardwareBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  hardwareSettingsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  hardwareSettingsBtnText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+  hardwareActionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    ...Platform.select({ web: { cursor: "pointer" } }),
+  },
+  hardwareActionChipActive: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#86EFAC",
+  },
+  hardwareActionChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+  hardwareActionChipTextActive: {
+    color: "#166534",
+  },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 10,
+  },
+  offlineBannerCopy: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  offlineBannerText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#92400E",
+  },
+  offlineSyncButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#B45309",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  offlineSyncButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 18,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 620,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    overflow: "hidden",
+    ...CARD_SHADOW,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    backgroundColor: "#F8FAFC",
+  },
+  modalHeaderTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  modalContent: {
+    padding: 18,
+  },
+  consoleStatusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 14,
+  },
+  consoleStatusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  consoleStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  consoleStatusText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#334155",
+  },
+  consoleActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  consoleBtn: {
+    backgroundColor: "#0A3D91",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  consoleBtnDanger: {
+    backgroundColor: "#DC2626",
+  },
+  consoleBtnText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  consoleBtnOutline: {
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  consoleBtnOutlineText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#475569",
+  },
+  consoleUnavailableText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#94A3B8",
+  },
+  terminalContainer: {
+    backgroundColor: "#0F172A",
+    borderRadius: 12,
+    padding: 12,
+    minHeight: 220,
+    maxHeight: 320,
+  },
+  terminalHeader: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#38BDF8",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  terminalScroll: {
+    flex: 1,
+  },
+  terminalEmptyText: {
+    fontSize: 12,
+    color: "#64748B",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    marginTop: 8,
+  },
+  terminalLine: {
+    fontSize: 11,
+    color: "#4ADE80",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    marginBottom: 4,
+  },
+  simSubtitle: {
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "600",
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  simPresetList: {
+    gap: 10,
+  },
+  simPresetCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 14,
+    borderRadius: 14,
+    ...Platform.select({ web: { cursor: "pointer" } }),
+  },
+  simPresetTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  simPresetMeta: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+    marginTop: 3,
   },
 });

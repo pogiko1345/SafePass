@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -61,6 +62,7 @@ export default function SecurityLogsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [selectedSecurityLog, setSelectedSecurityLog] = useState(null);
 
   const loadLogs = useCallback(async () => {
     setLoadError("");
@@ -115,6 +117,29 @@ export default function SecurityLogsScreen({ navigation }) {
     loadLogs();
   }, [loadLogs]);
 
+  const exportSecurityLogsCsv = () => {
+    if (!filteredLogs.length) return;
+    const headers = ["Title", "Description", "Type", "Time"];
+    const rows = filteredLogs.map((l) => [
+      `"${getLogTitle(l)}"`,
+      `"${getLogDescription(l)}"`,
+      `"${getLogMeta(l).label}"`,
+      `"${formatLogTime(l.createdAt || l.timestamp || l.time || l.updatedAt)}"`,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+
+    if (typeof window !== "undefined" && window.document) {
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `SafePass_SecurityLogs_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   return (
     <SafeAreaView style={screenStyles.safeArea}>
       <View style={screenStyles.header}>
@@ -157,6 +182,47 @@ export default function SecurityLogsScreen({ navigation }) {
           </View>
         </View>
 
+        {/* Action Toolbar */}
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              backgroundColor: "#EEF5FF",
+              borderWidth: 1,
+              borderColor: "#BFDBFE",
+              paddingVertical: 10,
+              borderRadius: 12,
+            }}
+            onPress={exportSecurityLogsCsv}
+          >
+            <Ionicons name="download-outline" size={16} color={BRAND.blue} />
+            <Text style={{ fontSize: 13, fontWeight: "800", color: BRAND.blue }}>Export CSV</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              backgroundColor: "#FFFFFF",
+              borderWidth: 1,
+              borderColor: "#E2E8F0",
+              paddingVertical: 10,
+              borderRadius: 12,
+            }}
+            onPress={onRefresh}
+            disabled={refreshing}
+          >
+            <Ionicons name="refresh-outline" size={16} color="#475569" />
+            <Text style={{ fontSize: 13, fontWeight: "800", color: "#475569" }}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={screenStyles.toolbar}>
           <MobileSearchField
             value={searchTerm}
@@ -182,7 +248,12 @@ export default function SecurityLogsScreen({ navigation }) {
           filteredLogs.map((log, index) => {
             const meta = getLogMeta(log);
             return (
-              <View key={log._id || log.id || `${meta.label}-${index}`} style={screenStyles.logCard}>
+              <TouchableOpacity
+                key={log._id || log.id || `${meta.label}-${index}`}
+                style={screenStyles.logCard}
+                onPress={() => setSelectedSecurityLog(log)}
+                activeOpacity={0.8}
+              >
                 <View style={[screenStyles.logIcon, { backgroundColor: `${meta.color}16` }]}>
                   <Ionicons name={meta.icon} size={19} color={meta.color} />
                 </View>
@@ -200,7 +271,7 @@ export default function SecurityLogsScreen({ navigation }) {
                     {formatLogTime(log.createdAt || log.timestamp || log.time || log.updatedAt)}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         ) : (
@@ -213,6 +284,78 @@ export default function SecurityLogsScreen({ navigation }) {
           />
         )}
       </ScrollView>
+
+      {/* Security Log Detail Modal */}
+      <Modal
+        visible={Boolean(selectedSecurityLog)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedSecurityLog(null)}
+      >
+        <View style={secModalStyles.modalBackdrop}>
+          <View style={secModalStyles.modalCard}>
+            <View style={secModalStyles.modalHeader}>
+              <View style={secModalStyles.modalTitleRow}>
+                <Ionicons
+                  name={getLogMeta(selectedSecurityLog || {}).icon}
+                  size={22}
+                  color={getLogMeta(selectedSecurityLog || {}).color}
+                />
+                <Text style={secModalStyles.modalTitle}>Security Event Detail</Text>
+              </View>
+              <TouchableOpacity
+                style={secModalStyles.modalCloseBtn}
+                onPress={() => setSelectedSecurityLog(null)}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={secModalStyles.modalBody}>
+              <View style={secModalStyles.modalHero}>
+                <Text style={secModalStyles.modalTitleText}>
+                  {getLogTitle(selectedSecurityLog || {})}
+                </Text>
+                <Text style={secModalStyles.modalTimestamp}>
+                  {formatLogTime(
+                    selectedSecurityLog?.createdAt ||
+                    selectedSecurityLog?.timestamp ||
+                    selectedSecurityLog?.time ||
+                    selectedSecurityLog?.updatedAt
+                  )}
+                </Text>
+              </View>
+
+              <View style={secModalStyles.modalGrid}>
+                <View style={secModalStyles.modalGridItem}>
+                  <Text style={secModalStyles.modalLabel}>Category</Text>
+                  <Text
+                    style={[
+                      secModalStyles.modalValue,
+                      { color: getLogMeta(selectedSecurityLog || {}).color },
+                    ]}
+                  >
+                    {getLogMeta(selectedSecurityLog || {}).label}
+                  </Text>
+                </View>
+                <View style={secModalStyles.modalGridItem}>
+                  <Text style={secModalStyles.modalLabel}>Description / Notes</Text>
+                  <Text style={secModalStyles.modalValue}>
+                    {getLogDescription(selectedSecurityLog || {})}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={secModalStyles.modalDoneBtn}
+                onPress={() => setSelectedSecurityLog(null)}
+              >
+                <Text style={secModalStyles.modalDoneBtnText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -387,3 +530,99 @@ const screenStyles = StyleSheet.create({
     color: "#94A3B8",
   },
 });
+
+const secModalStyles = StyleSheet.create({
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 500,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: "#F8FAFC",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  modalTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  modalBody: {
+    padding: 18,
+  },
+  modalHero: {
+    marginBottom: 16,
+  },
+  modalTitleText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  modalTimestamp: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#64748B",
+    marginTop: 4,
+  },
+  modalGrid: {
+    gap: 10,
+    marginBottom: 18,
+  },
+  modalGridItem: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    padding: 10,
+  },
+  modalLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    marginBottom: 3,
+  },
+  modalValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  modalDoneBtn: {
+    backgroundColor: "#0A3D91",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  modalDoneBtnText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+});
+
