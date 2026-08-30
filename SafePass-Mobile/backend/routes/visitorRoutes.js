@@ -7,7 +7,6 @@ const {
   notifySecurityCheckIn 
 } = require('../controllers/notificationController');
 
-// Register new visitor
 router.post('/register', async (req, res) => {
   try {
     const {
@@ -23,16 +22,14 @@ router.post('/register', async (req, res) => {
       privacyAccepted
     } = req.body;
 
-    // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email already registered' 
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered'
       });
     }
 
-    // Create visitor record
     const visitor = new Visitor({
       fullName,
       email,
@@ -50,10 +47,8 @@ router.post('/register', async (req, res) => {
 
     await visitor.save();
 
-    // Generate temporary password
     const tempPassword = `VIS${Math.random().toString(36).slice(-8).toUpperCase()}`;
 
-    // Create user account
     const user = new User({
       firstName: fullName.split(' ')[0],
       lastName: fullName.split(' ').slice(1).join(' ') || 'Visitor',
@@ -63,12 +58,17 @@ router.post('/register', async (req, res) => {
       role: 'visitor',
       status: 'pending',
       visitorId: visitor._id,
-      isActive: false // Account inactive until approved
+      isActive: false
     });
 
     await user.save();
 
-    // Notify admin about new registration
+    const verificationOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    visitor.verificationOtp = verificationOtp;
+    visitor.verificationExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await visitor.save();
+
     await notifyAdminNewVisitor({
       ...visitor.toObject(),
       visitorId: visitor._id
@@ -76,7 +76,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Visitor registration submitted successfully',
+      message: 'Visitor registration submitted successfully. Please check your email for verification code.',
       visitor: {
         _id: visitor._id,
         fullName: visitor.fullName,
@@ -86,10 +86,10 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Visitor registration error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Registration failed', 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Registration failed',
+      error: error.message
     });
   }
 });
@@ -209,19 +209,19 @@ router.get('/profile', async (req, res) => {
   try {
     const userId = req.user?.id;
     const user = await User.findById(userId);
-    
+
     if (!user || user.role !== 'visitor') {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Visitor profile not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Visitor profile not found'
       });
     }
 
     const visitor = await Visitor.findById(user.visitorId);
     if (!visitor) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Visitor record not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Visitor record not found'
       });
     }
 
@@ -231,9 +231,86 @@ router.get('/profile', async (req, res) => {
     });
   } catch (error) {
     console.error('Get visitor profile error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch profile' 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch profile'
+    });
+  }
+});
+
+// Update visitor profile
+router.put('/profile', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user || user.role !== 'visitor') {
+      return res.status(404).json({
+        success: false,
+        message: 'Visitor not found'
+      });
+    }
+
+    const {
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      emergencyContact
+    } = req.body;
+
+    // Update user fields if provided
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
+    if (email !== undefined) {
+      user.email = email.toLowerCase().trim();
+      // Check if email is already taken by another user
+      const existingUser = await User.findOne({ email: user.email, _id: { $ne: userId } });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email already in use by another account'
+        });
+      }
+    }
+    if (phoneNumber !== undefined) user.phone = phoneNumber;
+    if (emergencyContact !== undefined) user.emergencyContact = emergencyContact;
+
+    await user.save();
+
+    // Update visitor record if needed
+    const visitor = await Visitor.findOne({ userId: user._id });
+    if (visitor) {
+      // Sync important fields to visitor record
+      if (firstName !== undefined || lastName !== undefined) {
+        const fullName = `${firstName || visitor.fullName.split(' ')[0] || ''} ${lastName || visitor.fullName.split(' ').slice(1).join(' ') || ''}`.trim();
+        if (fullName) visitor.fullName = fullName;
+      }
+      if (email !== undefined) visitor.email = email;
+      if (phoneNumber !== undefined) visitor.phoneNumber = phoneNumber;
+      if (emergencyContact !== undefined) visitor.emergencyContact = emergencyContact;
+
+      await visitor.save();
+    }
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: user.toObject(),
+      visitor: visitor ? visitor.toObject() : null
+    });
+  } catch (error) {
+    console.error('Update visitor profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile',
+      error: error.message
     });
   }
 });

@@ -1780,7 +1780,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         setCurrentUser(currentUser);
       }
 
-      const profileResponse = await ApiService.getVisitorProfile();
+      const profileResponse = await ApiService.getVisitorProfileCached();
       await syncAndroidVirtualNfcToken(profileResponse);
       const accountSafePassId =
         profileResponse?.account?.nfcCardId ||
@@ -4770,6 +4770,224 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const accountDisplayName = visitor?.fullName || displayName || "Visitor";
   const accountFirstName = accountDisplayName.split(" ")[0] || accountDisplayName;
 
+  const [showProfileEditModal, setShowProfileEditModal] = useState(false);
+  const [profileEditForm, setProfileEditForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    emergencyContact: ''
+  });
+
+  const handleEditProfilePress = () => {
+    if (visitor) {
+      setProfileEditForm({
+        firstName: visitor.firstName || '',
+        lastName: visitor.lastName || '',
+        email: visitor.email || '',
+        phoneNumber: visitor.phoneNumber || '',
+        emergencyContact: visitor.emergencyContact || ''
+      });
+      setShowProfileEditModal(true);
+    }
+  };
+
+  const handleProfileEditCancel = () => {
+    setShowProfileEditModal(false);
+    // Reset form to current visitor data
+    if (visitor) {
+      setProfileEditForm({
+        firstName: visitor.firstName || '',
+        lastName: visitor.lastName || '',
+        email: visitor.email || '',
+        phoneNumber: visitor.phoneNumber || '',
+        emergencyContact: visitor.emergencyContact || ''
+      });
+    }
+  };
+
+  const handleProfileEditSave = async () => {
+    // Basic validation
+    if (!profileEditForm.firstName.trim() || !profileEditForm.lastName.trim()) {
+      showVisitorAlert("Validation Error", "First name and last name are required");
+      return;
+    }
+
+    if (!profileEditForm.email.trim() || !/\S+@\S+\.\S+/.test(profileEditForm.email)) {
+      showVisitorAlert("Validation Error", "Please enter a valid email address");
+      return;
+    }
+
+    try {
+      const response = await ApiService.updateProfile({
+        firstName: profileEditForm.firstName.trim(),
+        lastName: profileEditForm.lastName.trim(),
+        email: profileEditForm.email.trim().toLowerCase(),
+        phoneNumber: profileEditForm.phoneNumber.trim(),
+        emergencyContact: profileEditForm.emergencyContact.trim()
+      });
+
+      if (response.success) {
+        // Update local state
+        setVisitor(prev => ({
+          ...prev,
+          firstName: profileEditForm.firstName.trim(),
+          lastName: profileEditForm.lastName.trim(),
+          email: profileEditForm.email.trim().toLowerCase(),
+          phoneNumber: profileEditForm.phoneNumber.trim(),
+          emergencyContact: profileEditForm.emergencyContact.trim()
+        }));
+
+        // Update current user in AsyncStorage
+        await AsyncStorage.setItem("currentUser", JSON.stringify({
+          ...JSON.parse(await AsyncStorage.getItem("currentUser") || '{}'),
+          firstName: profileEditForm.firstName.trim(),
+          lastName: profileEditForm.lastName.trim(),
+          email: profileEditForm.email.trim().toLowerCase(),
+          phoneNumber: profileEditForm.phoneNumber.trim(),
+          emergencyContact: profileEditForm.emergencyContact.trim()
+        }));
+
+        setShowProfileEditModal(false);
+        showVisitorAlert("Profile Updated", "Your profile has been updated successfully.");
+
+        // Refresh visitor data to ensure consistency
+        await loadVisitorData();
+      } else {
+        showVisitorAlert("Update Failed", response.message || "Failed to update profile");
+      }
+    } catch (error) {
+      console.error("Profile edit error:", error);
+      showVisitorAlert("Update Failed", error.message || "An unexpected error occurred");
+    }
+  };
+
+  const renderProfileEditModal = () => (
+    <Modal
+      transparent={true}
+      visible={showProfileEditModal}
+      onRequestClose={handleProfileEditCancel}
+      animationType="fade"
+    >
+      <View style={visitorDashboardStyles.modalOverlay}>
+        <View style={[
+          visitorDashboardStyles.modalContainer,
+          isVisitorDarkMode && visitorDashboardStyles.darkModalContainer
+        ]}>
+          <View style={visitorDashboardStyles.modalHeader}>
+            <Ionicons
+              name="person-outline"
+              size={24}
+              color={isVisitorDarkMode ? "#FFFFFF" : "#0A3D91"}
+            />
+            <Text style={[
+              visitorDashboardStyles.modalTitle,
+              isVisitorDarkMode && visitorDashboardStyles.darkModalTitle
+            ]}>
+              Edit Profile
+            </Text>
+            <TouchableOpacity
+              style={visitorDashboardStyles.modalCloseButton}
+              onPress={handleProfileEditCancel}
+            >
+              <Ionicons name="close-outline" size={20} color={isVisitorDarkMode ? "#FFFFFF" : "#6B7280"} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={visitorDashboardStyles.modalContent}>
+            <View style={visitorDashboardStyles.modalFormGroup}>
+              <Text style={visitorDashboardStyles.modalFormLabel}>First Name</Text>
+              <TextInput
+                style={visitorDashboardStyles.modalFormInput}
+                value={profileEditForm.firstName}
+                onChangeText={(text) => setProfileEditForm(prev => ({ ...prev, firstName: text }))}
+                placeholder="Enter your first name"
+                autoCapitalize="words"
+              />
+            </View>
+
+            <View style={visitorDashboardStyles.modalFormGroup}>
+              <Text style={visitorDashboardStyles.modalFormLabel}>Last Name</Text>
+              <TextInput
+                style={visitorDashboardStyles.modalFormInput}
+                value={profileEditForm.lastName}
+                onChangeText={(text) => setProfileEditForm(prev => ({ ...prev, lastName: text }))}
+                placeholder="Enter your last name"
+                autoCapitalize="words"
+              />
+            </View>
+
+            <View style={visitorDashboardStyles.modalFormGroup}>
+              <Text style={visitorDashboardStyles.modalFormLabel}>Email</Text>
+              <TextInput
+                style={visitorDashboardStyles.modalFormInput}
+                value={profileEditForm.email}
+                onChangeText={(text) => setProfileEditForm(prev => ({ ...prev, email: text }))}
+                placeholder="Enter your email address"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={visitorDashboardStyles.modalFormGroup}>
+              <Text style={visitorDashboardStyles.modalFormLabel}>Phone Number</Text>
+              <TextInput
+                style={visitorDashboardStyles.modalFormInput}
+                value={profileEditForm.phoneNumber}
+                onChangeText={(text) => setProfileEditForm(prev => ({ ...prev, phoneNumber: text }))}
+                placeholder="Enter your phone number"
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={visitorDashboardStyles.modalFormGroup}>
+              <Text style={visitorDashboardStyles.modalFormLabel}>Emergency Contact</Text>
+              <TextInput
+                style={visitorDashboardStyles.modalFormInput}
+                value={profileEditForm.emergencyContact}
+                onChangeText={(text) => setProfileEditForm(prev => ({ ...prev, emergencyContact: text }))}
+                placeholder="Enter emergency contact name"
+              />
+            </View>
+
+            <View style={visitorDashboardStyles.modalActions}>
+              <TouchableOpacity
+                style={[
+                  visitorDashboardStyles.modalButtonSecondary,
+                  isVisitorDarkMode && visitorDashboardStyles.darkModalButtonSecondary
+                ]}
+                onPress={handleProfileEditCancel}
+              >
+                <Text style={[
+                  visitorDashboardStyles.modalButtonText,
+                  isVisitorDarkMode && visitorDashboardStyles.darkModalButtonText
+                ]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  visitorDashboardStyles.modalButtonPrimary,
+                  isVisitorDarkMode && visitorDashboardStyles.darkModalButtonPrimary
+                ]}
+                onPress={handleProfileEditSave}
+                activeOpacity={0.9}
+              >
+                <Text style={[
+                  visitorDashboardStyles.modalButtonText,
+                  isVisitorDarkMode && visitorDashboardStyles.darkModalButtonText
+                ]}>
+                  Save Changes
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const renderAccountPanel = () => (
     <View
       style={[
@@ -4886,7 +5104,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       <View style={visitorDashboardStyles.accountButtonDock}>
         <AnimatedPressable
           style={[visitorDashboardStyles.visitorFlowPrimaryButton, visitorDashboardStyles.accountDockPrimaryButton]}
-          onPress={() => handleVisitorRouteNavigation("Profile")}
+          onPress={handleEditProfilePress}
           activeOpacity={0.88}
         >
           <Ionicons name="create-outline" size={18} color="#FFFFFF" />
@@ -6789,7 +7007,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             </View>
             <View style={visitorDashboardStyles.headerActions}>
               <AnimatedPressable
-                onPress={() => handleVisitorRouteNavigation("Profile")}
+                onPress={handleEditProfilePress}
                 style={visitorDashboardStyles.profileButton}
                 activeOpacity={0.86}
               >
@@ -6891,7 +7109,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                 </Text>
               </View>
               <AnimatedPressable
-                onPress={() => handleVisitorRouteNavigation("Profile")}
+                onPress={handleEditProfilePress}
                 style={[
                   visitorDashboardStyles.miniBrandProfileButton,
                   { backgroundColor: "rgba(255,255,255,0.14)", borderColor: "rgba(255,255,255,0.22)" },

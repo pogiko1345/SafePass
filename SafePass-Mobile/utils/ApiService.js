@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+﻿import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 let AsyncStorage;
 
@@ -423,7 +423,7 @@ async fetch(url, options = {}) {
 
     return data;
   } catch (error) {
-    console.error(`❌ FETCH ERROR for ${url}:`, error);
+    console.error(`âŒ FETCH ERROR for ${url}:`, error);
     if (error.message.includes("Network request failed")) {
       throw createSafePassConnectionError();
     }
@@ -443,7 +443,7 @@ async register(userData) {
     logApiDebug("[ApiService] Register response:", response);
     return response;
   } catch (error) {
-    console.error('❌ Register error:', error);
+    console.error('âŒ Register error:', error);
     throw error;
   }
 }
@@ -558,26 +558,53 @@ async register(userData) {
   async getProfile() {
     try {
       const response = await this.fetch("/profile");
-      
+
       if (response && response.user) {
         await AsyncStorage.setItem("currentUser", JSON.stringify(response.user));
+        await AsyncStorage.setItem("visitorProfileCache", JSON.stringify(response.user));
         return response;
       }
       return response;
     } catch (error) {
       logApiDebug("Profile fetch failed:", error.message);
-      
+
       if (error.message.includes("401") || error.message.includes("authenticate")) {
         const cachedUser = await this.getCurrentUser();
         if (cachedUser) {
           logApiDebug("Using cached user data as fallback");
-          return { 
+          return {
             user: cachedUser,
             fromCache: true,
             message: "Using cached profile data"
           };
         }
       }
+      throw error;
+    }
+  }
+
+  async getVisitorProfileCached() {
+    try {
+      // Try network first for fresh data
+      const response = await this.fetch("/profile");
+      await AsyncStorage.setItem("visitorProfileCache", JSON.stringify(response.user));
+      return response;
+    } catch (error) {
+      // Fallback to cache if network fails
+      logApiDebug("Network profile fetch failed, trying cache:", error.message);
+      const cachedProfileJson = await AsyncStorage.getItem("visitorProfileCache");
+
+      if (cachedProfileJson) {
+        const cachedUser = JSON.parse(cachedProfileJson);
+        return {
+          success: true,
+          user: cachedUser,
+          fromCache: true,
+          message: "Showing cached profile data (offline)"
+        };
+      }
+
+      // If no cache available, throw original error
       throw error;
     }
   }
@@ -721,7 +748,7 @@ async verifyCredentials(email, password) {
       
       if (__DEV__) {
         setTimeout(() => {
-          alert(`🔐 Your OTP code is: ${mockOtp}`);
+          alert(`ðŸ” Your OTP code is: ${mockOtp}`);
         }, 500);
       }
       
@@ -771,6 +798,188 @@ async verifyCredentials(email, password) {
             : "Invalid OTP code",
         };
       }
+    }
+  }
+
+  // ================= SOCIAL LOGIN =================
+
+  async facebookLogin(accessToken) {
+    try {
+      logApiDebug("[ApiService] Facebook login with token:", accessToken.substring(0, 10) + "...");
+      const response = await this.fetch("/auth/facebook", {
+        method: "POST",
+        body: { accessToken },
+      });
+
+      if (response.token) {
+        await this.setToken(response.token);
+        await AsyncStorage.setItem("currentUser", JSON.stringify(response.user));
+      }
+      return response;
+    } catch (error) {
+      console.error("Facebook login API error:", error);
+
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
+      // Development fallback for Facebook login
+      const mockUser = {
+        id: "fb_dev_" + Math.random().toString(36).substr(2, 9),
+        email: `facebook_dev_${Date.now()}@example.com`,
+        firstName: "Facebook",
+        lastName: "Dev",
+        role: "visitor",
+        status: "active",
+        isActive: true,
+        isVerified: true
+      };
+
+      const mockToken = "fb_dev_token_" + Math.random().toString(36).substr(2, 9);
+      await this.setToken(mockToken);
+      await AsyncStorage.setItem("currentUser", JSON.stringify(mockUser));
+
+      return {
+        success: true,
+        token: mockToken,
+        user: mockUser,
+        message: "Facebook login successful (development mode)"
+      };
+    }
+  }
+
+  async googleLogin(idToken) {
+    try {
+      logApiDebug("[ApiService] Google login with token:", idToken.substring(0, 10) + "...");
+      const response = await this.fetch("/auth/google", {
+        method: "POST",
+        body: { idToken },
+      });
+
+      if (response.token) {
+        await this.setToken(response.token);
+        await AsyncStorage.setItem("currentUser", JSON.stringify(response.user));
+      }
+      return response;
+    } catch (error) {
+      console.error("Google login API error:", error);
+
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
+      // Development fallback for Google login
+      const mockUser = {
+        id: "google_dev_" + Math.random().toString(36).substr(2, 9),
+        email: `google_dev_${Date.now()}@example.com`,
+        firstName: "Google",
+        lastName: "Dev",
+        role: "visitor",
+        status: "active",
+        isActive: true,
+        isVerified: true
+      };
+
+      const mockToken = "google_dev_token_" + Math.random().toString(36).substr(2, 9);
+      await this.setToken(mockToken);
+      await AsyncStorage.setItem("currentUser", JSON.stringify(mockUser));
+
+      return {
+        success: true,
+        token: mockToken,
+        user: mockUser,
+        message: "Google login successful (development mode)"
+      };
+    }
+  }
+
+  async appleLogin(identityToken, userData = {}) {
+    try {
+      logApiDebug("[ApiService] Apple login with token:", identityToken.substring(0, 10) + "...");
+      const response = await this.fetch("/auth/apple", {
+        method: "POST",
+        body: { identityToken, userData },
+      });
+
+      if (response.token) {
+        await this.setToken(response.token);
+        await AsyncStorage.setItem("currentUser", JSON.stringify(response.user));
+      }
+      return response;
+    } catch (error) {
+      console.error("Apple login API error:", error);
+
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
+      // Development fallback for Apple login
+      const mockUser = {
+        id: "apple_dev_" + Math.random().toString(36).substr(2, 9),
+        email: `apple_dev_${Date.now()}@example.com`,
+        firstName: userData.firstName || "Apple",
+        lastName: userData.lastName || "User",
+        role: "visitor",
+        status: "active",
+        isActive: true,
+        isVerified: true
+      };
+
+      const mockToken = "apple_dev_token_" + Math.random().toString(36).substr(2, 9);
+      await this.setToken(mockToken);
+      await AsyncStorage.setItem("currentUser", JSON.stringify(mockUser));
+
+      return {
+        success: true,
+        token: mockToken,
+        user: mockUser,
+        message: "Apple login successful (development mode)"
+      };
+    }
+  }
+
+  async webauthnLogin(credential) {
+    try {
+      logApiDebug("[ApiService] WebAuthn login with credential:", credential.id.substring(0, 10) + "...");
+      const response = await this.fetch("/webauthn/authenticate/verify", {
+        method: "POST",
+        body: credential,
+      });
+
+      if (response.token) {
+        await this.setToken(response.token);
+        await AsyncStorage.setItem("currentUser", JSON.stringify(response.user));
+      }
+      return response;
+    } catch (error) {
+      console.error("WebAuthn login API error:", error);
+
+      if (!this.isDevFallbackEnabled()) {
+        throw error;
+      }
+
+      // Development fallback for WebAuthn login
+      const mockUser = {
+        id: "webauthn_dev_" + Math.random().toString(36).substr(2, 9),
+        email: `webauthn_dev_${Date.now()}@example.com`,
+        firstName: "WebAuthn",
+        lastName: "User",
+        role: "visitor",
+        status: "active",
+        isActive: true,
+        isVerified: true
+      };
+
+      const mockToken = "webauthn_dev_token_" + Math.random().toString(36).substr(2, 9);
+      await this.setToken(mockToken);
+      await AsyncStorage.setItem("currentUser", JSON.stringify(mockUser));
+
+      return {
+        success: true,
+        token: mockToken,
+        user: mockUser,
+        message: "WebAuthn login successful (development mode)"
+      };
     }
   }
 
@@ -880,7 +1089,7 @@ async verifyCredentials(email, password) {
       
       if (__DEV__) {
         setTimeout(() => {
-          alert(`🔐 Password reset OTP: 123456`);
+          alert(`ðŸ” Password reset OTP: 123456`);
         }, 500);
       }
       
@@ -1503,7 +1712,7 @@ async approveVisitor(visitorId, adminNotes = '') {
     logApiDebug("Approve response:", response);
     return response;
   } catch (error) {
-    console.error('❌ Approve error:', error);
+    console.error('âŒ Approve error:', error);
     throw error;
   }
 }
@@ -1518,7 +1727,7 @@ async rejectVisitor(visitorId, reason) {
     logApiDebug("Reject response:", response);
     return response;
   } catch (error) {
-    console.error('❌ Reject error:', error);
+    console.error('âŒ Reject error:', error);
     throw error;
   }
 }
@@ -1816,7 +2025,7 @@ async createSecurityGuard(guardData) {
     logApiDebug("Create guard response:", response);
     return response;
   } catch (error) {
-    console.error("❌ Create security guard error:", error);
+    console.error("âŒ Create security guard error:", error);
     const errorMessage = String(error?.message || "").toLowerCase();
     const isDuplicateEmail =
       error?.status === 409 ||
@@ -2281,6 +2490,27 @@ ApiService.prototype.testConnection = async function testConnectionWithAndroidFa
   return false;
 };
 
-export default new ApiService();
 
+const fetchReport = async (apiService, path, filters) => {
+  const queryString = new URLSearchParams(filters).toString();
+  return apiService.fetch(queryString ? `${path}?${queryString}` : path);
+};
+
+ApiService.prototype.getVisitorReports = function getVisitorReports(filters = {}) {
+  return fetchReport(this, "/api/reports/visitors", filters);
+};
+
+ApiService.prototype.getAttendanceReports = function getAttendanceReports(filters = {}) {
+  return fetchReport(this, "/api/reports/attendance", filters);
+};
+
+ApiService.prototype.getAccessLogsReports = function getAccessLogsReports(filters = {}) {
+  return fetchReport(this, "/api/reports/access-logs", filters);
+};
+
+ApiService.prototype.getMonthlySummaryReports = function getMonthlySummaryReports(filters = {}) {
+  return fetchReport(this, "/api/reports/monthly-summary", filters);
+};
+
+export default new ApiService();
 
