@@ -1,0 +1,10 @@
+const express = require('express');
+const router = express.Router();
+const authController = require('../controllers/authController');
+
+// Social login routes
+router.post('/facebook', authController.facebookLogin);
+router.post('/google', authController.googleLogin);
+router.post('/apple', authController.appleLogin);
+
+module.exports = router;

@@ -65,6 +65,8 @@
       "appVariant": "full",
       "appDisplayName": "Sapphire International Aviation Academy",
       "appOrganization": "Sapphire International Aviation Academy",
+      "facebookAppId": "1599774541871796",
+      "googleClientId": "YOUR_GOOGLE_CLIENT_ID",
       "eas": {
         "projectId": "b7043c15-cb4c-4f94-a9bc-3af130c25647"
       }

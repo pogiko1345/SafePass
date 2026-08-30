@@ -28,6 +28,10 @@ import { useAviationTransition } from "../utils/AviationTransitionContext";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import ApiService from "../utils/ApiService";
+import * as Facebook from 'expo-facebook';
+import * as GoogleSignIn from 'expo-auth-session/providers/google';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants from 'expo-constants';
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
 import {
   APP_ORGANIZATION_NAME,
@@ -181,6 +185,19 @@ export default function LoginScreen({ navigation, route }) {
   const [transitionBusy, setTransitionBusy] = useState(false);
   const hasHandledInitialFocusRef = useRef(false);
 
+  // Web biometric authentication state
+  const [isWebBiometricSupported, setIsWebBiometricSupported] = useState(false);
+  const [webBiometricChallenge, setWebBiometricChallenge] = useState(null);
+  const [webBiometricUserId, setWebBiometricUserId] = useState(null);
+  const [webBiometricUsername, setWebBiometricUsername] = useState("");
+  const [isWebAuthnAvailable, setIsWebAuthnAvailable] = useState(false);
+  const googleClientId = Constants.expoConfig?.extra?.googleClientId;
+  const [googleRequest, , promptGoogleSignIn] = GoogleSignIn.useIdTokenAuthRequest({
+    webClientId: googleClientId,
+    iosClientId: googleClientId,
+    androidClientId: googleClientId,
+  });
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(skipArrivalSplash ? 1 : 0)).current;
   const loginExitAnim = useRef(new Animated.Value(1)).current;
@@ -318,8 +335,43 @@ export default function LoginScreen({ navigation, route }) {
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
       document.title = `Login | ${APP_ORGANIZATION_NAME}`;
+
+      // Check if WebAuthn is supported
+      if (window.PublicKeyCredential) {
+        setIsWebBiometricSupported(true);
+        setIsWebAuthnAvailable(true);
+      }
     }
   }, []);
+
+  // Initialize WebAuthn options when component mounts
+  useEffect(() => {
+    if (isWeb && isWebBiometricSupported && isWebAuthnAvailable) {
+      initializeWebAuthnOptions();
+    }
+  }, [isWeb, isWebBiometricSupported, isWebAuthnAvailable]);
+
+  // Function to initialize WebAuthn options
+  const initializeWebAuthnOptions = async () => {
+    try {
+      // Generate a challenge for WebAuthn
+      const challenge = await fetch('/api/webauthn/challenge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username: email || 'web_user' })
+      });
+
+      const challengeData = await challenge.json();
+      setWebBiometricChallenge(challengeData.challenge);
+      setWebBiometricUserId(challengeData.userId);
+      setWebBiometricUsername(challengeData.username);
+    } catch (error) {
+      console.warn('WebAuthn initialization failed:', error);
+      // Fall back to regular login if WebAuthn setup fails
+    }
+  };
 
   useEffect(() => {
     if (!isWeb || typeof window === "undefined") return undefined;
@@ -647,7 +699,7 @@ export default function LoginScreen({ navigation, route }) {
         setLoginOtpResendAvailableAt(new Date(Date.now() + 60 * 1000).toISOString());
         setLoginSuccessMessage(
           response.otpDeliveryMode === "backend_log"
-            ? "A new verification code was generated. For local testing, check the backend terminal."
+            ? "A new verification code has been generated. Please check your email for the code."
             : "A new verification code was sent to your email.",
         );
         return;
@@ -1022,7 +1074,7 @@ export default function LoginScreen({ navigation, route }) {
     setLoginError("");
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Sign in to SafePass",
+        promptMessage: "Sign in to Sapphire",
         fallbackLabel: "Use passcode",
       });
 
@@ -1089,7 +1141,7 @@ export default function LoginScreen({ navigation, route }) {
     setLoginSplashMessage(
       apiConnected
         ? `Checking ${getRoleDisplayName(inferredLoginRole).toLowerCase()} account...`
-        : "Connecting to SafePass...",
+        : "Connecting to Sapphire...",
     );
     setLoginError("");
     setLoginSuccessMessage("");
@@ -1233,7 +1285,7 @@ export default function LoginScreen({ navigation, route }) {
       case "campus":
         return {
           label: "Campus Access",
-          title: "Sign In to SafePass",
+          title: "Sign In to Sapphire",
           subtitle:
             "Use your student, staff, visitor, security, or admin account to open the correct dashboard.",
           icon: "id-card-outline",
@@ -1253,7 +1305,7 @@ export default function LoginScreen({ navigation, route }) {
         return {
           label: "System Access",
           title: "Welcome Back",
-          subtitle: "Sign in to continue with your secure SafePass workflow.",
+          subtitle: "Sign in to continue with your secure Sapphire workflow.",
           icon: "log-in-outline",
           accent: brandColors.blue,
           panel: "Secure Entry",
@@ -1332,19 +1384,213 @@ export default function LoginScreen({ navigation, route }) {
           : "Create a new password that matches the same Secure Login standards.";
   const socialLinks = [
     {
-      label: "Website",
-      icon: "globe-outline",
-      onPress: () => openExternalLink("https://sapphireaviationacademy.edu.ph/"),
-    },
-    {
       label: "Facebook",
       icon: "logo-facebook",
-      onPress: () => openExternalLink("https://www.facebook.com/sapphireaviationacademy/"),
+      onPress: async () => {
+        if (Platform.OS === 'web') {
+          // Web-based Facebook login
+          try {
+            const { type, token } = await Facebook.logInWithReadPermissionsAsync(
+              Constants.expoConfig.extra.facebookAppId,
+              { permissions: ['public_profile', 'email'] }
+            );
+
+            if (type === 'success' && token) {
+              const response = await ApiService.facebookLogin(token);
+              // Handle successful login
+              console.log('Facebook login successful:', response);
+              // Navigate to appropriate screen based on user role
+            } else {
+              // User cancelled login
+              console.log('Facebook login cancelled');
+            }
+          } catch (error) {
+            console.error('Facebook login error:', error);
+            Alert.alert('Login Error', 'Unable to login with Facebook. Please try again.');
+          }
+        } else {
+          // Native Facebook login
+          try {
+            const result = await Facebook.logInWithReadPermissionsAsync(FACEBOOK_APP_ID, {
+              permissions: ['public_profile', 'email'],
+            });
+
+            if (result.isCancelled) {
+              console.log('Facebook login cancelled');
+              return;
+            }
+
+            const { token } = result;
+            const response = await ApiService.facebookLogin(token);
+            // Handle successful login
+            console.log('Facebook login successful:', response);
+          } catch (error) {
+            console.error('Facebook login error:', error);
+            Alert.alert('Login Error', 'Unable to login with Facebook. Please try again.');
+          }
+        }
+      },
     },
     {
-      label: "YouTube",
-      icon: "logo-youtube",
-      onPress: () => openExternalLink("https://www.youtube.com/@sapphireaviation5105"),
+      label: "Google",
+      icon: "logo-google",
+      onPress: async () => {
+        try {
+          if (!googleClientId || googleClientId === "YOUR_GOOGLE_CLIENT_ID") {
+            Alert.alert("Google Sign-In", "Add your Google client ID in app.json before using this option.");
+            return;
+          }
+          if (!googleRequest) {
+            Alert.alert("Google Sign-In", "Google Sign-In is still loading. Please try again.");
+            return;
+          }
+
+          const result = await promptGoogleSignIn();
+
+          if (result.type === 'success') {
+            const idToken = result.params?.id_token;
+            if (!idToken) {
+              throw new Error("Google did not return an ID token.");
+            }
+            const response = await ApiService.googleLogin(idToken);
+            // Handle successful login
+            console.log('Google login successful:', response);
+          } else {
+            // User cancelled login
+            console.log('Google login cancelled');
+          }
+        } catch (error) {
+          console.error('Google login error:', error);
+          Alert.alert('Login Error', 'Unable to login with Google. Please try again.');
+        }
+      },
+    },
+    {
+      label: "Apple",
+      icon: "logo-apple",
+      onPress: async () => {
+        if (Platform.OS === 'ios' || Platform.OS === 'web') {
+          try {
+            const appleAuthRequest = await AppleAuthentication.signInAsync({
+              requestedScopes: [
+                AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                AppleAuthentication.AppleAuthenticationScope.EMAIL,
+              ],
+            });
+
+            const { identityToken, user } = appleAuthRequest;
+            const response = await ApiService.appleLogin(identityToken, {
+              firstName: user?.givenName || '',
+              lastName: user?.familyName || '',
+              email: user?.email
+            });
+            // Handle successful login
+            console.log('Apple login successful:', response);
+          } catch (error) {
+            console.error('Apple login error:', error);
+            if (error.code === 'ERR_AUTHENTICATION_CANCELED') {
+              // User cancelled login
+              console.log('Apple login cancelled');
+            } else {
+              Alert.alert('Login Error', 'Unable to login with Apple. Please try again.');
+            }
+          }
+        } else {
+          Alert.alert('Not Available', 'Apple Sign In is only available on iOS and web platforms.');
+        }
+      },
+    },
+    {
+      label: "WebAuthn",
+      icon: "fingerprint",
+      onPress: async () => {
+        if (Platform.OS === 'web' && isWebAuthnAvailable) {
+          try {
+            // Check if email is provided for WebAuthn registration
+            if (!email || email.trim() === '') {
+              Alert.alert('WebAuthn Login', 'Please enter your email to use WebAuthn login.');
+              return;
+            }
+
+            // Start WebAuthn authentication process
+            const response = await fetch('/api/webauthn/authenticate/options', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ email })
+            });
+
+            const optionsData = await response.json();
+            if (!optionsData.success) {
+              throw new Error(optionsData.message || 'Failed to generate authentication options');
+            }
+
+            // Perform WebAuthn authentication
+            const credential = await navigator.credentials.get({
+              publicKey: optionsData.options
+            });
+
+            // Verify the credential with backend
+            const verifyResponse = await fetch('/api/webauthn/authenticate/verify', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                email,
+                id: credential.id,
+                rawId: Array.from(new Uint8Array(credential.rawId)).map(b => b.toString(16).padStart(2, '0')).join(''),
+                type: credential.type,
+                response: {
+                  authenticatorData: Array.from(new Uint8Array(credential.response.authenticatorData)).map(b => b.toString(16).padStart(2, '0')).join(''),
+                  clientDataJSON: Array.from(new Uint8Array(credential.response.clientDataJSON)).map(b => b.toString(16).padStart(2, '0')).join(''),
+                  signature: Array.from(new Uint8Array(credential.response.signature)).map(b => b.toString(16).padStart(2, '0')).join(''),
+                  userHandle: Array.from(new Uint8Array(credential.response.userHandle)).map(b => b.toString(16).padStart(2, '0')).join('')
+                }
+              })
+            });
+
+            const verifyData = await verifyResponse.json();
+            if (verifyData.success) {
+              // Handle successful login
+              console.log('WebAuthn login successful:', verifyData);
+              // Navigate to appropriate screen based on user role
+              const normalizedUser = {
+                ...verifyData.user,
+                role: normalizeRole(verifyData.user?.role) || "visitor",
+              };
+
+              await persistAuthenticatedSession({
+                token: verifyData.token,
+                user: normalizedUser,
+                rememberEmail: rememberMe,
+              });
+
+              await saveBiometricCredentialsIfEnabled(email, password); // Save for potential biometric fallback
+
+              navigation.reset({
+                index: 0,
+                routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(normalizedUser) }],
+              });
+            } else {
+              throw new Error(verifyData.message || 'WebAuthn verification failed');
+            }
+          } catch (error) {
+            console.error('WebAuthn login error:', error);
+            if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
+              // User cancelled or security restriction
+              console.log('WebAuthn login cancelled or blocked');
+            } else {
+              Alert.alert('Login Error', 'Unable to login with WebAuthn. Please try again.');
+            }
+          }
+        } else if (Platform.OS === 'web') {
+          Alert.alert('Not Available', 'WebAuthn is not supported on this browser.');
+        } else {
+          Alert.alert('Not Available', 'WebAuthn login is only available on web platforms.');
+        }
+      },
     },
   ];
   const handleLoginFooterLink = (topic) => {
@@ -1585,7 +1831,7 @@ export default function LoginScreen({ navigation, route }) {
                     />
                     <View style={loginStyles.brandBadgeTextWrap}>
                       <Text style={loginStyles.brandBadgeEyebrow}>Sapphire International Aviation Academy</Text>
-                      <Text style={loginStyles.brandBadgeTitle}>SafePass Smart Campus</Text>
+                      <Text style={loginStyles.brandBadgeTitle}>Sapphire Smart Campus</Text>
                     </View>
                   </View>
 
@@ -1642,7 +1888,7 @@ export default function LoginScreen({ navigation, route }) {
                         </View>
                         <View style={loginStyles.loginVisualBrandCopy}>
                           <Text style={loginStyles.loginVisualEyebrow}>Sapphire International Aviation Academy</Text>
-                          <Text style={loginStyles.loginVisualTitle}>SafePass Smart Campus</Text>
+                          <Text style={loginStyles.loginVisualTitle}>Sapphire Smart Campus</Text>
                         </View>
                       </View>
                       <View style={loginStyles.loginVisualContactCard}>
@@ -2143,7 +2389,7 @@ export default function LoginScreen({ navigation, route }) {
                     />
                     <View style={loginStyles.modalBrandBadgeTextWrap}>
                       <Text style={loginStyles.modalBrandBadgeEyebrow}>Account Recovery</Text>
-                      <Text style={loginStyles.modalBrandBadgeTitle}>Sapphire SafePass</Text>
+                      <Text style={loginStyles.modalBrandBadgeTitle}>Sapphire</Text>
                     </View>
                   </View>
                   <TouchableOpacity
@@ -2235,7 +2481,7 @@ export default function LoginScreen({ navigation, route }) {
                     <View style={loginStyles.modalInfoCard}>
                       <Ionicons name="mail-unread-outline" size={18} color={brandColors.blue} />
                       <Text style={loginStyles.modalInfoText}>
-                        Use the email linked to your SafePass account. We will send a 6-digit verification code and a secure reset link.
+                        Use the email linked to your Sapphire account. We will send a 6-digit verification code and a secure reset link.
                       </Text>
                     </View>
 

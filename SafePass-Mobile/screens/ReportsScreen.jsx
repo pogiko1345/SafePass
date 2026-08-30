@@ -11,13 +11,13 @@ export default function ReportsScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color="#0A3D91" />
         </TouchableOpacity>
         <Text style={{ fontSize: 24, fontWeight: "bold", color: "#111827", marginLeft: 16 }}>
-          Access Reports
+          Visitor Reports
         </Text>
       </View>
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <Ionicons name="document-text-outline" size={60} color="#CBD5E1" />
         <Text style={{ fontSize: 18, color: "#6B7280", marginTop: 16 }}>
-          Reports Coming Soon
+          Reports Module
         </Text>
       </View>
     </SafeAreaView>

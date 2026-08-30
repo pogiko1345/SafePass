@@ -347,6 +347,19 @@ test("password reset request is generic for existing and missing accounts", asyn
   assert.equal(existingResponse.body.message, missingResponse.body.message);
 });
 
+test("passkey enrollment and 2FA routes are registered and require authentication", async () => {
+  const passkeyResponse = await requestJson("/api/webauthn/register/options", {
+    method: "POST",
+    body: { email: "visitor@example.com" },
+  });
+  const twoFaResponse = await requestJson("/api/auth/enable-2fa", {
+    method: "POST",
+  });
+
+  assert.equal(passkeyResponse.status, 401);
+  assert.equal(twoFaResponse.status, 401);
+});
+
 test("admin settings can be updated and then read back through the API", async () => {
   persistDoc({
     _id: "admin-1",

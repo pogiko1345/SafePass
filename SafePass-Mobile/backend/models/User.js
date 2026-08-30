@@ -55,8 +55,19 @@ const userSchema = new mongoose.Schema({
   department: { type: String, default: "" },
   position: { type: String, default: "" },
   shift: { type: String, default: "" },
-  
-role: {
+
+  // Social login IDs
+  facebookId: { type: String, sparse: true },
+  googleId: { type: String, sparse: true },
+  appleId: { type: String, sparse: true },
+
+  // WebAuthn fields
+  webauthnCredentialID: { type: String, sparse: true },
+  webauthnCredentialPublicKey: { type: String, sparse: true },
+  webauthnCounter: { type: Number, default: 0 },
+  webauthnChallenge: { type: String, sparse: true },
+
+  role: {
   type: String,
   enum: ["visitor", "security", "guard", "admin", "staff", "student", "teacher"],
   default: "visitor",
@@ -103,6 +114,22 @@ role: {
   verifiedAt: { type: Date, default: null },
   dataPrivacyAccepted: { type: Boolean, default: false },
   dataPrivacyAcceptedAt: { type: Date, default: null },
+  // Two-Factor Authentication
+  isTwoFaEnabled: { type: Boolean, default: false },
+  twoFaSecret: { type: String }, // TOTP secret key (base32 encoded)
+  twoFaBackupCodes: { type: [String] }, // Hashed backup codes for account recovery
+  trustedDeviceToken: { type: String, default: "" },
+  trustedDeviceExpiresAt: { type: Date, default: null },
+  lastUsedAt: { type: Date, default: null },
+  // Trusted Device Management (Array of trusted devices)
+  trustedDevices: [{
+    deviceId: { type: String, required: true }, // Unique device identifier
+    deviceName: { type: String, default: "" }, // User-friendly name
+    tokenHash: { type: String, required: true }, // Hashed device token
+    lastUsedAt: { type: Date, default: null },
+    isTrusted: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now }
+  }],
 
   isActive: { type: Boolean, default: true },
   lastLogin: Date,

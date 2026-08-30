@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -1532,7 +1532,7 @@ const connectToDatabase = () => {
         global.__safepassMongoConnectionError = null;
         if (process.env.NODE_ENV !== "test") {
           console.log(
-            `✅ MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
+            `âœ… MongoDB Connected (${MONGODB_URI.includes("mongodb+srv") ? "Atlas" : "Local"})`,
           );
         }
         return mongoose.connection;
@@ -1540,7 +1540,7 @@ const connectToDatabase = () => {
       .catch((err) => {
         mongoConnectionError = err?.message || "Unknown MongoDB connection error";
         global.__safepassMongoConnectionError = mongoConnectionError;
-        console.error("❌ MongoDB Connection Error:", err);
+        console.error("âŒ MongoDB Connection Error:", err);
         console.log("Trying to connect to:", maskMongoUri(MONGODB_URI));
         mongoConnectionPromise = null;
         global.__safepassMongoConnectionPromise = null;
@@ -1702,6 +1702,14 @@ app.use(
     createSystemActivity,
   }),
 );
+
+// Auth routes
+const authRoutes = require("./routes/authRoutes");
+app.use("/api/auth", authRoutes);
+
+// WebAuthn routes
+const webauthnRoutes = require("./routes/webauthnRoutes");
+app.use("/api/webauthn", webauthnRoutes);
 
 const createRoleNotification = async ({
   title,
@@ -4620,7 +4628,7 @@ const normalizeDepartmentValue = (value = "") => {
   const normalized = String(value || "")
     .trim()
     .toLowerCase()
-    .replace(/['’]/g, "")
+    .replace(/['â€™]/g, "")
     .replace(/&/g, "and")
     .replace(/\s+/g, " ");
 
@@ -6286,7 +6294,7 @@ const userData = {
 
     const user = new User(userData);
     await user.save();
-    console.log("✅ User created:", user.email, "Status:", user.status);
+    console.log("âœ… User created:", user.email, "Status:", user.status);
 
     // Generate token (only if user is active)
     let token = null;
@@ -6306,7 +6314,7 @@ const userData = {
           `Please sign in using the password you created. If you need a new password, use the password reset option on the login screen.\n\n` +
           getSupportEmailSignature(),
       );
-      console.log(`📧 Welcome email sent to: ${user.email}`);
+      console.log(`ðŸ“§ Welcome email sent to: ${user.email}`);
     }
 
     // Create initial access log
@@ -6338,7 +6346,7 @@ const userData = {
       token,
     });
   } catch (error) {
-    console.error("❌ Registration error:", error);
+    console.error("âŒ Registration error:", error);
 
     if (error.code === 11000) {
       return res.status(400).json({
@@ -6548,7 +6556,7 @@ app.get("/api/profile", authMiddleware, async (req, res) => {
     }
     res.json({ success: true, user });
   } catch (error) {
-    console.error("❌ Profile fetch error:", error);
+    console.error("âŒ Profile fetch error:", error);
     res.status(500).json({ error: "Failed to fetch profile" });
   }
 });
@@ -6659,7 +6667,7 @@ app.put("/api/profile", authMiddleware, async (req, res) => {
       user,
     });
   } catch (error) {
-    console.error("❌ Update profile error:", error);
+    console.error("âŒ Update profile error:", error);
     res.status(500).json({ error: "Failed to update profile" });
   }
 });
@@ -6716,7 +6724,7 @@ app.post("/api/check-email", async (req, res) => {
       message: "Use registration or password reset to continue.",
     });
   } catch (error) {
-    console.error("❌ Check email error:", error);
+    console.error("âŒ Check email error:", error);
     res.status(500).json({ error: "Failed to check email" });
   }
 });
@@ -7755,7 +7763,7 @@ app.put("/api/admin/visitors/:id/appointment-office", authMiddleware, async (req
 // Approve visitor registration (admin only) - WITH DEBUG LOGS
 app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
   console.log("\n" + "=".repeat(60));
-  console.log("🔵 APPROVE ROUTE CALLED");
+  console.log("ðŸ”µ APPROVE ROUTE CALLED");
   console.log("=".repeat(60));
   console.log("Visitor ID:", req.params.id);
   console.log("Admin User:", req.user?.email);
@@ -7763,7 +7771,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
 
   try {
     if (req.user.role !== "admin") {
-      console.log("❌ Access denied - not admin");
+      console.log("âŒ Access denied - not admin");
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
@@ -7774,13 +7782,13 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     const visitor = await Visitor.findById(req.params.id);
 
     if (!visitor) {
-      console.log("❌ Visitor not found:", req.params.id);
+      console.log("âŒ Visitor not found:", req.params.id);
       return res
         .status(404)
         .json({ success: false, message: "Visitor not found" });
     }
 
-    console.log("\n📋 VISITOR FOUND:");
+    console.log("\nðŸ“‹ VISITOR FOUND:");
     console.log(`   Name: ${visitor.fullName}`);
     console.log(`   Email: ${visitor.email}`);
     console.log(`   Current status: ${visitor.status}`);
@@ -7792,18 +7800,18 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     let realNfcCardId = null;
 
     // Update visitor status - THIS IS THE KEY PART
-    console.log("\n📝 UPDATING VISITOR...");
+    console.log("\nðŸ“ UPDATING VISITOR...");
     visitor.approveRegistration(req.user._id, adminNotes || "");
     visitor.temporaryPassword = undefined;
 
     await visitor.save();
-    console.log("✅ Visitor updated in database");
+    console.log("âœ… Visitor updated in database");
     console.log(`   New status: ${visitor.status}`);
     console.log(`   New approvalStatus: ${visitor.approvalStatus}`);
     console.log(`   Approved At: ${visitor.approvedAt}`);
 
     // Find and update the user
-    console.log("\n👤 CHECKING FOR USER ACCOUNT...");
+    console.log("\nðŸ‘¤ CHECKING FOR USER ACCOUNT...");
     let user = await User.findOne({ email: visitor.email });
     console.log(`   User exists: ${user ? "Yes" : "No"}`);
     realNfcCardId =
@@ -7815,7 +7823,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
     let setupToken = null;
 
     if (!user) {
-      console.log("📝 Creating new user account...");
+      console.log("ðŸ“ Creating new user account...");
       setupToken = createPasswordSetupToken(48);
       setupLink = `${FRONTEND_URL}?resetEmail=${encodeURIComponent(visitor.email)}&resetToken=${encodeURIComponent(setupToken.token)}&activation=1`;
       // Create user account for the visitor
@@ -7845,13 +7853,13 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       user = new User(userData);
       await user.save();
       console.log(
-        "✅ User account created for approved visitor:",
+        "âœ… User account created for approved visitor:",
         visitor.email,
       );
       console.log(`   User ID: ${user._id}`);
       console.log(`   NFC Card: ${user.nfcCardId}`);
     } else {
-      console.log("📝 Updating existing user account...");
+      console.log("ðŸ“ Updating existing user account...");
       // Keep the approved account credentials and visitor link in sync.
       user.firstName = visitor.fullName.split(" ")[0] || user.firstName;
       user.lastName =
@@ -7880,7 +7888,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       };
       await user.save();
       console.log(
-        "✅ User account activated with real NFC card:",
+        "âœ… User account activated with real NFC card:",
         realNfcCardId,
       );
       console.log(`   User ID: ${user._id}`);
@@ -7965,7 +7973,7 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("\n❌ APPROVE VISITOR ERROR:", error);
+    console.error("\nâŒ APPROVE VISITOR ERROR:", error);
     console.log("=".repeat(60) + "\n");
     res.status(500).json({
       success: false,
@@ -8015,7 +8023,7 @@ app.put("/api/admin/visitors/:id/reject", authMiddleware, async (req, res) => {
       },
     });
 
-    console.log("❌ Visitor rejected:", visitor.email);
+    console.log("âŒ Visitor rejected:", visitor.email);
 
     await createSystemActivity({
       actorUser: req.user,
@@ -8906,7 +8914,7 @@ app.post("/api/admin/notifications", authMiddleware, async (req, res) => {
 
     await notification.save();
 
-    console.log("📢 Admin notification created for visitor:", visitorName);
+    console.log("ðŸ“¢ Admin notification created for visitor:", visitorName);
 
     res.json({
       success: true,
@@ -9136,7 +9144,7 @@ app.get("/api/admin/debug-visitors", authMiddleware, async (req, res) => {
 
     const visitors = await Visitor.find({}).sort({ registeredAt: -1 });
 
-    console.log("\n📋 ALL VISITORS IN DATABASE:");
+    console.log("\nðŸ“‹ ALL VISITORS IN DATABASE:");
     console.log("=".repeat(60));
     visitors.forEach((v) => {
       console.log(`   ${v.fullName} (${v.email}):`);
@@ -9261,7 +9269,7 @@ app.post("/api/access-log", authMiddleware, async (req, res) => {
       accessLog,
     });
   } catch (error) {
-    console.error("❌ Create access log error:", error);
+    console.error("âŒ Create access log error:", error);
     res.status(500).json({ error: "Failed to create access log" });
   }
 });
@@ -9313,7 +9321,7 @@ app.get("/api/access-logs", authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Get access logs error:", error);
+    console.error("âŒ Get access logs error:", error);
     res.status(500).json({ error: "Failed to fetch access logs" });
   }
 });
@@ -9326,7 +9334,7 @@ app.post("/api/nfc-scan", authMiddleware, requireRoles("admin", "security", "gua
       message: "This legacy NFC simulation endpoint is disabled. Use /api/nfc/station/tap for live checkpoint taps.",
     });
   } catch (error) {
-    console.error("❌ NFC scan error:", error);
+    console.error("âŒ NFC scan error:", error);
     res.status(500).json({ error: "NFC scan failed" });
   }
 });
@@ -9426,7 +9434,7 @@ app.get("/api/stats", authMiddleware, async (req, res) => {
           : "0%",
     });
   } catch (error) {
-    console.error("❌ Get stats error:", error);
+    console.error("âŒ Get stats error:", error);
     res.status(500).json({ error: "Failed to get statistics" });
   }
 });
@@ -9459,7 +9467,7 @@ app.post("/api/create-demo-user", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Demo user creation error:", error);
+    console.error("âŒ Demo user creation error:", error);
     res.status(500).json({ error: "Failed to create demo user" });
   }
 });
@@ -14786,23 +14794,100 @@ app.put("/api/admin/users/:id/access", authMiddleware, async (req, res) => {
   }
 });
 
-// ========== ERROR HANDLING ==========
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Route not found",
-    path: req.path,
-    method: req.method,
-  });
+
+// ========== 2FA HELPERS ==========
+const speakeasy = require('speakeasy');
+const TRUST_DEVICE_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+
+function hashToken(t) {
+  return crypto.createHash('sha256').update(t).digest('hex');
+}
+function generateTwoFaSecret() {
+  return speakeasy.generateSecret({ length: 20 }).base32;
+}
+function generateBackupCodes(count = 5) {
+  return Array.from({ length: count }, () =>
+    crypto.randomBytes(4).toString('hex').toUpperCase().match(/.{1,2}/g).join('-')
+  );
+}
+function generateTrustedDeviceToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+async function verifyTrustedDevice(userId, tokenHash) {
+  try {
+    const user = await User.findById(userId);
+    if (!user || !user.trustedDeviceToken || !user.trustedDeviceExpiresAt || new Date(user.trustedDeviceExpiresAt) <= new Date()) return false;
+    const isValid = crypto.timingSafeEqual(Buffer.from(user.trustedDeviceToken,'hex'), Buffer.from(tokenHash,'hex'));
+    if (isValid) { user.lastUsedAt = new Date(); await user.save(); }
+    return isValid;
+  } catch (e) { return false; }
+}
+
+// ========== 2FA ENDPOINTS ==========
+app.post('/api/auth/verify-2fa', authMiddleware, async (req, res) => {
+  try {
+    const { token } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user || !user.isTwoFaEnabled) return res.status(400).json({ error: '2FA not enabled' });
+    const verified = speakeasy.totp.verify({ secret: user.twoFaSecret, encoding: 'base32', token, window: 1 });
+    if (!verified) return res.status(400).json({ error: 'Invalid 2FA token' });
+    const authToken = generateToken(user._id);
+    res.json({ success: true, token: authToken, user: { id: user._id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role } });
+  } catch (e) { res.status(500).json({ error: 'Failed to verify 2FA' }); }
 });
 
-// Error handler
+app.post('/api/auth/enable-2fa', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const twoFaSecret = generateTwoFaSecret();
+    const backupCodes = generateBackupCodes(5);
+    user.isTwoFaEnabled = true; user.twoFaSecret = twoFaSecret; user.twoFaBackupCodes = backupCodes.map(hashToken);
+    await user.save();
+    res.json({ success: true, secret: twoFaSecret, backupCodes });
+  } catch (e) { res.status(500).json({ error: 'Failed to enable 2FA' }); }
+});
+
+app.post('/api/auth/disable-2fa', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.isTwoFaEnabled = false; user.twoFaSecret = null; user.twoFaBackupCodes = [];
+    await user.save();
+    res.json({ success: true, message: '2FA disabled' });
+  } catch (e) { res.status(500).json({ error: 'Failed to disable 2FA' }); }
+});
+
+app.post('/api/auth/trust-device', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const trustedDeviceToken = generateTrustedDeviceToken();
+    user.trustedDeviceToken = hashToken(trustedDeviceToken);
+    user.trustedDeviceExpiresAt = new Date(Date.now() + TRUST_DEVICE_DURATION_MS);
+    await user.save();
+    res.json({ success: true, trustedDeviceToken });
+  } catch (e) { res.status(500).json({ error: 'Failed to trust device' }); }
+});
+
+app.post('/api/auth/untrust-device', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.trustedDeviceToken = null; user.trustedDeviceExpiresAt = null;
+    await user.save();
+    res.json({ success: true, message: 'Device trust removed' });
+  } catch (e) { res.status(500).json({ error: 'Failed to remove device trust' }); }
+});
+
+// ========== ERROR HANDLING MIDDLEWARE ==========
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found', path: req.path, method: req.method });
+});
+
 app.use((err, req, res, next) => {
-  console.error("❌ Server error:", err);
-  res.status(500).json({
-    error: "Internal server error",
-    message: err.message,
-  });
+  console.error('Server error:', err);
+  res.status(500).json({ error: 'Internal server error', message: err.message });
 });
 
 // ========== START SERVER ==========
@@ -14810,40 +14895,18 @@ const PORT = process.env.PORT || 5000;
 
 if (!isVercelRuntime && require.main === module) {
   const server = app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📁 Database: ${MONGODB_URI}`);
-    console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
-    console.log(`✅ Test endpoint: http://localhost:${PORT}/api/health`);
-    console.log(`✅ Test endpoint: http://localhost:${PORT}/api/test`);
-    console.log(`👑 Admin routes available at /api/admin/*`);
-    console.log(`📝 Visitor approval routes available at /api/admin/visitors/*`);
+    console.log('Server running on port ' + PORT);
+    console.log('API: http://localhost:' + PORT + '/api');
   });
-
-  server.on("error", (error) => {
-    if (error.code === "EADDRINUSE") {
-      console.error(`❌ Port ${PORT} is already in use. Try a different port:`);
-      console.log(`   Try: PORT=5001 npm run dev`);
-      process.exit(1);
-    } else {
-      console.error("❌ Server error:", error);
-    }
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') { console.error('Port in use'); process.exit(1); }
+    else { console.error(error); }
   });
-
-  process.on("SIGINT", () => {
-    console.log("\n🛑 Shutting down server...");
+  process.on('SIGINT', () => {
     server.close(() => {
-      console.log("✅ Server closed");
-      mongoose.connection.close(false, () => {
-        console.log("✅ MongoDB connection closed");
-        process.exit(0);
-      });
+      mongoose.connection.close(false, () => process.exit(0));
     });
   });
 }
 
 module.exports = app;
-
-
-
-
-
