@@ -1665,6 +1665,24 @@ export default StyleSheet.create({
     color: "#475569",
   },
 
+  overdueBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#FEF3C7",
+  },
+
+  overdueBadgeText: {
+    color: "#B45309",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
   tableHelperText: {
     marginTop: 4,
     fontSize: 12,
@@ -1697,6 +1715,58 @@ export default StyleSheet.create({
 
   tableActionButtonPrimary: {
     backgroundColor: "#0A3D91",
+  },
+
+  tableActionButtonSelected: {
+    backgroundColor: "#DBEAFE",
+    borderWidth: 1,
+    borderColor: "#1C6DD0",
+  },
+
+  bulkActionBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+
+  bulkActionText: {
+    color: "#0A3D91",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  bulkClearButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+
+  bulkClearButtonText: {
+    color: "#0A3D91",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  bulkApproveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: "#0A3D91",
+  },
+
+  bulkApproveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
   },
 
   tableActionButtonDanger: {
