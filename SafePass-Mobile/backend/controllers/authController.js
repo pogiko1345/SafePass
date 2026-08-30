@@ -238,6 +238,72 @@ const googleLogin = async (req, res) => {
   }
 };
 
+// Verifies a provider identity for the visitor registration flow. This does not
+// create an account; it returns a short-lived, server-signed proof that the
+// visitor registration endpoint can safely bind to the new visitor account.
+const getSocialSignupProfile = async (req, res) => {
+  try {
+    const provider = String(req.body?.provider || '').toLowerCase();
+    let profile;
+
+    if (provider === 'google') {
+      const idToken = req.body?.idToken;
+      if (!idToken || !GOOGLE_CLIENT_ID) {
+        return res.status(400).json({ success: false, message: 'Google sign-up is not configured.' });
+      }
+      const { data = {} } = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
+        params: { id_token: idToken }
+      });
+      const validIssuer = ['accounts.google.com', 'https://accounts.google.com'].includes(data.iss);
+      const emailVerified = data.email_verified === true || data.email_verified === 'true';
+      if (data.aud !== GOOGLE_CLIENT_ID || !validIssuer || !emailVerified || !data.sub || !data.email) {
+        return res.status(401).json({ success: false, message: 'Invalid Google account.' });
+      }
+      profile = {
+        provider,
+        socialId: data.sub,
+        email: data.email,
+        fullName: `${data.given_name || ''} ${data.family_name || ''}`.trim() || data.email,
+      };
+    } else if (provider === 'facebook') {
+      const accessToken = req.body?.accessToken;
+      if (!accessToken || !FACEBOOK_APP_ID || !FACEBOOK_APP_SECRET) {
+        return res.status(400).json({ success: false, message: 'Facebook sign-up is not configured.' });
+      }
+      const debug = await axios.get('https://graph.facebook.com/debug_token', {
+        params: { input_token: accessToken, access_token: `${FACEBOOK_APP_ID}|${FACEBOOK_APP_SECRET}` }
+      });
+      if (!debug.data?.data?.is_valid || String(debug.data.data.app_id) !== FACEBOOK_APP_ID) {
+        return res.status(401).json({ success: false, message: 'Invalid Facebook account.' });
+      }
+      const { data = {} } = await axios.get('https://graph.facebook.com/me', {
+        params: { fields: 'id,email,first_name,last_name', access_token: accessToken }
+      });
+      if (!data.id || !data.email) {
+        return res.status(400).json({ success: false, message: 'Facebook did not provide an email address. Use the standard visitor form instead.' });
+      }
+      profile = {
+        provider,
+        socialId: data.id,
+        email: data.email,
+        fullName: `${data.first_name || ''} ${data.last_name || ''}`.trim() || data.email,
+      };
+    } else {
+      return res.status(400).json({ success: false, message: 'Choose Google or Facebook.' });
+    }
+
+    const signupToken = jwt.sign(
+      { purpose: 'visitor_signup', ...profile },
+      getJwtSecret(),
+      { expiresIn: '10m' },
+    );
+    return res.json({ success: true, profile, signupToken });
+  } catch (error) {
+    console.error('Social sign-up profile error:', error);
+    return res.status(401).json({ success: false, message: 'Unable to verify that social account.' });
+  }
+};
+
 /**
  * Handle Apple login
  * @param {Object} req - Express request
@@ -344,5 +410,6 @@ const appleLogin = async (req, res) => {
 module.exports = {
   facebookLogin,
   googleLogin,
+  getSocialSignupProfile,
   appleLogin
 };

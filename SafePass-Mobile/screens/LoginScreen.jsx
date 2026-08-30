@@ -207,6 +207,7 @@ export default function LoginScreen({ navigation, route }) {
     scopes: ["public_profile", "email"],
   });
   const [socialLoginProvider, setSocialLoginProvider] = useState("");
+  const [socialLoginHover, setSocialLoginHover] = useState("");
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(skipArrivalSplash ? 1 : 0)).current;
@@ -2283,15 +2284,27 @@ export default function LoginScreen({ navigation, route }) {
                           justifyContent: "center",
                           gap: 7,
                           borderWidth: 1,
-                          borderColor: "#CBD5E1",
+                          borderColor: socialLoginHover === "google" ? "#DB4437" : "#CBD5E1",
                           borderRadius: 8,
-                          backgroundColor: brandColors.surface,
+                          backgroundColor: socialLoginHover === "google" ? "#FFF7F5" : brandColors.surface,
                           opacity: socialLoginProvider && socialLoginProvider !== "google" ? 0.55 : 1,
+                          transform: [{ translateY: socialLoginHover === "google" ? -2 : 0 }],
+                          shadowColor: "#0F172A",
+                          shadowOpacity: socialLoginHover === "google" ? 0.12 : 0,
+                          shadowRadius: 7,
+                          shadowOffset: { width: 0, height: 3 },
+                          elevation: socialLoginHover === "google" ? 2 : 0,
                         }}
                         onPress={handleGoogleSignIn}
                         disabled={Boolean(socialLoginProvider) || transitionBusy}
                         accessibilityRole="button"
                         accessibilityLabel="Sign in with Google"
+                        {...(isWeb && {
+                          onMouseEnter: () => setSocialLoginHover("google"),
+                          onMouseLeave: () => setSocialLoginHover(""),
+                          onKeyPress: (e) => handleKeyPress(e, handleGoogleSignIn),
+                          tabIndex: 0,
+                        })}
                       >
                         {socialLoginProvider === "google" ? (
                           <ActivityIndicator size="small" color={brandColors.blue} />
@@ -2309,15 +2322,27 @@ export default function LoginScreen({ navigation, route }) {
                           justifyContent: "center",
                           gap: 7,
                           borderWidth: 1,
-                          borderColor: "#CBD5E1",
+                          borderColor: socialLoginHover === "facebook" ? "#1877F2" : "#CBD5E1",
                           borderRadius: 8,
-                          backgroundColor: brandColors.surface,
+                          backgroundColor: socialLoginHover === "facebook" ? "#F1F7FF" : brandColors.surface,
                           opacity: socialLoginProvider && socialLoginProvider !== "facebook" ? 0.55 : 1,
+                          transform: [{ translateY: socialLoginHover === "facebook" ? -2 : 0 }],
+                          shadowColor: "#0F172A",
+                          shadowOpacity: socialLoginHover === "facebook" ? 0.12 : 0,
+                          shadowRadius: 7,
+                          shadowOffset: { width: 0, height: 3 },
+                          elevation: socialLoginHover === "facebook" ? 2 : 0,
                         }}
                         onPress={handleFacebookSignIn}
                         disabled={Boolean(socialLoginProvider) || transitionBusy}
                         accessibilityRole="button"
                         accessibilityLabel="Sign in with Facebook"
+                        {...(isWeb && {
+                          onMouseEnter: () => setSocialLoginHover("facebook"),
+                          onMouseLeave: () => setSocialLoginHover(""),
+                          onKeyPress: (e) => handleKeyPress(e, handleFacebookSignIn),
+                          tabIndex: 0,
+                        })}
                       >
                         {socialLoginProvider === "facebook" ? (
                           <ActivityIndicator size="small" color="#1877F2" />
