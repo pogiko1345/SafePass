@@ -52,7 +52,22 @@ const logApiDebug = (...args) => {
   }
 };
 const API_ERROR_LOG_THROTTLE_MS = 30000;
+const API_REQUEST_TIMEOUT_MS = 30000;
 const apiErrorLogTimestamps = new Map();
+const isAbortError = (error) =>
+  error?.name === "AbortError" ||
+  String(error?.message || "").toLowerCase().includes("abort");
+const isNetworkLikeError = (error) => {
+  const message = String(error?.message || "");
+  return (
+    isAbortError(error) ||
+    message.includes("Network request failed") ||
+    message.includes("Failed to fetch") ||
+    message.includes("Load failed") ||
+    message.includes("NetworkError") ||
+    message.includes("Cannot connect to the SafePass server")
+  );
+};
 const shouldLogApiError = (key) => {
   if (API_DEBUG_ENABLED) return true;
   const now = Date.now();
@@ -63,22 +78,25 @@ const shouldLogApiError = (key) => {
 };
 const logApiFetchError = ({ url, baseUrl, error }) => {
   const message = String(error?.message || "");
-  const isNetworkError = message.includes("Network request failed");
+  const isNetworkError = isNetworkLikeError(error);
   const status = error?.status ? `:${error.status}` : "";
-  const logKey = `${baseUrl}|${url}|${isNetworkError ? "network" : message || status || "error"}`;
+  const logKey = `${baseUrl}|${url}|${isNetworkError ? "connection" : message || status || "error"}`;
   if (!shouldLogApiError(logKey)) return;
 
   const logMethod = isNetworkError ? console.warn : console.error;
-  logMethod(`[ApiService] Fetch error for ${url} via ${baseUrl}:`, error);
+  logMethod(
+    `[ApiService] ${isAbortError(error) ? "Request timed out" : "Fetch error"} for ${url} via ${baseUrl}:`,
+    error,
+  );
 };
 const logApiHealthError = ({ baseUrl, error }) => {
-  const isAbortError = error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("abort");
-  const logKey = `${baseUrl}|health|${isAbortError ? "timeout" : String(error?.message || "error")}`;
+  const timedOut = isAbortError(error);
+  const logKey = `${baseUrl}|health|${timedOut ? "timeout" : String(error?.message || "error")}`;
   if (!shouldLogApiError(logKey)) return;
 
-  const logMethod = isAbortError ? console.warn : console.error;
+  const logMethod = timedOut ? console.warn : console.error;
   logMethod(
-    `[ApiService] Health check ${isAbortError ? "timed out" : "failed"} via ${baseUrl}:`,
+    `[ApiService] Health check ${timedOut ? "timed out" : "failed"} via ${baseUrl}:`,
     error,
   );
 };
@@ -87,7 +105,7 @@ const logApiOperationError = (operation, error) => {
   const isFetchError =
     error?.status ||
     error?.data ||
-    message.includes("Network request failed") ||
+    isNetworkLikeError(error) ||
     message.includes("Cannot connect to the SafePass server");
   if (!API_DEBUG_ENABLED && isFetchError) return;
 
@@ -95,7 +113,7 @@ const logApiOperationError = (operation, error) => {
   const logKey = `operation|${operation}|${message || status || "error"}`;
   if (!shouldLogApiError(logKey)) return;
 
-  const isNetworkError = message.includes("Network request failed");
+  const isNetworkError = isNetworkLikeError(error);
   const logMethod = isNetworkError ? console.warn : console.error;
   logMethod(`${operation}:`, error);
 };
@@ -2388,11 +2406,20 @@ ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, option
   let lastError = null;
 
   for (const baseUrl of Array.from(new Set(API_BASE_URL_CANDIDATES))) {
+    const requestController =
+      !config.signal && typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutId = requestController
+      ? setTimeout(() => requestController.abort(), API_REQUEST_TIMEOUT_MS)
+      : null;
+
     try {
       if (API_DEBUG_ENABLED) {
         console.log(`[ApiService] Sending request to: ${baseUrl}${url}`);
       }
-      const response = await fetch(`${baseUrl}${url}`, config);
+      const response = await fetch(`${baseUrl}${url}`, {
+        ...config,
+        ...(requestController ? { signal: requestController.signal } : {}),
+      });
       const contentType = response.headers.get("content-type");
       let data;
 
@@ -2417,13 +2444,17 @@ ApiService.prototype.fetch = async function fetchWithAndroidFallback(url, option
       lastError = error;
       logApiFetchError({ url, baseUrl, error });
 
-      if (!String(error?.message || "").includes("Network request failed")) {
+      if (!isNetworkLikeError(error)) {
         throw error;
+      }
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
     }
   }
 
-  if (String(lastError?.message || "").includes("Network request failed")) {
+  if (isNetworkLikeError(lastError)) {
     throw createSafePassConnectionError();
   }
 

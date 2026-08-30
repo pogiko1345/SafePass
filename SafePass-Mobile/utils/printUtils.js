@@ -281,3 +281,504 @@ export const printUserListWeb = async (users, title, activeMenu, metadata = {}) 
 
   return startPrintPreview();
 };
+
+export const exportRecordsToCSV = async ({
+  headers = [],
+  rows = [],
+  filename = "safepass_report.csv",
+}) => {
+  if (!rows || rows.length === 0) {
+    throw new Error("No records to export.");
+  }
+
+  const escapeCSV = (val) => {
+    if (val === null || val === undefined) return '""';
+    const str = String(val);
+    if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return `"${str}"`;
+  };
+
+  const headerRow = headers.map(escapeCSV).join(",");
+  const dataRows = rows.map((row) =>
+    Array.isArray(row) ? row.map(escapeCSV).join(",") : Object.values(row).map(escapeCSV).join(","),
+  );
+
+  const csvString = [headerRow, ...dataRows].join("\r\n");
+
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 500);
+    return { success: true };
+  }
+
+  try {
+    const htmlWrapper = `<pre>${csvString.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
+    const { uri } = await Print.printToFileAsync({
+      html: `<!DOCTYPE html><html><body><pre style="font-family:monospace;white-space:pre-wrap;">${csvString}</pre></body></html>`,
+    });
+    await shareAsync(uri, {
+      mimeType: "text/csv",
+      dialogTitle: "Export Report CSV",
+      UTI: "public.comma-separated-values-text",
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("CSV export error:", error);
+    throw error;
+  }
+};
+
+export const printOfficialSecretariatReport = async ({
+  title = "Official Campus Access & Secretariat Report",
+  subtitle = "Sapphire Aviation Academy - Administrative & Access Log Summary",
+  dateRangeLabel = "All Time",
+  preparedBy = "Secretariat Office",
+  preparedByPosition = "Administrative Assistant / Secretary",
+  verifiedBy = "School Administrator",
+  verifiedByPosition = "Academy Director / Administrator",
+  kpis = {},
+  departmentBreakdown = [],
+  columns = ["Date & Time", "Name", "Role", "Purpose / Department", "Checkpoint", "Status"],
+  records = [],
+  dialogTitle = "Official Access Report",
+}) => {
+  const schoolLogoSource = await convertAssetToDataUrl(getSchoolLogoSource());
+  const reportRefNo = `REP-${Date.now().toString(36).toUpperCase()}`;
+  const printDate = new Date().toLocaleString("en-US", {
+    timeZone: "Asia/Manila",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const kpiItems = [
+    { label: "Total Entries / Logs", value: kpis.totalLogs ?? records.length },
+    { label: "Approved Visitors", value: kpis.approvedVisitors ?? 0 },
+    { label: "Student Check-ins", value: kpis.studentCount ?? 0 },
+    { label: "Staff & Faculty Access", value: kpis.staffCount ?? 0 },
+    { label: "Denied / Flagged", value: kpis.deniedCount ?? 0 },
+  ];
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <style>
+    @page { size: A4 portrait; margin: 16mm 14mm 16mm 14mm; }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      font-size: 11px;
+      line-height: 1.4;
+      background: #ffffff;
+    }
+    .header-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2.5px solid #0A3D91;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .header-logo {
+      width: 70px;
+      height: 70px;
+      object-fit: contain;
+    }
+    .header-text h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+      color: #0A3D91;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .header-text p {
+      margin: 2px 0 0 0;
+      font-size: 10.5px;
+      color: #64748b;
+      font-weight: 500;
+    }
+    .header-right {
+      text-align: right;
+      font-size: 9.5px;
+      color: #475569;
+    }
+    .header-right .ref-no {
+      font-weight: 700;
+      color: #0A3D91;
+      font-size: 10.5px;
+    }
+    .report-meta-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .meta-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.4px;
+    }
+    .meta-value {
+      font-size: 11px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 2px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .kpi-card {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .kpi-card .kpi-num {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0A3D91;
+    }
+    .kpi-card .kpi-lbl {
+      font-size: 8.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #475569;
+      margin-top: 3px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      margin: 16px 0 8px 0;
+      padding-bottom: 4px;
+      border-bottom: 1.5px solid #e2e8f0;
+    }
+    .dept-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .dept-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dept-name {
+      font-weight: 600;
+      color: #334155;
+      font-size: 10px;
+    }
+    .dept-count {
+      font-weight: 800;
+      color: #0A3D91;
+      background: #e0f2fe;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      margin-bottom: 24px;
+    }
+    th {
+      background: #0A3D91;
+      color: #ffffff;
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: 7px 8px;
+      text-align: left;
+      border: 1px solid #0A3D91;
+    }
+    td {
+      padding: 6px 8px;
+      border: 1px solid #e2e8f0;
+      font-size: 9.5px;
+      color: #334155;
+    }
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 8.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-granted { background: #dcfce7; color: #166534; }
+    .badge-denied { background: #fee2e2; color: #991b1b; }
+    .badge-pending { background: #fef3c7; color: #92400e; }
+    .badge-default { background: #e2e8f0; color: #475569; }
+    .signatures-container {
+      margin-top: 36px;
+      display: flex;
+      justify-content: space-between;
+      page-break-inside: avoid;
+    }
+    .signature-box {
+      width: 44%;
+      text-align: left;
+    }
+    .sig-line {
+      border-top: 1.5px solid #334155;
+      margin-top: 40px;
+      padding-top: 5px;
+    }
+    .sig-name {
+      font-weight: 800;
+      font-size: 11px;
+      color: #0f172a;
+    }
+    .sig-title {
+      font-size: 9.5px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .footer-note {
+      margin-top: 24px;
+      text-align: center;
+      font-size: 8.5px;
+      color: #94a3b8;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-container">
+    <div class="header-left">
+      ${schoolLogoSource ? `<img src="${schoolLogoSource}" class="header-logo" alt="Logo" />` : ""}
+      <div class="header-text">
+        <h1>Sapphire Aviation Academy</h1>
+        <p>Campus Security & Secretariat Administration • SafePass Portal</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="ref-no">Doc Ref: ${reportRefNo}</div>
+      <div>Generated: ${printDate} (PHT)</div>
+    </div>
+  </div>
+
+  <div class="report-meta-box">
+    <div class="meta-item">
+      <span class="meta-label">Report Document</span>
+      <span class="meta-value">${title}</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Reporting Period</span>
+      <span class="meta-value">${dateRangeLabel}</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Prepared By</span>
+      <span class="meta-value">${preparedBy} (${preparedByPosition})</span>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    ${kpiItems
+      .map(
+        (kpi) => `
+      <div class="kpi-card">
+        <div class="kpi-num">${kpi.value}</div>
+        <div class="kpi-lbl">${kpi.label}</div>
+      </div>
+    `,
+      )
+      .join("")}
+  </div>
+
+  ${
+    departmentBreakdown && departmentBreakdown.length > 0
+      ? `
+    <div class="section-title">Department / Office Traffic Summary</div>
+    <div class="dept-grid">
+      ${departmentBreakdown
+        .map(
+          (dept) => `
+        <div class="dept-card">
+          <span class="dept-name">${dept.name}</span>
+          <span class="dept-count">${dept.count} visits</span>
+        </div>
+      `,
+        )
+        .join("")}
+    </div>
+  `
+      : ""
+  }
+
+  <div class="section-title">Chronological Log of Entries & Activity (${records.length} total)</div>
+  <table>
+    <thead>
+      <tr>
+        ${columns.map((col) => `<th>${col}</th>`).join("")}
+      </tr>
+    </thead>
+    <tbody>
+      ${
+        records.length > 0
+          ? records
+              .slice(0, 150)
+              .map((rec) => {
+                const statusStr = String(rec.status || rec.action || rec.accessType || "recorded").toLowerCase();
+                const badgeClass =
+                  statusStr.includes("grant") || statusStr.includes("in") || statusStr.includes("approved")
+                    ? "badge-granted"
+                    : statusStr.includes("denied") || statusStr.includes("alert")
+                    ? "badge-denied"
+                    : statusStr.includes("pend")
+                    ? "badge-pending"
+                    : "badge-default";
+
+                return `
+            <tr>
+              <td>${rec.time || rec.timestamp || "N/A"}</td>
+              <td style="font-weight: 700;">${rec.name || rec.fullName || rec.userName || "N/A"}</td>
+              <td>${rec.role || rec.userType || "Visitor"}</td>
+              <td>${rec.purpose || rec.department || rec.office || "Campus Access"}</td>
+              <td>${rec.checkpoint || rec.checkpointName || rec.location || "Main Gate"}</td>
+              <td><span class="badge ${badgeClass}">${rec.status || rec.action || "Active"}</span></td>
+            </tr>
+          `;
+              })
+              .join("")
+          : `<tr><td colspan="${columns.length}" style="text-align: center; color: #94a3b8; padding: 18px;">No records found for the selected filter period.</td></tr>`
+      }
+    </tbody>
+  </table>
+
+  <div class="signatures-container">
+    <div class="signature-box">
+      <div class="sig-line">
+        <div class="sig-name">${preparedBy}</div>
+        <div class="sig-title">${preparedByPosition}</div>
+        <div style="font-size: 8.5px; color: #94a3b8; margin-top: 2px;">Prepared Official Record</div>
+      </div>
+    </div>
+    <div class="signature-box">
+      <div class="sig-line">
+        <div class="sig-name">${verifiedBy}</div>
+        <div class="sig-title">${verifiedByPosition}</div>
+        <div style="font-size: 8.5px; color: #94a3b8; margin-top: 2px;">Certified & Verified Administrator</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    Official Document • Sapphire Aviation Academy SafePass Integrated Access System • Confidential & Proprietary
+  </div>
+</body>
+</html>
+  `;
+
+  try {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.setAttribute("aria-hidden", "true");
+      document.body.appendChild(iframe);
+
+      const frameDoc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (!frameDoc) {
+        document.body.removeChild(iframe);
+        throw new Error("Unable to create report print preview.");
+      }
+
+      frameDoc.open();
+      frameDoc.write(htmlContent);
+      frameDoc.close();
+
+      const cleanup = () => {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1200);
+      };
+
+      let printed = false;
+      const trigger = () => {
+        if (printed) return;
+        printed = true;
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        cleanup();
+      };
+
+      iframe.onload = trigger;
+      if (frameDoc.readyState === "complete") {
+        trigger();
+      }
+    } else {
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+      });
+
+      await shareAsync(uri, {
+        mimeType: "application/pdf",
+        dialogTitle: dialogTitle || "Official SafePass Report",
+        UTI: "com.adobe.pdf",
+      });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Print official report error:", error);
+    throw error;
+  }
+};
