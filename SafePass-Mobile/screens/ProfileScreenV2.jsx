@@ -24,6 +24,9 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
+import * as GoogleSignIn from "expo-auth-session/providers/google";
+import * as FacebookAuth from "expo-auth-session/providers/facebook";
+import Constants from "expo-constants";
 import ApiService from "../utils/ApiService";
 import {
   PHILIPPINE_MOBILE_NUMBER_MESSAGE,
@@ -105,6 +108,18 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
     confirmPassword: false,
   });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [socialLinkBusy, setSocialLinkBusy] = useState("");
+  const googleClientId = Constants.expoConfig?.extra?.googleClientId;
+  const facebookAppId = Constants.expoConfig?.extra?.facebookAppId;
+  const [googleRequest, , promptGoogleLink] = GoogleSignIn.useIdTokenAuthRequest({
+    webClientId: googleClientId,
+    iosClientId: googleClientId,
+    androidClientId: googleClientId,
+  });
+  const [facebookRequest, , promptFacebookLink] = FacebookAuth.useAuthRequest({
+    clientId: facebookAppId,
+    scopes: ["public_profile", "email"],
+  });
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -879,6 +894,36 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
     </View>
   );
 
+  const handleSocialLink = async (provider) => {
+    const isGoogle = provider === "google";
+    const request = isGoogle ? googleRequest : facebookRequest;
+    const clientId = isGoogle ? googleClientId : facebookAppId;
+    if (!clientId || !request) {
+      Alert.alert("Connection not ready", `${isGoogle ? "Google" : "Facebook"} is still loading. Please try again.`);
+      return;
+    }
+    try {
+      setSocialLinkBusy(provider);
+      const result = await (isGoogle ? promptGoogleLink() : promptFacebookLink());
+      if (result.type !== "success") return;
+      const token = isGoogle
+        ? result.params?.id_token || result.authentication?.idToken
+        : result.params?.access_token || result.authentication?.accessToken;
+      if (!token) throw new Error("The provider did not return an account token.");
+      const proof = await ApiService.getSocialSignupProfile(provider, token, "account_link");
+      const response = await ApiService.linkSocialAccount(proof.signupToken);
+      if (!response?.success || !response?.user) throw new Error(response?.message || "Unable to connect this account.");
+      const updated = { ...DEFAULT_PROFILE, ...profile, ...response.user };
+      setProfile(updated);
+      setEditedProfile(updated);
+      Alert.alert("Account connected", response.message || "You can now use this provider to sign in.");
+    } catch (error) {
+      Alert.alert("Unable to connect account", error?.message || "Please try again.");
+    } finally {
+      setSocialLinkBusy("");
+    }
+  };
+
   const renderSecurity = () => (
     <View style={styles.stack}>
       <View style={themedCardStyle}>
@@ -916,6 +961,31 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
                 <Text style={styles.primaryBtnText}>Update Password</Text>
               </>
             )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={themedCardStyle}>
+        <Text style={themedTitleStyle}>Connected Sign-In Accounts</Text>
+        <Text style={themedMutedStyle}>
+          Connect an account only after signing in with your SafePass password. Connected accounts can use faster sign-in later.
+        </Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { flex: 1, minWidth: 170, borderColor: currentProfile.googleId ? "#86EFAC" : "#CBD5E1" }]}
+            onPress={() => handleSocialLink("google")}
+            disabled={Boolean(socialLinkBusy)}
+          >
+            {socialLinkBusy === "google" ? <ActivityIndicator size="small" color="#DB4437" /> : <Ionicons name="logo-google" size={18} color="#DB4437" />}
+            <Text style={styles.secondaryBtnText}>{currentProfile.googleId ? "Google connected" : "Connect Google"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { flex: 1, minWidth: 170, borderColor: currentProfile.facebookId ? "#86EFAC" : "#CBD5E1" }]}
+            onPress={() => handleSocialLink("facebook")}
+            disabled={Boolean(socialLinkBusy)}
+          >
+            {socialLinkBusy === "facebook" ? <ActivityIndicator size="small" color="#1877F2" /> : <Ionicons name="logo-facebook" size={18} color="#1877F2" />}
+            <Text style={styles.secondaryBtnText}>{currentProfile.facebookId ? "Facebook connected" : "Connect Facebook"}</Text>
           </TouchableOpacity>
         </View>
       </View>
