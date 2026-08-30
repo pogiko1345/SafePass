@@ -2470,6 +2470,23 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
           </Text>
           <Text style={styles.quickActionFooterText}>Open my profile</Text>
         </HomeHoverPressable>
+
+        <HomeHoverPressable style={styles.quickActionCard} onPress={() => navigation.navigate("Reports")}>
+          <View style={styles.quickActionMetaRow}>
+            <View style={styles.quickActionBadge}>
+              <Text style={styles.quickActionBadgeText}>Reports</Text>
+            </View>
+            <Ionicons name="arrow-forward-outline" size={16} color="#94A3B8" />
+          </View>
+          <View style={[styles.quickActionIcon, styles.quickActionIconOrange]}>
+            <Ionicons name="document-text-outline" size={22} color="#B45309" />
+          </View>
+          <Text style={styles.quickActionTitle}>Reports</Text>
+          <Text style={styles.quickActionSubtitle}>
+            View visitor summaries, KPI metrics, and export data.
+          </Text>
+          <Text style={styles.quickActionFooterText}>Open reports</Text>
+        </HomeHoverPressable>
       </View>
 
         </View>
