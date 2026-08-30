@@ -337,6 +337,34 @@ const compareAppointmentsBySchedule = (left, right) => {
   return String(left?._id || "").localeCompare(String(right?._id || ""));
 };
 
+const isOverdueAppointmentRequest = (appointment, referenceDate = new Date()) => {
+  if (!isActionableAppointmentRequest(appointment) || !appointment?.visitDate) return false;
+
+  const scheduledAt = new Date(appointment.visitDate);
+  if (Number.isNaN(scheduledAt.getTime())) return false;
+
+  const visitTime = appointment?.visitTime ? new Date(appointment.visitTime) : null;
+  if (visitTime && !Number.isNaN(visitTime.getTime())) {
+    scheduledAt.setHours(visitTime.getHours(), visitTime.getMinutes(), 0, 0);
+  } else {
+    scheduledAt.setHours(23, 59, 59, 999);
+  }
+
+  return scheduledAt.getTime() < referenceDate.getTime();
+};
+
+const compareRequestsByPriority = (left, right) => {
+  const leftOverdue = isOverdueAppointmentRequest(left);
+  const rightOverdue = isOverdueAppointmentRequest(right);
+  if (leftOverdue !== rightOverdue) return leftOverdue ? -1 : 1;
+
+  const leftRescheduled = getAppointmentStatus(left) === "rescheduled";
+  const rightRescheduled = getAppointmentStatus(right) === "rescheduled";
+  if (leftRescheduled !== rightRescheduled) return leftRescheduled ? -1 : 1;
+
+  return compareAppointmentsBySchedule(left, right);
+};
+
 const getAppointmentLatestSortValue = (appointment) => {
   const scheduleValue =
     appointment?.visitTime ||
@@ -411,6 +439,7 @@ const staffMobileTabs = [
 
 const requestFilterOptions = [
   { key: "all", label: "All" },
+  { key: "overdue", label: "Overdue" },
   { key: "today", label: "Today" },
   { key: "this-week", label: "This Week" },
 ];
@@ -421,6 +450,8 @@ const historyFilterOptions = [
   { key: "adjusted", label: "Adjusted" },
   { key: "completed", label: "Completed" },
   { key: "rejected", label: "Rejected" },
+  { key: "no_show", label: "No Show" },
+  { key: "expired", label: "Expired" },
 ];
 
 const staffRedirectDestinations = [
@@ -454,6 +485,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const [processingId, setProcessingId] = useState(null);
   const [accountMode, setAccountMode] = useState("view");
   const [requestFilter, setRequestFilter] = useState("all");
+  const [requestSort, setRequestSort] = useState("priority");
+  const [selectedRequestIds, setSelectedRequestIds] = useState([]);
   const [requestSearchTerm, setRequestSearchTerm] = useState("");
   const [recordSearchTerm, setRecordSearchTerm] = useState("");
   const [recordFilterDropdownOpen, setRecordFilterDropdownOpen] = useState(null);
@@ -725,6 +758,8 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       nextAppointments = appointmentRequests.filter((item) => isSameCalendarDay(item.visitDate));
     } else if (requestFilter === "this-week") {
       nextAppointments = appointmentRequests.filter((item) => isWithinCurrentWeek(item.visitDate));
+    } else if (requestFilter === "overdue") {
+      nextAppointments = appointmentRequests.filter((item) => isOverdueAppointmentRequest(item));
     }
 
     return nextAppointments;
@@ -739,7 +774,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     () =>
       appointments
         .filter((item) =>
-          ["approved", "adjusted", "adjustment_pending", "completed", "rejected"].includes(getAppointmentStatus(item)),
+          ["approved", "adjusted", "adjustment_pending", "completed", "rejected", "cancelled", "expired", "no_show"].includes(getAppointmentStatus(item)),
         )
         .sort(compareAppointmentsByLatestSchedule),
     [appointments],
@@ -911,7 +946,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
 
   useEffect(() => {
     setRequestPage(1);
-  }, [requestFilter, requestSearchTerm]);
+  }, [requestFilter, requestSearchTerm, requestSort]);
 
   useEffect(() => {
     setRecordPage(1);
@@ -920,9 +955,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
   const paginatedRequestAppointments = useMemo(() => {
     const startIndex = (requestPage - 1) * itemsPerPage;
     return [...filteredRequestAppointments]
-      .sort(compareAppointmentsBySchedule)
+      .sort(requestSort === "priority" ? compareRequestsByPriority : compareAppointmentsBySchedule)
       .slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredRequestAppointments, requestPage]);
+  }, [filteredRequestAppointments, requestPage, requestSort]);
 
   const paginatedRecordAppointments = useMemo(() => {
     const startIndex = (recordPage - 1) * itemsPerPage;
@@ -1343,6 +1378,50 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
     } finally {
       setProcessingId(null);
     }
+  };
+
+  const toggleRequestSelection = (appointmentId) => {
+    setSelectedRequestIds((currentIds) =>
+      currentIds.includes(appointmentId)
+        ? currentIds.filter((id) => id !== appointmentId)
+        : [...currentIds, appointmentId],
+    );
+  };
+
+  const handleBulkApproveRequests = () => {
+    const selectedRequests = appointmentRequests.filter((item) => selectedRequestIds.includes(item._id));
+    if (!selectedRequests.length) return;
+
+    Alert.alert(
+      "Approve selected requests?",
+      `Approve ${selectedRequests.length} selected appointment request${selectedRequests.length === 1 ? "" : "s"}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Approve",
+          onPress: async () => {
+            setProcessingId("bulk-approval");
+            try {
+              const results = await Promise.allSettled(
+                selectedRequests.map((appointment) => ApiService.approveStaffAppointment(appointment._id)),
+              );
+              const approvedCount = results.filter((result) => result.status === "fulfilled").length;
+              setSelectedRequestIds([]);
+              await loadData();
+              showStaffToast({
+                type: approvedCount === selectedRequests.length ? "success" : "warning",
+                title: "Bulk approval complete",
+                message: `${approvedCount} of ${selectedRequests.length} request${selectedRequests.length === 1 ? "" : "s"} approved.`,
+              });
+            } catch (error) {
+              Alert.alert("Bulk Approval Failed", error?.message || "Could not approve the selected requests.");
+            } finally {
+              setProcessingId(null);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const openAdjustModal = (appointment) => {
@@ -1844,6 +1923,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                 <View style={[styles.tableCell, styles.tableColumnSchedule]}>
                   <Text style={[styles.tablePrimaryText, mobileDarkModeEnabled && styles.darkText]}>{formatDate(appointment.visitDate)}</Text>
                   <Text style={[styles.tableSecondaryText, mobileDarkModeEnabled && styles.darkMutedText]}>{formatTime(appointment.visitTime)}</Text>
+                  {isOverdueAppointmentRequest(appointment) ? (
+                    <View style={styles.overdueBadge}>
+                      <Ionicons name="warning-outline" size={12} color="#B45309" />
+                      <Text style={styles.overdueBadgeText}>Needs review</Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 <View style={[styles.tableCell, styles.tableColumnOffice]}>
@@ -1868,6 +1953,21 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                   >
                     <Text style={styles.tableActionButtonText}>View</Text>
                   </TouchableOpacity>
+
+                  {mode === "requests" ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.tableActionButton,
+                        selectedRequestIds.includes(appointment._id) && styles.tableActionButtonSelected,
+                      ]}
+                      onPress={() => toggleRequestSelection(appointment._id)}
+                      disabled={processingId === "bulk-approval"}
+                    >
+                      <Text style={styles.tableActionButtonText}>
+                        {selectedRequestIds.includes(appointment._id) ? "Selected" : "Select"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
 
                   {mode === "requests" && canActOnRequest ? (
                     <>
@@ -2662,6 +2762,7 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
       <View style={styles.queueSummaryGrid}>
         {[
           ["Actionable", appointmentRequests.length, "mail-unread-outline"],
+          ["Overdue", appointmentRequests.filter((item) => isOverdueAppointmentRequest(item)).length, "warning-outline"],
           ["Today", appointmentRequests.filter((item) => isSameCalendarDay(item.visitDate)).length, "today-outline"],
           ["This Week", appointmentRequests.filter((item) => isWithinCurrentWeek(item.visitDate)).length, "calendar-outline"],
         ].map(([label, value, icon]) => (
@@ -2677,6 +2778,25 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         ))}
       </View>
 
+      {selectedRequestIds.length ? (
+        <View style={styles.bulkActionBar}>
+          <Text style={styles.bulkActionText}>{selectedRequestIds.length} request{selectedRequestIds.length === 1 ? "" : "s"} selected</Text>
+          <View style={styles.sectionActionRow}>
+            <TouchableOpacity style={styles.bulkClearButton} onPress={() => setSelectedRequestIds([])}>
+              <Text style={styles.bulkClearButtonText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bulkApproveButton, processingId === "bulk-approval" && styles.disabledAction]}
+              onPress={handleBulkApproveRequests}
+              disabled={processingId === "bulk-approval"}
+            >
+              <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" />
+              <Text style={styles.bulkApproveButtonText}>Approve selected</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
       {renderRecordSearchFilterToolbar({
         searchTitle: "Search Requests",
         searchSubtitle: "Find by visitor, email, purpose, date, or office.",
@@ -2684,9 +2804,12 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         onSearchChange: setRequestSearchTerm,
         onClearSearch: () => setRequestSearchTerm(""),
         searchPlaceholder: "Search visitor, email, purpose, date, or office...",
-        filterSubtitle: "Narrow pending requests by schedule window.",
-        hasFilters: requestFilter !== "all",
-        onResetFilters: () => setRequestFilter("all"),
+        filterSubtitle: "Prioritize overdue requests or sort by the appointment schedule.",
+        hasFilters: requestFilter !== "all" || requestSort !== "priority",
+        onResetFilters: () => {
+          setRequestFilter("all");
+          setRequestSort("priority");
+        },
         filterGroups: [
           {
             id: "staff-request-schedule",
@@ -2695,10 +2818,22 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
             icon: "calendar-outline",
             options: [
               { value: "all", label: `All (${appointmentRequests.length})` },
+              { value: "overdue", label: `Overdue (${appointmentRequests.filter((item) => isOverdueAppointmentRequest(item)).length})` },
               { value: "today", label: `Today (${appointmentRequests.filter((item) => isSameCalendarDay(item.visitDate)).length})` },
               { value: "this-week", label: `This Week (${appointmentRequests.filter((item) => isWithinCurrentWeek(item.visitDate)).length})` },
             ],
             onSelect: setRequestFilter,
+          },
+          {
+            id: "staff-request-sort",
+            label: "Sort",
+            value: requestSort,
+            icon: "swap-vertical-outline",
+            options: [
+              { value: "priority", label: "Urgent first" },
+              { value: "schedule", label: "Earliest schedule" },
+            ],
+            onSelect: setRequestSort,
           },
         ],
       })}
@@ -2766,6 +2901,9 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
                 { value: "adjusted", label: `Adjusted (${stats.adjusted})` },
                 { value: "rejected", label: `Rejected (${stats.rejected})` },
                 { value: "completed", label: `Completed (${stats.completed})` },
+                { value: "no_show", label: "No Show" },
+                { value: "expired", label: "Expired" },
+                { value: "cancelled", label: "Cancelled" },
               ],
               onSelect: setFilter,
             },
