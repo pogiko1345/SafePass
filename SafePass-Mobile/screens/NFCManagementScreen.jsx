@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,7 +14,26 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
-import { describeRfidReaderInput, normalizeRfidReaderInput } from "../utils/rfidReaderUtils";
+import {
+  describeRfidReaderInput,
+  normalizeRfidReaderInput,
+  playRfidChime,
+  formatRfidHex,
+  RfidKeystrokeBuffer,
+} from "../utils/rfidReaderUtils";
+
+let NfcManager = null;
+let NfcEvents = null;
+let Ndef = null;
+
+if (Platform.OS !== "web") {
+  try {
+    const nfcModule = require("react-native-nfc-manager");
+    NfcManager = nfcModule.default || nfcModule;
+    NfcEvents = nfcModule.NfcEvents;
+    Ndef = nfcModule.Ndef;
+  } catch (e) {}
+}
 
 const formatDateTime = (value) =>
   value
@@ -131,6 +151,57 @@ export default function NFCManagementScreen({ navigation }) {
 
     run();
   }, [loadData]);
+
+  // Mobile NFC Tag Listener for Card Assignment
+  useEffect(() => {
+    if (Platform.OS === "web" || !NfcManager || !NfcEvents) return undefined;
+    let isSubscribed = true;
+
+    const startNfcAssignScan = async () => {
+      try {
+        await NfcManager.start();
+        NfcManager.setEventListener(NfcEvents.DiscoverTag, (tag) => {
+          if (!isSubscribed) return;
+          let rawUid = tag?.id || tag?.uid || "";
+          if (!rawUid && tag?.ndefMessage && tag.ndefMessage[0]) {
+            try {
+              rawUid = Ndef?.text?.decodePayload(tag.ndefMessage[0].payload) || "";
+            } catch (e) {}
+          }
+          const normalized = normalizeRfidReaderInput(rawUid);
+          if (normalized) {
+            playRfidChime("success");
+            setManualCardId(normalized);
+          }
+        });
+        await NfcManager.registerTagEvent();
+      } catch (err) {
+        console.warn("Mobile NFC tag assign listener error:", err);
+      }
+    };
+
+    startNfcAssignScan();
+
+    return () => {
+      isSubscribed = false;
+      try {
+        NfcManager.unregisterTagEvent();
+        NfcManager.setEventListener(NfcEvents.DiscoverTag, () => {});
+      } catch (e) {}
+    };
+  }, []);
+
+  // Web USB Wedge Reader Keystroke Buffer for Card Assignment
+  useEffect(() => {
+    if (Platform.OS !== "web") return undefined;
+    const wedgeScanner = new RfidKeystrokeBuffer({
+      onScan: (scannedUid) => {
+        setManualCardId(scannedUid);
+      },
+    });
+    wedgeScanner.start();
+    return () => wedgeScanner.stop();
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => cardInputRef.current?.focus?.(), 350);

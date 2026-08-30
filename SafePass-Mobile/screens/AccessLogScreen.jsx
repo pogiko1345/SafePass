@@ -8,6 +8,8 @@ import {
   Image,
   RefreshControl,
   StatusBar,
+  Modal,
+  StyleSheet,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,6 +26,7 @@ export default function AccessLogScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState("all");
+  const [selectedLogDetail, setSelectedLogDetail] = useState(null);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -60,6 +63,31 @@ export default function AccessLogScreen({ navigation }) {
   const onRefresh = () => {
     setRefreshing(true);
     loadUserAndLogs();
+  };
+
+  const exportAccessLogsCsv = () => {
+    if (!filteredLogs.length) return;
+    const headers = ["Timestamp", "Location", "Access Type", "Status", "Reader Device", "Notes"];
+    const rows = filteredLogs.map((l) => [
+      `"${l.timestamp ? new Date(l.timestamp).toISOString() : ""}"`,
+      `"${l.location || ""}"`,
+      `"${l.accessType || ""}"`,
+      `"${l.status || ""}"`,
+      `"${l.readerDevice || l.device || ""}"`,
+      `"${l.notes || ""}"`,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+
+    if (typeof window !== "undefined" && window.document) {
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `SafePass_AccessLogs_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   // Filter options
@@ -254,6 +282,47 @@ export default function AccessLogScreen({ navigation }) {
             <Text style={accessLogStyles.statLabel}>Success</Text>
           </View>
         </View>
+
+        {/* Action Bar */}
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              backgroundColor: "#EEF5FF",
+              borderWidth: 1,
+              borderColor: "#BFDBFE",
+              paddingVertical: 10,
+              borderRadius: 12,
+            }}
+            onPress={exportAccessLogsCsv}
+          >
+            <Ionicons name="download-outline" size={16} color="#0A3D91" />
+            <Text style={{ fontSize: 13, fontWeight: "800", color: "#0A3D91" }}>Export CSV</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              backgroundColor: "#FFFFFF",
+              borderWidth: 1,
+              borderColor: "#E2E8F0",
+              paddingVertical: 10,
+              borderRadius: 12,
+            }}
+            onPress={onRefresh}
+            disabled={refreshing}
+          >
+            <Ionicons name="refresh-outline" size={16} color="#475569" />
+            <Text style={{ fontSize: 13, fontWeight: "800", color: "#475569" }}>Refresh Logs</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Filters Section */}
@@ -400,7 +469,7 @@ export default function AccessLogScreen({ navigation }) {
                     style={accessLogStyles.logCard}
                     activeOpacity={0.7}
                     onPress={() => {
-                      // Optional: Show detailed view
+                      setSelectedLogDetail(log);
                     }}
                   >
                     <View style={accessLogStyles.logIconContainer}>
@@ -530,6 +599,180 @@ export default function AccessLogScreen({ navigation }) {
           </View>
         )}
       </ScrollView>
+
+      {/* Access Log Inspection Modal */}
+      <Modal
+        visible={Boolean(selectedLogDetail)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedLogDetail(null)}
+      >
+        <View style={localModalStyles.modalBackdrop}>
+          <View style={localModalStyles.modalCard}>
+            <View style={localModalStyles.modalHeader}>
+              <View style={localModalStyles.modalTitleRow}>
+                <Ionicons
+                  name={selectedLogDetail?.status === "granted" ? "checkmark-circle" : "close-circle"}
+                  size={22}
+                  color={selectedLogDetail?.status === "granted" ? "#10B981" : "#EF4444"}
+                />
+                <Text style={localModalStyles.modalTitle}>Access Event Details</Text>
+              </View>
+              <TouchableOpacity
+                style={localModalStyles.modalCloseBtn}
+                onPress={() => setSelectedLogDetail(null)}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={localModalStyles.modalBody}>
+              <View style={localModalStyles.modalHero}>
+                <Text style={localModalStyles.modalLocation}>
+                  {selectedLogDetail?.location || "Campus Main Checkpoint"}
+                </Text>
+                <Text style={localModalStyles.modalTimestamp}>
+                  {formatFullDate(selectedLogDetail?.timestamp)}
+                </Text>
+              </View>
+
+              <View style={localModalStyles.modalGrid}>
+                <View style={localModalStyles.modalGridItem}>
+                  <Text style={localModalStyles.modalLabel}>Direction</Text>
+                  <Text style={localModalStyles.modalValue}>
+                    {selectedLogDetail?.accessType?.toUpperCase() || "CHECKPOINT"}
+                  </Text>
+                </View>
+                <View style={localModalStyles.modalGridItem}>
+                  <Text style={localModalStyles.modalLabel}>Decision</Text>
+                  <Text
+                    style={[
+                      localModalStyles.modalValue,
+                      { color: selectedLogDetail?.status === "granted" ? "#166534" : "#DC2626" },
+                    ]}
+                  >
+                    {selectedLogDetail?.status?.toUpperCase() || "UNKNOWN"}
+                  </Text>
+                </View>
+                {selectedLogDetail?.nfcCardId ? (
+                  <View style={localModalStyles.modalGridItem}>
+                    <Text style={localModalStyles.modalLabel}>Card UID</Text>
+                    <Text style={localModalStyles.modalValue}>{selectedLogDetail.nfcCardId}</Text>
+                  </View>
+                ) : null}
+                {selectedLogDetail?.notes ? (
+                  <View style={localModalStyles.modalGridItem}>
+                    <Text style={localModalStyles.modalLabel}>Operator Note</Text>
+                    <Text style={localModalStyles.modalValue}>{selectedLogDetail.notes}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <TouchableOpacity
+                style={localModalStyles.modalDoneBtn}
+                onPress={() => setSelectedLogDetail(null)}
+              >
+                <Text style={localModalStyles.modalDoneBtnText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const localModalStyles = StyleSheet.create({
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 500,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: "#F8FAFC",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  modalTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  modalBody: {
+    padding: 18,
+  },
+  modalHero: {
+    marginBottom: 16,
+  },
+  modalLocation: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  modalTimestamp: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#64748B",
+    marginTop: 4,
+  },
+  modalGrid: {
+    gap: 10,
+    marginBottom: 18,
+  },
+  modalGridItem: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    padding: 10,
+  },
+  modalLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    marginBottom: 3,
+  },
+  modalValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  modalDoneBtn: {
+    backgroundColor: "#0A3D91",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  modalDoneBtnText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+});
