@@ -893,11 +893,20 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async getSocialSignupProfile(provider, token) {
+  async getSocialSignupProfile(provider, token, purpose = "visitor_signup") {
     const body = provider === "google"
-      ? { provider, idToken: token }
-      : { provider, accessToken: token };
+      ? { provider, idToken: token, purpose }
+      : { provider, accessToken: token, purpose };
     return this.fetch("/auth/social-signup-profile", { method: "POST", body });
+  }
+
+  async linkSocialAccount(signupToken) {
+    const response = await this.fetch("/auth/link-social-account", {
+      method: "POST",
+      body: { signupToken },
+    });
+    if (response?.user) await AsyncStorage.setItem("currentUser", JSON.stringify(response.user));
+    return response;
   }
 
   async appleLogin(identityToken, userData = {}) {

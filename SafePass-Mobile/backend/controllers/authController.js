@@ -244,6 +244,7 @@ const googleLogin = async (req, res) => {
 const getSocialSignupProfile = async (req, res) => {
   try {
     const provider = String(req.body?.provider || '').toLowerCase();
+    const purpose = req.body?.purpose === 'account_link' ? 'account_link' : 'visitor_signup';
     let profile;
 
     if (provider === 'google') {
@@ -293,7 +294,7 @@ const getSocialSignupProfile = async (req, res) => {
     }
 
     const signupToken = jwt.sign(
-      { purpose: 'visitor_signup', ...profile },
+      { purpose, ...profile },
       getJwtSecret(),
       { expiresIn: '10m' },
     );
@@ -301,6 +302,39 @@ const getSocialSignupProfile = async (req, res) => {
   } catch (error) {
     console.error('Social sign-up profile error:', error);
     return res.status(401).json({ success: false, message: 'Unable to verify that social account.' });
+  }
+};
+
+const linkSocialAccount = async (req, res) => {
+  try {
+    const proof = jwt.verify(String(req.body?.signupToken || ''), getJwtSecret());
+    if (
+      proof?.purpose !== 'account_link' ||
+      !['google', 'facebook'].includes(proof.provider) ||
+      !proof.socialId
+    ) {
+      return res.status(401).json({ success: false, message: 'Invalid social account verification.' });
+    }
+
+    const field = proof.provider === 'google' ? 'googleId' : 'facebookId';
+    const owner = await User.findOne({ [field]: proof.socialId });
+    if (owner && String(owner._id) !== String(req.user._id)) {
+      return res.status(409).json({
+        success: false,
+        message: `This ${proof.provider === 'google' ? 'Google' : 'Facebook'} account is already connected to another SafePass account.`,
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'SafePass account not found.' });
+    user[field] = proof.socialId;
+    await user.save();
+
+    const userObject = user.toObject();
+    delete userObject.password;
+    return res.json({ success: true, message: `${proof.provider === 'google' ? 'Google' : 'Facebook'} account connected.`, user: userObject });
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Social account verification expired. Please try again.' });
   }
 };
 
@@ -411,5 +445,6 @@ module.exports = {
   facebookLogin,
   googleLogin,
   getSocialSignupProfile,
+  linkSocialAccount,
   appleLogin
 };
