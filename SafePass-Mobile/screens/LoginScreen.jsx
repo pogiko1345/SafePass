@@ -66,6 +66,11 @@ const SESSION_EXPIRED_MESSAGE =
   Platform.OS === "web"
     ? "Your web session has expired after 7 days. Please sign in again."
     : "You were inactive for 30 minutes. Please sign in again.";
+const ACADEMY_LINKS = {
+  facebook: "https://www.facebook.com/search/top/?q=Sapphire%20International%20Aviation%20Academy",
+  youtube: "https://www.youtube.com/results?search_query=Sapphire+International+Aviation+Academy",
+  website: "https://siaacentrixsafepass.com",
+};
 
 if (__DEV__) {
   LogBox.ignoreLogs([
@@ -335,21 +340,12 @@ export default function LoginScreen({ navigation, route }) {
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
       document.title = `Login | ${APP_ORGANIZATION_NAME}`;
-
-      // Check if WebAuthn is supported
-      if (window.PublicKeyCredential) {
-        setIsWebBiometricSupported(true);
-        setIsWebAuthnAvailable(true);
-      }
     }
   }, []);
 
   // Initialize WebAuthn options when component mounts
   useEffect(() => {
-    if (isWeb && isWebBiometricSupported && isWebAuthnAvailable) {
-      initializeWebAuthnOptions();
-    }
-  }, [isWeb, isWebBiometricSupported, isWebAuthnAvailable]);
+  }, []);
 
   // Function to initialize WebAuthn options
   const initializeWebAuthnOptions = async () => {
@@ -1411,6 +1407,8 @@ export default function LoginScreen({ navigation, route }) {
       label: "Facebook",
       icon: "logo-facebook",
       onPress: async () => {
+        await Linking.openURL(ACADEMY_LINKS.facebook);
+        return;
         if (Platform.OS === 'web') {
           // Web-based Facebook login
           try {
@@ -1453,9 +1451,11 @@ export default function LoginScreen({ navigation, route }) {
       },
     },
     {
-      label: "Google",
-      icon: "logo-google",
+      label: "YouTube",
+      icon: "logo-youtube",
       onPress: async () => {
+        await Linking.openURL(ACADEMY_LINKS.youtube);
+        return;
         try {
           if (!googleClientId || googleClientId === "YOUR_GOOGLE_CLIENT_ID") {
             Alert.alert("Google Sign-In", "Add your Google client ID in app.json before using this option.");
@@ -1486,9 +1486,11 @@ export default function LoginScreen({ navigation, route }) {
       },
     },
     {
-      label: "Apple",
-      icon: "logo-apple",
+      label: "Website",
+      icon: "globe-outline",
       onPress: async () => {
+        await Linking.openURL(ACADEMY_LINKS.website);
+        return;
         if (Platform.OS === 'ios' || Platform.OS === 'web') {
           try {
             const appleAuthRequest = await AppleAuthentication.signInAsync({
@@ -1522,6 +1524,7 @@ export default function LoginScreen({ navigation, route }) {
     {
       label: "WebAuthn",
       icon: "fingerprint",
+      hidden: true,
       onPress: async () => {
         if (Platform.OS === 'web' && isWebAuthnAvailable) {
           try {
@@ -1924,9 +1927,6 @@ export default function LoginScreen({ navigation, route }) {
                           <Text style={loginStyles.loginVisualCopyright}>
                             Copyright 2024. Sapphire International Aviation Academy
                           </Text>
-                        </View>
-                        <View style={loginStyles.loginVisualSocialDock}>
-                          <SocialDock links={socialLinks} showTray={false} />
                         </View>
                       </View>
                       <View style={loginStyles.loginVisualIntro}>

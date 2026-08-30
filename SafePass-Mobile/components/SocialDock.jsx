@@ -70,7 +70,7 @@ export default function SocialDock({ links = [], showTray = true }) {
   return (
     <Animated.View style={[styles.shell, !showTray && styles.shellInline, dockStyle]}>
       <Animated.View style={[styles.track, !showTray && styles.trackTransparent, floatStyle]}>
-        {links.map((link, index) => (
+        {links.filter((link) => !link.hidden).map((link, index) => (
           <SocialDockButton key={link.label} link={link} index={index} />
         ))}
       </Animated.View>
