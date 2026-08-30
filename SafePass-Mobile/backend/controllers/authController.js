@@ -105,6 +105,24 @@ const facebookLogin = async (req, res) => {
       });
     }
 
+    if (!FACEBOOK_APP_ID || !FACEBOOK_APP_SECRET) {
+      return res.status(503).json({
+        success: false,
+        message: 'Facebook sign-in is not configured on the server'
+      });
+    }
+
+    const tokenDebugResponse = await axios.get('https://graph.facebook.com/debug_token', {
+      params: {
+        input_token: accessToken,
+        access_token: `${FACEBOOK_APP_ID}|${FACEBOOK_APP_SECRET}`
+      }
+    });
+    const tokenDebugData = tokenDebugResponse.data?.data;
+    if (!tokenDebugData?.is_valid || String(tokenDebugData.app_id) !== FACEBOOK_APP_ID) {
+      return res.status(401).json({ success: false, message: 'Invalid Facebook access token' });
+    }
+
     // Verify the access token with Facebook's Graph API
     const facebookResponse = await axios.get(`https://graph.facebook.com/me`, {
       params: {
@@ -166,8 +184,7 @@ const facebookLogin = async (req, res) => {
     console.error('Facebook login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Facebook login failed',
-      error: error.message
+      message: 'Facebook login failed'
     });
   }
 };
@@ -188,20 +205,31 @@ const googleLogin = async (req, res) => {
       });
     }
 
-    // Verify the ID token with Google's OAuth2 API
-    const googleResponse = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: {
-        Authorization: `Bearer ${idToken}`
-      }
+    if (!GOOGLE_CLIENT_ID) {
+      return res.status(503).json({
+        success: false,
+        message: 'Google sign-in is not configured on the server'
+      });
+    }
+
+    const googleResponse = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
+      params: { id_token: idToken }
     });
 
+    const tokenData = googleResponse.data || {};
+    const validIssuer = ['accounts.google.com', 'https://accounts.google.com'].includes(tokenData.iss);
+    const emailVerified = tokenData.email_verified === true || tokenData.email_verified === 'true';
+    if (tokenData.aud !== GOOGLE_CLIENT_ID || !validIssuer || !emailVerified || !tokenData.email) {
+      return res.status(401).json({ success: false, message: 'Invalid Google ID token' });
+    }
+
     const googleUserData = {
-      id: googleResponse.data.sub,
-      email: googleResponse.data.email,
-      firstName: googleResponse.data.given_name,
-      lastName: googleResponse.data.family_name,
-      picture: googleResponse.data.picture,
-      verified_email: googleResponse.data.email_verified
+      id: tokenData.sub,
+      email: tokenData.email,
+      firstName: tokenData.given_name || '',
+      lastName: tokenData.family_name || '',
+      picture: tokenData.picture || '',
+      verified_email: emailVerified
     };
 
     // Check if user already exists with this Google ID
@@ -256,8 +284,7 @@ const googleLogin = async (req, res) => {
     console.error('Google login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Google login failed',
-      error: error.message
+      message: 'Google login failed'
     });
   }
 };
@@ -278,6 +305,13 @@ const appleLogin = async (req, res) => {
       });
     }
 
+    if (!APPLE_CLIENT_ID) {
+      return res.status(503).json({
+        success: false,
+        message: 'Apple sign-in is not configured on the server'
+      });
+    }
+
     // Verify the identity token with Apple's public keys
     let appleUserData;
     try {
@@ -285,8 +319,7 @@ const appleLogin = async (req, res) => {
     } catch (verifyError) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid Apple identity token',
-        error: verifyError.message
+        message: 'Invalid Apple identity token'
       });
     }
 
@@ -354,8 +387,7 @@ const appleLogin = async (req, res) => {
     console.error('Apple login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Apple login failed',
-      error: error.message
+      message: 'Apple login failed'
     });
   }
 };

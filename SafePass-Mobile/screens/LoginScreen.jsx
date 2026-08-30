@@ -1382,6 +1382,30 @@ export default function LoginScreen({ navigation, route }) {
         : resetToken
           ? "Create a new password from your secure reset link."
           : "Create a new password that matches the same Secure Login standards.";
+  const completeSocialLogin = async (response) => {
+    if (!response?.success || !response?.token || !response?.user) {
+      throw new Error(response?.message || "Social sign-in did not return a valid session.");
+    }
+
+    const normalizedUser = {
+      ...response.user,
+      role: normalizeRole(response.user?.role) || "visitor",
+    };
+    if (!isRoleAllowedInCurrentVariant(normalizedUser.role)) {
+      await ApiService.clearAuth();
+      throw new Error(getVariantBlockedRoleMessage(normalizedUser.role));
+    }
+
+    await persistAuthenticatedSession({
+      token: response.token,
+      user: normalizedUser,
+      rememberEmail: rememberMe,
+    });
+    navigation.reset({
+      index: 0,
+      routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(normalizedUser) }],
+    });
+  };
   const socialLinks = [
     {
       label: "Facebook",
@@ -1397,9 +1421,7 @@ export default function LoginScreen({ navigation, route }) {
 
             if (type === 'success' && token) {
               const response = await ApiService.facebookLogin(token);
-              // Handle successful login
-              console.log('Facebook login successful:', response);
-              // Navigate to appropriate screen based on user role
+              await completeSocialLogin(response);
             } else {
               // User cancelled login
               console.log('Facebook login cancelled');
@@ -1422,8 +1444,7 @@ export default function LoginScreen({ navigation, route }) {
 
             const { token } = result;
             const response = await ApiService.facebookLogin(token);
-            // Handle successful login
-            console.log('Facebook login successful:', response);
+            await completeSocialLogin(response);
           } catch (error) {
             console.error('Facebook login error:', error);
             Alert.alert('Login Error', 'Unable to login with Facebook. Please try again.');
@@ -1453,8 +1474,7 @@ export default function LoginScreen({ navigation, route }) {
               throw new Error("Google did not return an ID token.");
             }
             const response = await ApiService.googleLogin(idToken);
-            // Handle successful login
-            console.log('Google login successful:', response);
+            await completeSocialLogin(response);
           } else {
             // User cancelled login
             console.log('Google login cancelled');
@@ -1484,8 +1504,7 @@ export default function LoginScreen({ navigation, route }) {
               lastName: user?.familyName || '',
               email: user?.email
             });
-            // Handle successful login
-            console.log('Apple login successful:', response);
+            await completeSocialLogin(response);
           } catch (error) {
             console.error('Apple login error:', error);
             if (error.code === 'ERR_AUTHENTICATION_CANCELED') {
