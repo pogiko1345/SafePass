@@ -319,6 +319,74 @@ export default StyleSheet.create({
     color: "#0A3D91",
   },
 
+  fullscreenButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginBottom: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+
+  fullscreenButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+
+  fullscreenSafeArea: {
+    flex: 1,
+    backgroundColor: "#0F172A",
+  },
+
+  fullscreenHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: "#0F172A",
+  },
+
+  fullscreenHeaderCopy: {
+    flex: 1,
+  },
+
+  fullscreenEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: "#93C5FD",
+  },
+
+  fullscreenTitle: {
+    marginTop: 3,
+    fontSize: 19,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  fullscreenCloseButton: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+
+  fullscreenMapWrap: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+
   routeIconBadge: {
     width: 44,
     height: 44,

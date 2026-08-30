@@ -95,6 +95,22 @@ const getTodayFilter = () => {
   return { dateFrom: iso, dateTo: iso };
 };
 
+const getYesterdayFilter = () => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const iso = yesterday.toISOString().slice(0, 10);
+  return { dateFrom: iso, dateTo: iso };
+};
+
+const getThisMonthFilter = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  return {
+    dateFrom: start.toISOString().slice(0, 10),
+    dateTo: now.toISOString().slice(0, 10),
+  };
+};
+
 const getLastDaysFilter = (days) => {
   const end = new Date();
   const start = new Date();
@@ -110,6 +126,7 @@ export default function AttendanceRecordsScreen({ navigation }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedRecordDetail, setSelectedRecordDetail] = useState(null);
   const [filters, setFilters] = useState({
     dateFrom: "",
     dateTo: "",
@@ -160,6 +177,32 @@ export default function AttendanceRecordsScreen({ navigation }) {
     }
   };
 
+  const exportToCsv = () => {
+    if (!records.length) return;
+    const headers = ["Name", "User Type", "Location", "Status", "Check In", "Check Out", "Last Tap"];
+    const rows = records.map((r) => [
+      `"${r.name || ""}"`,
+      `"${r.userType || ""}"`,
+      `"${r.location || ""}"`,
+      `"${r.status || ""}"`,
+      `"${r.checkInTime ? new Date(r.checkInTime).toISOString() : ""}"`,
+      `"${r.checkOutTime ? new Date(r.checkOutTime).toISOString() : ""}"`,
+      `"${r.lastTapTime ? new Date(r.lastTapTime).toISOString() : ""}"`,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+
+    if (typeof window !== "undefined" && window.document) {
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `SafePass_Attendance_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   const groupedRecords = useMemo(() => groupAttendanceByDate(records), [records]);
 
   const quickFilter = async (nextFilter) => {
@@ -188,13 +231,36 @@ export default function AttendanceRecordsScreen({ navigation }) {
             <Ionicons name="arrow-back" size={22} color="#0A3D91" />
           </TouchableOpacity>
           <View style={styles.headerCopy}>
-            <Text style={styles.headerEyebrow}>Admin Records</Text>
-            <Text style={styles.headerTitle}>Attendance Records</Text>
+            <Text style={styles.headerEyebrow}>Admin Records & Compliance</Text>
+            <Text style={styles.headerTitle}>Attendance & Access Records</Text>
             <Text style={styles.headerSubtitle}>
               Review attendance across students, teachers, staff, security, and visitors with
-              date-based filtering and live status summaries.
+              date-based filtering, live status summaries, and exportable reports.
             </Text>
           </View>
+        </View>
+
+        {/* Action Bar: Export CSV & Print */}
+        <View style={styles.actionBar}>
+          <TouchableOpacity style={styles.actionBtn} onPress={exportToCsv}>
+            <Ionicons name="download-outline" size={16} color="#0A3D91" />
+            <Text style={styles.actionBtnText}>Export CSV</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => {
+              if (typeof window !== "undefined" && window.print) {
+                window.print();
+              }
+            }}
+          >
+            <Ionicons name="print-outline" size={16} color="#0A3D91" />
+            <Text style={styles.actionBtnText}>Print Report</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleRefresh} disabled={refreshing}>
+            <Ionicons name="refresh-outline" size={16} color="#0A3D91" />
+            <Text style={styles.actionBtnText}>Refresh</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.summaryGrid}>
@@ -222,11 +288,17 @@ export default function AttendanceRecordsScreen({ navigation }) {
             <TouchableOpacity style={styles.quickFilterChip} onPress={() => quickFilter(getTodayFilter())}>
               <Text style={styles.quickFilterText}>Today</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.quickFilterChip} onPress={() => quickFilter(getYesterdayFilter())}>
+              <Text style={styles.quickFilterText}>Yesterday</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.quickFilterChip} onPress={() => quickFilter(getLastDaysFilter(7))}>
               <Text style={styles.quickFilterText}>Last 7 Days</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickFilterChip} onPress={() => quickFilter(getLastDaysFilter(30))}>
               <Text style={styles.quickFilterText}>Last 30 Days</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickFilterChip} onPress={() => quickFilter(getThisMonthFilter())}>
+              <Text style={styles.quickFilterText}>This Month</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickFilterChip}
@@ -253,7 +325,7 @@ export default function AttendanceRecordsScreen({ navigation }) {
             />
             <TextInput
               style={styles.filterInput}
-              placeholder="Search by name"
+              placeholder="Search by name or ID"
               placeholderTextColor="#94A3B8"
               value={filters.search}
               onChangeText={(value) => setFilters((current) => ({ ...current, search: value }))}
@@ -301,7 +373,7 @@ export default function AttendanceRecordsScreen({ navigation }) {
 
         <View style={styles.section}>
           <View style={styles.recordsHeader}>
-            <Text style={styles.sectionTitle}>Attendance Log</Text>
+            <Text style={styles.sectionTitle}>Attendance Feed</Text>
             <Text style={styles.recordsCount}>{records.length} record{records.length === 1 ? "" : "s"}</Text>
           </View>
 
@@ -320,7 +392,12 @@ export default function AttendanceRecordsScreen({ navigation }) {
                 {group.entries.map((record) => {
                   const statusColors = getStatusColor(record.status);
                   return (
-                    <View key={record._id} style={styles.recordCard}>
+                    <TouchableOpacity
+                      key={record._id}
+                      style={styles.recordCard}
+                      onPress={() => setSelectedRecordDetail(record)}
+                      activeOpacity={0.85}
+                    >
                       <View style={styles.recordHeader}>
                         <View style={styles.recordHeaderCopy}>
                           <Text style={styles.recordName}>{record.name}</Text>
@@ -353,7 +430,7 @@ export default function AttendanceRecordsScreen({ navigation }) {
                           <Text style={styles.recordDetailValue}>{titleCase(record.module)}</Text>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
@@ -361,6 +438,74 @@ export default function AttendanceRecordsScreen({ navigation }) {
           )}
         </View>
       </ScrollView>
+
+      {/* Record Inspection Modal */}
+      <Modal
+        visible={Boolean(selectedRecordDetail)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedRecordDetail(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Ionicons name="clipboard-outline" size={20} color="#0A3D91" />
+                <Text style={styles.modalTitle}>Attendance Record Details</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setSelectedRecordDetail(null)}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.modalHero}>
+                <Text style={styles.modalName}>{selectedRecordDetail?.name}</Text>
+                <Text style={styles.modalUserRole}>
+                  {titleCase(selectedRecordDetail?.userType)} • {selectedRecordDetail?.location || "Campus Main"}
+                </Text>
+              </View>
+
+              <View style={styles.modalInfoGrid}>
+                <View style={styles.modalInfoItem}>
+                  <Text style={styles.modalInfoLabel}>Status</Text>
+                  <Text style={styles.modalInfoValue}>{titleCase(selectedRecordDetail?.status)}</Text>
+                </View>
+                <View style={styles.modalInfoItem}>
+                  <Text style={styles.modalInfoLabel}>Attendance Date</Text>
+                  <Text style={styles.modalInfoValue}>{formatDateLabel(selectedRecordDetail?.attendanceDate)}</Text>
+                </View>
+                <View style={styles.modalInfoItem}>
+                  <Text style={styles.modalInfoLabel}>Check-In Time</Text>
+                  <Text style={styles.modalInfoValue}>{formatDateTime(selectedRecordDetail?.checkInTime)}</Text>
+                </View>
+                <View style={styles.modalInfoItem}>
+                  <Text style={styles.modalInfoLabel}>Check-Out Time</Text>
+                  <Text style={styles.modalInfoValue}>{formatDateTime(selectedRecordDetail?.checkOutTime)}</Text>
+                </View>
+                <View style={styles.modalInfoItem}>
+                  <Text style={styles.modalInfoLabel}>Last Reader Tap</Text>
+                  <Text style={styles.modalInfoValue}>{formatDateTime(selectedRecordDetail?.lastTapTime)}</Text>
+                </View>
+                <View style={styles.modalInfoItem}>
+                  <Text style={styles.modalInfoLabel}>Logging Module</Text>
+                  <Text style={styles.modalInfoValue}>{titleCase(selectedRecordDetail?.module)}</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalDoneBtn}
+                onPress={() => setSelectedRecordDetail(null)}
+              >
+                <Text style={styles.modalDoneBtnText}>Done</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -617,5 +762,119 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: "#0F172A",
+  },
+  actionBar: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  actionBtnText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0A3D91",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 520,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: "#F8FAFC",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  modalTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  modalBody: {
+    padding: 18,
+  },
+  modalHero: {
+    marginBottom: 16,
+  },
+  modalName: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  modalUserRole: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#64748B",
+    marginTop: 4,
+  },
+  modalInfoGrid: {
+    gap: 10,
+    marginBottom: 18,
+  },
+  modalInfoItem: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    padding: 10,
+  },
+  modalInfoLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    marginBottom: 3,
+  },
+  modalInfoValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  modalDoneBtn: {
+    backgroundColor: "#0A3D91",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  modalDoneBtnText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
 });
