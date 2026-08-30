@@ -133,38 +133,13 @@ const facebookLogin = async (req, res) => {
 
     const facebookUserData = facebookResponse.data;
 
-    // Check if user already exists with this Facebook ID
-    let user = await User.findOne({ facebookId: facebookUserData.id });
-
+    const user = await User.findOne({ facebookId: facebookUserData.id });
     if (!user) {
-      // Check if user exists with the same email (for account linking)
-      user = await User.findOne({ email: facebookUserData.email });
-
-      if (user) {
-        // Link Facebook account to existing user
-        user.facebookId = facebookUserData.id;
-        user.profilePhoto = facebookUserData.picture.data.url || user.profilePhoto;
-        // Update name if not already set
-        if (!user.firstName || user.firstName === '') user.firstName = facebookUserData.firstName;
-        if (!user.lastName || user.lastName === '') user.lastName = facebookUserData.lastName;
-      } else {
-        // Create new user from Facebook data
-        user = new User({
-          email: facebookUserData.email,
-          firstName: facebookUserData.firstName,
-          lastName: facebookUserData.lastName,
-          facebookId: facebookUserData.id,
-          profilePhoto: facebookUserData.picture.data.url,
-          role: 'visitor', // Default role, can be adjusted based on business logic
-          password: crypto.randomBytes(16).toString('hex'), // Random password for social login users
-          isVerified: true, // Social login users are considered verified
-          verifiedAt: new Date(),
-          status: 'active',
-          isActive: true
-        });
-      }
-
-      await user.save();
+      return res.status(403).json({
+        success: false,
+        code: 'SOCIAL_ACCOUNT_NOT_LINKED',
+        message: 'This Facebook account is not connected to a SafePass account. Sign in with your SafePass password, then ask an administrator to connect it.'
+      });
     }
 
     // Generate JWT token
@@ -232,39 +207,13 @@ const googleLogin = async (req, res) => {
       verified_email: emailVerified
     };
 
-    // Check if user already exists with this Google ID
-    let user = await User.findOne({ googleId: googleUserData.id });
-
+    const user = await User.findOne({ googleId: googleUserData.id });
     if (!user) {
-      // Check if user exists with the same email (for account linking)
-      user = await User.findOne({ email: googleUserData.email });
-
-      if (user) {
-        // Link Google account to existing user
-        user.googleId = googleUserData.id;
-        user.profilePhoto = googleUserData.picture || user.profilePhoto;
-        // Update name if not already set
-        if (!user.firstName || user.firstName === '') user.firstName = googleUserData.firstName;
-        if (!user.lastName || user.lastName === '') user.lastName = googleUserData.lastName;
-        user.isVerified = googleUserData.verified_email || user.isVerified;
-      } else {
-        // Create new user from Google data
-        user = new User({
-          email: googleUserData.email,
-          firstName: googleUserData.firstName,
-          lastName: googleUserData.lastName,
-          googleId: googleUserData.id,
-          profilePhoto: googleUserData.picture,
-          role: 'visitor', // Default role, can be adjusted based on business logic
-          password: crypto.randomBytes(16).toString('hex'), // Random password for social login users
-          isVerified: googleUserData.verified_email,
-          verifiedAt: googleUserData.verified_email ? new Date() : null,
-          status: 'active',
-          isActive: true
-        });
-      }
-
-      await user.save();
+      return res.status(403).json({
+        success: false,
+        code: 'SOCIAL_ACCOUNT_NOT_LINKED',
+        message: 'This Google account is not connected to a SafePass account. Sign in with your SafePass password, then ask an administrator to connect it.'
+      });
     }
 
     // Generate JWT token
