@@ -1837,6 +1837,9 @@ export default function NFCScanScreen({ navigation }) {
                   </Text>
                   <Ionicons name="chevron-forward-outline" size={16} color={stationFeedPage >= stationFeedTotalPages ? "#94A3B8" : "#0A3D91"} />
                 </TouchableOpacity>
+              </View>
+            </>
+          )}
         </View>
       </ScrollView>
 
