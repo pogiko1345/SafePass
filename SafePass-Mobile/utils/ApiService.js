@@ -893,6 +893,13 @@ async verifyCredentials(email, password) {
     }
   }
 
+  async getSocialSignupProfile(provider, token) {
+    const body = provider === "google"
+      ? { provider, idToken: token }
+      : { provider, accessToken: token };
+    return this.fetch("/auth/social-signup-profile", { method: "POST", body });
+  }
+
   async appleLogin(identityToken, userData = {}) {
     try {
       logApiDebug("[ApiService] Apple login with token:", identityToken.substring(0, 10) + "...");

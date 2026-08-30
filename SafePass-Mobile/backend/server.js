@@ -7367,26 +7367,53 @@ app.post("/api/visitors/register", async (req, res) => {
     const normalizedUsername = normalizeUsernameValue(visitorData.username);
     const normalizedPhone = normalizePhoneValue(visitorData.phone || visitorData.phoneNumber);
     const password = String(visitorData.password || "");
+    let socialSignup = null;
+    if (visitorData.socialSignupToken) {
+      try {
+        const verifiedSignup = jwt.verify(
+          String(visitorData.socialSignupToken),
+          getRequiredEnvValue("JWT_SECRET"),
+        );
+        if (
+          verifiedSignup?.purpose !== "visitor_signup" ||
+          !["google", "facebook"].includes(verifiedSignup.provider) ||
+          !verifiedSignup.socialId ||
+          !verifiedSignup.email
+        ) {
+          throw new Error("Invalid social sign-up proof");
+        }
+        socialSignup = verifiedSignup;
+      } catch (error) {
+        return res.status(401).json({
+          success: false,
+          message: "Your Google/Facebook sign-up verification expired. Please connect it again.",
+        });
+      }
+    }
+    const verifiedFullName = socialSignup?.fullName || normalizedFullName;
+    const verifiedEmail = socialSignup?.email
+      ? normalizeEmailValue(socialSignup.email)
+      : normalizedEmail;
     const dataPrivacyAccepted = visitorData.privacyAccepted === true;
     const dataPrivacyAcceptedAt = visitorData.privacyAcceptedAt
       ? new Date(visitorData.privacyAcceptedAt)
       : new Date();
 
-    if (!normalizedFullName || !normalizedEmail || !normalizedUsername || !normalizedPhone || !password) {
+    if (!verifiedFullName || !verifiedEmail || !normalizedUsername || !normalizedPhone || (!password && !socialSignup)) {
       return res.status(400).json({
         success: false,
         message: "Full name, email, username, contact number, and password are required.",
       });
     }
 
-    if (!isValidEmailValue(normalizedEmail)) {
+    if (!isValidEmailValue(verifiedEmail)) {
       return res.status(400).json({
         success: false,
         message: "Please enter a valid email address.",
       });
     }
 
-    if (password.length < 6) {
+    if (!socialSignup && password.length < 6) {
       return res.status(400).json({
         success: false,
         message: "Password must be at least 6 characters long.",
@@ -7409,7 +7436,7 @@ app.post("/api/visitors/register", async (req, res) => {
       });
     }
 
-    const existingEmailUser = await User.findOne({ email: normalizedEmail });
+    const existingEmailUser = await User.findOne({ email: verifiedEmail });
     if (existingEmailUser) {
       return res.status(409).json({
         success: false,
@@ -7428,10 +7455,22 @@ app.post("/api/visitors/register", async (req, res) => {
       });
     }
 
-    const existingVisitor = await Visitor.findOne({ email: normalizedEmail }).sort({
+    const existingSocialUser = socialSignup
+      ? await User.findOne({ [socialSignup.provider === "google" ? "googleId" : "facebookId"]: socialSignup.socialId })
+      : null;
+    if (existingSocialUser) {
+      return res.status(409).json({
+        success: false,
+        code: "ACCOUNT_EXISTS",
+        field: "email",
+        message: "This social account is already connected to SafePass. Please sign in instead.",
+      });
+    }
+
+    const existingVisitor = await Visitor.findOne({ email: verifiedEmail }).sort({
       registeredAt: -1,
     });
-    const nameParts = normalizedFullName.split(/\s+/).filter(Boolean);
+    const nameParts = verifiedFullName.split(/\s+/).filter(Boolean);
     const firstName = nameParts.shift() || "Visitor";
     const lastName = nameParts.join(" ") || "User";
 
@@ -7440,8 +7479,8 @@ app.post("/api/visitors/register", async (req, res) => {
     user.firstName = firstName;
     user.lastName = lastName;
     user.username = normalizedUsername;
-    user.email = normalizedEmail;
-    user.password = password;
+    user.email = verifiedEmail;
+    user.password = password || crypto.randomBytes(32).toString("hex");
     user.phone = normalizedPhone;
     user.role = "visitor";
     user.status = "active";
@@ -7451,6 +7490,8 @@ app.post("/api/visitors/register", async (req, res) => {
     user.dataPrivacyAcceptedAt = dataPrivacyAcceptedAt;
     user.isActive = true;
     user.visitorId = existingVisitor?._id || user.visitorId || null;
+    if (socialSignup?.provider === "google") user.googleId = socialSignup.socialId;
+    if (socialSignup?.provider === "facebook") user.facebookId = socialSignup.socialId;
 
     const otp = await createRegistrationOtp(user);
     if (!isOtpDeliveryUsable(otp.emailResult)) {
@@ -7462,7 +7503,7 @@ app.post("/api/visitors/register", async (req, res) => {
     await user.save();
     console.log(
       "Visitor account created, waiting for OTP verification:",
-      normalizedEmail
+      verifiedEmail
     );
 
     await createSystemActivity({
@@ -7472,7 +7513,7 @@ app.post("/api/visitors/register", async (req, res) => {
       activityType: "visitor_account_registration",
       status: "pending",
       location: "Visitor Registration",
-      notes: `${normalizedFullName} created a visitor account and must verify OTP before login.`,
+      notes: `${verifiedFullName} created a visitor account and must verify OTP before login.`,
       metadata: {
         username: user.username,
         email: user.email,
@@ -7483,7 +7524,7 @@ app.post("/api/visitors/register", async (req, res) => {
     await AccessLog.create({
       userId: user._id,
       userEmail: user.email,
-      userName: normalizedFullName,
+      userName: verifiedFullName,
       actorRole: "visitor",
       location: "Visitor Registration",
       accessType: "system",
