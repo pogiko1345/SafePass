@@ -28,9 +28,8 @@ import { useAviationTransition } from "../utils/AviationTransitionContext";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import ApiService from "../utils/ApiService";
-import * as Facebook from 'expo-facebook';
+import * as FacebookAuth from 'expo-auth-session/providers/facebook';
 import * as GoogleSignIn from 'expo-auth-session/providers/google';
-import * as AppleAuthentication from 'expo-apple-authentication';
 import Constants from 'expo-constants';
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
 import {
@@ -197,11 +196,17 @@ export default function LoginScreen({ navigation, route }) {
   const [webBiometricUsername, setWebBiometricUsername] = useState("");
   const [isWebAuthnAvailable, setIsWebAuthnAvailable] = useState(false);
   const googleClientId = Constants.expoConfig?.extra?.googleClientId;
+  const facebookAppId = Constants.expoConfig?.extra?.facebookAppId;
   const [googleRequest, , promptGoogleSignIn] = GoogleSignIn.useIdTokenAuthRequest({
     webClientId: googleClientId,
     iosClientId: googleClientId,
     androidClientId: googleClientId,
   });
+  const [facebookRequest, , promptFacebookSignIn] = FacebookAuth.useAuthRequest({
+    clientId: facebookAppId,
+    scopes: ["public_profile", "email"],
+  });
+  const [socialLoginProvider, setSocialLoginProvider] = useState("");
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(skipArrivalSplash ? 1 : 0)).current;
@@ -1402,124 +1407,71 @@ export default function LoginScreen({ navigation, route }) {
       routes: [{ name: IS_VISITOR_ONLY_APP ? "VisitorDashboard" : getDashboardRoute(normalizedUser) }],
     });
   };
+  const handleGoogleSignIn = async () => {
+    if (!googleClientId || googleClientId === "YOUR_GOOGLE_CLIENT_ID") {
+      Alert.alert("Google Sign-In", "Google Sign-In is not configured yet.");
+      return;
+    }
+    if (!googleRequest) {
+      Alert.alert("Google Sign-In", "Google Sign-In is still loading. Please try again.");
+      return;
+    }
+
+    try {
+      setSocialLoginProvider("google");
+      setLoginError("");
+      const result = await promptGoogleSignIn();
+      if (result.type !== "success") return;
+
+      const idToken = result.params?.id_token || result.authentication?.idToken;
+      if (!idToken) throw new Error("Google did not return an ID token.");
+      await completeSocialLogin(await ApiService.googleLogin(idToken));
+    } catch (error) {
+      setLoginError(error?.message || "Unable to sign in with Google. Please try again.");
+    } finally {
+      setSocialLoginProvider("");
+    }
+  };
+  const handleFacebookSignIn = async () => {
+    if (!facebookAppId || facebookAppId === "YOUR_FACEBOOK_APP_ID") {
+      Alert.alert("Facebook Sign-In", "Facebook Sign-In is not configured yet.");
+      return;
+    }
+    if (!facebookRequest) {
+      Alert.alert("Facebook Sign-In", "Facebook Sign-In is still loading. Please try again.");
+      return;
+    }
+
+    try {
+      setSocialLoginProvider("facebook");
+      setLoginError("");
+      const result = await promptFacebookSignIn();
+      if (result.type !== "success") return;
+
+      const accessToken = result.params?.access_token || result.authentication?.accessToken;
+      if (!accessToken) throw new Error("Facebook did not return an access token.");
+      await completeSocialLogin(await ApiService.facebookLogin(accessToken));
+    } catch (error) {
+      setLoginError(error?.message || "Unable to sign in with Facebook. Please try again.");
+    } finally {
+      setSocialLoginProvider("");
+    }
+  };
   const socialLinks = [
     {
       label: "Facebook",
       icon: "logo-facebook",
-      onPress: async () => {
-        await Linking.openURL(ACADEMY_LINKS.facebook);
-        return;
-        if (Platform.OS === 'web') {
-          // Web-based Facebook login
-          try {
-            const { type, token } = await Facebook.logInWithReadPermissionsAsync(
-              Constants.expoConfig.extra.facebookAppId,
-              { permissions: ['public_profile', 'email'] }
-            );
-
-            if (type === 'success' && token) {
-              const response = await ApiService.facebookLogin(token);
-              await completeSocialLogin(response);
-            } else {
-              // User cancelled login
-              console.log('Facebook login cancelled');
-            }
-          } catch (error) {
-            console.error('Facebook login error:', error);
-            Alert.alert('Login Error', 'Unable to login with Facebook. Please try again.');
-          }
-        } else {
-          // Native Facebook login
-          try {
-            const result = await Facebook.logInWithReadPermissionsAsync(FACEBOOK_APP_ID, {
-              permissions: ['public_profile', 'email'],
-            });
-
-            if (result.isCancelled) {
-              console.log('Facebook login cancelled');
-              return;
-            }
-
-            const { token } = result;
-            const response = await ApiService.facebookLogin(token);
-            await completeSocialLogin(response);
-          } catch (error) {
-            console.error('Facebook login error:', error);
-            Alert.alert('Login Error', 'Unable to login with Facebook. Please try again.');
-          }
-        }
-      },
+      onPress: () => openExternalLink(ACADEMY_LINKS.facebook),
     },
     {
       label: "YouTube",
       icon: "logo-youtube",
-      onPress: async () => {
-        await Linking.openURL(ACADEMY_LINKS.youtube);
-        return;
-        try {
-          if (!googleClientId || googleClientId === "YOUR_GOOGLE_CLIENT_ID") {
-            Alert.alert("Google Sign-In", "Add your Google client ID in app.json before using this option.");
-            return;
-          }
-          if (!googleRequest) {
-            Alert.alert("Google Sign-In", "Google Sign-In is still loading. Please try again.");
-            return;
-          }
-
-          const result = await promptGoogleSignIn();
-
-          if (result.type === 'success') {
-            const idToken = result.params?.id_token;
-            if (!idToken) {
-              throw new Error("Google did not return an ID token.");
-            }
-            const response = await ApiService.googleLogin(idToken);
-            await completeSocialLogin(response);
-          } else {
-            // User cancelled login
-            console.log('Google login cancelled');
-          }
-        } catch (error) {
-          console.error('Google login error:', error);
-          Alert.alert('Login Error', 'Unable to login with Google. Please try again.');
-        }
-      },
+      onPress: () => openExternalLink(ACADEMY_LINKS.youtube),
     },
     {
       label: "Website",
       icon: "globe-outline",
-      onPress: async () => {
-        await Linking.openURL(ACADEMY_LINKS.website);
-        return;
-        if (Platform.OS === 'ios' || Platform.OS === 'web') {
-          try {
-            const appleAuthRequest = await AppleAuthentication.signInAsync({
-              requestedScopes: [
-                AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-                AppleAuthentication.AppleAuthenticationScope.EMAIL,
-              ],
-            });
-
-            const { identityToken, user } = appleAuthRequest;
-            const response = await ApiService.appleLogin(identityToken, {
-              firstName: user?.givenName || '',
-              lastName: user?.familyName || '',
-              email: user?.email
-            });
-            await completeSocialLogin(response);
-          } catch (error) {
-            console.error('Apple login error:', error);
-            if (error.code === 'ERR_AUTHENTICATION_CANCELED') {
-              // User cancelled login
-              console.log('Apple login cancelled');
-            } else {
-              Alert.alert('Login Error', 'Unable to login with Apple. Please try again.');
-            }
-          }
-        } else {
-          Alert.alert('Not Available', 'Apple Sign In is only available on iOS and web platforms.');
-        }
-      },
+      onPress: () => openExternalLink(ACADEMY_LINKS.website),
     },
     {
       label: "WebAuthn",
@@ -1928,6 +1880,9 @@ export default function LoginScreen({ navigation, route }) {
                             Copyright 2024. Sapphire International Aviation Academy
                           </Text>
                         </View>
+                        <View style={loginStyles.loginVisualSocialDock}>
+                          <SocialDock links={socialLinks} showTray={false} />
+                        </View>
                       </View>
                       <View style={loginStyles.loginVisualIntro}>
                         <Text style={loginStyles.loginVisualHeading}>Campus Login</Text>
@@ -2313,6 +2268,69 @@ export default function LoginScreen({ navigation, route }) {
                       )}
                     </TouchableOpacity>
                   </Animated.View>
+
+                  <View style={{ marginTop: 16, marginBottom: 16 }}>
+                    <Text style={{ textAlign: "center", color: brandColors.textMuted, fontSize: 12, fontWeight: "700", marginBottom: 10 }}>
+                      OR SIGN IN WITH A CONNECTED ACCOUNT
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 10 }}>
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          minHeight: 46,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 7,
+                          borderWidth: 1,
+                          borderColor: "#CBD5E1",
+                          borderRadius: 8,
+                          backgroundColor: brandColors.surface,
+                          opacity: socialLoginProvider && socialLoginProvider !== "google" ? 0.55 : 1,
+                        }}
+                        onPress={handleGoogleSignIn}
+                        disabled={Boolean(socialLoginProvider) || transitionBusy}
+                        accessibilityRole="button"
+                        accessibilityLabel="Sign in with Google"
+                      >
+                        {socialLoginProvider === "google" ? (
+                          <ActivityIndicator size="small" color={brandColors.blue} />
+                        ) : (
+                          <Ionicons name="logo-google" size={19} color="#DB4437" />
+                        )}
+                        <Text style={{ color: brandColors.text, fontSize: 13, fontWeight: "800" }}>Google</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          minHeight: 46,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 7,
+                          borderWidth: 1,
+                          borderColor: "#CBD5E1",
+                          borderRadius: 8,
+                          backgroundColor: brandColors.surface,
+                          opacity: socialLoginProvider && socialLoginProvider !== "facebook" ? 0.55 : 1,
+                        }}
+                        onPress={handleFacebookSignIn}
+                        disabled={Boolean(socialLoginProvider) || transitionBusy}
+                        accessibilityRole="button"
+                        accessibilityLabel="Sign in with Facebook"
+                      >
+                        {socialLoginProvider === "facebook" ? (
+                          <ActivityIndicator size="small" color="#1877F2" />
+                        ) : (
+                          <Ionicons name="logo-facebook" size={19} color="#1877F2" />
+                        )}
+                        <Text style={{ color: brandColors.text, fontSize: 13, fontWeight: "800" }}>Facebook</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={{ textAlign: "center", color: brandColors.textMuted, fontSize: 11, lineHeight: 16, marginTop: 9 }}>
+                      Only accounts already connected to SafePass can use these options.
+                    </Text>
+                  </View>
 
                   {/* 2FA Info */}
                   <View style={loginStyles.twoFactorInfo}>

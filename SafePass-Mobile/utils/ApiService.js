@@ -819,7 +819,7 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.error("Facebook login API error:", error);
 
-      if (!this.isDevFallbackEnabled()) {
+      if (!this.isDevFallbackEnabled() || error?.status === 403 || error?.data?.code === "SOCIAL_ACCOUNT_NOT_LINKED") {
         throw error;
       }
 
@@ -864,7 +864,7 @@ async verifyCredentials(email, password) {
     } catch (error) {
       console.error("Google login API error:", error);
 
-      if (!this.isDevFallbackEnabled()) {
+      if (!this.isDevFallbackEnabled() || error?.status === 403 || error?.data?.code === "SOCIAL_ACCOUNT_NOT_LINKED") {
         throw error;
       }
 
