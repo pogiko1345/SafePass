@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Modal,
   Platform,
   RefreshControl,
   ScrollView,
@@ -454,6 +455,7 @@ export default function NFCScanScreen({ navigation }) {
   });
   const [isScanningMobile, setIsScanningMobile] = useState(false);
   const [offlinePendingCount, setOfflinePendingCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
   const radarPulseAnim = useRef(new Animated.Value(1)).current;
   const [pn532Monitor, setPn532Monitor] = useState({
     loading: false,
@@ -514,23 +516,10 @@ export default function NFCScanScreen({ navigation }) {
     [offlinePendingCount, stationEvents],
   );
 
-  const openStationAlerts = () => {
-    if (!stationAlertCount) {
-      Alert.alert("Notifications", "No NFC scan errors or offline taps need attention.");
-      return;
-    }
-
-    const recentIssue = stationEvents.find((event) => event?.success === false);
-    const details = [
-      offlinePendingCount
-        ? `${offlinePendingCount} tap${offlinePendingCount === 1 ? " is" : "s are"} waiting to sync.`
-        : "",
-      recentIssue?.message || "Review the Station Feed for failed taps.",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-    Alert.alert(`${stationAlertCount} NFC notification${stationAlertCount === 1 ? "" : "s"}`, details);
-  };
+  const stationIssues = useMemo(
+    () => stationEvents.filter((event) => event?.success === false).slice(0, 5),
+    [stationEvents],
+  );
 
   useEffect(() => {
     if (stationFeedPage > stationFeedTotalPages) {
@@ -1141,7 +1130,7 @@ export default function NFCScanScreen({ navigation }) {
             <View style={styles.headerActions}>
               <TouchableOpacity
                 style={styles.notificationButton}
-                onPress={openStationAlerts}
+                onPress={() => setShowNotifications(true)}
                 accessibilityRole="button"
                 accessibilityLabel={stationAlertCount ? `${stationAlertCount} NFC notifications` : "NFC notifications"}
               >
@@ -1833,6 +1822,62 @@ export default function NFCScanScreen({ navigation }) {
           )}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showNotifications}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNotifications(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.notificationPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Ionicons name="notifications-outline" size={22} color="#0A3D91" />
+                <Text style={styles.modalTitle}>NFC Notifications</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowNotifications(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close notifications"
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.notificationPanelContent}>
+              {offlinePendingCount > 0 ? (
+                <View style={styles.notificationIssueCard}>
+                  <Ionicons name="cloud-offline-outline" size={20} color="#B45309" />
+                  <View style={styles.notificationIssueCopy}>
+                    <Text style={styles.notificationIssueTitle}>Offline taps waiting to sync</Text>
+                    <Text style={styles.notificationIssueText}>
+                      {offlinePendingCount} tap{offlinePendingCount === 1 ? " is" : "s are"} stored on this device. Use “Sync Now” when the connection returns.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+              {stationIssues.map((issue, index) => (
+                <View key={`${issue.timestamp}-${index}`} style={styles.notificationIssueCard}>
+                  <Ionicons name="alert-circle-outline" size={20} color="#B91C1C" />
+                  <View style={styles.notificationIssueCopy}>
+                    <Text style={styles.notificationIssueTitle}>{issue.checkpoint || "NFC tap needs attention"}</Text>
+                    <Text style={styles.notificationIssueText}>{issue.message || "The NFC tap could not be processed."}</Text>
+                    <Text style={styles.notificationIssueTime}>{formatDateTime(issue.timestamp)}</Text>
+                  </View>
+                </View>
+              ))}
+              {!offlinePendingCount && !stationIssues.length ? (
+                <View style={styles.notificationEmptyState}>
+                  <Ionicons name="checkmark-circle-outline" size={34} color="#16A34A" />
+                  <Text style={styles.notificationEmptyTitle}>All clear</Text>
+                  <Text style={styles.notificationIssueText}>There are no failed or queued NFC taps.</Text>
+                </View>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
@@ -3263,6 +3308,61 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     padding: 18,
+  },
+  notificationPanel: {
+    width: "100%",
+    maxWidth: 520,
+    maxHeight: "78%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    overflow: "hidden",
+    ...CARD_SHADOW,
+  },
+  notificationPanelContent: {
+    padding: 16,
+  },
+  notificationIssueCard: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderRadius: 14,
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+  },
+  notificationIssueCopy: {
+    flex: 1,
+  },
+  notificationIssueTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  notificationIssueText: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#475569",
+  },
+  notificationIssueTime: {
+    marginTop: 7,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  notificationEmptyState: {
+    alignItems: "center",
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  notificationEmptyTitle: {
+    marginTop: 8,
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#166534",
   },
   consoleStatusRow: {
     flexDirection: "row",
