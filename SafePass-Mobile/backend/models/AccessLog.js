@@ -24,5 +24,6 @@ accessLogSchema.index({ userId: 1, timestamp: -1 });
 accessLogSchema.index({ relatedVisitor: 1, timestamp: -1 });
 accessLogSchema.index({ relatedUser: 1, timestamp: -1 });
 accessLogSchema.index({ activityType: 1, timestamp: -1 });
+accessLogSchema.index({ userId: 1, "metadata.clientTapId": 1 });
 
 module.exports = mongoose.model('AccessLog', accessLogSchema);

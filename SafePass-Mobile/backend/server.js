@@ -1949,6 +1949,11 @@ const CHECKPOINT_LOCATIONS = {
     office: "Entrance / Lobby",
     coordinates: { x: 6.8, y: 40 },
   },
+  usb_rfid_reader: {
+    floor: "ground",
+    office: "Entrance / Lobby",
+    coordinates: { x: 6.8, y: 40 },
+  },
   pn532: {
     floor: "ground",
     office: "Entrance / Lobby",
@@ -2408,6 +2413,7 @@ const GATE_CHECKPOINT_IDS = new Set([
   "campus_exit",
   "arduino_reader",
   "arduino_reader_1",
+  "usb_rfid_reader",
   "pn532",
   "pn532_reader",
   "pn532_reader_1",
@@ -3632,6 +3638,7 @@ app.post(
       const tapAction = String(req.body?.action || req.body?.tapAction || "auto")
         .trim()
         .toLowerCase();
+      const clientTapId = String(req.body?.clientTapId || "").trim().slice(0, 100);
       const operatorRole = normalizeUserRoleValue(req.user?.role);
       const operatorName = getFullName(req.user) || req.user?.email || "Checkpoint operator";
 
@@ -3647,6 +3654,28 @@ app.post(
           success: false,
           message: "Missing checkpoint floor or office",
         });
+      }
+
+      // A retry may happen after the server processed the tap but before the reader
+      // received its response. Reusing the same clientTapId prevents a retry from
+      // turning an automatic check-in into a check-out.
+      if (clientTapId) {
+        const previousTap = await AccessLog.findOne({
+          userId: req.user._id,
+          status: "granted",
+          "metadata.clientTapId": clientTapId,
+        })
+          .select("nfcCardId metadata")
+          .lean();
+        if (previousTap) {
+          return res.json({
+            success: true,
+            duplicate: true,
+            message: "This checkpoint tap was already processed.",
+            action: previousTap.metadata?.action || "location_update",
+            nfcCardId: previousTap.nfcCardId || normalizedCardId,
+          });
+        }
       }
 
       let cardUser = await User.findOne(buildNfcCredentialQuery(cardId, normalizedCardId)).select(
@@ -3817,6 +3846,7 @@ app.post(
             userType: normalizedUserRole,
             attendanceRecordId: attendanceRecord._id,
             targetUserId: cardUser._id,
+            clientTapId,
           },
           notes: `${operatorName} recorded ${userDisplayName} ${action.replace("_", " ")} at ${tapLocation.office}.`,
         });
@@ -4122,6 +4152,7 @@ app.post(
           tapLocation,
           currentLocation: visitor.currentLocation,
           attendanceRecordId: visitorAttendanceRecord._id,
+          clientTapId,
         },
         notes: `${operatorName} recorded ${visitor.fullName} ${action.replace("_", " ")} at ${tapLocation.office}.`,
       });

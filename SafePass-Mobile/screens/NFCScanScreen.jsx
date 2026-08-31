@@ -22,11 +22,15 @@ import ApiService from "../utils/ApiService";
 import {
   describeRfidReaderInput,
   normalizeRfidReaderInput,
+<<<<<<< HEAD
   formatRfidHex,
   isRfidUid,
   playRfidChime,
   RfidKeystrokeBuffer,
   Esp32SerialGateway,
+=======
+  RfidKeystrokeBuffer,
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   RfidOfflineQueue,
 } from "../utils/rfidReaderUtils";
 import {
@@ -54,8 +58,8 @@ if (Platform.OS !== "web") {
 
 const ENTRY_CHECKPOINTS = [
   {
-    key: "pn532_reader",
-    label: "PN532 Lobby Reader",
+    key: "usb_rfid_reader",
+    label: "USB RFID Lobby Reader",
     floor: "ground",
     office: "Entrance / Lobby",
     icon: "radio-outline",
@@ -74,6 +78,14 @@ const STATION_EVENTS_STORAGE_KEY = "safepass:nfc-scan:station-events:v1";
 const STATION_READER_CHECKPOINT_KEY = "safepass:nfc-scan:reader-checkpoint:v1";
 const STATION_FEED_PAGE_SIZE = 6;
 const MAX_STATION_EVENTS = 100;
+
+const createClientTapId = () =>
+  `tap_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+const isRetryableTapError = (error) => {
+  const status = Number(error?.status);
+  return !Number.isFinite(status) || status >= 500;
+};
 
 const playWebTapDing = (type = "success") => {
   if (Platform.OS !== "web" || typeof window === "undefined") return;
@@ -366,7 +378,9 @@ const isPn532AccessLog = (log = {}) => {
   return (
     PN532_ACTIVITY_TYPES.has(activityType) ||
     deviceId.includes("pn532") ||
-    checkpointId.includes("pn532")
+    deviceId.includes("usb-rfid") ||
+    checkpointId.includes("pn532") ||
+    checkpointId.includes("usb_rfid")
   );
 };
 
@@ -386,13 +400,13 @@ const buildPn532EventFromLog = (log = {}) => {
     log.location ||
     tapLocation.checkpointId ||
     metadata.deviceId ||
-    "PN532 reader";
+    "USB RFID reader";
 
   return {
     success,
     message:
       log.notes ||
-      (success ? "PN532 tap processed." : "PN532 tap was blocked."),
+      (success ? "RFID tap processed." : "RFID tap was blocked."),
     timestamp: log.timestamp || new Date().toISOString(),
     checkpoint,
     action,
@@ -405,14 +419,14 @@ const buildPn532EventFromLog = (log = {}) => {
     visitTime: "",
     visitSchedule: "",
     purpose: "",
-    attendanceScope: "PN532 device tap",
+    attendanceScope: "RFID reader tap",
     nfcCardId,
     physicalNfcUid,
     phoneNfcUid,
     virtualNfcToken,
     credentialType: metadata.credentialType || getCredentialType({ cardId: nfcCardId, physicalNfcUid, phoneNfcUid, virtualNfcToken }),
     status: log.status || "processed",
-    source: "pn532",
+    source: "rfid_reader",
     raw: log,
   };
 };
@@ -424,6 +438,7 @@ export default function NFCScanScreen({ navigation }) {
   const readerBufferTimerRef = useRef(null);
   const lastReaderInputAtRef = useRef(0);
   const lastPn532LogIdRef = useRef("");
+  const isSubmittingTapRef = useRef(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -447,19 +462,24 @@ export default function NFCScanScreen({ navigation }) {
     checked: false,
   });
   const [isScanningMobile, setIsScanningMobile] = useState(false);
+<<<<<<< HEAD
   const serialGatewayRef = useRef(new Esp32SerialGateway());
   const [serialStatus, setSerialStatus] = useState({ connected: false, port: null });
   const [serialLogs, setSerialLogs] = useState([]);
   const [showHardwareModal, setShowHardwareModal] = useState(false);
   const [showSimulateModal, setShowSimulateModal] = useState(false);
   const [offlinePendingCount, setOfflinePendingCount] = useState(0);
+=======
+  const [offlinePendingCount, setOfflinePendingCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   const radarPulseAnim = useRef(new Animated.Value(1)).current;
   const [pn532Monitor, setPn532Monitor] = useState({
     loading: false,
     online: false,
     lastCheckedAt: null,
     lastEvent: null,
-    message: "Waiting for PN532 device taps.",
+    message: "Waiting for USB RFID reader taps.",
   });
 
   const checkpointOptions = useMemo(
@@ -508,6 +528,15 @@ export default function NFCScanScreen({ navigation }) {
     const startIndex = (safePage - 1) * STATION_FEED_PAGE_SIZE;
     return stationEvents.slice(startIndex, startIndex + STATION_FEED_PAGE_SIZE);
   }, [stationEvents, stationFeedPage, stationFeedTotalPages]);
+  const stationAlertCount = useMemo(
+    () => offlinePendingCount + stationEvents.filter((event) => event?.success === false).length,
+    [offlinePendingCount, stationEvents],
+  );
+
+  const stationIssues = useMemo(
+    () => stationEvents.filter((event) => event?.success === false).slice(0, 5),
+    [stationEvents],
+  );
 
   useEffect(() => {
     if (stationFeedPage > stationFeedTotalPages) {
@@ -570,6 +599,12 @@ export default function NFCScanScreen({ navigation }) {
         syncedCount++;
       } catch (e) {
         console.warn("Failed to sync queued tap:", e);
+<<<<<<< HEAD
+=======
+        if (!isRetryableTapError(e)) {
+          await RfidOfflineQueue.removeTap(tap.id);
+        }
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
       }
     }
     setBusy(false);
@@ -615,7 +650,11 @@ export default function NFCScanScreen({ navigation }) {
         const normalized = normalizeRfidReaderInput(rawUid);
         if (normalized) {
           await triggerTapFeedback("success");
+<<<<<<< HEAD
           handleSubmitTap(normalized);
+=======
+          await handleSubmitTap(normalized);
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
         }
       });
       await NfcManager.registerTagEvent();
@@ -664,6 +703,7 @@ export default function NFCScanScreen({ navigation }) {
     }
   }, [isScanningMobile]);
 
+<<<<<<< HEAD
   // Web Serial Gateway Event Listeners
   useEffect(() => {
     if (Platform.OS !== "web") return undefined;
@@ -689,6 +729,8 @@ export default function NFCScanScreen({ navigation }) {
     };
   }, [selectedAction, selectedCheckpointKey, isOperatorAllowed]);
 
+=======
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   // Web USB Wedge Scanner Keystroke Buffer
   useEffect(() => {
     if (loading || Platform.OS !== "web" || !isOperatorAllowed) return undefined;
@@ -701,6 +743,7 @@ export default function NFCScanScreen({ navigation }) {
     return () => wedgeScanner.stop();
   }, [loading, isOperatorAllowed, selectedAction, selectedCheckpointKey]);
 
+<<<<<<< HEAD
   const handleConnectSerial = async () => {
     try {
       await serialGatewayRef.current.connect({ baudRate: 115200 });
@@ -715,6 +758,8 @@ export default function NFCScanScreen({ navigation }) {
     } catch (error) {}
   };
 
+=======
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   useEffect(() => {
     if (loading) return undefined;
     const timer = setTimeout(() => cardInputRef.current?.focus?.(), 350);
@@ -839,7 +884,7 @@ export default function NFCScanScreen({ navigation }) {
       loading: true,
       message:
         manual || !current.message || current.message.includes("Failed to fetch")
-          ? "Checking PN532 device logs..."
+          ? "Checking RFID reader logs..."
           : current.message,
     }));
     try {
@@ -854,8 +899,8 @@ export default function NFCScanScreen({ navigation }) {
           lastCheckedAt: new Date().toISOString(),
           lastEvent: current.lastEvent,
           message: current.lastEvent
-            ? "No newer PN532 taps yet. Auto-refresh is still checking."
-            : "No PN532 taps found yet. Tap a card on the ESP32 reader.",
+            ? "No newer RFID reader taps yet. Auto-refresh is still checking."
+            : "No RFID taps found yet. Tap a card on the USB reader.",
         }));
         return;
       }
@@ -870,7 +915,7 @@ export default function NFCScanScreen({ navigation }) {
         online: true,
         lastCheckedAt: new Date().toISOString(),
         lastEvent: event,
-        message: event.success ? "PN532 scan received." : "PN532 scan received but blocked.",
+        message: event.success ? "RFID scan received." : "RFID scan received but blocked.",
       });
 
       if (announceNew && isNewLog) {
@@ -887,7 +932,7 @@ export default function NFCScanScreen({ navigation }) {
         message:
           manual || !current.lastEvent
             ? "Could not reach the SafePass server. Auto-refresh will keep retrying."
-            : "Auto-refresh could not reach the server. Keeping the latest PN532 tap on screen.",
+            : "Auto-refresh could not reach the server. Keeping the latest RFID tap on screen.",
       }));
     }
   };
@@ -951,25 +996,30 @@ export default function NFCScanScreen({ navigation }) {
       return;
     }
 
+    if (isSubmittingTapRef.current) return;
+
     readerBufferRef.current = "";
     setCardId("");
+    isSubmittingTapRef.current = true;
     setBusy(true);
+    const tapData = {
+      nfcCardId: normalizedCardId,
+      uid: normalizedCardId,
+      cardUid: normalizedCardId,
+      pn532Uid: normalizedCardId,
+      action: selectedAction,
+      floor: selectedCheckpoint.floor,
+      office: selectedCheckpoint.office,
+      checkpointId: selectedCheckpoint.key,
+      checkpointName: selectedCheckpoint.label,
+      coordinates: selectedCheckpoint.coordinates || undefined,
+      readerId: selectedCheckpoint.key,
+      deviceId: selectedCheckpoint.key === "usb_rfid_reader" ? "usb-rfid-reader-01" : "mobile-checkpoint-station",
+      source: selectedCheckpoint.key === "usb_rfid_reader" ? "usb_rfid_reader" : "mobile-checkpoint-station",
+      clientTapId: createClientTapId(),
+    };
     try {
-      const response = await ApiService.submitCheckpointTap({
-        nfcCardId: normalizedCardId,
-        uid: normalizedCardId,
-        cardUid: normalizedCardId,
-        pn532Uid: normalizedCardId,
-        action: selectedAction,
-        floor: selectedCheckpoint.floor,
-        office: selectedCheckpoint.office,
-        checkpointId: selectedCheckpoint.key,
-        checkpointName: selectedCheckpoint.label,
-        coordinates: selectedCheckpoint.coordinates || undefined,
-        readerId: selectedCheckpoint.key,
-        deviceId: selectedCheckpoint.key === "pn532_reader" ? "esp32-pn532-01" : "mobile-checkpoint-station",
-        source: selectedCheckpoint.key === "pn532_reader" ? "pn532_reader" : "mobile-checkpoint-station",
-      });
+      const response = await ApiService.submitCheckpointTap(tapData);
       const personDetails = getPersonDetails(response);
 
       const event = {
@@ -1011,6 +1061,28 @@ export default function NFCScanScreen({ navigation }) {
       await triggerTapFeedback("success");
       focusReader();
     } catch (error) {
+      if (isRetryableTapError(error)) {
+        await RfidOfflineQueue.queueTap(tapData);
+        await checkOfflineQueue();
+        const queuedEvent = {
+          success: false,
+          message: "Connection unavailable. This tap was saved locally and can be synced when the checkpoint is online.",
+          timestamp: new Date().toISOString(),
+          checkpoint: selectedCheckpoint.label,
+          action: selectedAction,
+          userType: "unknown",
+          name: normalizedCardId,
+          nfcCardId: normalizedCardId,
+          status: "queued_offline",
+          raw: error?.data || {},
+        };
+        setLatestResult(queuedEvent);
+        recordLocalEvent(queuedEvent);
+        await triggerTapFeedback("error");
+        Alert.alert("Tap Saved Offline", queuedEvent.message);
+        return;
+      }
+
       const errorData = error?.data || {};
       const personDetails = getPersonDetails({
         ...errorData,
@@ -1050,6 +1122,7 @@ export default function NFCScanScreen({ navigation }) {
       await triggerTapFeedback("error");
       Alert.alert("Tap Failed", failedEvent.message);
     } finally {
+      isSubmittingTapRef.current = false;
       setBusy(false);
       setCardId("");
       focusReader();
@@ -1123,15 +1196,30 @@ export default function NFCScanScreen({ navigation }) {
                 dedicated reader station.
               </Text>
             </View>
-            <View style={[styles.headerBadge, !isAllowed && styles.headerBadgeWarning]}>
-              <Ionicons
-                name={isAllowed ? "shield-checkmark-outline" : "alert-circle-outline"}
-                size={17}
-                color={isAllowed ? "#BBF7D0" : "#FDE68A"}
-              />
-              <Text style={[styles.headerBadgeText, !isAllowed && styles.headerBadgeTextWarning]}>
-                {isAllowed ? "Authorized" : "Read Only"}
-              </Text>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={() => setShowNotifications(true)}
+                accessibilityRole="button"
+                accessibilityLabel={stationAlertCount ? `${stationAlertCount} NFC notifications` : "NFC notifications"}
+              >
+                <Ionicons name="notifications-outline" size={21} color="#FFFFFF" />
+                {stationAlertCount > 0 ? (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>{stationAlertCount > 99 ? "99+" : stationAlertCount}</Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+              <View style={[styles.headerBadge, !isAllowed && styles.headerBadgeWarning]}>
+                <Ionicons
+                  name={isAllowed ? "shield-checkmark-outline" : "alert-circle-outline"}
+                  size={17}
+                  color={isAllowed ? "#BBF7D0" : "#FDE68A"}
+                />
+                <Text style={[styles.headerBadgeText, !isAllowed && styles.headerBadgeTextWarning]}>
+                  {isAllowed ? "Authorized" : "Read Only"}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -1231,6 +1319,7 @@ export default function NFCScanScreen({ navigation }) {
                   <View style={[styles.hardwareBadgeDot, { backgroundColor: "#10B981" }]} />
                   <Text style={styles.hardwareBadgeText}>⌨️ USB Wedge Buffer Active</Text>
                 </View>
+<<<<<<< HEAD
                 {Esp32SerialGateway.isSupported() ? (
                   <TouchableOpacity
                     style={[
@@ -1270,6 +1359,8 @@ export default function NFCScanScreen({ navigation }) {
                     Test Cards / HCE
                   </Text>
                 </TouchableOpacity>
+=======
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
               </View>
             </View>
           )}
@@ -1381,7 +1472,7 @@ export default function NFCScanScreen({ navigation }) {
                 <Text style={styles.readerHintText}>
                   {Platform.OS === "web"
                     ? "This station auto-arms the reader. Tap a card anywhere on this screen."
-                    : "On mobile, paste or type the UID, then process the tap. PN532 device taps still appear below."}
+                    : "On mobile, paste or type the UID, then process the tap. USB RFID reader taps still appear below."}
                 </Text>
               </View>
               <View style={[styles.inlineActions, isNarrowStation && styles.inlineActionsCompact]}>
@@ -1415,11 +1506,11 @@ export default function NFCScanScreen({ navigation }) {
             <View style={styles.pn532Panel}>
               <View style={styles.pn532PanelHeader}>
                 <View>
-                  <Text style={styles.readerPanelLabel}>PN532 Device</Text>
+                  <Text style={styles.readerPanelLabel}>RFID Reader Status</Text>
                   <Text style={styles.pn532PanelTitle}>
                     {pn532Monitor.lastEvent?.nfcCardId
                       ? `Last UID: ${pn532Monitor.lastEvent.nfcCardId}`
-                      : "Waiting for PN532 scan"}
+                      : "Waiting for USB RFID scan"}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -1469,7 +1560,7 @@ export default function NFCScanScreen({ navigation }) {
                 </View>
                 <View style={styles.pn532StatusCopy}>
                   <Text style={styles.pn532StatusTitle}>
-                    {pn532Monitor.lastEvent?.name || "No PN532 tap received"}
+                    {pn532Monitor.lastEvent?.name || "No RFID tap received"}
                   </Text>
                   <Text style={styles.pn532StatusText}>
                     {pn532Monitor.lastEvent?.message || pn532Monitor.message}
@@ -1482,7 +1573,7 @@ export default function NFCScanScreen({ navigation }) {
                         : "",
                       pn532Monitor.lastEvent?.status ? formatRoleLabel(pn532Monitor.lastEvent.status) : "",
                       pn532Monitor.lastEvent?.timestamp ? formatDateTime(pn532Monitor.lastEvent.timestamp) : "",
-                    ].filter(Boolean).join(" | ") || "The latest PN532 UID/result will appear here."}
+                    ].filter(Boolean).join(" | ") || "The latest RFID UID/result will appear here."}
                   </Text>
                 </View>
               </View>
@@ -1843,6 +1934,7 @@ export default function NFCScanScreen({ navigation }) {
         </View>
       </ScrollView>
 
+<<<<<<< HEAD
       {/* Hardware Console Modal */}
       <Modal
         visible={showHardwareModal}
@@ -1860,10 +1952,31 @@ export default function NFCScanScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.modalCloseBtn}
                 onPress={() => setShowHardwareModal(false)}
+=======
+      <Modal
+        visible={showNotifications}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNotifications(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.notificationPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Ionicons name="notifications-outline" size={22} color="#0A3D91" />
+                <Text style={styles.modalTitle}>NFC Notifications</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowNotifications(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close notifications"
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
               >
                 <Ionicons name="close" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
+<<<<<<< HEAD
 
             <View style={styles.modalContent}>
               <View style={styles.consoleStatusRow}>
@@ -1922,10 +2035,43 @@ export default function NFCScanScreen({ navigation }) {
                 </ScrollView>
               </View>
             </View>
+=======
+            <ScrollView style={styles.notificationPanelContent}>
+              {offlinePendingCount > 0 ? (
+                <View style={styles.notificationIssueCard}>
+                  <Ionicons name="cloud-offline-outline" size={20} color="#B45309" />
+                  <View style={styles.notificationIssueCopy}>
+                    <Text style={styles.notificationIssueTitle}>Offline taps waiting to sync</Text>
+                    <Text style={styles.notificationIssueText}>
+                      {offlinePendingCount} tap{offlinePendingCount === 1 ? " is" : "s are"} stored on this device. Use “Sync Now” when the connection returns.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+              {stationIssues.map((issue, index) => (
+                <View key={`${issue.timestamp}-${index}`} style={styles.notificationIssueCard}>
+                  <Ionicons name="alert-circle-outline" size={20} color="#B91C1C" />
+                  <View style={styles.notificationIssueCopy}>
+                    <Text style={styles.notificationIssueTitle}>{issue.checkpoint || "NFC tap needs attention"}</Text>
+                    <Text style={styles.notificationIssueText}>{issue.message || "The NFC tap could not be processed."}</Text>
+                    <Text style={styles.notificationIssueTime}>{formatDateTime(issue.timestamp)}</Text>
+                  </View>
+                </View>
+              ))}
+              {!offlinePendingCount && !stationIssues.length ? (
+                <View style={styles.notificationEmptyState}>
+                  <Ionicons name="checkmark-circle-outline" size={34} color="#16A34A" />
+                  <Text style={styles.notificationEmptyTitle}>All clear</Text>
+                  <Text style={styles.notificationIssueText}>There are no failed or queued NFC taps.</Text>
+                </View>
+              ) : null}
+            </ScrollView>
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
           </View>
         </View>
       </Modal>
 
+<<<<<<< HEAD
       {/* Simulate Card / HCE Modal */}
       <Modal
         visible={showSimulateModal}
@@ -1979,6 +2125,8 @@ export default function NFCScanScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+=======
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
     </SafeAreaView>
   );
 }
@@ -2140,6 +2288,41 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: "#D8E8FF",
     maxWidth: 760,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  notificationButton: {
+    position: "relative",
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1451A6",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.42)",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 4,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#DC2626",
+    borderWidth: 2,
+    borderColor: "#082A63",
+  },
+  notificationBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
   headerBadge: {
     flexDirection: "row",
@@ -3374,6 +3557,64 @@ const styles = StyleSheet.create({
   modalContent: {
     padding: 18,
   },
+<<<<<<< HEAD
+=======
+  notificationPanel: {
+    width: "100%",
+    maxWidth: 520,
+    maxHeight: "78%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    overflow: "hidden",
+    ...CARD_SHADOW,
+  },
+  notificationPanelContent: {
+    padding: 16,
+  },
+  notificationIssueCard: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderRadius: 14,
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+  },
+  notificationIssueCopy: {
+    flex: 1,
+  },
+  notificationIssueTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  notificationIssueText: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#475569",
+  },
+  notificationIssueTime: {
+    marginTop: 7,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  notificationEmptyState: {
+    alignItems: "center",
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  notificationEmptyTitle: {
+    marginTop: 8,
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#166534",
+  },
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   consoleStatusRow: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -363,12 +363,32 @@ export class Esp32SerialGateway {
 }
 
 const OFFLINE_QUEUE_KEY = "safepass:rfid:offline_queue:v1";
+<<<<<<< HEAD
+=======
+const MAX_OFFLINE_TAPS = 100;
+const MAX_OFFLINE_TAP_AGE_MS = 24 * 60 * 60 * 1000;
+
+const isCurrentOfflineTap = (tap) => {
+  if (!tap || typeof tap !== "object" || !tap.id || !tap.queuedAt) return false;
+  const queuedAt = new Date(tap.queuedAt).getTime();
+  return Number.isFinite(queuedAt) && Date.now() - queuedAt <= MAX_OFFLINE_TAP_AGE_MS;
+};
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
 
 export const RfidOfflineQueue = {
   async getPendingTaps() {
     try {
       const stored = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
+<<<<<<< HEAD
       return stored ? JSON.parse(stored) : [];
+=======
+      const parsed = stored ? JSON.parse(stored) : [];
+      const items = Array.isArray(parsed) ? parsed.filter(isCurrentOfflineTap) : [];
+      if (stored && items.length !== (Array.isArray(parsed) ? parsed.length : 0)) {
+        await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(items));
+      }
+      return items;
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
     } catch (e) {
       return [];
     }
@@ -384,7 +404,11 @@ export const RfidOfflineQueue = {
           queuedAt: new Date().toISOString(),
           id: `queue_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
         },
+<<<<<<< HEAD
       ];
+=======
+      ].slice(-MAX_OFFLINE_TAPS);
+>>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
       await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(nextItems));
       return nextItems;
     } catch (e) {
