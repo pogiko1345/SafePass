@@ -921,10 +921,6 @@ export default StyleSheet.create({
     backgroundColor: "#EDE9FE",
   },
 
-  quickActionIconOrange: {
-    backgroundColor: "#FEF3C7",
-  },
-
   quickActionTitle: {
     fontSize: 14,
     fontWeight: "800",

@@ -32,6 +32,9 @@ const cloneUserRecord = (record) => ({
   firstName: record.firstName,
   lastName: record.lastName,
   phone: record.phone,
+  department: record.department || "",
+  position: record.position || "",
+  employeeId: record.employeeId || "",
   visitorId: record.visitorId || null,
   nfcCardId: record.nfcCardId || null,
   passwordResetOtpHash: record.passwordResetOtpHash || "",
@@ -78,8 +81,27 @@ const findStoredUser = (predicate) => {
   return record ? createUserDoc(record) : null;
 };
 
-const UserMock = {
-  findOne: async (query = {}) => {
+class UserMock {
+  constructor(data = {}) {
+    Object.assign(this, cloneUserRecord(data));
+    this._id = this._id || `user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  async comparePassword(candidatePassword) {
+    return candidatePassword === this.password;
+  }
+
+  async save() {
+    this.updatedAt = new Date();
+    persistDoc(this);
+    return this;
+  }
+
+  toObject() {
+    return { ...this };
+  }
+
+  static async findOne(query = {}) {
     if (query.$or) {
       return (
         query.$or
@@ -89,6 +111,9 @@ const UserMock = {
             }
             if (condition.username) {
               return findStoredUser((user) => user.username === condition.username);
+            }
+            if (condition.employeeId) {
+              return findStoredUser((user) => user.employeeId === condition.employeeId);
             }
             return null;
           })
@@ -101,17 +126,55 @@ const UserMock = {
         return Object.entries(query).every(([key, value]) => user[key] === value);
       }) || null
     );
-  },
+  }
 
-  findById: (id) => ({
-    select: async () => {
-      const user = findStoredUser((item) => item._id === id);
-      if (!user) return null;
-      delete user.password;
-      return user;
-    },
-  }),
-};
+  static findById(id) {
+    return {
+      select: async () => {
+        const user = findStoredUser((item) => item._id === id);
+        if (!user) return null;
+        delete user.password;
+        return user;
+      },
+    };
+  }
+
+  static async exists(query = {}) {
+    return Boolean(await UserMock.findOne(query));
+  }
+}
+
+class VisitorMock {
+  constructor(data = {}) {
+    Object.assign(this, data);
+    this._id = this._id || `vis-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  rejectRegistration(adminId, reason) {
+    this.approvalStatus = "rejected";
+    this.status = "rejected";
+    this.rejectionReason = reason;
+    this.rejectedBy = adminId;
+  }
+
+  async save() {
+    return this;
+  }
+
+  static async findById(id) {
+    if (id === "visitor-nonexistent") return null;
+    return new VisitorMock({
+      _id: id,
+      fullName: "Test Visitor",
+      email: "visitor.test@example.com",
+      status: "pending",
+      approvalStatus: "pending",
+      assignedOffice: "Registrar",
+      visitDate: new Date(),
+      visitTime: new Date(),
+    });
+  }
+}
 
 const AppSettingsMock = {
   findOneAndUpdate: async (_query, update = {}, _options = {}) => {
@@ -170,7 +233,6 @@ const NotificationMock = {
   create: async () => ({}),
 };
 
-const VisitorMock = {};
 const AttendanceRecordMock = {
   find: () => ({
     sort: () => ({
@@ -404,3 +466,194 @@ test("admin settings can be updated and then read back through the API", async (
   assert.equal(fetchResponse.body.settings.sessionTimeout, "45");
   assert.equal(fetchResponse.body.settings.backupFrequency, "weekly");
 });
+
+test("non-admin roles receive 403 Forbidden on admin-only routes", async () => {
+  persistDoc({
+    _id: "student-1",
+    email: "student@example.com",
+    username: "studentuser",
+    password: "StudentPass123",
+    role: "student",
+    status: "active",
+    isVerified: true,
+    firstName: "Student",
+    lastName: "User",
+  });
+
+  const studentToken = jwt.sign({ userId: "student-1" }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
+
+  const settingsResponse = await requestJson("/api/admin/settings", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${studentToken}` },
+    body: { maintenanceMode: true },
+  });
+  const createStaffResponse = await requestJson("/api/admin/staff/create", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${studentToken}` },
+    body: { firstName: "Test", lastName: "Staff", email: "test.staff@example.com" },
+  });
+  const rejectVisitorResponse = await requestJson("/api/admin/visitors/vis-1/reject", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${studentToken}` },
+    body: { reason: "Not allowed" },
+  });
+
+  assert.equal(settingsResponse.status, 403);
+  assert.equal(createStaffResponse.status, 403);
+  assert.equal(rejectVisitorResponse.status, 403);
+});
+
+test("admin can create a staff account and generates an audit log", async () => {
+  persistDoc({
+    _id: "admin-1",
+    email: "admin@example.com",
+    username: "adminuser",
+    password: "AdminPass123",
+    role: "admin",
+    status: "active",
+    isVerified: true,
+    firstName: "Admin",
+    lastName: "User",
+  });
+
+  const adminToken = jwt.sign({ userId: "admin-1" }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
+
+  const initialLogCount = state.accessLogSaves.length;
+
+  const createResponse = await requestJson("/api/admin/staff/create", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${adminToken}` },
+    body: {
+      firstName: "Maria",
+      lastName: "Santos",
+      email: "maria.santos@sapphire.edu",
+      department: "Registrar",
+      position: "Registrar Officer",
+      employeeId: "STF-2026-099",
+      phone: "09171234567",
+    },
+  });
+
+  assert.equal(createResponse.status, 201);
+  assert.equal(createResponse.body.success, true);
+  assert.equal(createResponse.body.user.email, "maria.santos@sapphire.edu");
+  assert.equal(createResponse.body.user.role, "staff");
+  assert.equal(createResponse.body.user.department, "Registrar");
+
+  // Verify that an audit log was created
+  assert.ok(state.accessLogSaves.length > initialLogCount);
+  const lastLog = state.accessLogSaves[state.accessLogSaves.length - 1];
+  assert.match(lastLog.notes, /Created staff account: maria\.santos@sapphire\.edu/i);
+});
+
+test("admin can create a security guard account", async () => {
+  persistDoc({
+    _id: "admin-1",
+    email: "admin@example.com",
+    username: "adminuser",
+    password: "AdminPass123",
+    role: "admin",
+    status: "active",
+    isVerified: true,
+    firstName: "Admin",
+    lastName: "User",
+  });
+
+  const adminToken = jwt.sign({ userId: "admin-1" }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
+
+  const createGuardResponse = await requestJson("/api/admin/security/create", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${adminToken}` },
+    body: {
+      firstName: "Pedro",
+      lastName: "Reyes",
+      email: "pedro.guard@sapphire.edu",
+      phone: "09181234567",
+      employeeId: "SEC-2026-088",
+      position: "Security Guard",
+    },
+  });
+
+  assert.equal(createGuardResponse.status, 201);
+  assert.equal(createGuardResponse.body.success, true);
+  assert.equal(createGuardResponse.body.user.email, "pedro.guard@sapphire.edu");
+  assert.ok(["guard", "security"].includes(createGuardResponse.body.user.role));
+});
+
+test("admin staff creation rejects duplicate employeeId or email", async () => {
+  persistDoc({
+    _id: "admin-1",
+    email: "admin@example.com",
+    username: "adminuser",
+    password: "AdminPass123",
+    role: "admin",
+    status: "active",
+    isVerified: true,
+    firstName: "Admin",
+    lastName: "User",
+  });
+  persistDoc({
+    _id: "existing-staff-1",
+    email: "existing.staff@sapphire.edu",
+    username: "existingstaff",
+    employeeId: "STF-2026-001",
+    role: "staff",
+    status: "active",
+    firstName: "Existing",
+    lastName: "Staff",
+  });
+
+  const adminToken = jwt.sign({ userId: "admin-1" }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
+
+  const duplicateResponse = await requestJson("/api/admin/staff/create", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${adminToken}` },
+    body: {
+      firstName: "New",
+      lastName: "Staff",
+      email: "existing.staff@sapphire.edu",
+      department: "Accounting",
+      employeeId: "STF-2026-001",
+    },
+  });
+
+  assert.equal(duplicateResponse.status, 400);
+  assert.equal(duplicateResponse.body.success, false);
+});
+
+test("admin can reject a visitor registration with reason and log activity", async () => {
+  persistDoc({
+    _id: "admin-1",
+    email: "admin@example.com",
+    username: "adminuser",
+    password: "AdminPass123",
+    role: "admin",
+    status: "active",
+    isVerified: true,
+    firstName: "Admin",
+    lastName: "User",
+  });
+
+  const adminToken = jwt.sign({ userId: "admin-1" }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
+
+  const rejectResponse = await requestJson("/api/admin/visitors/vis-test-1/reject", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${adminToken}` },
+    body: { reason: "Incomplete identification documents provided" },
+  });
+
+  assert.equal(rejectResponse.status, 200);
+  assert.equal(rejectResponse.body.success, true);
+  assert.match(rejectResponse.body.message, /Visitor rejected successfully/i);
+});
+
