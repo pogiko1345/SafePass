@@ -171,28 +171,49 @@ const reloadForChunkUpdate = () => {
 };
 
 class ChunkLoadRecoveryBoundary extends React.Component {
-  state = { hasChunkError: false };
+  state = { error: null, hasChunkError: false };
 
   static getDerivedStateFromError(error) {
-    return isChunkLoadFailure(error) ? { hasChunkError: true } : null;
+    return {
+      error,
+      hasChunkError: isChunkLoadFailure(error),
+    };
   }
 
-  componentDidCatch(error) {
+  componentDidCatch(error, errorInfo) {
+    // Keep the detailed error in the developer console, but never replace the
+    // whole visitor site with a blank white page for an end user.
+    console.error("SafePass screen failed to render.", error, errorInfo);
+
     if (
-      Platform.OS !== "web" ||
-      typeof window === "undefined" ||
-      !isChunkLoadFailure(error)
+      Platform.OS === "web" &&
+      typeof window !== "undefined" &&
+      isChunkLoadFailure(error)
     ) {
-      throw error;
+      reloadForChunkUpdate();
+    }
+  }
+
+  recover = () => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.location.reload();
+      return;
     }
 
-    reloadForChunkUpdate();
-  }
+    this.setState({ error: null, hasChunkError: false });
+  };
 
   render() {
-    if (!this.state.hasChunkError) {
+    if (!this.state.error) {
       return this.props.children;
     }
+
+    const title = this.state.hasChunkError
+      ? "SafePass was updated"
+      : "SafePass could not open this page";
+    const message = this.state.hasChunkError
+      ? "Refresh this page to load the latest visitor portal."
+      : "Please refresh and try again. If the problem continues, return to the visitor sign-in page.";
 
     return (
       <View
@@ -218,7 +239,7 @@ class ChunkLoadRecoveryBoundary extends React.Component {
             marginBottom: 8,
           }}
         >
-          SafePass was updated
+          {title}
         </Text>
         <Text
           style={{
@@ -228,11 +249,11 @@ class ChunkLoadRecoveryBoundary extends React.Component {
             marginBottom: 18,
           }}
         >
-          Refresh this page to load the latest staff dashboard.
+          {message}
         </Text>
         <Text
           accessibilityRole="button"
-          onPress={() => window.location.reload()}
+          onPress={this.recover}
           style={{
             color: brandColors.blue,
             fontSize: 14,
@@ -241,7 +262,7 @@ class ChunkLoadRecoveryBoundary extends React.Component {
             paddingVertical: 10,
           }}
         >
-          Refresh now
+          Try again
         </Text>
       </View>
     );

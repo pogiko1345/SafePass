@@ -1,5 +1,6 @@
 // webpack.config.js
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
+const path = require('path');
 
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
@@ -7,10 +8,15 @@ module.exports = async function (env, argv) {
   // This is the key fix - ignore the AsyncStorage resolution error
   config.resolve.fullySpecified = false;
 
-  // Add fallback for AsyncStorage on web
+  // Visitor screens persist their progress on web.  Resolving this package to
+  // `false` turns imports into an empty module, which crashes those screens at
+  // runtime.  Use the browser-safe storage adapter instead.
   config.resolve.alias = {
     ...config.resolve.alias,
-    '@react-native-async-storage/async-storage': false,
+    '@react-native-async-storage/async-storage': path.resolve(
+      __dirname,
+      'utils/webStorage.js',
+    ),
   };
 
   // OneDrive/Windows can lock files in the output folder and crash the clean step.

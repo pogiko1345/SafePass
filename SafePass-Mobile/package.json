@@ -12,7 +12,8 @@
     "preview:web": "npm run build:web && npm run serve:web",
     "build:web": "node scripts/cleanWebOutput.js && expo export:web",
     "build:web:visitor": "node scripts/runVisitorWeb.js build",
-    "vercel-build": "npm run build:web"
+    "vercel-build": "npm run build:web",
+    "vercel-build:visitor": "npm run build:web:visitor"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

@@ -28,9 +28,13 @@ import {
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
 import { useAviationTransition } from "../utils/AviationTransitionContext";
+import { makeRedirectUri } from "expo-auth-session";
 import * as GoogleSignIn from "expo-auth-session/providers/google";
 import * as FacebookAuth from "expo-auth-session/providers/facebook";
 import Constants from "expo-constants";
+
+const VISITOR_SOCIAL_SIGNUP_REDIRECT_URI =
+  Platform.OS === "web" ? makeRedirectUri({ path: "visitor-register" }) : undefined;
 
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({
@@ -54,7 +58,7 @@ const SuccessModal = ({
       visible={visible}
       transparent={true}
       animationType="fade"
-      onRequestClose={onConfirm}
+      onRequestClose={isVerified ? onConfirm : undefined}
     >
       <View style={visitorRegisterStyles.modalOverlay}>
         <View style={visitorRegisterStyles.successModalContainer}>
@@ -552,16 +556,19 @@ export default function VisitorRegisterScreen({ navigation, route }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [socialSignup, setSocialSignup] = useState(null);
   const [socialSignupBusy, setSocialSignupBusy] = useState("");
+  const [socialSignupNotice, setSocialSignupNotice] = useState(null);
   const googleClientId = Constants.expoConfig?.extra?.googleClientId;
   const facebookAppId = Constants.expoConfig?.extra?.facebookAppId;
   const [googleRequest, , promptGoogleSignUp] = GoogleSignIn.useIdTokenAuthRequest({
     webClientId: googleClientId,
     iosClientId: googleClientId,
     androidClientId: googleClientId,
+    redirectUri: VISITOR_SOCIAL_SIGNUP_REDIRECT_URI,
   });
   const [facebookRequest, , promptFacebookSignUp] = FacebookAuth.useAuthRequest({
     clientId: facebookAppId,
     scopes: ["public_profile", "email"],
+    redirectUri: VISITOR_SOCIAL_SIGNUP_REDIRECT_URI,
   });
   const screenFadeAnim = useRef(new Animated.Value(0.96)).current;
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -997,6 +1004,16 @@ export default function VisitorRegisterScreen({ navigation, route }) {
     if (!response?.signupToken || !profile?.email || !profile?.fullName) {
       throw new Error("The social provider did not return a usable account profile.");
     }
+    if (response.accountExists) {
+      setSocialSignup(null);
+      setExistingAccountEmail(String(profile.email).trim().toLowerCase());
+      setSocialSignupNotice({
+        type: "existing",
+        email: String(profile.email).trim().toLowerCase(),
+        message: "A SafePass account already exists for this verified email. Sign in instead, then connect this provider from your profile if needed.",
+      });
+      return;
+    }
     const suggestedUsername = String(profile.email).split("@")[0]
       .replace(/[^A-Za-z0-9._]/g, "")
       .slice(0, 24)
@@ -1011,12 +1028,12 @@ export default function VisitorRegisterScreen({ navigation, route }) {
     };
     setFormData(nextFormData);
     setSocialSignup({ provider, signupToken: response.signupToken });
+    setSocialSignupNotice({
+      type: "connected",
+      message: `${provider === "google" ? "Google" : "Facebook"} is connected. Your account has not been created yet—add a username and contact number, then continue to create your account and verify it before signing in.`,
+    });
     setErrors((previous) => ({ ...previous, fullName: "", email: "", password: "", confirmPassword: "" }));
     setCompletedFields((previous) => ({ ...previous, fullName: true, email: true }));
-    Alert.alert(
-      `${provider === "google" ? "Google" : "Facebook"} connected`,
-      "Your name and verified email were filled in. Add a username and contact number, then create your visitor account.",
-    );
   };
 
   const handleSocialSignup = async (provider) => {
@@ -1158,6 +1175,7 @@ export default function VisitorRegisterScreen({ navigation, route }) {
   };
 
   const handleSuccessConfirm = async () => {
+    if (!registeredVisitor?.isVerified) return;
     const loginIdentifier =
       registeredVisitor?.email ||
       registeredVisitor?.username ||
@@ -1680,6 +1698,39 @@ export default function VisitorRegisterScreen({ navigation, route }) {
                   <Text style={{ textAlign: "center", color: "#15803D", fontSize: 11, fontWeight: "700", marginTop: 7 }}>
                     {socialSignup.provider === "google" ? "Google" : "Facebook"} will be connected to this visitor account.
                   </Text>
+                ) : null}
+                {socialSignupNotice ? (
+                  <View
+                    style={{
+                      marginTop: 9,
+                      padding: 10,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: socialSignupNotice.type === "existing" ? "#FCD34D" : "#86EFAC",
+                      backgroundColor: socialSignupNotice.type === "existing" ? "#FFFBEB" : "#F0FDF4",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: socialSignupNotice.type === "existing" ? "#92400E" : "#166534",
+                        fontSize: 11,
+                        lineHeight: 16,
+                        fontWeight: "700",
+                        textAlign: "center",
+                      }}
+                    >
+                      {socialSignupNotice.message}
+                    </Text>
+                    {socialSignupNotice.type === "existing" ? (
+                      <TouchableOpacity
+                        style={{ marginTop: 8, alignSelf: "center", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 7, backgroundColor: "#0A3D91" }}
+                        onPress={() => goToVisitorLogin({ initialEmail: socialSignupNotice.email })}
+                        disabled={transitionBusy}
+                      >
+                        <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "900" }}>Go to Sign In</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
 

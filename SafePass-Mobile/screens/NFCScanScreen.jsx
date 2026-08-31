@@ -22,15 +22,7 @@ import ApiService from "../utils/ApiService";
 import {
   describeRfidReaderInput,
   normalizeRfidReaderInput,
-<<<<<<< HEAD
-  formatRfidHex,
-  isRfidUid,
-  playRfidChime,
   RfidKeystrokeBuffer,
-  Esp32SerialGateway,
-=======
-  RfidKeystrokeBuffer,
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   RfidOfflineQueue,
 } from "../utils/rfidReaderUtils";
 import {
@@ -462,17 +454,8 @@ export default function NFCScanScreen({ navigation }) {
     checked: false,
   });
   const [isScanningMobile, setIsScanningMobile] = useState(false);
-<<<<<<< HEAD
-  const serialGatewayRef = useRef(new Esp32SerialGateway());
-  const [serialStatus, setSerialStatus] = useState({ connected: false, port: null });
-  const [serialLogs, setSerialLogs] = useState([]);
-  const [showHardwareModal, setShowHardwareModal] = useState(false);
-  const [showSimulateModal, setShowSimulateModal] = useState(false);
-  const [offlinePendingCount, setOfflinePendingCount] = useState(0);
-=======
   const [offlinePendingCount, setOfflinePendingCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   const radarPulseAnim = useRef(new Animated.Value(1)).current;
   const [pn532Monitor, setPn532Monitor] = useState({
     loading: false,
@@ -599,12 +582,9 @@ export default function NFCScanScreen({ navigation }) {
         syncedCount++;
       } catch (e) {
         console.warn("Failed to sync queued tap:", e);
-<<<<<<< HEAD
-=======
         if (!isRetryableTapError(e)) {
           await RfidOfflineQueue.removeTap(tap.id);
         }
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
       }
     }
     setBusy(false);
@@ -650,11 +630,7 @@ export default function NFCScanScreen({ navigation }) {
         const normalized = normalizeRfidReaderInput(rawUid);
         if (normalized) {
           await triggerTapFeedback("success");
-<<<<<<< HEAD
-          handleSubmitTap(normalized);
-=======
           await handleSubmitTap(normalized);
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
         }
       });
       await NfcManager.registerTagEvent();
@@ -703,34 +679,6 @@ export default function NFCScanScreen({ navigation }) {
     }
   }, [isScanningMobile]);
 
-<<<<<<< HEAD
-  // Web Serial Gateway Event Listeners
-  useEffect(() => {
-    if (Platform.OS !== "web") return undefined;
-    const gateway = serialGatewayRef.current;
-    const unsubScan = gateway.on("scan", (event) => {
-      if (event?.uid) {
-        handleSubmitTap(event.uid);
-      }
-    });
-    const unsubStatus = gateway.on("status", (status) => {
-      setSerialStatus(status);
-    });
-    const unsubLog = gateway.on("log", (log) => {
-      setSerialLogs((prev) => [
-        `[${new Date().toLocaleTimeString()}] ${log}`,
-        ...prev.slice(0, 49),
-      ]);
-    });
-    return () => {
-      unsubScan();
-      unsubStatus();
-      unsubLog();
-    };
-  }, [selectedAction, selectedCheckpointKey, isOperatorAllowed]);
-
-=======
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   // Web USB Wedge Scanner Keystroke Buffer
   useEffect(() => {
     if (loading || Platform.OS !== "web" || !isOperatorAllowed) return undefined;
@@ -743,23 +691,6 @@ export default function NFCScanScreen({ navigation }) {
     return () => wedgeScanner.stop();
   }, [loading, isOperatorAllowed, selectedAction, selectedCheckpointKey]);
 
-<<<<<<< HEAD
-  const handleConnectSerial = async () => {
-    try {
-      await serialGatewayRef.current.connect({ baudRate: 115200 });
-    } catch (error) {
-      Alert.alert("Hardware Connection", error?.message || "Could not connect to USB serial device.");
-    }
-  };
-
-  const handleDisconnectSerial = async () => {
-    try {
-      await serialGatewayRef.current.disconnect();
-    } catch (error) {}
-  };
-
-=======
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   useEffect(() => {
     if (loading) return undefined;
     const timer = setTimeout(() => cardInputRef.current?.focus?.(), 350);
@@ -1319,48 +1250,6 @@ export default function NFCScanScreen({ navigation }) {
                   <View style={[styles.hardwareBadgeDot, { backgroundColor: "#10B981" }]} />
                   <Text style={styles.hardwareBadgeText}>⌨️ USB Wedge Buffer Active</Text>
                 </View>
-<<<<<<< HEAD
-                {Esp32SerialGateway.isSupported() ? (
-                  <TouchableOpacity
-                    style={[
-                      styles.hardwareActionChip,
-                      serialStatus.connected && styles.hardwareActionChipActive,
-                    ]}
-                    onPress={serialStatus.connected ? handleDisconnectSerial : handleConnectSerial}
-                  >
-                    <Ionicons
-                      name={serialStatus.connected ? "link" : "hardware-chip-outline"}
-                      size={15}
-                      color={serialStatus.connected ? "#166534" : "#0A3D91"}
-                    />
-                    <Text
-                      style={[
-                        styles.hardwareActionChipText,
-                        serialStatus.connected && styles.hardwareActionChipTextActive,
-                      ]}
-                    >
-                      {serialStatus.connected ? "ESP32 USB Connected" : "Connect ESP32 / Arduino"}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-                <TouchableOpacity
-                  style={styles.hardwareActionChip}
-                  onPress={() => setShowHardwareModal(true)}
-                >
-                  <Ionicons name="terminal-outline" size={15} color="#0A3D91" />
-                  <Text style={styles.hardwareActionChipText}>Hardware Console</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.hardwareActionChip}
-                  onPress={() => setShowSimulateModal(true)}
-                >
-                  <Ionicons name="flash-outline" size={15} color="#D97706" />
-                  <Text style={[styles.hardwareActionChipText, { color: "#D97706" }]}>
-                    Test Cards / HCE
-                  </Text>
-                </TouchableOpacity>
-=======
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
               </View>
             </View>
           )}
@@ -1934,25 +1823,6 @@ export default function NFCScanScreen({ navigation }) {
         </View>
       </ScrollView>
 
-<<<<<<< HEAD
-      {/* Hardware Console Modal */}
-      <Modal
-        visible={showHardwareModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowHardwareModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTitleRow}>
-                <Ionicons name="terminal-outline" size={22} color="#0A3D91" />
-                <Text style={styles.modalTitle}>Hardware Scanner Console</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowHardwareModal(false)}
-=======
       <Modal
         visible={showNotifications}
         transparent
@@ -1971,71 +1841,10 @@ export default function NFCScanScreen({ navigation }) {
                 onPress={() => setShowNotifications(false)}
                 accessibilityRole="button"
                 accessibilityLabel="Close notifications"
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
               >
                 <Ionicons name="close" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
-<<<<<<< HEAD
-
-            <View style={styles.modalContent}>
-              <View style={styles.consoleStatusRow}>
-                <View style={styles.consoleStatusPill}>
-                  <View
-                    style={[
-                      styles.consoleStatusDot,
-                      { backgroundColor: serialStatus.connected ? "#10B981" : "#EF4444" },
-                    ]}
-                  />
-                  <Text style={styles.consoleStatusText}>
-                    Web Serial: {serialStatus.connected ? "Connected (115200)" : "Disconnected"}
-                  </Text>
-                </View>
-                <View style={styles.consoleActionsRow}>
-                  {Esp32SerialGateway.isSupported() ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.consoleBtn,
-                        serialStatus.connected && styles.consoleBtnDanger,
-                      ]}
-                      onPress={serialStatus.connected ? handleDisconnectSerial : handleConnectSerial}
-                    >
-                      <Text style={styles.consoleBtnText}>
-                        {serialStatus.connected ? "Disconnect" : "Connect Port"}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.consoleUnavailableText}>
-                      Web Serial unavailable in this browser
-                    </Text>
-                  )}
-                  <TouchableOpacity
-                    style={styles.consoleBtnOutline}
-                    onPress={() => setSerialLogs([])}
-                  >
-                    <Text style={styles.consoleBtnOutlineText}>Clear Log</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.terminalContainer}>
-                <Text style={styles.terminalHeader}>ESP32 / ARDUINO SERIAL STREAM</Text>
-                <ScrollView style={styles.terminalScroll} nestedScrollEnabled>
-                  {serialLogs.length === 0 ? (
-                    <Text style={styles.terminalEmptyText}>
-                      No serial packets received yet. Connect a USB device or send card taps.
-                    </Text>
-                  ) : (
-                    serialLogs.map((logLine, idx) => (
-                      <Text key={idx} style={styles.terminalLine}>
-                        {logLine}
-                      </Text>
-                    ))
-                  )}
-                </ScrollView>
-              </View>
-            </View>
-=======
             <ScrollView style={styles.notificationPanelContent}>
               {offlinePendingCount > 0 ? (
                 <View style={styles.notificationIssueCard}>
@@ -2066,67 +1875,10 @@ export default function NFCScanScreen({ navigation }) {
                 </View>
               ) : null}
             </ScrollView>
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
           </View>
         </View>
       </Modal>
 
-<<<<<<< HEAD
-      {/* Simulate Card / HCE Modal */}
-      <Modal
-        visible={showSimulateModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSimulateModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTitleRow}>
-                <Ionicons name="flash-outline" size={22} color="#D97706" />
-                <Text style={styles.modalTitle}>Test Tap / Android HCE Simulator</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowSimulateModal(false)}
-              >
-                <Ionicons name="close" size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalContent}>
-              <Text style={styles.simSubtitle}>
-                Select a preset virtual card or Android HCE pass to test check-in / check-out processing:
-              </Text>
-              <View style={styles.simPresetList}>
-                {[
-                  { label: "Registered Visitor Card", uid: "04A1B2C3D4", type: "Visitor Physical Tag" },
-                  { label: "Student RFID Pass", uid: "087E2396", type: "Student NFC UID" },
-                  { label: "Faculty / Staff Card", uid: "A1B2C3D4E5", type: "Staff Tag" },
-                  { label: "Android SafePass HCE Pass", uid: "5AFE99887766", type: "Android HCE Token" },
-                ].map((item) => (
-                  <TouchableOpacity
-                    key={item.uid}
-                    style={styles.simPresetCard}
-                    onPress={() => {
-                      setShowSimulateModal(false);
-                      handleSubmitTap(item.uid);
-                    }}
-                  >
-                    <View>
-                      <Text style={styles.simPresetTitle}>{item.label}</Text>
-                      <Text style={styles.simPresetMeta}>UID: {formatRfidHex(item.uid)} • {item.type}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#0A3D91" />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
-=======
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
     </SafeAreaView>
   );
 }
@@ -3557,8 +3309,6 @@ const styles = StyleSheet.create({
   modalContent: {
     padding: 18,
   },
-<<<<<<< HEAD
-=======
   notificationPanel: {
     width: "100%",
     maxWidth: 520,
@@ -3614,7 +3364,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: "#166534",
   },
->>>>>>> cd88f95bb951a49909d9fa64d710fe9dbb858a8a
   consoleStatusRow: {
     flexDirection: "row",
     justifyContent: "space-between",

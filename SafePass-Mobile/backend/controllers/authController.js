@@ -293,12 +293,26 @@ const getSocialSignupProfile = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Choose Google or Facebook.' });
     }
 
+    // The identity has already been verified by Google/Facebook, so it is safe
+    // to tell this person whether it is already associated with SafePass. This
+    // avoids making them complete a registration form only to hit a duplicate
+    // account error at the final step.
+    const providerField = provider === 'google' ? 'googleId' : 'facebookId';
+    const existingAccount = await User.findOne({
+      $or: [{ [providerField]: profile.socialId }, { email: profile.email }],
+    }).select('_id');
+
     const signupToken = jwt.sign(
       { purpose, ...profile },
       getJwtSecret(),
       { expiresIn: '10m' },
     );
-    return res.json({ success: true, profile, signupToken });
+    return res.json({
+      success: true,
+      profile,
+      signupToken,
+      accountExists: Boolean(existingAccount),
+    });
   } catch (error) {
     console.error('Social sign-up profile error:', error);
     return res.status(401).json({ success: false, message: 'Unable to verify that social account.' });
