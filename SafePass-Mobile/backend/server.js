@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -1654,8 +1654,10 @@ const notificationIsAccessibleToUser = (notification, user) => {
   return roleAllowed && userAllowed;
 };
 
-const getFullName = (user = {}) =>
-  `${user.firstName || ""} ${user.lastName || ""}`.trim();
+const getFullName = (user) => {
+  if (!user) return "";
+  return `${user.firstName || ""} ${user.lastName || ""}`.trim();
+};
 
 const createSystemActivity = async ({
   actorUser = null,
