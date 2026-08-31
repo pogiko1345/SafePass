@@ -7933,7 +7933,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
                           Ready To Tap
                         </Text>
                         <Text style={visitorDashboardStyles.virtualNfcTapHintText}>
-                          Tap this phone on Android, or tap your assigned physical NFC card at the PN532 reader.
+                          Tap this phone on Android, or tap your assigned physical NFC card at the USB RFID reader.
                         </Text>
                       </View>
                     </View>
@@ -7949,7 +7949,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
               >
                 {[
                   "Use the card view above to confirm your approved visitor details.",
-                  "On Android, the SafePass APK can present this virtual card to the PN532 reader.",
+                  "On Android, the SafePass APK can present this virtual card to the USB RFID reader.",
                   "You can still tap your assigned physical NFC card at the lobby reader.",
                   "Security and admin monitoring will record the reader tap automatically.",
                 ].map((item) => (
