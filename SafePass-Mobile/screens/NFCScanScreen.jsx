@@ -22,15 +22,11 @@ import ApiService from "../utils/ApiService";
 import {
   describeRfidReaderInput,
   normalizeRfidReaderInput,
-<<<<<<< HEAD
-  RfidKeystrokeBuffer,
-=======
   formatRfidHex,
   isRfidUid,
   playRfidChime,
   RfidKeystrokeBuffer,
   Esp32SerialGateway,
->>>>>>> 0ea76876f5e985d51c8d513069b16eb1a9fd5757
   RfidOfflineQueue,
 } from "../utils/rfidReaderUtils";
 import {
@@ -462,14 +458,11 @@ export default function NFCScanScreen({ navigation }) {
     checked: false,
   });
   const [isScanningMobile, setIsScanningMobile] = useState(false);
-<<<<<<< HEAD
-=======
   const serialGatewayRef = useRef(new Esp32SerialGateway());
   const [serialStatus, setSerialStatus] = useState({ connected: false, port: null });
   const [serialLogs, setSerialLogs] = useState([]);
   const [showHardwareModal, setShowHardwareModal] = useState(false);
   const [showSimulateModal, setShowSimulateModal] = useState(false);
->>>>>>> 0ea76876f5e985d51c8d513069b16eb1a9fd5757
   const [offlinePendingCount, setOfflinePendingCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const radarPulseAnim = useRef(new Animated.Value(1)).current;
@@ -695,8 +688,6 @@ export default function NFCScanScreen({ navigation }) {
     }
   }, [isScanningMobile]);
 
-<<<<<<< HEAD
-=======
   // Web Serial Gateway Event Listeners
   useEffect(() => {
     if (Platform.OS !== "web") return undefined;
@@ -722,7 +713,6 @@ export default function NFCScanScreen({ navigation }) {
     };
   }, [selectedAction, selectedCheckpointKey, isOperatorAllowed]);
 
->>>>>>> 0ea76876f5e985d51c8d513069b16eb1a9fd5757
   // Web USB Wedge Scanner Keystroke Buffer
   useEffect(() => {
     if (loading || Platform.OS !== "web" || !isOperatorAllowed) return undefined;
@@ -735,8 +725,6 @@ export default function NFCScanScreen({ navigation }) {
     return () => wedgeScanner.stop();
   }, [loading, isOperatorAllowed, selectedAction, selectedCheckpointKey]);
 
-<<<<<<< HEAD
-=======
   const handleConnectSerial = async () => {
     try {
       await serialGatewayRef.current.connect({ baudRate: 115200 });
@@ -751,7 +739,6 @@ export default function NFCScanScreen({ navigation }) {
     } catch (error) {}
   };
 
->>>>>>> 0ea76876f5e985d51c8d513069b16eb1a9fd5757
   useEffect(() => {
     if (loading) return undefined;
     const timer = setTimeout(() => cardInputRef.current?.focus?.(), 350);
@@ -1311,8 +1298,6 @@ export default function NFCScanScreen({ navigation }) {
                   <View style={[styles.hardwareBadgeDot, { backgroundColor: "#10B981" }]} />
                   <Text style={styles.hardwareBadgeText}>⌨️ USB Wedge Buffer Active</Text>
                 </View>
-<<<<<<< HEAD
-=======
                 {Esp32SerialGateway.isSupported() ? (
                   <TouchableOpacity
                     style={[
@@ -1352,7 +1337,6 @@ export default function NFCScanScreen({ navigation }) {
                     Test Cards / HCE
                   </Text>
                 </TouchableOpacity>
->>>>>>> 0ea76876f5e985d51c8d513069b16eb1a9fd5757
               </View>
             </View>
           )}
@@ -1926,26 +1910,6 @@ export default function NFCScanScreen({ navigation }) {
         </View>
       </ScrollView>
 
-<<<<<<< HEAD
-      <Modal
-        visible={showNotifications}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowNotifications(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.notificationPanel}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTitleRow}>
-                <Ionicons name="notifications-outline" size={22} color="#0A3D91" />
-                <Text style={styles.modalTitle}>NFC Notifications</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowNotifications(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Close notifications"
-=======
       {/* Hardware Console Modal */}
       <Modal
         visible={showHardwareModal}
@@ -1963,13 +1927,10 @@ export default function NFCScanScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.modalCloseBtn}
                 onPress={() => setShowHardwareModal(false)}
->>>>>>> 0ea76876f5e985d51c8d513069b16eb1a9fd5757
               >
                 <Ionicons name="close" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
-<<<<<<< HEAD
-=======
 
             <View style={styles.modalContent}>
               <View style={styles.consoleStatusRow}>
@@ -2054,7 +2015,6 @@ export default function NFCScanScreen({ navigation }) {
                 <Ionicons name="close" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
->>>>>>> 0ea76876f5e985d51c8d513069b16eb1a9fd5757
             <ScrollView style={styles.notificationPanelContent}>
               {offlinePendingCount > 0 ? (
                 <View style={styles.notificationIssueCard}>
@@ -2089,8 +2049,6 @@ export default function NFCScanScreen({ navigation }) {
         </View>
       </Modal>
 
-<<<<<<< HEAD
-=======
       {/* Simulate Card / HCE Modal */}
       <Modal
         visible={showSimulateModal}
@@ -2144,7 +2102,6 @@ export default function NFCScanScreen({ navigation }) {
           </View>
         </View>
       </Modal>
->>>>>>> 0ea76876f5e985d51c8d513069b16eb1a9fd5757
     </SafeAreaView>
   );
 }
