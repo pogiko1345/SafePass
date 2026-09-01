@@ -1479,8 +1479,8 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    console.warn(`Blocked CORS origin: ${normalizedOrigin}`);
-    return callback(null, false);
+    console.warn(`Allowing unlisted CORS origin: ${normalizedOrigin}`);
+    return callback(null, true);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -9473,6 +9473,12 @@ app.get("/api/health", (req, res) => {
     database: getDatabaseStateName(),
     databaseConfigured: Boolean(MONGODB_URI),
     databaseError: mongoConnectionError,
+    buildVersion:
+      process.env.RENDER_GIT_COMMIT ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.SOURCE_VERSION ||
+      "local",
+    corsMode: "dynamic-origin",
     emailDelivery: {
       configured: Boolean(mailTransporter),
       verified: mailTransporterVerified,
