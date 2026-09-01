@@ -1,5 +1,6 @@
 ﻿import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 let AsyncStorage;
 
 if (Platform.OS === 'web') {
@@ -10,6 +11,28 @@ if (Platform.OS === 'web') {
 import * as ImageManipulator from 'expo-image-manipulator';
 
 const DEPLOYED_API_BASE_URL = "https://safepass-052h.onrender.com/api";
+
+const isPrivateNetworkHost = (hostname = "") =>
+  hostname === "localhost" ||
+  hostname === "127.0.0.1" ||
+  hostname.startsWith("192.168.") ||
+  hostname.startsWith("10.") ||
+  /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+
+const getExpoDevServerApiBaseUrl = () => {
+  const hostUri =
+    Constants?.expoConfig?.hostUri ||
+    Constants?.manifest2?.extra?.expoClient?.hostUri ||
+    Constants?.manifest?.debuggerHost ||
+    "";
+  const hostname = String(hostUri).split(":")[0].trim();
+
+  if (!hostname || hostname === "localhost" || hostname === "127.0.0.1") {
+    return "";
+  }
+
+  return `http://${hostname}:5000/api`;
+};
 
 const WEB_FALLBACK_API_BASE_URL = (() => {
   if (
@@ -22,7 +45,7 @@ const WEB_FALLBACK_API_BASE_URL = (() => {
   }
 
   const hostname = window.location.hostname;
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
+  if (isPrivateNetworkHost(hostname)) {
     return `http://${hostname}:5000/api`;
   }
 
@@ -45,6 +68,7 @@ const API_BASE_URL_CANDIDATES = [
   API_BASE_URL,
   WEB_FALLBACK_API_BASE_URL,
   process.env.EXPO_PUBLIC_API_LAN_BASE_URL,
+  getExpoDevServerApiBaseUrl(),
   DEPLOYED_API_BASE_URL,
 ]
   .filter(Boolean)
@@ -147,6 +171,7 @@ const SENSITIVE_STORAGE_KEYS = [
   "authToken",
   "trustedDevice",
   "trustedUntil",
+  "trustedDeviceToken",
   REMEMBERED_SESSION_EXPIRES_AT_KEY,
 ];
 
@@ -162,12 +187,22 @@ const setSensitiveItem = async (key, value) => {
     return;
   }
 
-  if (normalizedValue == null) {
-    await SecureStore.deleteItemAsync(key);
-    return;
-  }
+  try {
+    if (normalizedValue == null) {
+      await SecureStore.deleteItemAsync(key);
+      await AsyncStorage.removeItem(key);
+      return;
+    }
 
-  await SecureStore.setItemAsync(key, normalizedValue);
+    await SecureStore.setItemAsync(key, normalizedValue);
+  } catch (error) {
+    logApiDebug(`[ApiService] SecureStore write failed for ${key}; using AsyncStorage fallback.`, error);
+    if (normalizedValue == null) {
+      await AsyncStorage.removeItem(key);
+    } else {
+      await AsyncStorage.setItem(key, normalizedValue);
+    }
+  }
 };
 
 const getSensitiveItem = async (key) => {
@@ -175,7 +210,14 @@ const getSensitiveItem = async (key) => {
     return AsyncStorage.getItem(key);
   }
 
-  return SecureStore.getItemAsync(key);
+  try {
+    const secureValue = await SecureStore.getItemAsync(key);
+    if (secureValue != null) return secureValue;
+  } catch (error) {
+    logApiDebug(`[ApiService] SecureStore read failed for ${key}; using AsyncStorage fallback.`, error);
+  }
+
+  return AsyncStorage.getItem(key);
 };
 
 const removeSensitiveItems = async (keys) => {
@@ -184,7 +226,16 @@ const removeSensitiveItems = async (keys) => {
     return;
   }
 
-  await Promise.all(keys.map((key) => SecureStore.deleteItemAsync(key)));
+  await Promise.all(
+    keys.map(async (key) => {
+      try {
+        await SecureStore.deleteItemAsync(key);
+      } catch (error) {
+        logApiDebug(`[ApiService] SecureStore delete failed for ${key}; clearing AsyncStorage fallback.`, error);
+      }
+      await AsyncStorage.removeItem(key);
+    }),
+  );
 };
 
 class ApiService {
@@ -195,7 +246,7 @@ class ApiService {
   }
 
   async clearTrustedDevice() {
-    await removeSensitiveItems(["trustedDevice", "trustedUntil"]);
+    await removeSensitiveItems(["trustedDevice", "trustedUntil", "trustedDeviceToken"]);
   }
 
   async rememberCurrentSession(durationMs = REMEMBERED_SESSION_DURATION_MS) {
@@ -1054,9 +1105,20 @@ async verifyCredentials(email, password) {
     try {
       await setSensitiveItem('trustedDevice', 'true');
       await setSensitiveItem('trustedUntil', String(Date.now() + TRUST_DEVICE_DURATION_MS));
+      const token = await this.getToken();
+      if (token) {
+        try {
+          const response = await this.fetch("/auth/trust-device", { method: "POST" });
+          if (response?.trustedDeviceToken) {
+            await setSensitiveItem("trustedDeviceToken", response.trustedDeviceToken);
+          }
+        } catch (error) {
+          logApiDebug("Server trust-device registration failed; keeping local trust state.", error);
+        }
+      }
       return { success: true };
     } catch (error) {
-      console.error("Trust device error:", error);
+      logApiDebug("Trust device error:", error);
       return { success: false };
     }
   }

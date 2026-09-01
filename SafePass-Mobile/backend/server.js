@@ -1429,6 +1429,26 @@ const corsAllowedOrigins = Array.from(
   ),
 );
 
+const isPrivateNetworkDevOrigin = (origin = "") => {
+  if (process.env.NODE_ENV === "production" || process.env.RENDER || process.env.VERCEL) {
+    return false;
+  }
+
+  try {
+    const parsedOrigin = new URL(origin);
+    const hostname = parsedOrigin.hostname;
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("10.") ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+    );
+  } catch {
+    return false;
+  }
+};
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) {
@@ -1436,7 +1456,10 @@ const corsOptions = {
     }
 
     const normalizedOrigin = String(origin || "").replace(/\/$/, "");
-    if (corsAllowedOrigins.includes(normalizedOrigin)) {
+    if (
+      corsAllowedOrigins.includes(normalizedOrigin) ||
+      isPrivateNetworkDevOrigin(normalizedOrigin)
+    ) {
       return callback(null, true);
     }
 
