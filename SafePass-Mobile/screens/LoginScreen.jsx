@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -219,22 +219,6 @@ export default function LoginScreen({ navigation, route }) {
   const loginButtonHoverAnim = useRef(new Animated.Value(0)).current;
   const loginButtonFloatAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
-      setTransitionBusy(false);
-      if (!hasHandledInitialFocusRef.current) {
-        hasHandledInitialFocusRef.current = true;
-        return;
-      }
-      if (route?.params?.skipArrivalSplash) {
-        navigation.setParams?.({ skipArrivalSplash: false });
-        return;
-      }
-      setArrivalVisible(true);
-    });
-
-    return unsubscribe;
-  }, [navigation, route?.params?.skipArrivalSplash]);
 
   // ============ FORGOT PASSWORD STATES ============
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -265,6 +249,24 @@ export default function LoginScreen({ navigation, route }) {
   const emailInputRef = useRef(null);
   const passwordInputRef = useRef(null);
   const loginButtonRef = useRef(null);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      setTransitionBusy(false);
+      if (!hasHandledInitialFocusRef.current) {
+        hasHandledInitialFocusRef.current = true;
+        return;
+      }
+      if (route?.params?.skipArrivalSplash) {
+        navigation.setParams?.({ skipArrivalSplash: false });
+        return;
+      }
+      setArrivalVisible(true);
+    });
+
+    return unsubscribe;
+  }, [navigation, route?.params?.skipArrivalSplash]);
+
 
   // ============ ANIMATIONS ============
   const playLoginEntrance = () => {
