@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+﻿import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { AppState, View, Text, Platform, Image } from "react-native";
 import {
   CommonActions,
@@ -601,6 +601,7 @@ export default function App() {
           await ApiService.clearAuth();
           await Storage.setItem(AUTH_NOTICE_KEY, SESSION_EXPIRED_MESSAGE);
           setCurrentUser(null);
+          setIsLoading(false);
           return;
         }
 
@@ -610,6 +611,7 @@ export default function App() {
           await ApiService.clearAuth();
           await Storage.setItem(AUTH_NOTICE_KEY, SESSION_EXPIRED_MESSAGE);
           setCurrentUser(null);
+          setIsLoading(false);
           return;
         }
 
@@ -892,7 +894,7 @@ export default function App() {
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="Reports">
             {(props) => (
-              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin"]} navigation={props.navigation}>
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin", "staff"]} navigation={props.navigation}>
                 <ReportsScreen {...props} />
               </ProtectedScreen>
             )}
