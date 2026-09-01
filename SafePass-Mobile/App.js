@@ -305,17 +305,56 @@ const ProtectedScreen = ({
   navigation,
   children,
 }) => {
-  const normalizedRole = normalizeRole(currentUser?.role);
-  const isLoggedIn = Boolean(currentUser);
+  const [resolvedUser, setResolvedUser] = useState(currentUser || null);
+  const [isVerifying, setIsVerifying] = useState(!currentUser);
+
+  useEffect(() => {
+    if (currentUser) {
+      setResolvedUser(currentUser);
+      setIsVerifying(false);
+      return;
+    }
+
+    let isMounted = true;
+    const restoreSession = async () => {
+      try {
+        const token = await ApiService.getToken();
+        const cachedUser = await ApiService.getCurrentUser();
+        const user = token ? (cachedUser || await ApiService.restoreCurrentUserFromToken()) : null;
+        if (isMounted) {
+          if (user) {
+            const normalized = { ...user, role: normalizeRole(user.role) };
+            setResolvedUser(normalized);
+          } else {
+            setResolvedUser(null);
+            navigation.replace("Login");
+          }
+          setIsVerifying(false);
+        }
+      } catch {
+        if (isMounted) {
+          setResolvedUser(null);
+          setIsVerifying(false);
+          navigation.replace("Login");
+        }
+      }
+    };
+
+    restoreSession();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser, navigation]);
+
+  if (isVerifying) {
+    return <ScreenFallback />;
+  }
+
+  const normalizedRole = normalizeRole(resolvedUser?.role);
+  const isLoggedIn = Boolean(resolvedUser);
   const isAllowed =
     isLoggedIn &&
     (!allowedRoles.length || allowedRoles.includes(normalizedRole));
-
-  useEffect(() => {
-    if (!isLoggedIn) {
-      navigation.replace("Login");
-    }
-  }, [isLoggedIn, navigation]);
 
   if (!isLoggedIn) {
     return <ScreenFallback />;
@@ -738,6 +777,7 @@ export default function App() {
           {(props) => (
             <LoginScreen
               {...props}
+              onLoginSuccess={(u) => setCurrentUser(u)}
               route={{
                 ...props.route,
                 params: {

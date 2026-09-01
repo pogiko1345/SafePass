@@ -77,7 +77,7 @@ if (__DEV__) {
   ]);
 }
 
-export default function LoginScreen({ navigation, route }) {
+export default function LoginScreen({ navigation, route, onLoginSuccess }) {
   const startAviationTransition = useAviationTransition();
   // Get role from navigation params
   const {
@@ -771,6 +771,9 @@ export default function LoginScreen({ navigation, route }) {
     }
 
     await Storage.removeItem("isNewRegistration");
+    if (typeof onLoginSuccess === "function") {
+      try { onLoginSuccess(normalizedUser); } catch {}
+    }
     return normalizedUser;
   };
 
