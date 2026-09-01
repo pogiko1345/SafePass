@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+﻿import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -614,6 +614,14 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const [showEditAppointmentDatePicker, setShowEditAppointmentDatePicker] = useState(false);
   const [showEditAppointmentTimePicker, setShowEditAppointmentTimePicker] = useState(false);
   const [showCancelAppointmentModal, setShowCancelAppointmentModal] = useState(false);
+  const [showProfileEditModal, setShowProfileEditModal] = useState(false);
+  const [profileEditForm, setProfileEditForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    emergencyContact: ''
+  });
   const [showPurposeDropdown, setShowPurposeDropdown] = useState(false);
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
   const [showIdTypeDropdown, setShowIdTypeDropdown] = useState(false);
@@ -4770,14 +4778,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   const accountDisplayName = visitor?.fullName || displayName || "Visitor";
   const accountFirstName = accountDisplayName.split(" ")[0] || accountDisplayName;
 
-  const [showProfileEditModal, setShowProfileEditModal] = useState(false);
-  const [profileEditForm, setProfileEditForm] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phoneNumber: '',
-    emergencyContact: ''
-  });
+
 
   const handleEditProfilePress = () => {
     if (visitor) {
