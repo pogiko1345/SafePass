@@ -299,6 +299,66 @@ const AUTH_STACK_TRANSITION = {
 
 let logoutCallback = null;
 
+const ProtectedScreen = ({
+  currentUser,
+  allowedRoles = [],
+  navigation,
+  children,
+}) => {
+  const normalizedRole = normalizeRole(currentUser?.role);
+  const isLoggedIn = Boolean(currentUser);
+  const isAllowed =
+    isLoggedIn &&
+    (!allowedRoles.length || allowedRoles.includes(normalizedRole));
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      navigation.replace("Login");
+    }
+  }, [isLoggedIn, navigation]);
+
+  if (!isLoggedIn) {
+    return <ScreenFallback />;
+  }
+
+  if (!isAllowed) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: brandColors.background,
+          padding: 24,
+        }}
+      >
+        <Text
+          style={{
+            color: brandColors.text,
+            fontSize: 20,
+            fontWeight: "800",
+            textAlign: "center",
+            marginBottom: 8,
+          }}
+        >
+          Access unavailable
+        </Text>
+        <Text
+          style={{
+            color: brandColors.textMuted,
+            fontSize: 14,
+            textAlign: "center",
+          }}
+        >
+          Your account does not have permission to open this page.
+        </Text>
+      </View>
+    );
+  }
+
+  return children;
+};
+
 export default function App() {
   const navigationRef = useNavigationContainerRef();
   const idleTimerRef = useRef(null);
@@ -711,48 +771,58 @@ export default function App() {
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="AdminDashboard">
             {(props) => (
-              <AdminDashboardScreen
-                {...props}
-                onLogout={() => setCurrentUser(null)}
-              />
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin"]} navigation={props.navigation}>
+                <AdminDashboardScreen
+                  {...props}
+                  onLogout={() => setCurrentUser(null)}
+                />
+              </ProtectedScreen>
             )}
           </Stack.Screen>
         )}
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="StaffDashboard">
             {(props) => (
-              <StaffDashboardScreen
-                {...props}
-                onLogout={() => setCurrentUser(null)}
-              />
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["staff"]} navigation={props.navigation}>
+                <StaffDashboardScreen
+                  {...props}
+                  onLogout={() => setCurrentUser(null)}
+                />
+              </ProtectedScreen>
             )}
           </Stack.Screen>
         )}
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="SecurityDashboard">
             {(props) => (
-              <SecurityDashboardScreen
-                {...props}
-                onLogout={() => setCurrentUser(null)}
-              />
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin", "security"]} navigation={props.navigation}>
+                <SecurityDashboardScreen
+                  {...props}
+                  onLogout={() => setCurrentUser(null)}
+                />
+              </ProtectedScreen>
             )}
           </Stack.Screen>
         )}
         {!IS_VISITOR_ONLY_APP && (
           <Stack.Screen name="StudentDashboard">
             {(props) => (
-              <StudentDashboardScreen
-                {...props}
-              />
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["student", "teacher"]} navigation={props.navigation}>
+                <StudentDashboardScreen
+                  {...props}
+                />
+              </ProtectedScreen>
             )}
           </Stack.Screen>
         )}
         <Stack.Screen name="VisitorDashboard" options={VISITOR_STACK_TRANSITION}>
           {(props) => (
-            <VisitorDashboardScreen
-              {...props}
-              onLogout={() => setCurrentUser(null)}
-            />
+            <ProtectedScreen currentUser={currentUser} allowedRoles={["visitor"]} navigation={props.navigation}>
+              <VisitorDashboardScreen
+                {...props}
+                onLogout={() => setCurrentUser(null)}
+              />
+            </ProtectedScreen>
           )}
         </Stack.Screen>
 
@@ -771,41 +841,80 @@ export default function App() {
         {/* Common Screens */}
         <Stack.Screen name="Profile" options={VISITOR_STACK_TRANSITION}>
           {(props) => (
-            <ProfileScreen {...props} onLogout={() => setCurrentUser(null)} />
+            <ProtectedScreen currentUser={currentUser} navigation={props.navigation}>
+              <ProfileScreen {...props} onLogout={() => setCurrentUser(null)} />
+            </ProtectedScreen>
           )}
         </Stack.Screen>
-        <Stack.Screen
-          name="AccessLog"
-          component={AccessLogScreen}
-          options={VISITOR_STACK_TRANSITION}
-        />
-        <Stack.Screen
-          name="NFCScan"
-          component={NFCScanScreen}
-          options={VISITOR_STACK_TRANSITION}
-        />
+        <Stack.Screen name="AccessLog" options={VISITOR_STACK_TRANSITION}>
+          {(props) => (
+            <ProtectedScreen currentUser={currentUser} allowedRoles={["admin", "security"]} navigation={props.navigation}>
+              <AccessLogScreen {...props} />
+            </ProtectedScreen>
+          )}
+        </Stack.Screen>
+        <Stack.Screen name="NFCScan" options={VISITOR_STACK_TRANSITION}>
+          {(props) => (
+            <ProtectedScreen currentUser={currentUser} allowedRoles={["admin", "security", "staff"]} navigation={props.navigation}>
+              <NFCScanScreen {...props} />
+            </ProtectedScreen>
+          )}
+        </Stack.Screen>
 
         {/* Admin Management Screens */}
         {!IS_VISITOR_ONLY_APP && (
-          <Stack.Screen
-            name="VisitorManagement"
-            component={VisitorManagementScreen}
-          />
+          <Stack.Screen name="VisitorManagement">
+            {(props) => (
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin"]} navigation={props.navigation}>
+                <VisitorManagementScreen {...props} />
+              </ProtectedScreen>
+            )}
+          </Stack.Screen>
         )}
         {!IS_VISITOR_ONLY_APP && (
-          <Stack.Screen name="NFCManagement" component={NFCManagementScreen} />
+          <Stack.Screen name="NFCManagement">
+            {(props) => (
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin"]} navigation={props.navigation}>
+                <NFCManagementScreen {...props} />
+              </ProtectedScreen>
+            )}
+          </Stack.Screen>
         )}
         {!IS_VISITOR_ONLY_APP && (
-          <Stack.Screen name="AttendanceRecords" component={AttendanceRecordsScreen} />
+          <Stack.Screen name="AttendanceRecords">
+            {(props) => (
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin", "staff"]} navigation={props.navigation}>
+                <AttendanceRecordsScreen {...props} />
+              </ProtectedScreen>
+            )}
+          </Stack.Screen>
         )}
         {!IS_VISITOR_ONLY_APP && (
-          <Stack.Screen name="Reports" component={ReportsScreen} />
+          <Stack.Screen name="Reports">
+            {(props) => (
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin"]} navigation={props.navigation}>
+                <ReportsScreen {...props} />
+              </ProtectedScreen>
+            )}
+          </Stack.Screen>
         )}
         {!IS_VISITOR_ONLY_APP && (
-          <Stack.Screen name="SecurityLogs" component={SecurityLogsScreen} />
+          <Stack.Screen name="SecurityLogs">
+            {(props) => (
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin", "security"]} navigation={props.navigation}>
+                <SecurityLogsScreen {...props} />
+              </ProtectedScreen>
+            )}
+          </Stack.Screen>
         )}
         {!IS_VISITOR_ONLY_APP && (
-          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Settings">
+            {(props) => (
+              <ProtectedScreen currentUser={currentUser} allowedRoles={["admin"]} navigation={props.navigation}>
+                <SettingsScreen {...props} />
+              </ProtectedScreen>
+            )}
+          </Stack.Screen>
         )}
           </Stack.Navigator>
         </Suspense>

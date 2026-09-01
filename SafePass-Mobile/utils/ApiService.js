@@ -21,13 +21,18 @@ const WEB_FALLBACK_API_BASE_URL = (() => {
     return DEPLOYED_API_BASE_URL;
   }
 
+  const hostname = window.location.hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return `http://${hostname}:5000/api`;
+  }
+
   return DEPLOYED_API_BASE_URL;
 })();
 
 const DEFAULT_API_BASE_URL = Platform.select({
   ios: DEPLOYED_API_BASE_URL,
   android: DEPLOYED_API_BASE_URL,
-  web: WEB_FALLBACK_API_BASE_URL,              // Browser uses deployed backend by default
+  web: WEB_FALLBACK_API_BASE_URL,
   default: DEPLOYED_API_BASE_URL,
 });
 
@@ -38,10 +43,14 @@ const API_BASE_URL = (
 
 const API_BASE_URL_CANDIDATES = [
   API_BASE_URL,
+  WEB_FALLBACK_API_BASE_URL,
   process.env.EXPO_PUBLIC_API_LAN_BASE_URL,
+  DEPLOYED_API_BASE_URL,
 ]
   .filter(Boolean)
   .map((baseUrl) => String(baseUrl).replace(/\/$/, ""));
+
+const UNIQUE_API_BASE_URL_CANDIDATES = [...new Set(API_BASE_URL_CANDIDATES)];
 
 // Keep simulation/fallback OFF by default so app uses real backend/database.
 const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
@@ -396,39 +405,42 @@ async fetch(url, options = {}) {
     config.body = JSON.stringify(config.body);
   }
 
-  try {
-    logApiDebug(`[ApiService] Sending request to: ${API_BASE_URL}${url}`);
-    const response = await fetch(`${API_BASE_URL}${url}`, config);
-    logApiDebug(`[ApiService] Response status: ${response.status}`);
+  for (const baseUrl of UNIQUE_API_BASE_URL_CANDIDATES) {
+    try {
+      logApiDebug(`[ApiService] Sending request to: ${baseUrl}${url}`);
+      const response = await fetch(`${baseUrl}${url}`, config);
+      logApiDebug(`[ApiService] Response status: ${response.status}`);
 
-    const contentType = response.headers.get("content-type");
-    let data;
+      const contentType = response.headers.get("content-type");
+      let data;
 
-    if (contentType && contentType.includes("application/json")) {
-      data = await response.json();
-      logApiDebug("[ApiService] Response data:", data);
-    } else {
-      const text = await response.text();
-      data = text ? { message: text } : {};
-      logApiDebug("[ApiService] Response text:", text);
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+        logApiDebug("[ApiService] Response data:", data);
+      } else {
+        const text = await response.text();
+        data = text ? { message: text } : {};
+        logApiDebug("[ApiService] Response text:", text);
+      }
+
+      if (!response.ok) {
+        logApiDebug(`[ApiService] HTTP ${response.status}:`, data);
+        const apiError = new Error(data.error || data.message || `HTTP ${response.status}`);
+        apiError.status = response.status;
+        apiError.data = data;
+        throw apiError;
+      }
+
+      return data;
+    } catch (error) {
+      logApiFetchError({ url, baseUrl, error });
+      if (!isNetworkLikeError(error)) {
+        throw error;
+      }
     }
-
-    if (!response.ok) {
-      logApiDebug(`[ApiService] HTTP ${response.status}:`, data);
-      const apiError = new Error(data.error || data.message || `HTTP ${response.status}`);
-      apiError.status = response.status;
-      apiError.data = data;
-      throw apiError;
-    }
-
-    return data;
-  } catch (error) {
-    console.error(`âŒ FETCH ERROR for ${url}:`, error);
-    if (error.message.includes("Network request failed")) {
-      throw createSafePassConnectionError();
-    }
-    throw error;
   }
+
+  throw createSafePassConnectionError();
 }
 
   // ================= AUTH =================

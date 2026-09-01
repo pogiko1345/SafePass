@@ -9432,7 +9432,6 @@ app.get("/api/health", (req, res) => {
     success: true,
     database: getDatabaseStateName(),
     databaseConfigured: Boolean(MONGODB_URI),
-    databaseTarget: MONGODB_URI ? maskMongoUri(MONGODB_URI) : "not configured",
     databaseError: mongoConnectionError,
     emailDelivery: {
       configured: Boolean(mailTransporter),
