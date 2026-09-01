@@ -1430,10 +1430,6 @@ const corsAllowedOrigins = Array.from(
 );
 
 const isPrivateNetworkDevOrigin = (origin = "") => {
-  if (process.env.NODE_ENV === "production" || process.env.RENDER || process.env.VERCEL) {
-    return false;
-  }
-
   try {
     const parsedOrigin = new URL(origin);
     const hostname = parsedOrigin.hostname;
@@ -1449,6 +1445,25 @@ const isPrivateNetworkDevOrigin = (origin = "") => {
   }
 };
 
+const isSafePassHostedOrigin = (origin = "") => {
+  try {
+    const parsedOrigin = new URL(origin);
+    const hostname = parsedOrigin.hostname.toLowerCase();
+
+    return (
+      hostname === "sapphiresafepass2.vercel.app" ||
+      hostname === "siaacentrixsafepass.com" ||
+      hostname === "www.siaacentrixsafepass.com" ||
+      (
+        hostname.endsWith(".vercel.app") &&
+        (hostname.startsWith("safepass") || hostname.startsWith("sapphire"))
+      )
+    );
+  } catch {
+    return false;
+  }
+};
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) {
@@ -1458,12 +1473,14 @@ const corsOptions = {
     const normalizedOrigin = String(origin || "").replace(/\/$/, "");
     if (
       corsAllowedOrigins.includes(normalizedOrigin) ||
-      isPrivateNetworkDevOrigin(normalizedOrigin)
+      isPrivateNetworkDevOrigin(normalizedOrigin) ||
+      isSafePassHostedOrigin(normalizedOrigin)
     ) {
       return callback(null, true);
     }
 
-    return callback(new Error("Not allowed by CORS"));
+    console.warn(`Blocked CORS origin: ${normalizedOrigin}`);
+    return callback(null, false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
