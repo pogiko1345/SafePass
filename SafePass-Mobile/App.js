@@ -275,9 +275,11 @@ const ScreenFallback = () => (
   </View>
 );
 
+const SCREEN_TRANSITION_DURATION = Platform.OS === "web" ? 280 : 300;
+
 const DEFAULT_STACK_TRANSITION = {
   animation: "fade",
-  animationDuration: 220,
+  animationDuration: SCREEN_TRANSITION_DURATION,
   animationTypeForReplace: "push",
   gestureEnabled: true,
   fullScreenGestureEnabled: true,
@@ -286,14 +288,14 @@ const DEFAULT_STACK_TRANSITION = {
 
 const VISITOR_STACK_TRANSITION = {
   ...DEFAULT_STACK_TRANSITION,
-  animationDuration: 220,
+  animationDuration: SCREEN_TRANSITION_DURATION,
 };
 
 const AUTH_STACK_TRANSITION = {
   ...DEFAULT_STACK_TRANSITION,
   animation: "fade",
-  animationDuration: 220,
-  animationTypeForReplace: "pop",
+  animationDuration: Platform.OS === "web" ? 260 : 280,
+  animationTypeForReplace: "push",
   gestureDirection: "horizontal",
 };
 
