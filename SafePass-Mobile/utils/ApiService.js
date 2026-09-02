@@ -2402,20 +2402,7 @@ generateRandomPassword(length = 10) {
   }
 
   async getSecurityReports() {
-    try {
-      const response = await this.getSecurityLogs({ limit: 100 });
-      const reports = (response?.logs || [])
-        .filter((log) => log?.notes || log?.status === "denied")
-        .map((log) => ({
-          ...log,
-          resolved: false,
-          reason: log.notes || "Security incident",
-        }));
-      return { success: true, reports };
-    } catch (error) {
-      console.error("Get security reports error:", error);
-      return { success: false, reports: [] };
-    }
+    return await this.fetch("/security/reports?limit=500");
   }
 
   async resolveAlert(alertId) {

@@ -682,6 +682,7 @@ export default function SecurityDashboardScreen({ navigation }) {
       setTimeout(() => {
         Promise.allSettled([
           loadSecurityLivePresence(),
+          loadReports(),
           loadNotifications(currentUser, { force: true }),
           loadMapSettings(),
         ]);
@@ -1624,15 +1625,12 @@ export default function SecurityDashboardScreen({ navigation }) {
           index === items.findIndex((item) => String(item?._id) === String(log?._id)),
         )
         .sort((left, right) => new Date(right?.timestamp || 0) - new Date(left?.timestamp || 0));
-      const derivedReports = deriveReports(collections.all);
-
       setVisitors(collections);
       setVisitorStats(stats);
       setAnalytics(operationalAnalytics);
       setVisitorLocations(deriveVisitorLocations(collections.active));
       setAccessLogs(combinedLogs);
       setLogsTotal(combinedLogs.length);
-      setReports(derivedReports);
       setRecentAccess(combinedLogs.slice(0, 10));
       setDashboardStats((current) => ({
         ...current,
@@ -1756,7 +1754,18 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const loadReports = async () => {
-    await loadOperationalData({ force: true });
+    try {
+      const response = await ApiService.getSecurityReports();
+      setReports(Array.isArray(response?.reports) ? response.reports : []);
+      return true;
+    } catch (error) {
+      logSecurityDashboardLoadError("security-reports", "Load security reports error:", error);
+      noteConnectionIssue(error);
+      if (isAuthError(error)) {
+        await handleAuthExpired();
+      }
+      return false;
+    }
   };
 
   const loadNotifications = async (currentUser = user, { force = false } = {}) => {
@@ -2021,6 +2030,7 @@ export default function SecurityDashboardScreen({ navigation }) {
     try {
       await Promise.all([
         loadOperationalData({ force: true }),
+        loadReports(),
         loadSecurityLivePresence(),
         loadNotifications(user, { force: true }),
       ]);

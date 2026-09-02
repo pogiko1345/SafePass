@@ -8042,22 +8042,43 @@ app.put("/api/admin/visitors/:id/approve", authMiddleware, async (req, res) => {
       ].join("\n"),
     );
 
-    // Create notification for security
-    await createRoleNotification({
-      title: "New Visitor Approved",
-      message: `${visitor.fullName} has been approved to visit on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}`,
-      type: "visitor",
-      severity: "medium",
-      targetRole: "security",
-      relatedVisitor: visitor._id,
-      relatedUser: user._id,
-      metadata: {
-        activityType: "admin_approved_registration",
-        visitDate: visitor.visitDate,
-        visitTime: visitor.visitTime,
-        purposeOfVisit: visitor.purposeOfVisit,
-      },
-    });
+    const approvalMessage = `${visitor.fullName} has been approved to visit on ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}`;
+
+    // Notify security about the new approved visitor and notify the visitor directly.
+    // targetUser prevents one visitor's approval from appearing in another visitor's inbox.
+    await Promise.all([
+      createRoleNotification({
+        title: "New Visitor Approved",
+        message: approvalMessage,
+        type: "visitor",
+        severity: "medium",
+        targetRole: "security",
+        relatedVisitor: visitor._id,
+        relatedUser: user._id,
+        metadata: {
+          activityType: "admin_approved_registration",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          purposeOfVisit: visitor.purposeOfVisit,
+        },
+      }),
+      createRoleNotification({
+        title: "Visit Approved",
+        message: `Your visit request has been approved for ${new Date(visitor.visitDate).toLocaleDateString()} at ${new Date(visitor.visitTime).toLocaleTimeString()}.`,
+        type: "visitor",
+        severity: "medium",
+        targetRole: "visitor",
+        targetUser: user._id,
+        relatedVisitor: visitor._id,
+        relatedUser: user._id,
+        metadata: {
+          activityType: "visitor_registration_approved",
+          visitDate: visitor.visitDate,
+          visitTime: visitor.visitTime,
+          purposeOfVisit: visitor.purposeOfVisit,
+        },
+      }),
+    ]);
     console.log(`Visitor approved successfully for ${visitor.email}.`);
 
     await createSystemActivity({
@@ -9647,6 +9668,64 @@ app.get("/api/visitors", authMiddleware, requireRoles("admin", "staff", "securit
     });
   }
 });
+
+// Security incident reports are stored on visitor records. Return a flattened,
+// paginated view so the Security dashboard is not limited by the visitor list.
+app.get(
+  "/api/security/reports",
+  authMiddleware,
+  requireRoles("admin", "security", "guard"),
+  async (req, res) => {
+    try {
+      const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+      const requestedStatus = String(req.query.status || "all").trim().toLowerCase();
+
+      const visitors = await Visitor.find({ "reports.0": { $exists: true } })
+        .select("fullName email assignedOffice reports")
+        .populate("reports.reportedBy", "firstName lastName email role")
+        .lean();
+
+      const reports = visitors
+        .flatMap((visitor) =>
+          (visitor.reports || []).map((report, index) => ({
+            _id: String(report._id || `${visitor._id}-report-${index}`),
+            visitorId: visitor._id,
+            visitorName: visitor.fullName || "Unnamed Visitor",
+            visitorEmail: visitor.email || "",
+            assignedOffice: visitor.assignedOffice || "",
+            reason: report.reason || "Security incident",
+            createdAt: report.reportedAt || visitor.updatedAt || visitor.registeredAt,
+            status: report.resolved ? "Resolved" : "Open",
+            resolved: Boolean(report.resolved),
+            resolvedAt: report.resolvedAt || null,
+            resolutionNotes: report.resolutionNotes || "",
+            reportedBy: report.reportedBy || null,
+          })),
+        )
+        .filter((report) =>
+          requestedStatus === "all" || String(report.status).toLowerCase() === requestedStatus,
+        )
+        .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
+
+      const total = reports.length;
+      const start = (page - 1) * limit;
+      res.json({
+        success: true,
+        reports: reports.slice(start, start + limit),
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.max(1, Math.ceil(total / limit)),
+        },
+      });
+    } catch (error) {
+      console.error("Get security reports error:", error);
+      res.status(500).json({ success: false, message: "Failed to load security reports" });
+    }
+  },
+);
 
 app.get(
   "/api/attendance",

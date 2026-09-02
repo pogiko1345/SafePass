@@ -1,11 +1,5 @@
 const baseConfig = require("./app.json");
 
-const getFacebookConfig = () => {
-  return {
-    appId: baseConfig.expo?.extra?.facebookAppId || '',
-  };
-};
-
 const getGoogleConfig = () => {
   return {
     androidClientId: baseConfig.expo?.extra?.googleClientId || '',

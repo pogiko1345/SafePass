@@ -1294,43 +1294,17 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
   }, [navigation, visitor?._id, visitor?.status, visitor?.approvalStatus, visitor?.appointmentStatus]);
 
   useEffect(() => {
-    const status = String(visitor?.status || "").toLowerCase();
-    const approvalStatus = String(visitor?.approvalStatus || "").toLowerCase();
-    const appointmentStatus = String(visitor?.appointmentStatus || "").toLowerCase();
-    const isWaitingForVisitUpdate =
-      !visitor?._id ||
-      status === "pending" ||
-      approvalStatus === "pending" ||
-      appointmentStatus === "pending" ||
-      appointmentStatus === "rescheduled";
+    // Keep an open visitor dashboard current while an admin processes the visit.
+    // This is in-app live refresh; native background push requires a separately
+    // configured Expo/FCM notification service.
+    const activeVisitorId = visitor?._id;
+    if (!activeVisitorId) return undefined;
 
-    if (!isWaitingForVisitUpdate) {
-      return undefined;
-    }
+    const refreshTimer = setInterval(() => {
+      loadVisitorData({ silent: true, force: true });
+    }, 15000);
 
-    return undefined;
-  }, [visitor?._id, visitor?.status, visitor?.approvalStatus, visitor?.appointmentStatus]);
-
-  useEffect(() => {
-    const status = String(visitor?.status || "").toLowerCase();
-    const approvalStatus = String(visitor?.approvalStatus || "").toLowerCase();
-    const appointmentStatus = String(visitor?.appointmentStatus || "").toLowerCase();
-    const isApprovedForLiveRefresh =
-      visitor?._id &&
-      (status === "approved" ||
-        status === "checked_in" ||
-        approvalStatus === "approved" ||
-        appointmentStatus === "approved" ||
-        appointmentStatus === "adjusted") &&
-      status !== "checked_out" &&
-      status !== "completed" &&
-      appointmentStatus !== "completed";
-
-    if (!isApprovedForLiveRefresh) {
-      return undefined;
-    }
-
-    return undefined;
+    return () => clearInterval(refreshTimer);
   }, [visitor?._id, visitor?.status, visitor?.approvalStatus, visitor?.appointmentStatus]);
 
   useEffect(() => () => {
@@ -1601,7 +1575,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             severity === "high" ||
             notificationText.includes("reported") ||
             activityType === "office_correct_location" ||
-            activityType === "visitor_destination_redirected"
+            activityType === "visitor_destination_redirected" ||
+            activityType === "visitor_registration_approved"
           )
         );
       });
@@ -1614,15 +1589,20 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       shownVisitorWarningIdsRef.current.add(noticeId);
       const noticeSeverity = String(latestNotice?.severity || latestNotice?.type || "warning").toLowerCase();
       const activityType = String(latestNotice?.metadata?.activityType || "").toLowerCase();
+      const isApprovalNotice = activityType === "visitor_registration_approved";
       const isWarningNotice =
         noticeSeverity === "warning" ||
         noticeSeverity === "high" ||
         String(latestNotice?.type || "").toLowerCase() === "alert" ||
         activityType === "office_wrong_location";
 
-      if (Platform.OS !== "web" && isWarningNotice) {
-        Vibration.vibrate([0, 120, 80, 120]);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch((error) => {
+      if (Platform.OS !== "web" && (isWarningNotice || isApprovalNotice)) {
+        if (isWarningNotice) Vibration.vibrate([0, 120, 80, 120]);
+        Haptics.notificationAsync(
+          isWarningNotice
+            ? Haptics.NotificationFeedbackType.Warning
+            : Haptics.NotificationFeedbackType.Success,
+        ).catch((error) => {
           console.log("Visitor warning haptic error:", error);
         });
       }
@@ -1637,9 +1617,13 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         });
       } else {
         showVisitorPushNotice({
-          title: latestNotice.title || "Location Updated",
-          message: latestNotice.message || "Your visitor route has been updated.",
-          type: "success",
+          title: latestNotice.title || (isApprovalNotice ? "Visit Approved" : "Location Updated"),
+          message:
+            latestNotice.message ||
+            (isApprovalNotice
+              ? "Your visitor request has been approved."
+              : "Your visitor route has been updated."),
+          type: isApprovalNotice ? "success" : "info",
         });
         ApiService.markNotificationAsRead(noticeId).catch((error) => {
           console.error("Mark visitor location notice as read error:", error);
