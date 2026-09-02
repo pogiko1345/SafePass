@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 
@@ -47,6 +48,8 @@ const cloneUserRecord = (record) => ({
   verificationTokenHash: record.verificationTokenHash || "",
   verificationExpiresAt: record.verificationExpiresAt || null,
   verifiedAt: record.verifiedAt || null,
+  trustedDeviceToken: record.trustedDeviceToken || "",
+  trustedDeviceExpiresAt: record.trustedDeviceExpiresAt || null,
   createdAt: record.createdAt || new Date("2026-01-01T00:00:00.000Z"),
   updatedAt: record.updatedAt || new Date("2026-01-01T00:00:00.000Z"),
   isActive: record.isActive !== false,
@@ -129,13 +132,15 @@ class UserMock {
   }
 
   static findById(id) {
+    const getUser = () => findStoredUser((item) => item._id === id);
     return {
       select: async () => {
-        const user = findStoredUser((item) => item._id === id);
+        const user = getUser();
         if (!user) return null;
         delete user.password;
         return user;
       },
+      then: (resolve, reject) => Promise.resolve(getUser()).then(resolve, reject),
     };
   }
 
@@ -420,6 +425,41 @@ test("passkey enrollment and 2FA routes are registered and require authenticatio
 
   assert.equal(passkeyResponse.status, 401);
   assert.equal(twoFaResponse.status, 401);
+});
+
+test("trusted-device verification requires the matching server-issued token", async () => {
+  const trustedDeviceToken = "trusted-device-token-for-test";
+  persistDoc({
+    _id: "trusted-user-1",
+    email: "trusted@example.com",
+    username: "trusteduser",
+    password: "TrustedPass123",
+    role: "student",
+    status: "active",
+    firstName: "Trusted",
+    lastName: "User",
+    trustedDeviceToken: crypto.createHash("sha256").update(trustedDeviceToken).digest("hex"),
+    trustedDeviceExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  });
+  const token = jwt.sign({ userId: "trusted-user-1" }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
+
+  const acceptedResponse = await requestJson("/api/auth/verify-trusted-device", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: { trustedDeviceToken },
+  });
+  const rejectedResponse = await requestJson("/api/auth/verify-trusted-device", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: { trustedDeviceToken: "wrong-token" },
+  });
+
+  assert.equal(acceptedResponse.status, 200);
+  assert.equal(acceptedResponse.body.success, true);
+  assert.equal(rejectedResponse.status, 401);
+  assert.equal(rejectedResponse.body.success, false);
 });
 
 test("admin settings can be updated and then read back through the API", async () => {

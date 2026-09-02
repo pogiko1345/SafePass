@@ -765,7 +765,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
     await Storage.removeItem("rememberedEmail");
 
     if (rememberEmail) {
-      await ApiService.trustDevice();
+      await ApiService.trustDevice(normalizedUser);
     } else {
       await ApiService.clearTrustedDevice();
     }
@@ -1125,7 +1125,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
         user: normalizedUser,
         rememberEmail: true,
       });
-      await ApiService.trustDevice();
+    await ApiService.trustDevice(normalizedUser);
 
       navigation.reset({
         index: 0,

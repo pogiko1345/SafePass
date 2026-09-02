@@ -14995,6 +14995,24 @@ app.post('/api/auth/trust-device', authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to trust device' }); }
 });
 
+app.post('/api/auth/verify-trusted-device', authMiddleware, async (req, res) => {
+  try {
+    const trustedDeviceToken = String(req.body?.trustedDeviceToken || '').trim();
+    if (!trustedDeviceToken) {
+      return res.status(400).json({ success: false, error: 'Trusted-device token is required' });
+    }
+
+    const trusted = await verifyTrustedDevice(req.user._id, hashToken(trustedDeviceToken));
+    if (!trusted) {
+      return res.status(401).json({ success: false, error: 'Trusted device is invalid or expired' });
+    }
+
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'Failed to verify trusted device' });
+  }
+});
+
 app.post('/api/auth/untrust-device', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);

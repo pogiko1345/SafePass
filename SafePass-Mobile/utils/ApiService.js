@@ -180,7 +180,14 @@ const SENSITIVE_STORAGE_KEYS = [
   "trustedDevice",
   "trustedUntil",
   "trustedDeviceToken",
+  "trustedDeviceUserId",
   REMEMBERED_SESSION_EXPIRES_AT_KEY,
+];
+const TRUSTED_DEVICE_STORAGE_KEYS = [
+  "trustedDevice",
+  "trustedUntil",
+  "trustedDeviceToken",
+  "trustedDeviceUserId",
 ];
 
 const setSensitiveItem = async (key, value) => {
@@ -254,7 +261,7 @@ class ApiService {
   }
 
   async clearTrustedDevice() {
-    await removeSensitiveItems(["trustedDevice", "trustedUntil", "trustedDeviceToken"]);
+    await removeSensitiveItems(TRUSTED_DEVICE_STORAGE_KEYS);
   }
 
   async rememberCurrentSession(durationMs = REMEMBERED_SESSION_DURATION_MS) {
@@ -284,26 +291,44 @@ class ApiService {
     return true;
   }
 
-  async isTrustedDeviceActive() {
-    const [trustedDevice, trustedUntilRaw] = await Promise.all([
+  async isTrustedDeviceActive(user, loginToken) {
+    const userId = String(user?._id || user?.id || user?.userId || "").trim();
+    const [trustedDevice, trustedUntilRaw, trustedDeviceToken, trustedDeviceUserId] = await Promise.all([
       getSensitiveItem("trustedDevice"),
       getSensitiveItem("trustedUntil"),
+      getSensitiveItem("trustedDeviceToken"),
+      getSensitiveItem("trustedDeviceUserId"),
     ]);
 
-    if (trustedDevice !== "true") {
-      if (trustedUntilRaw) {
-        await this.clearTrustedDevice();
-      }
-      return false;
-    }
-
     const trustedUntil = Number(trustedUntilRaw);
-    if (!Number.isFinite(trustedUntil) || trustedUntil <= Date.now()) {
+    if (
+      trustedDevice !== "true" ||
+      !userId ||
+      !loginToken ||
+      !trustedDeviceToken ||
+      trustedDeviceUserId !== userId ||
+      !Number.isFinite(trustedUntil) ||
+      trustedUntil <= Date.now()
+    ) {
       await this.clearTrustedDevice();
       return false;
     }
 
-    return true;
+    try {
+      const response = await this.fetch("/auth/verify-trusted-device", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${loginToken}` },
+        body: { trustedDeviceToken },
+      });
+      if (response?.success) {
+        return true;
+      }
+    } catch (error) {
+      logApiDebug("Trusted-device verification failed.", error);
+    }
+
+    await this.clearTrustedDevice();
+    return false;
   }
 
   // ================= TOKEN HANDLING =================
@@ -366,9 +391,13 @@ class ApiService {
     return this.token;
   }
 
-  async clearAuth() {
+  async clearAuth({ preserveTrustedDevice = true } = {}) {
     this.token = null;
-    await removeSensitiveItems(SENSITIVE_STORAGE_KEYS);
+    await removeSensitiveItems(
+      preserveTrustedDevice
+        ? SENSITIVE_STORAGE_KEYS.filter((key) => !TRUSTED_DEVICE_STORAGE_KEYS.includes(key))
+        : SENSITIVE_STORAGE_KEYS,
+    );
     await AsyncStorage.multiRemove([
       "currentUser",
       "isNewRegistration",
@@ -724,7 +753,10 @@ async verifyCredentials(email, password) {
       body: { email, password },
     });
     
-    const trustedDevice = await this.isTrustedDeviceActive();
+    const trustedDevice = await this.isTrustedDeviceActive(
+      loginResponse.user,
+      loginResponse.token,
+    );
     // Check if user is pending
     if (loginResponse.user?.status === 'pending') {
       return {
@@ -1109,23 +1141,28 @@ async verifyCredentials(email, password) {
     }
   }
 
-  async trustDevice() {
+  async trustDevice(user) {
     try {
-      await setSensitiveItem('trustedDevice', 'true');
-      await setSensitiveItem('trustedUntil', String(Date.now() + TRUST_DEVICE_DURATION_MS));
+      const userId = String(user?._id || user?.id || user?.userId || "").trim();
       const token = await this.getToken();
-      if (token) {
-        try {
-          const response = await this.fetch("/auth/trust-device", { method: "POST" });
-          if (response?.trustedDeviceToken) {
-            await setSensitiveItem("trustedDeviceToken", response.trustedDeviceToken);
-          }
-        } catch (error) {
-          logApiDebug("Server trust-device registration failed; keeping local trust state.", error);
-        }
+      if (!userId || !token) {
+        throw new Error("A signed-in user is required to trust this device.");
       }
+
+      const response = await this.fetch("/auth/trust-device", { method: "POST" });
+      if (!response?.trustedDeviceToken) {
+        throw new Error("The server did not create a trusted-device token.");
+      }
+
+      await Promise.all([
+        setSensitiveItem("trustedDevice", "true"),
+        setSensitiveItem("trustedUntil", String(Date.now() + TRUST_DEVICE_DURATION_MS)),
+        setSensitiveItem("trustedDeviceToken", response.trustedDeviceToken),
+        setSensitiveItem("trustedDeviceUserId", userId),
+      ]);
       return { success: true };
     } catch (error) {
+      await this.clearTrustedDevice();
       logApiDebug("Trust device error:", error);
       return { success: false };
     }
