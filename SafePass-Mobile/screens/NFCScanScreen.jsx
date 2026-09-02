@@ -67,6 +67,7 @@ const ACTION_OPTIONS = [
 
 const ALLOWED_ROLES = new Set(["admin", "security", "guard", "staff"]);
 const STATION_EVENTS_STORAGE_KEY = "safepass:nfc-scan:station-events:v1";
+const STATION_FEED_CLEARED_AT_STORAGE_KEY = "safepass:nfc-scan:station-feed-cleared-at:v1";
 const STATION_READER_CHECKPOINT_KEY = "safepass:nfc-scan:reader-checkpoint:v1";
 const STATION_FEED_PAGE_SIZE = 6;
 const MAX_STATION_EVENTS = 100;
@@ -121,11 +122,39 @@ const triggerTapFeedback = async (type = "success") => {
   await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 };
 
+const readStoredStationFeedClearedAt = () => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return "";
+  try {
+    const value = String(window.localStorage.getItem(STATION_FEED_CLEARED_AT_STORAGE_KEY) || "").trim();
+    return Number.isNaN(new Date(value).getTime()) ? "" : value;
+  } catch (error) {
+    return "";
+  }
+};
+
+const writeStoredStationFeedClearedAt = (value = "") => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
+  try {
+    if (value) {
+      window.localStorage.setItem(STATION_FEED_CLEARED_AT_STORAGE_KEY, value);
+      return;
+    }
+    window.localStorage.removeItem(STATION_FEED_CLEARED_AT_STORAGE_KEY);
+  } catch (error) {
+    // The feed can still work during this browser session if storage is unavailable.
+  }
+};
+
 const readStoredStationEvents = () => {
   if (Platform.OS !== "web" || typeof window === "undefined") return [];
   try {
     const parsed = JSON.parse(window.localStorage.getItem(STATION_EVENTS_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_STATION_EVENTS) : [];
+    const clearedAt = new Date(readStoredStationFeedClearedAt()).getTime();
+    return Array.isArray(parsed)
+      ? parsed
+          .filter((event) => !Number.isFinite(clearedAt) || new Date(event?.timestamp || 0).getTime() > clearedAt)
+          .slice(0, MAX_STATION_EVENTS)
+      : [];
   } catch (error) {
     return [];
   }
@@ -437,6 +466,8 @@ export default function NFCScanScreen({ navigation }) {
   const [selectedAction, setSelectedAction] = useState("auto");
   const [cardId, setCardId] = useState("");
   const [stationEvents, setStationEvents] = useState(() => readStoredStationEvents());
+  const [stationFeedClearedAt, setStationFeedClearedAt] = useState(() => readStoredStationFeedClearedAt());
+  const [stationFeedRefreshing, setStationFeedRefreshing] = useState(false);
   const [stationFeedPage, setStationFeedPage] = useState(1);
   const [latestResult, setLatestResult] = useState(null);
   const [mobileNfcStatus, setMobileNfcStatus] = useState({
@@ -786,38 +817,48 @@ export default function NFCScanScreen({ navigation }) {
   };
 
   const clearStationFeed = () => {
+    const clearedAt = new Date().toISOString();
     writeStoredStationEvents([]);
+    writeStoredStationFeedClearedAt(clearedAt);
     setStationEvents([]);
+    setStationFeedClearedAt(clearedAt);
     setStationFeedPage(1);
     setLatestResult(null);
   };
 
   const refreshStationFeed = async () => {
     if (!isOperatorAllowed) return;
-    const response = await ApiService.getAccessLogs(1, MAX_STATION_EVENTS, { all: true });
-    const serverEvents = (Array.isArray(response?.accessLogs) ? response.accessLogs : [])
-      .filter((log) => isStationAccessLog(log, getCheckpointDeviceId(selectedCheckpoint)))
-      .map(buildStationEventFromLog);
+    setStationFeedRefreshing(true);
+    try {
+      const response = await ApiService.getAccessLogs(1, MAX_STATION_EVENTS, { all: true });
+      const clearedAt = new Date(stationFeedClearedAt).getTime();
+      const serverEvents = (Array.isArray(response?.accessLogs) ? response.accessLogs : [])
+        .filter((log) => isStationAccessLog(log, getCheckpointDeviceId(selectedCheckpoint)))
+        .map(buildStationEventFromLog)
+        .filter((event) => !Number.isFinite(clearedAt) || new Date(event?.timestamp || 0).getTime() > clearedAt);
 
-    if (!serverEvents.length) return;
+      if (!serverEvents.length) return;
 
-    setStationEvents((currentEvents) => {
-      const existingEvents = [...currentEvents];
-      serverEvents.forEach((event) => {
-        const isAlreadyStored = existingEvents.some((storedEvent) => {
-          const sameSignature = getStationEventSignature(storedEvent) === getStationEventSignature(event);
-          const storedTime = new Date(storedEvent?.timestamp || 0).getTime();
-          const eventTime = new Date(event?.timestamp || 0).getTime();
-          return sameSignature && Math.abs(storedTime - eventTime) < 60000;
+      setStationEvents((currentEvents) => {
+        const existingEvents = [...currentEvents];
+        serverEvents.forEach((event) => {
+          const isAlreadyStored = existingEvents.some((storedEvent) => {
+            const sameSignature = getStationEventSignature(storedEvent) === getStationEventSignature(event);
+            const storedTime = new Date(storedEvent?.timestamp || 0).getTime();
+            const eventTime = new Date(event?.timestamp || 0).getTime();
+            return sameSignature && Math.abs(storedTime - eventTime) < 60000;
+          });
+          if (!isAlreadyStored) existingEvents.push(event);
         });
-        if (!isAlreadyStored) existingEvents.push(event);
+        const nextEvents = existingEvents
+          .sort((first, second) => new Date(second?.timestamp || 0) - new Date(first?.timestamp || 0))
+          .slice(0, MAX_STATION_EVENTS);
+        writeStoredStationEvents(nextEvents);
+        return nextEvents;
       });
-      const nextEvents = existingEvents
-        .sort((first, second) => new Date(second?.timestamp || 0) - new Date(first?.timestamp || 0))
-        .slice(0, MAX_STATION_EVENTS);
-      writeStoredStationEvents(nextEvents);
-      return nextEvents;
-    });
+    } finally {
+      setStationFeedRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -825,7 +866,7 @@ export default function NFCScanScreen({ navigation }) {
     refreshStationFeed().catch(() => {
       // The current device feed remains available from local storage when offline.
     });
-  }, [loading, isOperatorAllowed, selectedCheckpointKey]);
+  }, [loading, isOperatorAllowed, selectedCheckpointKey, stationFeedClearedAt]);
 
   const focusReader = () => {
     globalThis.requestAnimationFrame?.(() => cardInputRef.current?.focus?.());
@@ -1615,11 +1656,18 @@ export default function NFCScanScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.refreshFeedButton}
                 onPress={() => refreshStationFeed().catch(() => {})}
+                disabled={stationFeedRefreshing}
                 accessibilityRole="button"
                 accessibilityLabel="Refresh station feed"
               >
-                <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
-                <Text style={styles.refreshFeedButtonText}>Refresh</Text>
+                {stationFeedRefreshing ? (
+                  <ActivityIndicator size="small" color="#0A3D91" />
+                ) : (
+                  <Ionicons name="refresh-outline" size={15} color="#0A3D91" />
+                )}
+                <Text style={styles.refreshFeedButtonText}>
+                  {stationFeedRefreshing ? "Refreshing" : "Refresh"}
+                </Text>
               </TouchableOpacity>
               {stationEvents.length ? (
                 <TouchableOpacity style={styles.clearFeedButton} onPress={clearStationFeed}>
