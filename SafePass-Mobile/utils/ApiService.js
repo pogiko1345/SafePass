@@ -52,25 +52,33 @@ const WEB_FALLBACK_API_BASE_URL = (() => {
   return DEPLOYED_API_BASE_URL;
 })();
 
-const DEFAULT_API_BASE_URL = Platform.select({
-  ios: DEPLOYED_API_BASE_URL,
-  android: DEPLOYED_API_BASE_URL,
-  web: WEB_FALLBACK_API_BASE_URL,
-  default: DEPLOYED_API_BASE_URL,
-});
+const API_MODE = String(
+  process.env.EXPO_PUBLIC_API_MODE || process.env.NODE_ENV || "production",
+).toLowerCase();
+const API_BASE_URL = String(process.env.EXPO_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
 
-const API_BASE_URL = (
-  process.env.EXPO_PUBLIC_API_BASE_URL ||
-  DEFAULT_API_BASE_URL
-).replace(/\/$/, "");
+// Playwright sets this explicitly. In that mode, never try the deployed
+// fallback URL: a missing local backend must fail the test rather than touch production.
+const E2E_LOCAL_ONLY = process.env.EXPO_PUBLIC_E2E_LOCAL_ONLY === "true";
+const isE2eSafeLocalApiUrl = (baseUrl) => {
+  try {
+    const hostname = new URL(String(baseUrl)).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+};
 
-const API_BASE_URL_CANDIDATES = [
-  API_BASE_URL,
-  WEB_FALLBACK_API_BASE_URL,
-  process.env.EXPO_PUBLIC_API_LAN_BASE_URL,
-  getExpoDevServerApiBaseUrl(),
-  DEPLOYED_API_BASE_URL,
-]
+if (!API_BASE_URL) {
+  throw new Error("SafePass API configuration is missing: set EXPO_PUBLIC_API_BASE_URL.");
+}
+if ((E2E_LOCAL_ONLY || API_MODE === "test" || API_MODE === "development") && !isE2eSafeLocalApiUrl(API_BASE_URL)) {
+  throw new Error(
+    `SafePass ${E2E_LOCAL_ONLY ? "E2E" : API_MODE} API configuration must use localhost or 127.0.0.1.`,
+  );
+}
+
+const API_BASE_URL_CANDIDATES = [API_BASE_URL]
   .filter(Boolean)
   .map((baseUrl) => String(baseUrl).replace(/\/$/, ""));
 
