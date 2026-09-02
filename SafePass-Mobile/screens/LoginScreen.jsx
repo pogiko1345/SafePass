@@ -28,7 +28,6 @@ import { useAviationTransition } from "../utils/AviationTransitionContext";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import ApiService from "../utils/ApiService";
-import * as FacebookAuth from 'expo-auth-session/providers/facebook';
 import * as GoogleSignIn from 'expo-auth-session/providers/google';
 import Constants from 'expo-constants';
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
@@ -196,15 +195,10 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
   const [webBiometricUsername, setWebBiometricUsername] = useState("");
   const [isWebAuthnAvailable, setIsWebAuthnAvailable] = useState(false);
   const googleClientId = Constants.expoConfig?.extra?.googleClientId;
-  const facebookAppId = Constants.expoConfig?.extra?.facebookAppId;
   const [googleRequest, , promptGoogleSignIn] = GoogleSignIn.useIdTokenAuthRequest({
     webClientId: googleClientId,
     iosClientId: googleClientId,
     androidClientId: googleClientId,
-  });
-  const [facebookRequest, , promptFacebookSignIn] = FacebookAuth.useAuthRequest({
-    clientId: facebookAppId,
-    scopes: ["public_profile", "email"],
   });
   const [socialLoginProvider, setSocialLoginProvider] = useState("");
   const [socialLoginHover, setSocialLoginHover] = useState("");
@@ -1438,31 +1432,6 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
       setSocialLoginProvider("");
     }
   };
-  const handleFacebookSignIn = async () => {
-    if (!facebookAppId || facebookAppId === "YOUR_FACEBOOK_APP_ID") {
-      Alert.alert("Facebook Sign-In", "Facebook Sign-In is not configured yet.");
-      return;
-    }
-    if (!facebookRequest) {
-      Alert.alert("Facebook Sign-In", "Facebook Sign-In is still loading. Please try again.");
-      return;
-    }
-
-    try {
-      setSocialLoginProvider("facebook");
-      setLoginError("");
-      const result = await promptFacebookSignIn();
-      if (result.type !== "success") return;
-
-      const accessToken = result.params?.access_token || result.authentication?.accessToken;
-      if (!accessToken) throw new Error("Facebook did not return an access token.");
-      await completeSocialLogin(await ApiService.facebookLogin(accessToken));
-    } catch (error) {
-      setLoginError(error?.message || "Unable to sign in with Facebook. Please try again.");
-    } finally {
-      setSocialLoginProvider("");
-    }
-  };
   const socialLinks = [
     {
       label: "Facebook",
@@ -2318,47 +2287,9 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                         )}
                         <Text style={{ color: brandColors.text, fontSize: 13, fontWeight: "800" }}>Google</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={{
-                          flex: 1,
-                          minHeight: 46,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 7,
-                          borderWidth: 1,
-                          borderColor: socialLoginHover === "facebook" ? "#1877F2" : "#CBD5E1",
-                          borderRadius: 8,
-                          backgroundColor: socialLoginHover === "facebook" ? "#F1F7FF" : brandColors.surface,
-                          opacity: socialLoginProvider && socialLoginProvider !== "facebook" ? 0.55 : 1,
-                          transform: [{ translateY: socialLoginHover === "facebook" ? -2 : 0 }],
-                          shadowColor: "#0F172A",
-                          shadowOpacity: socialLoginHover === "facebook" ? 0.12 : 0,
-                          shadowRadius: 7,
-                          shadowOffset: { width: 0, height: 3 },
-                          elevation: socialLoginHover === "facebook" ? 2 : 0,
-                        }}
-                        onPress={handleFacebookSignIn}
-                        disabled={Boolean(socialLoginProvider) || transitionBusy}
-                        accessibilityRole="button"
-                        accessibilityLabel="Sign in with Facebook"
-                        {...(isWeb && {
-                          onMouseEnter: () => setSocialLoginHover("facebook"),
-                          onMouseLeave: () => setSocialLoginHover(""),
-                          onKeyPress: (e) => handleKeyPress(e, handleFacebookSignIn),
-                          tabIndex: 0,
-                        })}
-                      >
-                        {socialLoginProvider === "facebook" ? (
-                          <ActivityIndicator size="small" color="#1877F2" />
-                        ) : (
-                          <Ionicons name="logo-facebook" size={19} color="#1877F2" />
-                        )}
-                        <Text style={{ color: brandColors.text, fontSize: 13, fontWeight: "800" }}>Facebook</Text>
-                      </TouchableOpacity>
                     </View>
                     <Text style={{ textAlign: "center", color: brandColors.textMuted, fontSize: 11, lineHeight: 16, marginTop: 9 }}>
-                      Only accounts already connected to SafePass can use these options.
+                      Only accounts already connected to SafePass can use this option.
                     </Text>
                   </View>
 

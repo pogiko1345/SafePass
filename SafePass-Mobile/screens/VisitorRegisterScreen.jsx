@@ -30,11 +30,10 @@ import {
 import { useAviationTransition } from "../utils/AviationTransitionContext";
 import { makeRedirectUri } from "expo-auth-session";
 import * as GoogleSignIn from "expo-auth-session/providers/google";
-import * as FacebookAuth from "expo-auth-session/providers/facebook";
 import Constants from "expo-constants";
 
 const VISITOR_SOCIAL_SIGNUP_REDIRECT_URI =
-  Platform.OS === "web" ? makeRedirectUri({ path: "visitor-register" }) : undefined;
+  Platform.OS === "web" ? makeRedirectUri() : undefined;
 
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({
@@ -558,16 +557,10 @@ export default function VisitorRegisterScreen({ navigation, route }) {
   const [socialSignupBusy, setSocialSignupBusy] = useState("");
   const [socialSignupNotice, setSocialSignupNotice] = useState(null);
   const googleClientId = Constants.expoConfig?.extra?.googleClientId;
-  const facebookAppId = Constants.expoConfig?.extra?.facebookAppId;
   const [googleRequest, , promptGoogleSignUp] = GoogleSignIn.useIdTokenAuthRequest({
     webClientId: googleClientId,
     iosClientId: googleClientId,
     androidClientId: googleClientId,
-    redirectUri: VISITOR_SOCIAL_SIGNUP_REDIRECT_URI,
-  });
-  const [facebookRequest, , promptFacebookSignUp] = FacebookAuth.useAuthRequest({
-    clientId: facebookAppId,
-    scopes: ["public_profile", "email"],
     redirectUri: VISITOR_SOCIAL_SIGNUP_REDIRECT_URI,
   });
   const screenFadeAnim = useRef(new Animated.Value(0.96)).current;
@@ -1030,29 +1023,24 @@ export default function VisitorRegisterScreen({ navigation, route }) {
     setSocialSignup({ provider, signupToken: response.signupToken });
     setSocialSignupNotice({
       type: "connected",
-      message: `${provider === "google" ? "Google" : "Facebook"} is connected. Your account has not been created yet—add a username and contact number, then continue to create your account and verify it before signing in.`,
+      message: "Google is connected. Your account has not been created yet—add a username and contact number, then continue to create your account and verify it before signing in.",
     });
     setErrors((previous) => ({ ...previous, fullName: "", email: "", password: "", confirmPassword: "" }));
     setCompletedFields((previous) => ({ ...previous, fullName: true, email: true }));
   };
 
-  const handleSocialSignup = async (provider) => {
-    const isGoogle = provider === "google";
-    const request = isGoogle ? googleRequest : facebookRequest;
-    const clientId = isGoogle ? googleClientId : facebookAppId;
-    if (!clientId || !request) {
-      Alert.alert("Sign-up not ready", `${isGoogle ? "Google" : "Facebook"} sign-up is still loading. Please try again.`);
+  const handleGoogleSignup = async () => {
+    if (!googleClientId || !googleRequest) {
+      Alert.alert("Sign-up not ready", "Google sign-up is still loading. Please try again.");
       return;
     }
     try {
-      setSocialSignupBusy(provider);
-      const result = await (isGoogle ? promptGoogleSignUp() : promptFacebookSignUp());
+      setSocialSignupBusy("google");
+      const result = await promptGoogleSignUp();
       if (result.type !== "success") return;
-      const token = isGoogle
-        ? result.params?.id_token || result.authentication?.idToken
-        : result.params?.access_token || result.authentication?.accessToken;
-      if (!token) throw new Error(`${isGoogle ? "Google" : "Facebook"} did not return an account token.`);
-      applySocialSignupProfile(provider, await ApiService.getSocialSignupProfile(provider, token));
+      const token = result.params?.id_token || result.authentication?.idToken;
+      if (!token) throw new Error("Google did not return an account token.");
+      applySocialSignupProfile("google", await ApiService.getSocialSignupProfile("google", token));
     } catch (error) {
       Alert.alert("Unable to connect account", error?.message || "Please try again or use the standard visitor form.");
     } finally {
@@ -1674,29 +1662,21 @@ export default function VisitorRegisterScreen({ navigation, route }) {
                   FASTER VISITOR SIGN-UP
                 </Text>
                 <Text style={{ textAlign: "center", color: "#64748B", fontSize: 11, lineHeight: 15, marginBottom: 8 }}>
-                  Connect Google or Facebook to fill your verified name and email. You will still add a username and contact number.
+                  Connect Google to fill your verified name and email. You will still add a username and contact number.
                 </Text>
                 <View style={{ flexDirection: isCompactRegister ? "column" : "row", gap: 9 }}>
                   <TouchableOpacity
                     style={{ flex: 1, minHeight: 38, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 7, backgroundColor: "#FFFFFF", opacity: socialSignupBusy && socialSignupBusy !== "google" ? 0.55 : 1 }}
-                    onPress={() => handleSocialSignup("google")}
+                    onPress={handleGoogleSignup}
                     disabled={Boolean(socialSignupBusy) || isSubmitting}
                   >
                     {socialSignupBusy === "google" ? <ActivityIndicator size="small" color="#DB4437" /> : <Ionicons name="logo-google" size={16} color="#DB4437" />}
                     <Text style={{ color: "#1E293B", fontSize: 12, fontWeight: "800" }}>Google</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{ flex: 1, minHeight: 38, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 7, backgroundColor: "#FFFFFF", opacity: socialSignupBusy && socialSignupBusy !== "facebook" ? 0.55 : 1 }}
-                    onPress={() => handleSocialSignup("facebook")}
-                    disabled={Boolean(socialSignupBusy) || isSubmitting}
-                  >
-                    {socialSignupBusy === "facebook" ? <ActivityIndicator size="small" color="#1877F2" /> : <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
-                    <Text style={{ color: "#1E293B", fontSize: 12, fontWeight: "800" }}>Facebook</Text>
-                  </TouchableOpacity>
                 </View>
                 {socialSignup ? (
                   <Text style={{ textAlign: "center", color: "#15803D", fontSize: 11, fontWeight: "700", marginTop: 7 }}>
-                    {socialSignup.provider === "google" ? "Google" : "Facebook"} will be connected to this visitor account.
+                    Google will be connected to this visitor account.
                   </Text>
                 ) : null}
                 {socialSignupNotice ? (

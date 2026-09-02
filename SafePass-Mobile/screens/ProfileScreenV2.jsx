@@ -25,7 +25,6 @@ import * as ImagePicker from "expo-image-picker";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import * as GoogleSignIn from "expo-auth-session/providers/google";
-import * as FacebookAuth from "expo-auth-session/providers/facebook";
 import Constants from "expo-constants";
 import ApiService from "../utils/ApiService";
 import {
@@ -110,15 +109,10 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [socialLinkBusy, setSocialLinkBusy] = useState("");
   const googleClientId = Constants.expoConfig?.extra?.googleClientId;
-  const facebookAppId = Constants.expoConfig?.extra?.facebookAppId;
   const [googleRequest, , promptGoogleLink] = GoogleSignIn.useIdTokenAuthRequest({
     webClientId: googleClientId,
     iosClientId: googleClientId,
     androidClientId: googleClientId,
-  });
-  const [facebookRequest, , promptFacebookLink] = FacebookAuth.useAuthRequest({
-    clientId: facebookAppId,
-    scopes: ["public_profile", "email"],
   });
 
   useEffect(() => {
@@ -894,23 +888,18 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
     </View>
   );
 
-  const handleSocialLink = async (provider) => {
-    const isGoogle = provider === "google";
-    const request = isGoogle ? googleRequest : facebookRequest;
-    const clientId = isGoogle ? googleClientId : facebookAppId;
-    if (!clientId || !request) {
-      Alert.alert("Connection not ready", `${isGoogle ? "Google" : "Facebook"} is still loading. Please try again.`);
+  const handleGoogleLink = async () => {
+    if (!googleClientId || !googleRequest) {
+      Alert.alert("Connection not ready", "Google is still loading. Please try again.");
       return;
     }
     try {
-      setSocialLinkBusy(provider);
-      const result = await (isGoogle ? promptGoogleLink() : promptFacebookLink());
+      setSocialLinkBusy("google");
+      const result = await promptGoogleLink();
       if (result.type !== "success") return;
-      const token = isGoogle
-        ? result.params?.id_token || result.authentication?.idToken
-        : result.params?.access_token || result.authentication?.accessToken;
+      const token = result.params?.id_token || result.authentication?.idToken;
       if (!token) throw new Error("The provider did not return an account token.");
-      const proof = await ApiService.getSocialSignupProfile(provider, token, "account_link");
+      const proof = await ApiService.getSocialSignupProfile("google", token, "account_link");
       const response = await ApiService.linkSocialAccount(proof.signupToken);
       if (!response?.success || !response?.user) throw new Error(response?.message || "Unable to connect this account.");
       const updated = { ...DEFAULT_PROFILE, ...profile, ...response.user };
@@ -973,19 +962,11 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
           <TouchableOpacity
             style={[styles.secondaryBtn, { flex: 1, minWidth: 170, borderColor: currentProfile.googleId ? "#86EFAC" : "#CBD5E1" }]}
-            onPress={() => handleSocialLink("google")}
+            onPress={handleGoogleLink}
             disabled={Boolean(socialLinkBusy)}
           >
             {socialLinkBusy === "google" ? <ActivityIndicator size="small" color="#DB4437" /> : <Ionicons name="logo-google" size={18} color="#DB4437" />}
             <Text style={styles.secondaryBtnText}>{currentProfile.googleId ? "Google connected" : "Connect Google"}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.secondaryBtn, { flex: 1, minWidth: 170, borderColor: currentProfile.facebookId ? "#86EFAC" : "#CBD5E1" }]}
-            onPress={() => handleSocialLink("facebook")}
-            disabled={Boolean(socialLinkBusy)}
-          >
-            {socialLinkBusy === "facebook" ? <ActivityIndicator size="small" color="#1877F2" /> : <Ionicons name="logo-facebook" size={18} color="#1877F2" />}
-            <Text style={styles.secondaryBtnText}>{currentProfile.facebookId ? "Facebook connected" : "Connect Facebook"}</Text>
           </TouchableOpacity>
         </View>
       </View>
