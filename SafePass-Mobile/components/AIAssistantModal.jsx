@@ -148,7 +148,7 @@ export default function AIAssistantModal({ visible, onClose, onFillForm, current
     <Modal
       visible={visible}
       transparent
-      animationType="none"
+      animationType="none" Scott scroll up no chicken cristianes really thousand they red new plots times
       onRequestClose={onClose}
     >
       <Animated.View style={[aiAssistantStyles.modalOverlay, { opacity: fadeAnim }]}>
