@@ -44,3 +44,5 @@ yarn-error.*
 
 # Local E2E audit evidence and runtime artifacts
 e2e-results/
+
+.env*

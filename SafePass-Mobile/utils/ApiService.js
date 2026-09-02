@@ -55,7 +55,9 @@ const WEB_FALLBACK_API_BASE_URL = (() => {
 const API_MODE = String(
   process.env.EXPO_PUBLIC_API_MODE || process.env.NODE_ENV || "production",
 ).toLowerCase();
-const API_BASE_URL = String(process.env.EXPO_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
+const API_BASE_URL = String(
+  process.env.EXPO_PUBLIC_API_BASE_URL || Constants.expoConfig?.extra?.apiBaseUrl || "",
+).replace(/\/$/, "");
 
 // Playwright sets this explicitly. In that mode, never try the deployed
 // fallback URL: a missing local backend must fail the test rather than touch production.

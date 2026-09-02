@@ -37,6 +37,7 @@ module.exports = ({ config }) => {
     slug: isVisitorBuild ? "safepass-visitor" : expoConfig.slug,
     extra: {
       ...(expoConfig.extra || {}),
+      apiBaseUrl: String(process.env.EXPO_PUBLIC_API_BASE_URL || "").trim(),
       appVariant: variant,
       appDisplayName: appName,
       appOrganization: "Sapphire International Aviation Academy",
