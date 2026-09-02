@@ -41,3 +41,6 @@ yarn-error.*
 
 .vercel
 .env*.local
+
+# Local E2E audit evidence and runtime artifacts
+e2e-results/

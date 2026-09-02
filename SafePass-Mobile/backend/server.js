@@ -3831,6 +3831,12 @@ app.post(
           tapAction === "entry" ||
           tapAction === "exit" ||
           (tapAction === "auto" && isMainGateTap);
+        if (isExplicitCheckoutTap && !hasOpenAttendance && isMainGateTap) {
+          return res.status(400).json({
+            success: false,
+            message: "Cannot check out because there is no active attendance check-in.",
+          });
+        }
         const shouldCheckOut =
           hasOpenAttendance &&
           tapAction !== "location" &&

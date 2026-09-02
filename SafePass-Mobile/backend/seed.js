@@ -4,6 +4,11 @@ require('dotenv').config();
 
 // Connect to MongoDB
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/sapphire_aviation';
+const isLocalUri = /^mongodb:\/\/(localhost|127\.0\.0\.1)(:|\/)/i.test(MONGODB_URI);
+const isTestDatabase = /(?:test|dev|e2e)/i.test(MONGODB_URI);
+if (process.env.NODE_ENV === 'production' || !isLocalUri || !isTestDatabase || process.env.ALLOW_DESTRUCTIVE_TEST_SEED !== 'true') {
+  throw new Error('Refusing destructive seed: requires non-production NODE_ENV, localhost MongoDB test/dev/e2e database, and ALLOW_DESTRUCTIVE_TEST_SEED=true.');
+}
 
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,

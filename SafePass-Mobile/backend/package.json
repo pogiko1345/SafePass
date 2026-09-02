@@ -7,6 +7,7 @@
     "dev": "nodemon server.js",
     "test": "node tests/securityUtils.test.js && node tests/settingsUtils.test.js && node tests/routes.integration.test.js",
     "seed": "node seed.js",
+    "seed:test-admin": "node scripts/seedTestAdmin.js",
     "audit:roles": "node scripts/auditRoleAccounts.js",
     "seed:students": "node scripts/seedStudents.js",
     "seed:demo-staff": "node scripts/seedDemoStaff.js",

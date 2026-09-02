@@ -1794,7 +1794,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
             {/* Header with Logo */}
             <View style={showDesktopLoginDesign && loginStyles.loginDesktopFrame}>
               {showDesktopLoginDesign ? (
-                <View pointerEvents="none" style={loginStyles.desktopLoginDesign}>
+                <View style={[loginStyles.desktopLoginDesign, { pointerEvents: "none" }]}>
                   <View style={loginStyles.desktopSkyWash} />
                 </View>
               ) : null}

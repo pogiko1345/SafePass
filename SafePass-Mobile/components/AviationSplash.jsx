@@ -123,7 +123,7 @@ export default function AviationSplash({
     ],
   };
   return (
-    <Animated.View pointerEvents="auto" style={[styles.overlay, { opacity: overlayAnim }]}>
+    <Animated.View style={[styles.overlay, { opacity: overlayAnim, pointerEvents: "auto" }]}>
       <View style={styles.content}>
         <Image source={Logo} style={styles.logo} resizeMode="contain" />
         <Text style={styles.eyebrow}>SafePass Smart Campus</Text>
