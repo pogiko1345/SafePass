@@ -518,6 +518,8 @@ export default function NFCScanScreen({ navigation }) {
   const latestTone = useMemo(() => getResultTone(latestResult), [latestResult]);
   const isCompactStation = viewportWidth < 820;
   const isNarrowStation = viewportWidth < 520;
+  const isMobileNfcStation = Platform.OS !== "web";
+  const scannerLabel = isMobileNfcStation ? "Phone NFC" : "USB Reader";
   const stationFeedTotalPages = useMemo(
     () => Math.max(1, Math.ceil(stationEvents.length / STATION_FEED_PAGE_SIZE)),
     [stationEvents.length],
@@ -1112,8 +1114,9 @@ export default function NFCScanScreen({ navigation }) {
                 NFC Tap Console
               </Text>
               <Text style={styles.headerSubtitle}>
-                Process campus attendance, visitor arrival, departure, and location taps from one
-                dedicated reader station.
+                {isMobileNfcStation
+                  ? "Process campus attendance, visitor arrival, departure, and location taps with this phone's NFC reader."
+                  : "Process campus attendance, visitor arrival, departure, and location taps from one dedicated reader station."}
               </Text>
             </View>
             <View style={styles.headerActions}>
@@ -1212,10 +1215,10 @@ export default function NFCScanScreen({ navigation }) {
                 />
                 <Text style={styles.hardwareBadgeText}>
                   {mobileNfcStatus.enabled
-                    ? "📱 Native NFC Active • Tap Card to Back of Phone"
+                    ? "Phone NFC Active - Tap Card to Back of Phone"
                     : mobileNfcStatus.supported
-                    ? "📱 NFC Disabled on Device"
-                    : "📱 NFC Scanner Ready (Simulated / Wedge)"}
+                    ? "NFC Disabled on Device"
+                    : "NFC Is Not Available on This Phone"}
                 </Text>
               </View>
               {mobileNfcStatus.supported && !mobileNfcStatus.enabled ? (
@@ -1274,7 +1277,7 @@ export default function NFCScanScreen({ navigation }) {
                 <View style={[styles.tapPadStatusPill, { borderColor: latestTone.border }]}>
                   <View style={[styles.tapPadStatusDot, { backgroundColor: latestTone.icon }]} />
                   <Text style={[styles.tapPadStatusText, { color: latestTone.icon }]}>
-                    {busy ? "Reader Processing" : isScanningMobile ? "Native NFC Scanning" : "Reader Armed"}
+                    {busy ? "Processing Tap" : isScanningMobile ? "Phone NFC Scanning" : "Ready to Scan"}
                   </Text>
                 </View>
                 <Text style={[styles.tapPadTimestamp, isNarrowStation && styles.tapPadTimestampCompact]}>
@@ -1323,18 +1326,18 @@ export default function NFCScanScreen({ navigation }) {
             <View style={styles.readerPanel}>
               <View style={[styles.readerPanelHeader, isNarrowStation && styles.readerPanelHeaderCompact]}>
                 <View>
-                  <Text style={styles.readerPanelLabel}>USB Reader</Text>
+                  <Text style={styles.readerPanelLabel}>{scannerLabel}</Text>
                   <Text style={styles.readerPanelTitle}>{describeRfidReaderInput(cardId)}</Text>
                 </View>
                 <TouchableOpacity style={styles.focusButton} onPress={focusReader}>
                   <Ionicons name="locate-outline" size={16} color="#0A3D91" />
-                  <Text style={styles.focusButtonText}>Arm</Text>
+                  <Text style={styles.focusButtonText}>{isMobileNfcStation ? "Enter UID" : "Arm"}</Text>
                 </TouchableOpacity>
               </View>
               <TextInput
                 ref={cardInputRef}
                 style={[styles.cardInput, busy && styles.cardInputBusy]}
-                placeholder="Tap card on USB reader"
+                placeholder={isMobileNfcStation ? "Enter NFC card UID" : "Tap card on USB reader"}
                 placeholderTextColor="#94A3B8"
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -1350,7 +1353,7 @@ export default function NFCScanScreen({ navigation }) {
                 <Text style={styles.readerHintText}>
                   {Platform.OS === "web"
                     ? "This station auto-arms the reader. Tap a card anywhere on this screen."
-                    : "On mobile, paste or type the UID, then process the tap. USB RFID reader taps still appear below."}
+                    : "Hold a 13.56 MHz NFC card near the back of this phone. If needed, enter the card UID manually and process the tap."}
                 </Text>
               </View>
               <View style={[styles.inlineActions, isNarrowStation && styles.inlineActionsCompact]}>
@@ -1528,10 +1531,14 @@ export default function NFCScanScreen({ navigation }) {
               <View style={styles.sectionHeaderRow}>
                 <View>
                   <Text style={styles.sectionTitle}>Checkpoint</Text>
-                  <Text style={styles.sectionSubtitle}>Assign this physical reader to one office.</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    {isMobileNfcStation
+                      ? "Use this phone at the selected checkpoint."
+                      : "Assign this physical reader to one office."}
+                  </Text>
                 </View>
                 <View style={styles.floorCountBadge}>
-                  <Text style={styles.floorCountText}>1 reader</Text>
+                  <Text style={styles.floorCountText}>{isMobileNfcStation ? "This phone" : "1 reader"}</Text>
                 </View>
               </View>
 

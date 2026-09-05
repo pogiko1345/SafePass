@@ -40,7 +40,9 @@ require("dotenv").config();
 
 const app = express();
 const isVercelRuntime = Boolean(process.env.VERCEL);
+const isProductionRuntime = String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
 const sensitiveDebugLoggingEnabled =
+  !isProductionRuntime &&
   String(process.env.ALLOW_SENSITIVE_DEBUG_LOGS || "").trim().toLowerCase() === "true";
 const phoneOtpSmsProviderConfigured = [
   "SEMAPHORE_API_KEY",
@@ -1524,6 +1526,9 @@ const getDatabaseStateName = () => {
 
 let mongoConnectionPromise = global.__safepassMongoConnectionPromise;
 let mongoConnectionError = global.__safepassMongoConnectionError || null;
+let mongoReconnectTimer = null;
+let isShuttingDown = false;
+const MONGO_RECONNECT_DELAY_MS = 5000;
 
 const isTransientMongoNetworkError = (error) => {
   const name = String(error?.name || "");
@@ -1556,6 +1561,10 @@ const connectToDatabase = () => {
     global.__safepassMongoConnectionError = mongoConnectionError;
     console.error(`MongoDB configuration error: ${mongoConnectionError}`);
     return Promise.reject(new Error(mongoConnectionError));
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    return Promise.resolve(mongoose.connection);
   }
 
   if (!mongoConnectionPromise) {
@@ -1592,6 +1601,39 @@ const connectToDatabase = () => {
 
   return mongoConnectionPromise;
 };
+
+const scheduleMongoReconnect = () => {
+  if (
+    isShuttingDown ||
+    process.env.NODE_ENV === "test" ||
+    !MONGODB_URI ||
+    mongoReconnectTimer ||
+    mongoose.connection.readyState === 1 ||
+    mongoose.connection.readyState === 2
+  ) {
+    return;
+  }
+
+  mongoReconnectTimer = setTimeout(() => {
+    mongoReconnectTimer = null;
+    connectToDatabase().catch(() => scheduleMongoReconnect());
+  }, MONGO_RECONNECT_DELAY_MS);
+};
+
+mongoose.connection.on("disconnected", () => {
+  if (isShuttingDown) return;
+
+  mongoConnectionPromise = null;
+  global.__safepassMongoConnectionPromise = null;
+  mongoConnectionError = "MongoDB is disconnected; retrying connection.";
+  global.__safepassMongoConnectionError = mongoConnectionError;
+  scheduleMongoReconnect();
+});
+
+mongoose.connection.on("error", (error) => {
+  mongoConnectionError = error?.message || "Unknown MongoDB connection error";
+  global.__safepassMongoConnectionError = mongoConnectionError;
+});
 
 connectToDatabase().catch(() => {
   // /api/health reports the database state so Render can show the issue clearly.
@@ -9494,9 +9536,10 @@ app.post("/api/logout", authMiddleware, async (req, res) => {
 
 // 10. HEALTH CHECK (Updated)
 app.get("/api/health", (req, res) => {
-  res.json({
-    status: "OK",
-    success: true,
+  const databaseConnected = mongoose.connection.readyState === 1;
+  res.status(databaseConnected ? 200 : 503).json({
+    status: databaseConnected ? "OK" : "DEGRADED",
+    success: databaseConnected,
     database: getDatabaseStateName(),
     databaseConfigured: Boolean(MONGODB_URI),
     databaseError: mongoConnectionError,
@@ -15125,6 +15168,8 @@ if (!isVercelRuntime && require.main === module) {
     else { console.error(error); }
   });
   process.on('SIGINT', () => {
+    isShuttingDown = true;
+    if (mongoReconnectTimer) clearTimeout(mongoReconnectTimer);
     server.close(() => {
       mongoose.connection.close(false, () => process.exit(0));
     });
