@@ -24,8 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
-import * as GoogleSignIn from "expo-auth-session/providers/google";
-import Constants from "expo-constants";
+import useGoogleSignIn from "../utils/useGoogleSignIn";
 import ApiService from "../utils/ApiService";
 import {
   PHILIPPINE_MOBILE_NUMBER_MESSAGE,
@@ -108,12 +107,7 @@ export default function ProfileScreenV2({ navigation, onLogout }) {
   });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [socialLinkBusy, setSocialLinkBusy] = useState("");
-  const googleClientId = Constants.expoConfig?.extra?.googleClientId;
-  const [googleRequest, , promptGoogleLink] = GoogleSignIn.useIdTokenAuthRequest({
-    webClientId: googleClientId,
-    iosClientId: googleClientId,
-    androidClientId: googleClientId,
-  });
+  const { googleClientId, googleRequest, promptGoogleSignIn: promptGoogleLink } = useGoogleSignIn();
 
   useEffect(() => {
     Animated.timing(fadeAnim, {

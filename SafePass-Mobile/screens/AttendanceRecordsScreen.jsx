@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Modal,
   Image,
   RefreshControl,
   ScrollView,
@@ -13,6 +15,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ApiService from "../utils/ApiService";
+import saveCsv from "../utils/saveCsv";
+import { printRecordsTable } from "../utils/printUtils";
+import { ATTENDANCE_COLUMNS, attendanceExportRows, attendanceCsv } from "../utils/attendanceExport";
 
 const SCHOOL_LOGO = require("../assets/LogoSapphire.jpg");
 
@@ -177,29 +182,27 @@ export default function AttendanceRecordsScreen({ navigation }) {
     }
   };
 
-  const exportToCsv = () => {
-    if (!records.length) return;
-    const headers = ["Name", "User Type", "Location", "Status", "Check In", "Check Out", "Last Tap"];
-    const rows = records.map((r) => [
-      `"${r.name || ""}"`,
-      `"${r.userType || ""}"`,
-      `"${r.location || ""}"`,
-      `"${r.status || ""}"`,
-      `"${r.checkInTime ? new Date(r.checkInTime).toISOString() : ""}"`,
-      `"${r.checkOutTime ? new Date(r.checkOutTime).toISOString() : ""}"`,
-      `"${r.lastTapTime ? new Date(r.lastTapTime).toISOString() : ""}"`,
-    ]);
-    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+  const exportToCsv = async () => {
+    if (!records.length) {
+      Alert.alert("No records", "There are no attendance records to export.");
+      return;
+    }
+    try {
+      await saveCsv(attendanceCsv(records), `CentrixMobile_Attendance_${new Date().toISOString().slice(0, 10)}.csv`);
+    } catch (error) {
+      Alert.alert("Export failed", error?.message || "Unable to export attendance records.");
+    }
+  };
 
-    if (typeof window !== "undefined" && window.document) {
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `SafePass_Attendance_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  const printReport = async () => {
+    try {
+      await printRecordsTable({
+        title: "Attendance & Access Records",
+        columns: ATTENDANCE_COLUMNS.map((label, key) => ({ label, key })),
+        rows: attendanceExportRows(records),
+      });
+    } catch (error) {
+      Alert.alert("Print report", error?.message || "Unable to prepare the report.");
     }
   };
 
@@ -248,11 +251,7 @@ export default function AttendanceRecordsScreen({ navigation }) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionBtn}
-            onPress={() => {
-              if (typeof window !== "undefined" && window.print) {
-                window.print();
-              }
-            }}
+            onPress={printReport}
           >
             <Ionicons name="print-outline" size={16} color="#0A3D91" />
             <Text style={styles.actionBtnText}>Print Report</Text>

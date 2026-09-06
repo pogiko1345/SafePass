@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StatusBar,
   Modal,
@@ -28,8 +29,8 @@ import { useAviationTransition } from "../utils/AviationTransitionContext";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import ApiService from "../utils/ApiService";
-import * as GoogleSignIn from 'expo-auth-session/providers/google';
-import Constants from 'expo-constants';
+import useServerConnection from "../utils/useServerConnection";
+import useGoogleSignIn from "../utils/useGoogleSignIn";
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
 import {
   APP_ORGANIZATION_NAME,
@@ -171,7 +172,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loginSplashMessage, setLoginSplashMessage] = useState("Signing you in...");
-  const [apiConnected, setApiConnected] = useState(true);
+  const apiConnected = useServerConnection();
   const [errors, setErrors] = useState({});
   const [loginError, setLoginError] = useState("");
   const [loginSuccessMessage, setLoginSuccessMessage] = useState("");
@@ -194,12 +195,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
   const [webBiometricUserId, setWebBiometricUserId] = useState(null);
   const [webBiometricUsername, setWebBiometricUsername] = useState("");
   const [isWebAuthnAvailable, setIsWebAuthnAvailable] = useState(false);
-  const googleClientId = Constants.expoConfig?.extra?.googleClientId;
-  const [googleRequest, , promptGoogleSignIn] = GoogleSignIn.useIdTokenAuthRequest({
-    webClientId: googleClientId,
-    iosClientId: googleClientId,
-    androidClientId: googleClientId,
-  });
+  const { googleClientId, googleRequest, promptGoogleSignIn: promptGoogleSignIn } = useGoogleSignIn();
   const [socialLoginProvider, setSocialLoginProvider] = useState("");
   const [socialLoginHover, setSocialLoginHover] = useState("");
 
@@ -216,6 +212,16 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
 
   // ============ FORGOT PASSWORD STATES ============
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [recoveryKeyboardVisible, setRecoveryKeyboardVisible] = useState(false);
+  useEffect(() => {
+    if (!showForgotPassword) {
+      setRecoveryKeyboardVisible(false);
+      return undefined;
+    }
+    const show = Keyboard.addListener("keyboardDidShow", () => setRecoveryKeyboardVisible(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setRecoveryKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, [showForgotPassword]);
   const [resetEmail, setResetEmail] = useState("");
   const [resetEmailError, setResetEmailError] = useState("");
   const [resetOtp, setResetOtp] = useState("");
@@ -540,9 +546,6 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
 
   const checkAuthAndConnection = async () => {
     try {
-      const connected = await ApiService.testConnection();
-      setApiConnected(connected);
-
       const authNotice = await Storage.getItem(AUTH_NOTICE_KEY);
       if (authNotice) {
         setLoginError(authNotice);
@@ -1741,7 +1744,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
 
   return (
     <SafeAreaView style={loginStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={brandColors.navy} />
+      <StatusBar barStyle="dark-content" backgroundColor={brandColors.background} />
       
       <KeyboardAvoidingView
         style={loginStyles.container}
@@ -1805,13 +1808,13 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                   <Animated.View style={[
                     loginStyles.statusBadge,
                     {
-                      backgroundColor: apiConnected ? brandColors.success : brandColors.danger,
+                      backgroundColor: apiConnected === null ? brandColors.textMuted : apiConnected ? brandColors.success : brandColors.danger,
                       transform: [{ scale: statusPulseAnim }],
                     },
                   ]}>
                     <View style={loginStyles.statusDot} />
                     <Text style={loginStyles.statusText}>
-                      {apiConnected ? "SERVER CONNECTED" : "SERVER CHECK FAILED"}
+                      {apiConnected === null ? "CHECKING SERVER" : apiConnected ? "SERVER CONNECTED" : "SERVER CHECK FAILED"}
                     </Text>
                   </Animated.View>
                 </View>
@@ -1867,13 +1870,13 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                         <Animated.View style={[
                           loginStyles.loginVisualStatusBadge,
                           {
-                            backgroundColor: apiConnected ? brandColors.success : brandColors.danger,
+                            backgroundColor: apiConnected === null ? brandColors.textMuted : apiConnected ? brandColors.success : brandColors.danger,
                             transform: [{ scale: statusPulseAnim }],
                           },
                         ]}>
                           <View style={loginStyles.statusDot} />
                           <Text style={loginStyles.statusText}>
-                            {apiConnected ? "SERVER CONNECTED" : "SERVER CHECK FAILED"}
+                            {apiConnected === null ? "CHECKING SERVER" : apiConnected ? "SERVER CONNECTED" : "SERVER CHECK FAILED"}
                           </Text>
                         </Animated.View>
                       </View>
@@ -2331,7 +2334,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                 </>
 
                 {/* Server Info - Only when offline */}
-                {!apiConnected && (
+                {apiConnected === false && (
                   <View style={loginStyles.infoBox}>
                     <Ionicons name="information-circle" size={20} color={brandColors.danger} />
                     <Text style={loginStyles.infoText}>
@@ -2375,9 +2378,26 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
           animationType="slide"
           onRequestClose={handleCloseForgotPassword}
         >
-          <View style={loginStyles.modalOverlay}>
+          <KeyboardAvoidingView
+            style={loginStyles.modalOverlay}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
             <View style={[loginStyles.modalContent, forgotModalContentResponsiveStyle]}>
-              <View style={[loginStyles.modalHero, forgotModalHeroResponsiveStyle]}>
+              <ScrollView
+                style={loginStyles.modalBody}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="none"
+              >
+              {recoveryKeyboardVisible && (
+                <View style={loginStyles.modalCompactHeader}>
+                  <Text style={loginStyles.modalCompactTitle}>{resetStepTitle}</Text>
+                  <TouchableOpacity accessibilityLabel="Close password recovery" onPress={handleCloseForgotPassword} style={{ padding: 8 }}>
+                    <Ionicons name="close" size={22} color={brandColors.navy} />
+                  </TouchableOpacity>
+                </View>
+              )}
+              <View style={[loginStyles.modalHero, forgotModalHeroResponsiveStyle, recoveryKeyboardVisible && { display: "none" }]}>
                 <View style={[loginStyles.modalHeroTopRow, forgotModalHeroTopRowResponsiveStyle]}>
                   <View style={[loginStyles.modalBrandBadge, forgotModalBrandBadgeResponsiveStyle]}>
                     <Image
@@ -2433,13 +2453,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                 </View>
               </View>
 
-              <ScrollView
-                style={loginStyles.modalBody}
-                contentContainerStyle={[loginStyles.modalBodyContent, forgotModalBodyContentResponsiveStyle]}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-              >
+              <View style={[loginStyles.modalBodyContent, forgotModalBodyContentResponsiveStyle]}>
                 {resetStep === 1 && (
                   <>
                     <View style={loginStyles.inputBox}>
@@ -2801,9 +2815,10 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                     {resetStep === 1 ? 'Back to Login' : 'Back'}
                   </Text>
                 </TouchableOpacity>
+              </View>
               </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </KeyboardAvoidingView>
 

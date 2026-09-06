@@ -43,7 +43,7 @@ export const APP_VARIANT_LABEL = IS_VISITOR_ONLY_APP ? "Visitor" : "Full";
 const APP_EXTRA = getExpoExtra();
 export const APP_DISPLAY_NAME =
   APP_EXTRA.appDisplayName ||
-  (IS_VISITOR_ONLY_APP ? "SafePass Visitor" : "SafePass Smart Campus");
+  (IS_VISITOR_ONLY_APP ? "SafePass Visitor" : "CentrixMobile");
 export const APP_ORGANIZATION_NAME =
   APP_EXTRA.appOrganization || "Sapphire International Aviation Academy";
 

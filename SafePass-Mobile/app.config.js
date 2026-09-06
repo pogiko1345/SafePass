@@ -1,13 +1,5 @@
 const baseConfig = require("./app.json");
 
-const getGoogleConfig = () => {
-  return {
-    androidClientId: baseConfig.expo?.extra?.googleClientId || '',
-    iosClientId: baseConfig.expo?.extra?.googleClientId || '',
-    webClientId: baseConfig.expo?.extra?.googleClientId || '',
-  };
-};
-
 const normalizeVariant = (value) =>
   String(value || "").toLowerCase().trim() === "visitor" ? "visitor" : "full";
 
@@ -17,7 +9,7 @@ module.exports = ({ config }) => {
   const isVisitorBuild = variant === "visitor";
   const appName = isVisitorBuild
     ? "SafePass Visitor"
-    : expoConfig.name || "Sapphire International Aviation Academy";
+    : expoConfig.name || "CentrixMobile";
   const usesLocalHttpApi = String(
     process.env.EXPO_PUBLIC_API_BASE_URL ||
       process.env.EXPO_PUBLIC_API_LAN_BASE_URL ||

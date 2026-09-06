@@ -4549,12 +4549,12 @@ const loadDashboardData = useCallback(async () => {
     }
 
     setProcessingId("create-user");
+    const normalizedCreateRole = String(newUserData.role || "").toLowerCase();
+    const isAcademicStaffAccount = normalizedCreateRole === "teacher";
 
     try {
       const isSecurityAccount = isSecurityRole(newUserData.role);
-      const normalizedCreateRole = String(newUserData.role || "").toLowerCase();
       const isStudentAccount = normalizedCreateRole === "student";
-      const isAcademicStaffAccount = normalizedCreateRole === "teacher";
       const isAcademicAccessAccount = isStudentAccount || isAcademicStaffAccount;
       
       const userPayload = {

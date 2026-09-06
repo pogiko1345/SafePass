@@ -1723,7 +1723,7 @@ export default StyleSheet.create({
     borderRadius: 24,
     width: "100%",
     maxWidth: 520,
-    minHeight: isSmallPhone ? 420 : 460,
+    flexShrink: 1,
     maxHeight: "92%",
     borderWidth: 1,
     borderColor: "#E6EDF7",
@@ -1877,6 +1877,20 @@ export default StyleSheet.create({
   modalBody: {
     width: "100%",
     flexGrow: 0,
+    flexShrink: 1,
+  },
+  modalCompactHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  modalCompactTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#041E42",
   },
 
   modalBodyContent: {

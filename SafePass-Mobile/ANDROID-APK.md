@@ -1,4 +1,4 @@
-# Live Android APK
+# CentrixMobile live Android APK
 
 The full APK uses `https://safepass-052h.onrender.com/api`. The phone connects
 to Render, and Render connects to MongoDB. Internet access is required; Expo Go,
@@ -18,7 +18,7 @@ rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File S:\SafePass-Mobile
 rtk proxy subst S: /D
 ```
 
-The output is `SafePass-Mobile/dist/SafePass-Full-Live.apk`. Pass
+The output is `SafePass-Mobile/dist/CentrixMobile.apk`. Pass
 `-Variant visitor` to build `SafePass-Visitor-Live.apk` instead.
 
 The script explicitly selects production mode, disables local dotenv loading

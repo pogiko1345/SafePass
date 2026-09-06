@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Sapphire International Aviation Academy",
+    "name": "CentrixMobile",
     "slug": "safepass-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -23,6 +23,7 @@
       }
     },
     "android": {
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/LogoSapphireAppIcon.png",
         "backgroundColor": "#052044"
@@ -63,7 +64,7 @@
     ],
     "extra": {
       "appVariant": "full",
-      "appDisplayName": "Sapphire International Aviation Academy",
+      "appDisplayName": "CentrixMobile",
       "appOrganization": "Sapphire International Aviation Academy",
       "googleClientId": "369133705906-690ch64mj2drgqhk25d7caiia419s7jv.apps.googleusercontent.com",
       "eas": {

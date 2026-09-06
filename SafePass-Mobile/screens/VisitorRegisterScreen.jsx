@@ -29,8 +29,7 @@ import {
 } from "../utils/phoneValidation";
 import { useAviationTransition } from "../utils/AviationTransitionContext";
 import { makeRedirectUri } from "expo-auth-session";
-import * as GoogleSignIn from "expo-auth-session/providers/google";
-import Constants from "expo-constants";
+import useGoogleSignIn from "../utils/useGoogleSignIn";
 
 const VISITOR_SOCIAL_SIGNUP_REDIRECT_URI =
   Platform.OS === "web" ? makeRedirectUri() : undefined;
@@ -556,13 +555,7 @@ export default function VisitorRegisterScreen({ navigation, route }) {
   const [socialSignup, setSocialSignup] = useState(null);
   const [socialSignupBusy, setSocialSignupBusy] = useState("");
   const [socialSignupNotice, setSocialSignupNotice] = useState(null);
-  const googleClientId = Constants.expoConfig?.extra?.googleClientId;
-  const [googleRequest, , promptGoogleSignUp] = GoogleSignIn.useIdTokenAuthRequest({
-    webClientId: googleClientId,
-    iosClientId: googleClientId,
-    androidClientId: googleClientId,
-    redirectUri: VISITOR_SOCIAL_SIGNUP_REDIRECT_URI,
-  });
+  const { googleClientId, googleRequest, promptGoogleSignIn: promptGoogleSignUp } = useGoogleSignIn({ redirectUri: VISITOR_SOCIAL_SIGNUP_REDIRECT_URI });
   const screenFadeAnim = useRef(new Animated.Value(0.96)).current;
   const headerAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
@@ -1454,7 +1447,7 @@ export default function VisitorRegisterScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={visitorRegisterStyles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F4F8FC" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 12}

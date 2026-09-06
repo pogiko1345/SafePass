@@ -28,6 +28,7 @@ try {
 $apkSource = Join-Path $projectDirectory "android\app\build\outputs\apk\$Variant\release\app-$Variant-release.apk"
 $downloadDirectory = Join-Path $projectDirectory 'dist'
 New-Item -ItemType Directory -Path $downloadDirectory -Force | Out-Null
-$apkDestination = Join-Path $downloadDirectory "SafePass-$buildVariant-Live.apk"
+$apkName = if ($Variant -eq 'full') { 'CentrixMobile.apk' } else { 'SafePass-Visitor-Live.apk' }
+$apkDestination = Join-Path $downloadDirectory $apkName
 Copy-Item -LiteralPath $apkSource -Destination $apkDestination -Force
 Write-Output "APK ready: $apkDestination"
