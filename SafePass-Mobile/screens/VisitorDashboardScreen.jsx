@@ -1565,6 +1565,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         const severity = String(notification?.severity || "").toLowerCase();
         const notificationText = `${notification?.title || ""} ${notification?.message || ""}`.toLowerCase();
         const activityType = String(notification?.metadata?.activityType || "").toLowerCase();
+        const isApprovalNotice = [
+          "visitor_registration_approved",
+          "staff_approved_appointment",
+        ].includes(activityType);
 
         return (
           notificationId &&
@@ -1576,7 +1580,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
             notificationText.includes("reported") ||
             activityType === "office_correct_location" ||
             activityType === "visitor_destination_redirected" ||
-            activityType === "visitor_registration_approved"
+            isApprovalNotice
           )
         );
       });
@@ -1589,7 +1593,10 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
       shownVisitorWarningIdsRef.current.add(noticeId);
       const noticeSeverity = String(latestNotice?.severity || latestNotice?.type || "warning").toLowerCase();
       const activityType = String(latestNotice?.metadata?.activityType || "").toLowerCase();
-      const isApprovalNotice = activityType === "visitor_registration_approved";
+      const isApprovalNotice = [
+        "visitor_registration_approved",
+        "staff_approved_appointment",
+      ].includes(activityType);
       const isWarningNotice =
         noticeSeverity === "warning" ||
         noticeSeverity === "high" ||
@@ -1621,7 +1628,7 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
           message:
             latestNotice.message ||
             (isApprovalNotice
-              ? "Your visitor request has been approved."
+              ? "Your appointment has been approved."
               : "Your visitor route has been updated."),
           type: isApprovalNotice ? "success" : "info",
         });
@@ -8418,4 +8425,3 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
     </SafeAreaView>
   );
 }
-
