@@ -9,7 +9,11 @@
         "gradleCommand": ":app:assembleFullRelease"
       },
       "env": {
-        "EXPO_PUBLIC_APP_VARIANT": "full"
+        "EXPO_PUBLIC_APP_VARIANT": "full",
+        "EXPO_PUBLIC_API_MODE": "production",
+        "EXPO_PUBLIC_API_BASE_URL": "https://safepass-052h.onrender.com/api",
+        "EXPO_PUBLIC_ENABLE_DEV_FALLBACK": "false",
+        "EXPO_PUBLIC_E2E_LOCAL_ONLY": "false"
       }
     },
     "visitor-apk": {
@@ -18,7 +22,11 @@
         "gradleCommand": ":app:assembleVisitorRelease"
       },
       "env": {
-        "EXPO_PUBLIC_APP_VARIANT": "visitor"
+        "EXPO_PUBLIC_APP_VARIANT": "visitor",
+        "EXPO_PUBLIC_API_MODE": "production",
+        "EXPO_PUBLIC_API_BASE_URL": "https://safepass-052h.onrender.com/api",
+        "EXPO_PUBLIC_ENABLE_DEV_FALLBACK": "false",
+        "EXPO_PUBLIC_E2E_LOCAL_ONLY": "false"
       }
     },
     "visitor-debug-apk": {
